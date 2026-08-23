@@ -1,0 +1,132 @@
+{
+  "contract_version": "1.0",
+  "records": [
+    {
+      "record_type": "source",
+      "source_id": "S-029",
+      "name": "S-029 contract fixture",
+      "evidence_role": "PRIMARY_OFFICIAL",
+      "product_role": "PREP_CORE",
+      "integration_status": "FIXTURE_ONLY",
+      "created_at": "2026-08-18T06:30:00+08:00"
+    },
+    {
+      "record_type": "collection_run",
+      "collection_run_id": "run-2026-08-18-morning",
+      "slot_date": "2026-08-18",
+      "slot": "MORNING",
+      "timezone": "Asia/Taipei",
+      "scheduled_for": "2026-08-18T06:30:00+08:00",
+      "started_at": "2026-08-18T06:30:01+08:00",
+      "finished_at": "2026-08-18T06:31:00+08:00",
+      "status": "SUCCEEDED"
+    },
+    {
+      "record_type": "source_run",
+      "source_run_id": "source-run-s029-morning",
+      "collection_run_id": "run-2026-08-18-morning",
+      "source_id": "S-029",
+      "attempted_at": "2026-08-18T06:30:02+08:00",
+      "completed_at": "2026-08-18T06:30:50+08:00",
+      "source_health": "PASS",
+      "window_start": "2026-08-17T18:30:00+08:00",
+      "window_end": "2026-08-18T06:30:00+08:00",
+      "window_completeness": "COMPLETE_WITH_ITEMS",
+      "result": "NEW_ITEMS",
+      "item_count": 1,
+      "change_count": 1,
+      "manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "previous_successful_source_run_id": null,
+      "error_code": null,
+      "error_message": null
+    },
+    {
+      "record_type": "raw_item",
+      "raw_item_id": "raw-s029-fixture-v1",
+      "source_run_id": "source-run-s029-morning",
+      "source_id": "S-029",
+      "stable_key": "fixture-project-report",
+      "version_no": 1,
+      "requested_url": "https://example.invalid/s029/fixture",
+      "final_url": "https://example.invalid/s029/fixture",
+      "published_at": "2026-08-18T06:00:00+08:00",
+      "fetched_at": "2026-08-18T06:30:20+08:00",
+      "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "parser_version": "fixture-v1",
+      "snapshot_locator": "fixtures/s029/fixture.json",
+      "supersedes_raw_item_id": null,
+      "is_current": true
+    },
+    {
+      "record_type": "event",
+      "event_id": "event-s029-fixture-v1",
+      "raw_item_id": "raw-s029-fixture-v1",
+      "event_type": "PROJECT_REPORT",
+      "change_type": "NEW",
+      "date_status": "KNOWN",
+      "occurred_at": "2026-08-18T06:00:00+08:00",
+      "detected_at": "2026-08-18T06:30:30+08:00",
+      "previous_event_id": null,
+      "payload": { "fixture": true }
+    },
+    {
+      "record_type": "validation_run",
+      "validation_run_id": "producer-fixture-1",
+      "run_role": "PRODUCER",
+      "model": "fixture-model",
+      "prompt_version": "fixture-prompt-v1",
+      "input_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "decision": "AUTO_PASS",
+      "reason_codes": ["TRACEABLE"],
+      "started_at": "2026-08-18T06:30:31+08:00",
+      "finished_at": "2026-08-18T06:30:35+08:00"
+    },
+    {
+      "record_type": "validation_run",
+      "validation_run_id": "verifier-fixture-1",
+      "run_role": "VERIFIER",
+      "model": "fixture-model",
+      "prompt_version": "fixture-prompt-v1",
+      "input_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "decision": "AUTO_PASS",
+      "reason_codes": ["EVIDENCE_MATCH"],
+      "started_at": "2026-08-18T06:30:36+08:00",
+      "finished_at": "2026-08-18T06:30:40+08:00"
+    },
+    {
+      "record_type": "claim",
+      "claim_id": "claim-s029-fixture-1",
+      "event_id": "event-s029-fixture-v1",
+      "claim_type": "AI_SYNTHESIS",
+      "claim_text": "Synthetic contract fixture; not a live public claim.",
+      "verification_status": "AUTO_PASS",
+      "producer_run_id": "producer-fixture-1",
+      "verifier_run_id": "verifier-fixture-1",
+      "created_at": "2026-08-18T06:30:41+08:00"
+    },
+    {
+      "record_type": "evidence",
+      "evidence_id": "evidence-s029-fixture-1",
+      "claim_id": "claim-s029-fixture-1",
+      "raw_item_id": "raw-s029-fixture-v1",
+      "evidence_type": "OFFICIAL_DOCUMENT",
+      "locator_type": "PDF_PAGE",
+      "locator": "fixture-page-1",
+      "original_url": "https://example.invalid/s029/fixture.pdf",
+      "content_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "created_at": "2026-08-18T06:30:41+08:00"
+    },
+    {
+      "record_type": "gap",
+      "gap_id": "GAP-001",
+      "source_id": null,
+      "related_event_id": null,
+      "title": "Public written reply and post-meeting implementation source",
+      "status": "UNVERIFIED_AFTER_MEETING",
+      "detail": "No systematic public source has been verified; completion must not be inferred.",
+      "first_observed_at": "2026-08-14T00:00:00+08:00",
+      "last_checked_at": "2026-08-18T06:30:00+08:00",
+      "resolved_at": null
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "task-verification",
+      "description": "Rerun the deterministic quick gate before a Kiro agent turn is considered finished.",
+      "trigger": "Stop",
+      "action": {
+        "type": "command",
+        "command": "node scripts/verify-project.mjs quick"
+      },
+      "timeout": 120
+    }
+  ]
+}

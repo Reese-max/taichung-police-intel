@@ -1,0 +1,104 @@
+name: Refresh and deploy competition demo
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "30 22 * * *"
+    - cron: "30 10 * * *"
+  workflow_dispatch:
+    inputs:
+      slot:
+        description: Demo refresh slot
+        required: true
+        type: choice
+        options: [morning, evening]
+        default: evening
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: competition-demo-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select scheduled slot
+        if: github.event_name != 'push'
+        id: slot
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "value=${{ inputs.slot }}" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.event.schedule }}" == "30 22 * * *" ]]; then
+            echo "value=morning" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=evening" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Python
+        if: github.event_name != 'push'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Refresh official-source status
+        if: github.event_name != 'push'
+        run: |
+          python -m pip install -r requirements.txt
+          python online_collect.py --slot "${{ steps.slot.outputs.value }}" --demo-output apps/web/public/data/source-status.json --trigger "${{ github.event_name == 'schedule' && 'schedule' || 'manual' }}"
+
+      - name: Preserve refresh evidence
+        if: github.event_name != 'push'
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- apps/web/public/data/source-status.json
+          git diff --cached --quiet || git commit -m "data: refresh ${{ steps.slot.outputs.value }} source status"
+          git push
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - name: Install web dependencies
+        run: npm ci --prefix apps/web
+
+      - name: Setup Pages
+        id: pages
+        uses: actions/configure-pages@v5
+
+      - name: Build static competition demo
+        run: npm --prefix apps/web run build
+        env:
+          PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
+          NEXT_PUBLIC_BASE_PATH: ${{ steps.pages.outputs.base_path }}
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/web/out
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

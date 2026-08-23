@@ -1,0 +1,25 @@
+node_modules/
+.next/
+out/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+*.log
+.gstack/
+
+# Internal Chinese planning documents excluded from public submission
+daily-five-minute-homepage-sample-2026-08-13.md
+hackathon-implementation-plan-v3.md
+hackathon-master-roadmap-v4.md
+source-catalog.md
+source-seven-day-audit-2026-08-14.md
+.runtime/
+graphify-out/
+coverage/
+*.pre-sequential-fix-*.csv
+.DS_Store
+Thumbs.db

@@ -1,0 +1,16 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "check-on-save",
+      "description": "Run repository structure, web, evidence-contract, and self-check gates after relevant files change.",
+      "trigger": "PostFileSave",
+      "matcher": "\\.(css|js|json|md|mjs|py)$",
+      "action": {
+        "type": "command",
+        "command": "node scripts/verify-project.mjs quick"
+      },
+      "timeout": 120
+    }
+  ]
+}

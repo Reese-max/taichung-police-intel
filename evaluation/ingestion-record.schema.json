@@ -1,0 +1,336 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:taichung-police-intel:ingestion-records:1.0",
+  "title": "Ingestion and provenance record bundle",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract_version", "records"],
+  "properties": {
+    "contract_version": { "const": "1.0" },
+    "records": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "oneOf": [
+          { "$ref": "#/$defs/source" },
+          { "$ref": "#/$defs/collectionRun" },
+          { "$ref": "#/$defs/sourceRun" },
+          { "$ref": "#/$defs/rawItem" },
+          { "$ref": "#/$defs/event" },
+          { "$ref": "#/$defs/validationRun" },
+          { "$ref": "#/$defs/claim" },
+          { "$ref": "#/$defs/evidence" },
+          { "$ref": "#/$defs/gap" }
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "minLength": 1 },
+    "sourceId": { "type": "string", "pattern": "^S-[0-9]{3}$" },
+    "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_type", "source_id", "name", "evidence_role", "product_role",
+        "integration_status", "created_at"
+      ],
+      "properties": {
+        "record_type": { "const": "source" },
+        "source_id": { "$ref": "#/$defs/sourceId" },
+        "name": { "$ref": "#/$defs/id" },
+        "evidence_role": {
+          "enum": ["PRIMARY_OFFICIAL", "SECONDARY_OFFICIAL", "DISCOVERY_ONLY"]
+        },
+        "product_role": {
+          "enum": [
+            "PREP_CORE", "TREND_SIGNAL", "POLICY_UPSTREAM", "ANALYTIC_EVIDENCE",
+            "DISCOVERY_ONLY", "CONTEXT_ONLY"
+          ]
+        },
+        "integration_status": {
+          "enum": ["ACTIVE", "FIXTURE_ONLY", "LIMITED", "DEFERRED", "GAP"]
+        },
+        "created_at": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "collectionRun": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_type", "collection_run_id", "slot_date", "slot", "timezone",
+        "scheduled_for", "started_at", "finished_at", "status"
+      ],
+      "properties": {
+        "record_type": { "const": "collection_run" },
+        "collection_run_id": { "$ref": "#/$defs/id" },
+        "slot_date": { "type": "string", "format": "date" },
+        "slot": { "enum": ["MORNING", "EVENING", "MANUAL"] },
+        "timezone": { "const": "Asia/Taipei" },
+        "scheduled_for": { "$ref": "#/$defs/timestamp" },
+        "started_at": { "$ref": "#/$defs/timestamp" },
+        "finished_at": {
+          "oneOf": [{ "$ref": "#/$defs/timestamp" }, { "type": "null" }]
+        },
+        "status": { "enum": ["RUNNING", "SUCCEEDED", "PARTIAL", "FAILED"] }
+      }
+    },
+    "sourceRun": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_type", "source_run_id", "collection_run_id", "source_id",
+        "attempted_at", "completed_at", "source_health", "window_start", "window_end",
+        "window_completeness", "result", "item_count", "change_count", "manifest_sha256",
+        "previous_successful_source_run_id", "error_code", "error_message"
+      ],
+      "properties": {
+        "record_type": { "const": "source_run" },
+        "source_run_id": { "$ref": "#/$defs/id" },
+        "collection_run_id": { "$ref": "#/$defs/id" },
+        "source_id": { "$ref": "#/$defs/sourceId" },
+        "attempted_at": { "$ref": "#/$defs/timestamp" },
+        "completed_at": { "$ref": "#/$defs/timestamp" },
+        "source_health": { "enum": ["PASS", "DEGRADED", "FAILED", "QUARANTINED", "NOT_RUN"] },
+        "window_start": { "$ref": "#/$defs/timestamp" },
+        "window_end": { "$ref": "#/$defs/timestamp" },
+        "window_completeness": {
+          "enum": ["COMPLETE_WITH_ITEMS", "COMPLETE_ZERO", "PARTIAL", "NOT_RUN"]
+        },
+        "result": { "enum": ["NEW_ITEMS", "NO_NEW_ITEM", "PARTIAL", "FAILED", "NOT_RUN"] },
+        "item_count": { "type": ["integer", "null"], "minimum": 0 },
+        "change_count": { "type": ["integer", "null"], "minimum": 0 },
+        "manifest_sha256": {
+          "oneOf": [{ "$ref": "#/$defs/hash" }, { "type": "null" }]
+        },
+        "previous_successful_source_run_id": { "type": ["string", "null"], "minLength": 1 },
+        "error_code": { "type": ["string", "null"], "minLength": 1 },
+        "error_message": { "type": ["string", "null"], "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "result": { "const": "NO_NEW_ITEM" } } },
+          "then": {
+            "properties": {
+              "change_count": { "const": 0 },
+              "window_completeness": { "enum": ["COMPLETE_WITH_ITEMS", "COMPLETE_ZERO"] }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "result": { "const": "NEW_ITEMS" } } },
+          "then": {
+            "properties": {
+              "change_count": { "type": "integer", "minimum": 1 },
+              "window_completeness": { "const": "COMPLETE_WITH_ITEMS" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "result": { "const": "PARTIAL" } } },
+          "then": {
+            "properties": {
+              "item_count": { "type": "integer", "minimum": 0 },
+              "change_count": { "type": "integer", "minimum": 0 },
+              "window_completeness": { "const": "PARTIAL" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "result": { "enum": ["NEW_ITEMS", "NO_NEW_ITEM", "PARTIAL"] } }
+          },
+          "then": {
+            "properties": {
+              "source_health": { "enum": ["PASS", "DEGRADED"] },
+              "manifest_sha256": { "$ref": "#/$defs/hash" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "result": { "const": "FAILED" } } },
+          "then": {
+            "properties": {
+              "item_count": { "type": "null" },
+              "change_count": { "type": "null" },
+              "source_health": { "enum": ["FAILED", "QUARANTINED"] },
+              "error_code": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "result": { "const": "NOT_RUN" } } },
+          "then": {
+            "properties": {
+              "item_count": { "type": "null" },
+              "change_count": { "type": "null" },
+              "source_health": { "const": "NOT_RUN" },
+              "window_completeness": { "const": "NOT_RUN" },
+              "error_code": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      ]
+    },
+    "rawItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_type", "raw_item_id", "source_run_id", "source_id", "stable_key",
+        "version_no", "requested_url", "final_url", "published_at", "fetched_at",
+        "content_sha256", "parser_version", "snapshot_locator", "supersedes_raw_item_id",
+        "is_current"
+      ],
+      "properties": {
+        "record_type": { "const": "raw_item" },
+        "raw_item_id": { "$ref": "#/$defs/id" },
+        "source_run_id": { "$ref": "#/$defs/id" },
+        "source_id": { "$ref": "#/$defs/sourceId" },
+        "stable_key": { "$ref": "#/$defs/id" },
+        "version_no": { "type": "integer", "minimum": 1 },
+        "requested_url": { "type": "string", "format": "uri", "pattern": "^https?://" },
+        "final_url": { "type": "string", "format": "uri", "pattern": "^https?://" },
+        "published_at": {
+          "oneOf": [{ "$ref": "#/$defs/timestamp" }, { "type": "null" }]
+        },
+        "fetched_at": { "$ref": "#/$defs/timestamp" },
+        "content_sha256": { "$ref": "#/$defs/hash" },
+        "parser_version": { "$ref": "#/$defs/id" },
+        "snapshot_locator": { "$ref": "#/$defs/id" },
+        "supersedes_raw_item_id": { "type": ["string", "null"], "minLength": 1 },
+        "is_current": { "type": "boolean" }
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_type", "event_id", "raw_item_id", "event_type", "change_type",
+        "date_status", "occurred_at", "detected_at", "previous_event_id", "payload"
+      ],
+      "properties": {
+        "record_type": { "const": "event" },
+        "event_id": { "$ref": "#/$defs/id" },
+        "raw_item_id": { "$ref": "#/$defs/id" },
+        "event_type": {
+          "enum": [
+            "AGENDA", "PROPOSAL", "RESOLUTION", "ORAL_ANSWER", "WRITTEN_REPLY",
+            "PROJECT_REPORT", "POLICY_STAGE", "PROCUREMENT_STAGE", "STATISTIC_RELEASE"
+          ]
+        },
+        "change_type": {
+          "enum": ["NEW", "REVISED", "REMOVED", "DEADLINE_CHANGED", "STATUS_CHANGED"]
+        },
+        "date_status": { "enum": ["KNOWN", "UNVERIFIED_DATE"] },
+        "occurred_at": {
+          "oneOf": [{ "$ref": "#/$defs/timestamp" }, { "type": "null" }]
+        },
+        "detected_at": { "$ref": "#/$defs/timestamp" },
+        "previous_event_id": { "type": ["string", "null"], "minLength": 1 },
+        "payload": { "type": "object" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "date_status": { "const": "KNOWN" } } },
+          "then": { "properties": { "occurred_at": { "$ref": "#/$defs/timestamp" } } },
+          "else": { "properties": { "occurred_at": { "type": "null" } } }
+        }
+      ]
+    },
+    "validationRun": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_type", "validation_run_id", "run_role", "model", "prompt_version",
+        "input_sha256", "decision", "reason_codes", "started_at", "finished_at"
+      ],
+      "properties": {
+        "record_type": { "const": "validation_run" },
+        "validation_run_id": { "$ref": "#/$defs/id" },
+        "run_role": { "enum": ["PRODUCER", "VERIFIER"] },
+        "model": { "$ref": "#/$defs/id" },
+        "prompt_version": { "$ref": "#/$defs/id" },
+        "input_sha256": { "$ref": "#/$defs/hash" },
+        "decision": {
+          "enum": ["AUTO_PASS", "AUTO_RETRY", "AI_DISAGREEMENT", "CLAIM_REJECTED", "QUARANTINED"]
+        },
+        "reason_codes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/id" },
+          "uniqueItems": true
+        },
+        "started_at": { "$ref": "#/$defs/timestamp" },
+        "finished_at": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_type", "claim_id", "event_id", "claim_type", "claim_text",
+        "verification_status", "producer_run_id", "verifier_run_id", "created_at"
+      ],
+      "properties": {
+        "record_type": { "const": "claim" },
+        "claim_id": { "$ref": "#/$defs/id" },
+        "event_id": { "$ref": "#/$defs/id" },
+        "claim_type": { "enum": ["FACT", "STATUS", "DEADLINE", "NEXT_STEP", "AI_SYNTHESIS"] },
+        "claim_text": { "$ref": "#/$defs/id" },
+        "verification_status": {
+          "enum": ["AUTO_PASS", "AUTO_RETRY", "AI_DISAGREEMENT", "CLAIM_REJECTED", "QUARANTINED"]
+        },
+        "producer_run_id": { "$ref": "#/$defs/id" },
+        "verifier_run_id": { "$ref": "#/$defs/id" },
+        "created_at": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_type", "evidence_id", "claim_id", "raw_item_id", "evidence_type",
+        "locator_type", "locator", "original_url", "content_sha256", "created_at"
+      ],
+      "properties": {
+        "record_type": { "const": "evidence" },
+        "evidence_id": { "$ref": "#/$defs/id" },
+        "claim_id": { "$ref": "#/$defs/id" },
+        "raw_item_id": { "$ref": "#/$defs/id" },
+        "evidence_type": {
+          "enum": ["OFFICIAL_TEXT", "OFFICIAL_DOCUMENT", "OFFICIAL_AUDIO", "GROQ_ASR_DERIVATIVE"]
+        },
+        "locator_type": { "enum": ["WEB_FRAGMENT", "PDF_PAGE", "AUDIO_TIMESTAMP", "ASR_SEGMENT"] },
+        "locator": { "$ref": "#/$defs/id" },
+        "original_url": { "type": "string", "format": "uri", "pattern": "^https?://" },
+        "content_sha256": { "$ref": "#/$defs/hash" },
+        "created_at": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "gap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_type", "gap_id", "source_id", "related_event_id", "title", "status",
+        "detail", "first_observed_at", "last_checked_at", "resolved_at"
+      ],
+      "properties": {
+        "record_type": { "const": "gap" },
+        "gap_id": { "type": "string", "pattern": "^GAP-[0-9]{3}$" },
+        "source_id": {
+          "oneOf": [{ "$ref": "#/$defs/sourceId" }, { "type": "null" }]
+        },
+        "related_event_id": { "type": ["string", "null"], "minLength": 1 },
+        "title": { "$ref": "#/$defs/id" },
+        "status": { "enum": ["OPEN", "UNVERIFIED_AFTER_MEETING", "RESOLVED", "NOT_AVAILABLE"] },
+        "detail": { "$ref": "#/$defs/id" },
+        "first_observed_at": { "$ref": "#/$defs/timestamp" },
+        "last_checked_at": { "$ref": "#/$defs/timestamp" },
+        "resolved_at": {
+          "oneOf": [{ "$ref": "#/$defs/timestamp" }, { "type": "null" }]
+        }
+      }
+    }
+  }
+}

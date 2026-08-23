@@ -1,0 +1,28 @@
+{
+  "status": "PASS",
+  "checked_at": "2026-08-14T12:09:01+08:00",
+  "metric": "normalized_zh_character_error_rate",
+  "cer": 0.06177,
+  "cer_percent": 6.18,
+  "threshold": 0.2,
+  "threshold_percent": 20.0,
+  "edit_distance": 74,
+  "reference_characters": 1198,
+  "hypothesis_characters": 1197,
+  "normalization": "Unicode NFKC、台→臺、移除空白／標點／符號，保留數字與文字",
+  "reference": {
+    "status": "CURATED_FROM_OFFICIAL_RECORD",
+    "independent_human_signoff": false,
+    "source_is_proofread": false,
+    "sha256": "780daa93b0a65a434a8069183e0ad91625c752320a11b12922b95c173732d4ed",
+    "path": "groq-asr-reference-2026-08-14.json"
+  },
+  "asr": {
+    "provider": "Groq",
+    "model": "whisper-large-v3",
+    "audio_sha256": "e606af471c752459461dcbc717f17cdfeaaafcec86ad20ce01bab4ba974b9d8e",
+    "sha256": "fe79af1a17b58ea4bc34eaee72eb51baebf3f8319cdda827b6231a58bf290578",
+    "path": "groq-asr-canary-2026-08-14.json"
+  },
+  "limitation": "官方議事錄各段標示 isProofread=false；本稿可用於 CER 技術 Gate，但正式上線前仍應由業務人員抽聽簽核。"
+}

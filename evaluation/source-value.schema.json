@@ -1,0 +1,259 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:taichung-police-intel:source-value-contract:1.0",
+  "title": "臺中警政來源價值評分契約",
+  "oneOf": [
+    { "$ref": "#/$defs/itemDecision" },
+    { "$ref": "#/$defs/sourceScore" }
+  ],
+  "$defs": {
+    "scoreComponents": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mission_fit",
+        "actionable_change",
+        "local_police_relevance",
+        "evidence_strength",
+        "novelty_corroboration"
+      ],
+      "properties": {
+        "mission_fit": { "type": "integer", "minimum": 0, "maximum": 30 },
+        "actionable_change": { "type": "integer", "minimum": 0, "maximum": 25 },
+        "local_police_relevance": { "type": "integer", "minimum": 0, "maximum": 20 },
+        "evidence_strength": { "type": "integer", "minimum": 0, "maximum": 15 },
+        "novelty_corroboration": { "type": "integer", "minimum": 0, "maximum": 10 }
+      }
+    },
+    "itemDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_version",
+        "record_type",
+        "source_id",
+        "raw_item_id",
+        "traceability_gate",
+        "verification_status",
+        "content_disposition",
+        "item_value_score",
+        "score_components",
+        "score_reason_codes",
+        "dedup_cluster_id",
+        "duplicate_of",
+        "new_information_fields",
+        "validation_reason_codes",
+        "producer_run_id",
+        "verifier_run_id",
+        "producer_model",
+        "verifier_model",
+        "prompt_version",
+        "scored_at",
+        "original_url",
+        "publisher",
+        "content_sha256",
+        "evidence_locators"
+      ],
+      "properties": {
+        "contract_version": { "const": "1.0" },
+        "record_type": { "const": "item_value_decision" },
+        "source_id": { "type": "string", "pattern": "^S-[0-9]{3}$" },
+        "raw_item_id": { "type": "string", "minLength": 1 },
+        "traceability_gate": { "enum": ["PASS", "FAIL"] },
+        "verification_status": {
+          "enum": ["AUTO_PASS", "AUTO_RETRY", "AI_DISAGREEMENT", "QUARANTINED"]
+        },
+        "content_disposition": {
+          "enum": [
+            "HOME_CANDIDATE",
+            "SEARCH_ONLY",
+            "LOW_VALUE_SUPPRESSED",
+            "EXACT_DUPLICATE_SUPPRESSED",
+            "SEMANTIC_DUPLICATE_SUPPRESSED",
+            "VALIDATION_PENDING",
+            "QUARANTINED"
+          ]
+        },
+        "item_value_score": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "maximum": 100
+        },
+        "score_components": { "$ref": "#/$defs/scoreComponents" },
+        "score_reason_codes": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "dedup_cluster_id": { "type": ["string", "null"], "minLength": 1 },
+        "duplicate_of": { "type": ["string", "null"], "minLength": 1 },
+        "new_information_fields": {
+          "type": "array",
+          "items": {
+            "enum": ["new_facts", "new_status", "new_milestone", "new_evidence"]
+          },
+          "uniqueItems": true
+        },
+        "validation_reason_codes": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "producer_run_id": { "type": ["string", "null"], "minLength": 1 },
+        "verifier_run_id": { "type": ["string", "null"], "minLength": 1 },
+        "producer_model": { "type": ["string", "null"], "minLength": 1 },
+        "verifier_model": { "type": ["string", "null"], "minLength": 1 },
+        "prompt_version": { "type": ["string", "null"], "minLength": 1 },
+        "scored_at": { "type": "string", "format": "date-time" },
+        "original_url": { "type": ["string", "null"], "format": "uri" },
+        "publisher": { "type": ["string", "null"], "minLength": 1 },
+        "content_sha256": {
+          "type": ["string", "null"],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "evidence_locators": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "traceability_gate": { "const": "PASS" } } },
+          "then": {
+            "properties": {
+              "original_url": { "type": "string", "format": "uri" },
+              "publisher": { "type": "string", "minLength": 1 },
+              "content_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "evidence_locators": { "minItems": 1 }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "traceability_gate": { "const": "FAIL" } } },
+          "then": {
+            "properties": {
+              "verification_status": { "const": "QUARANTINED" },
+              "content_disposition": { "const": "QUARANTINED" },
+              "validation_reason_codes": { "contains": { "const": "UNTRACEABLE" } }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "content_disposition": { "const": "HOME_CANDIDATE" } } },
+          "then": {
+            "properties": {
+              "traceability_gate": { "const": "PASS" },
+              "verification_status": { "const": "AUTO_PASS" },
+              "item_value_score": { "type": "integer", "minimum": 70 }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "content_disposition": {
+                "enum": ["EXACT_DUPLICATE_SUPPRESSED", "SEMANTIC_DUPLICATE_SUPPRESSED"]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "dedup_cluster_id": { "type": "string", "minLength": 1 },
+              "duplicate_of": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "content_disposition": { "const": "LOW_VALUE_SUPPRESSED" } } },
+          "then": {
+            "properties": { "item_value_score": { "type": "integer", "maximum": 39 } }
+          }
+        },
+        {
+          "if": { "properties": { "content_disposition": { "const": "QUARANTINED" } } },
+          "then": {
+            "properties": { "verification_status": { "const": "QUARANTINED" } }
+          }
+        }
+      ]
+    },
+    "sourceScore": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_version",
+        "record_type",
+        "source_id",
+        "product_role",
+        "window_start",
+        "window_end",
+        "rates",
+        "consecutive_low_windows",
+        "source_value_score_90d",
+        "source_value_status",
+        "calculated_at"
+      ],
+      "properties": {
+        "contract_version": { "const": "1.0" },
+        "record_type": { "const": "source_value_score" },
+        "source_id": { "type": "string", "pattern": "^S-[0-9]{3}$" },
+        "product_role": {
+          "enum": [
+            "PREP_CORE",
+            "TREND_SIGNAL",
+            "POLICY_UPSTREAM",
+            "ANALYTIC_EVIDENCE",
+            "DISCOVERY_ONLY",
+            "CONTEXT_ONLY"
+          ]
+        },
+        "window_start": { "type": "string", "format": "date" },
+        "window_end": { "type": "string", "format": "date" },
+        "rates": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": [
+            "useful_yield_rate",
+            "traceable_rate",
+            "unique_information_rate",
+            "successful_window_rate"
+          ],
+          "properties": {
+            "useful_yield_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+            "traceable_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+            "unique_information_rate": { "type": "number", "minimum": 0, "maximum": 1 },
+            "successful_window_rate": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        },
+        "consecutive_low_windows": { "type": "integer", "minimum": 0 },
+        "source_value_score_90d": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 100
+        },
+        "source_value_status": {
+          "enum": ["ACTIVE", "LOW_FREQUENCY", "DEFERRED_BY_VALUE", "NOT_ENOUGH_DATA"]
+        },
+        "calculated_at": { "type": "string", "format": "date-time" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "source_value_status": { "const": "NOT_ENOUGH_DATA" } } },
+          "then": {
+            "properties": {
+              "rates": { "type": "null" },
+              "source_value_score_90d": { "type": "null" }
+            }
+          },
+          "else": {
+            "properties": {
+              "rates": { "type": "object" },
+              "source_value_score_90d": { "type": "number" }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,68 @@
+# Competition Submission Checklist
+
+Official deadline: **2026-08-23 23:59 UTC / 2026-08-24 07:59 Asia/Taipei**.
+
+## Completed locally
+
+- [x] A local Git repository exists and the application source is present.
+- [x] Root `.kiro/` contains Steering, Specs, and Hooks.
+- [x] English README contains the setup, use, testing, cost, third-party, and limitation baseline.
+- [x] Static production build succeeds locally.
+- [x] GitHub Pages workflow includes two daily refresh schedules.
+- [x] Public demo requires no login, API key, database, payment, or other test credentials for anonymous judge access.
+- [x] Three-minute English demo script is ready.
+- [x] Submission draft is ready.
+- [x] Kiro CLI is authenticated with Builder ID.
+- [x] One meaningful Kiro V3 Spec session reviewed all 16 control artifacts.
+- [x] The real session ID, prompts, reviewed artifacts, human corrections, and `VERIFY_OK` output are saved in `docs/KIRO_USAGE.md`.
+- [x] Kiro implemented the bounded English homepage path and executable acceptance test in a retained V3 Spec session.
+- [x] The complete English primary journey, source translations, limitations, drawer controls, and responsive layouts passed local browser QA.
+
+## Must complete before submission
+
+- [ ] Entrant confirms every member is an eligible adult and the project was created during the 2026-08-08 00:00 UTC to 2026-08-23 23:59 UTC competition period without prohibited outside support.
+- [ ] Preserve honest competition-period evidence through public Git history and Kiro session records; do not claim pre-repository work as Kiro-generated.
+- [x] Complete the full English primary product journey with translated UI, source names, and controls. Official Chinese transcript remains Chinese and is explicitly labeled as navigation-only derived text, not authoritative evidence.
+- [x] Use Kiro to implement and verify one bounded product task; retain changed files, session ID, human corrections, Hook-activity truth, and final acceptance output.
+- [ ] Capture the Kiro session ID and final `VERIFY_OK` line in the demo video.
+- [ ] Set the repository owner/name and replace all `PENDING_*` fields.
+- [ ] Make the repository public.
+- [ ] Enable GitHub Pages with **Source: GitHub Actions**.
+- [ ] Confirm the Pages workflow and both static JSON endpoints return HTTP 200.
+- [ ] Confirm anonymous access in a signed-out browser.
+- [ ] Record a demo no longer than three minutes in English or with complete English captions.
+- [ ] Upload the video as public or unlisted and verify anonymous playback.
+- [ ] Add entrant/team and contribution details.
+- [ ] List every third-party API, dataset, library, and asset, plus costs, rate limits, setup requirements, attribution, and usage rights.
+- [ ] Complete the official submission form and save the receipt.
+- [ ] After the deadline, freeze source, documentation, README, video, links, credentials, application, and team membership through the judging period unless the organizers explicitly authorize a correction.
+
+## Official form field map
+
+- Representative name and Discord username.
+- Entry type: solo, team of two, or team of three.
+- Team name, member names, Discord usernames, email addresses, roles, and contributions when applicable.
+- Eligibility, competition-period originality, support, and rules confirmations.
+- Project description, problem, key features, target users, and project type.
+- Public repository, working demo or test build, and demo video URLs.
+- Setup/testing notes and safe test credentials, if needed.
+- Meaningful Kiro usage and confirmations for root `.kiro`, README, and video evidence.
+- Rights, secrets/malware, English/translation, third-party resources, paid services, rate limits, and setup confirmations.
+
+## Final acceptance commands
+
+```bash
+npm run check
+curl -f PENDING_PUBLIC_DEMO_URL/api/health.json
+curl -f PENDING_PUBLIC_DEMO_URL/api/status.json
+```
+
+Verify manually:
+
+- homepage and English judge guide load;
+- all five source cards are present;
+- official links open;
+- evidence drawer opens;
+- transcript search and timestamp seeking work;
+- mobile and desktop layouts have no blocking overflow;
+- repository, demo, and video remain public through judging.

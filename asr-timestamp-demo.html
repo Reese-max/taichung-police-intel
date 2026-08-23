@@ -1,0 +1,975 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>議會影音證據工作台｜臺中警政公共資訊監測</title>
+  <style>
+    :root {
+      --ink: #13212b;
+      --muted: #5b6973;
+      --navy: #12304a;
+      --blue: #1d5d8f;
+      --blue-soft: #e5f0f7;
+      --amber: #c77700;
+      --amber-soft: #fff1d6;
+      --teal: #177066;
+      --paper: #f3f6f8;
+      --surface: #ffffff;
+      --line: #cbd6dd;
+      --danger: #a33a2b;
+      --shadow: 0 14px 36px rgba(18, 48, 74, 0.11);
+      --radius: 14px;
+      font-family: "Microsoft JhengHei UI", "Microsoft JhengHei", system-ui, sans-serif;
+      color: var(--ink);
+      background: var(--paper);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    body {
+      margin: 0;
+      min-width: 320px;
+      background:
+        linear-gradient(90deg, rgba(18, 48, 74, 0.035) 1px, transparent 1px) 0 0 / 28px 28px,
+        var(--paper);
+    }
+
+    button,
+    input,
+    a {
+      font: inherit;
+    }
+
+    button,
+    a {
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    button:focus-visible,
+    input:focus-visible,
+    a:focus-visible {
+      outline: 3px solid rgba(199, 119, 0, 0.45);
+      outline-offset: 3px;
+    }
+
+    .shell {
+      width: min(1480px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 22px 0 34px;
+    }
+
+    .masthead {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 24px;
+      align-items: end;
+      padding: 18px 22px;
+      color: #fff;
+      background: var(--navy);
+      border-top: 4px solid var(--amber);
+      box-shadow: var(--shadow);
+    }
+
+    .eyebrow,
+    .utility-label,
+    .timecode,
+    .meta-value {
+      font-family: Bahnschrift, "Segoe UI", sans-serif;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .eyebrow {
+      margin: 0 0 7px;
+      color: #bcd5e5;
+      font-size: 0.77rem;
+      font-weight: 700;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      max-width: 920px;
+      margin: 0;
+      font-size: clamp(1.35rem, 2.3vw, 2.15rem);
+      line-height: 1.25;
+      letter-spacing: -0.025em;
+    }
+
+    .origin-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      color: #fff;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.26);
+      border-radius: 999px;
+      font-size: 0.78rem;
+      white-space: nowrap;
+    }
+
+    .origin-badge::before {
+      width: 8px;
+      height: 8px;
+      content: "";
+      background: #76d5c8;
+      border-radius: 50%;
+      box-shadow: 0 0 0 4px rgba(118, 213, 200, 0.14);
+    }
+
+    .workbench {
+      display: grid;
+      grid-template-columns: minmax(0, 1.12fr) minmax(390px, 0.88fr);
+      min-height: 720px;
+      margin-top: 18px;
+      overflow: hidden;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .viewer {
+      min-width: 0;
+      padding: 22px;
+      background: #e8eef2;
+      border-right: 1px solid var(--line);
+    }
+
+    .video-frame {
+      position: relative;
+      overflow: hidden;
+      background: #07131c;
+      border-radius: 10px;
+      aspect-ratio: 16 / 9;
+      box-shadow: 0 10px 28px rgba(7, 19, 28, 0.22);
+    }
+
+    video {
+      display: block;
+      width: 100%;
+      height: 100%;
+      background: #07131c;
+    }
+
+    .clip-marker {
+      height: 7px;
+      margin-top: 12px;
+      overflow: hidden;
+      background: #c8d2d9;
+      border-radius: 999px;
+    }
+
+    .clip-marker span {
+      display: block;
+      width: var(--clip-progress, 0%);
+      height: 100%;
+      background: var(--amber);
+      transition: width 180ms linear;
+    }
+
+    .transport {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 16px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 13px 2px 0;
+    }
+
+    .clock {
+      font-family: Bahnschrift, "Segoe UI", sans-serif;
+      font-size: 1.12rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.03em;
+    }
+
+    .clock span {
+      color: var(--muted);
+      font-size: 0.77rem;
+      font-weight: 500;
+    }
+
+    .transport-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .action {
+      min-height: 40px;
+      padding: 8px 12px;
+      color: var(--navy);
+      background: transparent;
+      border: 1px solid #9fb2bf;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .action:hover {
+      background: #fff;
+      border-color: var(--blue);
+    }
+
+    .action.primary {
+      color: #fff;
+      background: var(--blue);
+      border-color: var(--blue);
+    }
+
+    .action.primary:hover {
+      background: #174e78;
+    }
+
+    .playback-status {
+      min-height: 24px;
+      margin: 13px 0 0;
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+
+    .playback-status[data-tone="ready"] {
+      color: var(--teal);
+    }
+
+    .playback-status[data-tone="error"] {
+      color: var(--danger);
+    }
+
+    .evidence-card {
+      margin-top: 18px;
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.78);
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--teal);
+      border-radius: 10px;
+    }
+
+    .evidence-card h2 {
+      margin: 0 0 12px;
+      font-size: 1rem;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 13px 20px;
+      margin: 0;
+    }
+
+    .meta-grid div {
+      min-width: 0;
+    }
+
+    .meta-grid dt {
+      margin-bottom: 4px;
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+    }
+
+    .meta-grid dd {
+      margin: 0;
+      overflow: hidden;
+      font-size: 0.87rem;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .transcript-panel {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      min-width: 0;
+      min-height: 0;
+      background: #fff;
+    }
+
+    .transcript-toolbar {
+      padding: 18px 18px 14px;
+      background: #fff;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .toolbar-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .toolbar-row h2 {
+      margin: 0;
+      color: var(--navy);
+      font-size: 1.05rem;
+    }
+
+    .segment-count {
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+
+    .search-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .search-row input {
+      width: 100%;
+      min-height: 42px;
+      padding: 9px 11px;
+      color: var(--ink);
+      background: var(--paper);
+      border: 1px solid #afbec8;
+      border-radius: 8px;
+    }
+
+    .follow-button {
+      min-height: 42px;
+      padding: 8px 11px;
+      color: var(--blue);
+      background: var(--blue-soft);
+      border: 1px solid #9fc1d7;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+
+    .follow-button[aria-pressed="false"] {
+      color: var(--muted);
+      background: #fff;
+      border-color: var(--line);
+    }
+
+    .term-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      min-height: 27px;
+      margin-top: 10px;
+    }
+
+    .term-chip {
+      padding: 4px 8px;
+      color: #714400;
+      background: var(--amber-soft);
+      border: 1px solid #ecc57f;
+      border-radius: 999px;
+      cursor: pointer;
+      font-size: 0.76rem;
+      font-weight: 700;
+    }
+
+    .transcript-list {
+      position: relative;
+      min-height: 0;
+      margin: 0;
+      padding: 10px 12px 36px 0;
+      overflow-y: auto;
+      list-style: none;
+      scroll-behavior: smooth;
+    }
+
+    .transcript-list::before {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 83px;
+      width: 2px;
+      content: "";
+      background: #d6e0e6;
+    }
+
+    .segment {
+      position: relative;
+      display: grid;
+      grid-template-columns: 83px minmax(0, 1fr);
+      min-height: 72px;
+    }
+
+    .segment[hidden] {
+      display: none;
+    }
+
+    .segment::after {
+      position: absolute;
+      top: 25px;
+      left: 78px;
+      width: 10px;
+      height: 10px;
+      content: "";
+      background: #fff;
+      border: 2px solid #91a7b5;
+      border-radius: 50%;
+      transform: translateX(-1px);
+      transition: transform 140ms ease, background 140ms ease, border-color 140ms ease;
+    }
+
+    .timecode {
+      align-self: start;
+      margin: 14px 12px 0 0;
+      padding: 4px 5px;
+      color: var(--blue);
+      background: transparent;
+      border: 0;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .timecode:hover {
+      color: #fff;
+      background: var(--blue);
+    }
+
+    .segment-copy {
+      width: calc(100% - 12px);
+      margin: 4px 0 4px 18px;
+      padding: 12px 14px;
+      color: var(--ink);
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      cursor: pointer;
+      text-align: left;
+      line-height: 1.65;
+      transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
+    }
+
+    .segment-copy:hover {
+      background: #f4f8fa;
+      border-color: #d6e0e6;
+    }
+
+    .segment.is-active::after {
+      background: var(--amber);
+      border-color: var(--amber);
+      box-shadow: 0 0 0 5px rgba(199, 119, 0, 0.16);
+      transform: translateX(-1px) scale(1.05);
+    }
+
+    .segment.is-active .timecode {
+      color: #fff;
+      background: var(--amber);
+    }
+
+    .segment.is-active .segment-copy {
+      background: var(--amber-soft);
+      border-color: #e7b65b;
+      transform: translateX(2px);
+    }
+
+    mark {
+      color: inherit;
+      background: #ffe29d;
+      border-radius: 2px;
+    }
+
+    .empty {
+      margin: 30px 24px 0 104px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .loading {
+      display: grid;
+      min-height: 320px;
+      place-items: center;
+      color: var(--muted);
+    }
+
+    @media (max-width: 960px) {
+      .workbench {
+        grid-template-columns: 1fr;
+      }
+
+      .viewer {
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .transcript-panel {
+        min-height: 620px;
+      }
+    }
+
+    @media (max-width: 620px) {
+      .shell {
+        width: min(100% - 18px, 1480px);
+        padding-top: 9px;
+      }
+
+      .masthead {
+        grid-template-columns: 1fr;
+        gap: 14px;
+        padding: 16px;
+      }
+
+      .origin-badge {
+        width: max-content;
+      }
+
+      .viewer {
+        padding: 12px;
+      }
+
+      .meta-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .search-row {
+        grid-template-columns: 1fr;
+      }
+
+      .transcript-list::before {
+        left: 68px;
+      }
+
+      .segment {
+        grid-template-columns: 68px minmax(0, 1fr);
+      }
+
+      .segment::after {
+        left: 63px;
+      }
+
+      .segment-copy {
+        margin-left: 13px;
+        padding-right: 9px;
+      }
+
+      .timecode {
+        margin-right: 8px;
+        font-size: 0.75rem;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="masthead">
+      <div>
+        <p class="eyebrow">Taichung police intelligence · council evidence</p>
+        <h1 id="page-title">議會影音證據工作台</h1>
+      </div>
+      <span class="origin-badge">GROQ_ASR · 衍生逐字稿</span>
+    </header>
+
+    <section class="workbench" aria-labelledby="page-title">
+      <div class="viewer">
+        <div class="video-frame">
+          <video id="evidence-video" controls playsinline preload="metadata" aria-label="臺中市議會官方影音"></video>
+        </div>
+        <div class="clip-marker" aria-hidden="true"><span id="clip-progress"></span></div>
+
+        <div class="transport">
+          <div class="clock">
+            <strong id="current-time">--:--</strong>
+            <span id="clip-range">載入片段範圍中</span>
+          </div>
+          <div class="transport-actions">
+            <button class="action primary" id="clip-start-button" type="button">回到片段起點</button>
+            <a class="action" id="official-link" href="#" target="_blank" rel="noreferrer">開啟官方來源</a>
+          </div>
+        </div>
+
+        <p class="playback-status" id="playback-status" role="status">正在讀取逐字稿與官方影音來源…</p>
+
+        <aside class="evidence-card" aria-labelledby="evidence-title">
+          <h2 id="evidence-title">證據資訊</h2>
+          <dl class="meta-grid">
+            <div>
+              <dt>來源狀態</dt>
+              <dd class="meta-value" id="gate-status">--</dd>
+            </div>
+            <div>
+              <dt>辨識模型</dt>
+              <dd class="meta-value" id="model-name">--</dd>
+            </div>
+            <div>
+              <dt>片段範圍</dt>
+              <dd class="meta-value" id="clip-metadata">--</dd>
+            </div>
+            <div>
+              <dt>音訊 SHA-256</dt>
+              <dd class="meta-value" id="audio-hash" title="">--</dd>
+            </div>
+          </dl>
+        </aside>
+      </div>
+
+      <section class="transcript-panel" aria-labelledby="transcript-title">
+        <div class="transcript-toolbar">
+          <div class="toolbar-row">
+            <h2 id="transcript-title">可跳轉逐字稿</h2>
+            <span class="segment-count" id="segment-count">載入中</span>
+          </div>
+          <div class="search-row">
+            <label>
+              <span class="utility-label" hidden>搜尋逐字稿</span>
+              <input id="transcript-search" type="search" aria-label="搜尋逐字稿" placeholder="搜尋逐字稿，例如：警察局" autocomplete="off">
+            </label>
+            <button class="follow-button" id="follow-button" type="button" aria-pressed="true">跟隨播放位置</button>
+          </div>
+          <div class="term-list" id="term-list" aria-label="已辨識警政詞"></div>
+        </div>
+
+        <div id="transcript-loading" class="loading">正在建立時間軸…</div>
+        <ol class="transcript-list" id="transcript-list" aria-label="逐字稿時間軸" hidden></ol>
+        <p class="empty" id="empty-state" hidden>找不到符合的逐字稿。請清除搜尋條件後再試。</p>
+      </section>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js"></script>
+  <script>
+    (function () {
+      "use strict";
+
+      var DATA_URL = "./groq-asr-canary-2026-08-14.json";
+      var video = document.getElementById("evidence-video");
+      var title = document.getElementById("page-title");
+      var officialLink = document.getElementById("official-link");
+      var playbackStatus = document.getElementById("playback-status");
+      var currentTime = document.getElementById("current-time");
+      var clipRange = document.getElementById("clip-range");
+      var clipProgress = document.getElementById("clip-progress");
+      var clipStartButton = document.getElementById("clip-start-button");
+      var transcriptList = document.getElementById("transcript-list");
+      var transcriptLoading = document.getElementById("transcript-loading");
+      var segmentCount = document.getElementById("segment-count");
+      var searchInput = document.getElementById("transcript-search");
+      var followButton = document.getElementById("follow-button");
+      var termList = document.getElementById("term-list");
+      var emptyState = document.getElementById("empty-state");
+      var gateStatus = document.getElementById("gate-status");
+      var modelName = document.getElementById("model-name");
+      var clipMetadata = document.getElementById("clip-metadata");
+      var audioHash = document.getElementById("audio-hash");
+
+      var data = null;
+      var segments = [];
+      var segmentElements = [];
+      var clipStart = 0;
+      var clipDuration = 0;
+      var pendingSeek = null;
+      var activeIndex = -1;
+      var followPlayback = true;
+      var hls = null;
+      var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+      function formatTime(seconds) {
+        var safe = Math.max(0, Math.floor(Number(seconds) || 0));
+        var hours = Math.floor(safe / 3600);
+        var minutes = Math.floor((safe % 3600) / 60);
+        var secs = safe % 60;
+        var body = String(minutes).padStart(2, "0") + ":" + String(secs).padStart(2, "0");
+        return hours ? String(hours).padStart(2, "0") + ":" + body : body;
+      }
+
+      function setStatus(message, tone) {
+        playbackStatus.textContent = message;
+        playbackStatus.dataset.tone = tone || "";
+      }
+
+      function validateData(payload) {
+        if (!payload || payload.status !== "PASS") {
+          throw new Error("逐字稿證據尚未通過 Gate。");
+        }
+        if (!payload.source || !payload.source.media_url || !payload.source.official_page_url) {
+          throw new Error("逐字稿缺少官方影音來源。");
+        }
+        if (!payload.asr || !Array.isArray(payload.asr.segments) || !payload.asr.segments.length) {
+          throw new Error("逐字稿沒有可跳轉段落。");
+        }
+      }
+
+      function createHighlightedText(text, query) {
+        var fragment = document.createDocumentFragment();
+        if (!query) {
+          fragment.appendChild(document.createTextNode(text));
+          return fragment;
+        }
+        var lower = text.toLocaleLowerCase("zh-Hant");
+        var needle = query.toLocaleLowerCase("zh-Hant");
+        var cursor = 0;
+        var match = lower.indexOf(needle);
+        while (match !== -1) {
+          fragment.appendChild(document.createTextNode(text.slice(cursor, match)));
+          var mark = document.createElement("mark");
+          mark.textContent = text.slice(match, match + query.length);
+          fragment.appendChild(mark);
+          cursor = match + query.length;
+          match = lower.indexOf(needle, cursor);
+        }
+        fragment.appendChild(document.createTextNode(text.slice(cursor)));
+        return fragment;
+      }
+
+      function seekToSegment(index, playAfterSeek) {
+        var segment = segments[index];
+        if (!segment) {
+          return;
+        }
+        var target = clipStart + Number(segment.start);
+        pendingSeek = target;
+        if (video.readyState >= 1) {
+          applyPendingSeek();
+        }
+        setActiveSegment(index, true);
+        setStatus("已定位至官方影音 " + formatTime(target) + "。", "ready");
+        if (playAfterSeek) {
+          var playPromise = video.play();
+          if (playPromise && typeof playPromise.catch === "function") {
+            playPromise.catch(function () {
+              setStatus("已定位至 " + formatTime(target) + "；按播放鍵即可觀看。", "ready");
+            });
+          }
+        }
+      }
+
+      function applyPendingSeek() {
+        if (pendingSeek === null || video.readyState < 1) {
+          return;
+        }
+        var duration = Number.isFinite(video.duration) ? video.duration : pendingSeek + 1;
+        video.currentTime = Math.min(pendingSeek, Math.max(0, duration - 0.1));
+        pendingSeek = null;
+        updatePlaybackPosition();
+      }
+
+      function setActiveSegment(index, forceScroll) {
+        if (index === activeIndex && !forceScroll) {
+          return;
+        }
+        if (activeIndex >= 0 && segmentElements[activeIndex]) {
+          segmentElements[activeIndex].classList.remove("is-active");
+          segmentElements[activeIndex].removeAttribute("aria-current");
+        }
+        activeIndex = index;
+        if (index >= 0 && segmentElements[index]) {
+          var row = segmentElements[index];
+          row.classList.add("is-active");
+          row.setAttribute("aria-current", "true");
+          if (followPlayback && !row.hidden) {
+            row.scrollIntoView({ block: "nearest", behavior: reduceMotion ? "auto" : "smooth" });
+          }
+        }
+      }
+
+      function findActiveSegment(relativeSeconds) {
+        for (var index = segments.length - 1; index >= 0; index -= 1) {
+          if (relativeSeconds >= Number(segments[index].start)) {
+            return relativeSeconds <= Number(segments[index].end) + 1 ? index : -1;
+          }
+        }
+        return -1;
+      }
+
+      function updatePlaybackPosition() {
+        if (!data) {
+          return;
+        }
+        var absolute = Number(video.currentTime) || clipStart;
+        var relative = absolute - clipStart;
+        currentTime.textContent = formatTime(absolute);
+        var progress = Math.max(0, Math.min(1, relative / clipDuration));
+        clipProgress.style.setProperty("--clip-progress", String(progress * 100) + "%");
+        clipProgress.style.width = String(progress * 100) + "%";
+        setActiveSegment(findActiveSegment(relative), false);
+      }
+
+      function renderTerms(terms) {
+        termList.replaceChildren();
+        terms.forEach(function (term) {
+          var button = document.createElement("button");
+          button.type = "button";
+          button.className = "term-chip";
+          button.textContent = term;
+          button.addEventListener("click", function () {
+            searchInput.value = term;
+            applySearch();
+            var index = segments.findIndex(function (segment) {
+              return String(segment.text || "").includes(term);
+            });
+            if (index >= 0) {
+              seekToSegment(index, false);
+            }
+          });
+          termList.appendChild(button);
+        });
+      }
+
+      function renderSegments() {
+        var fragment = document.createDocumentFragment();
+        segmentElements = [];
+        segments.forEach(function (segment, index) {
+          var item = document.createElement("li");
+          item.className = "segment";
+          item.dataset.index = String(index);
+
+          var timeButton = document.createElement("button");
+          timeButton.type = "button";
+          timeButton.className = "timecode";
+          timeButton.textContent = formatTime(clipStart + Number(segment.start));
+          timeButton.setAttribute("aria-label", "跳到 " + timeButton.textContent);
+          timeButton.addEventListener("click", function () {
+            seekToSegment(index, true);
+          });
+
+          var copyButton = document.createElement("button");
+          copyButton.type = "button";
+          copyButton.className = "segment-copy";
+          copyButton.textContent = String(segment.text || "").trim() || "（無辨識文字）";
+          copyButton.addEventListener("click", function () {
+            seekToSegment(index, true);
+          });
+
+          item.append(timeButton, copyButton);
+          fragment.appendChild(item);
+          segmentElements.push(item);
+        });
+        transcriptList.replaceChildren(fragment);
+        transcriptLoading.hidden = true;
+        transcriptList.hidden = false;
+      }
+
+      function applySearch() {
+        var query = searchInput.value.trim();
+        var visible = 0;
+        segments.forEach(function (segment, index) {
+          var text = String(segment.text || "");
+          var matches = !query || text.toLocaleLowerCase("zh-Hant").includes(query.toLocaleLowerCase("zh-Hant"));
+          var row = segmentElements[index];
+          row.hidden = !matches;
+          var copyButton = row.querySelector(".segment-copy");
+          copyButton.replaceChildren(createHighlightedText(text.trim() || "（無辨識文字）", query));
+          if (matches) {
+            visible += 1;
+          }
+        });
+        emptyState.hidden = visible !== 0;
+        segmentCount.textContent = query ? visible + "／" + segments.length + " 段" : segments.length + " 段";
+      }
+
+      function initializeVideo(mediaUrl) {
+        video.addEventListener("loadedmetadata", function () {
+          applyPendingSeek();
+          setStatus("官方影音已就緒；點擊右側時間碼即可跳轉。", "ready");
+        });
+        video.addEventListener("timeupdate", updatePlaybackPosition);
+        video.addEventListener("error", function () {
+          setStatus("官方影音無法播放；可改用「開啟官方來源」核對。", "error");
+        });
+
+        pendingSeek = clipStart;
+        if (video.canPlayType("application/vnd.apple.mpegurl")) {
+          video.src = mediaUrl;
+          video.load();
+          return;
+        }
+
+        if (window.Hls && window.Hls.isSupported()) {
+          hls = new window.Hls({ enableWorker: true, lowLatencyMode: false });
+          hls.loadSource(mediaUrl);
+          hls.attachMedia(video);
+          hls.on(window.Hls.Events.MANIFEST_PARSED, function () {
+            applyPendingSeek();
+          });
+          hls.on(window.Hls.Events.ERROR, function (_, eventData) {
+            if (eventData && eventData.fatal) {
+              setStatus("HLS 播放失敗；可改用「開啟官方來源」核對。", "error");
+            }
+          });
+          return;
+        }
+
+        setStatus("此瀏覽器不支援 HLS；請開啟官方來源觀看。", "error");
+      }
+
+      function populateMetadata(payload) {
+        title.textContent = payload.source.title;
+        officialLink.href = payload.source.official_page_url;
+        gateStatus.textContent = payload.status + " · " + payload.validation.segment_count + " 段";
+        modelName.textContent = payload.asr.provider + " / " + payload.asr.model;
+        clipMetadata.textContent = formatTime(clipStart) + "～" + formatTime(clipStart + clipDuration);
+        audioHash.textContent = String(payload.audio.sha256).slice(0, 16) + "…";
+        audioHash.title = payload.audio.sha256;
+        clipRange.textContent = "／證據片段 " + formatTime(clipStart) + "～" + formatTime(clipStart + clipDuration);
+        currentTime.textContent = formatTime(clipStart);
+        segmentCount.textContent = segments.length + " 段";
+        renderTerms(payload.validation.detected_police_terms || []);
+      }
+
+      function initialize(payload) {
+        validateData(payload);
+        data = payload;
+        segments = payload.asr.segments;
+        clipStart = Number(payload.source.clip_start_seconds);
+        clipDuration = Number(payload.source.clip_duration_seconds);
+        populateMetadata(payload);
+        renderSegments();
+        initializeVideo(payload.source.media_url);
+      }
+
+      clipStartButton.addEventListener("click", function () {
+        if (segments.length) {
+          seekToSegment(0, false);
+        }
+      });
+
+      searchInput.addEventListener("input", applySearch);
+
+      followButton.addEventListener("click", function () {
+        followPlayback = !followPlayback;
+        followButton.setAttribute("aria-pressed", String(followPlayback));
+        followButton.textContent = followPlayback ? "跟隨播放位置" : "已停止跟隨";
+      });
+
+      fetch(DATA_URL)
+        .then(function (response) {
+          if (!response.ok) {
+            throw new Error("逐字稿 JSON HTTP " + response.status);
+          }
+          return response.json();
+        })
+        .then(initialize)
+        .catch(function (error) {
+          transcriptLoading.textContent = "載入失敗：" + error.message + "。請用本機 HTTP 伺服器開啟此頁面。";
+          setStatus("逐字稿載入失敗。", "error");
+        });
+
+      window.addEventListener("beforeunload", function () {
+        if (hls) {
+          hls.destroy();
+        }
+      });
+    }());
+  </script>
+</body>
+</html>

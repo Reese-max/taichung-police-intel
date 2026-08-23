@@ -1,0 +1,12 @@
+{
+  "name": "taichung-police-public-intelligence",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check:gate0": "node scripts/verify-project.mjs gate0",
+    "check:specs": "node scripts/verify-project.mjs specs",
+    "test": "node scripts/verify-project.mjs quick",
+    "check": "node scripts/verify-project.mjs full"
+  }
+}

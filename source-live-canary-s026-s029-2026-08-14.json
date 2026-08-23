@@ -1,0 +1,132 @@
+{
+  "status": "PASS",
+  "checked_at": "2026-08-14T13:44:54+08:00",
+  "window_start": "2026-08-08",
+  "window_end": "2026-08-14",
+  "script": "canary-s026-s029.py",
+  "script_sha256": "6c1e871e9f4428288782fd54d51940923e05095453626488241657b9eac709f2",
+  "sources": {
+    "S-026": {
+      "source_id": "S-026",
+      "source_name": "臺中市政府主管法規共用系統",
+      "canary_status": "PASS",
+      "source_health": "PASS",
+      "window_completeness": "COMPLETE_ZERO",
+      "legacy_redirect": {
+        "requested_url": "https://lawsearch.taichung.gov.tw/GLRSout/DraftForum.aspx",
+        "final_url": "https://law.taichung.gov.tw/DraftForum.aspx",
+        "http_status": 200,
+        "content_type": "text/html; charset=utf-8",
+        "content_length": 19731,
+        "raw_sha256": "c98ed2bb2f0a0500619b99407d72e59783dc7fd46f2c17c8ce95d1c3402b5d55"
+      },
+      "current_drafts": {
+        "requested_url": "https://law.taichung.gov.tw/DraftForum.aspx",
+        "final_url": "https://law.taichung.gov.tw/DraftForum.aspx",
+        "http_status": 200,
+        "content_type": "text/html; charset=utf-8",
+        "content_length": 19731,
+        "raw_sha256": "9d182a84a6d7dd58c48a29314ac6b1c4382301c37c8005edbfa5adedc38311f0",
+        "item_count": 0,
+        "explicit_zero": true
+      },
+      "history_page_1": {
+        "requested_url": "https://law.taichung.gov.tw/DraftForum.aspx?Type=H",
+        "final_url": "https://law.taichung.gov.tw/DraftForum.aspx?Type=H",
+        "http_status": 200,
+        "content_type": "text/html; charset=utf-8",
+        "content_length": 33199,
+        "raw_sha256": "2885e1a0caf45aa1a092097901a0a4465722973db0f7ab5648c87cb1168e524f",
+        "declared_count": 784,
+        "page_count": 79,
+        "parsed_count": 10,
+        "latest_published_at": "2026-07-27",
+        "oldest_published_at": "2026-06-05"
+      },
+      "window_items": [],
+      "police_probe": {
+        "requested_url": "https://law.taichung.gov.tw/DraftOpinion.aspx?id=111637&Type=H",
+        "final_url": "https://law.taichung.gov.tw/DraftOpinion.aspx?id=111637&Type=H",
+        "http_status": 200,
+        "content_type": "text/html; charset=utf-8",
+        "content_length": 20871,
+        "raw_sha256": "147394ccc11a81972d83f599e396d2222e8729364395d77eca8545c9aac5fb9b",
+        "item_id": "111637",
+        "title": "預告修正「臺中市交通義勇警察協勤派遣與管理辦法」草案",
+        "attachments": [
+          {
+            "title": "府授警交字第11303572301號公告.pdf",
+            "url": "https://law.taichung.gov.tw/Download.ashx?FileID=135108&id=111637&type=ANN",
+            "http_status": 200,
+            "content_length": 358193,
+            "sha256": "2af7515aefe8507c9e6e97a25d3b7a296a9128331a2b248f5a48bf9a4687860b"
+          },
+          {
+            "title": "臺中市交通義勇警察協勤派遣與管理辦法-總說明、對照表、條文.pdf",
+            "url": "https://law.taichung.gov.tw/Download.ashx?FileID=135109&id=111637&type=ANN",
+            "http_status": 200,
+            "content_length": 107660,
+            "sha256": "c5cde3966a07e4be9c46e572ca456c6096a9348b74f7281b72b684c012c2ebd2"
+          }
+        ]
+      },
+      "manifest_sha256": "34cc7021cd92eee69d943acf772382ef617155156d0014abe5efa8a622ac6b39"
+    },
+    "S-029": {
+      "source_id": "S-029",
+      "source_name": "臺中市政府議會專案報告",
+      "canary_status": "PASS",
+      "source_health": "PASS",
+      "window_completeness": "COMPLETE_ZERO",
+      "index": {
+        "requested_url": "https://www.rdec.taichung.gov.tw/12047/12142/12145",
+        "final_url": "https://www.rdec.taichung.gov.tw/12047/12142/12145",
+        "http_status": 200,
+        "content_type": "text/html; charset=utf-8",
+        "content_length": 91925,
+        "raw_sha256": "a1df15ddbee7e7874afe423e6374c31bd3b3455c3a3b6a79e4c5bf95da676fe4",
+        "session_count": 42
+      },
+      "latest_session": {
+        "title": "臺中市議會第4屆第8次定期會",
+        "url": "https://www.rdec.taichung.gov.tw/3329431/Lpsimplelist",
+        "declared_count": 19,
+        "page_count": 1,
+        "parsed_count": 19,
+        "list_pages": [
+          {
+            "requested_url": "https://www.rdec.taichung.gov.tw/3329431/Lpsimplelist?Page=1&PageSize=30&type=",
+            "final_url": "https://www.rdec.taichung.gov.tw/3329431/Lpsimplelist?Page=1&PageSize=30&type=",
+            "http_status": 200,
+            "content_type": "text/html; charset=utf-8",
+            "content_length": 99981,
+            "raw_sha256": "8066190844dc11b814541535385e83bb9654385ee885c13596f87bb86111156a"
+          }
+        ]
+      },
+      "window_items": [],
+      "police_item_count": 2,
+      "police_attachments": [
+        {
+          "item_id": "1150731-4",
+          "title": "1150731-4-臺中市科技執法設置應以「危險路口改善為優先、執法為輔」之理念推動，罰鍰收入優先投入道路工程改善及標誌標線優化專案報告(警察、交通)",
+          "published_at": "2026-07-24",
+          "url": "https://www.rdec.taichung.gov.tw/media/1443292/1150731-4-臺中市科技執法設置應以-危險路口改善為優先-執法為輔-之理念推動-罰鍰收入優先投入道路工程改善及標誌標線優化專案報告-警察-交通.pdf",
+          "http_status": 200,
+          "content_length": 1731368,
+          "sha256": "4b91f8240f11cce5cb48fa858e9e0acb5bfc480478be431ad8338dd01418ba06"
+        },
+        {
+          "item_id": "1150803-2",
+          "title": "1150803-2-菸品與依托咪酯進入校園、社會之防範、改善措施及各類毒品查緝績效專案報告(衛生、教育、警察)",
+          "published_at": "2026-07-24",
+          "url": "https://www.rdec.taichung.gov.tw/media/1443294/1150803-2-菸品與依托咪酯進入校園-社會之防範-改善措施及各類毒品查緝績效專案報告-衛生-教育-警察.pdf",
+          "http_status": 200,
+          "content_length": 927396,
+          "sha256": "d47a9eea25ba1f7dc7089ab2fa661fec702a49ea6864056a377772606e10afa2"
+        }
+      ],
+      "manifest_sha256": "a427ebfe37643d830711f30d02d1ef1ee0adea55ddaf713925c4fb121aa3ce05"
+    }
+  }
+}

@@ -1,0 +1,352 @@
+{
+  "status": "PASS",
+  "checked_at": "2026-08-22T00:05:43+08:00",
+  "script": "canary-s028-165.py",
+  "script_sha256": "b11a6142042c48a18d0bface14c881489537113dafa3f640132b7771f6fb3aa9",
+  "sources": {
+    "crime": {
+      "source_id": "S-028",
+      "role": "NUMERATOR",
+      "canary_status": "PASS",
+      "snapshot_completeness": "FULL_RESOURCE_PARSED",
+      "dataset": {
+        "dataset_id": "88147",
+        "title": "10952-01-01-2 臺中市受(處)理刑事案件-分局別",
+        "publisher": "臺中市政府警察局",
+        "update_frequency": "不定期更新",
+        "license": "政府資料開放授權條款-第1版",
+        "metadata_updated_at": "2026-08-13 19:14",
+        "page": {
+          "requested_url": "https://data.gov.tw/dataset/88147",
+          "final_url": "https://data.gov.tw/dataset/88147",
+          "fetched_at": "2026-08-22T00:05:49+08:00",
+          "http_status": 200,
+          "content_type": "text/html;charset=utf-8",
+          "content_length": 592761,
+          "etag": null,
+          "last_modified": null,
+          "raw_sha256": "46083bc21e5f5350089a2a057c0c1508cea195dc88c3267780eff3256fa469af"
+        }
+      },
+      "resource": {
+        "resource_id": "62b43956-448d-4433-981b-c655ca1fafa6",
+        "format": "JSON",
+        "label": "2026-06_10952-01-01-2_臺中市受(處)理刑事案件-分局別.JSON",
+        "url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=62b43956-448d-4433-981b-c655ca1fafa6",
+        "requested_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=62b43956-448d-4433-981b-c655ca1fafa6",
+        "final_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=62b43956-448d-4433-981b-c655ca1fafa6",
+        "fetched_at": "2026-08-22T00:06:26+08:00",
+        "http_status": 200,
+        "content_type": "application/octet-stream",
+        "content_length": 1272776,
+        "etag": null,
+        "last_modified": null,
+        "raw_sha256": "1d56a364de5eee8451590bbc00b74dcbe0a6c8122543c585f15f950df8984928"
+      },
+      "analysis": {
+        "statistical_period": "2026-06",
+        "parsed_count": 3120,
+        "matched_count": 16,
+        "fraud_occurrence_count": 1670,
+        "normalized_rows": [
+          {
+            "row_index": 2047,
+            "unit": "和平分局",
+            "value": 3
+          },
+          {
+            "row_index": 1852,
+            "unit": "大甲分局",
+            "value": 98
+          },
+          {
+            "row_index": 2112,
+            "unit": "大雅分局",
+            "value": 135
+          },
+          {
+            "row_index": 1917,
+            "unit": "太平分局",
+            "value": 100
+          },
+          {
+            "row_index": 8,
+            "unit": "局本部",
+            "value": 0
+          },
+          {
+            "row_index": 1982,
+            "unit": "東勢分局",
+            "value": 35
+          },
+          {
+            "row_index": 1787,
+            "unit": "清水分局",
+            "value": 148
+          },
+          {
+            "row_index": 1722,
+            "unit": "烏日分局",
+            "value": 124
+          },
+          {
+            "row_index": 203,
+            "unit": "第一分局",
+            "value": 61
+          },
+          {
+            "row_index": 593,
+            "unit": "第三分局",
+            "value": 145
+          },
+          {
+            "row_index": 398,
+            "unit": "第二分局",
+            "value": 101
+          },
+          {
+            "row_index": 983,
+            "unit": "第五分局",
+            "value": 157
+          },
+          {
+            "row_index": 1178,
+            "unit": "第六分局",
+            "value": 165
+          },
+          {
+            "row_index": 788,
+            "unit": "第四分局",
+            "value": 96
+          },
+          {
+            "row_index": 1373,
+            "unit": "豐原分局",
+            "value": 128
+          },
+          {
+            "row_index": 1568,
+            "unit": "霧峰分局",
+            "value": 174
+          }
+        ]
+      }
+    },
+    "population": {
+      "source_id": "S-028",
+      "role": "DENOMINATOR",
+      "canary_status": "PASS",
+      "snapshot_completeness": "FULL_RESOURCE_PARSED",
+      "dataset": {
+        "dataset_id": "103703",
+        "title": "10122-00-01-2 臺中市各區戶數、人口數按戶別及性別分",
+        "publisher": "臺中市政府民政局",
+        "update_frequency": "每6月",
+        "license": "政府資料開放授權條款-第1版",
+        "metadata_updated_at": "2026-06-21 04:03",
+        "page": {
+          "requested_url": "https://data.gov.tw/dataset/103703",
+          "final_url": "https://data.gov.tw/dataset/103703",
+          "fetched_at": "2026-08-22T00:06:30+08:00",
+          "http_status": 200,
+          "content_type": "text/html;charset=utf-8",
+          "content_length": 548845,
+          "etag": null,
+          "last_modified": null,
+          "raw_sha256": "a625c0443322f4db172cce21a4090ba5b78f1acc356615d5427711ad792d5837"
+        }
+      },
+      "resource": {
+        "resource_id": "e2ec75c8-2866-4332-b5d5-a048bbb231d3",
+        "format": "JSON",
+        "label": "2025_10122-00-01-2_臺中市各區 戶數、人口數按戶別及性別分.JSON",
+        "url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=e2ec75c8-2866-4332-b5d5-a048bbb231d3",
+        "requested_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=e2ec75c8-2866-4332-b5d5-a048bbb231d3",
+        "final_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=e2ec75c8-2866-4332-b5d5-a048bbb231d3",
+        "fetched_at": "2026-08-22T00:06:35+08:00",
+        "http_status": 200,
+        "content_type": "application/octet-stream",
+        "content_length": 111339,
+        "etag": null,
+        "last_modified": null,
+        "raw_sha256": "cbf6b57c03fe2da197c58b05613b7a5529cc070792644aae1865ae84014827fa"
+      },
+      "analysis": {
+        "statistical_period": "2025",
+        "parsed_count": 261,
+        "matched_count": 174,
+        "population": 2868465,
+        "region_count": 29,
+        "region_totals": {
+          "臺中市中區": 18029,
+          "臺中市北區": 143537,
+          "臺中市北屯區": 317182,
+          "臺中市南區": 128309,
+          "臺中市南屯區": 186105,
+          "臺中市后里區": 52754,
+          "臺中市和平區": 10469,
+          "臺中市外埔區": 30823,
+          "臺中市大安區": 17487,
+          "臺中市大甲區": 73108,
+          "臺中市大肚區": 55255,
+          "臺中市大里區": 211094,
+          "臺中市大雅區": 94741,
+          "臺中市太平區": 201536,
+          "臺中市新社區": 22579,
+          "臺中市東勢區": 46488,
+          "臺中市東區": 77745,
+          "臺中市梧棲區": 65685,
+          "臺中市沙鹿區": 101419,
+          "臺中市清水區": 90640,
+          "臺中市潭子區": 109314,
+          "臺中市烏日區": 82248,
+          "臺中市石岡區": 13668,
+          "臺中市神岡區": 63271,
+          "臺中市西區": 113288,
+          "臺中市西屯區": 238052,
+          "臺中市豐原區": 161771,
+          "臺中市霧峰區": 62627,
+          "臺中市龍井區": 79241
+        }
+      }
+    },
+    "fraud_context": {
+      "source_id": null,
+      "candidate_name": "165 全民防騙公開統計候選",
+      "role": "CONTEXT_ONLY",
+      "canary_status": "PASS",
+      "snapshot_completeness": "FULL_RESOURCE_PARSED",
+      "dataset": {
+        "dataset_id": "176455",
+        "title": "165反詐騙諮詢專線_遭停止解析涉詐網站",
+        "publisher": "警政署",
+        "update_frequency": "不定期更新",
+        "license": "政府資料開放授權條款-第1版",
+        "metadata_updated_at": "2026-08-21 15:09",
+        "page": {
+          "requested_url": "https://data.gov.tw/dataset/176455",
+          "final_url": "https://data.gov.tw/dataset/176455",
+          "fetched_at": "2026-08-22T00:06:38+08:00",
+          "http_status": 200,
+          "content_type": "text/html;charset=utf-8",
+          "content_length": 528168,
+          "etag": null,
+          "last_modified": null,
+          "raw_sha256": "8ba4ec42ce6ab7280a202be87aadb6c773a1b0da5fdbd53edbfde8a1977c3078"
+        }
+      },
+      "resource": {
+        "resource_id": "8F6AA6B0-F2C1-49BD-A9D8-6497FFFB0D57",
+        "format": "CSV",
+        "label": "165反詐騙諮詢專線_遭停止解析涉詐網站",
+        "url": "https://opdadm.moi.gov.tw/api/v1/no-auth/resource/api/dataset/29E8E643-88ED-4952-B21E-BD42A3B7108C/resource/8F6AA6B0-F2C1-49BD-A9D8-6497FFFB0D57/download",
+        "requested_url": "https://opdadm.moi.gov.tw/api/v1/no-auth/resource/api/dataset/29E8E643-88ED-4952-B21E-BD42A3B7108C/resource/8F6AA6B0-F2C1-49BD-A9D8-6497FFFB0D57/download",
+        "final_url": "https://opdadm.moi.gov.tw/api/v1/no-auth/resource/api/dataset/29E8E643-88ED-4952-B21E-BD42A3B7108C/resource/8F6AA6B0-F2C1-49BD-A9D8-6497FFFB0D57/download",
+        "fetched_at": "2026-08-22T00:11:47+08:00",
+        "http_status": 200,
+        "content_type": "text/csv;charset=UTF-8",
+        "content_length": 7566175,
+        "etag": null,
+        "last_modified": null,
+        "raw_sha256": "40d41b631fe084491e01ebb44a4a857387335a76de6d63b1bf10611e56339eb5"
+      },
+      "analysis": {
+        "parsed_count": 69370,
+        "unique_domain_count": 68497,
+        "duplicate_domain_rows": 873,
+        "latest_statistical_period": "2026-07",
+        "latest_period_count": 6156,
+        "latest_top_categories": [
+          {
+            "category": "電子商務",
+            "count": 2849
+          },
+          {
+            "category": "金融保險",
+            "count": 1506
+          },
+          {
+            "category": "資訊服務",
+            "count": 1123
+          },
+          {
+            "category": "運輸倉儲",
+            "count": 531
+          },
+          {
+            "category": "釣魚網站",
+            "count": 74
+          }
+        ]
+      }
+    }
+  },
+  "trend_card": {
+    "card_id": "trend-taichung-fraud-baseline",
+    "claim_type": "STATISTICAL_BASELINE",
+    "title": "臺中市詐欺案件公開統計基線",
+    "metric_id": "TAICHUNG_FRAUD_OCCURRENCE_PER_100K",
+    "value": 1670,
+    "unit": "件",
+    "statistical_period": "2026-06",
+    "rate_per_100k": "58.22",
+    "formula": "fraud_occurrence_count / population * 100000",
+    "formula_version": "fraud-rate-v1",
+    "denominator": 2868465,
+    "denominator_period": "2025",
+    "comparison_status": "BASELINE_ONLY",
+    "comparability_status": "LIMITED_DENOMINATOR_PERIOD_MISMATCH",
+    "context": {
+      "description": "165 涉詐網站為全國脈絡，不與臺中案件數直接相加或比較。",
+      "latest_period": "2026-07",
+      "stopped_domain_rows": 6156,
+      "top_categories": [
+        {
+          "category": "電子商務",
+          "count": 2849
+        },
+        {
+          "category": "金融保險",
+          "count": 1506
+        },
+        {
+          "category": "資訊服務",
+          "count": 1123
+        },
+        {
+          "category": "運輸倉儲",
+          "count": 531
+        },
+        {
+          "category": "釣魚網站",
+          "count": 74
+        }
+      ]
+    },
+    "evidence_locators": [
+      {
+        "dataset_id": "88147",
+        "resource_id": "62b43956-448d-4433-981b-c655ca1fafa6",
+        "locator_type": "JSON_FILTER",
+        "locator": "項目=處理刑事案件-分局別-發生數(單位:件);欄位名稱=*_詐欺",
+        "content_sha256": "1d56a364de5eee8451590bbc00b74dcbe0a6c8122543c585f15f950df8984928"
+      },
+      {
+        "dataset_id": "103703",
+        "resource_id": "e2ec75c8-2866-4332-b5d5-a048bbb231d3",
+        "locator_type": "JSON_FILTER",
+        "locator": "項目=各區戶數、人口數按戶別及性別分-人口數(單位:人)",
+        "content_sha256": "cbf6b57c03fe2da197c58b05613b7a5529cc070792644aae1865ae84014827fa"
+      },
+      {
+        "dataset_id": "176455",
+        "resource_id": "8F6AA6B0-F2C1-49BD-A9D8-6497FFFB0D57",
+        "locator_type": "CSV_COLUMNS",
+        "locator": "民國年月,網站性質",
+        "content_sha256": "40d41b631fe084491e01ebb44a4a857387335a76de6d63b1bf10611e56339eb5"
+      }
+    ],
+    "derived_output_sha256": "29e84f85ffc97a3604fd4b512292b2854e7de4a71ae3c7bd9a040cf870d0aed0"
+  },
+  "manifest_sha256": "6dc61cb31b1162a3b2b32bcd8223f420cb33d12048f47ef3dd69bce375881e4c"
+}

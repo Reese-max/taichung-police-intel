@@ -1,0 +1,16 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "spec-ready-gate",
+      "description": "Block Spec tool use when required artifacts or validation contracts are incomplete.",
+      "trigger": "PreToolUse",
+      "matcher": "spec",
+      "action": {
+        "type": "command",
+        "command": "node scripts/verify-project.mjs specs"
+      },
+      "timeout": 30
+    }
+  ]
+}
