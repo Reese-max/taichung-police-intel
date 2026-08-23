@@ -10,6 +10,8 @@ venv/
 !.env.example
 *.log
 .gstack/
+.playwright-cli/
+output/playwright/
 
 # Internal Chinese planning documents excluded from public submission
 daily-five-minute-homepage-sample-2026-08-13.md
