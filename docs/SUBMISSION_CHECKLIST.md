@@ -38,7 +38,7 @@ Official deadline: **2026-08-23 23:59 UTC / 2026-08-24 07:59 Asia/Taipei**.
 - [x] Upload the video as public or unlisted and verify anonymous playback. (Verified: run 32650584348 succeeded; HTTP 200 `video/mp4`; remote SHA-256 matches; anonymous Chrome reports 163 seconds, 1280×720, `readyState=4`, 2026-08-24.)
 - [ ] Add entrant/team and contribution details.
 - [x] List direct third-party APIs, datasets, libraries, assets, AI/development tools, costs, rate limits, setup requirements, attribution, and usage-right boundaries in `README.md` and `SUBMISSION.md`.
-- [ ] Complete the official submission form and save the receipt.
+- [ ] Complete the [official submission form](https://forms.gle/xBLjk9nKMqbi2zie9) and save the receipt.
 - [ ] After the deadline, freeze source, documentation, README, video, links, credentials, application, and team membership through the judging period unless the organizers explicitly authorize a correction.
 
 ## Official form field map

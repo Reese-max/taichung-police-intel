@@ -170,6 +170,7 @@ Authenticated Kiro V3 sessions first reviewed all 16 Steering, Spec, and Hook ar
 - [Three-minute demo script](./docs/DEMO_SCRIPT.md)
 - [Submission checklist](./docs/SUBMISSION_CHECKLIST.md)
 - [Kiro usage evidence](./docs/KIRO_USAGE.md)
+- [Official submission form](https://forms.gle/xBLjk9nKMqbi2zie9)
 
 Official competition deadline: **2026-08-23 23:59 UTC**, which is **2026-08-24 07:59 Asia/Taipei**.
 
