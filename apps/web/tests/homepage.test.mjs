@@ -10,6 +10,7 @@ import {
   SOURCE_NAMES_EN,
   formatPlaybackStatus,
   limitCentralPolicyCards,
+  requiresOfficialFallback,
 } from "../lib/homepage-data.js";
 
 // ── R4: limitCentralPolicyCards pure function ─────────────────────────────────
@@ -78,6 +79,17 @@ test("playback status follows the selected language without resetting state", ()
   assert.equal(formatPlaybackStatus(status, COPY.en), "Seeked to official video 18:00.00.");
   assert.equal(formatPlaybackStatus(status, COPY.zh), "已定位至官方影音 18:00.00。");
   assert.equal(formatPlaybackStatus({ kind: "ready" }, COPY.en), COPY.en.playback_ready);
+});
+
+test("unavailable HLS keeps an explicit official-source fallback", async () => {
+  assert.equal(requiresOfficialFallback({ kind: "hls_error" }), true);
+  assert.equal(requiresOfficialFallback({ kind: "hls_unsupported" }), true);
+  assert.equal(requiresOfficialFallback({ kind: "ready" }), false);
+
+  const pageSource = await readFile(new URL("../app/page.js", import.meta.url), "utf8");
+  assert.match(pageSource, /addEventListener\("error", failPlayback\)/);
+  assert.match(pageSource, /setTimeout\(failPlayback, HLS_LOAD_TIMEOUT_MS\)/);
+  assert.doesNotMatch(pageSource, /demo-video\.mp4/);
 });
 
 test("every source in the competition snapshot has an English display name", async () => {
@@ -211,6 +223,7 @@ const REQUIRED_JOURNEY_KEYS = [
   "transcript_note",
   "workflow_body",
   "limitation_note",
+  "playback_open_official",
 ];
 
 for (const key of REQUIRED_JOURNEY_KEYS) {

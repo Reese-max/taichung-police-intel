@@ -235,6 +235,8 @@ h1 { margin-bottom: 0; font-size: clamp(1.8rem, 3vw, 3rem); letter-spacing: -0.0
 .clip-track span { height: 100%; display: block; background: var(--amber); transition: width 100ms linear; }
 
 .playback-status { min-height: 1.3em; margin: 9px 0 0; color: var(--green); font-size: 0.76rem; }
+.playback-fallback { margin-top: 8px; padding: 9px 11px; border: 1px solid #b65f00; background: #fff2d8; font-size: 0.78rem; }
+.playback-fallback a { color: #713900; font-weight: 750; }
 
 .provenance-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin-top: 12px; background: var(--line); border: 1px solid var(--line); }
 .provenance-grid div { min-width: 0; padding: 9px; background: var(--surface); }

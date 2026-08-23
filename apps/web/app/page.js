@@ -11,12 +11,14 @@ import {
   SOURCE_NAMES_EN,
   formatPlaybackStatus,
   limitCentralPolicyCards,
+  requiresOfficialFallback,
 } from "../lib/homepage-data.js";
 
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
 const DATA_URL = `${BASE_PATH}/data/groq-asr-canary-2026-08-14.json`;
 const CER_URL = `${BASE_PATH}/data/groq-asr-cer-2026-08-14.json`;
 const REFERENCE_URL = `${BASE_PATH}/data/groq-asr-reference-2026-08-14.json`;
+const HLS_LOAD_TIMEOUT_MS = 10_000;
 
 export default function Home() {
   // ── Language toggle ──────────────────────────────────────────────────────
@@ -76,7 +78,24 @@ export default function Home() {
     const video = videoRef.current;
     const clipStart = Number(data.source.clip_start_seconds);
     let hls;
+    let failed = false;
+    let loadTimer;
+    setPlaybackStatus({ kind: "loading" });
+
+    const failPlayback = () => {
+      if (failed) return;
+      failed = true;
+      window.clearTimeout(loadTimer);
+      pendingSeekRef.current = null;
+      hls?.destroy();
+      hls = undefined;
+      video.removeAttribute("src");
+      video.load();
+      setPlaybackStatus({ kind: "hls_error" });
+    };
     const ready = () => {
+      if (failed) return;
+      window.clearTimeout(loadTimer);
       const target = pendingSeekRef.current ?? clipStart;
       video.currentTime = target;
       setPlaybackStatus(
@@ -87,22 +106,27 @@ export default function Home() {
       pendingSeekRef.current = null;
     };
     video.addEventListener("loadedmetadata", ready);
+    video.addEventListener("error", failPlayback);
 
     if (video.canPlayType("application/vnd.apple.mpegurl")) {
       video.src = data.source.media_url;
+      loadTimer = window.setTimeout(failPlayback, HLS_LOAD_TIMEOUT_MS);
     } else if (Hls.isSupported()) {
       hls = new Hls({ enableWorker: true, lowLatencyMode: false });
       hls.loadSource(data.source.media_url);
       hls.attachMedia(video);
       hls.on(Hls.Events.ERROR, (_, details) => {
-        if (details?.fatal) setPlaybackStatus({ kind: "hls_error" });
+        if (details?.fatal) failPlayback();
       });
+      loadTimer = window.setTimeout(failPlayback, HLS_LOAD_TIMEOUT_MS);
     } else {
       setPlaybackStatus({ kind: "hls_unsupported" });
     }
 
     return () => {
+      window.clearTimeout(loadTimer);
       video.removeEventListener("loadedmetadata", ready);
+      video.removeEventListener("error", failPlayback);
       hls?.destroy();
     };
   }, [data, drawerOpen]);
@@ -129,20 +153,21 @@ export default function Home() {
     const video = videoRef.current;
     if (!video || !data) return;
     const absolute = clipStart + Number(relativeSeconds);
-    if (video.readyState === 0) pendingSeekRef.current = absolute;
-    else video.currentTime = absolute;
     setCurrentSeconds(absolute);
     if (segmentIndex !== null) {
       setActiveSegment(segmentIndex);
       setExpandedSegment(segmentIndex);
     }
+    if (requiresOfficialFallback(playbackStatus)) return;
+    if (video.readyState === 0) pendingSeekRef.current = absolute;
+    else video.currentTime = absolute;
     setPlaybackStatus({ kind: "seeked", timestamp: formatTime(absolute, true) });
     if (autoplay) {
       video.play().catch(() =>
         setPlaybackStatus({ kind: "autoplay_blocked", timestamp: formatTime(absolute, true) }),
       );
     }
-  }, [clipStart, data]);
+  }, [clipStart, data, playbackStatus]);
 
   const updatePlayback = () => {
     if (!data || !videoRef.current) return;
@@ -403,6 +428,13 @@ export default function Home() {
                   />
                 </div>
                 <p className="playback-status" role="status">{formatPlaybackStatus(playbackStatus, t)}</p>
+                {requiresOfficialFallback(playbackStatus) && (
+                  <div className="playback-fallback" role="alert">
+                    <a href={data.source.official_page_url} target="_blank" rel="noreferrer">
+                      {t.playback_open_official}
+                    </a>
+                  </div>
+                )}
 
                 <div className="provenance-grid">
                   <div>

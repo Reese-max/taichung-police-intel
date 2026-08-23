@@ -56,6 +56,10 @@ export function formatPlaybackStatus(status, copy) {
   return copy[`playback_${status.kind}`] || copy.playback_loading;
 }
 
+export function requiresOfficialFallback(status) {
+  return status?.kind === "hls_error" || status?.kind === "hls_unsupported";
+}
+
 // ── Bilingual copy contract ───────────────────────────────────────────────────
 // Every key must exist in both "en" and "zh". Values must be non-empty strings.
 // The Chinese transcript text itself is NOT translated here — it is preserved
@@ -153,6 +157,7 @@ export const COPY = {
     playback_hls_error: "HLS playback failed — verify via official source.",
     playback_hls_unsupported:
       "This browser does not support HLS — verify via official source.",
+    playback_open_official: "Open official council video",
     playback_autoplay_blocked_prefix: "Seeked to ",
     playback_autoplay_blocked_suffix: " — press play to watch.",
 
@@ -258,6 +263,7 @@ export const COPY = {
     playback_seeked_suffix: "。",
     playback_hls_error: "HLS 播放失敗，請改由官方來源核對。",
     playback_hls_unsupported: "此瀏覽器不支援 HLS，請改由官方來源核對。",
+    playback_open_official: "開啟臺中市議會官方影音",
     playback_autoplay_blocked_prefix: "已定位至 ",
     playback_autoplay_blocked_suffix: "，按播放鍵即可觀看。",
 

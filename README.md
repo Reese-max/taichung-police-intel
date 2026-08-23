@@ -203,6 +203,7 @@ The retained current-workspace Kiro records show Auto as `qdev::auto`: 10.254967
 - Some official endpoints provide no usable publication date or only partial date-window coverage.
 - Transcript quality is a historical baseline and has not received independent human sign-off.
 - The English path translates the product journey and source names; the official Chinese transcript remains Chinese and is explicitly labelled as navigation-only evidence.
+- The official `S-010` HLS CDN can fail in some Chrome sessions with `ERR_CONTENT_DECODING_FAILED`. A fatal media error or ten-second metadata timeout now preserves the transcript and provenance while showing a prominent link to the official council video. The local 2:43 product-demo MP4 is deliberately not substituted because it does not share the official evidence timeline.
 - The five source adapters passed local canaries and one GitHub-hosted scheduled EVENING run succeeded on 2026-08-23. A completed post-deployment MORNING plus EVENING pair has not yet been observed.
 - Public repository, public demo, and captioned video are live and verified anonymously; entrant details and form submission remain pending.
 

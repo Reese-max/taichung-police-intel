@@ -68,7 +68,7 @@ No test credentials, API key, database, payment, or private account are required
 
 ## Honest boundaries
 
-The demo contains one complete council-preparation journey. It does not access police internal systems, infer missing post-meeting implementation status, or claim that derived ASR text is authoritative. The official page, video, and source-status evidence remain the basis for verification.
+The demo contains one complete council-preparation journey. It does not access police internal systems, infer missing post-meeting implementation status, or claim that derived ASR text is authoritative. The official page, video, and source-status evidence remain the basis for verification. The official `S-010` HLS CDN can be incompatible with some Chrome sessions; fatal playback errors or a ten-second load timeout now produce an explicit official-video fallback instead of presenting a false successful seek. The local product-demo MP4 is not evidence media and is never substituted into the official timeline.
 
 ## Entrant details
 
