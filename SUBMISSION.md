@@ -30,14 +30,14 @@ The application presents one priority council issue, exposes the health and know
 - Health, completeness, intelligence-gap, SHA-256, and last-known-good status.
 - Evidence drawer with searchable segments and word-level video seeking.
 - Complete English judge path with official Chinese source names translated and the Chinese transcript clearly labelled as navigation-only.
-- Two daily GitHub Actions refreshes and GitHub Pages deployment configuration.
+- Two daily GitHub Actions refreshes and GitHub Pages deployment configuration; one natural scheduled EVENING run completed successfully on 2026-08-23.
 - Deterministic project, Spec, workflow, data-contract, secret, and build verification passes locally.
 
 ## Kiro usage
 
 Kiro Steering defines the police user, public-data boundary, technology constraints, and evidence policy. Three Kiro Specs define executable requirements for source provenance, the five-minute homepage, and council evidence. Three Hooks invoke the same repository verifier on relevant lifecycle events.
 
-Authenticated Kiro CLI V3 Spec sessions reviewed all 16 Steering, Spec, and Hook artifacts and implemented a bounded product task: the English primary path, shared evidence contract, central-policy cap, and homepage acceptance test. Human review rejected an insufficient first pass, fixed a drawer initialization defect found by browser QA, and reran the complete gate. The session IDs, prompts, corrections, Hook truth, and exact results are retained in [docs/KIRO_USAGE.md](./docs/KIRO_USAGE.md).
+Authenticated Kiro CLI V3 sessions reviewed all 16 Steering, Spec, and Hook artifacts and implemented a bounded product task: the English primary path, shared evidence contract, central-policy cap, and homepage acceptance test. Entrant-directed review rejected an insufficient first pass, fixed a drawer initialization defect found by browser QA, and reran the complete gate. The three retained current-workspace sessions selected Auto, exposed only `qdev::auto` rather than a routed base-model name, and recorded 13.006002 credits. Session IDs, prompts, corrections, Hook truth, model disclosure, and exact results are retained in [docs/KIRO_USAGE.md](./docs/KIRO_USAGE.md).
 
 ## URLs
 
@@ -54,6 +54,17 @@ npm run check
 ```
 
 Then open the public demo, review the source monitor, open the evidence drawer, search for `警察局`, and click a transcript timestamp.
+
+No test credentials, API key, database, payment, or private account are required for the judge path.
+
+## Third-party and AI assistance disclosure
+
+- Direct JavaScript dependencies: Next.js, React, React DOM, `pg`, and hls.js. Direct Python dependencies: Beautiful Soup, jsonschema, requests, and psycopg.
+- Hosting and automation: GitHub Pages and GitHub-maintained Actions for checkout, language setup, Pages configuration, artifact upload, and deployment. The legacy standalone ASR demo loads hls.js from jsDelivr; the primary Next.js demo does not.
+- Data and media: five named official Taichung sources (`S-004`, `S-006`, `S-007`, `S-009`, `S-029`) plus the `S-010` official council page, minutes, and HLS video. Publisher rights remain with the original agencies.
+- Historical ASR: a checked-in Groq `whisper-large-v3` snapshot is used only as derived navigation text. The default demo makes no live Groq call; an optional rerun requires user-supplied FFmpeg/ffprobe plus `GROQ_API_KEY` and is subject to provider quotas.
+- Development assistance: Kiro CLI V3 was the core competition workflow. OpenAI Codex performed entrant-directed independent QA and submission-document preparation. OpenHands-authored repository commits and gstack `browse.exe` QA evidence are retained. None of these tools is a deployed runtime dependency.
+- Repository rights: no software license has been selected, so reuse rights must not be assumed. Exact licenses, costs, setup boundaries, and source links are listed in [README.md](./README.md).
 
 ## Honest boundaries
 

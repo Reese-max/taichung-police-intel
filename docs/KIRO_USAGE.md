@@ -2,17 +2,22 @@
 
 ## Current status
 
-**Authenticated and verified on 2026-08-23.** Kiro CLI `kiro-cli-chat 2.17.0` was authenticated with Builder ID. The account email is intentionally redacted from this public evidence.
+**Authenticated and verified on 2026-08-23.** Kiro CLI `kiro-cli-chat 2.19.1` was authenticated with Builder ID. The account email is intentionally redacted from this public evidence.
 
 | Field | Evidence |
 |---|---|
 | Implementation session | `sess_3168ba8f-9bca-4967-9eb7-5640b6a58f31` — `Five-minute homepage English path` |
 | Architecture-review session | `sess_f8e0bb4d-ae6f-4c09-82c8-b361346821e3` — `Auditable Competition Evidence Report` |
 | Supporting review session | `sess_fb15f607-371b-453d-9f9f-8c1e1119b85f` — `Patch spec docs for static topology` |
-| Session type | Local Kiro CLI V3 Spec session |
-| Invocation | `kiro-cli chat --v3 --mode spec` |
+| Session type | Local Kiro CLI V3 sessions: one Spec implementation session and two Vibe review sessions |
+| Invocation | Implementation: `kiro-cli chat --v3 --mode spec`; reviews: local V3 Vibe sessions |
 | Repository role | Bounded architecture review followed by bounded product implementation |
 | Product files changed by Kiro | `apps/web/app/page.js`, `apps/web/lib/homepage-data.js`, `apps/web/tests/homepage.test.mjs` |
+| Requested model | Auto for all three retained current-workspace sessions |
+| Observed model identifier | `qdev::auto`; the routed base model was not disclosed |
+| Recorded credits | 10.254967 + 1.736521 + 1.014514 = **13.006002 credits** |
+
+The credit total above is parsed from local `usage_summary` records for only the three sessions in this table. It is not an account-wide total and does not include the separate roadmap, rerun, or deployment sessions documented later when comparable local usage summaries are unavailable.
 
 ## Meaningful use
 
@@ -112,7 +117,7 @@ npm run check
 VERIFY_OK mode=full required=39 specs=3 secrets=0
 ```
 
-This is evidence of authenticated, bounded Kiro use with retained implementation and executable gates. It is not evidence of a public deployment or an observed Hook lifecycle run. The demo video should show the implementation session ID, checked tasks, the final `VERIFY_OK` line, and this limitation.
+This is evidence of authenticated, bounded Kiro use with retained implementation and executable gates. This subsection alone is not public-deployment evidence; the deployment evidence appears below. No observed Hook lifecycle run is claimed. The demo video should show the implementation session ID, checked tasks, the final `VERIFY_OK` line, and this limitation.
 
 
 
@@ -235,8 +240,20 @@ External official links were not opened; smoke check is confined to the deployed
 - Video recording, demo video upload, and form submission remain pending external actions and are not performed by Kiro.
 - Entrant identity, team membership, and eligibility confirmation remain pending and are not invented by Kiro.
 - Member contribution statement remains pending.
-- No scheduled cron run has been observed post-deployment; cron evidence requires a future run.
+- One scheduled EVENING run has been observed post-deployment; a completed MORNING plus EVENING pair has not yet been observed.
 - No Hook lifecycle firing was observed during this session.
 - The controller's separate visual screenshot inspection (`.runtime/qa/` PNG files) is distinct from the Kiro-owned headless checks documented above.
 
-**Final marker:** `K4_PUBLIC_EVIDENCE_COMPLETE` (pending Phase C push and post-deploy recheck)
+### Post-deployment scheduled-run update
+
+The first natural scheduled run after deployment completed successfully on 2026-08-23:
+
+- GitHub Actions run `32634682889`: workflow conclusion `success`;
+- collection run `CR-DEMO-20260823-EVENING-SCHEDULE`: `slot=EVENING`, `trigger=SCHEDULE`, overall `status=PARTIAL`;
+- all five endpoints reported `source_health=PASS`;
+- `PARTIAL` honestly reflects stale or incomplete date-window evidence, including `VERY_STALE_DATA`, `WINDOW_PARTIAL`, and `NO_DATA_AS_OF`, rather than a workflow failure;
+- the next natural MORNING refresh is scheduled for 2026-08-24 06:30 Asia/Taipei.
+
+This proves one natural schedule and the failure-aware status contract. It does not yet prove a completed post-deployment MORNING plus EVENING pair.
+
+**Final marker:** `K4_PUBLIC_EVIDENCE_COMPLETE` (public deployment and recheck complete; this documentation update remains local until separately authorized for push)
