@@ -18,7 +18,7 @@ The demo compresses official Taichung council and government sources into one wo
 |---|---|
 | Working application | Local static production build passes |
 | Public demo | Deployed at [https://reese-max.github.io/taichung-police-intel](https://reese-max.github.io/taichung-police-intel) — verified HTTP 200 anonymously 2026-08-23 |
-| Demo video | [2:43 English-captioned MP4](https://reese-max.github.io/taichung-police-intel/demo-video.mp4) |
+| Demo video | [2:43 English-captioned MP4](https://reese-max.github.io/taichung-police-intel/demo-video.mp4) — verified anonymously in Chrome 2026-08-24 |
 | Twice-daily updates | GitHub Actions schedules 06:30 and 18:30 Asia/Taipei |
 | Source observability | Five live official-source adapters emit health, completeness, gaps, SHA-256, and last-known-good |
 | Evidence navigation | 86 transcript segments and 1,036 word timestamps seek the official HLS video |
@@ -203,7 +203,7 @@ The retained current-workspace Kiro records show Auto as `qdev::auto`: 10.254967
 - Transcript quality is a historical baseline and has not received independent human sign-off.
 - The English path translates the product journey and source names; the official Chinese transcript remains Chinese and is explicitly labelled as navigation-only evidence.
 - The five source adapters passed local canaries and one GitHub-hosted scheduled EVENING run succeeded on 2026-08-23. A completed post-deployment MORNING plus EVENING pair has not yet been observed.
-- Public repository, public demo, and captioned video are available; entrant details and form submission remain pending.
+- Public repository, public demo, and captioned video are live and verified anonymously; entrant details and form submission remain pending.
 
 ## License and data rights
 

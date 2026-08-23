@@ -35,7 +35,7 @@ Official deadline: **2026-08-23 23:59 UTC / 2026-08-24 07:59 Asia/Taipei**.
 - [x] Observe one natural post-deployment schedule. (Verified: run 32634682889 conclusion=success; `CR-DEMO-20260823-EVENING-SCHEDULE`, `trigger=SCHEDULE`, 2026-08-23.)
 - [ ] Observe a completed post-deployment MORNING plus EVENING pair; the next MORNING run is scheduled for 2026-08-24 06:30 Asia/Taipei.
 - [x] Record a demo no longer than three minutes in English or with complete English captions. (Verified locally: H.264, 1280×720, 2:43, full decode succeeds.)
-- [ ] Upload the video as public or unlisted and verify anonymous playback.
+- [x] Upload the video as public or unlisted and verify anonymous playback. (Verified: run 32650584348 succeeded; HTTP 200 `video/mp4`; remote SHA-256 matches; anonymous Chrome reports 163 seconds, 1280×720, `readyState=4`, 2026-08-24.)
 - [ ] Add entrant/team and contribution details.
 - [x] List direct third-party APIs, datasets, libraries, assets, AI/development tools, costs, rate limits, setup requirements, attribution, and usage-right boundaries in `README.md` and `SUBMISSION.md`.
 - [ ] Complete the official submission form and save the receipt.
