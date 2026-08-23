@@ -176,3 +176,67 @@ Root .kiro/ intentionally included as required competition evidence
 **Remaining external gate:** Requires entrant/team name, contribution statement, explicit public repository/push authorization, and GitHub Pages authorization. Video and submission form follow after the live URL exists.
 
 **Final marker:** `KIRO_AUTO_FULL_LOCAL_RERUN_ACCEPTED`
+
+
+
+## Kiro Auto public deployment and live smoke (2026-08-23)
+
+**Session ID:** `sess_current_k4d_2026-08-23` (Kiro Auto, acp-client, autopilot mode)
+**Date:** 2026-08-23
+**Initial SHA:** `4b1d8441a46ed2749cee6d44232aab6f672984b4`
+**Repository:** `https://github.com/Reese-max/taichung-police-intel`
+**Demo:** `https://reese-max.github.io/taichung-police-intel`
+
+### Prior whitespace gate correction (same session)
+
+13 source files had trailing whitespace that would have caused `git diff --check` to fail. Kiro Auto corrected those files in a prior commit before proceeding to the evidence document update. This is noted for completeness; that correction is not part of this Phase B document update.
+
+### GitHub Actions run evidence
+
+- **Run ID:** 32631305048
+- **Run URL:** `https://github.com/Reese-max/taichung-police-intel/actions/runs/32631305048`
+- **Conclusion:** `success` (status: `completed`)
+- **Workflow:** `Refresh and deploy competition demo`
+- **Head SHA:** `4b1d8441a46ed2749cee6d44232aab6f672984b4`
+- **Pages build_type:** `workflow` (verified via `gh api repos/Reese-max/taichung-police-intel/pages`)
+
+### Kiro-owned anonymous curl evidence
+
+All checks performed without credentials against the live GitHub Pages URL:
+
+| Endpoint | HTTP status | Parsed result |
+|---|---|---|
+| `https://reese-max.github.io/taichung-police-intel/` | 200 | — |
+| `https://reese-max.github.io/taichung-police-intel/api/health.json` | 200 | `status=ok`, `sources=5`, `failed_sources=0`, `mode=COMPETITION_DEMO`, `generated_at=2026-08-22T22:45:52+08:00` |
+| `https://reese-max.github.io/taichung-police-intel/api/status.json` | 200 | 5 source objects confirmed |
+
+### Kiro-owned headless browse.exe smoke
+
+Tool: `C:\Users\Administrator\.codex\skills\gstack\browse\dist\browse.exe`
+Mode: fresh/restarted headless state, no stored credentials used.
+
+| Check | Result |
+|---|---|
+| Homepage `goto` | HTTP 200 |
+| Console messages | None (no console errors) |
+| Network 4xx/5xx | None — all assets HTTP 200 |
+| Language toggle (zh→en) | Clicked `@e2 "Switch to English"`; h1 changed from `今晚議會準備` to `Tonight's council preparation`; button changed to `切換中文 [pressed]` |
+| Evidence drawer | Clicked `@e31 "View video evidence" [expanded]`; drawer opened with video player, metadata, and jumpable transcript |
+| Transcript search `警察局` | Searchbox filled; result count changed to `2／86 segs`; rows: `20:39` and `20:46` |
+| Timestamp click `20:39.60` | Video `currentTime` = 1241.3 s (expected ≈ 1239.6 s; ~1.7 s playback lag during 2 s wait); `readyState=4`, `paused=false` |
+| Viewport 375×812 | `scrollWidth=375`, `innerWidth=375` — no horizontal overflow |
+| Viewport 768×1024 | `scrollWidth=768`, `innerWidth=768` — no horizontal overflow |
+| Viewport 1280×720 | `scrollWidth=1280`, `innerWidth=1280` — no horizontal overflow |
+
+External official links were not opened; smoke check is confined to the deployed demo domain.
+
+### Honest boundaries
+
+- Video recording, demo video upload, and form submission remain pending external actions and are not performed by Kiro.
+- Entrant identity, team membership, and eligibility confirmation remain pending and are not invented by Kiro.
+- Member contribution statement remains pending.
+- No scheduled cron run has been observed post-deployment; cron evidence requires a future run.
+- No Hook lifecycle firing was observed during this session.
+- The controller's separate visual screenshot inspection (`.runtime/qa/` PNG files) is distinct from the Kiro-owned headless checks documented above.
+
+**Final marker:** `K4_PUBLIC_EVIDENCE_COMPLETE` (pending Phase C push and post-deploy recheck)

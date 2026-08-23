@@ -41,8 +41,8 @@ Authenticated Kiro CLI V3 Spec sessions reviewed all 16 Steering, Spec, and Hook
 
 ## URLs
 
-- **Public repository:** `PENDING_PUBLIC_REPOSITORY_URL`
-- **Working demo:** `PENDING_PUBLIC_DEMO_URL`
+- **Public repository:** `https://github.com/Reese-max/taichung-police-intel`
+- **Working demo:** `https://reese-max.github.io/taichung-police-intel`
 - **Demo video (three minutes maximum):** `PENDING_VIDEO_URL`
 
 ## Judge test

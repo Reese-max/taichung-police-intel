@@ -25,11 +25,11 @@ Official deadline: **2026-08-23 23:59 UTC / 2026-08-24 07:59 Asia/Taipei**.
 - [x] Complete the full English primary product journey with translated UI, source names, and controls. Official Chinese transcript remains Chinese and is explicitly labeled as navigation-only derived text, not authoritative evidence.
 - [x] Use Kiro to implement and verify one bounded product task; retain changed files, session ID, human corrections, Hook-activity truth, and final acceptance output.
 - [ ] Capture the Kiro session ID and final `VERIFY_OK` line in the demo video.
-- [ ] Set the repository owner/name and replace all `PENDING_*` fields.
-- [ ] Make the repository public.
-- [ ] Enable GitHub Pages with **Source: GitHub Actions**.
-- [ ] Confirm the Pages workflow and both static JSON endpoints return HTTP 200.
-- [ ] Confirm anonymous access in a signed-out browser.
+- [x] Set the repository owner/name and replace all `PENDING_*` fields (repo and demo URLs now set; video, entrant, and contribution remain pending).
+- [x] Make the repository public. (Verified: `private: false` via GitHub API, 2026-08-23.)
+- [x] Enable GitHub Pages with **Source: GitHub Actions**. (Verified: `build_type: workflow` via GitHub API, 2026-08-23.)
+- [x] Confirm the Pages workflow and both static JSON endpoints return HTTP 200. (Verified: run 32631305048 conclusion=success; `/`, `/api/health.json`, `/api/status.json` each returned HTTP 200 anonymously, 2026-08-23.)
+- [x] Confirm anonymous access in a signed-out browser. (Verified: Kiro-owned anonymous curl and browse.exe headless checks, 2026-08-23; no login prompt, no console errors, no 4xx/5xx assets.)
 - [ ] Record a demo no longer than three minutes in English or with complete English captions.
 - [ ] Upload the video as public or unlisted and verify anonymous playback.
 - [ ] Add entrant/team and contribution details.
@@ -53,8 +53,8 @@ Official deadline: **2026-08-23 23:59 UTC / 2026-08-24 07:59 Asia/Taipei**.
 
 ```bash
 npm run check
-curl -f PENDING_PUBLIC_DEMO_URL/api/health.json
-curl -f PENDING_PUBLIC_DEMO_URL/api/status.json
+curl -f https://reese-max.github.io/taichung-police-intel/api/health.json
+curl -f https://reese-max.github.io/taichung-police-intel/api/status.json
 ```
 
 Verify manually:

@@ -17,7 +17,7 @@ The demo compresses official Taichung council and government sources into one wo
 | Deliverable | Current state |
 |---|---|
 | Working application | Local static production build passes |
-| Public demo | GitHub Pages workflow is ready; public deployment is pending authorization |
+| Public demo | Deployed at [https://reese-max.github.io/taichung-police-intel](https://reese-max.github.io/taichung-police-intel) — verified HTTP 200 anonymously 2026-08-23 |
 | Twice-daily updates | GitHub Actions schedules 06:30 and 18:30 Asia/Taipei |
 | Source observability | Five live official-source adapters emit health, completeness, gaps, SHA-256, and last-known-good |
 | Evidence navigation | 86 transcript segments and 1,036 word timestamps seek the official HLS video |
@@ -114,7 +114,10 @@ Open `http://localhost:8000`. The live refresh performs read-only requests to th
 - each scheduled run commits only `apps/web/public/data/source-status.json`, then deploys the static export;
 - manual dispatch can refresh either slot.
 
-After the repository is public, enable Pages with **Source: GitHub Actions**. The deployed demo and repository URLs will be added to [SUBMISSION.md](./SUBMISSION.md). A workflow file is not deployment evidence; acceptance requires an anonymous HTTPS check.
+After the repository is public, enable Pages with **Source: GitHub Actions**. The deployed demo and repository URLs are recorded in [SUBMISSION.md](./SUBMISSION.md). A workflow file is not deployment evidence; acceptance requires an anonymous HTTPS check.
+
+Repository: `https://github.com/Reese-max/taichung-police-intel`
+Demo: `https://reese-max.github.io/taichung-police-intel` (verified HTTP 200 anonymously 2026-08-23; initial run 32631305048 conclusion=success)
 
 ## Verification
 
@@ -189,8 +192,8 @@ Default verification performs no paid operation and no external write. Scheduled
 - Some official endpoints provide no usable publication date or only partial date-window coverage.
 - Transcript quality is a historical baseline and has not received independent human sign-off.
 - The English path translates the product journey and source names; the official Chinese transcript remains Chinese and is explicitly labelled as navigation-only evidence.
-- The five source adapters passed local canaries, but the GitHub-hosted schedule and anonymous public URL are not verified until deployment.
-- Public repository, public demo, video, and form submission remain pending external actions.
+- The five source adapters passed local canaries; the GitHub-hosted schedule is pending the first cron run after deployment (scheduled 06:30 and 18:30 Asia/Taipei).
+- Public repository and public demo are live and verified anonymously; video and form submission remain pending.
 
 ## License and data rights
 
