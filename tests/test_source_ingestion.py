@@ -300,6 +300,51 @@ class SourceIngestionContractTests(unittest.TestCase):
             self.assertEqual(evening["source_status"]["S-004"]["result"], "NO_NEW_ITEM")
             self.assertEqual(len(evening["current_items"]), 2)
 
+    def test_stable_keys_no_duplicates_and_normalized_manifests(self) -> None:
+        """Two fixture runs yield no duplicate stable keys and identical manifests."""
+        with tempfile.TemporaryDirectory() as directory:
+            state_path = Path(directory) / "state.json"
+            state, _, run_id = run_slot(
+                "morning",
+                date(2026, 8, 22),
+                state_path,
+                now=datetime(2026, 8, 22, 7, 0, tzinfo=TZ),
+            )
+            # No duplicate stable keys in current_items
+            keys = list(state["current_items"].keys())
+            self.assertEqual(len(keys), len(set(keys)), "duplicate stable_key in current_items")
+
+            # Every current item has version_no=1 (first observation of fixed fixture)
+            for key, item in state["current_items"].items():
+                self.assertEqual(item["version_no"], 1, f"{key} should be version 1")
+                self.assertIn("content_sha256", item, f"{key} missing content_sha256")
+
+            # Collect manifest hashes from source_runs
+            manifests_run1 = {
+                record["source_id"]: record["manifest_sha256"]
+                for record in state["source_runs"].values()
+                if record["collection_run_id"] == run_id and record["manifest_sha256"]
+            }
+
+            # Second (distinct evening) slot produces identical manifests
+            state2, _, run_id2 = run_slot(
+                "evening",
+                date(2026, 8, 22),
+                state_path,
+                now=datetime(2026, 8, 22, 19, 0, tzinfo=TZ),
+            )
+            manifests_run2 = {
+                record["source_id"]: record["manifest_sha256"]
+                for record in state2["source_runs"].values()
+                if record["collection_run_id"] == run_id2 and record["manifest_sha256"]
+            }
+            self.assertEqual(manifests_run1, manifests_run2, "manifests differ between runs")
+
+            # Still no duplicate stable keys after second run
+            keys2 = list(state2["current_items"].keys())
+            self.assertEqual(len(keys2), len(set(keys2)), "duplicate after evening run")
+            self.assertEqual(len(keys2), 2, "item count should remain 2")
+
     @unittest.skipUnless(os.environ.get("TEST_DATABASE_URL"), "TEST_DATABASE_URL not set")
     def test_migration_applies_to_postgresql(self) -> None:
         psql = shutil.which("psql")

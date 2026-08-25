@@ -3,19 +3,35 @@
 // Both language paths reference the same evidence identifiers and official URLs.
 // Formal citation always returns to the official source; GROQ_ASR text is navigation only.
 
-export const EVIDENCE_SOURCE_ID = "S-010";
+import { COUNCIL_FIXTURE, getFixtureEvidenceChain } from "./council-prep.js";
 
-export const PRIORITY_ITEM = {
+const COUNCIL_EVIDENCE_CHAIN = getFixtureEvidenceChain();
+const HISTORICAL_EVIDENCE = COUNCIL_FIXTURE.historical_question;
+const TRANSCRIPT_EVIDENCE = COUNCIL_FIXTURE.derived_transcript;
+
+export const EVIDENCE_SOURCE_ID = HISTORICAL_EVIDENCE.source_id;
+
+// This is the homepage candidate projection of the council fixture. It keeps
+// evidence IDs/URLs/clip bounds in one contract instead of restating them in
+// the production page.
+export const PRIORITY_ITEM = Object.freeze({
+  item_id: `COUNCIL-${HISTORICAL_EVIDENCE.evidence_id}`,
   evidence_source_id: EVIDENCE_SOURCE_ID,
-  session_date: "2026-04-27",
-  official_page_url: "https://vod.tccc.gov.tw/wb_news02.asp?url=92&ano=14170&pageno=1",
-  meeting_records_url: "https://yishi.tccc.gov.tw/meeting-records/292a8e4a-0e1e-4429-8889-72bc56bc895d",
-  clip_start_seconds: 1080,
-  derivation_type: "GROQ_ASR",
-  verification_status: "AUTO_PASS",
-  content_label: "ORAL_OFFICIAL",
-  post_meeting_label: "UNVERIFIED_AFTER_MEETING",
-};
+  evidence_ids: Object.freeze(COUNCIL_EVIDENCE_CHAIN.map(({ evidence_id }) => evidence_id)),
+  session_date: COUNCIL_FIXTURE.agenda_item.session_date,
+  official_page_url: HISTORICAL_EVIDENCE.official_url,
+  official_url: HISTORICAL_EVIDENCE.official_url,
+  meeting_records_url: COUNCIL_FIXTURE.meeting_record.official_url,
+  clip_start_seconds: HISTORICAL_EVIDENCE.clip_start_seconds,
+  clip_duration_seconds: HISTORICAL_EVIDENCE.clip_duration_seconds,
+  derivation_type: TRANSCRIPT_EVIDENCE.evidence_type,
+  verification_status: COUNCIL_FIXTURE.validation.verification_status,
+  content_disposition: "HOME_CANDIDATE",
+  reason_codes: Object.freeze(["COUNCIL_ATTENTION"]),
+  item_value_score: 100,
+  content_label: HISTORICAL_EVIDENCE.content_label,
+  post_meeting_label: COUNCIL_FIXTURE.validation.post_meeting_label,
+});
 
 export const SOURCE_NAMES_EN = {
   "S-004": "Taichung City Council meeting agenda",

@@ -68,7 +68,7 @@ class SourceValueContractTests(unittest.TestCase):
         self.assertEqual(decision["content_disposition"], "HOME_CANDIDATE")
         VALIDATOR.validate(payload(decision))
 
-    def test_untraceable_item_is_quarantined(self):
+    def test_untraceable_item_is_claim_rejected(self):
         decision = route_item(verification_status="AUTO_PASS", traceability_gate="FAIL")
         rejected = payload(
             decision,
@@ -84,6 +84,8 @@ class SourceValueContractTests(unittest.TestCase):
             verifier_model=None,
             prompt_version=None,
         )
+        self.assertEqual(decision["verification_status"], "CLAIM_REJECTED")
+        self.assertEqual(decision["content_disposition"], "CLAIM_REJECTED")
         self.assertEqual(decision["validation_reason_codes"], ["UNTRACEABLE"])
         VALIDATOR.validate(rejected)
 

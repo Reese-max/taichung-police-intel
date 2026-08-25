@@ -264,3 +264,365 @@ test("COPY.en.transcript_note labels the transcript as Chinese official-source n
     "EN transcript note must describe the Chinese official-source nature of the transcript",
   );
 });
+
+// ── Spec tasks: typed homepage response, eligibility, deterministic ordering ──
+
+import {
+  HOMEPAGE_ITEM_LIMIT,
+  REASON_CODES,
+  buildHomepageResponse,
+  checkEligibility,
+  deterministicSort,
+  validateGeneratedWording,
+  verifySentence,
+} from "../lib/homepage-eligibility.js";
+
+// ── Eligibility function ──────────────────────────────────────────────────────
+
+test("HOMEPAGE_ITEM_LIMIT is exactly 10", () => {
+  assert.equal(HOMEPAGE_ITEM_LIMIT, 10);
+});
+
+test("checkEligibility rejects non-AUTO_PASS items", () => {
+  const item = {
+    verification_status: "QUARANTINED",
+    content_disposition: "HOME_CANDIDATE",
+    evidence_ids: ["EV-001"],
+    official_url: "https://example.com",
+    reason_codes: ["RECURRING"],
+  };
+  const result = checkEligibility(item);
+  assert.equal(result.eligible, false);
+  assert.equal(result.reason, "NOT_AUTO_PASS");
+});
+
+test("checkEligibility rejects non-HOME_CANDIDATE items", () => {
+  const item = {
+    verification_status: "AUTO_PASS",
+    content_disposition: "SEARCH_ONLY",
+    evidence_ids: ["EV-001"],
+    official_url: "https://example.com",
+    reason_codes: ["HIGH_VALUE"],
+  };
+  assert.equal(checkEligibility(item).eligible, false);
+  assert.equal(checkEligibility(item).reason, "NOT_HOME_CANDIDATE");
+});
+
+test("checkEligibility rejects items without evidence", () => {
+  const item = {
+    item_id: "HP-NO-EVIDENCE",
+    verification_status: "AUTO_PASS",
+    content_disposition: "HOME_CANDIDATE",
+    evidence_ids: [],
+    official_url: "https://example.com",
+    reason_codes: ["HIGH_VALUE"],
+  };
+  assert.equal(checkEligibility(item).eligible, false);
+  assert.equal(checkEligibility(item).reason, "NO_EVIDENCE");
+});
+
+test("checkEligibility accepts valid AUTO_PASS HOME_CANDIDATE item", () => {
+  const item = {
+    item_id: "HP-VALID",
+    verification_status: "AUTO_PASS",
+    content_disposition: "HOME_CANDIDATE",
+    evidence_ids: ["EV-001"],
+    official_url: "https://example.com",
+    reason_codes: ["COUNCIL_ATTENTION"],
+  };
+  assert.equal(checkEligibility(item).eligible, true);
+});
+
+test("checkEligibility rejects candidates without a stable identity", () => {
+  const item = {
+    verification_status: "AUTO_PASS",
+    content_disposition: "HOME_CANDIDATE",
+    evidence_ids: ["EV-001"],
+    official_url: "https://example.com",
+    reason_codes: ["COUNCIL_ATTENTION"],
+  };
+  assert.equal(checkEligibility(item).reason, "MISSING_STABLE_ID");
+});
+
+test("checkEligibility rejects unknown reason codes", () => {
+  const item = {
+    item_id: "HP-UNKNOWN-REASON",
+    verification_status: "AUTO_PASS",
+    content_disposition: "HOME_CANDIDATE",
+    evidence_ids: ["EV-001"],
+    official_url: "https://example.com",
+    reason_codes: ["MADE_UP"],
+  };
+  assert.equal(checkEligibility(item).reason, "INVALID_REASON_CODE");
+});
+
+// ── buildHomepageResponse enforces limits ─────────────────────────────────────
+
+test("buildHomepageResponse returns at most 10 items", () => {
+  const candidates = Array.from({ length: 15 }, (_, i) => ({
+    item_id: `HP-${i}`,
+    verification_status: "AUTO_PASS",
+    content_disposition: "HOME_CANDIDATE",
+    item_value_score: 80 - i,
+    evidence_ids: [`EV-${i}`],
+    official_url: "https://example.com",
+    reason_codes: ["HIGH_VALUE"],
+  }));
+  const response = buildHomepageResponse(candidates);
+  assert.ok(response.items.length <= 10, `Expected ≤10 items, got ${response.items.length}`);
+  assert.equal(response.total_candidates, 15);
+});
+
+test("buildHomepageResponse rejects non-AUTO_PASS items", () => {
+  const candidates = [
+    {
+      item_id: "HP-GOOD",
+      verification_status: "AUTO_PASS",
+      content_disposition: "HOME_CANDIDATE",
+      item_value_score: 90,
+      evidence_ids: ["EV-001"],
+      official_url: "https://example.com",
+      reason_codes: ["RECURRING"],
+    },
+    {
+      item_id: "HP-BAD",
+      verification_status: "QUARANTINED",
+      content_disposition: "HOME_CANDIDATE",
+      item_value_score: 95,
+      evidence_ids: ["EV-002"],
+      official_url: "https://example.com",
+      reason_codes: ["HIGH_VALUE"],
+    },
+  ];
+  const response = buildHomepageResponse(candidates);
+  assert.equal(response.items.length, 1);
+  assert.equal(response.items[0].item_id, "HP-GOOD");
+  assert.equal(response.rejected.length, 1);
+  assert.equal(response.rejected[0].rejection_reason, "NOT_AUTO_PASS");
+});
+
+// ── Deterministic ordering ────────────────────────────────────────────────────
+
+test("deterministicSort produces identical order across repeated runs", () => {
+  const items = [
+    { item_id: "A", reason_codes: ["HIGH_VALUE"], item_value_score: 90 },
+    { item_id: "B", reason_codes: ["COUNCIL_ATTENTION"], item_value_score: 80 },
+    { item_id: "C", reason_codes: ["RECURRING"], item_value_score: 85 },
+  ];
+  const sorted1 = deterministicSort(items);
+  const sorted2 = deterministicSort(items);
+  assert.deepEqual(
+    sorted1.map((i) => i.item_id),
+    sorted2.map((i) => i.item_id),
+  );
+  // COUNCIL_ATTENTION has highest priority
+  assert.equal(sorted1[0].item_id, "B");
+  // RECURRING is next
+  assert.equal(sorted1[1].item_id, "C");
+  // HIGH_VALUE is lowest priority
+  assert.equal(sorted1[2].item_id, "A");
+});
+
+test("deterministicSort breaks ties by score descending", () => {
+  const items = [
+    { item_id: "X", reason_codes: ["RECURRING"], item_value_score: 70 },
+    { item_id: "Y", reason_codes: ["RECURRING"], item_value_score: 95 },
+  ];
+  const sorted = deterministicSort(items);
+  assert.equal(sorted[0].item_id, "Y");
+  assert.equal(sorted[1].item_id, "X");
+});
+
+test("deterministicSort breaks equal reason and score ties by stable item ID", () => {
+  const items = [
+    { item_id: "Z-ITEM", reason_codes: ["RECURRING"], item_value_score: 70 },
+    { item_id: "A-ITEM", reason_codes: ["RECURRING"], item_value_score: 70 },
+  ];
+  assert.deepEqual(
+    deterministicSort(items).map((item) => item.item_id),
+    ["A-ITEM", "Z-ITEM"],
+  );
+  assert.deepEqual(
+    deterministicSort([...items].reverse()).map((item) => item.item_id),
+    ["A-ITEM", "Z-ITEM"],
+  );
+});
+
+// ── Wording generation and verification ───────────────────────────────────────
+
+test("validateGeneratedWording rejects missing text", () => {
+  const result = validateGeneratedWording({}, []);
+  assert.equal(result.valid, false);
+  assert.equal(result.fallback_to_source, true);
+  assert.equal(result.reason, "MISSING_GENERATED_TEXT");
+});
+
+test("validateGeneratedWording rejects unbound evidence references", () => {
+  const generated = {
+    text: "Some wording",
+    evidence_ids: ["EV-999"],
+    producer_run_id: "PROD-001",
+  };
+  const bound = [{ evidence_id: "EV-001" }];
+  const result = validateGeneratedWording(generated, bound);
+  assert.equal(result.valid, false);
+  assert.equal(result.reason, "UNBOUND_EVIDENCE_REFERENCE");
+});
+
+test("validateGeneratedWording accepts valid wording with bound evidence", () => {
+  const generated = {
+    text: "Councillor raised the incentive gap issue.",
+    evidence_ids: ["EV-001"],
+    producer_run_id: "PROD-001",
+  };
+  const bound = [{ evidence_id: "EV-001" }];
+  const result = validateGeneratedWording(generated, bound);
+  assert.equal(result.valid, true);
+  assert.equal(result.fallback_to_source, false);
+});
+
+test("verifySentence rejects when producer and verifier are the same", () => {
+  const sentence = {
+    text: "Test",
+    evidence_ids: ["EV-001"],
+    producer_run_id: "SAME",
+    verifier_run_id: "SAME",
+  };
+  const result = verifySentence(sentence, [{ evidence_id: "EV-001", locator: "page:1" }]);
+  assert.equal(result.verified, false);
+  assert.equal(result.reason, "PRODUCER_VERIFIER_NOT_INDEPENDENT");
+});
+
+test("verifySentence rejects when evidence is not found", () => {
+  const sentence = {
+    text: "Test",
+    evidence_ids: ["EV-MISSING"],
+    producer_run_id: "PROD-001",
+    verifier_run_id: "VERI-001",
+  };
+  const result = verifySentence(sentence, [{ evidence_id: "EV-001", locator: "page:1" }]);
+  assert.equal(result.verified, false);
+  assert.equal(result.reason, "EVIDENCE_NOT_FOUND");
+});
+
+test("verifySentence rejects when locator is missing on bound evidence", () => {
+  const sentence = {
+    text: "Test",
+    evidence_ids: ["EV-001"],
+    producer_run_id: "PROD-001",
+    verifier_run_id: "VERI-001",
+  };
+  const result = verifySentence(sentence, [{ evidence_id: "EV-001" }]);
+  assert.equal(result.verified, false);
+  assert.equal(result.reason, "MISSING_LOCATOR");
+});
+
+test("verifySentence rejects a sentence without explicit verifier attestation", () => {
+  const sentence = {
+    text: "Arbitrary wording",
+    evidence_ids: ["EV-001"],
+    producer_run_id: "PROD-001",
+    verifier_run_id: "VERI-001",
+  };
+  const result = verifySentence(sentence, [{ evidence_id: "EV-001", locator: "page:1" }]);
+  assert.equal(result.verified, false);
+  assert.equal(result.reason, "MISSING_VERIFIER_ATTESTATION");
+});
+
+test("verifySentence rejects an attestation that checked different evidence IDs", () => {
+  const sentence = {
+    text: "Arbitrary wording",
+    evidence_ids: ["EV-001"],
+    producer_run_id: "PROD-001",
+    verifier_run_id: "VERI-001",
+    verifier_attestation: {
+      verifier_run_id: "VERI-001",
+      decision: "PASS",
+      checked_text: "Arbitrary wording",
+      checked_evidence_ids: ["EV-002"],
+    },
+  };
+  const result = verifySentence(sentence, [{ evidence_id: "EV-001", locator: "page:1" }]);
+  assert.equal(result.verified, false);
+  assert.equal(result.reason, "VERIFIER_EVIDENCE_MISMATCH");
+});
+
+test("verifySentence rejects an attestation from a different verifier run", () => {
+  const sentence = {
+    text: "Arbitrary wording",
+    evidence_ids: ["EV-001"],
+    producer_run_id: "PROD-001",
+    verifier_run_id: "VERI-001",
+    verifier_attestation: {
+      verifier_run_id: "VERI-OTHER",
+      decision: "PASS",
+      checked_text: "Arbitrary wording",
+      checked_evidence_ids: ["EV-001"],
+    },
+  };
+  const result = verifySentence(sentence, [{ evidence_id: "EV-001", locator: "page:1" }]);
+  assert.equal(result.verified, false);
+  assert.equal(result.reason, "VERIFIER_RUN_MISMATCH");
+});
+
+test("verifySentence rejects an attestation for different text", () => {
+  const sentence = {
+    text: "Changed after review",
+    evidence_ids: ["EV-001"],
+    producer_run_id: "PROD-001",
+    verifier_run_id: "VERI-001",
+    verifier_attestation: {
+      verifier_run_id: "VERI-001",
+      decision: "PASS",
+      checked_text: "Original reviewed text",
+      checked_evidence_ids: ["EV-001"],
+    },
+  };
+  const result = verifySentence(sentence, [{ evidence_id: "EV-001", locator: "page:1" }]);
+  assert.equal(result.verified, false);
+  assert.equal(result.reason, "VERIFIER_TEXT_MISMATCH");
+});
+
+test("verifySentence accepts valid independently verified sentence", () => {
+  const sentence = {
+    text: "Incentive gap is real.",
+    evidence_ids: ["EV-001"],
+    producer_run_id: "PROD-001",
+    verifier_run_id: "VERI-001",
+    verifier_attestation: {
+      verifier_run_id: "VERI-001",
+      decision: "PASS",
+      checked_text: "Incentive gap is real.",
+      checked_evidence_ids: ["EV-001"],
+    },
+  };
+  const evidence = [{ evidence_id: "EV-001", locator: "timestamp:1080-1380" }];
+  const result = verifySentence(sentence, evidence);
+  assert.equal(result.verified, true);
+  assert.equal(result.status, "AUTO_PASS");
+});
+
+test("production page builds formal cards through the homepage eligibility gate", async () => {
+  const pageSource = await readFile(new URL("../app/page.js", import.meta.url), "utf8");
+  assert.match(pageSource, /buildHomepageResponse\(\[PRIORITY_ITEM\]\)/);
+  assert.match(pageSource, /HOMEPAGE_RESPONSE\.items/);
+  assert.match(pageSource, /priorityItem &&/);
+});
+
+test("homepage data derives PRIORITY_ITEM from the council fixture contract", async () => {
+  const dataSource = await readFile(new URL("../lib/homepage-data.js", import.meta.url), "utf8");
+  assert.match(dataSource, /from ["']\.\/council-prep\.js["']/);
+  assert.match(dataSource, /COUNCIL_FIXTURE\.historical_question/);
+  assert.match(dataSource, /COUNCIL_FIXTURE\.meeting_record/);
+  assert.match(dataSource, /COUNCIL_EVIDENCE_CHAIN\.map/);
+});
+
+test("PRIORITY_ITEM is eligible only through the formal homepage contract", () => {
+  const response = buildHomepageResponse([PRIORITY_ITEM]);
+  assert.equal(response.items.length, 1);
+  assert.equal(response.items[0].verification_status, "AUTO_PASS");
+  assert.equal(response.items[0].content_disposition, "HOME_CANDIDATE");
+  assert.ok(response.items[0].evidence_ids.length > 0);
+  assert.ok(response.items[0].official_url.startsWith("https://"));
+  assert.ok(response.items[0].reason_codes.length > 0);
+});

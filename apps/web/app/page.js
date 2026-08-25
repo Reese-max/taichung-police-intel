@@ -4,6 +4,7 @@ import Hls from "hls.js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { findActiveIndex, formatTime, groupWordsBySegment, validateEvidence } from "../lib/evidence.js";
+import { validateCouncilDrawerPayload } from "../lib/council-prep.js";
 import {
   COPY,
   PRIORITY_ITEM,
@@ -13,14 +14,20 @@ import {
   limitCentralPolicyCards,
   requiresOfficialFallback,
 } from "../lib/homepage-data.js";
+import { buildHomepageResponse } from "../lib/homepage-eligibility.js";
 
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
 const DATA_URL = `${BASE_PATH}/data/groq-asr-canary-2026-08-14.json`;
 const CER_URL = `${BASE_PATH}/data/groq-asr-cer-2026-08-14.json`;
 const REFERENCE_URL = `${BASE_PATH}/data/groq-asr-reference-2026-08-14.json`;
 const HLS_LOAD_TIMEOUT_MS = 10_000;
+const HOMEPAGE_RESPONSE = buildHomepageResponse([PRIORITY_ITEM]);
 
 export default function Home() {
+  // Formal cards are rendered only from the typed eligibility response. The
+  // response itself is built from the fixture-derived PRIORITY_ITEM above.
+  const priorityItem = HOMEPAGE_RESPONSE.items[0] || null;
+
   // ── Language toggle ──────────────────────────────────────────────────────
   const [lang, setLang] = useState("zh");
   const t = COPY[lang];
@@ -40,7 +47,7 @@ export default function Home() {
   const [activeSegment, setActiveSegment] = useState(0);
   const [expandedSegment, setExpandedSegment] = useState(0);
   const [activeWord, setActiveWord] = useState(-1);
-  const [currentSeconds, setCurrentSeconds] = useState(1080);
+  const [currentSeconds, setCurrentSeconds] = useState(Number(priorityItem?.clip_start_seconds || 0));
   const [followPlayback, setFollowPlayback] = useState(true);
   const [playbackStatus, setPlaybackStatus] = useState({ kind: "loading" });
   const videoRef = useRef(null);
@@ -59,12 +66,17 @@ export default function Home() {
       }),
     ])
       .then(([payload, cerReport]) => {
-        setData(validateEvidence(payload));
+        const validatedPayload = validateEvidence(payload);
+        const councilResult = validateCouncilDrawerPayload(validatedPayload);
+        if (!councilResult.valid) {
+          throw new Error(`Council evidence contract ${councilResult.reason}.`);
+        }
+        setData(validatedPayload);
         setCer(cerReport);
-        setCurrentSeconds(Number(payload.source.clip_start_seconds));
+        setCurrentSeconds(Number(priorityItem?.clip_start_seconds || 0));
       })
       .catch((reason) => setError(reason.message));
-  }, []);
+  }, [priorityItem]);
 
   useEffect(() => {
     fetch(`${BASE_PATH}/api/status.json`, { cache: "no-store" })
@@ -76,7 +88,7 @@ export default function Home() {
   useEffect(() => {
     if (!drawerOpen || !data || !videoRef.current) return undefined;
     const video = videoRef.current;
-    const clipStart = Number(data.source.clip_start_seconds);
+    const clipStart = Number(priorityItem?.clip_start_seconds || 0);
     let hls;
     let failed = false;
     let loadTimer;
@@ -129,10 +141,10 @@ export default function Home() {
       video.removeEventListener("error", failPlayback);
       hls?.destroy();
     };
-  }, [data, drawerOpen]);
+  }, [data, drawerOpen, priorityItem]);
 
-  const clipStart = Number(data?.source?.clip_start_seconds || 0);
-  const clipDuration = Number(data?.source?.clip_duration_seconds || 0);
+  const clipStart = Number(priorityItem?.clip_start_seconds || 0);
+  const clipDuration = Number(priorityItem?.clip_duration_seconds || 0);
   const segments = data?.asr?.segments || [];
   const words = data?.asr?.words || [];
   const wordsBySegment = useMemo(() => groupWordsBySegment(segments, words), [segments, words]);
@@ -240,15 +252,15 @@ export default function Home() {
           <p className="evidence-note">
             Evidence:{" "}
             <a
-              href={PRIORITY_ITEM.official_page_url}
+              href={priorityItem?.official_page_url}
               target="_blank"
               rel="noreferrer"
-              data-evidence-id={PRIORITY_ITEM.evidence_source_id}
+              data-evidence-id={priorityItem?.evidence_source_id}
             >
-              Official video ({PRIORITY_ITEM.evidence_source_id})
+              Official video ({priorityItem?.evidence_source_id})
             </a>
             {" · "}
-            <a href={PRIORITY_ITEM.meeting_records_url} target="_blank" rel="noreferrer">
+            <a href={priorityItem?.meeting_records_url} target="_blank" rel="noreferrer">
               Meeting records
             </a>
             {" · "}
@@ -267,38 +279,40 @@ export default function Home() {
         </section>
 
         {/* ── Priority card ──────────────────────────────────────────────── */}
-        <article
-          className="priority-card"
-          data-testid="priority-card"
-          data-evidence-id={PRIORITY_ITEM.evidence_source_id}
-          data-official-url={PRIORITY_ITEM.official_page_url}
-        >
-          <div className="priority-meta">
-            <span className="tag synthesis">{t.card_tag}</span>
-            <span>{t.card_session}</span>
-            <span>{PRIORITY_ITEM.session_date}</span>
-          </div>
-          <h3>{t.card_prep_heading}</h3>
-          <ul>
-            <li>{t.card_point1}</li>
-            <li>{t.card_point2}</li>
-            <li>{t.card_point3}</li>
-          </ul>
-          <div className="card-actions">
-            <button
-              className="primary-action"
-              type="button"
-              aria-expanded={drawerOpen}
-              aria-controls="evidence-drawer"
-              onClick={() => setDrawerOpen(true)}
-            >
-              {t.card_action_drawer}
-            </button>
-            <a href={PRIORITY_ITEM.meeting_records_url} target="_blank" rel="noreferrer">
-              {t.card_action_records}
-            </a>
-          </div>
-        </article>
+        {priorityItem && (
+          <article
+            className="priority-card"
+            data-testid="priority-card"
+            data-evidence-id={priorityItem.evidence_source_id}
+            data-official-url={priorityItem.official_page_url}
+          >
+            <div className="priority-meta">
+              <span className="tag synthesis">{t.card_tag}</span>
+              <span>{t.card_session}</span>
+              <span>{priorityItem.session_date}</span>
+            </div>
+            <h3>{t.card_prep_heading}</h3>
+            <ul>
+              <li>{t.card_point1}</li>
+              <li>{t.card_point2}</li>
+              <li>{t.card_point3}</li>
+            </ul>
+            <div className="card-actions">
+              <button
+                className="primary-action"
+                type="button"
+                aria-expanded={drawerOpen}
+                aria-controls="evidence-drawer"
+                onClick={() => setDrawerOpen(true)}
+              >
+                {t.card_action_drawer}
+              </button>
+              <a href={priorityItem.meeting_records_url} target="_blank" rel="noreferrer">
+                {t.card_action_records}
+              </a>
+            </div>
+          </article>
+        )}
 
         {/* ── Interpretation / limitation note ───────────────────────────── */}
         <section className="workflow-note">
@@ -430,7 +444,7 @@ export default function Home() {
                 <p className="playback-status" role="status">{formatPlaybackStatus(playbackStatus, t)}</p>
                 {requiresOfficialFallback(playbackStatus) && (
                   <div className="playback-fallback" role="alert">
-                    <a href={data.source.official_page_url} target="_blank" rel="noreferrer">
+                    <a href={priorityItem?.official_page_url} target="_blank" rel="noreferrer">
                       {t.playback_open_official}
                     </a>
                   </div>
@@ -461,7 +475,7 @@ export default function Home() {
                 </div>
 
                 <div className="source-actions">
-                  <a href={data.source.official_page_url} target="_blank" rel="noreferrer">
+                  <a href={priorityItem?.official_page_url} target="_blank" rel="noreferrer">
                     {t.source_action_official}
                   </a>
                   <a href={REFERENCE_URL} target="_blank" rel="noreferrer">

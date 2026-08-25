@@ -18,7 +18,7 @@ SOURCE_WEIGHTS = {
     "unique_information_rate": 20,
     "successful_window_rate": 20,
 }
-VERIFICATION_STATUSES = {"AUTO_PASS", "AUTO_RETRY", "AI_DISAGREEMENT", "QUARANTINED"}
+VERIFICATION_STATUSES = {"AUTO_PASS", "AUTO_RETRY", "AI_DISAGREEMENT", "CLAIM_REJECTED", "QUARANTINED"}
 PRODUCT_ROLES = {
     "PREP_CORE",
     "TREND_SIGNAL",
@@ -90,8 +90,8 @@ def route_item(
 
     if traceability_gate == "FAIL":
         return {
-            "verification_status": "QUARANTINED",
-            "content_disposition": "QUARANTINED",
+            "verification_status": "CLAIM_REJECTED",
+            "content_disposition": "CLAIM_REJECTED",
             "item_value_score": None,
             "score_reason_codes": [],
             "validation_reason_codes": ["UNTRACEABLE"],

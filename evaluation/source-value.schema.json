@@ -61,7 +61,7 @@
         "raw_item_id": { "type": "string", "minLength": 1 },
         "traceability_gate": { "enum": ["PASS", "FAIL"] },
         "verification_status": {
-          "enum": ["AUTO_PASS", "AUTO_RETRY", "AI_DISAGREEMENT", "QUARANTINED"]
+          "enum": ["AUTO_PASS", "AUTO_RETRY", "AI_DISAGREEMENT", "CLAIM_REJECTED", "QUARANTINED"]
         },
         "content_disposition": {
           "enum": [
@@ -71,6 +71,7 @@
             "EXACT_DUPLICATE_SUPPRESSED",
             "SEMANTIC_DUPLICATE_SUPPRESSED",
             "VALIDATION_PENDING",
+            "CLAIM_REJECTED",
             "QUARANTINED"
           ]
         },
@@ -133,8 +134,8 @@
           "if": { "properties": { "traceability_gate": { "const": "FAIL" } } },
           "then": {
             "properties": {
-              "verification_status": { "const": "QUARANTINED" },
-              "content_disposition": { "const": "QUARANTINED" },
+              "verification_status": { "const": "CLAIM_REJECTED" },
+              "content_disposition": { "const": "CLAIM_REJECTED" },
               "validation_reason_codes": { "contains": { "const": "UNTRACEABLE" } }
             }
           }
@@ -174,6 +175,12 @@
           "if": { "properties": { "content_disposition": { "const": "QUARANTINED" } } },
           "then": {
             "properties": { "verification_status": { "const": "QUARANTINED" } }
+          }
+        },
+        {
+          "if": { "properties": { "content_disposition": { "const": "CLAIM_REJECTED" } } },
+          "then": {
+            "properties": { "verification_status": { "const": "CLAIM_REJECTED" } }
           }
         }
       ]

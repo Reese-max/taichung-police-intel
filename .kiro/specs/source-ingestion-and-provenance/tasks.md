@@ -16,9 +16,9 @@
   - Acceptance: the production static build, collector self-check, migration self-check, and Pages workflow checks exit 0.
 - [ ] Enable GitHub Pages and complete D2 competition production acceptance.
   - Acceptance: anonymous `/api/health.json` and `/api/status.json` return HTTP 200 from the Pages domain, then two successful scheduled workflow runs produce distinct `MORNING` and `EVENING` committed states. No database connection is required; PostgreSQL acceptance is post-competition scope.
-- [ ] Implement stable keys, exact deduplication, and version relationships.
+- [x] Implement stable keys, exact deduplication, and version relationships.
   - Acceptance: two fixture runs yield no duplicate current items, identical normalized manifests, and typed change events.
-- [ ] Connect candidate generation and independent verification.
+- [x] Connect candidate generation and independent verification.
   - Acceptance: disagreement retries once, then becomes `QUARANTINED`; untraceable claims become `CLAIM_REJECTED`.
 - [x] Add `tests/test_source_ingestion.py` and run the Spec acceptance command.
   - Acceptance: contract tests and a disposable PostgreSQL apply exit 0; then both commands in `design.md` exit 0.

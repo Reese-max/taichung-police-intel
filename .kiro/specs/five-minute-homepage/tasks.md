@@ -1,10 +1,10 @@
 # Five-minute homepage tasks
 
-- [ ] Define the typed homepage response and deterministic eligibility function.
+- [x] Define the typed homepage response and deterministic eligibility function.
   - Acceptance: tests reject non-`AUTO_PASS` items and lists over ten items.
-- [ ] Build a fixed fixture with recurring, council-attention, cross-source, and near-milestone reason codes.
+- [x] Build a fixed fixture with recurring, council-attention, cross-source, and near-milestone reason codes.
   - Acceptance: ordering is identical across repeated runs.
-- [ ] Connect evidence-bound wording generation and independent sentence verification.
+- [x] Connect evidence-bound wording generation and independent sentence verification.
   - Acceptance: unsupported text is rejected and verified source text remains available.
 - [x] Implement the English primary path and at most two central-policy cards.
   - Acceptance: the same evidence IDs and official links appear in both languages.
