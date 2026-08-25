@@ -605,8 +605,18 @@ test("verifySentence accepts valid independently verified sentence", () => {
 test("production page builds formal cards through the homepage eligibility gate", async () => {
   const pageSource = await readFile(new URL("../app/page.js", import.meta.url), "utf8");
   assert.match(pageSource, /buildHomepageResponse\(\[PRIORITY_ITEM\]\)/);
-  assert.match(pageSource, /HOMEPAGE_RESPONSE\.items/);
+  assert.match(pageSource, /FALLBACK_RESPONSE\.items/);
   assert.match(pageSource, /priorityItem &&/);
+  assert.match(pageSource, /projectFeedToHomepageCandidates/);
+  assert.match(pageSource, /intelligence-feed\.json/);
+  // D: priority-card only shown BEFORE feed loads
+  assert.match(pageSource, /!feedLoaded && priorityItem/);
+  // D: feed-empty-state has evidence-demo-fallback, not priority card
+  assert.match(pageSource, /evidence-demo-fallback/);
+  assert.match(pageSource, /not live/i);
+  // Live feed response does NOT merge PRIORITY_ITEM into candidates
+  assert.match(pageSource, /buildHomepageResponse\(candidates\)/);
+  assert.doesNotMatch(pageSource, /\[\.\.\.candidates,\s*PRIORITY_ITEM\]/);
 });
 
 test("homepage data derives PRIORITY_ITEM from the council fixture contract", async () => {

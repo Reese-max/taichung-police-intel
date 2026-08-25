@@ -20,13 +20,80 @@ const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
 const DATA_URL = `${BASE_PATH}/data/groq-asr-canary-2026-08-14.json`;
 const CER_URL = `${BASE_PATH}/data/groq-asr-cer-2026-08-14.json`;
 const REFERENCE_URL = `${BASE_PATH}/data/groq-asr-reference-2026-08-14.json`;
+const FEED_URL = `${BASE_PATH}/data/intelligence-feed.json`;
 const HLS_LOAD_TIMEOUT_MS = 10_000;
-const HOMEPAGE_RESPONSE = buildHomepageResponse([PRIORITY_ITEM]);
+
+// Static fallback: council evidence journey PRIORITY_ITEM always available
+const FALLBACK_RESPONSE = buildHomepageResponse([PRIORITY_ITEM]);
+
+/**
+ * Project feed items into homepage candidates compatible with buildHomepageResponse().
+ * Only HOME_CANDIDATE items are projected.
+ * NOTE: This is the client-side version of feed-projection.js (which uses node:fs
+ * and cannot be imported in a "use client" component). Logic must stay in sync.
+ */
+function projectFeedToHomepageCandidates(feed) {
+  if (!feed || !Array.isArray(feed.items)) return [];
+  return feed.items
+    .filter((item) => item.eligibility === "HOME_CANDIDATE")
+    .map((item) => ({
+      item_id: item.stable_id,
+      stable_id: item.stable_id,
+      verification_status: "AUTO_PASS",
+      content_disposition: "HOME_CANDIDATE",
+      evidence_ids: [item.stable_id],
+      official_url: item.official_url,
+      reason_codes: item.reason_codes || ["HIGH_VALUE"],
+      item_value_score: item.item_value_score || 50,
+      source_id: item.source_id,
+      source_role: item.source_role,
+      title: item.title,
+      title_zh: item.title_zh || item.title,
+      published_at: item.published_at,
+      fetched_at: item.fetched_at,
+      data_as_of: item.data_as_of,
+      change_type: item.change_type,
+      freshness_status: item.freshness_status,
+      source_health: item.source_health,
+      window_completeness: item.window_completeness,
+      evidence_count: item.evidence_count || 1,
+      next_milestone: item.next_milestone || null,
+      content_sha256: item.content_sha256,
+    }));
+}
 
 export default function Home() {
-  // Formal cards are rendered only from the typed eligibility response. The
-  // response itself is built from the fixture-derived PRIORITY_ITEM above.
-  const priorityItem = HOMEPAGE_RESPONSE.items[0] || null;
+  // ── Feed state ──────────────────────────────────────────────────────────────
+  const [feedResponse, setFeedResponse] = useState(FALLBACK_RESPONSE);
+  const [feedLoaded, setFeedLoaded] = useState(false);
+  const [feedMeta, setFeedMeta] = useState(null);
+
+  // Load intelligence feed at mount time
+  useEffect(() => {
+    fetch(FEED_URL, { cache: "no-store" })
+      .then((res) => res.ok ? res.json() : null)
+      .then((feed) => {
+        if (!feed || feed.schema_version !== 1) {
+          setFeedLoaded(true);
+          return;
+        }
+        setFeedMeta(feed);
+        const candidates = projectFeedToHomepageCandidates(feed);
+        if (candidates.length > 0) {
+          // Live response uses only feed candidates — PRIORITY_ITEM is NOT mixed in
+          // to avoid occupying the 10-item limit or altering deterministic sort order.
+          setFeedResponse(buildHomepageResponse(candidates));
+        }
+        // If no feed candidates qualify, keep FALLBACK_RESPONSE (PRIORITY_ITEM)
+        setFeedLoaded(true);
+      })
+      .catch(() => setFeedLoaded(true));
+  }, []);
+
+  // The council evidence journey item — always available for the drawer
+  const priorityItem = FALLBACK_RESPONSE.items[0] || null;
+  // Feed-sourced items for the main homepage display (may be empty)
+  const feedItems = feedResponse.items;
 
   // ── Language toggle ──────────────────────────────────────────────────────
   const [lang, setLang] = useState("zh");
@@ -278,8 +345,8 @@ export default function Home() {
           <p>{t.brief_body}</p>
         </section>
 
-        {/* ── Priority card ──────────────────────────────────────────────── */}
-        {priorityItem && (
+        {/* ── Priority card: only shown BEFORE feed loads (loading fallback) ── */}
+        {!feedLoaded && priorityItem && (
           <article
             className="priority-card"
             data-testid="priority-card"
@@ -319,6 +386,94 @@ export default function Home() {
           <strong>{t.workflow_heading}</strong>
           <p>{t.workflow_body}</p>
         </section>
+
+        {/* ── Live intelligence feed items ───────────────────────────────── */}
+        {feedLoaded && (
+          <section
+            className="feed-section"
+            aria-labelledby="feed-section-title"
+            data-testid="feed-section"
+          >
+            <p className="section-label">{lang === "en" ? "Live intelligence feed" : "即時情報動態"}</p>
+            <h2 id="feed-section-title">
+              {lang === "en" ? "Official source updates" : "官方來源更新"}
+            </h2>
+            {feedItems.filter((item) => item.stable_id && item.stable_id !== priorityItem?.item_id).length === 0 ? (
+              <div className="feed-empty-state" data-testid="feed-empty-state" role="status">
+                <p>
+                  {lang === "en"
+                    ? "No publishable intelligence items this period."
+                    : "本時段無可發布重點情報。"}
+                </p>
+                <p className="feed-empty-reason">
+                  {lang === "en"
+                    ? "All source items are either stale, missing publication dates, or unchanged. Source health is shown below."
+                    : "所有來源項目均為過時、缺少發布日期，或無變更。來源健康狀態如下。"}
+                </p>
+                {feedMeta?.source_summary && (
+                  <ul className="feed-source-status">
+                    {Object.entries(feedMeta.source_summary).map(([sid, info]) => (
+                      <li key={sid}>
+                        <strong>{sid}</strong>: {info.health} · {info.freshness} · {info.item_count} {lang === "en" ? "items" : "筆"}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {/* Evidence-demo fallback: clearly labelled, not posing as live priority */}
+                {priorityItem && (
+                  <div className="evidence-demo-fallback" data-testid="evidence-demo-fallback">
+                    <p className="evidence-demo-label">
+                      {lang === "en"
+                        ? "Historical council evidence demo (not live):"
+                        : "議會證據示範（非即時）："}
+                    </p>
+                    <button
+                      className="secondary-action"
+                      type="button"
+                      aria-expanded={drawerOpen}
+                      aria-controls="evidence-drawer"
+                      onClick={() => setDrawerOpen(true)}
+                    >
+                      {lang === "en" ? "Open council evidence demo" : "開啟議會證據示範"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="feed-items" data-testid="feed-items">
+                {feedItems
+                  .filter((item) => item.stable_id && item.stable_id !== priorityItem?.item_id)
+                  .map((item) => (
+                    <article
+                      key={item.stable_id || item.item_id}
+                      className="feed-card"
+                      data-testid="feed-card"
+                      data-source-id={item.source_id}
+                    >
+                      <div className="feed-card-meta">
+                        <span className="tag">{item.source_id}</span>
+                        <span className={`freshness-badge ${(item.freshness_status || "").toLowerCase()}`}>
+                          {item.freshness_status}
+                        </span>
+                        {item.change_type === "NEW" && <span className="tag new">NEW</span>}
+                      </div>
+                      <h3>{item.title_zh || item.title || (lang === "en" ? "(untitled)" : "（無標題）")}</h3>
+                      <p className="feed-card-detail">
+                        {item.published_at
+                          ? `${lang === "en" ? "Published" : "發布"}：${new Date(item.published_at).toLocaleDateString(lang === "en" ? "en-GB" : "zh-TW")}`
+                          : (lang === "en" ? "No publication date" : "無發布日期")}
+                        {" · "}
+                        {lang === "en" ? "Health" : "來源"}：{item.source_health}
+                      </p>
+                      <a href={item.official_url} target="_blank" rel="noreferrer">
+                        {lang === "en" ? "Official source" : "回到官方來源"} ↗
+                      </a>
+                    </article>
+                  ))}
+              </div>
+            )}
+          </section>
+        )}
 
         {/* ── Central-policy section (R4: at most CENTRAL_POLICY_LIMIT) ──── */}
         {visiblePolicyCards.length > 0 && (

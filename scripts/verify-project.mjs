@@ -29,6 +29,7 @@ const required = [
   "apps/web/scripts/migrate.mjs",
   "apps/web/next.config.mjs",
   "apps/web/public/data/source-status.json",
+  "apps/web/public/data/intelligence-feed.json",
   "apps/web/app/api/health.json/route.js",
   "apps/web/app/api/status.json/route.js",
   "evaluation/ingestion-record.schema.json",
@@ -46,6 +47,7 @@ const specNames = [
   "source-ingestion-and-provenance",
   "five-minute-homepage",
   "council-prep-and-evidence",
+  "live-intelligence-feed",
 ];
 for (const spec of specNames) {
   for (const artifact of ["requirements.md", "design.md", "tasks.md"]) {
@@ -97,6 +99,28 @@ if (!failures.length) {
     if (!/^[0-9a-f]{64}$/.test(source.manifest_sha256 || "")) failures.push(`demo-status:${source.source_id}:invalid-manifest`);
     if (!Array.isArray(source.intelligence_gaps)) failures.push(`demo-status:${source.source_id}:invalid-gaps`);
     if (source.source_health === "PASS" && !source.last_known_good?.source_run_id) failures.push(`demo-status:${source.source_id}:missing-lkg`);
+  }
+
+  const feed = JSON.parse(await read("apps/web/public/data/intelligence-feed.json"));
+  if (feed.schema_version !== 1) failures.push("feed:invalid-schema-version");
+  if (!Array.isArray(feed.items)) failures.push("feed:items-not-array");
+  if (!feed.generated_at) failures.push("feed:missing-generated-at");
+  if (!feed.source_summary) failures.push("feed:missing-source-summary");
+  for (const item of feed.items || []) {
+    if (!item.stable_id) failures.push(`feed:item-missing-stable-id`);
+    if (!/^https:\/\//.test(item.official_url || "")) failures.push(`feed:${item.stable_id || "unknown"}:invalid-url`);
+    if (item.freshness_status === "VERY_STALE" && item.eligibility === "HOME_CANDIDATE") {
+      failures.push(`feed:${item.stable_id}:stale-marked-eligible`);
+    }
+    if (item.freshness_status === "NO_DATA" && item.eligibility === "HOME_CANDIDATE") {
+      failures.push(`feed:${item.stable_id}:nodata-marked-eligible`);
+    }
+    if (item.change_type === "UNCHANGED" && item.eligibility === "HOME_CANDIDATE") {
+      failures.push(`feed:${item.stable_id}:unchanged-marked-eligible`);
+    }
+    if (item.window_completeness === "PARTIAL" && item.eligibility === "HOME_CANDIDATE") {
+      failures.push(`feed:${item.stable_id}:partial-marked-eligible`);
+    }
   }
 }
 

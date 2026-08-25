@@ -620,25 +620,135 @@ def canary() -> None:
     print(json.dumps({"checked_at": timestamp(datetime.now(TZ)), "sources": summary}, ensure_ascii=False, sort_keys=True))
 
 
+def project_feed_item(
+    item: dict,
+    source_id: str,
+    source_name: str,
+    source_url: str,
+    freshness: str,
+    source_health: str,
+    window_completeness: str,
+    data_as_of: str | None,
+    fetched_at: str,
+    previous_sha256s: set[str],
+) -> dict:
+    """Project a raw collector item into a safe feed item for the homepage."""
+    stable_key_hash = canonical_sha256(f"{source_id}:{item['stable_key']}")[:16]
+    stable_id = f"FEED-{source_id}-{stable_key_hash}"
+
+    # Determine change type
+    if item["content_sha256"] in previous_sha256s:
+        change_type = "UNCHANGED"
+    else:
+        change_type = "NEW"
+
+    # Extract safe title from payload (no raw payload exposure)
+    title = ""
+    if isinstance(item.get("payload"), dict):
+        title = item["payload"].get("title", "")
+        if not title:
+            # For API records, use content/subject/billName if available
+            title = (
+                item["payload"].get("subject")
+                or item["payload"].get("billName")
+                or item["payload"].get("content", "")[:100]
+                or ""
+            )
+    # Truncate for safety
+    if len(title) > 200:
+        title = title[:197] + "…"
+
+    # Eligibility rules — order matters: most restrictive first
+    if change_type == "UNCHANGED":
+        eligibility = "INELIGIBLE_UNCHANGED"
+    elif source_health == "FAILED":
+        eligibility = "INELIGIBLE_SOURCE_FAILED"
+    elif window_completeness == "PARTIAL":
+        eligibility = "INELIGIBLE_PARTIAL"
+    elif freshness in ("VERY_STALE",):
+        eligibility = "INELIGIBLE_STALE"
+    elif freshness == "NO_DATA" or not item.get("published_at"):
+        eligibility = "INELIGIBLE_NO_DATE"
+    else:
+        eligibility = "HOME_CANDIDATE"
+
+    # Reason codes based on source context
+    reason_codes = []
+    if source_id in ("S-007",):
+        reason_codes.append("COUNCIL_ATTENTION")
+    elif source_id in ("S-004", "S-006"):
+        reason_codes.append("NEAR_MILESTONE")
+    elif source_id in ("S-009",):
+        reason_codes.append("POLICY_CHANGE")
+    elif source_id in ("S-029",):
+        reason_codes.append("CROSS_SOURCE")
+    if not reason_codes:
+        reason_codes.append("HIGH_VALUE")
+
+    # Value score: higher for items with dates and fresh sources
+    score = 50
+    if item.get("published_at"):
+        score += 20
+    if freshness == "FRESH":
+        score += 20
+    elif freshness == "STALE":
+        score += 10
+    if change_type == "NEW":
+        score += 10
+
+    return {
+        "stable_id": stable_id,
+        "source_id": source_id,
+        "source_role": "PRIMARY_OFFICIAL",
+        "title": title,
+        "official_url": item.get("source_url") or source_url,
+        "published_at": item.get("published_at"),
+        "fetched_at": fetched_at,
+        "data_as_of": data_as_of,
+        "change_type": change_type,
+        "freshness_status": freshness,
+        "source_health": source_health,
+        "window_completeness": window_completeness,
+        "reason_codes": reason_codes,
+        "item_value_score": min(score, 100),
+        "eligibility": eligibility,
+        "evidence_count": 1,
+        "next_milestone": None,
+        "content_sha256": item["content_sha256"],
+    }
+
+
 def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) -> dict:
     now = datetime.now(TZ)
     prior = json.loads(output.read_text(encoding="utf-8")) if output.exists() else None
     if prior and (prior.get("schema_version"), prior.get("mode")) != (1, "COMPETITION_DEMO"):
         raise ValueError("unsupported competition demo state")
     prior_sources = {item["source_id"]: item for item in (prior or {}).get("sources", [])}
+
+    # Load prior feed for change detection
+    feed_output = output.parent / "intelligence-feed.json"
+    prior_feed = json.loads(feed_output.read_text(encoding="utf-8")) if feed_output.exists() else None
+    prior_feed_sha256s: set[str] = set()
+    if prior_feed and isinstance(prior_feed.get("items"), list):
+        prior_feed_sha256s = {item["content_sha256"] for item in prior_feed["items"] if item.get("content_sha256")}
+
     session = http_session()
     window_end = scheduled_time(slot_date, slot)
     window_start = window_end - timedelta(days=7)
     next_at = next_update(slot_date, slot)
     source_status = []
+    feed_items = []
+    source_summary = {}
 
     for source_id, (source_name, source_url) in P0_SOURCES.items():
         source_run_id = f"SR-DEMO-{slot_date:%Y%m%d}-{slot}-{source_id[2:]}"
         previous = prior_sources.get(source_id, {})
         previous_lkg = previous.get("last_known_good")
+        collected_items = []
         try:
             collected = collect_source(session, source_id, window_start.date(), window_end.date())
-            dates = [item["published_at"] for item in collected["items"] if item["published_at"]]
+            collected_items = collected.get("items", [])
+            dates = [item["published_at"] for item in collected_items if item["published_at"]]
             data_as_of = max(dates, default=previous.get("data_as_of"))
             manifest_changed = collected["manifest_sha256"] != previous.get("manifest_sha256")
             change_count = collected["window_item_count"] if manifest_changed else 0
@@ -695,16 +805,53 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
             record["intelligence_gaps"].append("NO_DATA_AS_OF")
         source_status.append(record)
 
+        # Project items into feed
+        fetched_at = timestamp(now)
+        if collected_items:
+            for item in collected_items:
+                feed_item = project_feed_item(
+                    item=item,
+                    source_id=source_id,
+                    source_name=source_name,
+                    source_url=source_url,
+                    freshness=freshness,
+                    source_health=record["source_health"],
+                    window_completeness=record["window_completeness"],
+                    data_as_of=record["data_as_of"],
+                    fetched_at=fetched_at,
+                    previous_sha256s=prior_feed_sha256s,
+                )
+                feed_items.append(feed_item)
+        elif record["source_health"] == "FAILED" and prior_feed and isinstance(prior_feed.get("items"), list):
+            # C: LKG preservation — copy prior feed items for this source with LKG markers
+            for prior_item in prior_feed["items"]:
+                if prior_item.get("source_id") == source_id:
+                    lkg_item = {**prior_item}
+                    lkg_item["change_type"] = "LKG"
+                    lkg_item["source_health"] = "FAILED"
+                    lkg_item["eligibility"] = "INELIGIBLE_SOURCE_FAILED"
+                    lkg_item["freshness_status"] = freshness if freshness != "FRESH" else "VERY_STALE"
+                    lkg_item["fetched_at"] = fetched_at
+                    feed_items.append(lkg_item)
+
+        # Source summary for feed
+        source_summary[source_id] = {
+            "health": record["source_health"],
+            "freshness": freshness,
+            "item_count": len(collected_items),
+        }
+
     failed = sum(item["result"] == "FAILED" for item in source_status)
     partial = sum(item["result"] == "PARTIAL" for item in source_status)
     status = "FAILED" if failed == len(source_status) else "PARTIAL" if failed or partial else "SUCCEEDED"
+    collection_run_id = f"CR-DEMO-{slot_date:%Y%m%d}-{slot}-{trigger.upper()}"
     state = {
         "schema_version": 1,
         "mode": "COMPETITION_DEMO",
         "generated_at": timestamp(now),
         "next_update_at": next_at,
         "latest_collection_run": {
-            "collection_run_id": f"CR-DEMO-{slot_date:%Y%m%d}-{slot}-{trigger.upper()}",
+            "collection_run_id": collection_run_id,
             "slot_date": slot_date.isoformat(),
             "slot": slot,
             "trigger": trigger.upper(),
@@ -715,7 +862,27 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
         "sources": source_status,
     }
     save_state(output, state)
+
+    # Write intelligence feed
+    # Dedup by stable_id (keep first occurrence per stable_id)
+    seen_ids: set[str] = set()
+    deduped_items = []
+    for item in feed_items:
+        if item["stable_id"] not in seen_ids:
+            seen_ids.add(item["stable_id"])
+            deduped_items.append(item)
+
+    feed_state = {
+        "schema_version": 1,
+        "generated_at": timestamp(now),
+        "collection_run_id": collection_run_id,
+        "items": deduped_items,
+        "source_summary": source_summary,
+    }
+    save_state(feed_output, feed_state)
+
     print(f"DEMO_STATUS_OK slot={slot} status={status} sources={len(source_status)} output={output}")
+    print(f"FEED_OK items={len(deduped_items)} eligible={sum(1 for i in deduped_items if i['eligibility'] == 'HOME_CANDIDATE')} output={feed_output}")
     return state
 
 
