@@ -190,6 +190,13 @@ export const COPY = {
     segment_jump_prefix: "Jump to ",
     word_blank: "space",
     empty_state: "No matching segments — clear the search.",
+
+    // ── Intelligence summary ──────────────────────────────────────────────────
+    summary_heading: "Intelligence Summary",
+    summary_topics: "Key Topics",
+    download_csv: "Download CSV",
+    download_json: "Download JSON",
+    download_heading: "Export Data",
   },
 
   zh: {
@@ -296,5 +303,12 @@ export const COPY = {
     segment_jump_prefix: "跳到 ",
     word_blank: "空白",
     empty_state: "找不到符合的逐字稿，請清除搜尋條件。",
+
+    // ── Intelligence summary ──────────────────────────────────────────────────
+    summary_heading: "情報摘要",
+    summary_topics: "關鍵議題",
+    download_csv: "下載 CSV",
+    download_json: "下載 JSON",
+    download_heading: "匯出資料",
   },
 };

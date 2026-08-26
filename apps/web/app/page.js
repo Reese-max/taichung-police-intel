@@ -21,6 +21,7 @@ const DATA_URL = `${BASE_PATH}/data/groq-asr-canary-2026-08-14.json`;
 const CER_URL = `${BASE_PATH}/data/groq-asr-cer-2026-08-14.json`;
 const REFERENCE_URL = `${BASE_PATH}/data/groq-asr-reference-2026-08-14.json`;
 const FEED_URL = `${BASE_PATH}/data/intelligence-feed.json`;
+const SUMMARY_URL = `${BASE_PATH}/data/intelligence-summary.json`;
 const HLS_LOAD_TIMEOUT_MS = 10_000;
 
 // Static fallback: council evidence journey PRIORITY_ITEM always available
@@ -94,6 +95,18 @@ export default function Home() {
   const priorityItem = FALLBACK_RESPONSE.items[0] || null;
   // Feed-sourced items for the main homepage display (may be empty)
   const feedItems = feedResponse.items;
+
+  // ── Intelligence summary state ──────────────────────────────────────────
+  const [summaryData, setSummaryData] = useState(null);
+
+  useEffect(() => {
+    fetch(SUMMARY_URL, { cache: "no-store" })
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (data && data.schema_version === 1) setSummaryData(data);
+      })
+      .catch(() => {});
+  }, []);
 
   // ── Language toggle ──────────────────────────────────────────────────────
   const [lang, setLang] = useState("zh");
@@ -300,6 +313,42 @@ export default function Home() {
           </span>
         </header>
 
+        {/* ── Intelligence summary card ─────────────────────────────────── */}
+        {summaryData && (
+          <section className="summary-card" aria-labelledby="summary-title" data-testid="summary-card">
+            <p className="section-label">{t.summary_heading}</p>
+            <h2 id="summary-title">{t.summary_heading}</h2>
+            <div className="summary-stats">
+              <span className="summary-stat">
+                <strong>{summaryData.total_items}</strong> {lang === "en" ? "items monitored" : "筆監測"}
+              </span>
+              <span className="summary-stat">
+                <strong>{summaryData.eligible_items}</strong> {lang === "en" ? "eligible" : "筆符合條件"}
+              </span>
+            </div>
+            <div className="summary-sources">
+              {summaryData.source_breakdown.map((src) => (
+                <span key={src.source_id} className="source-badge" data-source-id={src.source_id}>
+                  {src.source_id} · {src.item_count}
+                </span>
+              ))}
+            </div>
+            <p className="summary-brief">
+              {lang === "en" ? summaryData.daily_brief_en : summaryData.daily_brief}
+            </p>
+            {summaryData.key_topics.length > 0 && (
+              <div className="summary-topics">
+                <span className="summary-topics-label">{t.summary_topics}:</span>
+                {summaryData.key_topics.slice(0, 3).map((topic) => (
+                  <span key={topic.topic} className="topic-badge">
+                    {topic.topic} ({topic.item_count})
+                  </span>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
         {/* ── Judge quick guide (always English per spec) ────────────────── */}
         <section
           className="judge-guide"
@@ -504,6 +553,15 @@ export default function Home() {
                 ? `${t.source_next_update} ${new Date(sourceStatus.next_update_at).toLocaleString(lang === "en" ? "en-GB" : "zh-TW")}`
                 : t.source_snapshot_loading}
             </span>
+          </div>
+          <div className="data-export" data-testid="data-export">
+            <span className="export-label">{t.download_heading}</span>
+            <a href={`${BASE_PATH}/data/feed-export.csv`} download className="export-btn">
+              {t.download_csv}
+            </a>
+            <a href={`${BASE_PATH}/data/intelligence-feed.json`} download className="export-btn">
+              {t.download_json}
+            </a>
           </div>
           <div className="source-grid">
             {(sourceStatus?.sources || []).map((source) => (

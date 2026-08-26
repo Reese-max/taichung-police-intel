@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import importlib.util
+import io
 import json
 import os
 import re
 import time
 import urllib.parse
+from collections import Counter
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -734,6 +737,11 @@ def project_feed_item(
     if change_type == "NEW":
         score += 10
 
+    # Extract committee from payload (S-009 items)
+    committee = ""
+    if isinstance(item.get("payload"), dict):
+        committee = item["payload"].get("committee", "") or ""
+
     return {
         "stable_id": stable_id,
         "source_id": source_id,
@@ -753,7 +761,159 @@ def project_feed_item(
         "evidence_count": 1,
         "next_milestone": None,
         "content_sha256": item["content_sha256"],
+        "committee": committee,
     }
+
+
+def generate_intelligence_summary(
+    feed_items: list[dict],
+    collection_run_id: str,
+    now: datetime,
+    source_status: list[dict],
+) -> dict:
+    """Generate a deterministic intelligence summary from the feed items."""
+    total_items = len(feed_items)
+    eligible_items = sum(1 for i in feed_items if i.get("eligibility") == "HOME_CANDIDATE")
+
+    # Source breakdown
+    source_groups: dict[str, list[dict]] = {}
+    for item in feed_items:
+        source_groups.setdefault(item["source_id"], []).append(item)
+
+    source_names = {s["source_id"]: s["source_name"] for s in source_status}
+    source_freshness = {s["source_id"]: s["freshness_status"] for s in source_status}
+
+    # Topic keywords for extraction
+    topic_keywords = {
+        "科技執法與道路安全": ["科技執法", "測速", "超速", "闖紅燈", "道路安全", "交通事故"],
+        "分局整建與設施": ["整建", "分局", "派出所", "廳舍", "設施"],
+        "毒品與毒駕防制": ["毒品", "毒駕", "反毒", "藥駕"],
+        "交通管理與規劃": ["交通", "停車", "號誌", "路口", "道路"],
+        "治安巡邏與防竊": ["巡邏", "防竊", "竊盜", "治安", "監視器"],
+        "移工管理與查緝": ["移工", "外勞", "失聯", "查緝"],
+        "婦幼安全與保護": ["婦幼", "性騷擾", "家暴", "保護令"],
+        "詐騙防制": ["詐騙", "詐欺", "反詐"],
+        "警力配置與人事": ["警力", "人事", "員額", "編制", "調任"],
+    }
+
+    def extract_top_topics(items: list[dict], limit: int = 3) -> list[str]:
+        """Extract top topics from item titles using keyword matching."""
+        topic_counts: Counter = Counter()
+        for item in items:
+            title = item.get("title", "")
+            for topic, keywords in topic_keywords.items():
+                if any(kw in title for kw in keywords):
+                    topic_counts[topic] += 1
+        return [t for t, _ in topic_counts.most_common(limit)]
+
+    source_breakdown = []
+    for sid in sorted(source_groups.keys()):
+        items = source_groups[sid]
+        source_breakdown.append({
+            "source_id": sid,
+            "source_name": source_names.get(sid, sid),
+            "item_count": len(items),
+            "freshness": source_freshness.get(sid, "UNKNOWN"),
+            "top_topics": extract_top_topics(items),
+        })
+
+    # Key topics across all items
+    key_topics = []
+    for topic, keywords in topic_keywords.items():
+        matching_items = [
+            item for item in feed_items
+            if any(kw in item.get("title", "") for kw in keywords)
+        ]
+        if matching_items:
+            sources = sorted(set(item["source_id"] for item in matching_items))
+            sample_titles = [item["title"] for item in matching_items[:3] if item.get("title")]
+            key_topics.append({
+                "topic": topic,
+                "item_count": len(matching_items),
+                "sources": sources,
+                "sample_titles": sample_titles,
+            })
+    key_topics.sort(key=lambda x: x["item_count"], reverse=True)
+
+    # Committee breakdown from S-009 items (extract from titles if committee field unavailable)
+    committee_counts: Counter = Counter()
+    for item in feed_items:
+        committee = item.get("committee")
+        if committee:
+            committee_counts[committee] += 1
+    committee_breakdown = [
+        {"committee": c, "count": n}
+        for c, n in committee_counts.most_common()
+    ]
+
+    # Template-based daily brief (Chinese)
+    top_sources_str = "、".join(
+        f"{s['source_name']}（{s['item_count']} 筆）" for s in source_breakdown[:3]
+    )
+    top_topic_names = [t["topic"] for t in key_topics[:3]]
+    topics_str = "、".join(top_topic_names) if top_topic_names else "一般議會事務"
+    daily_brief = (
+        f"本期共監測 {total_items} 筆警政相關議會資訊，"
+        f"符合首頁展示條件 {eligible_items} 筆。"
+        f"主要來源：{top_sources_str}。"
+        f"關鍵議題包括：{topics_str}。"
+    )
+
+    # Template-based daily brief (English)
+    top_sources_en = ", ".join(
+        f"{s['source_id']} ({s['item_count']} items)" for s in source_breakdown[:3]
+    )
+    topics_en = ", ".join(top_topic_names) if top_topic_names else "general council affairs"
+    daily_brief_en = (
+        f"Monitoring {total_items} police-related council items, "
+        f"{eligible_items} eligible for homepage display. "
+        f"Primary sources: {top_sources_en}. "
+        f"Key topics: {topics_en}."
+    )
+
+    return {
+        "schema_version": 1,
+        "generated_at": timestamp(now),
+        "collection_run_id": collection_run_id,
+        "total_items": total_items,
+        "eligible_items": eligible_items,
+        "source_breakdown": source_breakdown,
+        "key_topics": key_topics,
+        "committee_breakdown": committee_breakdown,
+        "daily_brief": daily_brief,
+        "daily_brief_en": daily_brief_en,
+    }
+
+
+def generate_feed_csv(feed_items: list[dict], output_path: Path) -> None:
+    """Generate a CSV export of all feed items."""
+    fieldnames = [
+        "stable_id", "source_id", "source_name", "title",
+        "official_url", "published_at", "freshness_status",
+        "change_type", "committee",
+    ]
+
+    # Map source_id to source_name
+    source_names = {sid: name for sid, (name, _) in P0_SOURCES.items()}
+
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=fieldnames, extrasaction="ignore")
+    writer.writeheader()
+    for item in feed_items:
+        row = {
+            "stable_id": item.get("stable_id", ""),
+            "source_id": item.get("source_id", ""),
+            "source_name": source_names.get(item.get("source_id", ""), ""),
+            "title": item.get("title", ""),
+            "official_url": item.get("official_url", ""),
+            "published_at": item.get("published_at", ""),
+            "freshness_status": item.get("freshness_status", ""),
+            "change_type": item.get("change_type", ""),
+            "committee": item.get("committee", ""),
+        }
+        writer.writerow(row)
+
+    output_path.write_text(buf.getvalue(), encoding="utf-8-sig")
 
 
 def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) -> dict:
@@ -934,6 +1094,18 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
 
     print(f"DEMO_STATUS_OK slot={slot} status={status} sources={len(source_status)} output={output}")
     print(f"FEED_OK items={len(deduped_items)} eligible={sum(1 for i in deduped_items if i['eligibility'] == 'HOME_CANDIDATE')} output={feed_output}")
+
+    # Generate intelligence summary
+    summary_output = output.parent / "intelligence-summary.json"
+    summary_data = generate_intelligence_summary(deduped_items, collection_run_id, now, source_status)
+    save_state(summary_output, summary_data)
+    print(f"SUMMARY_OK topics={len(summary_data['key_topics'])} output={summary_output}")
+
+    # Generate CSV export
+    csv_output = output.parent / "feed-export.csv"
+    generate_feed_csv(deduped_items, csv_output)
+    print(f"CSV_OK items={len(deduped_items)} output={csv_output}")
+
     return state
 
 
