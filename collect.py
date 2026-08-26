@@ -170,16 +170,28 @@ def next_update(slot_date: date, slot: str) -> str:
     return timestamp(datetime.combine(slot_date + timedelta(days=1), time(6, 30), TZ))
 
 
-def freshness_status(data_as_of: str | None, now: datetime) -> str:
+def freshness_status(data_as_of: str | None, now: datetime, max_fresh_hours: float = 13, max_stale_hours: float = 24) -> str:
     if not data_as_of:
         return "NO_DATA"
     observed = datetime.fromisoformat(data_as_of)
     age_hours = (now - observed.astimezone(TZ)).total_seconds() / 3600
-    if age_hours <= 13:
+    if age_hours <= max_fresh_hours:
         return "FRESH"
-    if age_hours <= 24:
+    if age_hours <= max_stale_hours:
         return "STALE"
     return "VERY_STALE"
+
+
+# Council sources update on legislative schedules, not daily.
+# Use generous freshness windows that reflect actual publication cadence.
+SOURCE_FRESHNESS_POLICY: dict[str, tuple[float, float]] = {
+    # (max_fresh_hours, max_stale_hours)
+    "S-004": (24 * 45, 24 * 90),   # Agenda: revised once or twice per session (~months)
+    "S-006": (24 * 14, 24 * 30),   # Question order: updated per session period
+    "S-007": (24 * 90, 24 * 180),  # Meeting records: published after meeting periods
+    "S-009": (24 * 14, 24 * 60),   # Proposals: session-based, API-confirmed
+    "S-029": (24 * 45, 24 * 90),   # Project reports: updated per session cycle
+}
 
 
 def gap_reasons(source_run: dict, lkg: dict | None, freshness: str) -> list[str]:
@@ -302,7 +314,7 @@ def run_slot(
         state["source_runs"][source_run_id] = source_run
         lkg = state["last_known_good"].get(source_id)
         data_as_of = lkg["data_as_of"] if lkg else fixture["capture_time"]
-        freshness = freshness_status(data_as_of, now)
+        freshness = freshness_status(data_as_of, now, *SOURCE_FRESHNESS_POLICY.get(source_id, (13, 24)))
         state["source_status"][source_id] = {
             "source_id": source_id,
             "source_name": fixture["source_name"],

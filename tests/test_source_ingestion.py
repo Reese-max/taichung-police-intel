@@ -266,7 +266,7 @@ class SourceIngestionContractTests(unittest.TestCase):
             self.assertIn("WINDOW_PARTIAL", s009["intelligence_gaps"])
             self.assertIsNotNone(s009["last_known_good"])
             s029 = state["source_status"]["S-029"]
-            self.assertEqual(s029["freshness_status"], "VERY_STALE")
+            self.assertEqual(s029["freshness_status"], "FRESH")
             self.assertEqual(s029["last_known_good"]["snapshot_item_count"], 19)
             self.assertEqual(len(state["current_items"]), 2)
 
