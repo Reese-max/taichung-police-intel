@@ -1,8 +1,8 @@
 {
-  "generated_at": "2026-08-27T07:12:56+08:00",
+  "generated_at": "2026-08-27T07:42:05+08:00",
   "latest_collection_run": {
     "collection_run_id": "CR-DEMO-20260827-EVENING-MANUAL",
-    "finished_at": "2026-08-27T07:12:56+08:00",
+    "finished_at": "2026-08-27T07:42:05+08:00",
     "scheduled_for": "2026-08-27T18:30:00+08:00",
     "slot": "EVENING",
     "slot_date": "2026-08-27",
@@ -18,15 +18,15 @@
       "data_as_of": "2026-07-27T00:00:00+08:00",
       "freshness_status": "FRESH",
       "intelligence_gaps": [],
-      "last_checked_at": "2026-08-27T07:12:56+08:00",
+      "last_checked_at": "2026-08-27T07:42:05+08:00",
       "last_known_good": {
-        "completed_at": "2026-08-27T07:12:56+08:00",
+        "completed_at": "2026-08-27T07:42:05+08:00",
         "manifest_sha256": "fdb63cdc18095db80ee071041b1be90c679d215e5d5f969c3f9ad444233bd281",
         "snapshot_count": 3,
         "snapshot_item_count": 1,
         "source_run_id": "SR-DEMO-20260827-EVENING-004"
       },
-      "last_success_at": "2026-08-27T07:12:56+08:00",
+      "last_success_at": "2026-08-27T07:42:05+08:00",
       "manifest_sha256": "fdb63cdc18095db80ee071041b1be90c679d215e5d5f969c3f9ad444233bd281",
       "next_update_at": "2026-08-28T06:30:00+08:00",
       "result": "NO_NEW_ITEM",
@@ -41,18 +41,18 @@
     },
     {
       "current_source_run_id": "SR-DEMO-20260827-EVENING-006",
-      "data_as_of": "2026-08-27T07:12:56+08:00",
+      "data_as_of": "2026-08-27T07:42:05+08:00",
       "freshness_status": "FRESH",
       "intelligence_gaps": [],
-      "last_checked_at": "2026-08-27T07:12:56+08:00",
+      "last_checked_at": "2026-08-27T07:42:05+08:00",
       "last_known_good": {
-        "completed_at": "2026-08-27T07:12:56+08:00",
+        "completed_at": "2026-08-27T07:42:05+08:00",
         "manifest_sha256": "cb56b8328c2d4d7f4f33a397a2cf283e27a512d4e1ed2e03928067d338b65213",
         "snapshot_count": 15,
         "snapshot_item_count": 7,
         "source_run_id": "SR-DEMO-20260827-EVENING-006"
       },
-      "last_success_at": "2026-08-27T07:12:56+08:00",
+      "last_success_at": "2026-08-27T07:42:05+08:00",
       "manifest_sha256": "cb56b8328c2d4d7f4f33a397a2cf283e27a512d4e1ed2e03928067d338b65213",
       "next_update_at": "2026-08-28T06:30:00+08:00",
       "result": "NO_NEW_ITEM",
@@ -72,15 +72,15 @@
       "intelligence_gaps": [
         "STALE_DATA"
       ],
-      "last_checked_at": "2026-08-27T07:12:56+08:00",
+      "last_checked_at": "2026-08-27T07:42:05+08:00",
       "last_known_good": {
-        "completed_at": "2026-08-27T07:12:56+08:00",
+        "completed_at": "2026-08-27T07:42:05+08:00",
         "manifest_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "snapshot_count": 2,
         "snapshot_item_count": 0,
         "source_run_id": "SR-DEMO-20260827-EVENING-007"
       },
-      "last_success_at": "2026-08-27T07:12:56+08:00",
+      "last_success_at": "2026-08-27T07:42:05+08:00",
       "manifest_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
       "next_update_at": "2026-08-28T06:30:00+08:00",
       "result": "NO_NEW_ITEM",
@@ -95,18 +95,18 @@
     },
     {
       "current_source_run_id": "SR-DEMO-20260827-EVENING-009",
-      "data_as_of": "2026-08-27T07:13:08+08:00",
+      "data_as_of": "2026-08-27T07:42:19+08:00",
       "freshness_status": "FRESH",
       "intelligence_gaps": [],
-      "last_checked_at": "2026-08-27T07:12:56+08:00",
+      "last_checked_at": "2026-08-27T07:42:05+08:00",
       "last_known_good": {
-        "completed_at": "2026-08-27T07:12:56+08:00",
+        "completed_at": "2026-08-27T07:42:05+08:00",
         "manifest_sha256": "d74de2631cff63316fb4ba717e1c63de412bb6d3ae2fdf32c3bba68fc4957490",
         "snapshot_count": 1,
         "snapshot_item_count": 108,
         "source_run_id": "SR-DEMO-20260827-EVENING-009"
       },
-      "last_success_at": "2026-08-27T07:12:56+08:00",
+      "last_success_at": "2026-08-27T07:42:05+08:00",
       "manifest_sha256": "d74de2631cff63316fb4ba717e1c63de412bb6d3ae2fdf32c3bba68fc4957490",
       "next_update_at": "2026-08-28T06:30:00+08:00",
       "result": "NO_NEW_ITEM",
@@ -124,15 +124,15 @@
       "data_as_of": "2026-07-24T00:00:00+08:00",
       "freshness_status": "FRESH",
       "intelligence_gaps": [],
-      "last_checked_at": "2026-08-27T07:12:56+08:00",
+      "last_checked_at": "2026-08-27T07:42:05+08:00",
       "last_known_good": {
-        "completed_at": "2026-08-27T07:12:56+08:00",
+        "completed_at": "2026-08-27T07:42:05+08:00",
         "manifest_sha256": "a427ebfe37643d830711f30d02d1ef1ee0adea55ddaf713925c4fb121aa3ce05",
         "snapshot_count": 4,
         "snapshot_item_count": 19,
         "source_run_id": "SR-DEMO-20260827-EVENING-029"
       },
-      "last_success_at": "2026-08-27T07:12:56+08:00",
+      "last_success_at": "2026-08-27T07:42:05+08:00",
       "manifest_sha256": "a427ebfe37643d830711f30d02d1ef1ee0adea55ddaf713925c4fb121aa3ce05",
       "next_update_at": "2026-08-28T06:30:00+08:00",
       "result": "NO_NEW_ITEM",

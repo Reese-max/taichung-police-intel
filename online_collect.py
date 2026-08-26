@@ -885,31 +885,73 @@ def generate_intelligence_summary(
     }
 
 
-def generate_feed_csv(feed_items: list[dict], output_path: Path) -> None:
-    """Generate a CSV export of all feed items."""
+def generate_feed_csv(feed_items: list[dict], raw_items_by_source: dict[str, list[dict]], output_path: Path) -> None:
+    """Generate a CSV export of all feed items with full content data."""
     fieldnames = [
         "stable_id", "source_id", "source_name", "title",
         "official_url", "published_at", "freshness_status",
-        "change_type", "committee",
+        "change_type", "committee", "bill_type", "sponsor",
+        "proposal_rationale", "resolution", "session",
+        "content_sha256",
     ]
 
     # Map source_id to source_name
     source_names = {sid: name for sid, (name, _) in P0_SOURCES.items()}
 
+    # Build a lookup from stable_key to raw payload
+    raw_lookup: dict[str, dict] = {}
+    for source_id, items in raw_items_by_source.items():
+        for item in items:
+            key = f"{source_id}:{item['stable_key']}"
+            raw_lookup[key] = item.get("payload", {})
+
     buf = io.StringIO()
     writer = csv.DictWriter(buf, fieldnames=fieldnames, extrasaction="ignore")
     writer.writeheader()
     for item in feed_items:
+        source_id = item.get("source_id", "")
+        # Recover the stable_key from stable_id: "FEED-S-009-xxxx" -> lookup
+        stable_id = item.get("stable_id", "")
+        # Try to find matching raw payload by content_sha256
+        payload = {}
+        for sid, raw_items in raw_items_by_source.items():
+            if sid != source_id:
+                continue
+            for raw in raw_items:
+                if canonical_sha256(f"{sid}:{raw['stable_key']}")[:16] in stable_id:
+                    payload = raw.get("payload", {})
+                    break
+            if payload:
+                break
+
+        # Extract S-009 specific fields
+        proposal_rationale = ""
+        if isinstance(payload, dict):
+            rationale = payload.get("proposalRationale") or payload.get("proposalRationaleSort") or ""
+            # Clean HTML tags
+            if "<" in rationale:
+                rationale = re.sub(r"<[^>]+>", "", rationale)
+            # Remove keyword highlight suffix
+            if "關鍵字包含" in rationale:
+                rationale = rationale.split("關鍵字包含")[0].strip()
+            proposal_rationale = rationale.strip()
+
         row = {
-            "stable_id": item.get("stable_id", ""),
-            "source_id": item.get("source_id", ""),
-            "source_name": source_names.get(item.get("source_id", ""), ""),
+            "stable_id": stable_id,
+            "source_id": source_id,
+            "source_name": source_names.get(source_id, ""),
             "title": item.get("title", ""),
             "official_url": item.get("official_url", ""),
             "published_at": item.get("published_at", ""),
             "freshness_status": item.get("freshness_status", ""),
             "change_type": item.get("change_type", ""),
-            "committee": item.get("committee", ""),
+            "committee": item.get("committee", "") or (payload.get("committee", "") if isinstance(payload, dict) else ""),
+            "bill_type": payload.get("billType", "") if isinstance(payload, dict) else "",
+            "sponsor": payload.get("sponsor", "") if isinstance(payload, dict) else "",
+            "proposal_rationale": proposal_rationale,
+            "resolution": (payload.get("resolution", "") if isinstance(payload, dict) else ""),
+            "session": payload.get("session", "") if isinstance(payload, dict) else "",
+            "content_sha256": item.get("content_sha256", ""),
         }
         writer.writerow(row)
 
@@ -937,6 +979,7 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
     source_status = []
     feed_items = []
     source_summary = {}
+    raw_items_by_source: dict[str, list[dict]] = {}
 
     for source_id, (source_name, source_url) in P0_SOURCES.items():
         source_run_id = f"SR-DEMO-{slot_date:%Y%m%d}-{slot}-{source_id[2:]}"
@@ -946,6 +989,7 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
         try:
             collected = collect_source(session, source_id, window_start.date(), window_end.date())
             collected_items = collected.get("items", [])
+            raw_items_by_source[source_id] = collected_items
             dates = [item["published_at"] for item in collected_items if item["published_at"]]
             # Use latest_record_date from S-007 probe or api_confirmed_at from S-009
             # when no items have published_at in the collection window.
@@ -1103,7 +1147,7 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
 
     # Generate CSV export
     csv_output = output.parent / "feed-export.csv"
-    generate_feed_csv(deduped_items, csv_output)
+    generate_feed_csv(deduped_items, raw_items_by_source, csv_output)
     print(f"CSV_OK items={len(deduped_items)} output={csv_output}")
 
     return state
