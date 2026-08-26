@@ -666,7 +666,13 @@ def project_feed_item(
 
     # Determine change type
     if item["content_sha256"] in previous_sha256s:
-        change_type = "UNCHANGED"
+        # Item content is identical to prior feed. However, if the source is
+        # confirmed FRESH and healthy, mark as CONFIRMED (still active/valid)
+        # rather than UNCHANGED (implies stale repetition).
+        if source_health == "PASS" and freshness in ("FRESH", "STALE"):
+            change_type = "CONFIRMED"
+        else:
+            change_type = "UNCHANGED"
     else:
         change_type = "NEW"
 
@@ -675,13 +681,17 @@ def project_feed_item(
     if isinstance(item.get("payload"), dict):
         title = item["payload"].get("title", "")
         if not title:
-            # For API records, use content/subject/billName if available
+            # For API records, use proposalRationale/content/subject/billName
             title = (
-                item["payload"].get("subject")
+                item["payload"].get("proposalRationale")
+                or item["payload"].get("subject")
                 or item["payload"].get("billName")
                 or item["payload"].get("content", "")[:100]
                 or ""
             )
+        # Clean up: remove keyword highlights from API
+        if "關鍵字包含" in title:
+            title = title.split("\n")[0].strip()
     # Truncate for safety
     if len(title) > 200:
         title = title[:197] + "…"
@@ -695,7 +705,7 @@ def project_feed_item(
         eligibility = "INELIGIBLE_PARTIAL"
     elif freshness in ("VERY_STALE",):
         eligibility = "INELIGIBLE_STALE"
-    elif freshness == "NO_DATA" or not item.get("published_at"):
+    elif freshness == "NO_DATA" or (not item.get("published_at") and change_type == "NEW"):
         eligibility = "INELIGIBLE_NO_DATE"
     else:
         eligibility = "HOME_CANDIDATE"
