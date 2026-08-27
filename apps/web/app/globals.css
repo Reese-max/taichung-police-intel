@@ -779,6 +779,108 @@ h1 {
   .summary-stats { flex-direction: column; gap: 12px; }
 }
 
+/* ── Source dot indicator ────────────────────────────────────────────────────── */
+.source-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+.source-dot.pass { background: var(--green); }
+.source-dot.failed { background: var(--danger); }
+
+/* ── Source card enhanced layout ────────────────────────────────────────────── */
+.source-card .item-count {
+  font-size: 1.5rem;
+  font-weight: 700;
+  font-family: var(--mono);
+  color: #ffffff;
+  line-height: 1.2;
+}
+.source-card .relative-time {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  font-family: var(--mono);
+}
+.source-card .empty-note {
+  font-size: 0.7rem;
+  color: var(--amber);
+  margin-top: 4px;
+}
+
+/* ── Feed card enhancements ─────────────────────────────────────────────────── */
+.feed-card {
+  cursor: pointer;
+  border-left: 4px solid var(--border);
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+.feed-card-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.feed-card .source-label {
+  display: block;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+  font-weight: 500;
+}
+
+/* Source-specific left border colors */
+.feed-card[data-source-id="S-004"] { border-left-color: var(--accent); }
+.feed-card[data-source-id="S-006"] { border-left-color: #a78bfa; }
+.feed-card[data-source-id="S-007"] { border-left-color: var(--amber); }
+.feed-card[data-source-id="S-009"] { border-left-color: var(--green); }
+.feed-card[data-source-id="S-029"] { border-left-color: #22d3ee; }
+
+/* ── Summary stat box ───────────────────────────────────────────────────────── */
+.summary-stat-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.summary-stat-box .stat-number {
+  font-size: 2rem;
+  font-weight: 800;
+  font-family: var(--mono);
+  color: #ffffff;
+  line-height: 1.1;
+}
+.summary-stat-box .stat-label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+.summary-updated {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-family: var(--mono);
+  margin-bottom: 12px;
+}
+.committee-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+.committee-breakdown .committee-badge {
+  padding: 3px 8px;
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }

@@ -1,5 +1,5 @@
 {
-  "collection_run_id": "CR-DEMO-20260827-EVENING-MANUAL",
+  "collection_run_id": "CR-DEMO-20260827-MORNING-MANUAL",
   "committee_breakdown": [
     {
       "committee": "警消環衛委員會-警察",
@@ -58,10 +58,10 @@
       "count": 1
     }
   ],
-  "daily_brief": "本期共監測 118 筆警政相關議會資訊，符合首頁展示條件 118 筆。主要來源：臺中市議會議事日程（1 筆）、臺中市議會質詢順序表（7 筆）、臺中市議會議事資訊系統－各項提案（108 筆）。關鍵議題包括：分局整建與設施、交通管理與規劃、治安巡邏與防竊。",
-  "daily_brief_en": "Monitoring 118 police-related council items, 118 eligible for homepage display. Primary sources: S-004 (1 items), S-006 (7 items), S-009 (108 items). Key topics: 分局整建與設施, 交通管理與規劃, 治安巡邏與防竊.",
-  "eligible_items": 118,
-  "generated_at": "2026-08-27T07:42:05+08:00",
+  "daily_brief": "本期共監測 118 筆警政相關議會資訊，符合首頁展示條件 117 筆。主要來源：臺中市議會議事日程（1 筆）、臺中市議會質詢順序表（7 筆）、臺中市議會議事資訊系統－各項提案（108 筆）。關鍵議題包括：分局整建與設施、交通管理與規劃、治安巡邏與防竊。",
+  "daily_brief_en": "Monitoring 118 police-related council items, 117 eligible for homepage display. Primary sources: S-004 (1 items), S-006 (7 items), S-009 (108 items). Key topics: 分局整建與設施, 交通管理與規劃, 治安巡邏與防竊.",
+  "eligible_items": 117,
+  "generated_at": "2026-08-27T12:13:22+08:00",
   "key_topics": [
     {
       "item_count": 39,

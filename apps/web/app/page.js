@@ -16,6 +16,28 @@ import {
 } from "../lib/homepage-data.js";
 import { buildHomepageResponse } from "../lib/homepage-eligibility.js";
 
+// ── Relative time helper ──────────────────────────────────────────────────────
+function relativeTime(iso, lang) {
+  if (!iso) return '';
+  const diff = Date.now() - new Date(iso).getTime();
+  const hours = Math.floor(diff / 3_600_000);
+  const minutes = Math.floor(diff / 60_000);
+  if (minutes < 1) return lang === 'en' ? 'just now' : '剛剛';
+  if (minutes < 60) return lang === 'en' ? `${minutes}m ago` : `${minutes} 分前`;
+  if (hours < 24) return lang === 'en' ? `${hours}h ago` : `${hours} 小時前`;
+  const days = Math.floor(hours / 24);
+  return lang === 'en' ? `${days}d ago` : `${days} 天前`;
+}
+
+// ── Source name mapping (Chinese, from source_status) ─────────────────────────
+const SOURCE_NAMES_ZH = {
+  "S-004": "臺中市議會議事日程",
+  "S-006": "臺中市議會質詢順序表",
+  "S-007": "臺中市議會議事資訊系統－議事錄",
+  "S-009": "臺中市議會議事資訊系統－各項提案",
+  "S-029": "臺中市政府議會專案報告",
+};
+
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
 const DATA_URL = `${BASE_PATH}/data/groq-asr-canary-2026-08-14.json`;
 const CER_URL = `${BASE_PATH}/data/groq-asr-cer-2026-08-14.json`;
@@ -458,15 +480,23 @@ export default function Home() {
             <section className="summary-card" aria-labelledby="summary-title" data-testid="summary-card">
               <p className="section-label">{t.summary_heading}</p>
               <h2 id="summary-title">{t.summary_heading}</h2>
+              {summaryData.generated_at && (
+                <p className="summary-updated">
+                  {lang === "en" ? "Updated " : "更新於 "}{relativeTime(summaryData.generated_at, lang)}
+                </p>
+              )}
               <div className="summary-stats">
-                <span className="summary-stat">
-                  <strong>{summaryData.total_items}</strong> {lang === "en" ? "items monitored" : "筆監測"}
+                <span className="summary-stat summary-stat-box">
+                  <span className="stat-number">{summaryData.total_items}</span>
+                  <span className="stat-label">{lang === "en" ? "items monitored" : "筆監測"}</span>
                 </span>
-                <span className="summary-stat">
-                  <strong>{summaryData.eligible_items}</strong> {lang === "en" ? "eligible" : "筆符合條件"}
+                <span className="summary-stat summary-stat-box">
+                  <span className="stat-number">{summaryData.eligible_items}</span>
+                  <span className="stat-label">{lang === "en" ? "eligible" : "筆符合條件"}</span>
                 </span>
-                <span className="summary-stat">
-                  <strong>{summaryData.source_breakdown.length}</strong> {lang === "en" ? "sources" : "個來源"}
+                <span className="summary-stat summary-stat-box">
+                  <span className="stat-number">{summaryData.source_breakdown.length}</span>
+                  <span className="stat-label">{lang === "en" ? "sources" : "個來源"}</span>
                 </span>
               </div>
               <div className="summary-sources">
@@ -485,6 +515,15 @@ export default function Home() {
                   {summaryData.key_topics.slice(0, 3).map((topic) => (
                     <span key={topic.topic} className="topic-badge">
                       {topic.topic} ({topic.item_count})
+                    </span>
+                  ))}
+                </div>
+              )}
+              {summaryData.committee_breakdown && summaryData.committee_breakdown.length > 0 && (
+                <div className="committee-breakdown">
+                  {summaryData.committee_breakdown.slice(0, 6).map((cb) => (
+                    <span key={cb.committee} className="committee-badge">
+                      {cb.committee} ({cb.count})
                     </span>
                   ))}
                 </div>
@@ -580,12 +619,20 @@ export default function Home() {
                   {feedItems
                     .filter((item) => item.stable_id && item.stable_id !== priorityItem?.item_id)
                     .map((item) => (
-                      <article
+                      <a
                         key={item.stable_id || item.item_id}
                         className="feed-card"
                         data-testid="feed-card"
                         data-source-id={item.source_id}
+                        href={item.official_url}
+                        target="_blank"
+                        rel="noreferrer"
                       >
+                        <span className="source-label">
+                          {lang === "en"
+                            ? (SOURCE_NAMES_EN[item.source_id] || item.source_id)
+                            : (SOURCE_NAMES_ZH[item.source_id] || item.source_id)}
+                        </span>
                         <div className="feed-card-meta">
                           <span className="tag">{item.source_id}</span>
                           <span className={`freshness-badge ${(item.freshness_status || "").toLowerCase()}`}>
@@ -593,7 +640,7 @@ export default function Home() {
                           </span>
                           {item.change_type === "NEW" && <span className="tag new">NEW</span>}
                         </div>
-                        <h3>{item.title_zh || item.title || (lang === "en" ? "(untitled)" : "（無標題）")}</h3>
+                        <h3 className="feed-card-title">{item.title_zh || item.title || (lang === "en" ? "(untitled)" : "（無標題）")}</h3>
                         {item.committee && (
                           <p className="committee-tag">{t.card_committee}：{item.committee}</p>
                         )}
@@ -622,10 +669,7 @@ export default function Home() {
                             <> · {lang === "en" ? "Confirmed" : "確認時間"}：{new Date(item.fetched_at).toLocaleString(lang === "en" ? "en-GB" : "zh-TW", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</>
                           )}
                         </p>
-                        <a href={item.official_url} target="_blank" rel="noreferrer">
-                          {lang === "en" ? "Official source" : "回到官方來源"} ↗
-                        </a>
-                      </article>
+                      </a>
                     ))}
                 </div>
               )}
@@ -658,12 +702,21 @@ export default function Home() {
               {(sourceStatus?.sources || []).map((source) => (
                 <article className="source-card" key={source.source_id}>
                   <div>
-                    <strong>{source.source_id}</strong>
-                    <span className={`health ${source.source_health.toLowerCase()}`}>
-                      {source.source_health}
+                    <span style={{ display: 'flex', alignItems: 'center' }}>
+                      <span className={`source-dot ${source.source_health.toLowerCase() === 'pass' ? 'pass' : 'failed'}`} />
+                      <strong>{source.source_id}</strong>
                     </span>
                   </div>
                   <h3>{lang === "en" ? SOURCE_NAMES_EN[source.source_id] || source.source_name : source.source_name}</h3>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginTop: '4px' }}>
+                    <span className="item-count">{source.snapshot_item_count}</span>
+                    <span className="relative-time">{relativeTime(source.last_checked_at, lang)}</span>
+                  </div>
+                  {source.snapshot_item_count === 0 && (
+                    <p className="empty-note">
+                      {lang === "en" ? "No records during recess" : "休會期間無新紀錄"}
+                    </p>
+                  )}
                   {lang === "en" && (
                     <small lang="zh-Hant">{t.source_official_name} {source.source_name}</small>
                   )}
