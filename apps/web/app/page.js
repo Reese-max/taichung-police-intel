@@ -614,10 +614,13 @@ export default function Home() {
                         </div>
                         <p className="feed-card-detail">
                           {item.published_at
-                            ? `${lang === "en" ? "Published" : "發布"}：${new Date(item.published_at).toLocaleDateString(lang === "en" ? "en-GB" : "zh-TW")}`
-                            : (lang === "en" ? "No publication date" : "無發布日期")}
-                          {" · "}
-                          {lang === "en" ? "Health" : "來源"}：{item.source_health}
+                            ? `${lang === "en" ? "Source date" : "來源日期"}：${new Date(item.published_at).toLocaleDateString(lang === "en" ? "en-GB" : "zh-TW")}`
+                            : item.data_as_of
+                              ? `${lang === "en" ? "Source date" : "來源日期"}：${new Date(item.data_as_of).toLocaleDateString(lang === "en" ? "en-GB" : "zh-TW")}`
+                              : (lang === "en" ? "No source date" : "無來源日期")}
+                          {item.fetched_at && (
+                            <> · {lang === "en" ? "Confirmed" : "確認時間"}：{new Date(item.fetched_at).toLocaleString(lang === "en" ? "en-GB" : "zh-TW", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</>
+                          )}
                         </p>
                         <a href={item.official_url} target="_blank" rel="noreferrer">
                           {lang === "en" ? "Official source" : "回到官方來源"} ↗

@@ -89,7 +89,7 @@ export const COPY = {
     // ── Site header ───────────────────────────────────────────────────────────
     site_kicker: "Taichung police intelligence",
     site_title: "Tonight's council preparation",
-    freshness_live: "Live check: ",
+    freshness_live: "Data collected: ",
     freshness_static: "Static evidence: 2026-08-14",
 
     // ── Judge guide ───────────────────────────────────────────────────────────
@@ -216,7 +216,7 @@ export const COPY = {
     // ── Site header ───────────────────────────────────────────────────────────
     site_kicker: "Taichung police intelligence",
     site_title: "今晚議會準備",
-    freshness_live: "線上核對：",
+    freshness_live: "資料蒐集於：",
     freshness_static: "靜態證據：2026-08-14",
 
     // ── Judge guide ───────────────────────────────────────────────────────────
