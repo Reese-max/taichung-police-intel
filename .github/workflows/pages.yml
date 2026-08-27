@@ -3,6 +3,11 @@ name: Refresh and deploy competition demo
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "apps/web/public/data/source-status.json"
+      - "apps/web/public/data/intelligence-feed.json"
+      - "apps/web/public/data/intelligence-summary.json"
+      - "apps/web/public/data/feed-export.csv"
   schedule:
     - cron: "30 22 * * *"
     - cron: "30 10 * * *"
@@ -30,6 +35,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Select scheduled slot
         if: github.event_name != 'push'
@@ -45,27 +52,24 @@ jobs:
           fi
 
       - name: Set up Python
-        if: github.event_name != 'push'
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
 
-      - name: Refresh official-source status
-        if: github.event_name != 'push'
-        run: |
-          python -m pip install -r requirements.txt
-          python online_collect.py --slot "${{ steps.slot.outputs.value }}" --demo-output apps/web/public/data/source-status.json --trigger "${{ github.event_name == 'schedule' && 'schedule' || 'manual' }}"
+      - name: Install Python dependencies
+        run: python -m pip install -r requirements.txt
 
-      - name: Preserve refresh evidence
+      - name: Refresh official-source publication bundle
         if: github.event_name != 'push'
-        shell: bash
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- apps/web/public/data/source-status.json
-          git diff --cached --quiet || git commit -m "data: refresh ${{ steps.slot.outputs.value }} source status"
-          git push
+          python online_collect.py \
+            --slot "${{ steps.slot.outputs.value }}" \
+            --demo-output apps/web/public/data/source-status.json \
+            --trigger "${{ github.event_name == 'schedule' && 'schedule' || 'manual' }}"
+
+      - name: Verify generated publication bundle
+        run: python -X utf8 scripts/verify-publication-bundle.py
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -81,11 +85,25 @@ jobs:
         id: pages
         uses: actions/configure-pages@v5
 
-      - name: Build static competition demo
-        run: npm --prefix apps/web run build
+      - name: Run full verification gate and build static site
+        run: npm run check
         env:
           PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
           NEXT_PUBLIC_BASE_PATH: ${{ steps.pages.outputs.base_path }}
+
+      - name: Preserve refresh evidence as one bundle
+        if: github.event_name != 'push'
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- \
+            apps/web/public/data/source-status.json \
+            apps/web/public/data/intelligence-feed.json \
+            apps/web/public/data/intelligence-summary.json \
+            apps/web/public/data/feed-export.csv
+          git diff --cached --quiet || git commit -m "data: refresh ${{ steps.slot.outputs.value }} publication bundle [skip ci]"
+          git push
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
