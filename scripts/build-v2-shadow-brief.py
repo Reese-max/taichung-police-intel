@@ -14,14 +14,59 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from intel_v2.semantics import compare_snapshot, feed_item_to_version, shadow_brief
+from intel_v2.semantics import ChangeEvent, compare_snapshot, feed_item_to_version, shadow_brief
 
 
 TZ = ZoneInfo("Asia/Taipei")
+GENERATOR_VERSION = 2
 DEFAULT_FEED = ROOT / "apps" / "web" / "public" / "data" / "intelligence-feed.json"
 DEFAULT_STATUS = ROOT / "apps" / "web" / "public" / "data" / "source-status.json"
 DEFAULT_STATE = ROOT / "state" / "v2-shadow-state.json"
 DEFAULT_OUTPUT = ROOT / "apps" / "web" / "public" / "data" / "v2-daily-brief.json"
+
+SOURCE_CONTEXT = {
+    "S-004": {
+        "source_name": "臺中市議會議事日程",
+        "why_it_matters": "涉及會期、議程、列席與答詢準備時程。",
+        "affected_roles": ["議會聯絡", "局本部幕僚"],
+    },
+    "S-006": {
+        "source_name": "臺中市議會質詢順序表",
+        "why_it_matters": "涉及質詢順序、列席主管與資料準備優先順序。",
+        "affected_roles": ["議會聯絡", "列席主管", "相關業管單位"],
+    },
+    "S-007": {
+        "source_name": "臺中市議會議事錄",
+        "why_it_matters": "可能包含公開答覆、承諾事項與後續追蹤責任。",
+        "affected_roles": ["議會聯絡", "原答詢業管單位"],
+    },
+    "S-009": {
+        "source_name": "臺中市議會各項提案",
+        "why_it_matters": "涉及議員提案、政策回應、預算或地方警政需求。",
+        "affected_roles": ["議會聯絡", "相關業管單位", "涉及分局或大隊"],
+    },
+    "S-029": {
+        "source_name": "臺中市政府議會專案報告",
+        "why_it_matters": "涉及市府專案說明、跨機關政策與警察局公開立場。",
+        "affected_roles": ["局本部幕僚", "專案報告業管單位", "相關分局或大隊"],
+    },
+}
+
+CHANGE_ACTIONS = {
+    "NEW": "確認業管歸屬與現行處理狀態，判斷是否需納入答詢或政策追蹤。",
+    "REVISED": "比對前後版本，更新既有答詢、簡報或追蹤紀錄。",
+    "STATUS_CHANGED": "確認最新官方階段與後續責任，更新追蹤狀態。",
+    "DEADLINE_CHANGED": "立即核對新日期，調整列席、資料準備與內部期限。",
+    "REMOVED": "確認是否為正式撤下、移轉或來源改版，保留最後版本並視需要查核。",
+}
+
+CHANGE_PRIORITY = {
+    "STATUS_CHANGED": 0,
+    "DEADLINE_CHANGED": 1,
+    "NEW": 2,
+    "REVISED": 3,
+    "REMOVED": 4,
+}
 
 
 def load_json(path: Path) -> dict:
@@ -91,6 +136,62 @@ def source_health_projection(source_status: dict | None) -> dict:
     }
 
 
+def event_projection(event: ChangeEvent, publication_tier: str) -> dict:
+    context = SOURCE_CONTEXT.get(
+        event.source_id,
+        {
+            "source_name": event.source_id,
+            "why_it_matters": "涉及公開警政政策、議會或市政資訊的變更。",
+            "affected_roles": ["議會聯絡", "相關業管單位"],
+        },
+    )
+    return {
+        "event_id": event.event_id,
+        "source_id": event.source_id,
+        "source_name": context["source_name"],
+        "change_type": event.change_type,
+        "headline": event.title,
+        "what_changed": event.wording,
+        "why_it_matters": context["why_it_matters"],
+        "affected_roles": context["affected_roles"],
+        "recommended_action": CHANGE_ACTIONS.get(
+            event.change_type,
+            "確認官方內容與業管責任，視需要更新追蹤紀錄。",
+        ),
+        "deadline": event.occurred_at if event.change_type == "DEADLINE_CHANGED" else None,
+        "temporal_basis": event.temporal_basis,
+        "date_status": event.date_status,
+        "detected_at": event.detected_at,
+        "changed_fields": list(event.changed_fields),
+        "official_url": event.official_url,
+        "verification_status": "DETERMINISTIC_PASS",
+        "evidence_status": "OFFICIAL_URL_BOUND",
+        "publication_tier": publication_tier,
+    }
+
+
+def enrich_for_police_users(brief: dict, events: list[ChangeEvent]) -> None:
+    publishable = [event for event in events if event.publishable]
+    publishable.sort(
+        key=lambda event: (
+            CHANGE_PRIORITY.get(event.change_type, 99),
+            event.source_id,
+            event.identity,
+        )
+    )
+    priority_items = [event_projection(event, "TOP") for event in publishable[:3]]
+    other_changes = [event_projection(event, "OTHER") for event in publishable[3:23]]
+
+    brief["generator_version"] = GENERATOR_VERSION
+    brief["audience"] = ["議會聯絡", "局本部幕僚", "業管承辦", "分局主管"]
+    brief["priority_items"] = priority_items
+    brief["tracking_items"] = []
+    brief["other_changes"] = other_changes
+    brief["overview"]["priority_count"] = len(priority_items)
+    brief["overview"]["tracking_count"] = 0
+    brief["overview"]["other_change_count"] = len(other_changes)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Build a persistent V2 shadow brief from the current official-source feed."
@@ -138,6 +239,7 @@ def main() -> int:
         events=events,
         generated_at=observed_at,
     )
+    enrich_for_police_users(brief, events)
     brief["publication_status"] = "READY" if snapshot_complete else "PARTIAL"
     brief["snapshot_complete"] = snapshot_complete
     brief["source_health"] = source_health_projection(source_status)
@@ -151,6 +253,7 @@ def main() -> int:
         f"baseline={brief['baseline_established_at']} "
         f"archive={brief['overview']['archive_total']} "
         f"changes={brief['overview']['current_change_count']} "
+        f"priority={brief['overview']['priority_count']} "
         f"complete={str(snapshot_complete).lower()} "
         f"quality_issues={len(brief['quality_issues'])} "
         f"state={args.state} output={args.output}"
