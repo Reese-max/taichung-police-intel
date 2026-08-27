@@ -49,3 +49,15 @@ jobs:
 
       - name: Verify generated publication bundle
         run: python -X utf8 scripts/verify-publication-bundle.py
+
+      - name: Run V2 time and item-diff regression tests
+        run: python -X utf8 -m unittest discover -s tests -p "test_v2_semantics.py" -v
+
+      - name: Build conservative V2 shadow comparison
+        run: |
+          rm -f /tmp/v2-shadow-state.json /tmp/v2-shadow-brief.json
+          python -X utf8 scripts/build-v2-shadow-brief.py \
+            --state /tmp/v2-shadow-state.json \
+            --output /tmp/v2-shadow-brief.json \
+            --reset-baseline
+          python -X utf8 -c 'import json; p="/tmp/v2-shadow-brief.json"; d=json.load(open(p, encoding="utf-8")); o=d["overview"]; assert o["current_change_count"] == 0; print("V2_SHADOW_BASELINE_OK archive={} legacy={}".format(o["archive_total"], o["legacy_home_candidate_count"]))'
