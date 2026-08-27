@@ -5,6 +5,10 @@ export const metadata = {
   description: "可回到官方影音時間點的議會準備證據介面。",
 };
 
+export const viewport = {
+  themeColor: "#0f1923",
+};
+
 export default function RootLayout({ children }) {
   return (
     <html lang="zh-Hant-TW">

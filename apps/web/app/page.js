@@ -153,6 +153,19 @@ export default function Home() {
     document.documentElement.lang = lang === "en" ? "en" : "zh-Hant-TW";
   }, [lang]);
 
+  // ── Live clock ───────────────────────────────────────────────────────────
+  const [clockStr, setClockStr] = useState("");
+
+  useEffect(() => {
+    const update = () => {
+      const now = new Date();
+      setClockStr(now.toLocaleTimeString(lang === "en" ? "en-GB" : "zh-TW", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
+    };
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, [lang]);
+
   // ── Evidence drawer state ────────────────────────────────────────────────
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [data, setData] = useState(null);
@@ -341,6 +354,7 @@ export default function Home() {
           <div>
             <p className="kicker">{t.site_kicker}</p>
             <h1>{t.site_title}</h1>
+            <p className="header-clock" aria-live="off" aria-hidden="true">{clockStr}</p>
           </div>
           <span className="freshness">
             {sourceStatus?.generated_at
@@ -348,42 +362,6 @@ export default function Home() {
               : t.freshness_static}
           </span>
         </header>
-
-        {/* ── Intelligence summary card ─────────────────────────────────── */}
-        {summaryData && (
-          <section className="summary-card" aria-labelledby="summary-title" data-testid="summary-card">
-            <p className="section-label">{t.summary_heading}</p>
-            <h2 id="summary-title">{t.summary_heading}</h2>
-            <div className="summary-stats">
-              <span className="summary-stat">
-                <strong>{summaryData.total_items}</strong> {lang === "en" ? "items monitored" : "筆監測"}
-              </span>
-              <span className="summary-stat">
-                <strong>{summaryData.eligible_items}</strong> {lang === "en" ? "eligible" : "筆符合條件"}
-              </span>
-            </div>
-            <div className="summary-sources">
-              {summaryData.source_breakdown.map((src) => (
-                <span key={src.source_id} className="source-badge" data-source-id={src.source_id}>
-                  {src.source_id} · {src.item_count}
-                </span>
-              ))}
-            </div>
-            <p className="summary-brief">
-              {lang === "en" ? summaryData.daily_brief_en : summaryData.daily_brief}
-            </p>
-            {summaryData.key_topics.length > 0 && (
-              <div className="summary-topics">
-                <span className="summary-topics-label">{t.summary_topics}:</span>
-                {summaryData.key_topics.slice(0, 3).map((topic) => (
-                  <span key={topic.topic} className="topic-badge">
-                    {topic.topic} ({topic.item_count})
-                  </span>
-                ))}
-              </div>
-            )}
-          </section>
-        )}
 
         {/* ── Judge quick guide (always English per spec) ────────────────── */}
         <section
@@ -472,142 +450,245 @@ export default function Home() {
           <p>{t.workflow_body}</p>
         </section>
 
-        {/* ── Live intelligence feed items ───────────────────────────────── */}
-        {feedLoaded && (
-          <section
-            className="feed-section"
-            aria-labelledby="feed-section-title"
-            data-testid="feed-section"
-          >
-            <p className="section-label">{lang === "en" ? "Live intelligence feed" : "即時情報動態"}</p>
-            <h2 id="feed-section-title">
-              {lang === "en" ? "Official source updates" : "官方來源更新"}
-            </h2>
+        {/* ── Dashboard grid: summary + feed + sources ───────────────────── */}
+        <div className="dashboard-grid">
 
-            {/* ── Topic filter buttons ──────────────────────────────────── */}
-            {summaryData && summaryData.key_topics.length > 0 && (
-              <div className="topic-filter" data-testid="topic-filter">
-                <button
-                  type="button"
-                  className={activeTopic === null ? "active" : ""}
-                  onClick={() => setActiveTopic(null)}
-                >
-                  {t.filter_all}
-                </button>
-                {summaryData.key_topics.map((topic) => (
-                  <button
-                    key={topic.topic}
-                    type="button"
-                    className={activeTopic === topic.topic ? "active" : ""}
-                    onClick={() => setActiveTopic(topic.topic)}
-                  >
-                    {topic.topic} ({topic.item_count})
-                  </button>
+          {/* ── Intelligence summary card ─────────────────────────────────── */}
+          {summaryData && (
+            <section className="summary-card" aria-labelledby="summary-title" data-testid="summary-card">
+              <p className="section-label">{t.summary_heading}</p>
+              <h2 id="summary-title">{t.summary_heading}</h2>
+              <div className="summary-stats">
+                <span className="summary-stat">
+                  <strong>{summaryData.total_items}</strong> {lang === "en" ? "items monitored" : "筆監測"}
+                </span>
+                <span className="summary-stat">
+                  <strong>{summaryData.eligible_items}</strong> {lang === "en" ? "eligible" : "筆符合條件"}
+                </span>
+                <span className="summary-stat">
+                  <strong>{summaryData.source_breakdown.length}</strong> {lang === "en" ? "sources" : "個來源"}
+                </span>
+              </div>
+              <div className="summary-sources">
+                {summaryData.source_breakdown.map((src) => (
+                  <span key={src.source_id} className="source-badge" data-source-id={src.source_id}>
+                    {src.source_id} · {src.item_count}
+                  </span>
                 ))}
               </div>
-            )}
-
-            {/* Filter result count */}
-            {activeTopic && (
-              <p className="filter-result-count" role="status">
-                {t.filter_showing} <strong>{feedItems.filter((item) => item.stable_id && item.stable_id !== priorityItem?.item_id).length}</strong> {t.filter_items}
+              <p className="summary-brief">
+                {lang === "en" ? summaryData.daily_brief_en : summaryData.daily_brief}
               </p>
-            )}
-
-            {feedItems.filter((item) => item.stable_id && item.stable_id !== priorityItem?.item_id).length === 0 ? (
-              <div className="feed-empty-state" data-testid="feed-empty-state" role="status">
-                <p>
-                  {lang === "en"
-                    ? "No publishable intelligence items this period."
-                    : "本時段無可發布重點情報。"}
-                </p>
-                <p className="feed-empty-reason">
-                  {lang === "en"
-                    ? "All source items are either stale, missing publication dates, or unchanged. Source health is shown below."
-                    : "所有來源項目均為過時、缺少發布日期，或無變更。來源健康狀態如下。"}
-                </p>
-                {feedMeta?.source_summary && (
-                  <ul className="feed-source-status">
-                    {Object.entries(feedMeta.source_summary).map(([sid, info]) => (
-                      <li key={sid}>
-                        <strong>{sid}</strong>: {info.health} · {info.freshness} · {info.item_count} {lang === "en" ? "items" : "筆"}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {/* Evidence-demo fallback: clearly labelled, not posing as live priority */}
-                {priorityItem && (
-                  <div className="evidence-demo-fallback" data-testid="evidence-demo-fallback">
-                    <p className="evidence-demo-label">
-                      {lang === "en"
-                        ? "Historical council evidence demo (not live):"
-                        : "議會證據示範（非即時）："}
-                    </p>
-                    <button
-                      className="secondary-action"
-                      type="button"
-                      aria-expanded={drawerOpen}
-                      aria-controls="evidence-drawer"
-                      onClick={() => setDrawerOpen(true)}
-                    >
-                      {lang === "en" ? "Open council evidence demo" : "開啟議會證據示範"}
-                    </button>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="feed-items" data-testid="feed-items">
-                {feedItems
-                  .filter((item) => item.stable_id && item.stable_id !== priorityItem?.item_id)
-                  .map((item) => (
-                    <article
-                      key={item.stable_id || item.item_id}
-                      className="feed-card"
-                      data-testid="feed-card"
-                      data-source-id={item.source_id}
-                    >
-                      <div className="feed-card-meta">
-                        <span className="tag">{item.source_id}</span>
-                        <span className={`freshness-badge ${(item.freshness_status || "").toLowerCase()}`}>
-                          {item.freshness_status}
-                        </span>
-                        {item.change_type === "NEW" && <span className="tag new">NEW</span>}
-                      </div>
-                      <h3>{item.title_zh || item.title || (lang === "en" ? "(untitled)" : "（無標題）")}</h3>
-                      {item.committee && (
-                        <p className="committee-tag">{t.card_committee}：{item.committee}</p>
-                      )}
-                      {/* Reason code tags */}
-                      {item.reason_codes && item.reason_codes.length > 0 && (
-                        <div className="reason-tags">
-                          {item.reason_codes.map((code) => (
-                            <span key={code} className={`reason-tag ${REASON_CODE_COLORS[code] || "reason-default"}`}>
-                              {code}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                      {/* Score indicator */}
-                      <div className="score-indicator" aria-label={`${t.card_score}: ${item.item_value_score}`}>
-                        <span className="score-bar" style={{ width: `${Math.min(100, item.item_value_score || 0)}%` }} />
-                        <span className="score-label">{item.item_value_score}</span>
-                      </div>
-                      <p className="feed-card-detail">
-                        {item.published_at
-                          ? `${lang === "en" ? "Published" : "發布"}：${new Date(item.published_at).toLocaleDateString(lang === "en" ? "en-GB" : "zh-TW")}`
-                          : (lang === "en" ? "No publication date" : "無發布日期")}
-                        {" · "}
-                        {lang === "en" ? "Health" : "來源"}：{item.source_health}
-                      </p>
-                      <a href={item.official_url} target="_blank" rel="noreferrer">
-                        {lang === "en" ? "Official source" : "回到官方來源"} ↗
-                      </a>
-                    </article>
+              {summaryData.key_topics.length > 0 && (
+                <div className="summary-topics">
+                  <span className="summary-topics-label">{t.summary_topics}:</span>
+                  {summaryData.key_topics.slice(0, 3).map((topic) => (
+                    <span key={topic.topic} className="topic-badge">
+                      {topic.topic} ({topic.item_count})
+                    </span>
                   ))}
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* ── Live intelligence feed items ───────────────────────────────── */}
+          {feedLoaded && (
+            <section
+              className="feed-section"
+              aria-labelledby="feed-section-title"
+              data-testid="feed-section"
+            >
+              <p className="section-label">{lang === "en" ? "Live intelligence feed" : "即時情報動態"}</p>
+              <h2 id="feed-section-title">
+                {lang === "en" ? "Official source updates" : "官方來源更新"}
+              </h2>
+
+              {/* ── Topic filter buttons ──────────────────────────────────── */}
+              {summaryData && summaryData.key_topics.length > 0 && (
+                <div className="topic-filter" data-testid="topic-filter">
+                  <button
+                    type="button"
+                    className={activeTopic === null ? "active" : ""}
+                    onClick={() => setActiveTopic(null)}
+                  >
+                    {t.filter_all}
+                  </button>
+                  {summaryData.key_topics.map((topic) => (
+                    <button
+                      key={topic.topic}
+                      type="button"
+                      className={activeTopic === topic.topic ? "active" : ""}
+                      onClick={() => setActiveTopic(topic.topic)}
+                    >
+                      {topic.topic} ({topic.item_count})
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Filter result count */}
+              {activeTopic && (
+                <p className="filter-result-count" role="status">
+                  {t.filter_showing} <strong>{feedItems.filter((item) => item.stable_id && item.stable_id !== priorityItem?.item_id).length}</strong> {t.filter_items}
+                </p>
+              )}
+
+              {feedItems.filter((item) => item.stable_id && item.stable_id !== priorityItem?.item_id).length === 0 ? (
+                <div className="feed-empty-state" data-testid="feed-empty-state" role="status">
+                  <p>
+                    {lang === "en"
+                      ? "No publishable intelligence items this period."
+                      : "本時段無可發布重點情報。"}
+                  </p>
+                  <p className="feed-empty-reason">
+                    {lang === "en"
+                      ? "All source items are either stale, missing publication dates, or unchanged. Source health is shown below."
+                      : "所有來源項目均為過時、缺少發布日期，或無變更。來源健康狀態如下。"}
+                  </p>
+                  {feedMeta?.source_summary && (
+                    <ul className="feed-source-status">
+                      {Object.entries(feedMeta.source_summary).map(([sid, info]) => (
+                        <li key={sid}>
+                          <strong>{sid}</strong>: {info.health} · {info.freshness} · {info.item_count} {lang === "en" ? "items" : "筆"}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {/* Evidence-demo fallback: clearly labelled, not posing as live priority */}
+                  {priorityItem && (
+                    <div className="evidence-demo-fallback" data-testid="evidence-demo-fallback">
+                      <p className="evidence-demo-label">
+                        {lang === "en"
+                          ? "Historical council evidence demo (not live):"
+                          : "議會證據示範（非即時）："}
+                      </p>
+                      <button
+                        className="secondary-action"
+                        type="button"
+                        aria-expanded={drawerOpen}
+                        aria-controls="evidence-drawer"
+                        onClick={() => setDrawerOpen(true)}
+                      >
+                        {lang === "en" ? "Open council evidence demo" : "開啟議會證據示範"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="feed-items" data-testid="feed-items">
+                  {feedItems
+                    .filter((item) => item.stable_id && item.stable_id !== priorityItem?.item_id)
+                    .map((item) => (
+                      <article
+                        key={item.stable_id || item.item_id}
+                        className="feed-card"
+                        data-testid="feed-card"
+                        data-source-id={item.source_id}
+                      >
+                        <div className="feed-card-meta">
+                          <span className="tag">{item.source_id}</span>
+                          <span className={`freshness-badge ${(item.freshness_status || "").toLowerCase()}`}>
+                            {item.freshness_status}
+                          </span>
+                          {item.change_type === "NEW" && <span className="tag new">NEW</span>}
+                        </div>
+                        <h3>{item.title_zh || item.title || (lang === "en" ? "(untitled)" : "（無標題）")}</h3>
+                        {item.committee && (
+                          <p className="committee-tag">{t.card_committee}：{item.committee}</p>
+                        )}
+                        {/* Reason code tags */}
+                        {item.reason_codes && item.reason_codes.length > 0 && (
+                          <div className="reason-tags">
+                            {item.reason_codes.map((code) => (
+                              <span key={code} className={`reason-tag ${REASON_CODE_COLORS[code] || "reason-default"}`}>
+                                {code}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {/* Score indicator */}
+                        <div className="score-indicator" aria-label={`${t.card_score}: ${item.item_value_score}`}>
+                          <span className="score-bar" style={{ width: `${Math.min(100, item.item_value_score || 0)}%` }} />
+                          <span className="score-label">{item.item_value_score}</span>
+                        </div>
+                        <p className="feed-card-detail">
+                          {item.published_at
+                            ? `${lang === "en" ? "Published" : "發布"}：${new Date(item.published_at).toLocaleDateString(lang === "en" ? "en-GB" : "zh-TW")}`
+                            : (lang === "en" ? "No publication date" : "無發布日期")}
+                          {" · "}
+                          {lang === "en" ? "Health" : "來源"}：{item.source_health}
+                        </p>
+                        <a href={item.official_url} target="_blank" rel="noreferrer">
+                          {lang === "en" ? "Official source" : "回到官方來源"} ↗
+                        </a>
+                      </article>
+                    ))}
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* ── Source monitor (sidebar on desktop) ──────────────────────── */}
+          <section className="source-monitor" aria-labelledby="source-monitor-title">
+            <div className="source-monitor-heading">
+              <div>
+                <p className="section-label">{t.source_monitor_label}</p>
+                <h2 id="source-monitor-title">{t.source_monitor_heading}</h2>
               </div>
-            )}
+              <span>
+                {sourceStatus?.next_update_at
+                  ? `${t.source_next_update} ${new Date(sourceStatus.next_update_at).toLocaleString(lang === "en" ? "en-GB" : "zh-TW")}`
+                  : t.source_snapshot_loading}
+              </span>
+            </div>
+            <div className="data-export" data-testid="data-export">
+              <span className="export-label">{t.download_heading}</span>
+              <a href={`${BASE_PATH}/data/feed-export.csv`} download className="export-btn">
+                {t.download_csv}
+              </a>
+              <a href={`${BASE_PATH}/data/intelligence-feed.json`} download className="export-btn">
+                {t.download_json}
+              </a>
+            </div>
+            <div className="source-grid">
+              {(sourceStatus?.sources || []).map((source) => (
+                <article className="source-card" key={source.source_id}>
+                  <div>
+                    <strong>{source.source_id}</strong>
+                    <span className={`health ${source.source_health.toLowerCase()}`}>
+                      {source.source_health}
+                    </span>
+                  </div>
+                  <h3>{lang === "en" ? SOURCE_NAMES_EN[source.source_id] || source.source_name : source.source_name}</h3>
+                  {lang === "en" && (
+                    <small lang="zh-Hant">{t.source_official_name} {source.source_name}</small>
+                  )}
+                  <p>{source.result} · {source.freshness_status}</p>
+                  <small>
+                    {t.source_data_as_of}
+                    {source.data_as_of
+                      ? new Date(source.data_as_of).toLocaleDateString(lang === "en" ? "en-GB" : "zh-TW")
+                      : t.source_no_date}
+                    {" · "}{t.source_lkg}
+                    {source.last_known_good?.source_run_id || t.source_no_lkg}
+                  </small>
+                  <small>
+                    {source.intelligence_gaps.length
+                      ? source.intelligence_gaps.join(lang === "en" ? ", " : "、")
+                      : t.source_no_gaps}
+                  </small>
+                  {source.source_url && (
+                    <a href={source.source_url} target="_blank" rel="noreferrer">
+                      {t.source_back_to_official}
+                    </a>
+                  )}
+                </article>
+              ))}
+            </div>
           </section>
-        )}
+
+        </div>
 
         {/* ── Central-policy section (R4: at most CENTRAL_POLICY_LIMIT) ──── */}
         {visiblePolicyCards.length > 0 && (
@@ -626,64 +707,6 @@ export default function Home() {
           </section>
         )}
 
-        {/* ── Source monitor ─────────────────────────────────────────────── */}
-        <section className="source-monitor" aria-labelledby="source-monitor-title">
-          <div className="source-monitor-heading">
-            <div>
-              <p className="section-label">{t.source_monitor_label}</p>
-              <h2 id="source-monitor-title">{t.source_monitor_heading}</h2>
-            </div>
-            <span>
-              {sourceStatus?.next_update_at
-                ? `${t.source_next_update} ${new Date(sourceStatus.next_update_at).toLocaleString(lang === "en" ? "en-GB" : "zh-TW")}`
-                : t.source_snapshot_loading}
-            </span>
-          </div>
-          <div className="data-export" data-testid="data-export">
-            <span className="export-label">{t.download_heading}</span>
-            <a href={`${BASE_PATH}/data/feed-export.csv`} download className="export-btn">
-              {t.download_csv}
-            </a>
-            <a href={`${BASE_PATH}/data/intelligence-feed.json`} download className="export-btn">
-              {t.download_json}
-            </a>
-          </div>
-          <div className="source-grid">
-            {(sourceStatus?.sources || []).map((source) => (
-              <article className="source-card" key={source.source_id}>
-                <div>
-                  <strong>{source.source_id}</strong>
-                  <span className={`health ${source.source_health.toLowerCase()}`}>
-                    {source.source_health}
-                  </span>
-                </div>
-                <h3>{lang === "en" ? SOURCE_NAMES_EN[source.source_id] || source.source_name : source.source_name}</h3>
-                {lang === "en" && (
-                  <small lang="zh-Hant">{t.source_official_name} {source.source_name}</small>
-                )}
-                <p>{source.result} · {source.freshness_status}</p>
-                <small>
-                  {t.source_data_as_of}
-                  {source.data_as_of
-                    ? new Date(source.data_as_of).toLocaleDateString(lang === "en" ? "en-GB" : "zh-TW")
-                    : t.source_no_date}
-                  {" · "}{t.source_lkg}
-                  {source.last_known_good?.source_run_id || t.source_no_lkg}
-                </small>
-                <small>
-                  {source.intelligence_gaps.length
-                    ? source.intelligence_gaps.join(lang === "en" ? ", " : "、")
-                    : t.source_no_gaps}
-                </small>
-                {source.source_url && (
-                  <a href={source.source_url} target="_blank" rel="noreferrer">
-                    {t.source_back_to_official}
-                  </a>
-                )}
-              </article>
-            ))}
-          </div>
-        </section>
       </main>
 
       {/* ── Evidence drawer ───────────────────────────────────────────────── */}
