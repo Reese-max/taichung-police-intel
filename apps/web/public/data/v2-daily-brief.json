@@ -1,0 +1,44 @@
+{
+  "baseline_established_at": "2026-08-27T12:13:22+08:00",
+  "generated_at": "2026-08-27T12:13:22+08:00",
+  "mode": "V2_SHADOW",
+  "overview": {
+    "archive_total": 118,
+    "current_change_count": 0,
+    "legacy_home_candidate_count": 117,
+    "priority_count": 0,
+    "tracking_count": 0
+  },
+  "priority_items": [],
+  "publication_status": "READY",
+  "quality_issues": [
+    {
+      "code": "HIGH_LEGACY_ELIGIBILITY_RATIO",
+      "detail": "Legacy feed marks 117/118 items as current. V2 does not treat archive confirmation as a daily change.",
+      "severity": "HIGH"
+    },
+    {
+      "code": "LEGACY_CONFIRMED_AS_CURRENT",
+      "count": 117,
+      "severity": "HIGH"
+    },
+    {
+      "code": "MISSING_OFFICIAL_DATE",
+      "count": 115,
+      "detail": "These items may use first-seen wording after the baseline is established.",
+      "severity": "INFO"
+    }
+  ],
+  "schema_version": 1,
+  "snapshot_complete": true,
+  "source_collection_run_id": "CR-DEMO-20260827-MORNING-MANUAL",
+  "source_health": {
+    "failed_count": 0,
+    "gap_count": 1,
+    "pass_count": 5,
+    "stale_count": 1,
+    "status": "SUCCEEDED"
+  },
+  "source_status_generated_at": "2026-08-27T12:13:22+08:00",
+  "status_message": "本期未偵測到可確認的新增或修正；歷史資料保留於資料庫。"
+}
