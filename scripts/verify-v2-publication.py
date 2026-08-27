@@ -17,6 +17,7 @@ PUBLISHABLE_CHANGE_TYPES = {
     "DEADLINE_CHANGED",
     "REMOVED",
 }
+TEMPORAL_BASES = {"OFFICIAL_DATE", "FIRST_SEEN", "DETECTED_CHANGE"}
 
 
 def load_json(path: Path) -> dict:
@@ -27,6 +28,33 @@ def load_json(path: Path) -> dict:
 
 def fail(message: str) -> None:
     raise ValueError(f"V2_PUBLICATION_INVALID: {message}")
+
+
+def validate_action_item(item: dict, seen_event_ids: set[str], expected_tier: str) -> None:
+    event_id = item.get("event_id")
+    if not event_id or event_id in seen_event_ids:
+        fail("published event IDs must be present and unique")
+    seen_event_ids.add(event_id)
+    if item.get("change_type") not in PUBLISHABLE_CHANGE_TYPES:
+        fail(f"non-publishable change type in daily intelligence: {item.get('change_type')!r}")
+    if not str(item.get("official_url") or "").startswith("https://"):
+        fail(f"published item lacks an HTTPS official URL: {event_id}")
+    if not item.get("source_id") or not item.get("source_name"):
+        fail(f"published item lacks source identity: {event_id}")
+    for field in ("headline", "what_changed", "why_it_matters", "recommended_action"):
+        if not str(item.get(field) or "").strip():
+            fail(f"published item lacks {field}: {event_id}")
+    affected_roles = item.get("affected_roles")
+    if not isinstance(affected_roles, list) or not affected_roles:
+        fail(f"published item lacks affected_roles: {event_id}")
+    if item.get("temporal_basis") not in TEMPORAL_BASES:
+        fail(f"published item has an invalid temporal basis: {event_id}")
+    if item.get("verification_status") != "DETERMINISTIC_PASS":
+        fail(f"published item was not deterministically verified: {event_id}")
+    if item.get("evidence_status") != "OFFICIAL_URL_BOUND":
+        fail(f"published item lacks official evidence binding: {event_id}")
+    if item.get("publication_tier") != expected_tier:
+        fail(f"published item tier mismatch: {event_id}")
 
 
 def verify(*, feed_path: Path, status_path: Path, state_path: Path, brief_path: Path) -> dict:
@@ -45,6 +73,10 @@ def verify(*, feed_path: Path, status_path: Path, state_path: Path, brief_path: 
         fail("state items must be an object keyed by stable identity")
     if brief.get("schema_version") != 1 or brief.get("mode") != "V2_SHADOW":
         fail("brief must use schema_version=1 and mode=V2_SHADOW")
+    if brief.get("generator_version") != 2:
+        fail("brief must use police-user generator_version=2")
+    if not isinstance(brief.get("audience"), list) or not brief["audience"]:
+        fail("brief must declare its police-user audience")
 
     run_id = feed.get("collection_run_id")
     status_run_id = (status.get("latest_collection_run") or {}).get("collection_run_id")
@@ -67,29 +99,28 @@ def verify(*, feed_path: Path, status_path: Path, state_path: Path, brief_path: 
         fail("current_change_count must be a non-negative integer")
 
     priority_items = brief.get("priority_items")
-    if not isinstance(priority_items, list):
-        fail("priority_items must be an array")
+    tracking_items = brief.get("tracking_items")
+    other_changes = brief.get("other_changes")
+    if not isinstance(priority_items, list) or not isinstance(tracking_items, list) or not isinstance(other_changes, list):
+        fail("priority_items, tracking_items and other_changes must be arrays")
     if len(priority_items) > 3:
         fail("priority_items exceeds the police-user Top 3 limit")
+    if len(tracking_items) > 5:
+        fail("tracking_items exceeds the five-item limit")
     if overview.get("priority_count") != len(priority_items):
         fail("priority_count does not match priority_items")
-    if len(priority_items) > current_change_count:
-        fail("priority items cannot exceed current changes")
+    if overview.get("tracking_count") != len(tracking_items):
+        fail("tracking_count does not match tracking_items")
+    if overview.get("other_change_count") != len(other_changes):
+        fail("other_change_count does not match other_changes")
+    if len(priority_items) + len(other_changes) > current_change_count:
+        fail("displayed current changes cannot exceed current_change_count")
 
     seen_event_ids: set[str] = set()
     for item in priority_items:
-        event_id = item.get("event_id")
-        if not event_id or event_id in seen_event_ids:
-            fail("priority event IDs must be present and unique")
-        seen_event_ids.add(event_id)
-        if item.get("change_type") not in PUBLISHABLE_CHANGE_TYPES:
-            fail(f"non-publishable change type in Top 3: {item.get('change_type')!r}")
-        if not str(item.get("official_url") or "").startswith("https://"):
-            fail(f"priority item lacks an HTTPS official URL: {event_id}")
-        if not item.get("what_changed"):
-            fail(f"priority item lacks what_changed wording: {event_id}")
-        if item.get("time_basis") not in {"OFFICIAL_DATE", "FIRST_SEEN", "DETECTED_CHANGE"}:
-            fail(f"priority item has an invalid time basis: {event_id}")
+        validate_action_item(item, seen_event_ids, "TOP")
+    for item in other_changes:
+        validate_action_item(item, seen_event_ids, "OTHER")
 
     state_identities = set(state["items"])
     if len(state_identities) != len(state["items"]):
@@ -116,6 +147,7 @@ def verify(*, feed_path: Path, status_path: Path, state_path: Path, brief_path: 
         "state_total": len(state["items"]),
         "changes": current_change_count,
         "priority": len(priority_items),
+        "other": len(other_changes),
         "publication_status": brief["publication_status"],
     }
 
@@ -138,7 +170,8 @@ def main() -> int:
         "V2_PUBLICATION_OK "
         f"run={result['run_id']} archive={result['archive_total']} "
         f"state={result['state_total']} changes={result['changes']} "
-        f"priority={result['priority']} status={result['publication_status']}"
+        f"priority={result['priority']} other={result['other']} "
+        f"status={result['publication_status']}"
     )
     return 0
 
