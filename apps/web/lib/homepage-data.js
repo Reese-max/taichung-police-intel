@@ -197,6 +197,15 @@ export const COPY = {
     download_csv: "Download CSV",
     download_json: "Download JSON",
     download_heading: "Export Data",
+
+    // ── Topic filter ──────────────────────────────────────────────────────────
+    filter_all: "All",
+    filter_showing: "Showing",
+    filter_items: "items",
+
+    // ── Enriched feed cards ───────────────────────────────────────────────────
+    card_committee: "Committee",
+    card_score: "Score",
   },
 
   zh: {
@@ -310,5 +319,14 @@ export const COPY = {
     download_csv: "下載 CSV",
     download_json: "下載 JSON",
     download_heading: "匯出資料",
+
+    // ── Topic filter ──────────────────────────────────────────────────────────
+    filter_all: "全部",
+    filter_showing: "顯示",
+    filter_items: "筆",
+
+    // ── Enriched feed cards ───────────────────────────────────────────────────
+    card_committee: "委員會",
+    card_score: "分數",
   },
 };

@@ -24,6 +24,28 @@ const FEED_URL = `${BASE_PATH}/data/intelligence-feed.json`;
 const SUMMARY_URL = `${BASE_PATH}/data/intelligence-summary.json`;
 const HLS_LOAD_TIMEOUT_MS = 10_000;
 
+// ── Topic filter keywords ─────────────────────────────────────────────────────
+const TOPIC_KEYWORDS = {
+  "分局整建與設施": ["分局", "整建", "派出所", "廳舍"],
+  "交通管理與規劃": ["交通", "科技執法", "測速", "道路"],
+  "治安巡邏與防竊": ["治安", "巡邏", "防竊", "竊盜"],
+  "警力配置與人事": ["警力", "員額", "人事", "編制"],
+  "毒品與毒駕防制": ["毒品", "毒駕", "依托咚酯"],
+  "科技執法與道路安全": ["科技執法", "照相機", "路口"],
+  "婦幼安全與保護": ["婦幼", "家暴", "兒少"],
+  "移工管理與查緝": ["移工", "查緝"],
+};
+
+// ── Reason code display colors ────────────────────────────────────────────────
+const REASON_CODE_COLORS = {
+  COUNCIL_ATTENTION: "reason-blue",
+  POLICY_CHANGE: "reason-orange",
+  CROSS_SOURCE: "reason-green",
+  NEAR_MILESTONE: "reason-purple",
+  RECURRING: "reason-teal",
+  HIGH_VALUE: "reason-amber",
+};
+
 // Static fallback: council evidence journey PRIORITY_ITEM always available
 const FALLBACK_RESPONSE = buildHomepageResponse([PRIORITY_ITEM]);
 
@@ -60,6 +82,7 @@ function projectFeedToHomepageCandidates(feed) {
       evidence_count: item.evidence_count || 1,
       next_milestone: item.next_milestone || null,
       content_sha256: item.content_sha256,
+      committee: item.committee || "",
     }));
 }
 
@@ -68,6 +91,8 @@ export default function Home() {
   const [feedResponse, setFeedResponse] = useState(FALLBACK_RESPONSE);
   const [feedLoaded, setFeedLoaded] = useState(false);
   const [feedMeta, setFeedMeta] = useState(null);
+  const [allCandidates, setAllCandidates] = useState([]);
+  const [activeTopic, setActiveTopic] = useState(null);
 
   // Load intelligence feed at mount time
   useEffect(() => {
@@ -80,6 +105,7 @@ export default function Home() {
         }
         setFeedMeta(feed);
         const candidates = projectFeedToHomepageCandidates(feed);
+        setAllCandidates(candidates);
         if (candidates.length > 0) {
           // Live response uses only feed candidates — PRIORITY_ITEM is NOT mixed in
           // to avoid occupying the 10-item limit or altering deterministic sort order.
@@ -94,7 +120,17 @@ export default function Home() {
   // The council evidence journey item — always available for the drawer
   const priorityItem = FALLBACK_RESPONSE.items[0] || null;
   // Feed-sourced items for the main homepage display (may be empty)
-  const feedItems = feedResponse.items;
+  // When a topic filter is active, display from full candidates; otherwise use capped response.
+  const feedItems = useMemo(() => {
+    const source = activeTopic ? allCandidates : feedResponse.items;
+    if (!activeTopic) return source;
+    const keywords = TOPIC_KEYWORDS[activeTopic] || [];
+    if (keywords.length === 0) return source;
+    return source.filter((item) => {
+      const title = item.title_zh || item.title || "";
+      return keywords.some((kw) => title.includes(kw));
+    });
+  }, [activeTopic, allCandidates, feedResponse.items]);
 
   // ── Intelligence summary state ──────────────────────────────────────────
   const [summaryData, setSummaryData] = useState(null);
@@ -447,6 +483,37 @@ export default function Home() {
             <h2 id="feed-section-title">
               {lang === "en" ? "Official source updates" : "官方來源更新"}
             </h2>
+
+            {/* ── Topic filter buttons ──────────────────────────────────── */}
+            {summaryData && summaryData.key_topics.length > 0 && (
+              <div className="topic-filter" data-testid="topic-filter">
+                <button
+                  type="button"
+                  className={activeTopic === null ? "active" : ""}
+                  onClick={() => setActiveTopic(null)}
+                >
+                  {t.filter_all}
+                </button>
+                {summaryData.key_topics.map((topic) => (
+                  <button
+                    key={topic.topic}
+                    type="button"
+                    className={activeTopic === topic.topic ? "active" : ""}
+                    onClick={() => setActiveTopic(topic.topic)}
+                  >
+                    {topic.topic} ({topic.item_count})
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Filter result count */}
+            {activeTopic && (
+              <p className="filter-result-count" role="status">
+                {t.filter_showing} <strong>{feedItems.filter((item) => item.stable_id && item.stable_id !== priorityItem?.item_id).length}</strong> {t.filter_items}
+              </p>
+            )}
+
             {feedItems.filter((item) => item.stable_id && item.stable_id !== priorityItem?.item_id).length === 0 ? (
               <div className="feed-empty-state" data-testid="feed-empty-state" role="status">
                 <p>
@@ -507,6 +574,24 @@ export default function Home() {
                         {item.change_type === "NEW" && <span className="tag new">NEW</span>}
                       </div>
                       <h3>{item.title_zh || item.title || (lang === "en" ? "(untitled)" : "（無標題）")}</h3>
+                      {item.committee && (
+                        <p className="committee-tag">{t.card_committee}：{item.committee}</p>
+                      )}
+                      {/* Reason code tags */}
+                      {item.reason_codes && item.reason_codes.length > 0 && (
+                        <div className="reason-tags">
+                          {item.reason_codes.map((code) => (
+                            <span key={code} className={`reason-tag ${REASON_CODE_COLORS[code] || "reason-default"}`}>
+                              {code}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {/* Score indicator */}
+                      <div className="score-indicator" aria-label={`${t.card_score}: ${item.item_value_score}`}>
+                        <span className="score-bar" style={{ width: `${Math.min(100, item.item_value_score || 0)}%` }} />
+                        <span className="score-label">{item.item_value_score}</span>
+                      </div>
                       <p className="feed-card-detail">
                         {item.published_at
                           ? `${lang === "en" ? "Published" : "發布"}：${new Date(item.published_at).toLocaleDateString(lang === "en" ? "en-GB" : "zh-TW")}`

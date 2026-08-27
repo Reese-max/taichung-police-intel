@@ -373,3 +373,119 @@ h1 { margin-bottom: 0; font-size: clamp(1.8rem, 3vw, 3rem); letter-spacing: -0.0
   cursor: pointer;
 }
 .export-btn:hover { background: #d4e6f6; }
+
+
+/* ── Topic filter buttons ───────────────────────────────────────────────────── */
+.topic-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.topic-filter button {
+  padding: 6px 14px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+.topic-filter button:hover {
+  background: var(--blue-soft);
+  border-color: var(--blue);
+  color: var(--blue);
+}
+.topic-filter button.active {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #ffffff;
+}
+
+.filter-result-count {
+  margin: 0 0 12px;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+.filter-result-count strong {
+  color: var(--ink);
+}
+
+/* ── Feed card enrichments ──────────────────────────────────────────────────── */
+.feed-card .committee-tag {
+  margin: 4px 0 8px;
+  font-size: 0.75rem;
+  font-style: italic;
+  color: var(--ink-soft);
+}
+
+.feed-card .reason-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 8px;
+}
+.feed-card .reason-tag {
+  padding: 2px 8px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
+}
+.reason-blue { color: #1a4b8c; background: #e0edff; }
+.reason-orange { color: #7a4300; background: var(--amber-soft); }
+.reason-green { color: #065e54; background: #e5f4f1; }
+.reason-purple { color: #5b21b6; background: #f0e7ff; }
+.reason-teal { color: #065e54; background: #ccfbf1; }
+.reason-amber { color: #7a4300; background: #fff3df; }
+.reason-default { color: var(--ink-soft); background: var(--paper); }
+
+.feed-card .score-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.feed-card .score-bar {
+  display: block;
+  height: 4px;
+  max-width: 60px;
+  background: var(--blue);
+  border-radius: 2px;
+  transition: width 200ms ease;
+}
+.feed-card .score-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--ink-soft);
+  font-family: ui-monospace, "Cascadia Mono", monospace;
+}
+
+/* ── Feed section spacing ───────────────────────────────────────────────────── */
+.feed-section { max-width: 760px; margin-top: 32px; }
+.feed-section h2 { margin-bottom: 14px; }
+
+.feed-items { display: grid; gap: 12px; }
+
+.feed-card {
+  padding: 16px 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.feed-card h3 { margin: 8px 0 4px; font-size: 0.95rem; line-height: 1.5; }
+.feed-card-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.feed-card-detail { margin: 4px 0; font-size: 0.78rem; color: var(--ink-soft); }
+.feed-card a { font-size: 0.78rem; color: var(--blue); }
+.freshness-badge {
+  padding: 2px 7px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  border-radius: 999px;
+  color: var(--green);
+  background: #e5f4f1;
+}
+.freshness-badge.very_stale, .freshness-badge.no_data { color: var(--danger); background: #feeceb; }
+.tag.new { color: #065e54; background: #ccfbf1; }

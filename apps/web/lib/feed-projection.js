@@ -65,6 +65,7 @@ export function projectToHomepageCandidates(feed) {
       evidence_count: item.evidence_count || 1,
       next_milestone: item.next_milestone || null,
       content_sha256: item.content_sha256,
+      committee: item.committee || "",
     }));
 }
 
