@@ -8,6 +8,8 @@ on:
       - "apps/web/public/data/intelligence-feed.json"
       - "apps/web/public/data/intelligence-summary.json"
       - "apps/web/public/data/feed-export.csv"
+      - "apps/web/public/data/v2-daily-brief.json"
+      - "state/v2-shadow-state.json"
   schedule:
     - cron: "30 22 * * *"
     - cron: "30 10 * * *"
@@ -68,8 +70,31 @@ jobs:
             --demo-output apps/web/public/data/source-status.json \
             --trigger "${{ github.event_name == 'schedule' && 'schedule' || 'manual' }}"
 
-      - name: Verify generated publication bundle
+      - name: Verify generated V1 publication bundle
         run: python -X utf8 scripts/verify-publication-bundle.py
+
+      - name: Build persistent V2 daily intelligence
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" != "push" ]] \
+             || [[ ! -f state/v2-shadow-state.json ]] \
+             || [[ ! -f apps/web/public/data/v2-daily-brief.json ]]; then
+            python -X utf8 scripts/build-v2-shadow-brief.py \
+              --input apps/web/public/data/intelligence-feed.json \
+              --source-status apps/web/public/data/source-status.json \
+              --state state/v2-shadow-state.json \
+              --output apps/web/public/data/v2-daily-brief.json
+          else
+            echo "Using the checked-in persistent V2 publication for this code-only push."
+          fi
+
+      - name: Verify persistent V2 publication
+        run: |
+          python -X utf8 scripts/verify-v2-publication.py \
+            --feed apps/web/public/data/intelligence-feed.json \
+            --status apps/web/public/data/source-status.json \
+            --state state/v2-shadow-state.json \
+            --brief apps/web/public/data/v2-daily-brief.json
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -91,8 +116,7 @@ jobs:
           PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
           NEXT_PUBLIC_BASE_PATH: ${{ steps.pages.outputs.base_path }}
 
-      - name: Preserve refresh evidence as one bundle
-        if: github.event_name != 'push'
+      - name: Preserve V1 and V2 publication evidence as one commit
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
@@ -101,8 +125,10 @@ jobs:
             apps/web/public/data/source-status.json \
             apps/web/public/data/intelligence-feed.json \
             apps/web/public/data/intelligence-summary.json \
-            apps/web/public/data/feed-export.csv
-          git diff --cached --quiet || git commit -m "data: refresh ${{ steps.slot.outputs.value }} publication bundle [skip ci]"
+            apps/web/public/data/feed-export.csv \
+            apps/web/public/data/v2-daily-brief.json \
+            state/v2-shadow-state.json
+          git diff --cached --quiet || git commit -m "data: refresh V1 and V2 publication bundle [skip ci]"
           git push
 
       - name: Upload Pages artifact
