@@ -1,11 +1,20 @@
 {
+  "audience": [
+    "議會聯絡",
+    "局本部幕僚",
+    "業管承辦",
+    "分局主管"
+  ],
   "baseline_established_at": "2026-08-27T12:13:22+08:00",
   "generated_at": "2026-08-27T12:13:22+08:00",
+  "generator_version": 2,
   "mode": "V2_SHADOW",
+  "other_changes": [],
   "overview": {
     "archive_total": 118,
     "current_change_count": 0,
     "legacy_home_candidate_count": 117,
+    "other_change_count": 0,
     "priority_count": 0,
     "tracking_count": 0
   },
@@ -40,5 +49,6 @@
     "status": "SUCCEEDED"
   },
   "source_status_generated_at": "2026-08-27T12:13:22+08:00",
-  "status_message": "本期未偵測到可確認的新增或修正；歷史資料保留於資料庫。"
+  "status_message": "本期未偵測到可確認的新增或修正；歷史資料保留於資料庫。",
+  "tracking_items": []
 }
