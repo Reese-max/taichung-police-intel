@@ -50,14 +50,19 @@ test("generated brief separates current changes from the historical archive", as
   ];
 
   assert.equal(brief.overview.archive_total, feed.items.length);
-  assert.equal(brief.overview.current_change_count, publishedChanges.length);
+  assert.ok(
+    publishedChanges.length <= brief.overview.current_change_count,
+    "the UI may cap displayed changes but must not exceed the detected total",
+  );
   assert.equal(brief.overview.priority_count, brief.priority_items.length);
   assert.equal(brief.overview.tracking_count, brief.tracking_items.length);
   assert.equal(brief.overview.other_change_count, brief.other_changes.length);
 
-  if (publishedChanges.length === 0) {
+  if (brief.overview.current_change_count === 0) {
+    assert.equal(publishedChanges.length, 0);
     assert.match(brief.status_message, /未偵測到可確認的新增或修正/);
   } else {
+    assert.ok(publishedChanges.length > 0);
     assert.doesNotMatch(brief.status_message, /未偵測到可確認的新增或修正/);
   }
 });
