@@ -111,10 +111,42 @@ jobs:
         uses: actions/configure-pages@v5
 
       - name: Run full verification gate and build static site
-        run: npm run check
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run check 2>&1 | tee verification.log
         env:
           PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
           NEXT_PUBLIC_BASE_PATH: ${{ steps.pages.outputs.base_path }}
+
+      - name: Retain failed scheduled-publication evidence
+        if: failure() && github.event_name != 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: failed-publication-${{ steps.slot.outputs.value }}-${{ github.run_id }}
+          path: |
+            verification.log
+            apps/web/public/data/source-status.json
+            apps/web/public/data/intelligence-feed.json
+            apps/web/public/data/intelligence-summary.json
+            apps/web/public/data/feed-export.csv
+            apps/web/public/data/v2-daily-brief.json
+            state/v2-shadow-state.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Alert operators that the deployed publication is stale
+        if: failure() && github.event_name != 'push'
+        shell: bash
+        run: |
+          artifact_name="failed-publication-${{ steps.slot.outputs.value }}-${{ github.run_id }}"
+          {
+            echo "## Scheduled publication blocked"
+            echo "The generated ${{ steps.slot.outputs.value }} bundle did not pass the publication gate."
+            echo "GitHub Pages was not updated; the deployed publication remains stale."
+            printf 'Failure evidence is retained in artifact `%s`.\n' "$artifact_name"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::error title=Scheduled publication blocked::The generated ${{ steps.slot.outputs.value }} bundle failed verification. GitHub Pages was not updated; inspect the retained failure artifact."
 
       - name: Preserve V1 and V2 publication evidence as one commit
         shell: bash

@@ -73,3 +73,34 @@ jobs:
             --state /tmp/v2-shadow-state.json \
             --brief /tmp/v2-shadow-brief.json
           python -X utf8 -c 'import json; p="/tmp/v2-shadow-brief.json"; d=json.load(open(p, encoding="utf-8")); o=d["overview"]; assert o["current_change_count"] == 0; print("V2_SHADOW_BASELINE_OK archive={} legacy={}".format(o["archive_total"], o["legacy_home_candidate_count"]))'
+
+      - name: Verify web tests when detected changes exceed the display cap
+        shell: bash
+        run: |
+          cp apps/web/public/data/intelligence-feed.json /tmp/v2-regression-feed.json
+          cp state/v2-shadow-state.json /tmp/v2-regression-state.json
+          python -X utf8 -c 'import json; p="/tmp/v2-regression-feed.json"; d=json.load(open(p, encoding="utf-8")); assert len(d["items"]) >= 24; [(item.__setitem__("title", item["title"] + "（排程回歸測試）")) for item in d["items"][:24]]; json.dump(d, open(p, "w", encoding="utf-8"), ensure_ascii=False, indent=2)'
+          python -X utf8 scripts/build-v2-shadow-brief.py \
+            --input /tmp/v2-regression-feed.json \
+            --source-status apps/web/public/data/source-status.json \
+            --state /tmp/v2-regression-state.json \
+            --output /tmp/v2-regression-brief.json
+          cp /tmp/v2-regression-feed.json apps/web/public/data/intelligence-feed.json
+          cp /tmp/v2-regression-brief.json apps/web/public/data/v2-daily-brief.json
+          npm --prefix apps/web test
+          python -X utf8 -c 'import json; d=json.load(open("/tmp/v2-regression-brief.json", encoding="utf-8")); displayed=len(d["priority_items"])+len(d["tracking_items"])+len(d["other_changes"]); assert d["overview"]["current_change_count"] == 24; assert displayed == 23; print("V2_WEB_DISPLAY_CAP_OK changes=24 displayed=23")'
+
+      - name: Verify scheduled-failure summary quoting
+        shell: bash
+        run: |
+          python -X utf8 - <<'PY'
+          from pathlib import Path
+
+          workflow = Path(".github/workflows/pages.yml").read_text(encoding="utf-8")
+          expected = r'''printf 'Failure evidence is retained in artifact `%s`.\n' "$artifact_name"'''
+          assert expected in workflow, "pages workflow must keep Markdown backticks out of shell command substitution"
+          PY
+          artifact_name="failed-publication-morning-123"
+          rendered="$(printf 'Failure evidence is retained in artifact `%s`.\n' "$artifact_name")"
+          test "$rendered" = 'Failure evidence is retained in artifact `failed-publication-morning-123`.'
+          echo "SCHEDULED_FAILURE_SUMMARY_OK $rendered"

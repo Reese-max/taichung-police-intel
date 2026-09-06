@@ -41,13 +41,30 @@ test("V2 brief and official-source bundle refer to one collection run", async ()
   assert.equal(brief.source_status_generated_at, status.generated_at);
 });
 
-test("baseline separates current changes from the historical archive", async () => {
+test("generated brief separates current changes from the historical archive", async () => {
   const [brief, feed] = await Promise.all([json(briefUrl), json(feedUrl)]);
+  const publishedChanges = [
+    ...brief.priority_items,
+    ...brief.tracking_items,
+    ...brief.other_changes,
+  ];
+
   assert.equal(brief.overview.archive_total, feed.items.length);
-  assert.equal(brief.overview.current_change_count, 0);
-  assert.equal(brief.overview.priority_count, 0);
-  assert.match(brief.status_message, /未偵測到可確認的新增或修正/);
-  assert.ok(brief.overview.legacy_home_candidate_count > brief.overview.current_change_count);
+  assert.ok(
+    publishedChanges.length <= brief.overview.current_change_count,
+    "the UI may cap displayed changes but must not exceed the detected total",
+  );
+  assert.equal(brief.overview.priority_count, brief.priority_items.length);
+  assert.equal(brief.overview.tracking_count, brief.tracking_items.length);
+  assert.equal(brief.overview.other_change_count, brief.other_changes.length);
+
+  if (brief.overview.current_change_count === 0) {
+    assert.equal(publishedChanges.length, 0);
+    assert.match(brief.status_message, /未偵測到可確認的新增或修正/);
+  } else {
+    assert.ok(publishedChanges.length > 0);
+    assert.doesNotMatch(brief.status_message, /未偵測到可確認的新增或修正/);
+  }
 });
 
 test("daily publication never promotes CONFIRMED or UNCHANGED to Top 3", async () => {
