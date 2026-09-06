@@ -139,11 +139,12 @@ jobs:
         if: failure() && github.event_name != 'push'
         shell: bash
         run: |
+          artifact_name="failed-publication-${{ steps.slot.outputs.value }}-${{ github.run_id }}"
           {
             echo "## Scheduled publication blocked"
             echo "The generated ${{ steps.slot.outputs.value }} bundle did not pass the publication gate."
             echo "GitHub Pages was not updated; the deployed publication remains stale."
-            echo "Failure evidence is retained in artifact `failed-publication-${{ steps.slot.outputs.value }}-${{ github.run_id }}`."
+            printf 'Failure evidence is retained in artifact `%s`.\n' "$artifact_name"
           } >> "$GITHUB_STEP_SUMMARY"
           echo "::error title=Scheduled publication blocked::The generated ${{ steps.slot.outputs.value }} bundle failed verification. GitHub Pages was not updated; inspect the retained failure artifact."
 
