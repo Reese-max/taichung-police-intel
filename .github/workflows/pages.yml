@@ -111,10 +111,24 @@ jobs:
         uses: actions/configure-pages@v5
 
       - name: Run full verification gate and build static site
-        run: npm run check
+        id: verify_gate
+        run: |
+          set -o pipefail
+          npm run check 2>&1 | tee verify-gate.log
+          rc=${PIPESTATUS[0]}
+          echo "::set-output name=exit_code::${rc}"
+          exit ${rc}
         env:
           PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
           NEXT_PUBLIC_BASE_PATH: ${{ steps.pages.outputs.base_path }}
+
+      - name: Upload verify-gate artifact
+        if: always() && hashFiles('verify-gate.log') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-gate-${{ github.run_id }}
+          path: verify-gate.log
+          if-no-files-found: ignore
 
       - name: Preserve V1 and V2 publication evidence as one commit
         shell: bash
@@ -135,6 +149,34 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: apps/web/out
+
+      - name: Stale-publication alert
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set +e
+          ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          sha="$(git rev-parse HEAD)"
+          branch="${GITHUB_REF_NAME}"
+          status="verify-gate-failed"
+          note=$(grep -oE 'verify_gate\.[A-Za-z_]+' verify-gate.log 2>/dev/null | head -n 3 | tr '\n' ',' )
+          payload=$(printf '{"updated_at": "%s", "head_sha": "%s", "branch": "%s", "status": "%s", "run_url": "%s", "note": "%s"}\n'             "$ts" "$sha" "$branch" "$status" "$RUN_URL" "$note")
+          tmp=$(mktemp)
+          printf '%s' "$payload" > "$tmp"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git ls-files --error-unmatch .github/stale-publication-state.json >/dev/null 2>&1; then
+            git fetch origin "$branch"
+            git checkout --orphan _stale_alert 2>/dev/null || git checkout -b _stale_alert
+            git checkout -B _stale_alert origin/"$branch"
+          fi
+          mkdir -p .github
+          cp "$tmp" .github/stale-publication-state.json
+          git add .github/stale-publication-state.json
+          git commit -m "data(ops): stale-publication alert $ts" || true
+          git push -u origin _stale_alert || true
 
   deploy:
     environment:
