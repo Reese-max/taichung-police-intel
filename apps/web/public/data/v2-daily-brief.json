@@ -6,14 +6,14 @@
     "分局主管"
   ],
   "baseline_established_at": "2026-08-27T12:13:22+08:00",
-  "generated_at": "2026-09-07T08:13:01+08:00",
+  "generated_at": "2026-09-07T23:56:24+08:00",
   "generator_version": 2,
   "mode": "V2_SHADOW",
   "other_changes": [],
   "overview": {
     "archive_total": 118,
     "current_change_count": 2,
-    "legacy_home_candidate_count": 115,
+    "legacy_home_candidate_count": 118,
     "other_change_count": 0,
     "priority_count": 2,
     "tracking_count": 0
@@ -25,22 +25,22 @@
         "列席主管",
         "相關業管單位"
       ],
-      "change_type": "NEW",
+      "change_type": "REMOVED",
       "changed_fields": [],
       "date_status": "UNVERIFIED_DATE",
       "deadline": null,
-      "detected_at": "2026-09-07T08:13:01+08:00",
-      "event_id": "EVT-E30EA78F78CD8ABCEF84",
+      "detected_at": "2026-09-07T23:56:24+08:00",
+      "event_id": "EVT-B65E4AB185AA2649DF6C",
       "evidence_status": "OFFICIAL_URL_BOUND",
-      "headline": "第四屆 第8次定期會 都發建設水利委員會業務質詢順序表",
-      "official_url": "https://www.tccc.gov.tw/pic/DocCouncil/17882754682859(1).doc",
+      "headline": "第四屆 第8次定期會 市政總質詢順序表",
+      "official_url": "https://www.tccc.gov.tw/pic/DocCouncil/17875856282853(1).doc",
       "publication_tier": "TOP",
-      "recommended_action": "確認業管歸屬與現行處理狀態，判斷是否需納入答詢或政策追蹤。",
+      "recommended_action": "確認是否為正式撤下、移轉或來源改版，保留最後版本並視需要查核。",
       "source_id": "S-006",
       "source_name": "臺中市議會質詢順序表",
-      "temporal_basis": "FIRST_SEEN",
+      "temporal_basis": "DETECTED_CHANGE",
       "verification_status": "DETERMINISTIC_PASS",
-      "what_changed": "本次監測首次偵測到「第四屆 第8次定期會 都發建設水利委員會業務質詢順序表」；官方未提供可驗證的發布日期。",
+      "what_changed": "連續 2 次完整監測未再發現「第四屆 第8次定期會 市政總質詢順序表」，標記為已移除。",
       "why_it_matters": "涉及質詢順序、列席主管與資料準備優先順序。"
     },
     {
@@ -49,22 +49,22 @@
         "列席主管",
         "相關業管單位"
       ],
-      "change_type": "NEW",
+      "change_type": "REMOVED",
       "changed_fields": [],
       "date_status": "UNVERIFIED_DATE",
       "deadline": null,
-      "detected_at": "2026-09-07T08:13:01+08:00",
-      "event_id": "EVT-89481D6B1DBB034EF686",
+      "detected_at": "2026-09-07T23:56:24+08:00",
+      "event_id": "EVT-D8382184533ED6BB4F5E",
       "evidence_status": "OFFICIAL_URL_BOUND",
-      "headline": "第四屆 第8次定期會 市政總質詢順序表",
-      "official_url": "https://www.tccc.gov.tw/pic/DocCouncil/17885343862853(1).doc",
+      "headline": "第四屆 第8次定期會 都發建設水利委員會業務質詢順序表",
+      "official_url": "https://www.tccc.gov.tw/pic/DocCouncil/17876726492859(1).doc",
       "publication_tier": "TOP",
-      "recommended_action": "確認業管歸屬與現行處理狀態，判斷是否需納入答詢或政策追蹤。",
+      "recommended_action": "確認是否為正式撤下、移轉或來源改版，保留最後版本並視需要查核。",
       "source_id": "S-006",
       "source_name": "臺中市議會質詢順序表",
-      "temporal_basis": "FIRST_SEEN",
+      "temporal_basis": "DETECTED_CHANGE",
       "verification_status": "DETERMINISTIC_PASS",
-      "what_changed": "本次監測首次偵測到「第四屆 第8次定期會 市政總質詢順序表」；官方未提供可驗證的發布日期。",
+      "what_changed": "連續 2 次完整監測未再發現「第四屆 第8次定期會 都發建設水利委員會業務質詢順序表」，標記為已移除。",
       "why_it_matters": "涉及質詢順序、列席主管與資料準備優先順序。"
     }
   ],
@@ -72,12 +72,12 @@
   "quality_issues": [
     {
       "code": "HIGH_LEGACY_ELIGIBILITY_RATIO",
-      "detail": "Legacy feed marks 115/118 items as current. V2 does not treat archive confirmation as a daily change.",
+      "detail": "Legacy feed marks 118/118 items as current. V2 does not treat archive confirmation as a daily change.",
       "severity": "HIGH"
     },
     {
       "code": "LEGACY_CONFIRMED_AS_CURRENT",
-      "count": 115,
+      "count": 118,
       "severity": "HIGH"
     },
     {
@@ -89,7 +89,7 @@
   ],
   "schema_version": 1,
   "snapshot_complete": true,
-  "source_collection_run_id": "CR-DEMO-20260907-MORNING-SCHEDULE",
+  "source_collection_run_id": "CR-DEMO-20260907-EVENING-SCHEDULE",
   "source_health": {
     "failed_count": 0,
     "gap_count": 2,
@@ -97,7 +97,7 @@
     "stale_count": 2,
     "status": "SUCCEEDED"
   },
-  "source_status_generated_at": "2026-09-07T08:13:01+08:00",
+  "source_status_generated_at": "2026-09-07T23:56:24+08:00",
   "status_message": "本期偵測到 2 件可確認變更。",
   "tracking_items": []
 }
