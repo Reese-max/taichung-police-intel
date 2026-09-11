@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-09-09",
+  "purpose": "Hybrid Twinkle + direct-official source overlay for GovIntel AI.",
+  "routing_modes": {
+    "OFFICIAL_FIRST": "Use direct official source for freshness/change detection; Twinkle may enrich.",
+    "TWINKLE_FIRST": "Use Twinkle for discovery/history/query; return to official source when authoritative or full current data is needed.",
+    "DUAL_VERIFY": "Compare Twinkle and official source for high-value claims; surface conflicts instead of silently choosing one."
+  },
+  "sources": [
+    {"key":"fraud_165_blocked_domains","priority":1,"routing_mode":"DUAL_VERIFY","twinkle":{"domain":"public_safety","dataset_id":"176455"},"direct_official":{"authority":"警政署","catalog":"https://data.gov.tw/dataset/176455"},"refresh_class":"DATASET_METADATA_DIFF"},
+    {"key":"fraud_165_debunk","priority":1,"routing_mode":"TWINKLE_FIRST","twinkle":{"domain":"public_safety","dataset_id":"38262"},"direct_official":{"authority":"警政署","catalog":"https://data.gov.tw/dataset/38262"}},
+    {"key":"government_procurement","priority":1,"routing_mode":"DUAL_VERIFY","twinkle":{"skill":"tw-opendata-pcc","dataset_id":"pcc-tender"},"direct_official":{"authority":"政府電子採購網","entrypoint":"https://web.pcc.gov.tw/tps/tp/OpenData","transport":"PCC Open Data XML"},"refresh_class":"DAILY"},
+    {"key":"legislative_yuan","priority":1,"routing_mode":"DUAL_VERIFY","twinkle":{"domain":"legislature","collections":["bills","legislators","interpellations","IVOD","gazette","votes"]},"direct_official":{"authority":"立法院","entrypoint":"https://data.ly.gov.tw/","transport":"JSON/XML/CSV official API/download"},"refresh_class":"6H_TO_DAILY"},
+    {"key":"statutes","priority":1,"routing_mode":"DUAL_VERIFY","twinkle":{"skill":"Taiwan statute time machine","capabilities":["article-at-date","revision-history","diff","full-text-search","citation-graph"]},"direct_official":{"authorities":["全國法規資料庫","法務部","臺中市政府主管法規共用系統"],"entrypoints":["https://law.moj.gov.tw/","https://law.taichung.gov.tw/DraftForum.aspx"]}},
+    {"key":"transport","priority":2,"routing_mode":"OFFICIAL_FIRST","twinkle":{"domain":"transport"},"direct_official":{"authorities":["臺中市政府交通局","警政署","TDX/交通主管機關"]},"refresh_class":"15M_FOR_EVENTS_METADATA_FOR_HISTORY"},
+    {"key":"population_and_geo","priority":2,"routing_mode":"TWINKLE_FIRST","twinkle":{"domains":["social_population","geo"]},"direct_official":{"authority":"內政部","entrypoints":["https://segis.moi.gov.tw/","https://segis.moi.gov.tw/STATCloud/ServiceList"]},"refresh_class":"LOW_FREQUENCY_BY_STATISTICAL_PERIOD"},
+    {"key":"public_finance_budget","priority":2,"routing_mode":"TWINKLE_FIRST","twinkle":{"domain":"public_finance"},"direct_official":{"authorities":["data.gov.tw","臺中市政府主計處","臺中市政府警察局"]}},
+    {"key":"environment_weather_disaster","priority":2,"routing_mode":"OFFICIAL_FIRST","twinkle":{"domains":["environment","weather","hydrology"]},"direct_official":{"authorities":["中央氣象署","環境部","消防機關"]}},
+    {"key":"judicial","priority":3,"routing_mode":"TWINKLE_FIRST","twinkle":{"skill":"Judicial Court Decisions"},"direct_official":{"authority":"司法院","status":"Require official-source canary before production"}}
+  ],
+  "promotion_gate": [
+    "Read Twinkle dataset metadata/schema before use.",
+    "Preserve official source URL, publisher, license and statistical period.",
+    "Define direct-official fallback or document why none exists.",
+    "Compare at least one Twinkle sample with the official source.",
+    "Handle stale, missing and conflict states explicitly.",
+    "Never replace source publish/effective time with collector observation time.",
+    "Never present historical/simulated data as live state.",
+    "Pass sensitive-data disclosure gate."
+  ]
+}

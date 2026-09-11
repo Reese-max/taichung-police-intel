@@ -83,7 +83,7 @@ def canonical_bytes_sha256(body: bytes) -> str:
 
 
 def roc_date(value: str) -> date | None:
-    match = re.search(r"(\d{2,3})[./](\d{1,2})[./](\d{1,2})", value)
+    match = re.search(r"(\d{2,3})\s*[-/.年]\s*(\d{1,2})\s*[-/.月]\s*(\d{1,2})\s*日?", value)
     if not match:
         return None
     year, month, day = map(int, match.groups())
@@ -329,19 +329,168 @@ def collect_s029(session: requests.Session, start: date, end: date) -> dict:
     }
 
 
+# Issue #14 — P1 官方新聞列表來源（同型 taichung.gov.tw CMS：列表頁 → 明細頁）。
+# collection_rule：list-first——只有 stable_id 新增或列表列變更才抓明細，
+# 不重跑全歷史（S-001 audit 曾觀察到密集重建被 reset）。
+NEWS_LIST_SOURCES = {
+    "S-001": {
+        "name": "臺中市政府警察局警政新聞",
+        "list_url": "https://www.police.taichung.gov.tw/ch/home.jsp?id=1&parentpath=0&mcustomize=news_list.jsp",
+        "id_pattern": r"news_view\.jsp[^\"']*dataserno=(\d+)",
+    },
+    "S-019": {
+        "name": "臺中市政府市政會議紀錄與專案報告",
+        "list_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186",
+        "id_pattern": r"/(\d+)/post\b",
+    },
+    "S-032": {
+        "name": "臺中市政府交通局最新消息",
+        "list_url": "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,7,218",
+        "id_pattern": r"Parser=9,4,(\d+)",
+    },
+}
+
+
+def parse_news_list(html: bytes, base_url: str, id_pattern: str) -> list[dict]:
+    """從同型 CMS 新聞列表抽列：明細連結 + 列內日期 + 標題。
+
+    解析不到任何明細列 = 頁面結構改了 → raise（失敗不可當零筆）。
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    pattern = re.compile(id_pattern)
+    seen: dict[str, dict] = {}
+    for anchor in soup.find_all("a", href=True):
+        match = pattern.search(anchor["href"])
+        if not match:
+            continue
+        stable_key = match.group(1)
+        row = anchor.find_parent(["li", "tr", "dd", "div"]) or anchor.parent or anchor
+        row_text = " ".join(row.stripped_strings)
+        published = roc_date(row_text)
+        title = re.sub(r"\s+", " ", anchor.get_text(strip=True))
+        if stable_key not in seen:
+            seen[stable_key] = {
+                "stable_key": stable_key,
+                "title": title,
+                "detail_url": urllib.parse.urljoin(base_url, anchor["href"]),
+                "published": published,
+            }
+    entries = list(seen.values())
+    if not entries:
+        raise ValueError("news list has no parseable entries")
+    return entries
+
+
+def collect_news_list(
+    session: requests.Session,
+    source_id: str,
+    start: date,
+    end: date,
+    existing: dict[str, dict] | None = None,
+    max_details: int | None = None,
+) -> dict:
+    """List-first collector：明細頁只抓新增或列表列有變的 stable_key。
+
+    max_details 用於無 DB 狀態的 canary：每列都是「新」的，
+    沒有上限等於密集全量明細抓取（S-001 audit 就是被這種行為 reset 的）。
+    """
+    config = NEWS_LIST_SOURCES[source_id]
+    listing = get(session, config["list_url"])
+    responses = [snapshot(listing, "LIST")]
+    entries = parse_news_list(listing.content, listing.url, config["id_pattern"])
+    existing = existing or {}
+    details_fetched = 0
+    items = []
+    for entry in entries:
+        list_payload = {
+            "title": entry["title"],
+            "detail_url": entry["detail_url"],
+            "published_at": published_at(entry["published"]),
+        }
+        # content_sha256 只由列表列決定——這是「new or changed」的判定鍵，
+        # 也讓未變更列可以直接沿用既有 raw_item（不做多餘明細抓取）。
+        list_sha = canonical_sha256(list_payload)
+        if existing.get(entry["stable_key"], {}).get("content_sha256") == list_sha:
+            payload = {**list_payload, "detail": "unchanged-skipped"}
+        elif max_details is not None and details_fetched >= max_details:
+            payload = {**list_payload, "detail": "skipped-detail-cap"}
+        else:
+            details_fetched += 1
+            detail = get(session, entry["detail_url"], timeout=120)
+            responses.append(snapshot(detail, "DETAIL"))
+            payload = {
+                **list_payload,
+                "detail": "fetched",
+                "body_sha256": canonical_bytes_sha256(detail.content),
+                "attachments": [
+                    urllib.parse.urljoin(detail.url, a["href"])
+                    for a in BeautifulSoup(detail.content, "html.parser").find_all("a", href=True)
+                    if re.search(r"\.(pdf|docx?|xlsx?|odt|zip)(\?|$)", a["href"], re.I)
+                ],
+            }
+        items.append(
+            {
+                "stable_key": entry["stable_key"],
+                "source_url": entry["detail_url"],
+                "published_at": list_payload["published_at"],
+                "content_sha256": list_sha,
+                "payload": payload,
+            }
+        )
+
+    dated = [date.fromisoformat(item["published_at"][:10]) for item in items if item["published_at"]]
+    window_items = [item for item in items if item["published_at"] and start <= date.fromisoformat(item["published_at"][:10]) <= end]
+    if window_items:
+        completeness = "COMPLETE_WITH_ITEMS"
+    elif dated and max(dated) < start:
+        completeness = "COMPLETE_ZERO"
+    else:
+        completeness = "PARTIAL"
+    manifest = [{key: item[key] for key in ("stable_key", "content_sha256", "published_at")} for item in items]
+    return {
+        "source_health": "PASS",
+        "window_completeness": completeness,
+        "window_item_count": len(window_items),
+        "snapshot_item_count": len(items),
+        "items": items,
+        "snapshots": responses,
+        "manifest_sha256": canonical_sha256(manifest),
+    }
+
+
 COLLECTORS = {
     "S-004": collect_download_list,
     "S-006": collect_download_list,
     "S-007": collect_s007,
     "S-009": collect_s009,
     "S-029": collect_s029,
+    "S-001": collect_news_list,
+    "S-019": collect_news_list,
+    "S-032": collect_news_list,
 }
 
+# Issue #14：先註冊為 CANDIDATE——catalog 要求每個新來源經 low-frequency canary
+# 才升 ACTIVE；S-001 audit 曾觀察到密集重建被對端 reset。
+SOURCE_ROWS.update(
+    {
+        source_id: (config["name"], "PRIMARY_OFFICIAL", "PREP_CORE", "CANDIDATE")
+        for source_id, config in NEWS_LIST_SOURCES.items()
+    }
+)
 
-def collect_source(session: requests.Session, source_id: str, start: date, end: date) -> dict:
+
+def collect_source(
+    session: requests.Session,
+    source_id: str,
+    start: date,
+    end: date,
+    existing: dict[str, dict] | None = None,
+) -> dict:
     collector = COLLECTORS[source_id]
     if collector is collect_download_list:
         return collector(session, source_id, start, end)
+    if collector is collect_news_list:
+        return collector(session, source_id, start, end, existing)
     return collector(session, start, end)
 
 
@@ -574,14 +723,23 @@ def run_database_slot(slot: str, slot_date: date, now: datetime | None = None) -
                 ).fetchall()
             }
             session = http_session()
-            for source_id in P0_SOURCES:
+            for source_id in list(P0_SOURCES) + list(NEWS_LIST_SOURCES):
                 if source_id in completed_sources:
                     continue
                 source_run_id = f"SR-{slot_date:%Y%m%d}-{slot}-{source_id[2:]}"
                 attempted_at = datetime.now(TZ)
                 started = time.monotonic()
                 try:
-                    collected = collect_source(session, source_id, window_start.date(), window_end.date())
+                    # list-first gating：把既有 stable_key → content_sha256 餵給
+                    # 新聞列表 collector，未變更的列不抓明細。
+                    existing = (
+                        current_items(connection, source_id)
+                        if source_id in NEWS_LIST_SOURCES
+                        else None
+                    )
+                    collected = collect_source(
+                        session, source_id, window_start.date(), window_end.date(), existing
+                    )
                     completed_at = datetime.now(TZ)
                     with connection.transaction():
                         save_success(
@@ -603,7 +761,8 @@ def run_database_slot(slot: str, slot_date: date, now: datetime | None = None) -
             ).fetchall()
             failed = sum(row["result"] == "FAILED" for row in results)
             partial = sum(row["result"] == "PARTIAL" for row in results)
-            status = "FAILED" if failed == len(P0_SOURCES) else "PARTIAL" if failed or partial else "SUCCEEDED"
+            total_sources = len(P0_SOURCES) + len(NEWS_LIST_SOURCES)
+            status = "FAILED" if failed == total_sources else "PARTIAL" if failed or partial else "SUCCEEDED"
             connection.execute(
                 "UPDATE collection_runs SET status = %s, finished_at = %s WHERE collection_run_id = %s",
                 (status, datetime.now(TZ), collection_run_id),
@@ -636,9 +795,14 @@ def canary() -> None:
     end = datetime.now(TZ).date()
     start = end - timedelta(days=6)
     summary = {}
-    for source_id in P0_SOURCES:
+    for source_id in list(P0_SOURCES) + list(NEWS_LIST_SOURCES):
         started = time.monotonic()
-        result = collect_source(session, source_id, start, end)
+        # canary 無 DB 狀態：新聞列表來源限抓前 5 筆明細，
+        # 保持低頻低量，不觸發對端 reset（catalog 對 S-001 的明確告誡）。
+        if source_id in NEWS_LIST_SOURCES:
+            result = collect_source(session, source_id, start, end, {}, max_details=5)
+        else:
+            result = collect_source(session, source_id, start, end)
         summary[source_id] = {
             "source_health": result["source_health"],
             "window_completeness": result["window_completeness"],
