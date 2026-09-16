@@ -1,4 +1,8 @@
 import importlib.util
+import os
+import subprocess
+import sys
+import tempfile
 from pathlib import Path
 import unittest
 
@@ -35,6 +39,41 @@ class OutcomeTests(unittest.TestCase):
     def test_no_arbitrary_evidence_link(self):
         for url in ["https://evil.test/artifact", "http://github.com/actions/runs/1/artifacts/2", "https://github.com/actions/runs/1/artifacts/2?token=secret"]:
             self.assertNotIn(url, module.report({"EVIDENCE": "success", "EVIDENCE_URL": url})[0])
+
+    def test_cli_writes_literal_summary_and_preserves_failed_exit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            summary = Path(directory) / "summary.md"
+            env = {**os.environ, "GITHUB_STEP_SUMMARY": str(summary),
+                   "BUILD_RESULT": "failure", "DEPLOY_RESULT": "skipped",
+                   "PRESERVE": "failure", "EVIDENCE": "success",
+                   "EVIDENCE_URL": "https://github.com/Reese-max/taichung-police-intel/actions/runs/123/artifacts/456"}
+            expected, code = module.report(env)
+            result = subprocess.run([sys.executable, str(ROOT / "scripts/publication-outcome.py")],
+                                    env=env, capture_output=True, text=True, timeout=10, check=False)
+            self.assertEqual(result.returncode, code)
+            self.assertEqual(code, 1)
+            self.assertEqual(summary.read_text(encoding="utf-8"), expected)
+            self.assertIn("`PUBLICATION_NOT_CONFIRMED`", result.stdout)
+            self.assertIn("::warning title=Publication not confirmed::", result.stdout)
+
+    def test_cli_treats_shell_metacharacters_as_untrusted_data(self):
+        with tempfile.TemporaryDirectory() as directory:
+            summary = Path(directory) / "summary.md"
+            sentinel = Path(directory) / "must-not-exist"
+            payload = f"`touch {sentinel}` $(touch {sentinel})"
+            env = {**os.environ, "GITHUB_STEP_SUMMARY": str(summary),
+                   "BUILD_RESULT": "success", "DEPLOY_RESULT": "success",
+                   "PRESERVE": payload, "EVIDENCE": "success",
+                   "EVIDENCE_URL": payload}
+            result = subprocess.run([sys.executable, str(ROOT / "scripts/publication-outcome.py")],
+                                    env=env, capture_output=True, text=True, timeout=10, check=False)
+            self.assertEqual(result.returncode, 0)
+            self.assertFalse(sentinel.exists())
+            rendered = summary.read_text(encoding="utf-8")
+            self.assertNotIn(payload, rendered)
+            self.assertIn("| preserve | unknown |", rendered)
+            self.assertIn("No successful evidence-upload receipt", rendered)
+            self.assertIn("UNVERIFIED_HTTP", rendered)
 
     def test_real_workflow_places_retention_after_push_and_upload(self):
         text = (ROOT / ".github/workflows/pages.yml").read_text()
