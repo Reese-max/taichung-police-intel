@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Versioned regression evaluator for GovIntel gold cases.
 
-This harness reports engineering metrics with explicit denominators.  A synthetic
+This harness reports engineering metrics with explicit denominators. A synthetic
 starter set validates metric plumbing only; it must never be presented as measured
 production accuracy.
 """
@@ -55,8 +55,21 @@ def validate_cases(cases: list[dict[str, Any]]) -> None:
             reviewer = case.get("reviewer")
             if not isinstance(reviewer, str) or not reviewer:
                 raise ValueError(f"non-synthetic case requires reviewer: {case_id}")
-        if not isinstance(case.get("expected"), dict):
+        expected = case.get("expected")
+        if not isinstance(expected, dict):
             raise ValueError(f"expected object missing: {case_id}")
+        if task == "event_pair" and not isinstance(expected.get("same_event"), bool):
+            raise ValueError(f"event_pair expected same_event must be boolean: {case_id}")
+        if task == "material_change" and not isinstance(expected.get("material_change"), bool):
+            raise ValueError(f"material_change expected material_change must be boolean: {case_id}")
+        if task == "query_ids":
+            expected_ids = expected.get("ids")
+            if not isinstance(expected_ids, list) or any(not isinstance(item, str) for item in expected_ids):
+                raise ValueError(f"query_ids expected ids must be string array: {case_id}")
+            if "answer_state" in expected and not isinstance(expected["answer_state"], str):
+                raise ValueError(f"query_ids expected answer_state must be string: {case_id}")
+        if task == "claim_support" and not isinstance(expected.get("support_status"), str):
+            raise ValueError(f"claim_support expected support_status missing: {case_id}")
 
 
 def index_predictions(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
@@ -70,6 +83,20 @@ def index_predictions(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
             raise ValueError(f"duplicate prediction: {case_id}")
         indexed[case_id] = prediction
     return indexed
+
+
+def require_bool(prediction: dict[str, Any], field: str, case_id: str) -> bool:
+    value = prediction.get(field)
+    if not isinstance(value, bool):
+        raise ValueError(f"prediction {case_id} field {field} must be boolean")
+    return value
+
+
+def require_string_list(prediction: dict[str, Any], field: str, case_id: str) -> list[str]:
+    value = prediction.get(field)
+    if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
+        raise ValueError(f"prediction {case_id} field {field} must be string array")
+    return value
 
 
 def safe_ratio(num: int, den: int) -> float | None:
@@ -130,27 +157,36 @@ def evaluate(manifest: dict[str, Any], cases: list[dict[str, Any]], predictions:
     change_pairs: list[tuple[bool, bool]] = []
     query_expected: list[set[str]] = []
     query_predicted: list[set[str]] = []
+    query_state_total = query_state_correct = 0
     claim_total = claim_correct = 0
     missing: list[str] = []
     exact_case_matches = 0
 
     for case in cases:
-        prediction = predictions.get(case["case_id"])
+        case_id = case["case_id"]
+        prediction = predictions.get(case_id)
         if prediction is None:
-            missing.append(case["case_id"])
+            missing.append(case_id)
             continue
         expected = case["expected"]
         task = case["task"]
         if task == "event_pair":
-            event_pairs.append((bool(expected.get("same_event")), bool(prediction.get("same_event"))))
+            event_pairs.append((expected["same_event"], require_bool(prediction, "same_event", case_id)))
         elif task == "material_change":
-            change_pairs.append((bool(expected.get("material_change")), bool(prediction.get("material_change"))))
+            change_pairs.append((expected["material_change"], require_bool(prediction, "material_change", case_id)))
         elif task == "query_ids":
-            query_expected.append(set(expected.get("ids") or []))
-            query_predicted.append(set(prediction.get("ids") or []))
+            predicted_ids = require_string_list(prediction, "ids", case_id)
+            query_expected.append(set(expected["ids"]))
+            query_predicted.append(set(predicted_ids))
+            if "answer_state" in expected:
+                query_state_total += 1
+                query_state_correct += int(prediction.get("answer_state") == expected["answer_state"])
         elif task == "claim_support":
+            support_status = prediction.get("support_status")
+            if not isinstance(support_status, str) or not support_status:
+                raise ValueError(f"prediction {case_id} support_status must be string")
             claim_total += 1
-            claim_correct += int(prediction.get("support_status") == expected.get("support_status"))
+            claim_correct += int(support_status == expected["support_status"])
         if prediction == expected:
             exact_case_matches += 1
 
@@ -168,6 +204,11 @@ def evaluate(manifest: dict[str, Any], cases: list[dict[str, Any]], predictions:
         "event_pair": binary_metrics(event_pairs),
         "material_change": binary_metrics(change_pairs),
         "query_ids": set_metrics(query_expected, query_predicted),
+        "query_answer_state": {
+            "denominator": query_state_total,
+            "correct": query_state_correct,
+            "accuracy": safe_ratio(query_state_correct, query_state_total),
+        },
         "claim_support": {
             "denominator": claim_total,
             "correct": claim_correct,
@@ -188,6 +229,7 @@ def self_check() -> None:
     assert perfect["event_pair"]["f1"] == 1.0
     assert perfect["material_change"]["f1"] == 1.0
     assert perfect["query_ids"]["f1"] == 1.0
+    assert perfect["query_answer_state"]["accuracy"] == 1.0
     assert perfect["claim_support"]["accuracy"] == 1.0
 
     wrong = perfect_predictions(cases)
@@ -195,6 +237,12 @@ def self_check() -> None:
     degraded = evaluate(manifest, cases, wrong)
     assert degraded["event_pair"]["fp"] == 1
     assert degraded["event_pair"]["f1"] < 1.0
+
+    wrong_state = perfect_predictions(cases)
+    wrong_state["query-zero-failed-001"] = {"ids": []}
+    degraded_state = evaluate(manifest, cases, wrong_state)
+    assert degraded_state["query_ids"]["f1"] == 1.0
+    assert degraded_state["query_answer_state"]["accuracy"] == 0.0
     print(f"GOLD_EVAL_SELF_CHECK_OK dataset={manifest['dataset_id']} cases={len(cases)}")
 
 
