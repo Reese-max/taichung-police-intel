@@ -30,6 +30,13 @@ def registry_hash(registry: dict[str, Any]) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def registry_receipt(registry: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "registry_version": registry["registry_version"],
+        "registry_hash": registry_hash(registry),
+    }
+
+
 def load_registry(path: Path = DEFAULT_REGISTRY) -> dict[str, Any]:
     data = json.loads(path.read_text(encoding="utf-8"))
     validate_registry(data)
@@ -39,6 +46,8 @@ def load_registry(path: Path = DEFAULT_REGISTRY) -> dict[str, Any]:
 def validate_registry(registry: dict[str, Any]) -> None:
     if registry.get("schema_version") != 1:
         raise ValueError("unsupported entity registry schema_version")
+    if not isinstance(registry.get("registry_version"), int) or registry["registry_version"] < 1:
+        raise ValueError("registry_version must be a positive integer")
     entities = registry.get("entities")
     if not isinstance(entities, list):
         raise ValueError("entities must be an array")
@@ -52,6 +61,7 @@ def validate_registry(registry: dict[str, Any]) -> None:
         label = entity.get("canonical_label")
         jurisdiction = entity.get("jurisdiction") or ""
         status = entity.get("status")
+        aliases = entity.get("aliases", [])
         if not isinstance(entity_id, str) or not entity_id:
             raise ValueError("entity_id missing")
         if entity_id in ids:
@@ -61,12 +71,16 @@ def validate_registry(registry: dict[str, Any]) -> None:
             raise ValueError(f"unsupported entity kind: {kind}")
         if not isinstance(label, str) or not label.strip():
             raise ValueError(f"canonical_label missing: {entity_id}")
+        if not isinstance(jurisdiction, str):
+            raise ValueError(f"jurisdiction must be a string: {entity_id}")
         if status != "CONFIRMED":
             raise ValueError(f"unconfirmed entity cannot enter canonical registry: {entity_id}")
-        names = [label, *(entity.get("aliases") or [])]
+        if not isinstance(aliases, list):
+            raise ValueError(f"aliases must be an array of strings: {entity_id}")
+        if any(not isinstance(alias, str) or not alias.strip() for alias in aliases):
+            raise ValueError(f"aliases must be an array of strings: {entity_id}")
+        names = [label, *aliases]
         for name in names:
-            if not isinstance(name, str) or not name.strip():
-                raise ValueError(f"invalid alias on {entity_id}")
             key = (kind, normalize(jurisdiction), normalize(name))
             previous = alias_keys.get(key)
             if previous and previous != entity_id:
@@ -79,14 +93,28 @@ def build_index(registry: dict[str, Any]) -> dict[tuple[str, str, str], dict[str
     index: dict[tuple[str, str, str], dict[str, Any]] = {}
     for entity in registry["entities"]:
         jurisdiction = normalize(entity.get("jurisdiction") or "")
-        for name in [entity["canonical_label"], *(entity.get("aliases") or [])]:
+        for name in [entity["canonical_label"], *entity.get("aliases", [])]:
             index[(entity["kind"], jurisdiction, normalize(name))] = entity
     return index
+
+
+def no_match(registry: dict[str, Any], kind: str, text: str, jurisdiction: str | None) -> dict[str, Any]:
+    return {
+        "status": "NO_MATCH",
+        "query": text,
+        "kind": kind,
+        "jurisdiction": jurisdiction,
+        **registry_receipt(registry),
+    }
 
 
 def resolve(registry: dict[str, Any], kind: str, text: str, jurisdiction: str | None = None) -> dict[str, Any]:
     if kind not in ALLOWED_KINDS:
         raise ValueError(f"unsupported kind: {kind}")
+    if not isinstance(text, str) or not text.strip():
+        raise ValueError("query text must be a non-empty string")
+    if jurisdiction is not None and (not isinstance(jurisdiction, str) or not jurisdiction.strip()):
+        raise ValueError("jurisdiction must be a non-empty string when provided")
     query = normalize(text)
     jurisdiction_norm = normalize(jurisdiction or "")
     index = build_index(registry)
@@ -95,7 +123,7 @@ def resolve(registry: dict[str, Any], kind: str, text: str, jurisdiction: str | 
         entity = index.get((kind, jurisdiction_norm, query))
         if entity:
             return _resolved(entity, registry)
-        return {"status": "NO_MATCH", "query": text, "kind": kind, "jurisdiction": jurisdiction}
+        return no_match(registry, kind, text, jurisdiction)
 
     matches: dict[str, dict[str, Any]] = {}
     for (entry_kind, _entry_jurisdiction, alias), entity in index.items():
@@ -109,9 +137,9 @@ def resolve(registry: dict[str, Any], kind: str, text: str, jurisdiction: str | 
             "query": text,
             "kind": kind,
             "candidate_ids": sorted(matches),
-            "registry_hash": registry_hash(registry),
+            **registry_receipt(registry),
         }
-    return {"status": "NO_MATCH", "query": text, "kind": kind, "jurisdiction": jurisdiction}
+    return no_match(registry, kind, text, jurisdiction)
 
 
 def _resolved(entity: dict[str, Any], registry: dict[str, Any]) -> dict[str, Any]:
@@ -121,8 +149,7 @@ def _resolved(entity: dict[str, Any], registry: dict[str, Any]) -> dict[str, Any
         "kind": entity["kind"],
         "canonical_label": entity["canonical_label"],
         "jurisdiction": entity.get("jurisdiction"),
-        "registry_version": registry["registry_version"],
-        "registry_hash": registry_hash(registry),
+        **registry_receipt(registry),
         "match_method": "EXACT_NORMALIZED_ALIAS",
     }
 
@@ -150,6 +177,8 @@ def self_check(registry: dict[str, Any]) -> None:
     assert road["entity_id"] == "location:tc-taiwan-blvd"
     unknown = resolve(registry, "location", "不存在的地點", "臺中市")
     assert unknown["status"] == "NO_MATCH"
+    assert unknown["registry_version"] == registry["registry_version"]
+    assert unknown["registry_hash"] == registry_hash(registry)
     print(
         "ENTITY_REGISTRY_SELF_CHECK_OK "
         f"version={registry['registry_version']} hash={registry_hash(registry)[:12]} entities={len(registry['entities'])}"
