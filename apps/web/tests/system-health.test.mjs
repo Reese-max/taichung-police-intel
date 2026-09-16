@@ -26,14 +26,15 @@ function runPython(args) {
 test("system-health runtime suite passes", () => {
   const result = runPython(["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_system_health.py", "-v"]);
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-  assert.match(result.stderr, /Ran 8 tests/);
+  assert.match(result.stderr, /Ran 11 tests/);
   assert.match(result.stderr, /OK/);
 });
 
-test("system-health CLI self-check keeps query failure separate from publication failure", () => {
+test("system-health CLI self-check keeps query failure separate and missing publication stages unknown", () => {
   const result = runPython(["-X", "utf8", "scripts/system-health.py", "--self-check"]);
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   assert.match(result.stdout, /SYSTEM_HEALTH_SELF_CHECK_OK/);
   assert.match(result.stdout, /query_failure_preserves_publication=true/);
   assert.match(result.stdout, /publish_failure_blocks=true/);
+  assert.match(result.stdout, /missing_stage_unknown=true/);
 });
