@@ -80,9 +80,12 @@ def project_source(source: dict[str, Any], status_hash: str) -> dict[str, Any]:
     source_id = _string(source.get("source_id"))
     if not source_id:
         raise ValueError("source status row missing source_id")
+    source_name = _string(source.get("source_name"))
+    if not source_name:
+        raise ValueError(f"source status row missing source_name: {source_id}")
     return {
         "source_id": source_id,
-        "name": source.get("name"),
+        "name": source_name,
         "source_health": source.get("source_health"),
         "window_completeness": source.get("window_completeness"),
         "result": source.get("result"),
@@ -235,6 +238,7 @@ def self_check() -> None:
     second = build_from_paths(DEFAULT_FEED, DEFAULT_STATUS, DEFAULT_BRIEF)
     assert first["generation_id"] == second["generation_id"]
     assert [row["canonical_id"] for row in first["items"]] == [row["canonical_id"] for row in second["items"]]
+    assert all(row["name"] for row in first["sources"])
     result = query_store(first, source_id="S-004", limit=5)
     assert result["query_generation_id"] == first["generation_id"]
     assert all(row["source_id"] == "S-004" for row in result["results"])
