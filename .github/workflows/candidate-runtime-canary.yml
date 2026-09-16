@@ -1,0 +1,63 @@
+name: Candidate collector runtime evidence
+on:
+  push:
+    branches: [devin/issue-14-news-collectors]
+    paths:
+      - scripts/candidate-runtime-canary.py
+      - tests/test_candidate_runtime_canary.py
+      - .github/workflows/candidate-runtime-canary.yml
+  pull_request:
+    branches: [main]
+    paths:
+      - scripts/candidate-runtime-canary.py
+      - tests/test_candidate_runtime_canary.py
+      - .github/workflows/candidate-runtime-canary.yml
+permissions:
+  contents: read
+concurrency:
+  group: candidate-runtime-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt
+      - name: Exercise candidate wrapper and real collector fixtures
+        run: |
+          python -m unittest discover -s tests -p 'test_candidate_runtime_canary.py' -v
+          python -m unittest discover -s tests -p 'test_news_list_collector.py' -v
+  live:
+    if: github.event_name == 'push' && github.repository == 'Reese-max/taichung-police-intel'
+    needs: contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt
+      - name: One bounded live observation, never production promotion
+        run: python scripts/candidate-runtime-canary.py --output runtime-evidence/candidate-live.json
+      - name: Retain exact source and observation for replay
+        if: always()
+        run: |
+          mkdir -p runtime-evidence
+          git rev-parse HEAD > runtime-evidence/code-sha.txt
+          git archive --format=tar --prefix=source/ HEAD > runtime-evidence/source.tar
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: candidate-runtime-${{ github.sha }}
+          path: runtime-evidence/
+          if-no-files-found: error
+          retention-days: 14
