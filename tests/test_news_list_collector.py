@@ -131,10 +131,39 @@ class ListFirstGatingTests(unittest.TestCase):
         capped = [i for i in result["items"] if i["payload"]["detail"] == "skipped-detail-cap"]
         self.assertEqual(len(capped), 2)
 
+    def test_collect_source_accepts_bounded_canary_option(self):
+        session = FakeSession({oc.NEWS_LIST_SOURCES["S-001"]["list_url"]: POLICE_LIST})
+        result = oc.collect_source(
+            session, "S-001", date(2026, 9, 4), date(2026, 9, 11), {}, max_details=1
+        )
+        self.assertEqual(result["source_health"], "PASS")
+        self.assertEqual(len([u for u in session.fetched if "news_view" in u]), 1)
+
     def test_window_completeness(self):
         result, _ = _collect("S-001", POLICE_LIST)
         self.assertEqual(result["window_completeness"], "COMPLETE_WITH_ITEMS")
-        self.assertEqual(result["window_item_count"], 2)  # 09-10, 09-08 在窗內；07-01 不在
+        self.assertEqual(result["window_item_count"], 2)  # 09-10, 09-08 在窗內；07-01 證明頁面跨過窗口起點
+
+    def test_single_page_that_does_not_reach_before_window_is_partial(self):
+        recent_only = _page(
+            """
+            <li><a href="home.jsp?mcustomize=news_view.jsp&dataserno=1">115-09-10 A</a></li>
+            <li><a href="home.jsp?mcustomize=news_view.jsp&dataserno=2">115-09-08 B</a></li>
+            """
+        )
+        result, _ = _collect("S-001", recent_only)
+        self.assertEqual(result["window_completeness"], "PARTIAL")
+
+    def test_non_monotonic_list_dates_fail_closed_as_partial(self):
+        unordered = _page(
+            """
+            <li><a href="home.jsp?mcustomize=news_view.jsp&dataserno=1">115-09-08 A</a></li>
+            <li><a href="home.jsp?mcustomize=news_view.jsp&dataserno=2">115-09-10 B</a></li>
+            <li><a href="home.jsp?mcustomize=news_view.jsp&dataserno=3">115-07-01 C</a></li>
+            """
+        )
+        result, _ = _collect("S-001", unordered)
+        self.assertEqual(result["window_completeness"], "PARTIAL")
 
 
 class RocDateTests(unittest.TestCase):
@@ -143,6 +172,15 @@ class RocDateTests(unittest.TestCase):
         self.assertEqual(oc.roc_date("115年9月10日"), date(2026, 9, 10))
         self.assertEqual(oc.roc_date("115.07.27"), date(2026, 7, 27))
         self.assertIsNone(oc.roc_date("沒有日期"))
+
+    def test_gregorian_dates_are_not_reinterpreted_as_roc(self):
+        self.assertEqual(oc.roc_date("2026-09-16"), date(2026, 9, 16))
+        self.assertEqual(oc.roc_date("2026/09/16"), date(2026, 9, 16))
+        self.assertEqual(oc.roc_date("2026年9月16日"), date(2026, 9, 16))
+
+    def test_invalid_dates_fail_closed(self):
+        self.assertIsNone(oc.roc_date("2026-13-40"))
+        self.assertIsNone(oc.roc_date("115-02-30"))
 
 
 if __name__ == "__main__":

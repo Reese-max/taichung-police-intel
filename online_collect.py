@@ -83,11 +83,34 @@ def canonical_bytes_sha256(body: bytes) -> str:
 
 
 def roc_date(value: str) -> date | None:
-    match = re.search(r"(\d{2,3})\s*[-/.年]\s*(\d{1,2})\s*[-/.月]\s*(\d{1,2})\s*日?", value)
-    if not match:
+    # Parse an explicit four-digit Gregorian date first.  The ROC matcher is
+    # bounded so it can never start in the middle of 2026 and interpret 026.
+    gregorian = re.search(
+        r"(?<!\d)(\d{4})\s*[-/.年]\s*(\d{1,2})\s*[-/.月]\s*(\d{1,2})\s*日?(?!\d)",
+        value,
+    )
+    if gregorian:
+        year, month, day = map(int, gregorian.groups())
+        if not 1912 <= year <= 2200:
+            return None
+        try:
+            return date(year, month, day)
+        except ValueError:
+            return None
+
+    roc = re.search(
+        r"(?<!\d)(\d{2,3})\s*[-/.年]\s*(\d{1,2})\s*[-/.月]\s*(\d{1,2})\s*日?(?!\d)",
+        value,
+    )
+    if not roc:
         return None
-    year, month, day = map(int, match.groups())
-    return date(year + 1911, month, day)
+    year, month, day = map(int, roc.groups())
+    if not 1 <= year <= 289:
+        return None
+    try:
+        return date(year + 1911, month, day)
+    except ValueError:
+        return None
 
 
 def published_at(value: str | date | None) -> str | None:
@@ -440,9 +463,16 @@ def collect_news_list(
 
     dated = [date.fromisoformat(item["published_at"][:10]) for item in items if item["published_at"]]
     window_items = [item for item in items if item["published_at"] and start <= date.fromisoformat(item["published_at"][:10]) <= end]
-    if window_items:
+    # A single list page is not automatically a complete date window.  We can
+    # prove coverage only when the dated rows are reverse-chronological and the
+    # page reaches strictly before the requested window start.  Otherwise a
+    # second page could still contain additional in-window items, so fail closed
+    # as PARTIAL until source-specific pagination is enumerated.
+    reverse_chronological = all(left >= right for left, right in zip(dated, dated[1:]))
+    reaches_before_window = bool(dated) and min(dated) < start
+    if window_items and reverse_chronological and reaches_before_window:
         completeness = "COMPLETE_WITH_ITEMS"
-    elif dated and max(dated) < start:
+    elif dated and reverse_chronological and max(dated) < start:
         completeness = "COMPLETE_ZERO"
     else:
         completeness = "PARTIAL"
@@ -485,12 +515,16 @@ def collect_source(
     start: date,
     end: date,
     existing: dict[str, dict] | None = None,
+    *,
+    max_details: int | None = None,
 ) -> dict:
     collector = COLLECTORS[source_id]
     if collector is collect_download_list:
         return collector(session, source_id, start, end)
     if collector is collect_news_list:
-        return collector(session, source_id, start, end, existing)
+        return collector(session, source_id, start, end, existing, max_details=max_details)
+    if max_details is not None:
+        raise ValueError(f"max_details is only valid for list-news sources: {source_id}")
     return collector(session, start, end)
 
 
