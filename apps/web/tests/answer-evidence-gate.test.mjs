@@ -7,22 +7,31 @@ import test from "node:test";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, "../../..");
 
+function findPython() {
+  const candidates = process.platform === "win32"
+    ? [{ command: "python", prefix: [] }, { command: "py", prefix: ["-3"] }]
+    : [{ command: "python3", prefix: [] }, { command: "python", prefix: [] }];
+  for (const candidate of candidates) {
+    const result = spawnSync(candidate.command, [...candidate.prefix, "--version"], { stdio: "ignore" });
+    if (result.status === 0) return candidate;
+  }
+  throw new Error("No supported Python interpreter found");
+}
+
+const python = findPython();
+function runPython(args) {
+  return spawnSync(python.command, [...python.prefix, ...args], { cwd: repo, encoding: "utf8" });
+}
+
 test("answer evidence gate runtime suite passes", () => {
-  const result = spawnSync(
-    "python",
-    ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_answer_evidence_gate.py", "-v"],
-    { cwd: repo, encoding: "utf8" },
-  );
+  const result = runPython(["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_answer_evidence_gate.py", "-v"]);
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   assert.match(result.stderr, /Ran 10 tests/);
   assert.match(result.stderr, /OK/);
 });
 
 test("answer evidence CLI self-check rejects unsupported cause while preserving supported time", () => {
-  const result = spawnSync("python", ["-X", "utf8", "scripts/answer-evidence-gate.py", "--self-check"], {
-    cwd: repo,
-    encoding: "utf8",
-  });
+  const result = runPython(["-X", "utf8", "scripts/answer-evidence-gate.py", "--self-check"]);
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   assert.match(result.stdout, /ANSWER_EVIDENCE_GATE_SELF_CHECK_OK/);
   assert.match(result.stdout, /NEEDS_QUALIFICATION/);
