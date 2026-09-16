@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { assessPublication } from "../lib/publication-freshness.mjs";
 
 
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
@@ -51,16 +52,17 @@ function formatDateTime(value) {
   });
 }
 
-function PublicationStatus({ publication }) {
+function PublicationStatus({ publication, assessment }) {
   const health = publication.source_health || {};
-  const isReady = publication.publication_status === "READY";
+  const isReady = assessment.canReassure;
+  const labels = { RECENT: "近期監測快照", STALE: "已保存快照過期", PARTIAL: "監測範圍不完整", UNKNOWN: "資料時效待核對" };
   return (
     <div className={`v2-publication-status ${isReady ? "ready" : "partial"}`} role="status">
       <span className="v2-status-dot" aria-hidden="true" />
       <div>
-        <strong>{isReady ? "本期資料完整" : "本期資料部分完成"}</strong>
+        <strong>{labels[assessment.state]}</strong>
         <span>
-          {health.pass_count || 0} 個來源正常
+          快照記錄 {health.pass_count || 0} 個來源正常
           {health.stale_count ? ` · ${health.stale_count} 個資料較舊` : ""}
           {health.failed_count ? ` · ${health.failed_count} 個來源失敗` : ""}
           {health.gap_count ? ` · ${health.gap_count} 個情報缺口` : ""}
@@ -139,19 +141,19 @@ function ActionCard({ item, index }) {
   );
 }
 
-function SourceHealthSummary({ sourceStatus }) {
+function SourceHealthSummary({ sourceStatus, canReassure }) {
   const sources = Array.isArray(sourceStatus?.sources) ? sourceStatus.sources : [];
   if (!sources.length) return null;
 
   return (
     <details className="v2-source-health">
-      <summary>查看五個官方來源健康狀態</summary>
+      <summary>查看 {sources.length} 個官方來源的快照健康狀態</summary>
       <div className="v2-source-health-grid">
         {sources.map((source) => (
           <article key={source.source_id}>
             <div>
               <span
-                className={`v2-source-dot ${source.source_health === "PASS" ? "pass" : "fail"}`}
+                className={`v2-source-dot ${canReassure && source.source_health === "PASS" ? "pass" : "fail"}`}
                 aria-hidden="true"
               />
               <strong>{source.source_id}</strong>
@@ -181,6 +183,20 @@ export default function V2DailyDashboard() {
   const [loadState, setLoadState] = useState("loading");
   const [loadError, setLoadError] = useState("");
   const [archiveQuery, setArchiveQuery] = useState("");
+  const [nowMs, setNowMs] = useState(null);
+
+  useEffect(() => {
+    const updateClock = () => setNowMs(Date.now());
+    updateClock();
+    const timer = setInterval(updateClock, 60_000);
+    window.addEventListener("focus", updateClock);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", updateClock);
+    };
+  }, []);
+
+  const assessment = assessPublication(publication, sourceStatus, nowMs);
 
   useEffect(() => {
     let cancelled = false;
@@ -265,7 +281,7 @@ export default function V2DailyDashboard() {
         </div>
         {publication && (
           <div className="v2-updated">
-            <span>本期更新</span>
+            <span>快照產生時間（非官方發布時間）</span>
             <strong>{formatDateTime(publication.generated_at)}</strong>
             <small>Asia/Taipei</small>
           </div>
@@ -288,11 +304,17 @@ export default function V2DailyDashboard() {
 
       {loadState === "ready" && publication && (
         <>
-          <PublicationStatus publication={publication} />
+          <PublicationStatus publication={publication} assessment={assessment} />
+          <section className={`v2-system-message ${assessment.canReassure ? "" : "error"}`}
+            role={assessment.canReassure ? "status" : "alert"} data-testid="publication-freshness">
+            <strong>{assessment.reason}</strong>
+            <p>依裝置時間估算快照年齡，每分鐘及返回視窗時重新判斷；此頁不會自動執行新的官方蒐集。</p>
+            <button type="button" onClick={() => window.location.reload()}>重新載入資料</button>
+          </section>
 
           <section className="v2-metrics" aria-label="本期情報摘要">
-            <Metric value={overview.current_change_count || 0} label="本期真正變更" emphasis />
-            <Metric value={overview.priority_count || 0} label="今日重點" />
+            <Metric value={overview.current_change_count || 0} label="快照記錄變更" emphasis />
+            <Metric value={overview.priority_count || 0} label="快照重點" />
             <Metric value={overview.tracking_count || 0} label="持續追蹤" />
             <Metric value={overview.archive_total || 0} label="歷史資料" />
           </section>
@@ -301,17 +323,19 @@ export default function V2DailyDashboard() {
             <div className="v2-section-heading">
               <div>
                 <p className="v2-eyebrow">10 秒掌握</p>
-                <h2 id="v2-priority-title">今日重點</h2>
+                <h2 id="v2-priority-title">快照重點</h2>
               </div>
               <span>最多 3 件</span>
             </div>
 
             {priorityItems.length === 0 ? (
               <div className="v2-empty-priority" data-testid="v2-empty-priority" role="status">
-                <strong>本期沒有需要處理的重要變更</strong>
-                <p>{publication.status_message}</p>
+                <strong>{assessment.canReassure
+                  ? "本期沒有需要處理的重要變更（僅限此快照範圍）"
+                  : "快照未列出重點，但目前是否有新異動仍待確認"}</strong>
+                {assessment.canReassure && <p>{publication.status_message}</p>}
                 <p>
-                  已檢查 {publication.source_health?.pass_count || 0} 個正常官方來源；
+                  此快照曾檢查 {publication.source_health?.pass_count || 0} 個正常官方來源；
                   {overview.archive_total || 0} 筆既有資料保留於歷史區，不列為今日情資。
                 </p>
               </div>
@@ -390,11 +414,11 @@ export default function V2DailyDashboard() {
                 {filteredArchive.length === 0 && <p>找不到符合關鍵字的歷史資料。</p>}
               </div>
             ) : (
-              <p className="v2-archive-unavailable">歷史索引暫時無法載入，V2 今日情報仍可獨立使用。</p>
+              <p className="v2-archive-unavailable">歷史索引暫時無法載入；已載入的 V2 快照須依上方時效與缺口提示使用。</p>
             )}
           </section>
 
-          <SourceHealthSummary sourceStatus={sourceStatus} />
+          <SourceHealthSummary sourceStatus={sourceStatus} canReassure={assessment.canReassure} />
         </>
       )}
     </main>
