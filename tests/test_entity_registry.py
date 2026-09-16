@@ -1,7 +1,5 @@
 import importlib.util
-import json
 from pathlib import Path
-import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -30,9 +28,11 @@ class EntityRegistryTests(unittest.TestCase):
         district = er.resolve(self.registry, "location", "台中市西屯區", "台中市")
         self.assertEqual(district["entity_id"], "location:tc-xitun")
 
-    def test_unknown_text_does_not_fuzzy_merge(self):
+    def test_unknown_text_does_not_fuzzy_merge_and_has_registry_receipt(self):
         result = er.resolve(self.registry, "location", "臺灣大到", "臺中市")
         self.assertEqual(result["status"], "NO_MATCH")
+        self.assertEqual(result["registry_version"], self.registry["registry_version"])
+        self.assertEqual(result["registry_hash"], er.registry_hash(self.registry))
 
     def test_same_road_name_across_jurisdictions_is_ambiguous_without_scope(self):
         registry = {
@@ -46,6 +46,7 @@ class EntityRegistryTests(unittest.TestCase):
         result = er.resolve(registry, "location", "中正路")
         self.assertEqual(result["status"], "AMBIGUOUS")
         self.assertEqual(result["candidate_ids"], ["location:a", "location:b"])
+        self.assertEqual(result["registry_version"], 99)
         scoped = er.resolve(registry, "location", "中正路", "乙市")
         self.assertEqual(scoped["entity_id"], "location:b")
 
@@ -59,6 +60,17 @@ class EntityRegistryTests(unittest.TestCase):
             ],
         }
         with self.assertRaisesRegex(ValueError, "alias collision"):
+            er.validate_registry(registry)
+
+    def test_scalar_aliases_fail_closed_instead_of_becoming_characters(self):
+        registry = {
+            "schema_version": 1,
+            "registry_version": 2,
+            "entities": [
+                {"entity_id": "agency:a", "kind": "agency", "canonical_label": "甲局", "aliases": "共同縮寫", "jurisdiction": "臺中市", "status": "CONFIRMED"},
+            ],
+        }
+        with self.assertRaisesRegex(ValueError, "aliases must be an array"):
             er.validate_registry(registry)
 
     def test_unconfirmed_alias_cannot_enter_canonical_registry(self):
@@ -89,6 +101,12 @@ class EntityRegistryTests(unittest.TestCase):
         self.assertEqual(first["registry_hash"], second["registry_hash"])
         self.assertEqual(first["registry_version"], 1)
         self.assertEqual(first["match_method"], "EXACT_NORMALIZED_ALIAS")
+
+    def test_unscoped_no_match_also_has_registry_identity(self):
+        result = er.resolve(self.registry, "named_event", "不存在活動")
+        self.assertEqual(result["status"], "NO_MATCH")
+        self.assertEqual(result["registry_version"], 1)
+        self.assertEqual(result["registry_hash"], er.registry_hash(self.registry))
 
 
 if __name__ == "__main__":
