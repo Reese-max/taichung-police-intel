@@ -27,6 +27,7 @@ class GoldEvaluatorTests(unittest.TestCase):
         self.assertEqual(report["event_pair"]["f1"], 1.0)
         self.assertEqual(report["material_change"]["f1"], 1.0)
         self.assertEqual(report["query_ids"]["f1"], 1.0)
+        self.assertEqual(report["query_answer_state"]["accuracy"], 1.0)
         self.assertEqual(report["claim_support"]["accuracy"], 1.0)
 
     def test_false_merge_changes_event_precision(self):
@@ -49,6 +50,24 @@ class GoldEvaluatorTests(unittest.TestCase):
         report = ev.evaluate(self.manifest, self.cases, predictions)
         self.assertGreaterEqual(report["query_ids"]["fp"], 1)
         self.assertGreaterEqual(report["query_ids"]["fn"], 1)
+
+    def test_source_gap_answer_state_is_scored_separately_from_empty_ids(self):
+        predictions = ev.perfect_predictions(self.cases)
+        predictions["query-zero-failed-001"] = {"ids": []}
+        report = ev.evaluate(self.manifest, self.cases, predictions)
+        self.assertEqual(report["query_ids"]["f1"], 1.0)
+        self.assertEqual(report["query_answer_state"]["denominator"], 1)
+        self.assertEqual(report["query_answer_state"]["accuracy"], 0.0)
+
+    def test_binary_prediction_must_be_actual_boolean(self):
+        predictions = ev.perfect_predictions(self.cases)
+        predictions["event-different-date-001"] = {"same_event": "false"}
+        with self.assertRaisesRegex(ValueError, "must be boolean"):
+            ev.evaluate(self.manifest, self.cases, predictions)
+        predictions = ev.perfect_predictions(self.cases)
+        predictions["change-time-001"] = {"fields": ["start_time"]}
+        with self.assertRaisesRegex(ValueError, "must be boolean"):
+            ev.evaluate(self.manifest, self.cases, predictions)
 
     def test_missing_predictions_are_explicit(self):
         predictions = ev.perfect_predictions(self.cases)
