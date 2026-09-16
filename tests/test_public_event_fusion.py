@@ -37,6 +37,7 @@ class PublicEventFusionTests(unittest.TestCase):
         self.assertEqual(event["fusion_status"], "CONFIRMED")
         self.assertEqual(event["independent_source_count"], 3)
         self.assertEqual(len(event["linked_document_versions"]), 3)
+        self.assertTrue(all(link["official_url"].startswith("https://") for link in event["linked_document_versions"]))
 
     def test_same_named_event_on_different_dates_does_not_merge(self):
         events = pe.fuse_documents([doc("CITY", day="2026-09-20"), doc("CITY2", day="2026-10-18")])
@@ -72,9 +73,23 @@ class PublicEventFusionTests(unittest.TestCase):
         self.assertEqual(len(events), 2)
         self.assertTrue(all(event["fusion_status"] == "CANDIDATE" for event in events))
 
-    def test_media_document_cannot_enter_canonical_event_fusion(self):
-        with self.assertRaisesRegex(ValueError, "official documents"):
+    def test_non_official_or_missing_authority_cannot_enter_canonical_event_fusion(self):
+        with self.assertRaisesRegex(ValueError, "affirmatively official"):
             pe.fuse_documents([doc("MEDIA", authority="media")])
+        missing = doc("UNKNOWN")
+        missing.pop("authority")
+        with self.assertRaisesRegex(ValueError, "affirmatively official"):
+            pe.fuse_documents([missing])
+
+    def test_missing_or_insecure_official_url_is_rejected(self):
+        missing = doc("POLICE")
+        missing.pop("official_url")
+        with self.assertRaisesRegex(ValueError, "HTTPS"):
+            pe.fuse_documents([missing])
+        insecure = doc("POLICE")
+        insecure["official_url"] = "http://example.gov/POLICE"
+        with self.assertRaisesRegex(ValueError, "HTTPS"):
+            pe.fuse_documents([insecure])
 
     def test_input_order_does_not_change_public_event_id_or_link_order(self):
         docs = [doc("CITY"), doc("POLICE"), doc("TRAFFIC")]
@@ -83,7 +98,7 @@ class PublicEventFusionTests(unittest.TestCase):
         self.assertEqual(first["public_event_id"], second["public_event_id"])
         self.assertEqual(first["linked_document_versions"], second["linked_document_versions"])
 
-    def test_background_requires_exact_geography_and_period(self):
+    def test_background_requires_exact_geography_period_and_source(self):
         event = pe.fuse_documents([doc("CITY"), doc("POLICE")])[0]
         record = {
             "dataset_id": "CTX-POP",
@@ -99,6 +114,29 @@ class PublicEventFusionTests(unittest.TestCase):
         wrong = dict(record, district_id="location:tc-fengyuan")
         with self.assertRaisesRegex(ValueError, "geography"):
             pe.attach_background(event, wrong)
+        missing_url = dict(record)
+        missing_url.pop("source_url")
+        with self.assertRaisesRegex(ValueError, "source_url"):
+            pe.attach_background(event, missing_url)
+
+    def test_background_rejects_candidate_and_conflict_events(self):
+        record = {
+            "dataset_id": "CTX-POP",
+            "period": "2026-08",
+            "value": 230000,
+            "unit": "persons",
+            "district_id": "location:tc-xitun",
+            "source_url": "https://data.gov.tw/dataset/example",
+        }
+        candidate = pe.fuse_documents([doc("CITY")])[0]
+        self.assertEqual(candidate["fusion_status"], "CANDIDATE")
+        with self.assertRaisesRegex(ValueError, "CONFIRMED"):
+            pe.attach_background(candidate, record)
+
+        conflict = pe.fuse_documents([doc("POLICE"), doc("TRAFFIC", district="location:tc-fengyuan")])[0]
+        self.assertEqual(conflict["fusion_status"], "CONFLICT")
+        with self.assertRaisesRegex(ValueError, "CONFIRMED"):
+            pe.attach_background(conflict, record)
 
 
 if __name__ == "__main__":
