@@ -19,6 +19,13 @@ DEFAULT_STATUS = ROOT / "apps/web/public/data/source-status.json"
 DEFAULT_BRIEF = ROOT / "apps/web/public/data/v2-daily-brief.json"
 VALID_OUTCOMES = {"SUCCESS", "FAILED", "PARTIAL", "STALE", "UNKNOWN", "SKIPPED"}
 VALID_LANES = {"publication", "query", "discovery"}
+REQUIRED_PUBLICATION_STAGES = {
+    "collection",
+    "canonical_validation",
+    "deployment",
+    "public_http_verification",
+}
+REQUIRED_PUBLICATION_SOURCE_IDS = {"S-004", "S-006", "S-007", "S-009", "S-029"}
 
 
 def parse_time(value: Any) -> datetime | None:
@@ -61,10 +68,14 @@ def stage_health(outcome: str) -> str:
     }[outcome]
 
 
-def lane_health(stages: list[dict[str, Any]]) -> str:
+def lane_health(lane: str, stages: list[dict[str, Any]]) -> str:
     if not stages:
         return "UNKNOWN"
     states = [stage_health(stage["outcome"]) for stage in stages]
+    if lane == "publication":
+        names = {stage["stage"] for stage in stages}
+        if REQUIRED_PUBLICATION_STAGES - names:
+            states.append("UNKNOWN")
     if "BLOCKED" in states:
         return "BLOCKED"
     if "PARTIAL" in states:
@@ -86,8 +97,6 @@ def overall_health(lanes: dict[str, str]) -> str:
         return "STALE"
     if publication == "UNKNOWN":
         return "UNKNOWN"
-    # Canonical publication is healthy.  Optional downstream/discovery lanes may
-    # degrade the system experience but never rewrite publication truth.
     if any(value != "HEALTHY" for lane, value in lanes.items() if lane != "publication"):
         return "DEGRADED"
     return "HEALTHY"
@@ -96,9 +105,7 @@ def overall_health(lanes: dict[str, str]) -> str:
 def latency_ms(start: Any, end: Any) -> int | None:
     left = parse_time(start)
     right = parse_time(end)
-    if left is None or right is None:
-        return None
-    if left.tzinfo is None or right.tzinfo is None:
+    if left is None or right is None or left.tzinfo is None or right.tzinfo is None:
         return None
     delta = int((right - left).total_seconds() * 1000)
     return delta if delta >= 0 else None
@@ -114,7 +121,7 @@ def build_health(stages: list[dict[str, Any]], timestamps: dict[str, Any] | None
         seen.add(key)
 
     grouped = {lane: [stage for stage in stages if stage["lane"] == lane] for lane in sorted(VALID_LANES)}
-    lanes = {lane: lane_health(rows) for lane, rows in grouped.items()}
+    lanes = {lane: lane_health(lane, rows) for lane, rows in grouped.items()}
     times = timestamps or {}
     metrics = {
         "source_to_detect_ms": latency_ms(times.get("source_published_at"), times.get("detected_at")),
@@ -131,44 +138,66 @@ def build_health(stages: list[dict[str, Any]], timestamps: dict[str, Any] | None
     }
 
 
+def _source_coverage(sources: Any) -> tuple[list[dict[str, Any]], bool]:
+    if not isinstance(sources, list) or not sources or any(not isinstance(source, dict) for source in sources):
+        return [], False
+    source_ids = [source.get("source_id") for source in sources]
+    if any(not isinstance(source_id, str) or not source_id for source_id in source_ids):
+        return sources, False
+    exact = len(source_ids) == len(set(source_ids)) == len(REQUIRED_PUBLICATION_SOURCE_IDS) and set(source_ids) == REQUIRED_PUBLICATION_SOURCE_IDS
+    return sources, exact
+
+
 def current_publication_stages(status: dict[str, Any], brief: dict[str, Any]) -> list[dict[str, Any]]:
     generated_at = status.get("generated_at")
     run = status.get("latest_collection_run") if isinstance(status.get("latest_collection_run"), dict) else {}
+    run_id = run.get("collection_run_id")
     run_status = run.get("status")
-    sources = status.get("sources") if isinstance(status.get("sources"), list) else []
-    has_source_gap = any(
-        not isinstance(source, dict)
-        or source.get("source_health") != "PASS"
+    sources, exact_coverage = _source_coverage(status.get("sources"))
+    has_source_gap = (not exact_coverage) or any(
+        source.get("source_health") != "PASS"
         or source.get("window_completeness") not in {"COMPLETE_ZERO", "COMPLETE_WITH_ITEMS"}
         for source in sources
     )
-    if run_status == "SUCCEEDED" and not has_source_gap:
+    if run_status == "SUCCEEDED" and exact_coverage and not has_source_gap:
         collect_outcome = "SUCCESS"
+        collect_error = None
     elif run_status in {"FAILED", "ERROR"}:
         collect_outcome = "FAILED"
-    elif sources:
+        collect_error = "COLLECTION_RUN_FAILED"
+    elif run_status == "SUCCEEDED" or sources:
         collect_outcome = "PARTIAL"
+        collect_error = "SOURCE_COVERAGE_OR_COLLECTION_GAP"
     else:
         collect_outcome = "UNKNOWN"
+        collect_error = "COLLECTION_RECEIPT_INCOMPLETE"
 
     publication_status = brief.get("publication_status")
     snapshot_complete = brief.get("snapshot_complete") is True
-    if publication_status == "READY" and snapshot_complete:
+    same_run = bool(run_id) and brief.get("source_collection_run_id") == run_id
+    same_generation = brief.get("source_status_generated_at") == status.get("generated_at")
+    if publication_status == "READY" and snapshot_complete and same_run and same_generation:
         validate_outcome = "SUCCESS"
+        validate_error = None
+    elif brief and (not same_run or not same_generation):
+        validate_outcome = "PARTIAL"
+        validate_error = "PUBLICATION_GENERATION_MISMATCH"
     elif publication_status in {"PARTIAL", "BLOCKED"} or brief:
         validate_outcome = "PARTIAL"
+        validate_error = "PUBLICATION_NOT_READY"
     else:
         validate_outcome = "UNKNOWN"
+        validate_error = "PUBLICATION_RECEIPT_INCOMPLETE"
 
     return [
         {
             "lane": "publication",
             "stage": "collection",
             "outcome": collect_outcome,
-            "generation_id": run.get("collection_run_id"),
+            "generation_id": run_id,
             "ended_at": generated_at,
             "last_success_at": generated_at if collect_outcome == "SUCCESS" else None,
-            "error_class": None if collect_outcome == "SUCCESS" else "SOURCE_OR_COLLECTION_GAP",
+            "error_class": collect_error,
         },
         {
             "lane": "publication",
@@ -177,7 +206,7 @@ def current_publication_stages(status: dict[str, Any], brief: dict[str, Any]) ->
             "generation_id": brief.get("source_collection_run_id"),
             "ended_at": brief.get("generated_at"),
             "last_success_at": brief.get("generated_at") if validate_outcome == "SUCCESS" else None,
-            "error_class": None if validate_outcome == "SUCCESS" else "PUBLICATION_NOT_READY",
+            "error_class": validate_error,
         },
         {
             "lane": "publication",
@@ -215,24 +244,27 @@ def load_current(status_path: Path = DEFAULT_STATUS, brief_path: Path = DEFAULT_
 def self_check() -> None:
     healthy_publication = [
         {"lane": "publication", "stage": "collection", "outcome": "SUCCESS"},
-        {"lane": "publication", "stage": "validation", "outcome": "SUCCESS"},
+        {"lane": "publication", "stage": "canonical_validation", "outcome": "SUCCESS"},
         {"lane": "publication", "stage": "deployment", "outcome": "SUCCESS"},
-        {"lane": "publication", "stage": "public_http", "outcome": "SUCCESS"},
+        {"lane": "publication", "stage": "public_http_verification", "outcome": "SUCCESS"},
     ]
-    query_failed = [
-        {"lane": "query", "stage": "query_index", "outcome": "FAILED", "error_class": "INDEX_BUILD"}
-    ]
+    query_failed = [{"lane": "query", "stage": "query_index", "outcome": "FAILED", "error_class": "INDEX_BUILD"}]
     result = build_health(healthy_publication + query_failed)
     assert result["lanes"]["publication"] == "HEALTHY"
     assert result["lanes"]["query"] == "BLOCKED"
     assert result["overall"] == "DEGRADED"
 
+    incomplete = build_health([{"lane": "publication", "stage": "collection", "outcome": "SUCCESS"}])
+    assert incomplete["lanes"]["publication"] == "UNKNOWN"
+    assert incomplete["overall"] == "UNKNOWN"
+
     blocked = build_health([
         {"lane": "publication", "stage": "collection", "outcome": "SUCCESS"},
+        {"lane": "publication", "stage": "canonical_validation", "outcome": "SUCCESS"},
         {"lane": "publication", "stage": "deployment", "outcome": "FAILED", "error_class": "PROTECTED_BRANCH"},
     ])
     assert blocked["overall"] == "BLOCKED"
-    print("SYSTEM_HEALTH_SELF_CHECK_OK query_failure_preserves_publication=true publish_failure_blocks=true")
+    print("SYSTEM_HEALTH_SELF_CHECK_OK query_failure_preserves_publication=true publish_failure_blocks=true missing_stage_unknown=true")
 
 
 def parse_args() -> argparse.Namespace:
