@@ -63,11 +63,7 @@ class OutcomeTests(unittest.TestCase):
             expected, code = module.report(env)
             result = subprocess.run(
                 [sys.executable, str(ROOT / "scripts/publication-outcome.py")],
-                env=env,
-                capture_output=True,
-                text=True,
-                timeout=10,
-                check=False,
+                env=env, capture_output=True, text=True, timeout=10, check=False,
             )
             self.assertEqual(result.returncode, code)
             self.assertEqual(code, 1)
@@ -91,11 +87,7 @@ class OutcomeTests(unittest.TestCase):
             }
             result = subprocess.run(
                 [sys.executable, str(ROOT / "scripts/publication-outcome.py")],
-                env=env,
-                capture_output=True,
-                text=True,
-                timeout=10,
-                check=False,
+                env=env, capture_output=True, text=True, timeout=10, check=False,
             )
             self.assertEqual(result.returncode, 0)
             self.assertFalse(sentinel.exists())
@@ -107,24 +99,23 @@ class OutcomeTests(unittest.TestCase):
 
     def test_real_workflow_uses_dedicated_state_branch_and_retains_downstream_evidence(self):
         text = (ROOT / ".github/workflows/pages.yml").read_text(encoding="utf-8")
-
         restore = "publication-state-branch.py restore --branch publication-state"
         collect = "Refresh official-source publication bundle"
         persist = "publication-state-branch.py persist"
         pages_upload = "id: pages_upload"
         evidence = "id: evidence"
-
         self.assertIn(restore, text)
         self.assertIn(persist, text)
         self.assertLess(text.index(restore), text.index(collect))
         self.assertLess(text.index(persist), text.index(pages_upload))
         self.assertLess(text.index(pages_upload), text.index(evidence))
-
-        # The protected default branch must no longer be the scheduled state store.
         self.assertNotIn("git push\n", text)
         self.assertNotIn('git commit -m "data: refresh V1 and V2 publication bundle', text)
-        self.assertIn("if: github.event_name != 'push'", text[text.index("id: preserve") - 200 : text.index("id: pages_upload")])
-
+        # Restore/persist must ALSO run on code-only pushes, to avoid deploying main's old JSON.
+        restore_block = text[text.index("id: restore_state"):text.index(collect)]
+        persist_block = text[text.index("id: preserve"):text.index(pages_upload)]
+        self.assertNotIn("if:", restore_block)
+        self.assertNotIn("if:", persist_block)
         self.assertIn("needs: [build, deploy]", text)
         self.assertIn("if: always()", text[text.index("publication_outcome:"):])
         self.assertIn("python scripts/publication-outcome.py", text)
@@ -132,6 +123,28 @@ class OutcomeTests(unittest.TestCase):
         self.assertIn("npm run check", text)
         self.assertNotIn("continue-on-error", text)
         self.assertNotIn("--force", text)
+
+    def test_pending_replay_and_public_acknowledgement_are_wired(self):
+        text = (ROOT / ".github/workflows/pages.yml").read_text(encoding="utf-8")
+        self.assertIn("if: github.ref == 'refs/heads/main'", text)
+        self.assertIn("steps.restore_state.outputs.pending_recovery != 'true'", text)
+        self.assertIn('if [[ "$PENDING_RECOVERY" == "true" ]]', text)
+        self.assertLess(text.index("id: deployment"), text.index("id: acknowledge"))
+        self.assertIn("EXPECTED_STATE_COMMIT: ${{ needs.build.outputs.state_commit }}", text)
+        self.assertIn("EXPECTED_GENERATION: ${{ needs.build.outputs.generation_id }}", text)
+        self.assertIn("PUBLICATION_BASE_URL: ${{ steps.deployment.outputs.page_url }}", text)
+        self.assertIn("PUBLIC_VERIFY: ${{ needs.deploy.outputs.public_verify }}", text)
+
+    def test_explicit_failed_public_probe_cannot_report_success(self):
+        for status in ("failure", "skipped", "", "unknown"):
+            text, code = module.report({"BUILD_RESULT": "success", "DEPLOY_RESULT": "success", "PUBLIC_VERIFY": status})
+            self.assertEqual(code, 1)
+            self.assertIn("PUBLICATION_NOT_CONFIRMED", text)
+        text, code = module.report({"BUILD_RESULT": "success", "DEPLOY_RESULT": "success", "PUBLIC_VERIFY": "success"})
+        self.assertEqual(code, 0)
+        self.assertIn("PUBLIC_DATA_VERIFIED", text)
+        self.assertNotIn("UNVERIFIED_HTTP", text)
+        self.assertIn("not attest every frontend asset", text)
 
 
 if __name__ == "__main__":

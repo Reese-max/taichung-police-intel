@@ -33,13 +33,17 @@ concurrency:
 
 jobs:
   build:
+    if: github.ref == 'refs/heads/main'
     outputs:
+      restore: ${{ steps.restore_state.outcome }}
       collect: ${{ steps.collect.outcome }}
       v1: ${{ steps.v1.outcome }}
       v2: ${{ steps.v2.outcome }}
       v2_verify: ${{ steps.v2_verify.outcome }}
       verify: ${{ steps.verify.outcome }}
       preserve: ${{ steps.preserve.outcome }}
+      state_commit: ${{ steps.preserve.outputs.state_commit }}
+      generation_id: ${{ steps.preserve.outputs.generation_id }}
       pages_upload: ${{ steps.pages_upload.outcome }}
       evidence: ${{ steps.evidence.outcome }}
       evidence_url: ${{ steps.evidence.outputs.artifact-url }}
@@ -51,12 +55,13 @@ jobs:
           fetch-depth: 0
 
       - name: Select scheduled slot
-        if: github.event_name != 'push'
         id: slot
         shell: bash
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo "value=${{ inputs.slot }}" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.event_name }}" == "push" ]]; then
+            echo "value=code" >> "$GITHUB_OUTPUT"
           elif [[ "${{ github.event.schedule }}" == "30 22 * * *" ]]; then
             echo "value=morning" >> "$GITHUB_OUTPUT"
           else
@@ -72,14 +77,14 @@ jobs:
       - name: Install Python dependencies
         run: python -m pip install -r requirements.txt
 
+      # Code-only deploys also restore; checked-in JSON on main may be older.
       - name: Restore last durable publication state
         id: restore_state
-        if: github.event_name != 'push'
         run: python -X utf8 scripts/publication-state-branch.py restore --branch publication-state
 
       - name: Refresh official-source publication bundle
         id: collect
-        if: github.event_name != 'push'
+        if: github.event_name != 'push' && steps.restore_state.outputs.pending_recovery != 'true'
         run: |
           python online_collect.py \
             --slot "${{ steps.slot.outputs.value }}" \
@@ -93,17 +98,20 @@ jobs:
       - name: Build persistent V2 daily intelligence
         id: v2
         shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PENDING_RECOVERY: ${{ steps.restore_state.outputs.pending_recovery }}
         run: |
-          if [[ "${{ github.event_name }}" != "push" ]] \
-             || [[ ! -f state/v2-shadow-state.json ]] \
-             || [[ ! -f apps/web/public/data/v2-daily-brief.json ]]; then
+          if [[ "$PENDING_RECOVERY" == "true" ]]; then
+            echo "Replaying the exact pending V2 bundle; no recollection or diff advancement."
+          elif [[ "$EVENT_NAME" != "push" ]]; then
             python -X utf8 scripts/build-v2-shadow-brief.py \
               --input apps/web/public/data/intelligence-feed.json \
               --source-status apps/web/public/data/source-status.json \
               --state state/v2-shadow-state.json \
               --output apps/web/public/data/v2-daily-brief.json
           else
-            echo "Using the checked-in persistent V2 publication for this code-only push."
+            echo "Using the restored durable V2 publication for this code-only push."
           fi
 
       - name: Verify persistent V2 publication
@@ -139,11 +147,8 @@ jobs:
           PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
           NEXT_PUBLIC_BASE_PATH: ${{ steps.pages.outputs.base_path }}
 
-      - name: Persist V1 and V2 publication state outside protected main
+      - name: Persist pending V1 and V2 state outside protected main
         id: preserve
-        if: github.event_name != 'push'
-        env:
-          PUBLICATION_SLOT: ${{ steps.slot.outputs.value }}
         run: |
           python -X utf8 scripts/publication-state-branch.py persist \
             --branch publication-state \
@@ -178,10 +183,24 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     needs: build
+    outputs:
+      public_verify: ${{ steps.acknowledge.outcome }}
     steps:
+      - name: Checkout reviewed code for public verification
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+      - name: Verify public data bytes and acknowledge exact checkpoint
+        id: acknowledge
+        run: python -X utf8 scripts/publication-state-branch.py acknowledge
+        env:
+          EXPECTED_STATE_COMMIT: ${{ needs.build.outputs.state_commit }}
+          EXPECTED_GENERATION: ${{ needs.build.outputs.generation_id }}
+          PUBLICATION_BASE_URL: ${{ steps.deployment.outputs.page_url }}
 
   publication_outcome:
     needs: [build, deploy]
@@ -201,6 +220,7 @@ jobs:
         env:
           BUILD_RESULT: ${{ needs.build.result }}
           DEPLOY_RESULT: ${{ needs.deploy.result }}
+          RESTORE: ${{ needs.build.outputs.restore }}
           COLLECT: ${{ needs.build.outputs.collect }}
           V1: ${{ needs.build.outputs.v1 }}
           V2: ${{ needs.build.outputs.v2 }}
@@ -210,3 +230,4 @@ jobs:
           PAGES_UPLOAD: ${{ needs.build.outputs.pages_upload }}
           EVIDENCE: ${{ needs.build.outputs.evidence }}
           EVIDENCE_URL: ${{ needs.build.outputs.evidence_url }}
+          PUBLIC_VERIFY: ${{ needs.deploy.outputs.public_verify }}
