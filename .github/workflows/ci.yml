@@ -93,7 +93,10 @@ jobs:
       - name: Verify publication outcome and safe summary rendering
         shell: bash
         run: |
-          # Report rendering moved from inline shell into a Python entry point.
-          # Test the actual CLI, exit codes, evidence receipts and safe output.
           python -X utf8 -m unittest discover -s tests -p "test_publication_outcome.py" -v
           echo "PUBLICATION_OUTCOME_SUMMARY_OK"
+
+      - name: Verify protected-main publication state lifecycle
+        run: |
+          python -X utf8 -m unittest discover -s tests -p "test_publication_state_branch.py" -v
+          echo "PUBLICATION_STATE_BRANCH_OK"
