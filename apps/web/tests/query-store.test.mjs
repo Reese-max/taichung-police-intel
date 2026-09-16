@@ -12,7 +12,7 @@ function findPython() {
     ? [{ command: "python", prefix: [] }, { command: "py", prefix: ["-3"] }]
     : [{ command: "python3", prefix: [] }, { command: "python", prefix: [] }];
   for (const candidate of candidates) {
-    const result = spawnSync(candidate.command, [...candidate.prefix, "--version"], { stdio: "ignore" });
+    const result = spawnSync(candidate.command, [...candidate.prefix, "--version"], { stdio: "ignore", timeout: 10000 });
     if (result.status === 0) return candidate;
   }
   throw new Error("No supported Python interpreter found");
@@ -20,13 +20,13 @@ function findPython() {
 
 const python = findPython();
 function runPython(args) {
-  return spawnSync(python.command, [...python.prefix, ...args], { cwd: repo, encoding: "utf8" });
+  return spawnSync(python.command, [...python.prefix, ...args], { cwd: repo, encoding: "utf8", timeout: 60000 });
 }
 
-test("canonical query store rebuild/query runtime suite passes", () => {
-  const result = runPython(["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_query_store.py", "-v"]);
+test("canonical query store rebuild/query runtime suites pass", () => {
+  const result = runPython(["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_query_store*.py", "-v"]);
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-  assert.match(result.stderr, /Ran 8 tests/);
+  assert.match(result.stderr, /Ran [1-9]\d* tests?/);
   assert.match(result.stderr, /OK/);
 });
 
