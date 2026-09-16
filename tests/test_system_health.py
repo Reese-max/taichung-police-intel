@@ -1,4 +1,5 @@
 import importlib.util
+import json
 from pathlib import Path
 import unittest
 
@@ -14,42 +15,45 @@ def stage(lane, name, outcome, **extra):
     return {"lane": lane, "stage": name, "outcome": outcome, **extra}
 
 
+def complete_publication(overrides=None):
+    rows = [
+        stage("publication", "collection", "SUCCESS"),
+        stage("publication", "canonical_validation", "SUCCESS"),
+        stage("publication", "deployment", "SUCCESS"),
+        stage("publication", "public_http_verification", "SUCCESS"),
+    ]
+    for name, outcome in (overrides or {}).items():
+        for row in rows:
+            if row["stage"] == name:
+                row["outcome"] = outcome
+    return rows
+
+
 class SystemHealthTests(unittest.TestCase):
     def test_query_failure_does_not_rewrite_publication_truth(self):
-        stages = [
-            stage("publication", "collection", "SUCCESS"),
-            stage("publication", "validation", "SUCCESS"),
-            stage("publication", "deployment", "SUCCESS"),
-            stage("publication", "public_http", "SUCCESS"),
-            stage("query", "query_index", "FAILED", error_class="INDEX_BUILD"),
-        ]
+        stages = complete_publication() + [stage("query", "query_index", "FAILED", error_class="INDEX_BUILD")]
         result = health.build_health(stages)
         self.assertEqual(result["lanes"]["publication"], "HEALTHY")
         self.assertEqual(result["lanes"]["query"], "BLOCKED")
         self.assertEqual(result["overall"], "DEGRADED")
 
     def test_publish_or_deploy_failure_blocks_publication_lane(self):
-        result = health.build_health([
-            stage("publication", "collection", "SUCCESS"),
-            stage("publication", "deployment", "FAILED", error_class="PROTECTED_BRANCH"),
-        ])
+        result = health.build_health(complete_publication({"deployment": "FAILED"}))
         self.assertEqual(result["lanes"]["publication"], "BLOCKED")
         self.assertEqual(result["overall"], "BLOCKED")
 
+    def test_missing_required_publication_stage_never_reports_healthy(self):
+        result = health.build_health([stage("publication", "collection", "SUCCESS")])
+        self.assertEqual(result["lanes"]["publication"], "UNKNOWN")
+        self.assertEqual(result["overall"], "UNKNOWN")
+
     def test_partial_collection_is_not_reported_as_zero_or_healthy(self):
-        result = health.build_health([
-            stage("publication", "collection", "PARTIAL", error_class="SOURCE_GAP"),
-            stage("publication", "validation", "SUCCESS"),
-        ])
+        result = health.build_health(complete_publication({"collection": "PARTIAL"}))
         self.assertEqual(result["lanes"]["publication"], "PARTIAL")
         self.assertEqual(result["overall"], "PARTIAL")
 
     def test_unknown_deployment_receipt_keeps_publication_unknown(self):
-        result = health.build_health([
-            stage("publication", "collection", "SUCCESS"),
-            stage("publication", "validation", "SUCCESS"),
-            stage("publication", "deployment", "UNKNOWN"),
-        ])
+        result = health.build_health(complete_publication({"deployment": "UNKNOWN"}))
         self.assertEqual(result["lanes"]["publication"], "UNKNOWN")
         self.assertEqual(result["overall"], "UNKNOWN")
 
@@ -77,6 +81,28 @@ class SystemHealthTests(unittest.TestCase):
     def test_bad_stage_time_fails_closed(self):
         with self.assertRaisesRegex(ValueError, "invalid ended_at"):
             health.build_health([stage("publication", "collection", "SUCCESS", ended_at="not-a-time")])
+
+    def test_succeeded_run_with_empty_sources_is_partial_not_success(self):
+        status = json.loads(health.DEFAULT_STATUS.read_text(encoding="utf-8"))
+        brief = json.loads(health.DEFAULT_BRIEF.read_text(encoding="utf-8"))
+        status["latest_collection_run"]["status"] = "SUCCEEDED"
+        status["sources"] = []
+        stages = health.current_publication_stages(status, brief)
+        collection = next(row for row in stages if row["stage"] == "collection")
+        self.assertEqual(collection["outcome"], "PARTIAL")
+        self.assertEqual(collection["error_class"], "SOURCE_COVERAGE_OR_COLLECTION_GAP")
+
+    def test_stale_brief_from_another_run_is_not_validation_success(self):
+        status = json.loads(health.DEFAULT_STATUS.read_text(encoding="utf-8"))
+        brief = json.loads(health.DEFAULT_BRIEF.read_text(encoding="utf-8"))
+        status["latest_collection_run"]["status"] = "SUCCEEDED"
+        brief["publication_status"] = "READY"
+        brief["snapshot_complete"] = True
+        brief["source_collection_run_id"] = "different-run"
+        stages = health.current_publication_stages(status, brief)
+        validation = next(row for row in stages if row["stage"] == "canonical_validation")
+        self.assertEqual(validation["outcome"], "PARTIAL")
+        self.assertEqual(validation["error_class"], "PUBLICATION_GENERATION_MISMATCH")
 
     def test_checked_in_current_artifacts_produce_machine_readable_stage_breakdown(self):
         result = health.load_current()
