@@ -72,6 +72,11 @@ jobs:
       - name: Install Python dependencies
         run: python -m pip install -r requirements.txt
 
+      - name: Restore last durable publication state
+        id: restore_state
+        if: github.event_name != 'push'
+        run: python -X utf8 scripts/publication-state-branch.py restore --branch publication-state
+
       - name: Refresh official-source publication bundle
         id: collect
         if: github.event_name != 'push'
@@ -134,21 +139,15 @@ jobs:
           PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
           NEXT_PUBLIC_BASE_PATH: ${{ steps.pages.outputs.base_path }}
 
-      - name: Preserve V1 and V2 publication evidence as one commit
+      - name: Persist V1 and V2 publication state outside protected main
         id: preserve
-        shell: bash
+        if: github.event_name != 'push'
+        env:
+          PUBLICATION_SLOT: ${{ steps.slot.outputs.value }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- \
-            apps/web/public/data/source-status.json \
-            apps/web/public/data/intelligence-feed.json \
-            apps/web/public/data/intelligence-summary.json \
-            apps/web/public/data/feed-export.csv \
-            apps/web/public/data/v2-daily-brief.json \
-            state/v2-shadow-state.json
-          git diff --cached --quiet || git commit -m "data: refresh V1 and V2 publication bundle [skip ci]"
-          git push
+          python -X utf8 scripts/publication-state-branch.py persist \
+            --branch publication-state \
+            --slot "${{ steps.slot.outputs.value }}"
 
       - name: Upload Pages artifact
         id: pages_upload
@@ -172,7 +171,6 @@ jobs:
             state/v2-shadow-state.json
           if-no-files-found: error
           retention-days: 14
-
 
   deploy:
     environment:
