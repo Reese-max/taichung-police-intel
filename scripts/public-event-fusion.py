@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Conservative deterministic public-event fusion for GovIntel.
 
-Inputs are already-normalized public documents.  This module intentionally does not
-perform fuzzy/embedding promotion.  It only auto-groups documents with a stable
+Inputs are already-normalized public documents. This module intentionally does not
+perform fuzzy/embedding promotion. It only auto-groups documents with a stable
 named_event_id (or explicit cross-reference) and compatible date semantics.
 """
 
@@ -17,11 +17,9 @@ from pathlib import Path
 from typing import Any
 
 
-def _https(value: Any) -> str | None:
-    if value is None:
-        return None
+def _https(value: Any) -> str:
     if not isinstance(value, str) or not value.startswith("https://"):
-        raise ValueError("official/source URLs must use HTTPS")
+        raise ValueError("official/source URLs must use nonempty HTTPS URLs")
     return value
 
 
@@ -43,8 +41,8 @@ def validate_document(document: dict[str, Any]) -> None:
     for field in required:
         if not isinstance(document.get(field), str) or not document[field].strip():
             raise ValueError(f"document missing {field}")
-    if document.get("authority") not in (None, "official"):
-        raise ValueError("only official documents can enter canonical PublicEvent fusion")
+    if document.get("authority") != "official":
+        raise ValueError("only affirmatively official documents can enter canonical PublicEvent fusion")
     _https(document.get("official_url"))
     for field in ("agency_ids", "location_ids"):
         value = document.get(field, [])
@@ -85,16 +83,13 @@ def build_public_event(key: tuple[str, str, str] | None, documents: list[dict[st
         validate_document(document)
 
     ordered = sorted(documents, key=lambda doc: (doc["source_id"], doc["document_id"], doc["document_version_id"]))
-    if key is None:
-        id_material = "candidate|" + ordered[0]["document_id"]
-    else:
-        id_material = "|".join(key)
+    id_material = "candidate|" + ordered[0]["document_id"] if key is None else "|".join(key)
     public_event_id = _stable_id("PE", id_material)
 
     independent_sources = sorted({doc.get("independent_source_id") or doc["source_id"] for doc in ordered})
     time_conflicts = _time_conflicts(ordered)
     location_conflict = _location_conflict(ordered)
-    conflict_fields = [*time_conflicts, *( ["district_id"] if location_conflict else [])]
+    conflict_fields = [*time_conflicts, *(["district_id"] if location_conflict else [])]
 
     if conflict_fields:
         fusion_status = "CONFLICT"
@@ -128,7 +123,7 @@ def build_public_event(key: tuple[str, str, str] | None, documents: list[dict[st
                 "document_version_id": doc["document_version_id"],
                 "source_id": doc["source_id"],
                 "independent_source_id": doc.get("independent_source_id") or doc["source_id"],
-                "official_url": doc.get("official_url"),
+                "official_url": _https(doc["official_url"]),
             }
             for doc in ordered
         ],
@@ -155,12 +150,17 @@ def fuse_documents(documents: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def attach_background(event: dict[str, Any], record: dict[str, Any]) -> dict[str, Any]:
-    if record.get("district_id") != event.get("district_id"):
+    if event.get("fusion_status") != "CONFIRMED":
+        raise ValueError("background enrichment requires a CONFIRMED public event")
+    event_district = event.get("district_id")
+    if not isinstance(event_district, str) or not event_district:
+        raise ValueError("background enrichment requires a confirmed nonempty event district")
+    if record.get("district_id") != event_district:
         raise ValueError("background geography must exactly match the confirmed event district")
-    for field in ("dataset_id", "period", "value", "unit"):
+    for field in ("dataset_id", "period", "value", "unit", "source_url"):
         if record.get(field) in (None, ""):
             raise ValueError(f"background record missing {field}")
-    source_url = _https(record.get("source_url"))
+    source_url = _https(record["source_url"])
     enriched = json.loads(json.dumps(event))
     enriched.setdefault("background", []).append(
         {
