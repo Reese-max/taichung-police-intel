@@ -20,6 +20,7 @@ class QueryStoreTests(unittest.TestCase):
         self.assertEqual(first["items"], second["items"])
         self.assertGreater(first["counts"]["publication_items"], 0)
         self.assertGreater(first["counts"]["sources"], 0)
+        self.assertTrue(all(row["name"] for row in first["sources"]))
 
     def test_every_projected_item_has_a_canonical_backlink(self):
         store = qs.build_from_paths(qs.DEFAULT_FEED, qs.DEFAULT_STATUS, qs.DEFAULT_BRIEF)
@@ -30,6 +31,16 @@ class QueryStoreTests(unittest.TestCase):
             self.assertEqual(len(row["canonical_ref"]["artifact_sha256"]), 64)
             self.assertNotIn("payload", row)
             self.assertNotIn("raw", row)
+
+    def test_source_projection_uses_canonical_source_name(self):
+        status, status_hash = qs.load_json(qs.DEFAULT_STATUS)
+        source = status["sources"][0]
+        projected = qs.project_source(source, status_hash)
+        self.assertEqual(projected["name"], source["source_name"])
+        malformed = dict(source)
+        malformed.pop("source_name", None)
+        with self.assertRaisesRegex(ValueError, "source_name"):
+            qs.project_source(malformed, status_hash)
 
     def test_structured_query_is_bounded_and_generation_bound(self):
         store = qs.build_from_paths(qs.DEFAULT_FEED, qs.DEFAULT_STATUS, qs.DEFAULT_BRIEF)
