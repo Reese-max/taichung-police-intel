@@ -105,7 +105,11 @@ export function inspectSnapshot(feed, status, brief, now = Date.now()) {
   const unknown = checks.some(t => !Number.isFinite(t) || t > now + 60000);
   const stale = !unknown && now - Math.min(...checks) > MAX_AGE_MS;
   const partial = sourceGap || brief.snapshot_complete !== true || brief.publication_status !== 'READY' || status.latest_collection_run.status !== 'SUCCEEDED';
-  return { run, generated_at: feed.generated_at, status: unknown ? 'UNKNOWN' : stale ? 'STALE' : partial ? 'PARTIAL' : 'SNAPSHOT_RECENT', stale, partial, sources: status.sources,
+  const freshness = unknown ? 'UNKNOWN' : stale ? 'STALE' : 'RECENT';
+  const completeness = partial ? 'PARTIAL' : 'COMPLETE';
+  return { run, generated_at: feed.generated_at,
+    status: partial ? 'PARTIAL' : unknown ? 'UNKNOWN' : stale ? 'STALE' : 'SNAPSHOT_RECENT',
+    freshness, completeness, stale, partial, sources: status.sources,
     items: feed.items, publication_verified: false, capabilities: ['保存快照列表', '來源狀態'],
     limitation: '只讀取本站保存的公開資料；沒有即時重查政府網站，也不是全市事件完整清單。' };
 }
