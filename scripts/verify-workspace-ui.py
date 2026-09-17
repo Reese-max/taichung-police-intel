@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Real browser acceptance for the isolated Figma UI preview, never production."""
 from __future__ import annotations
+from datetime import datetime, timezone
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -167,10 +168,12 @@ class WorkspaceTests(unittest.TestCase):
         triggers=self.page.locator('[data-action="source-detail"]')
         self.assertGreaterEqual(triggers.count(),2)
         first=triggers.nth(0); second=triggers.nth(1)
-        first.click(); expect(self.page.locator('dialog')).to_be_visible()
+        first.evaluate("el=>{document.querySelector('#main-content').focus();el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));}")
+        expect(self.page.locator('dialog')).to_be_visible()
         first_id=first.get_attribute('id'); self.assertTrue(first_id and first_id.startswith('workspace-action-'))
         self.page.keyboard.press('Escape'); expect(first).to_be_focused()
-        second.click(); expect(self.page.locator('dialog')).to_be_visible()
+        second.evaluate("el=>{document.querySelector('#main-content').focus();el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));}")
+        expect(self.page.locator('dialog')).to_be_visible()
         second_id=second.get_attribute('id'); self.assertTrue(second_id and second_id.startswith('workspace-action-'))
         self.assertNotEqual(first_id,second_id)
         self.page.keyboard.press('Escape'); expect(second).to_be_focused()
@@ -193,6 +196,49 @@ class WorkspaceTests(unittest.TestCase):
         self.go(mode='snapshot')
         expect(self.page.locator('main')).to_contain_text('快照不完整')
         self.assertNotIn('快照核對時間在本地期限內',self.page.locator('main').inner_text())
+    def test_13_return_links_resolve_inside_pages_base_path(self):
+        self.go('connections')
+        footer=self.page.locator('footer a').filter(has_text='返回既有情報首頁')
+        expect(footer).to_have_attribute('href','../')
+        resolved=footer.evaluate("el=>new URL(el.getAttribute('href'),location.href).pathname")
+        self.assertEqual(resolved,PREFIX+'/')
+        self.page.set_viewport_size({'width':390,'height':900}); self.go()
+        self.page.locator('[data-action="more"]').click()
+        more=self.page.locator('dialog a').filter(has_text='原有情報首頁')
+        expect(more).to_have_attribute('href','../')
+        self.assertEqual(more.evaluate("el=>new URL(el.getAttribute('href'),location.href).pathname"),PREFIX+'/')
+    def test_14_open_snapshot_recalculates_freshness_without_route_change(self):
+        current=datetime.now(timezone.utc).isoformat()
+        def respond(route):
+            name=route.request.url.rsplit('/',1)[-1]
+            data=json.loads((PUBLIC/'data'/name).read_text())
+            if name=='intelligence-feed.json': data['generated_at']=current
+            elif name=='source-status.json':
+                data['generated_at']=current; data['latest_collection_run']['status']='SUCCEEDED'
+                for source in data['sources']:
+                    source['source_health']='PASS'; source['window_completeness']='COMPLETE_WITH_ITEMS'; source['last_checked_at']=current
+            else:
+                data['generated_at']=current; data['source_status_generated_at']=current; data['snapshot_complete']=True; data['publication_status']='READY'
+            route.fulfill(status=200,content_type='application/json',body=json.dumps(data))
+        self.page.route('**/data/*.json',respond)
+        self.go(mode='snapshot')
+        expect(self.page.locator('main')).to_contain_text('快照核對時間在本地期限內')
+        before_hash=self.page.evaluate('location.hash')
+        self.page.evaluate("""() => {
+          const base=Date.now();
+          Date.now=()=>base+(17*60*60*1000);
+          document.dispatchEvent(new Event('govintel:refresh-snapshot-age'));
+        }""")
+        expect(self.page.locator('main')).to_contain_text('資料已過期')
+        self.assertEqual(self.page.evaluate('location.hash'),before_hash)
+    def test_15_pointer_dispatch_focus_restores_without_browser_autofocus(self):
+        self.go('sources')
+        trigger=self.page.locator('[data-action="source-detail"]').nth(0)
+        self.page.locator('#main-content').focus()
+        trigger.evaluate("el=>el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}))")
+        expect(self.page.locator('dialog')).to_be_visible()
+        self.page.keyboard.press('Escape')
+        expect(trigger).to_be_focused()
 
 if __name__=='__main__':
     suite=unittest.defaultTestLoader.loadTestsFromTestCase(WorkspaceTests)
