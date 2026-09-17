@@ -108,6 +108,7 @@ class WorkspaceTests(unittest.TestCase):
         self.go('event'); self.page.locator('#scenario').select_option('aligned')
         self.go('handoff'); self.page.locator('[data-action="confirm-open"]').click()
         self.page.locator('#review-checkbox').check()
+        self.page.evaluate("key=>localStorage.removeItem(key)",KEY)
         quota=self.page.evaluate("""() => {
           try {
             for (let i=0;i<32;i+=1) localStorage.setItem(`__quota_test_${i}`,'x'.repeat(1024*1024));
