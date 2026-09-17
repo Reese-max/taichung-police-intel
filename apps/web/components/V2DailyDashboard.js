@@ -7,6 +7,7 @@ const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
 const BRIEF_URL = `${BASE_PATH}/data/v2-daily-brief.json`;
 const ARCHIVE_URL = `${BASE_PATH}/data/intelligence-feed.json`;
 const STATUS_URL = `${BASE_PATH}/data/source-status.json`;
+const CANDIDATE_URL = `${BASE_PATH}/data/candidate.json`;
 
 const SOURCE_NAMES = {
   "S-004": "議事日程",
@@ -34,6 +35,17 @@ async function fetchJson(url) {
   const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) throw new Error(`${url} HTTP ${response.status}`);
   return response.json();
+}
+
+function samePublicationGeneration(brief, feed, status) {
+  const runId = feed?.collection_run_id;
+  return Boolean(
+    runId
+    && runId === status?.latest_collection_run?.collection_run_id
+    && runId === brief?.source_collection_run_id
+    && feed?.generated_at === status?.generated_at
+    && status?.generated_at === brief?.source_status_generated_at,
+  );
 }
 
 function formatDateTime(value) {
@@ -139,6 +151,88 @@ function ActionCard({ item, index }) {
   );
 }
 
+function PublicationProvenance({ publication, archive, sourceStatus, candidate, generationMixed }) {
+  const dataStatusLabels = {
+    SNAPSHOT_RECENT: "快照在有效時效內",
+    STALE: "快照已過時",
+    PARTIAL: "快照部分完成",
+    UNKNOWN: "快照時效未知",
+    SOURCE_NOT_AVAILABLE: "來源不在核准快照內",
+  };
+  return (
+    <section className="v2-provenance" data-testid="candidate-version" aria-labelledby="v2-provenance-title">
+      <div className="v2-section-heading">
+        <div>
+          <p className="v2-eyebrow">版本識別</p>
+          <h2 id="v2-provenance-title">資料版本與涵蓋範圍</h2>
+        </div>
+        <span className={generationMixed ? "v2-generation-badge mixed" : "v2-generation-badge"}>
+          {generationMixed ? "世代不一致 · 已拒絕混版" : "同一世代"}
+        </span>
+      </div>
+      <dl className="v2-provenance-grid">
+        <div>
+          <dt>簡報世代</dt>
+          <dd>{publication?.source_collection_run_id || "未提供"}</dd>
+        </div>
+        <div>
+          <dt>資料庫世代</dt>
+          <dd>{archive?.collection_run_id || "未提供"}</dd>
+        </div>
+        <div>
+          <dt>來源狀態世代</dt>
+          <dd>{sourceStatus?.latest_collection_run?.collection_run_id || "未提供"}</dd>
+        </div>
+        <div>
+          <dt>發布時間</dt>
+          <dd>{formatDateTime(publication?.generated_at)}</dd>
+        </div>
+        <div>
+          <dt>資料版本</dt>
+          <dd>
+            schema v{publication?.schema_version ?? "?"} · generator v
+            {publication?.generator_version ?? "?"} · {publication?.mode || "未知模式"}
+          </dd>
+        </div>
+        <div>
+          <dt>資料性質</dt>
+          <dd>保存快照 · 非即時資料</dd>
+        </div>
+        {candidate && (
+          <>
+            <div>
+              <dt>查詢索引世代</dt>
+              <dd data-testid="query-generation">{String(candidate.query_generation_id || "").slice(0, 16)}…</dd>
+            </div>
+            <div>
+              <dt>來源政策</dt>
+              <dd>
+                v{candidate.policy_version} · {String(candidate.policy_hash || "").slice(0, 12)}…
+              </dd>
+            </div>
+            <div>
+              <dt>快照時效</dt>
+              <dd>{dataStatusLabels[candidate.data_status] || candidate.data_status}</dd>
+            </div>
+          </>
+        )}
+      </dl>
+      {candidate && Array.isArray(candidate.unavailable_capabilities) && candidate.unavailable_capabilities.length > 0 && (
+        <div className="v2-capabilities" data-testid="candidate-capabilities">
+          <strong>本候選版未提供的能力</strong>
+          <ul>
+            {candidate.unavailable_capabilities.map((row) => (
+              <li key={row.capability_id}>
+                {row.capability_id} · {row.status}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function SourceHealthSummary({ sourceStatus }) {
   const sources = Array.isArray(sourceStatus?.sources) ? sourceStatus.sources : [];
   if (!sources.length) return null;
@@ -178,6 +272,7 @@ export default function V2DailyDashboard() {
   const [publication, setPublication] = useState(null);
   const [archive, setArchive] = useState(null);
   const [sourceStatus, setSourceStatus] = useState(null);
+  const [candidate, setCandidate] = useState(null);
   const [loadState, setLoadState] = useState("loading");
   const [loadError, setLoadError] = useState("");
   const [archiveQuery, setArchiveQuery] = useState("");
@@ -222,6 +317,14 @@ export default function V2DailyDashboard() {
       })
       .catch(() => {});
 
+    fetchJson(CANDIDATE_URL)
+      .then((data) => {
+        if (!cancelled && data?.schema_version === 1 && data?.kind === "GOVINTEL_CANDIDATE_MANIFEST") {
+          setCandidate(data);
+        }
+      })
+      .catch(() => {});
+
     return () => {
       cancelled = true;
     };
@@ -252,6 +355,10 @@ export default function V2DailyDashboard() {
   const otherChanges = Array.isArray(publication?.other_changes)
     ? publication.other_changes
     : [];
+  const generationMixed = Boolean(
+    publication && archive && sourceStatus
+      && !samePublicationGeneration(publication, archive, sourceStatus),
+  );
 
   return (
     <main className="v2-home" id="v2-daily-intelligence">
@@ -288,16 +395,28 @@ export default function V2DailyDashboard() {
 
       {loadState === "ready" && publication && (
         <>
-          <PublicationStatus publication={publication} />
+          {generationMixed && (
+            <section className="v2-system-message error" role="alert" data-testid="generation-mixed">
+              <strong>資料世代不一致，已拒絕合併呈現</strong>
+              <p>
+                簡報、資料庫與來源狀態不是同一批發布；為避免誤判，本期彙整已停止呈現。
+                下方歷史資料仍來自單一資料庫快照，可安全查閱。
+              </p>
+            </section>
+          )}
 
-          <section className="v2-metrics" aria-label="本期情報摘要">
-            <Metric value={overview.current_change_count || 0} label="本期真正變更" emphasis />
-            <Metric value={overview.priority_count || 0} label="今日重點" />
-            <Metric value={overview.tracking_count || 0} label="持續追蹤" />
-            <Metric value={overview.archive_total || 0} label="歷史資料" />
-          </section>
+          {!generationMixed && (
+            <>
+              <PublicationStatus publication={publication} />
 
-          <section className="v2-priority-section" aria-labelledby="v2-priority-title">
+              <section className="v2-metrics" aria-label="本期情報摘要">
+                <Metric value={overview.current_change_count || 0} label="本期真正變更" emphasis />
+                <Metric value={overview.priority_count || 0} label="今日重點" />
+                <Metric value={overview.tracking_count || 0} label="持續追蹤" />
+                <Metric value={overview.archive_total || 0} label="歷史資料" />
+              </section>
+
+              <section className="v2-priority-section" aria-labelledby="v2-priority-title">
             <div className="v2-section-heading">
               <div>
                 <p className="v2-eyebrow">10 秒掌握</p>
@@ -357,6 +476,8 @@ export default function V2DailyDashboard() {
               </div>
             </details>
           )}
+            </>
+          )}
 
           <section className="v2-archive" aria-labelledby="v2-archive-title">
             <div className="v2-section-heading">
@@ -394,7 +515,15 @@ export default function V2DailyDashboard() {
             )}
           </section>
 
-          <SourceHealthSummary sourceStatus={sourceStatus} />
+          {!generationMixed && <SourceHealthSummary sourceStatus={sourceStatus} />}
+
+          <PublicationProvenance
+            publication={publication}
+            archive={archive}
+            sourceStatus={sourceStatus}
+            candidate={candidate}
+            generationMixed={generationMixed}
+          />
         </>
       )}
     </main>
