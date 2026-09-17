@@ -162,6 +162,37 @@ class WorkspaceTests(unittest.TestCase):
         expect(self.page.locator('#page-title')).to_have_text('讓資料進入你的 AI 工作流程。')
         expect(self.page.get_by_role('button',name='連接端點尚未提供')).to_be_disabled()
         self.assertEqual(self.page.locator('input').count(),0)
+    def test_11_dialog_focus_returns_to_actual_trigger(self):
+        self.go('sources')
+        triggers=self.page.locator('[data-action="source-detail"]')
+        self.assertGreaterEqual(triggers.count(),2)
+        first=triggers.nth(0); second=triggers.nth(1)
+        first.click(); expect(self.page.locator('dialog')).to_be_visible()
+        first_id=first.get_attribute('id'); self.assertTrue(first_id and first_id.startswith('workspace-action-'))
+        self.page.keyboard.press('Escape'); expect(first).to_be_focused()
+        second.click(); expect(self.page.locator('dialog')).to_be_visible()
+        second_id=second.get_attribute('id'); self.assertTrue(second_id and second_id.startswith('workspace-action-'))
+        self.assertNotEqual(first_id,second_id)
+        self.page.keyboard.press('Escape'); expect(second).to_be_focused()
+        self.assertEqual(self.page.locator('#last-dialog-trigger').count(),0)
+    def test_12_stale_partial_snapshot_keeps_incompleteness_visible(self):
+        old='2026-01-01T00:00:00+08:00'
+        def respond(route):
+            name=route.request.url.rsplit('/',1)[-1]
+            data=json.loads((PUBLIC/'data'/name).read_text())
+            if name=='intelligence-feed.json': data['generated_at']=old
+            elif name=='source-status.json':
+                data['generated_at']=old; data['latest_collection_run']['status']='SUCCEEDED'
+                for source in data['sources']:
+                    source['source_health']='PASS'; source['window_completeness']='COMPLETE_WITH_ITEMS'; source['last_checked_at']=old
+                data['sources'][0]['window_completeness']='PARTIAL'
+            else:
+                data['generated_at']=old; data['source_status_generated_at']=old; data['snapshot_complete']=True; data['publication_status']='READY'
+            route.fulfill(status=200,content_type='application/json',body=json.dumps(data))
+        self.page.route('**/data/*.json',respond)
+        self.go(mode='snapshot')
+        expect(self.page.locator('main')).to_contain_text('快照不完整')
+        self.assertNotIn('快照核對時間在本地期限內',self.page.locator('main').inner_text())
 
 if __name__=='__main__':
     suite=unittest.defaultTestLoader.loadTestsFromTestCase(WorkspaceTests)
