@@ -163,6 +163,7 @@ Authenticated Kiro V3 sessions first reviewed all 16 Steering, Spec, and Hook ar
 - Every displayed source links to an HTTPS official page or endpoint.
 - Public aggregates are allowed; personal and operational police data are out of scope.
 - Missing post-meeting evidence remains an explicit gap, not an AI inference.
+- Answer drafts pass `apps/web/lib/answer-evidence-gate.js` before release: every factual claim needs exact official evidence (locator + document version), conflicting official sources surface as `CONFLICT` instead of a merged answer, stale sources cannot back current wording, and media-derived records never verify a claim. The shared gate emits one receipt with the publication hash and validator version for both Web Chat and MCP.
 
 ## Competition package
 
