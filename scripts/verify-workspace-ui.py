@@ -110,12 +110,15 @@ class WorkspaceTests(unittest.TestCase):
         self.page.locator('#review-checkbox').check()
         self.page.evaluate("key=>localStorage.removeItem(key)",KEY)
         quota=self.page.evaluate("""() => {
-          try {
-            for (let i=0;i<32;i+=1) localStorage.setItem(`__quota_test_${i}`,'x'.repeat(1024*1024));
-            return 'not-exhausted';
-          } catch (error) {
-            return error?.name || 'quota-error';
+          let counter=0;
+          for (const size of [1024*1024,256*1024,64*1024,16*1024,4096,1024,256,64,16,4,1]) {
+            for (let i=0;i<128;i+=1) {
+              try { localStorage.setItem(`__quota_${size}_${counter++}`,'x'.repeat(size)); }
+              catch (_) { break; }
+            }
           }
+          try { localStorage.setItem('__quota_final_probe','x'); return 'not-exhausted'; }
+          catch (error) { return error?.name || 'quota-error'; }
         }""")
         self.assertNotEqual(quota,'not-exhausted','browser localStorage quota was not exhausted')
         self.page.locator('#save-confirmation').click()
