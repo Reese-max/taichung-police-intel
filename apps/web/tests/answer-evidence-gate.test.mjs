@@ -238,6 +238,82 @@ test("stale evidence disagreeing with the claim value is UNSUPPORTED", () => {
   const result = gateAnswer({ claims: [wrongValue], evidence: [STALE_STATISTIC] });
   assert.equal(result.removed_claims[0].support_status, "UNSUPPORTED");
   assert.equal(result.removed_claims[0].reason_code, "VALUE_MISMATCH");
+  assert.deepEqual(result.receipt.claims[0].official_values, ["120"]);
+});
+
+// ── Superseded: stale-matched value contradicted by newer official data ───────
+
+const CURRENT_STATISTIC_NEW = {
+  schema_version: EVIDENCE_SCHEMA_VERSION,
+  evidence_id: "EV-S026-STAT-09",
+  evidence_type: "WRITTEN_OFFICIAL",
+  source_id: "S-026",
+  locator: "page:1",
+  official_url: "https://example.gov.tw/stats/monthly",
+  document_version: 8,
+  is_current: true,
+  published_at: "2026-09-15T09:00:00+08:00",
+  assertions: [{ subject: "交通違規舉發件數", value: "130" }],
+};
+
+function currentStatClaim(overrides = {}) {
+  return {
+    schema_version: CLAIM_SCHEMA_VERSION,
+    text: "本月交通違規舉發件數為 120 件",
+    claim_type: "STATISTIC",
+    temporal_scope: "CURRENT",
+    proposition: { subject: "交通違規舉發件數", value: "120" },
+    ...overrides,
+  };
+}
+
+test("stale-matched value contradicted by current official data is UNSUPPORTED, not STALE", () => {
+  const result = gateAnswer({
+    claims: [currentStatClaim()],
+    evidence: [STALE_STATISTIC, CURRENT_STATISTIC_NEW],
+  });
+  const removed = result.removed_claims[0];
+  assert.equal(removed.support_status, "UNSUPPORTED");
+  assert.equal(removed.reason_code, "SUPERSEDED_BY_CURRENT");
+  assert.match(removed.qualified_text, /130/);
+  assert.doesNotMatch(removed.qualified_text, /尚無更新/);
+  assert.deepEqual(result.receipt.claims[0].official_values, ["130"]);
+});
+
+test("citing stale evidence while newer official data disagrees is still superseded", () => {
+  const claim = currentStatClaim({ cited_evidence_ids: ["EV-S026-STAT-08"] });
+  const result = gateAnswer({
+    claims: [claim],
+    evidence: [STALE_STATISTIC, CURRENT_STATISTIC_NEW],
+  });
+  assert.equal(result.removed_claims[0].support_status, "UNSUPPORTED");
+  assert.equal(result.removed_claims[0].reason_code, "SUPERSEDED_BY_CURRENT");
+});
+
+test("cited stale evidence stays STALE when current official data records the same value", () => {
+  const currentSame = {
+    ...CURRENT_STATISTIC_NEW,
+    evidence_id: "EV-S026-STAT-09B",
+    assertions: [{ subject: "交通違規舉發件數", value: "120" }],
+  };
+  const claim = currentStatClaim({ cited_evidence_ids: ["EV-S026-STAT-08"] });
+  const result = gateAnswer({ claims: [claim], evidence: [STALE_STATISTIC, currentSame] });
+  const admitted = result.final_claims[0];
+  assert.equal(admitted.support_status, "STALE");
+  assert.match(admitted.text, /較新的官方資料亦記載相同內容/);
+  assert.doesNotMatch(admitted.text, /尚無更新的官方確認/);
+});
+
+test("HISTORICAL claims are not superseded by newer data", () => {
+  const claim = currentStatClaim({
+    text: "2026-08 月交通違規舉發件數為 120 件",
+    temporal_scope: "HISTORICAL",
+  });
+  const result = gateAnswer({
+    claims: [claim],
+    evidence: [STALE_STATISTIC, CURRENT_STATISTIC_NEW],
+  });
+  assert.equal(result.final_claims[0].support_status, "SUPPORTED");
 });
 
 // ── Media discovery cannot support a verified claim ───────────────────────────
@@ -435,4 +511,27 @@ test("a __proto__ evidence_id cannot pollute the receipt prototype", () => {
   assert.equal(result.receipt.source_document_versions["__proto__"], 4);
   assert.equal(Object.getPrototypeOf(result.receipt.source_document_versions), null);
   assert.doesNotThrow(() => JSON.stringify(result.receipt));
+});
+
+test("blank locator or document_version downgrades support to PARTIAL", () => {
+  for (const record of [
+    { ...TRAFFIC_TIME, evidence_id: "EV-BLANK-LOC", locator: "   " },
+    { ...TRAFFIC_TIME, evidence_id: "EV-BLANK-VER", document_version: "" },
+    { ...TRAFFIC_TIME, evidence_id: "EV-OBJ-VER", document_version: { v: 4 } },
+  ]) {
+    const result = gateAnswer({ claims: [timeClaim()], evidence: [record] });
+    const claim = result.final_claims[0];
+    assert.equal(claim.support_status, "PARTIAL", record.evidence_id);
+    assert.equal(result.receipt.claims[0].reason_code, "MISSING_EXACT_LOCATOR");
+  }
+});
+
+test("validator errors fail closed and keep a truncated error detail", () => {
+  const throwing = { get text() { throw new Error("boom-internal-detail"); } };
+  const result = gateAnswer({ claims: [throwing], evidence: [TRAFFIC_TIME] });
+  assert.equal(result.gate_status, "BLOCKED");
+  assert.equal(result.receipt.failure_reason, "VALIDATOR_ERROR");
+  assert.equal(result.receipt.publication_hash, null);
+  assert.match(result.receipt.error_detail, /boom-internal-detail/);
+  assert.equal(result.final_claims.length, 0);
 });
