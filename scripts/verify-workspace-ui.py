@@ -108,7 +108,15 @@ class WorkspaceTests(unittest.TestCase):
         self.go('event'); self.page.locator('#scenario').select_option('aligned')
         self.go('handoff'); self.page.locator('[data-action="confirm-open"]').click()
         self.page.locator('#review-checkbox').check()
-        self.page.evaluate("Storage.prototype.setItem=function(){throw new Error('quota')}")
+        quota=self.page.evaluate("""() => {
+          try {
+            for (let i=0;i<32;i+=1) localStorage.setItem(`__quota_test_${i}`,'x'.repeat(1024*1024));
+            return 'not-exhausted';
+          } catch (error) {
+            return error?.name || 'quota-error';
+          }
+        }""")
+        self.assertNotEqual(quota,'not-exhausted','browser localStorage quota was not exhausted')
         self.page.locator('#save-confirmation').click()
         expect(self.page.locator('main')).to_contain_text('此操作尚未保存')
         self.assertNotIn('v2 已保存在此瀏覽器',self.page.locator('.document').inner_text())
