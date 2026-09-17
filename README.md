@@ -145,6 +145,19 @@ VERIFY_OK mode=full ... secrets=0
 
 The static artifact must also contain `out/index.html`, `out/api/health.json`, and `out/api/status.json`.
 
+### Single-checkout release candidate (issue #47)
+
+One command builds, starts, and verifies the M1 integration candidate end-to-end — canonical publication → canonical query store → loopback HTTP/site search → source links and version surfaces — using only modules in this checkout:
+
+```bash
+pip install -r requirements.txt
+npm ci --prefix apps/web
+npm install                       # playwright-core (browser driver)
+python -X utf8 scripts/verify-current-checkout.py
+```
+
+It writes a machine-readable receipt to `runtime-evidence/current-checkout/<timestamp>/receipt.json` (override with `--output`). `--mode core` runs the module/publication/policy/store/sabotage checks without the site build, HTTP, and browser lanes. See [docs/govintel/CURRENT_CHECKOUT.md](./docs/govintel/CURRENT_CHECKOUT.md) for the receipt schema, negative cases, and the separate pinned-SHA replay lane.
+
 ## Kiro workflow
 
 - `.kiro/steering/` defines product, technology, repository structure, and evidence/safety boundaries.
