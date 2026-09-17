@@ -184,10 +184,8 @@ function exactSupporters(records, subject, value) {
       record.assertions.some(
         (assertion) => assertion.subject === subject && assertion.value === value,
       ) &&
-      record.locator !== null &&
-      record.locator !== "" &&
-      record.document_version !== null &&
-      record.document_version !== undefined,
+      isTerm(record.locator) &&
+      isTerm(record.document_version),
   );
 }
 
@@ -207,10 +205,10 @@ function valuesForSubject(records, subject) {
   )];
 }
 
-function evaluateProposition(prop, index, pool, assertsCurrent) {
+function evaluateProposition(prop, allRecords, pool, assertsCurrent) {
   // CONFLICT is judged over the whole index so a draft cannot cite only one
   // side of a genuine disagreement between current official sources.
-  const conflictRecords = index.filter(
+  const conflictRecords = allRecords.filter(
     (record) =>
       record.official &&
       record.is_current &&
@@ -248,7 +246,32 @@ function evaluateProposition(prop, index, pool, assertsCurrent) {
   const staleMatches = looseSupporters(stale, prop.subject, prop.value);
   if (staleMatches.length) {
     if (assertsCurrent) {
-      return { status: "STALE", reason_code: "EVIDENCE_NOT_CURRENT", supporting: staleMatches };
+      // A current official record asserting a different value for the same
+      // subject means the claim is contradicted by newer data — not merely
+      // unconfirmed. Reporting STALE here would wrongly imply nothing newer
+      // exists.
+      const superseding = conflictRecords.filter((record) =>
+        record.assertions.some(
+          (assertion) => assertion.subject === prop.subject && assertion.value !== prop.value,
+        ),
+      );
+      if (superseding.length) {
+        return {
+          status: "UNSUPPORTED",
+          reason_code: "SUPERSEDED_BY_CURRENT",
+          supporting: staleMatches,
+          official_values: valuesForSubject(superseding, prop.subject),
+        };
+      }
+      // Reaching here means any current official record asserts the claim
+      // value itself, so newer confirmation exists even though the matched
+      // (or cited) evidence is stale.
+      return {
+        status: "STALE",
+        reason_code: "EVIDENCE_NOT_CURRENT",
+        supporting: staleMatches,
+        newer_confirmation: conflictRecords.length > 0,
+      };
     }
     const exactStale = exactSupporters(stale, prop.subject, prop.value);
     if (exactStale.length) return { status: "SUPPORTED", supporting: exactStale, historical: true };
@@ -302,9 +325,12 @@ function staleText(claim, subResults) {
         .filter(Boolean)
         .sort();
       const date = (dates.at(-1) || "未知日期").slice(0, 10);
-      return `官方資料（${date}，可能已過期）記載${prop.subject}為${prop.value}`;
+      const suffix = sub.newer_confirmation
+        ? "較新的官方資料亦記載相同內容"
+        : "尚無更新的官方確認";
+      return `官方資料（${date}，可能已過期）記載${prop.subject}為${prop.value}，${suffix}`;
     });
-  return `${fragments.join("；")}；尚無更新的官方確認`;
+  return fragments.join("；");
 }
 
 function partialText(claim, subResults) {
@@ -396,25 +422,41 @@ function evaluateClaim(raw, index) {
         .map((entry) => [`${entry.evidence_id}|${entry.value}`, entry]),
     ).values(),
   ];
+  const officialValues = [
+    ...new Set(subResults.flatMap((sub) => sub.official_values || [])),
+  ];
   const base = {
     claim_id: claim.claim_id,
     claim_type: claim.claim_type,
     requires_evidence: true,
     supporting_evidence: supporting,
     ...(conflictValues.length ? { conflict_values: conflictValues } : {}),
+    ...(officialValues.length ? { official_values: officialValues } : {}),
   };
 
   if (status === "SUPPORTED") {
     return { ...base, text: claim.text, support_status: "SUPPORTED", admitted: true, final_text: claim.text };
   }
   if (status === "UNSUPPORTED") {
-    const reason = subResults[0]?.reason_code || "NO_EVIDENCE";
+    const reason =
+      subResults.find((sub) => sub.reason_code === "SUPERSEDED_BY_CURRENT")?.reason_code ??
+      subResults[0]?.reason_code ??
+      "NO_EVIDENCE";
+    const supersededValues = [
+      ...new Set(
+        subResults
+          .filter((sub) => sub.reason_code === "SUPERSEDED_BY_CURRENT")
+          .flatMap((sub) => sub.official_values || []),
+      ),
+    ];
     return {
       ...base,
       text: claim.text,
       support_status: "UNSUPPORTED",
       reason_code: reason,
-      qualified_text: UNKNOWN_TEXT[claim.claim_type] || UNKNOWN_TEXT.OTHER,
+      qualified_text: supersededValues.length
+        ? `官方來源未證實此說法；最新官方資料記載為 ${supersededValues.join("、")}`
+        : UNKNOWN_TEXT[claim.claim_type] || UNKNOWN_TEXT.OTHER,
       admitted: false,
     };
   }
@@ -435,7 +477,7 @@ function evaluateClaim(raw, index) {
   };
 }
 
-function blockedReceipt(reason) {
+function blockedReceipt(reason, error) {
   return {
     gate_status: "BLOCKED",
     final_claims: [],
@@ -445,6 +487,10 @@ function blockedReceipt(reason) {
       validator_version: VALIDATOR_VERSION,
       gate_status: "BLOCKED",
       failure_reason: reason,
+      publication_hash: null,
+      ...(error !== undefined
+        ? { error_detail: String(error?.message ?? error).slice(0, 200) }
+        : {}),
       claim_ids: [],
       evidence_ids: [],
       source_document_versions: {},
@@ -526,10 +572,11 @@ export function gateAnswer({ claims, evidence, generated_at } = {}) {
           final_text: entry.final_text ?? entry.qualified_text ?? null,
           supporting_evidence: entry.supporting_evidence,
           ...(entry.conflict_values ? { conflict_values: entry.conflict_values } : {}),
+          ...(entry.official_values ? { official_values: entry.official_values } : {}),
         })),
       },
     };
   } catch (error) {
-    return blockedReceipt("VALIDATOR_ERROR");
+    return blockedReceipt("VALIDATOR_ERROR", error);
   }
 }
