@@ -46,6 +46,17 @@ This competition version focuses on one real task: preparing for a council quest
 - A Traditional Chinese / English toggle covering the primary journey while preserving the official Chinese transcript as labelled navigation text.
 - A static-export deployment path that needs no paid database or application server.
 
+## Query Store / Search Index
+
+The Query Store (`intel_v2/query_store/`) is a versioned, rebuild-only projection layer over canonical publications. It serves as the single read-only index for Web Chat, MCP, and any future search consumer. Key properties:
+
+- **Versioned schema** (`schema.py`): each store carries a `SCHEMA_VERSION` and rejects unsupported versions on rebuild.
+- **Deterministic rebuild** (`store.py`): the same canonical publication always produces identical index entries and query results.
+- **Trust tiers** (`trust.py`): every indexed entry is classified as `VERIFIED`, `DISCOVERY_UNVERIFIED`, `CONFLICT`, or `STALE`.
+- **Write protection**: the store accepts no direct mutations; only `rebuild` (creates a generation) and `swap_generation` (atomic activation with stale marking of the previous generation).
+- **Stale / degraded fallback**: when the active generation is stale or degraded, queries fall back to static GovIntel publication.
+- **Bounded query**: pagination (`limit`/`offset`), result caps, and a truncation receipt on every query response.
+
 ## Architecture
 
 ```text
