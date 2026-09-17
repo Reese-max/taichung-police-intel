@@ -45,6 +45,20 @@ This competition version focuses on one real task: preparing for a council quest
 - An evidence drawer with official HLS playback, searchable transcript segments, and word-level timestamp navigation.
 - A Traditional Chinese / English toggle covering the primary journey while preserving the official Chinese transcript as labelled navigation text.
 - A static-export deployment path that needs no paid database or application server.
+- An opt-in live-meeting session layer (`apps/web/lib/live-session.js`) for bounded provisional ASR monitoring of allowlisted official streams, with visible gap intervals, WATCH bookmarks, and post-event reconciliation receipts back to official VOD/minutes locators.
+
+## Live meeting sessions (opt-in)
+
+`apps/web/lib/live-session.js` implements the provisional-intelligence contract for meetings that are still in progress:
+
+- **Explicit opt-in only.** `startLiveSession` refuses without `opt_in: true`, an allowlisted official source (`S-010`), an HTTPS stream on an allowlisted host, a configured ASR key, and a bounded `max_duration_seconds`. A blocked start creates zero provider transport; the fixed-snapshot path is unaffected.
+- **Everything provisional.** Every live segment is labelled `LIVE_ASR_PROVISIONAL` with `verification_status: "PROVISIONAL"` — it cannot satisfy the `AUTO_PASS` publication gate and cannot carry real official names from diarization.
+- **Honest gaps.** Stream disconnects, ASR outages, budget stops, and crashes record visible gap intervals on the session timeline — never rendered as "nothing happened". Reconnects cannot overlap or silently stitch the timeline.
+- **Revision-safe bookmarks.** Interim→final provider corrections keep append-only revision history; WATCH bookmarks retain the segment IDs, time range, and content hashes captured at mark time.
+- **Post-event reconciliation.** `reconcileSession` maps WATCH candidates to official VOD/minutes locators with before/after hashes, tool versions, and statuses (`CONFIRMED_*`, `SUPERSEDED_TRANSCRIPT`, `UNRESOLVED`, `SOURCE_NOT_YET_AVAILABLE`, `DROPPED_FALSE_POSITIVE`). Receipts are immutable; a revised official source marks the receipt stale instead of rewriting it. Only `CONFIRMED_*` entries project into formal evidence via `toFormalEvidence`.
+- **Deterministic highlighting.** Profile/topic terms raise navigation priority only — they never modify transcript text and never emit operational recommendations.
+
+Executable fixtures covering the ten required scenarios (normal session, interim→final correction, stream gap, ASR reconnect, speaker-label drift, budget stop, crash/restart, late VOD, minutes contradiction, no post-event source) live in `apps/web/lib/live-session-fixtures.js` and run in `apps/web/tests/live-session.test.mjs`. The durable schema is `migrations/0003_live_sessions.sql`.
 
 ## Architecture
 
