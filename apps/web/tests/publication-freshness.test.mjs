@@ -34,6 +34,14 @@ function fixture() {
 }
 const check = ({ brief, status }, at = now) => assessPublication(brief, status, at);
 
+test("required UI coverage is derived from the canonical active catalog", async () => {
+  const catalog = JSON.parse(await readFile(new URL("../../../docs/govintel/source-catalog.v2.json", import.meta.url)));
+  assert.deepEqual(
+    REQUIRED_PUBLICATION_SOURCE_IDS,
+    catalog.sources.filter(source => source.status === "PRODUCTION_ACTIVE").map(source => source.source_id).sort(),
+  );
+});
+
 test("recent matched complete snapshot allows bounded zero-change wording", () => {
   assert.equal(check(fixture()).state, "RECENT");
   assert.equal(check(fixture()).canReassure, true);

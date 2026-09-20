@@ -30,6 +30,8 @@ const required = [
   "apps/web/scripts/migrate.mjs",
   "apps/web/next.config.mjs",
   "apps/web/public/data/source-status.json",
+  "apps/web/public/data/source-policy.json",
+  "apps/web/scripts/sync-source-policy.mjs",
   "apps/web/public/data/intelligence-feed.json",
   "apps/web/app/api/health.json/route.js",
   "apps/web/app/api/status.json/route.js",

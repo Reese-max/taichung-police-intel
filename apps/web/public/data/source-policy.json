@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "catalog_schema_version": 2,
+  "catalog_updated_at": "2026-09-09",
+  "active_source_ids": [
+    "S-004",
+    "S-006",
+    "S-007",
+    "S-009",
+    "S-029"
+  ]
+}

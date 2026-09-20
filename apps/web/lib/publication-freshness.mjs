@@ -1,6 +1,10 @@
 /** Snapshot-age policy, not an upstream-data freshness or live-service guarantee. */
+import sourcePolicy from "../public/data/source-policy.json" with { type: "json" };
+
 export const MAX_SNAPSHOT_AGE_MS = 16 * 60 * 60 * 1000;
-export const REQUIRED_PUBLICATION_SOURCE_IDS = Object.freeze(["S-004", "S-006", "S-007", "S-009", "S-029"]);
+export const REQUIRED_PUBLICATION_SOURCE_IDS = Object.freeze(
+  [...sourcePolicy.active_source_ids].sort(),
+);
 
 function time(value) {
   if (typeof value !== "string" || !/(Z|[+-]\d{2}:\d{2})$/i.test(value)) return NaN;
