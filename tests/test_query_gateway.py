@@ -64,6 +64,8 @@ class QueryGatewayTests(unittest.TestCase):
         )
         self.assertEqual(query["publication_hash"], structured["publication_hash"])
         self.assertEqual(query["policy"], structured["policy"])
+        self.assertFalse(query["retention"]["full_text_allowed"])
+        self.assertRegex(query["retention"]["policy_hash"], r"^[0-9a-f]{64}$")
 
     def test_stale_snapshot_is_not_presented_as_current(self):
         status, response = self.request("POST", "/query", {"tool": "get_current_brief", "arguments": {}})

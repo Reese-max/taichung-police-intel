@@ -112,6 +112,7 @@ def run(output: Path | None = None) -> dict:
             "freshness": query["freshness"],
         },
         "source_policy": query["policy"],
+        "retention_policy": query["retention"],
         "test_mode": "same-checkout-ephemeral-http",
         "verified_at": datetime.now(timezone.utc).isoformat(),
         "checks": {

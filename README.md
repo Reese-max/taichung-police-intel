@@ -125,6 +125,8 @@ python scripts/verify-current-checkout.py --output output/current-checkout-recei
 
 This starts an ephemeral local HTTP server, records the actual code SHA, lockfile hash, publication generation/hash and source-policy binding, and verifies Web/MCP parity plus fail-closed unsupported/generation paths. It is a candidate-version receipt, not production deployment or public-reachability evidence.
 
+Rights/retention defaults are compiled from [retention-rights-policy.v1.json](./docs/govintel/retention-rights-policy.v1.json). Rights remain `UNKNOWN` until reviewed; outward Query Gateway data is metadata/link-only and never a legal permission or full-text archive.
+
 ## Public deployment
 
 `.github/workflows/pages.yml` uses GitHub Pages and GitHub Actions:

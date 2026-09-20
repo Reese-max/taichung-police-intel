@@ -17,6 +17,7 @@ import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
 QUERY_STORE_PATH = ROOT / "scripts" / "query-store.py"
+RETENTION_POLICY_PATH = ROOT / "scripts" / "retention-policy.py"
 MAX_REQUEST_BYTES = 64 * 1024
 SERVER_VERSION = "query-gateway-v1"
 DEFAULT_RATE_LIMIT = 60
@@ -26,6 +27,12 @@ if _query_store_spec is None or _query_store_spec.loader is None:
     raise RuntimeError("query store module is unavailable")
 qs = importlib.util.module_from_spec(_query_store_spec)
 _query_store_spec.loader.exec_module(qs)
+_retention_policy_spec = importlib.util.spec_from_file_location("govintel_retention_policy", RETENTION_POLICY_PATH)
+if _retention_policy_spec is None or _retention_policy_spec.loader is None:
+    raise RuntimeError("retention policy module is unavailable")
+retention_policy_module = importlib.util.module_from_spec(_retention_policy_spec)
+_retention_policy_spec.loader.exec_module(retention_policy_module)
+RETENTION_POLICY = retention_policy_module.compile_policy()
 
 CAPABILITIES = (
     "search_evidence",
@@ -200,6 +207,12 @@ class QueryGateway:
             "discovery_unverified_count": 0,
             "truncated": truncated,
             "policy": self.store["policy"],
+            "retention": {
+                "policy_version": RETENTION_POLICY["policy_version"],
+                "policy_hash": RETENTION_POLICY["policy_hash"],
+                "public_projection": "METADATA_LINK_ONLY",
+                "full_text_allowed": False,
+            },
             "result_type": "publication_metadata",
             "receipt": {
                 "schema_version": 1,
@@ -301,6 +314,12 @@ class QueryGateway:
             "capabilities": list(CAPABILITIES),
             "unavailable_capabilities": sorted(UNIMPLEMENTED),
             "policy": self.store["policy"],
+            "retention": {
+                "policy_version": RETENTION_POLICY["policy_version"],
+                "policy_hash": RETENTION_POLICY["policy_hash"],
+                "public_projection": "METADATA_LINK_ONLY",
+                "full_text_allowed": False,
+            },
         }
 
     def health(self) -> dict[str, Any]:
@@ -314,6 +333,12 @@ class QueryGateway:
             "publication_id": self.store["generated_from"]["collection_run_id"],
             "publication_hash": self.store["generated_from"]["brief_sha256"],
             "policy": self.store["policy"],
+            "retention": {
+                "policy_version": RETENTION_POLICY["policy_version"],
+                "policy_hash": RETENTION_POLICY["policy_hash"],
+                "public_projection": "METADATA_LINK_ONLY",
+                "full_text_allowed": False,
+            },
             "source_gaps": scope["source_gaps"],
             "read_only": True,
         }
