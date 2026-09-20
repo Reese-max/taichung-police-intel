@@ -16,6 +16,8 @@ test("health endpoint does not call a stale checked-in snapshot ok", () => {
   assert.equal(response.deployment_verified, false);
   assert.equal(response.public_http_verified, false);
   assert.deepEqual(response.policy, PUBLICATION_POLICY_BINDING);
+  assert.match(response.policy.policy_hash, /^[0-9a-f]{64}$/);
+  assert.match(response.policy.catalog_hash, /^[0-9a-f]{64}$/);
 });
 
 test("health response stays explicit when source state is incomplete", () => {

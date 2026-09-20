@@ -2,6 +2,9 @@
   "schema_version": 1,
   "catalog_schema_version": 2,
   "catalog_updated_at": "2026-09-09",
+  "policy_version": 1,
+  "policy_hash": "79bdfae6210068dbe44b76214ed7cfc7605a1922798e0fc56cd87a94db109930",
+  "catalog_hash": "ec200cc249fc5921c4c820f1346f566d1d3acc43c02c9197afce395dc92fe9e7",
   "active_source_ids": [
     "S-004",
     "S-006",

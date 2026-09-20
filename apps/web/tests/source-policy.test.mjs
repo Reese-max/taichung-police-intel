@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -34,4 +35,15 @@ test('source policy CLI self-check compiles current source catalog', () => {
   const result = runPython(['-X', 'utf8', 'scripts/source-policy.py', '--self-check']);
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   assert.match(result.stdout, /SOURCE_POLICY_SELF_CHECK_OK/);
+});
+
+test('web policy projection preserves the compiled policy binding', async () => {
+  const projection = JSON.parse(await readFile(new URL('../public/data/source-policy.json', import.meta.url), 'utf8'));
+  const result = runPython(['-X', 'utf8', 'scripts/source-policy.py']);
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  const policy = JSON.parse(result.stdout);
+  assert.equal(projection.policy_version, policy.policy_version);
+  assert.match(projection.policy_hash, /^[0-9a-f]{64}$/);
+  assert.equal(projection.policy_hash, policy.policy_hash);
+  assert.equal(projection.catalog_hash, policy.catalog_hash);
 });
