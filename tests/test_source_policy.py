@@ -32,6 +32,16 @@ class SourcePolicyTests(unittest.TestCase):
         expected = sorted(row["source_id"] for row in self.catalog["sources"] if row["status"] == "PRODUCTION_ACTIVE")
         self.assertEqual(self.baseline["active_source_ids"], expected)
         self.assertEqual([row["source_id"] for row in self.baseline["active_sources"]], expected)
+
+    def test_collector_inventory_matches_active_catalog_rows(self):
+        from collect import P0_SOURCES
+
+        expected = {
+            row["source_id"]: (row["name"], row["entrypoint"])
+            for row in self.catalog["sources"]
+            if row["status"] == "PRODUCTION_ACTIVE"
+        }
+        self.assertEqual(P0_SOURCES, expected)
         self.assertEqual(self.baseline["catalog_hash"], sp.digest(self.catalog))
 
     def test_policy_build_is_deterministic(self):
