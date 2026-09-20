@@ -19,10 +19,10 @@ The demo compresses official Taichung council and government sources into one wo
 | Deliverable | Current state |
 |---|---|
 | Working application | Local static production build passes |
-| Public demo | Deployed at [https://reese-max.github.io/taichung-police-intel](https://reese-max.github.io/taichung-police-intel) — verified HTTP 200 anonymously 2026-08-23 |
+| Public demo | [https://reese-max.github.io/taichung-police-intel](https://reese-max.github.io/taichung-police-intel) has a historical anonymous HTTP 200 receipt from 2026-08-23; current public bytes are not verified by this checkout |
 | Demo video | [2:43 English-captioned MP4](https://reese-max.github.io/taichung-police-intel/demo-video.mp4) — verified anonymously in Chrome 2026-08-24 |
-| Twice-daily updates | GitHub Actions schedules 06:30 and 18:30 Asia/Taipei |
-| Source observability | Five live official-source adapters emit health, completeness, gaps, SHA-256, and last-known-good |
+| Twice-daily updates | GitHub Actions schedules 06:30 and 18:30 Asia/Taipei; a current successful schedule pair is not proven here |
+| Source observability | Five official-source adapters emit health, completeness, gaps, SHA-256, and last-known-good; the checked-in snapshot remains subject to its recorded freshness |
 | Evidence navigation | 86 transcript segments and 1,036 word timestamps seek the official HLS video |
 | English judge path | Complete homepage, source-monitor, evidence-drawer, control, limitation, and official-source translation path passes browser QA |
 | Kiro assets | Four Steering files, three Specs, and three executable Hooks are checked in |
@@ -121,7 +121,7 @@ Open `http://localhost:8000`. The live refresh performs read-only requests to th
 After the repository is public, enable Pages with **Source: GitHub Actions**. The deployed demo and repository URLs are recorded in [SUBMISSION.md](./SUBMISSION.md). A workflow file is not deployment evidence; acceptance requires an anonymous HTTPS check.
 
 Repository: `https://github.com/Reese-max/taichung-police-intel`
-Demo: `https://reese-max.github.io/taichung-police-intel` (verified HTTP 200 anonymously 2026-08-23; initial run 32631305048 conclusion=success)
+Demo: `https://reese-max.github.io/taichung-police-intel` (historical HTTP 200 receipt from 2026-08-23; initial run 32631305048 conclusion=success). This branch does not contain a current anonymous version/hash receipt, so the workflow configuration is not deployment evidence.
 
 ## Verification
 
@@ -208,7 +208,7 @@ The retained current-workspace Kiro records show Auto as `qdev::auto`: 10.254967
 - The English path translates the product journey and source names; the official Chinese transcript remains Chinese and is explicitly labelled as navigation-only evidence.
 - The official `S-010` HLS CDN can fail in some Chrome sessions with `ERR_CONTENT_DECODING_FAILED`. A fatal media error or ten-second metadata timeout now preserves the transcript and provenance while showing a prominent link to the official council video. The local 2:43 product-demo MP4 is deliberately not substituted because it does not share the official evidence timeline.
 - The five source adapters passed local canaries and one GitHub-hosted scheduled EVENING run succeeded on 2026-08-23. A completed post-deployment MORNING plus EVENING pair has not yet been observed.
-- Public repository, public demo, and captioned video are live and verified anonymously; entrant details and form submission remain pending.
+- The public repository, demo, and captioned video have historical anonymous verification receipts; current deployment/version/hash status remains unverified in this checkout. Entrant details and form submission remain pending.
 
 ## License and data rights
 
