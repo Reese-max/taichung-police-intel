@@ -12,6 +12,7 @@ const stamp = "2026-09-16T08:00:00+08:00";
 const source = (source_id) => ({
   source_id,
   last_checked_at: stamp,
+  freshness_status: "FRESH",
   source_health: "PASS",
   window_completeness: "COMPLETE_ZERO",
   result: "NO_NEW_ITEM",
@@ -123,6 +124,14 @@ test("old reference statistics do not imply the recent collection failed", () =>
   f.status.sources[0].freshness_status = "VERY_STALE";
   assert.equal(check(f).state, "RECENT");
 });
+for (const freshness of ["NO_DATA", "UNKNOWN", null]) {
+  test(`missing or unusable source freshness cannot reassure (${freshness})`, () => {
+    const f = fixture();
+    f.status.sources[0].freshness_status = freshness;
+    assert.equal(check(f).state, "PARTIAL");
+    assert.equal(check(f).canReassure, false);
+  });
+}
 test("threshold is deterministic and configurable", () => {
   const f = fixture();
   const t = Date.parse(stamp);

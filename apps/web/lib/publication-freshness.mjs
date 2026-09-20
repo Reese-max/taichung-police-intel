@@ -44,6 +44,10 @@ export function assessPublication(publication, sourceStatus, nowMs, maxAgeMs = M
   }
   const ageMs = nowMs - Math.min(...timestamps);
   if (ageMs > maxAgeMs) return result("STALE", "這份快照已超過核對期限，不能推論現在沒有新消息。", ageMs);
+  const freshnessStates = sources.map(source => source.freshness_status);
+  if (freshnessStates.some(state => !["FRESH", "RECENT", "STALE", "VERY_STALE"].includes(state))) {
+    return result("PARTIAL", "至少一個來源沒有可核對的資料新鮮度，不能排除其他異動。", ageMs);
+  }
   if (publication.publication_status !== "READY" || publication.snapshot_complete !== true ||
       sourceStatus.latest_collection_run?.status !== "SUCCEEDED" ||
       sources.some(s => s.source_health !== "PASS" ||
