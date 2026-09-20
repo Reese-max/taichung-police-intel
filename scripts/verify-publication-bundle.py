@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import importlib.util
 import json
 import sys
 from pathlib import Path
@@ -8,7 +9,20 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "apps" / "web" / "public" / "data"
-EXPECTED_SOURCES = {"S-004", "S-006", "S-007", "S-009", "S-029"}
+SOURCE_POLICY = ROOT / "scripts" / "source-policy.py"
+
+
+def load_expected_sources() -> set[str]:
+    spec = importlib.util.spec_from_file_location("publication_source_policy", SOURCE_POLICY)
+    if spec is None or spec.loader is None:
+        raise ValueError("source policy module is unavailable")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    policy = module.compile_policy(module.load_catalog())
+    expected = set(policy["active_source_ids"])
+    if not expected:
+        raise ValueError("source policy has no active sources")
+    return expected
 
 
 def load_json(name: str) -> dict:
@@ -23,6 +37,12 @@ def load_json(name: str) -> dict:
 
 def main() -> int:
     errors: list[str] = []
+
+    try:
+        expected_sources = load_expected_sources()
+    except (OSError, ValueError, json.JSONDecodeError) as error:
+        print(f"PUBLICATION_BUNDLE_FAIL {error}", file=sys.stderr)
+        return 1
 
     try:
         status = load_json("source-status.json")
@@ -63,13 +83,13 @@ def main() -> int:
         errors.append("source-status.json sources must be an array")
         status_sources = []
     status_source_ids = [item.get("source_id") for item in status_sources if isinstance(item, dict)]
-    if set(status_source_ids) != EXPECTED_SOURCES or len(status_source_ids) != len(EXPECTED_SOURCES):
+    if set(status_source_ids) != expected_sources or len(status_source_ids) != len(expected_sources):
         errors.append(f"source-status source IDs invalid: {status_source_ids}")
 
     source_summary = feed.get("source_summary")
-    if not isinstance(source_summary, dict) or set(source_summary) != EXPECTED_SOURCES:
+    if not isinstance(source_summary, dict) or set(source_summary) != expected_sources:
         errors.append(
-            f"intelligence-feed source_summary must cover exactly {sorted(EXPECTED_SOURCES)}"
+            f"intelligence-feed source_summary must cover exactly {sorted(expected_sources)}"
         )
 
     items = feed.get("items")
