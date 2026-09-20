@@ -7,6 +7,7 @@ const briefUrl = new URL("../public/data/v2-daily-brief.json", import.meta.url);
 const feedUrl = new URL("../public/data/intelligence-feed.json", import.meta.url);
 const statusUrl = new URL("../public/data/source-status.json", import.meta.url);
 const componentUrl = new URL("../components/V2DailyDashboard.js", import.meta.url);
+const queryGatewayUrl = new URL("../components/QueryGatewayPanel.js", import.meta.url);
 const layoutUrl = new URL("../app/layout.js", import.meta.url);
 
 async function json(url) {
@@ -98,6 +99,20 @@ test("V2 dashboard is police-first, Top 3 capped, and evidence-bound", async () 
   assert.match(source, /開啟官方來源/);
   assert.match(source, /DETERMINISTIC_PASS/);
   assert.doesNotMatch(source, /AUTO_PASS/);
+});
+
+test("Ask GovIntel is a bounded shared-gateway entry rather than a fake chatbot", async () => {
+  const [dashboard, panel] = await Promise.all([
+    readFile(componentUrl, "utf8"),
+    readFile(queryGatewayUrl, "utf8"),
+  ]);
+  assert.match(dashboard, /QueryGatewayPanel/);
+  assert.match(panel, /search_evidence/);
+  assert.match(panel, /get_current_brief/);
+  assert.match(panel, /get_source_health/);
+  assert.match(panel, /publication metadata/);
+  assert.match(panel, /Dashboard 仍可使用/);
+  assert.doesNotMatch(panel, /new Function|eval\(|arbitrary/);
 });
 
 test("V2 dashboard distinguishes fetch failure from a valid zero-change period", async () => {

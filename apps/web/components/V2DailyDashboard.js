@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { assessPublication } from "../lib/publication-freshness.mjs";
+import QueryGatewayPanel from "./QueryGatewayPanel.js";
 
 
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
@@ -287,6 +288,8 @@ export default function V2DailyDashboard() {
           </div>
         )}
       </header>
+
+      <QueryGatewayPanel />
 
       {loadState === "loading" && (
         <section className="v2-system-message" role="status">
