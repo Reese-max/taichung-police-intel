@@ -11,6 +11,14 @@ spec.loader.exec_module(module)
 
 
 class PublicationBundleTests(unittest.TestCase):
+    def test_source_rows_are_not_silently_filtered(self):
+        with self.assertRaisesRegex(ValueError, "only objects"):
+            module.source_ids([{"source_id": "S-004"}, None])
+
+    def test_source_ids_must_be_nonempty_strings(self):
+        with self.assertRaisesRegex(ValueError, "non-empty strings"):
+            module.source_ids([{"source_id": ""}])
+
     def test_validator_uses_current_source_policy(self):
         policy_path = Path(__file__).resolve().parents[1] / "scripts/source-policy.py"
         policy_spec = importlib.util.spec_from_file_location("source_policy", policy_path)

@@ -35,6 +35,15 @@ def load_json(name: str) -> dict:
         raise ValueError(f"invalid JSON: {path.relative_to(ROOT)}: {error}") from error
 
 
+def source_ids(sources: object) -> list[str]:
+    if not isinstance(sources, list) or any(not isinstance(source, dict) for source in sources):
+        raise ValueError("source-status sources must contain only objects")
+    ids = [source.get("source_id") for source in sources]
+    if any(not isinstance(source_id, str) or not source_id for source_id in ids):
+        raise ValueError("source-status source_id must be non-empty strings")
+    return ids
+
+
 def main() -> int:
     errors: list[str] = []
 
@@ -79,10 +88,12 @@ def main() -> int:
         errors.append("intelligence-summary.json must use schema_version=1")
 
     status_sources = status.get("sources")
-    if not isinstance(status_sources, list):
-        errors.append("source-status.json sources must be an array")
+    try:
+        status_source_ids = source_ids(status_sources)
+    except ValueError as error:
+        errors.append(str(error))
         status_sources = []
-    status_source_ids = [item.get("source_id") for item in status_sources if isinstance(item, dict)]
+        status_source_ids = []
     if set(status_source_ids) != expected_sources or len(status_source_ids) != len(expected_sources):
         errors.append(f"source-status source IDs invalid: {status_source_ids}")
 
@@ -96,6 +107,15 @@ def main() -> int:
     if not isinstance(items, list):
         errors.append("intelligence-feed.json items must be an array")
         items = []
+
+    feed_source_ids = {
+        item.get("source_id")
+        for item in items
+        if isinstance(item, dict) and isinstance(item.get("source_id"), str)
+    }
+    unknown_feed_sources = sorted(feed_source_ids - expected_sources)
+    if unknown_feed_sources:
+        errors.append(f"feed contains sources outside active policy: {unknown_feed_sources}")
 
     stable_ids = [item.get("stable_id") for item in items if isinstance(item, dict)]
     missing_stable_ids = sum(not stable_id for stable_id in stable_ids)
