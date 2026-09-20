@@ -183,11 +183,11 @@ class QueryBoundaryTests(unittest.TestCase):
     def test_actual_cli_build_then_query_stale_checked_in_data(self):
         with tempfile.TemporaryDirectory() as tmp:
             output = Path(tmp)/'store.json'
-            build = subprocess.run([sys.executable, str(SCRIPT), 'build', '--output', str(output)],
-                                   capture_output=True, text=True, timeout=15)
+            build = subprocess.run([sys.executable, '-X', 'utf8', str(SCRIPT), 'build', '--output', str(output)],
+                                   capture_output=True, text=True, encoding='utf-8', timeout=15)
             self.assertEqual(build.returncode, 0, build.stderr)
-            query = subprocess.run([sys.executable, str(SCRIPT), 'query', '--store', str(output), '--q', '警察', '--limit', '2'],
-                                   capture_output=True, text=True, timeout=15)
+            query = subprocess.run([sys.executable, '-X', 'utf8', str(SCRIPT), 'query', '--store', str(output), '--q', '警察', '--limit', '2'],
+                                   capture_output=True, text=True, encoding='utf-8', timeout=15)
             self.assertEqual(query.returncode, 0, query.stderr)
             result = json.loads(query.stdout)
             self.assertLessEqual(result['result_count'], 2)
