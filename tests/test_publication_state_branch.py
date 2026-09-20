@@ -68,6 +68,16 @@ class PublicationStateBranchTests(unittest.TestCase):
         self.write_bundle(self.work, "candidate")
         module.persist(self.work, "publication-state", "101", "1", "evening")
 
+    def symlink_or_skip(self, link, target):
+        try:
+            link.symlink_to(target)
+        except NotImplementedError:
+            self.skipTest("symlinks are unavailable on this platform")
+        except OSError as error:
+            if getattr(error, "winerror", None) == 1314:
+                self.skipTest("Windows symlink privilege is unavailable")
+            raise
+
     def serve(self, bundle):
         directory = self.root / "public"
         directory.mkdir(exist_ok=True)
@@ -149,7 +159,7 @@ class PublicationStateBranchTests(unittest.TestCase):
         victim.write_text("do-not-touch")
         first = self.work / module.STATE_PATHS[0]
         first.unlink()
-        first.symlink_to(victim)
+        self.symlink_or_skip(first, victim)
         with self.assertRaisesRegex(RuntimeError, "symlink"):
             module.restore(self.work, "publication-state")
         self.assertEqual(victim.read_text(), "do-not-touch")
@@ -158,7 +168,7 @@ class PublicationStateBranchTests(unittest.TestCase):
         git(self.seed, "checkout", "publication-state")
         path = self.seed / module.STATE_PATHS[-1]
         path.unlink()
-        path.symlink_to("/etc/passwd")
+        self.symlink_or_skip(path, "/etc/passwd")
         git(self.seed, "add", ".")
         git(self.seed, "commit", "-m", "bad blob fixture")
         git(self.seed, "push", "origin", "publication-state")
