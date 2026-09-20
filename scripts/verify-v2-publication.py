@@ -2,13 +2,20 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from intel_v2.handoff import ACTIVE_WATCH_STATUSES, validate_state as validate_handoff_state
+
 DEFAULT_FEED = ROOT / "apps" / "web" / "public" / "data" / "intelligence-feed.json"
 DEFAULT_STATUS = ROOT / "apps" / "web" / "public" / "data" / "source-status.json"
 DEFAULT_STATE = ROOT / "state" / "v2-shadow-state.json"
+DEFAULT_HANDOFF_STATE = ROOT / "state" / "v2-handoff-state.json"
 DEFAULT_BRIEF = ROOT / "apps" / "web" / "public" / "data" / "v2-daily-brief.json"
 PUBLISHABLE_CHANGE_TYPES = {
     "NEW",
@@ -57,16 +64,28 @@ def validate_action_item(item: dict, seen_event_ids: set[str], expected_tier: st
         fail(f"published item tier mismatch: {event_id}")
 
 
-def verify(*, feed_path: Path, status_path: Path, state_path: Path, brief_path: Path) -> dict:
+def verify(
+    *,
+    feed_path: Path,
+    status_path: Path,
+    state_path: Path,
+    handoff_state_path: Path,
+    brief_path: Path,
+) -> dict:
     feed = load_json(feed_path)
     status = load_json(status_path)
     state = load_json(state_path)
+    handoff_state = load_json(handoff_state_path)
     brief = load_json(brief_path)
 
     if feed.get("schema_version") != 1 or not isinstance(feed.get("items"), list):
         fail("legacy feed contract is invalid")
     if state.get("schema_version") != 1 or state.get("mode") != "V2_SHADOW":
         fail("state must use schema_version=1 and mode=V2_SHADOW")
+    try:
+        validate_handoff_state(handoff_state)
+    except ValueError as error:
+        fail(str(error))
     if not state.get("baseline_established_at"):
         fail("state is missing baseline_established_at")
     if not isinstance(state.get("items"), dict):
@@ -111,6 +130,16 @@ def verify(*, feed_path: Path, status_path: Path, state_path: Path, brief_path: 
         fail("priority_count does not match priority_items")
     if overview.get("tracking_count") != len(tracking_items):
         fail("tracking_count does not match tracking_items")
+    active_watch_ids = {
+        watch_id
+        for watch_id, watch in handoff_state["watch_items"].items()
+        if watch.get("status") in ACTIVE_WATCH_STATUSES
+    }
+    tracking_watch_ids = {item.get("watch_id") for item in tracking_items}
+    if None in tracking_watch_ids or not tracking_watch_ids <= active_watch_ids:
+        fail("tracking_items must project active persistent watch items")
+    if overview.get("tracking_total") != len(active_watch_ids):
+        fail("tracking_total does not match persistent active watch items")
     if overview.get("other_change_count") != len(other_changes):
         fail("other_change_count does not match other_changes")
     if len(priority_items) + len(other_changes) > current_change_count:
@@ -147,6 +176,8 @@ def verify(*, feed_path: Path, status_path: Path, state_path: Path, brief_path: 
         "state_total": len(state["items"]),
         "changes": current_change_count,
         "priority": len(priority_items),
+        "tracking": len(tracking_items),
+        "tracking_total": len(active_watch_ids),
         "other": len(other_changes),
         "publication_status": brief["publication_status"],
     }
@@ -157,6 +188,7 @@ def main() -> int:
     parser.add_argument("--feed", type=Path, default=DEFAULT_FEED)
     parser.add_argument("--status", type=Path, default=DEFAULT_STATUS)
     parser.add_argument("--state", type=Path, default=DEFAULT_STATE)
+    parser.add_argument("--handoff-state", type=Path, default=DEFAULT_HANDOFF_STATE)
     parser.add_argument("--brief", type=Path, default=DEFAULT_BRIEF)
     args = parser.parse_args()
 
@@ -164,13 +196,14 @@ def main() -> int:
         feed_path=args.feed,
         status_path=args.status,
         state_path=args.state,
+        handoff_state_path=args.handoff_state,
         brief_path=args.brief,
     )
     print(
         "V2_PUBLICATION_OK "
         f"run={result['run_id']} archive={result['archive_total']} "
         f"state={result['state_total']} changes={result['changes']} "
-        f"priority={result['priority']} other={result['other']} "
+        f"priority={result['priority']} tracking={result['tracking_total']} other={result['other']} "
         f"status={result['publication_status']}"
     )
     return 0

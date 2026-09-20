@@ -127,6 +127,16 @@ This starts an ephemeral local HTTP server, records the actual code SHA, lockfil
 
 Rights/retention defaults are compiled from [retention-rights-policy.v1.json](./docs/govintel/retention-rights-policy.v1.json). Rights remain `UNKNOWN` until reviewed; outward Query Gateway data is metadata/link-only and never a legal permission or full-text archive.
 
+Local-first handoff state:
+
+```bash
+python scripts/handoff-state.py watch --identity S-009:FEED-S-009-example
+python scripts/handoff-state.py confirm
+python scripts/handoff-state.py export --format markdown --output output/handoff.md
+```
+
+The command uses the durable `state/v2-handoff-state.json`, makes repeated watch adds idempotent, preserves confirmed handoff versions, and reopens only affected watches as `NEEDS_REVIEW` when a source version changes. The static Web page is read-only; write operations currently use this local CLI and never store private notes or operational police fields.
+
 ## Public deployment
 
 `.github/workflows/pages.yml` uses GitHub Pages and GitHub Actions:

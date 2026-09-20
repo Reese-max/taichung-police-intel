@@ -360,11 +360,15 @@ export default function V2DailyDashboard() {
                 </div>
                 <span>最多 5 件</span>
               </div>
-              <div className="v2-tracking-list">
+              <div className="v2-tracking-list" data-testid="v2-tracking-list">
                 {trackingItems.map((item) => (
-                  <a key={item.event_id} href={item.official_url} target="_blank" rel="noreferrer">
+                  <a key={item.tracking_id || item.watch_id || item.event_id} href={item.official_url} target="_blank" rel="noreferrer">
                     <strong>{item.headline}</strong>
-                    <span>{item.recommended_action}</span>
+                    <span>
+                      {item.watch_status === "NEEDS_REVIEW" ? "需重新核對" : "持續追蹤"}
+                      {item.source_health && item.source_health !== "PASS" ? ` · 來源 ${item.source_health}` : ""}
+                    </span>
+                    <small>{item.recommended_action}</small>
                   </a>
                 ))}
               </div>

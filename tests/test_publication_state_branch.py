@@ -97,7 +97,7 @@ class PublicationStateBranchTests(unittest.TestCase):
 
     def test_restore_replaces_local_generated_files_from_state_branch(self):
         self.write_bundle(self.work, "stale")
-        self.assertEqual(module.restore(self.work, "publication-state"), 6)
+        self.assertEqual(module.restore(self.work, "publication-state"), 7)
         self.assertTrue((self.work / module.STATE_PATHS[0]).read_text().startswith("baseline:"))
 
     def test_missing_remote_file_rejects_entire_restore_without_mixed_writes(self):

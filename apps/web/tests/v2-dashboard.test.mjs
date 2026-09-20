@@ -40,13 +40,13 @@ test("V2 brief and official-source bundle refer to one collection run", async ()
   );
   assert.equal(brief.generated_at, feed.generated_at);
   assert.equal(brief.source_status_generated_at, status.generated_at);
+  assert.ok(brief.overview.tracking_total >= brief.tracking_items.length);
 });
 
 test("generated brief separates current changes from the historical archive", async () => {
   const [brief, feed] = await Promise.all([json(briefUrl), json(feedUrl)]);
   const publishedChanges = [
     ...brief.priority_items,
-    ...brief.tracking_items,
     ...brief.other_changes,
   ];
 
@@ -95,6 +95,8 @@ test("V2 dashboard is police-first, Top 3 capped, and evidence-bound", async () 
   assert.match(source, /本期沒有需要處理的重要變更/);
   assert.match(source, /why_it_matters/);
   assert.match(source, /recommended_action/);
+  assert.match(source, /watch_status/);
+  assert.match(source, /data-testid="v2-tracking-list"/);
   assert.match(source, /affected_roles/);
   assert.match(source, /開啟官方來源/);
   assert.match(source, /DETERMINISTIC_PASS/);

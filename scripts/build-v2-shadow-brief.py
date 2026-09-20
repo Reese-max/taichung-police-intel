@@ -14,6 +14,11 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from intel_v2.handoff import (
+    load_state as load_handoff_state,
+    sync_with_publication,
+    tracking_projection,
+)
 from intel_v2.semantics import ChangeEvent, compare_snapshot, feed_item_to_version, shadow_brief
 
 
@@ -22,6 +27,7 @@ GENERATOR_VERSION = 2
 DEFAULT_FEED = ROOT / "apps" / "web" / "public" / "data" / "intelligence-feed.json"
 DEFAULT_STATUS = ROOT / "apps" / "web" / "public" / "data" / "source-status.json"
 DEFAULT_STATE = ROOT / "state" / "v2-shadow-state.json"
+DEFAULT_HANDOFF_STATE = ROOT / "state" / "v2-handoff-state.json"
 DEFAULT_OUTPUT = ROOT / "apps" / "web" / "public" / "data" / "v2-daily-brief.json"
 
 SOURCE_CONTEXT = {
@@ -170,7 +176,14 @@ def event_projection(event: ChangeEvent, publication_tier: str) -> dict:
     }
 
 
-def enrich_for_police_users(brief: dict, events: list[ChangeEvent]) -> None:
+def enrich_for_police_users(
+    brief: dict,
+    events: list[ChangeEvent],
+    *,
+    handoff_state: dict,
+    current_items: dict,
+    source_status: dict | None,
+) -> None:
     publishable = [event for event in events if event.publishable]
     publishable.sort(
         key=lambda event: (
@@ -185,11 +198,22 @@ def enrich_for_police_users(brief: dict, events: list[ChangeEvent]) -> None:
     brief["generator_version"] = GENERATOR_VERSION
     brief["audience"] = ["議會聯絡", "局本部幕僚", "業管承辦", "分局主管"]
     brief["priority_items"] = priority_items
-    brief["tracking_items"] = []
+    tracking_items, tracking_total = tracking_projection(
+        handoff_state,
+        current_items=current_items,
+        events=events,
+        source_status=source_status,
+        limit=5,
+    )
+    brief["tracking_items"] = tracking_items
     brief["other_changes"] = other_changes
     brief["overview"]["priority_count"] = len(priority_items)
-    brief["overview"]["tracking_count"] = 0
+    brief["overview"]["tracking_count"] = len(tracking_items)
+    brief["overview"]["tracking_total"] = tracking_total
     brief["overview"]["other_change_count"] = len(other_changes)
+    if tracking_total:
+        suffix = f"另有 {tracking_total} 件跨日追蹤仍保留。"
+        brief["status_message"] = f"{brief['status_message']} {suffix}"
 
 
 def main() -> int:
@@ -199,6 +223,7 @@ def main() -> int:
     parser.add_argument("--input", type=Path, default=DEFAULT_FEED)
     parser.add_argument("--source-status", type=Path, default=DEFAULT_STATUS)
     parser.add_argument("--state", type=Path, default=DEFAULT_STATE)
+    parser.add_argument("--handoff-state", type=Path, default=DEFAULT_HANDOFF_STATE)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--observed-at")
     parser.add_argument("--reset-baseline", action="store_true")
@@ -233,19 +258,35 @@ def main() -> int:
         observed_at,
         snapshot_complete=snapshot_complete,
     )
+    handoff_state = load_handoff_state(args.handoff_state)
+    handoff_state = sync_with_publication(
+        handoff_state,
+        previous_items=(previous_state or {}).get("items", {}),
+        current_items={item.identity: item.to_state() for item in current_items},
+        events=events,
+        observed_at=observed_at,
+        collection_run_id=feed.get("collection_run_id"),
+    )
     brief = shadow_brief(
         feed=feed,
         state=state,
         events=events,
         generated_at=observed_at,
     )
-    enrich_for_police_users(brief, events)
+    enrich_for_police_users(
+        brief,
+        events,
+        handoff_state=handoff_state,
+        current_items=state["items"],
+        source_status=source_status,
+    )
     brief["publication_status"] = "READY" if snapshot_complete else "PARTIAL"
     brief["snapshot_complete"] = snapshot_complete
     brief["source_health"] = source_health_projection(source_status)
     brief["source_status_generated_at"] = source_status.get("generated_at") if source_status else None
 
     save_json(args.state, state)
+    save_json(args.handoff_state, handoff_state)
     save_json(args.output, brief)
 
     print(
@@ -254,6 +295,7 @@ def main() -> int:
         f"archive={brief['overview']['archive_total']} "
         f"changes={brief['overview']['current_change_count']} "
         f"priority={brief['overview']['priority_count']} "
+        f"tracking={brief['overview']['tracking_total']} "
         f"complete={str(snapshot_complete).lower()} "
         f"quality_issues={len(brief['quality_issues'])} "
         f"state={args.state} output={args.output}"

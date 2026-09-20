@@ -29,8 +29,9 @@ STATE_PATHS = (
     "apps/web/public/data/feed-export.csv",
     "apps/web/public/data/v2-daily-brief.json",
     "state/v2-shadow-state.json",
+    "state/v2-handoff-state.json",
 )
-PUBLIC_PATHS = STATE_PATHS[:-1]
+PUBLIC_PATHS = tuple(path for path in STATE_PATHS if path.startswith("apps/web/public/"))
 MANIFEST = "state/publication-checkpoint.json"
 MAX_FILE_BYTES = 32 * 1024 * 1024
 SHA_RE = re.compile(r"[0-9a-f]{40}\Z")

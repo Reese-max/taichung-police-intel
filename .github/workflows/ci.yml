@@ -12,6 +12,7 @@ on:
       - "apps/web/public/data/feed-export.csv"
       - "apps/web/public/data/v2-daily-brief.json"
       - "state/v2-shadow-state.json"
+      - "state/v2-handoff-state.json"
 
 permissions:
   contents: read
@@ -57,11 +58,12 @@ jobs:
 
       - name: Build conservative V2 baseline publication
         run: |
-          rm -f /tmp/v2-shadow-state.json /tmp/v2-shadow-brief.json
+          rm -f /tmp/v2-shadow-state.json /tmp/v2-handoff-state.json /tmp/v2-shadow-brief.json
           python -X utf8 scripts/build-v2-shadow-brief.py \
             --input apps/web/public/data/intelligence-feed.json \
             --source-status apps/web/public/data/source-status.json \
             --state /tmp/v2-shadow-state.json \
+            --handoff-state /tmp/v2-handoff-state.json \
             --output /tmp/v2-shadow-brief.json \
             --reset-baseline
 
@@ -71,6 +73,7 @@ jobs:
             --feed apps/web/public/data/intelligence-feed.json \
             --status apps/web/public/data/source-status.json \
             --state /tmp/v2-shadow-state.json \
+            --handoff-state /tmp/v2-handoff-state.json \
             --brief /tmp/v2-shadow-brief.json
           python -X utf8 -c 'import json; p="/tmp/v2-shadow-brief.json"; d=json.load(open(p, encoding="utf-8")); o=d["overview"]; assert o["current_change_count"] == 0; print("V2_SHADOW_BASELINE_OK archive={} legacy={}".format(o["archive_total"], o["legacy_home_candidate_count"]))'
 
@@ -79,11 +82,13 @@ jobs:
         run: |
           cp apps/web/public/data/intelligence-feed.json /tmp/v2-regression-feed.json
           cp state/v2-shadow-state.json /tmp/v2-regression-state.json
+          cp state/v2-handoff-state.json /tmp/v2-regression-handoff-state.json
           python -X utf8 -c 'import json; p="/tmp/v2-regression-feed.json"; d=json.load(open(p, encoding="utf-8")); assert len(d["items"]) >= 24; [(item.__setitem__("title", item["title"] + "（排程回歸測試）")) for item in d["items"][:24]]; json.dump(d, open(p, "w", encoding="utf-8"), ensure_ascii=False, indent=2)'
           python -X utf8 scripts/build-v2-shadow-brief.py \
             --input /tmp/v2-regression-feed.json \
             --source-status apps/web/public/data/source-status.json \
             --state /tmp/v2-regression-state.json \
+            --handoff-state /tmp/v2-regression-handoff-state.json \
             --output /tmp/v2-regression-brief.json
           cp /tmp/v2-regression-feed.json apps/web/public/data/intelligence-feed.json
           cp /tmp/v2-regression-brief.json apps/web/public/data/v2-daily-brief.json
