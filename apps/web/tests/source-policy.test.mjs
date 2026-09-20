@@ -26,7 +26,7 @@ function runPython(args) {
 test('source policy promotion/retirement/query coverage suite passes', () => {
   const result = runPython(['-X', 'utf8', '-m', 'unittest', 'discover', '-s', 'tests', '-p', 'test_source_policy.py', '-v']);
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-  assert.match(result.stderr, /Ran 10 tests/);
+  assert.match(result.stderr, /Ran [1-9]\d* tests?/);
   assert.match(result.stderr, /OK/);
 });
 

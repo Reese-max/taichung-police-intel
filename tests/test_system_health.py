@@ -153,6 +153,7 @@ class SystemHealthTests(unittest.TestCase):
         # Existing checked-in artifacts are stale and still lack deployment/HTTP
         # receipts; the model must not manufacture HEALTHY.
         self.assertEqual(result["lanes"]["publication"], "STALE")
+        self.assertEqual(result["policy"]["active_source_ids"], sorted(health.load_current_policy()["active_source_ids"]))
 
 
 if __name__ == "__main__":

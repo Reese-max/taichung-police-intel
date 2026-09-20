@@ -101,6 +101,24 @@ class SourcePolicyTests(unittest.TestCase):
         self.assertEqual(stale["status"], "STALE")
         self.assertFalse(stale["can_state_bounded_no_match"])
 
+    def test_very_stale_no_data_and_missing_freshness_fail_closed(self):
+        for freshness in ("VERY_STALE", "NO_DATA", None):
+            with self.subTest(freshness=freshness):
+                states = self.good_states()
+                target = self.baseline["active_source_ids"][0]
+                if freshness is None:
+                    states[target].pop("freshness")
+                else:
+                    states[target]["freshness_status"] = freshness
+                    states[target].pop("freshness")
+                result = sp.assess_query(self.baseline, "publication_metadata", states)
+                self.assertEqual(result["status"], "STALE" if freshness == "VERY_STALE" else "PARTIAL")
+                self.assertFalse(result["can_state_bounded_no_match"])
+                if freshness == "VERY_STALE":
+                    self.assertIn(target, result["stale_required_sources"])
+                else:
+                    self.assertIn(target, result["missing_required_sources"])
+
     def test_unsupported_query_never_returns_fake_empty(self):
         result = sp.assess_query(self.baseline, "traffic_events", self.good_states())
         self.assertEqual(result["status"], "CAPABILITY_NOT_AVAILABLE")

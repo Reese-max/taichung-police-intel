@@ -6,6 +6,7 @@ import argparse
 import base64
 from datetime import datetime, timezone
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -21,12 +22,21 @@ DEFAULT_BRIEF = ROOT / "apps/web/public/data/v2-daily-brief.json"
 DEFAULT_OUTPUT = ROOT / "apps/web/public/data/query-store.json"
 SCHEMA_VERSION = 2
 PROJECTION_VERSION = "publication-metadata-v2"
-EXPECTED_SOURCES = frozenset(("S-004", "S-006", "S-007", "S-009", "S-029"))
+SOURCE_POLICY = ROOT / "scripts/source-policy.py"
 MAX_BYTES = 32 * 1024 * 1024
 MAX_ROWS = 10000
 MAX_AGE_SECONDS = 16 * 60 * 60
 HASH = re.compile(r"[a-f0-9]{64}\Z")
 CHANGES = frozenset(("NEW", "REVISED", "STATUS_CHANGED", "DEADLINE_CHANGED", "CONFIRMED", "UNCHANGED", "LKG", "REMOVED"))
+
+
+def load_current_policy() -> dict[str, Any]:
+    spec = importlib.util.spec_from_file_location("query_store_source_policy", SOURCE_POLICY)
+    if spec is None or spec.loader is None:
+        raise ValueError("source policy module is unavailable")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.compile_policy(module.load_catalog())
 
 
 def canonical_json(value: Any) -> bytes:
@@ -111,7 +121,8 @@ def project_source(source: dict[str, Any], status_hash: str) -> dict[str, Any]:
     }
 
 
-def build_store(feed: dict[str, Any], status: dict[str, Any], brief: dict[str, Any], hashes: dict[str, str]) -> dict[str, Any]:
+def build_store(feed: dict[str, Any], status: dict[str, Any], brief: dict[str, Any], hashes: dict[str, str],
+                policy: dict[str, Any] | None = None) -> dict[str, Any]:
     if not all(isinstance(value, dict) for value in (feed, status, brief, hashes)):
         raise ValueError("canonical artifacts must be objects")
     if any(type(d.get("schema_version")) is not int or d["schema_version"] != 1 for d in (feed, status, brief)):
@@ -128,6 +139,8 @@ def build_store(feed: dict[str, Any], status: dict[str, Any], brief: dict[str, A
         raise ValueError("cross-generation publication artifacts")
     for d in (feed, status, brief):
         instant(d.get("generated_at"))
+    policy = load_current_policy() if policy is None else policy
+    active_source_ids = frozenset(policy["active_source_ids"])
     rows, sources = feed.get("items"), status.get("sources")
     if not isinstance(rows, list) or not isinstance(sources, list) or len(rows) > MAX_ROWS:
         raise ValueError("invalid or unbounded canonical arrays")
@@ -138,19 +151,28 @@ def build_store(feed: dict[str, Any], status: dict[str, Any], brief: dict[str, A
     source_rows = [project_source(s, hashes["status"]) for s in sources]
     source_rows.sort(key=lambda r: r["source_id"])
     source_ids = {s["source_id"] for s in source_rows}
-    if len(source_ids) != len(source_rows) or source_ids != EXPECTED_SOURCES:
+    if len(source_ids) != len(source_rows) or source_ids != active_source_ids:
         raise ValueError("source coverage must match the approved P0 set exactly")
     if any(row["source_id"] not in source_ids for row in projected):
         raise ValueError("feed references unknown source")
-    material = {"schema_version": SCHEMA_VERSION, "projection_version": PROJECTION_VERSION, "artifact_hashes": hashes}
+    policy_binding = {
+        "policy_version": policy["policy_version"],
+        "policy_hash": policy["policy_hash"],
+        "catalog_hash": policy["catalog_hash"],
+        "active_source_ids": sorted(active_source_ids),
+    }
+    material = {"schema_version": SCHEMA_VERSION, "projection_version": PROJECTION_VERSION,
+                "artifact_hashes": hashes, "policy": policy_binding}
     store = {
         "schema_version": SCHEMA_VERSION, "projection_version": PROJECTION_VERSION,
         "generation_id": sha256_bytes(canonical_json(material)),
         "capabilities": ["publication_metadata", "source_health"],
+        "policy": policy_binding,
         "generated_from": {"collection_run_id": run,
                            "feed_generated_at": feed["generated_at"], "status_generated_at": status["generated_at"],
                            "brief_generated_at": brief["generated_at"],
                            "feed_sha256": hashes["feed"], "status_sha256": hashes["status"], "brief_sha256": hashes["brief"],
+                           "policy_hash": policy["policy_hash"],
                            "collection_status": status_run.get("status"), "publication_status": brief.get("publication_status"),
                            "snapshot_complete": brief.get("snapshot_complete")},
         "counts": {"publication_items": len(projected), "sources": len(source_rows)},
@@ -169,7 +191,17 @@ def validate_store(store):
         raise ValueError("query projection hash mismatch")
     if not isinstance(store.get("items"), list) or not isinstance(store.get("sources"), list):
         raise ValueError("query store arrays missing")
-    if {s.get("source_id") for s in store["sources"]} != EXPECTED_SOURCES or len(store["sources"]) != len(EXPECTED_SOURCES):
+    current_policy = load_current_policy()
+    expected_policy = {
+        "policy_version": current_policy["policy_version"],
+        "policy_hash": current_policy["policy_hash"],
+        "catalog_hash": current_policy["catalog_hash"],
+        "active_source_ids": sorted(current_policy["active_source_ids"]),
+    }
+    if store.get("policy") != expected_policy:
+        raise ValueError("query store source policy mismatch; rebuild from canonical artifacts")
+    expected_sources = frozenset(current_policy["active_source_ids"])
+    if {s.get("source_id") for s in store["sources"]} != expected_sources or len(store["sources"]) != len(expected_sources):
         raise ValueError("query store source coverage mismatch")
     if len(store["items"]) > MAX_ROWS:
         raise ValueError("query store item budget exceeded")
@@ -303,6 +335,7 @@ def query_store(store: dict[str, Any], *, text=None, source_id=None, change_type
         "schema_version": 2, "query_generation_id": store["generation_id"],
         "canonical_artifact_hashes": {k: store["generated_from"][f"{k}_sha256"] for k in ("feed", "status", "brief")},
         "publication_deployment_verified": False,
+        "policy": store["policy"],
         "data_status": assessment, "source_gaps": gaps,
         "source_status": [s for s in store["sources"] if not source_id or s["source_id"] == source_id],
         "answerable_no_match": total == 0 and not gaps,

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime
+import importlib.util
 import json
 from pathlib import Path
 from typing import Any
@@ -17,6 +18,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_STATUS = ROOT / "apps/web/public/data/source-status.json"
 DEFAULT_BRIEF = ROOT / "apps/web/public/data/v2-daily-brief.json"
+SOURCE_POLICY = ROOT / "scripts/source-policy.py"
 VALID_OUTCOMES = {"SUCCESS", "FAILED", "PARTIAL", "STALE", "UNKNOWN", "SKIPPED"}
 VALID_LANES = {"publication", "query", "discovery"}
 REQUIRED_PUBLICATION_STAGES = {
@@ -25,9 +27,26 @@ REQUIRED_PUBLICATION_STAGES = {
     "deployment",
     "public_http_verification",
 }
-REQUIRED_PUBLICATION_SOURCE_IDS = {"S-004", "S-006", "S-007", "S-009", "S-029"}
 FRESH_SOURCE_STATES = {"FRESH", "RECENT"}
 STALE_SOURCE_STATES = {"STALE", "VERY_STALE"}
+
+
+def load_current_policy() -> dict[str, Any]:
+    spec = importlib.util.spec_from_file_location("system_health_source_policy", SOURCE_POLICY)
+    if spec is None or spec.loader is None:
+        raise ValueError("source policy module is unavailable")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.compile_policy(module.load_catalog())
+
+
+def policy_binding(policy: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "policy_version": policy["policy_version"],
+        "policy_hash": policy["policy_hash"],
+        "catalog_hash": policy["catalog_hash"],
+        "active_source_ids": list(policy["active_source_ids"]),
+    }
 
 
 def parse_time(value: Any) -> datetime | None:
@@ -140,22 +159,28 @@ def build_health(stages: list[dict[str, Any]], timestamps: dict[str, Any] | None
     }
 
 
-def _source_coverage(sources: Any) -> tuple[list[dict[str, Any]], bool]:
+def _source_coverage(sources: Any, required_source_ids: set[str]) -> tuple[list[dict[str, Any]], bool]:
     if not isinstance(sources, list) or not sources or any(not isinstance(source, dict) for source in sources):
         return [], False
     source_ids = [source.get("source_id") for source in sources]
     if any(not isinstance(source_id, str) or not source_id for source_id in source_ids):
         return sources, False
-    exact = len(source_ids) == len(set(source_ids)) == len(REQUIRED_PUBLICATION_SOURCE_IDS) and set(source_ids) == REQUIRED_PUBLICATION_SOURCE_IDS
+    exact = len(source_ids) == len(set(source_ids)) == len(required_source_ids) and set(source_ids) == required_source_ids
     return sources, exact
 
 
-def current_publication_stages(status: dict[str, Any], brief: dict[str, Any]) -> list[dict[str, Any]]:
+def current_publication_stages(status: dict[str, Any], brief: dict[str, Any], policy: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    if policy is None:
+        try:
+            policy = load_current_policy()
+        except (OSError, ValueError, json.JSONDecodeError):
+            policy = None
+    required_source_ids = set(policy["active_source_ids"]) if policy else set()
     generated_at = status.get("generated_at")
     run = status.get("latest_collection_run") if isinstance(status.get("latest_collection_run"), dict) else {}
     run_id = run.get("collection_run_id")
     run_status = run.get("status")
-    sources, exact_coverage = _source_coverage(status.get("sources"))
+    sources, exact_coverage = _source_coverage(status.get("sources"), required_source_ids)
     freshness_states = {
         str(source.get("freshness_status", "UNKNOWN")).upper()
         for source in sources
@@ -170,7 +195,10 @@ def current_publication_stages(status: dict[str, Any], brief: dict[str, Any]) ->
         or source.get("window_completeness") not in {"COMPLETE_ZERO", "COMPLETE_WITH_ITEMS"}
         for source in sources
     )
-    if run_status == "SUCCEEDED" and exact_coverage and not has_source_gap and not has_unknown_freshness and not has_stale_source:
+    if policy is None:
+        collect_outcome = "UNKNOWN"
+        collect_error = "SOURCE_POLICY_UNAVAILABLE"
+    elif run_status == "SUCCEEDED" and exact_coverage and not has_source_gap and not has_unknown_freshness and not has_stale_source:
         collect_outcome = "SUCCESS"
         collect_error = None
     elif run_status == "SUCCEEDED" and exact_coverage and has_stale_source and not has_unknown_freshness:
@@ -206,6 +234,7 @@ def current_publication_stages(status: dict[str, Any], brief: dict[str, Any]) ->
         validate_outcome = "UNKNOWN"
         validate_error = "PUBLICATION_RECEIPT_INCOMPLETE"
 
+    binding = policy_binding(policy) if policy else {"policy_status": "UNKNOWN"}
     return [
         {
             "lane": "publication",
@@ -215,6 +244,7 @@ def current_publication_stages(status: dict[str, Any], brief: dict[str, Any]) ->
             "ended_at": generated_at,
             "last_success_at": generated_at if collect_outcome == "SUCCESS" else None,
             "error_class": collect_error,
+            **binding,
         },
         {
             "lane": "publication",
@@ -224,30 +254,35 @@ def current_publication_stages(status: dict[str, Any], brief: dict[str, Any]) ->
             "ended_at": brief.get("generated_at"),
             "last_success_at": brief.get("generated_at") if validate_outcome == "SUCCESS" else None,
             "error_class": validate_error,
+            **binding,
         },
         {
             "lane": "publication",
             "stage": "deployment",
             "outcome": "UNKNOWN",
             "error_class": "NO_DEPLOYMENT_RECEIPT_IN_CANONICAL_ARTIFACT",
+            **binding,
         },
         {
             "lane": "publication",
             "stage": "public_http_verification",
             "outcome": "UNKNOWN",
             "error_class": "NO_HTTP_HASH_RECEIPT_IN_CANONICAL_ARTIFACT",
+            **binding,
         },
         {
             "lane": "query",
             "stage": "query_index",
             "outcome": "UNKNOWN",
             "error_class": "QUERY_INDEX_NOT_YET_WIRED",
+            **binding,
         },
         {
             "lane": "query",
             "stage": "mcp_web_query",
             "outcome": "UNKNOWN",
             "error_class": "QUERY_RUNTIME_NOT_YET_WIRED",
+            **binding,
         },
     ]
 
@@ -255,7 +290,13 @@ def current_publication_stages(status: dict[str, Any], brief: dict[str, Any]) ->
 def load_current(status_path: Path = DEFAULT_STATUS, brief_path: Path = DEFAULT_BRIEF) -> dict[str, Any]:
     status = json.loads(status_path.read_text(encoding="utf-8"))
     brief = json.loads(brief_path.read_text(encoding="utf-8"))
-    return build_health(current_publication_stages(status, brief))
+    try:
+        policy = load_current_policy()
+    except (OSError, ValueError, json.JSONDecodeError):
+        policy = None
+    result = build_health(current_publication_stages(status, brief, policy))
+    result["policy"] = policy_binding(policy) if policy else {"policy_status": "UNKNOWN"}
+    return result
 
 
 def self_check() -> None:

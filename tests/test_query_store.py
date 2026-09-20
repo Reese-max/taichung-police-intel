@@ -50,6 +50,22 @@ class QueryStoreTests(unittest.TestCase):
         self.assertTrue(all(row["source_id"] == "S-004" for row in result["results"]))
         self.assertEqual(result["truncated"], result["total_matches"] > result["result_count"])
 
+    def test_query_store_is_bound_to_current_source_policy(self):
+        store = qs.build_from_paths(qs.DEFAULT_FEED, qs.DEFAULT_STATUS, qs.DEFAULT_BRIEF)
+        policy = qs.load_current_policy()
+        self.assertEqual(store["policy"]["policy_hash"], policy["policy_hash"])
+        result = qs.query_store(store, source_id="S-004")
+        self.assertEqual(result["policy"], store["policy"])
+
+    def test_tampered_source_policy_binding_fails_closed(self):
+        store = qs.build_from_paths(qs.DEFAULT_FEED, qs.DEFAULT_STATUS, qs.DEFAULT_BRIEF)
+        store["policy"]["policy_hash"] = "0" * 64
+        store["projection_sha256"] = qs.sha256_bytes(
+            qs.canonical_json({key: value for key, value in store.items() if key != "projection_sha256"})
+        )
+        with self.assertRaisesRegex(ValueError, "policy mismatch"):
+            qs.query_store(store)
+
     def test_query_limit_fails_closed(self):
         store = qs.build_from_paths(qs.DEFAULT_FEED, qs.DEFAULT_STATUS, qs.DEFAULT_BRIEF)
         for bad in (0, 101, 1000):

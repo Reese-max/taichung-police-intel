@@ -20,6 +20,8 @@ SCHEMA_VERSION = 1
 VALID_STATUSES = {"PRODUCTION_ACTIVE", "AUDITED_EXISTING", "VERIFIED_CANDIDATE", "REFERENCE_ONLY"}
 VALID_ROLES = {"PRIMARY_EVENT", "PRIMARY_REFERENCE", "ENRICHMENT", "DISCOVERY_ONLY"}
 COMPLETE = {"COMPLETE_ZERO", "COMPLETE_WITH_ITEMS"}
+FRESHNESS_RECENT = {"FRESH", "RECENT"}
+FRESHNESS_STALE = {"STALE", "VERY_STALE"}
 
 
 def canonical(value: Any) -> bytes:
@@ -241,8 +243,12 @@ def assess_query(policy: dict[str, Any], capability_id: str, source_states: dict
             continue
         if state.get("source_health") != "PASS" or state.get("window_completeness") not in COMPLETE:
             bad.append(source_id)
-        if state.get("freshness") == "STALE":
+        freshness = state.get("freshness", state.get("freshness_status"))
+        freshness = str(freshness).upper() if freshness is not None else "UNKNOWN"
+        if freshness in FRESHNESS_STALE:
             stale.append(source_id)
+        elif freshness not in FRESHNESS_RECENT:
+            bad.append(source_id)
     if missing or bad:
         status = "PARTIAL"
     elif stale:
