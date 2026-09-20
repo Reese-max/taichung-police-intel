@@ -95,8 +95,14 @@ if (!failures.length) {
   }
 
   const status = JSON.parse(await read("apps/web/public/data/source-status.json"));
+  const sourcePolicy = JSON.parse(await read("apps/web/public/data/source-policy.json"));
+  const activeSourceIds = new Set(sourcePolicy.active_source_ids || []);
+  const statusSourceIds = new Set((status.sources || []).map(source => source?.source_id));
   if (status.mode !== "COMPETITION_DEMO") failures.push("demo-status:invalid-mode");
-  if (status.sources?.length !== 5) failures.push("demo-status:expected-five-sources");
+  if (activeSourceIds.size === 0 || statusSourceIds.size !== activeSourceIds.size ||
+      [...activeSourceIds].some(sourceId => !statusSourceIds.has(sourceId))) {
+    failures.push("demo-status:source-coverage-does-not-match-policy");
+  }
   if (!(Date.parse(status.next_update_at) > Date.parse(status.generated_at))) failures.push("demo-status:next-update-not-future");
   for (const source of status.sources || []) {
     if (!/^https:\/\//.test(source.source_url || "")) failures.push(`demo-status:${source.source_id}:invalid-url`);
