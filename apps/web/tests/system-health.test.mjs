@@ -12,11 +12,13 @@ test("system health receipt exposes lane and stage evidence", async () => {
   assert.deepEqual(Object.keys(health.lanes).sort(), ["discovery", "publication", "query"]);
   assert.ok(Array.isArray(health.stages) && health.stages.length >= 4);
   assert.ok(health.stages.some((stage) => stage.stage === "public_http_verification"));
+  assert.ok(Array.isArray(health.review_inbox));
 });
 
 test("dashboard renders the saved health receipt without treating UNKNOWN as success", async () => {
   const source = await readFile(componentUrl, "utf8");
   assert.match(source, /system-health\.json/);
   assert.match(source, /v2-system-health/);
+  assert.match(source, /v2-review-inbox/);
   assert.match(source, /UNKNOWN 不會被解讀成成功/);
 });

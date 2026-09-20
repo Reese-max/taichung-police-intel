@@ -126,6 +126,10 @@ jobs:
             --handoff-state state/v2-handoff-state.json \
             --brief apps/web/public/data/v2-daily-brief.json
 
+      - name: Build source contract drift receipt
+        id: schema_drift
+        run: python -X utf8 scripts/schema_drift.py --output apps/web/public/data/schema-drift.json
+
       - name: Build machine-readable system health receipt
         id: system_health
         run: python -X utf8 scripts/system-health.py --output apps/web/public/data/system-health.json
@@ -181,6 +185,7 @@ jobs:
             apps/web/public/data/feed-export.csv
             apps/web/public/data/v2-daily-brief.json
             apps/web/public/data/system-health.json
+            apps/web/public/data/schema-drift.json
             state/v2-shadow-state.json
             state/v2-handoff-state.json
           if-no-files-found: error

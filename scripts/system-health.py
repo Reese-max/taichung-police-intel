@@ -18,6 +18,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_STATUS = ROOT / "apps/web/public/data/source-status.json"
 DEFAULT_BRIEF = ROOT / "apps/web/public/data/v2-daily-brief.json"
+DEFAULT_SCHEMA_DRIFT = ROOT / "apps/web/public/data/schema-drift.json"
 SOURCE_POLICY = ROOT / "scripts/source-policy.py"
 VALID_OUTCOMES = {"SUCCESS", "FAILED", "PARTIAL", "STALE", "UNKNOWN", "SKIPPED"}
 VALID_LANES = {"publication", "query", "discovery"}
@@ -46,6 +47,43 @@ def policy_binding(policy: dict[str, Any]) -> dict[str, Any]:
         "policy_hash": policy["policy_hash"],
         "catalog_hash": policy["catalog_hash"],
         "active_source_ids": list(policy["active_source_ids"]),
+    }
+
+
+def load_schema_drift(path: Path = DEFAULT_SCHEMA_DRIFT) -> dict[str, Any] | None:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def schema_contract_stage(receipt: dict[str, Any] | None) -> dict[str, Any]:
+    if not receipt or not isinstance(receipt.get("sources"), list) or not receipt["sources"]:
+        return {
+            "lane": "discovery",
+            "stage": "source_contracts",
+            "outcome": "UNKNOWN",
+            "error_class": "NO_SCHEMA_DRIFT_RECEIPT",
+        }
+    statuses = {str(source.get("status", "UNKNOWN")) for source in receipt["sources"] if isinstance(source, dict)}
+    if "BREAKING_DRIFT" in statuses or "SOURCE_UNAVAILABLE" in statuses:
+        outcome, error = "FAILED", "SOURCE_CONTRACT_DRIFT"
+    elif "CONTENT_SHAPE_UNKNOWN" in statuses:
+        outcome, error = "UNKNOWN", "SOURCE_CONTRACT_UNVERIFIED"
+    elif statuses <= {"NO_DRIFT", "ADDITIVE_COMPATIBLE"}:
+        outcome, error = "SUCCESS", None
+    else:
+        outcome, error = "UNKNOWN", "SOURCE_CONTRACT_STATUS_UNKNOWN"
+    return {
+        "lane": "discovery",
+        "stage": "source_contracts",
+        "outcome": outcome,
+        "error_class": error,
+        "contract_overall": receipt.get("overall"),
+        "review_inbox_count": len(receipt.get("review_inbox", [])) if isinstance(receipt.get("review_inbox"), list) else 0,
+        "ended_at": receipt.get("generated_at"),
+        "last_success_at": receipt.get("generated_at") if outcome == "SUCCESS" else None,
     }
 
 
@@ -169,7 +207,12 @@ def _source_coverage(sources: Any, required_source_ids: set[str]) -> tuple[list[
     return sources, exact
 
 
-def current_publication_stages(status: dict[str, Any], brief: dict[str, Any], policy: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+def current_publication_stages(
+    status: dict[str, Any],
+    brief: dict[str, Any],
+    policy: dict[str, Any] | None = None,
+    schema_drift: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
     if policy is None:
         try:
             policy = load_current_policy()
@@ -235,7 +278,8 @@ def current_publication_stages(status: dict[str, Any], brief: dict[str, Any], po
         validate_error = "PUBLICATION_RECEIPT_INCOMPLETE"
 
     binding = policy_binding(policy) if policy else {"policy_status": "UNKNOWN"}
-    return [
+    stages = [schema_contract_stage(schema_drift or load_schema_drift())]
+    stages.extend([
         {
             "lane": "publication",
             "stage": "collection",
@@ -284,7 +328,8 @@ def current_publication_stages(status: dict[str, Any], brief: dict[str, Any], po
             "error_class": "QUERY_RUNTIME_NOT_YET_WIRED",
             **binding,
         },
-    ]
+    ])
+    return stages
 
 
 def load_current(status_path: Path = DEFAULT_STATUS, brief_path: Path = DEFAULT_BRIEF) -> dict[str, Any]:
@@ -294,8 +339,14 @@ def load_current(status_path: Path = DEFAULT_STATUS, brief_path: Path = DEFAULT_
         policy = load_current_policy()
     except (OSError, ValueError, json.JSONDecodeError):
         policy = None
-    result = build_health(current_publication_stages(status, brief, policy))
+    schema_drift = load_schema_drift()
+    result = build_health(current_publication_stages(status, brief, policy, schema_drift))
     result["policy"] = policy_binding(policy) if policy else {"policy_status": "UNKNOWN"}
+    result["schema_drift"] = {
+        "overall": schema_drift.get("overall") if schema_drift else "UNKNOWN",
+        "source_count": len(schema_drift.get("sources", [])) if schema_drift else 0,
+    }
+    result["review_inbox"] = schema_drift.get("review_inbox", []) if schema_drift else []
     return result
 
 

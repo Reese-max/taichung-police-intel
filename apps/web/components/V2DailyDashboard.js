@@ -85,6 +85,7 @@ function Metric({ value, label, emphasis = false }) {
 
 function SystemHealthSummary({ health }) {
   if (!health || !health.lanes || !Array.isArray(health.stages)) return null;
+  const reviewItems = Array.isArray(health.review_inbox) ? health.review_inbox : [];
   return (
     <details className="v2-system-health" data-testid="v2-system-health">
       <summary>端到端系統健康：{health.overall}</summary>
@@ -106,6 +107,18 @@ function SystemHealthSummary({ health }) {
             </li>
           ))}
         </ul>
+        <section className="v2-review-inbox" data-testid="v2-review-inbox" aria-label="來源契約 Review Inbox">
+          <strong>Review Inbox：{reviewItems.length} 件</strong>
+          {reviewItems.length > 0 ? (
+            <ul>
+              {reviewItems.slice(0, 5).map((item) => (
+                <li key={`${item.source_id}-${item.observed_at}`}>
+                  {item.source_id} · {item.status} · {(item.reasons || []).join(", ")}
+                </li>
+              ))}
+            </ul>
+          ) : <span>目前沒有需要人工覆核的契約漂移。</span>}
+        </section>
         <p className="v2-health-note">此 receipt 只反映已保存的處理鏈證據；UNKNOWN 不會被解讀成成功。</p>
       </div>
     </details>

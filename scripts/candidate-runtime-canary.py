@@ -105,6 +105,15 @@ def run_canary(collector, sources, now, *, session_factory=BoundedSession):
         raise ValueError("canary clock must be timezone-aware")
 
     records = []
+    drift = None
+    try:
+        drift_path = ROOT / "scripts" / "schema_drift.py"
+        drift_spec = importlib.util.spec_from_file_location("govintel_schema_drift", drift_path)
+        if drift_spec is not None and drift_spec.loader is not None:
+            drift = importlib.util.module_from_spec(drift_spec)
+            drift_spec.loader.exec_module(drift)
+    except Exception:
+        drift = None
     for source_id in sources:
         url = collector.NEWS_LIST_SOURCES[source_id]["list_url"]
         session = session_factory(url)
@@ -146,6 +155,30 @@ def run_canary(collector, sources, now, *, session_factory=BoundedSession):
                 "manifest_sha256": manifest,
                 "coverage_independently_verified": False,
             })
+            first_snapshot = next((item for item in result["snapshots"] if item.get("purpose") == "LIST"), None)
+            if drift is not None and first_snapshot and "body" in first_snapshot:
+                contract = drift.CONTRACTS[source_id]
+                contract_result = drift.observe(
+                    contract,
+                    first_snapshot["body"],
+                    http_status=first_snapshot.get("http_status", 200),
+                    content_type=first_snapshot.get("content_type", ""),
+                    requested_url=first_snapshot.get("requested_url"),
+                    final_url=first_snapshot.get("final_url"),
+                    observed_at=now.isoformat(),
+                )
+                record["schema_contract"] = {
+                    key: contract_result.get(key)
+                    for key in ("contract_version", "parser_version", "transport", "status", "observed_schema_fingerprint", "sample_sha256", "reasons", "review_required")
+                }
+                if contract_result["status"] not in drift.GOOD_STATUSES:
+                    raise ValueError(f"schema contract {contract_result['status']}")
+            else:
+                record["schema_contract"] = {
+                    "status": "CONTENT_SHAPE_UNKNOWN",
+                    "reasons": ["NO_SNAPSHOT_BODY"],
+                    "review_required": False,
+                }
             if record["source_health"] not in ("PASS", "DEGRADED") or record["detail_fetch_count"] > 1:
                 raise ValueError("collector violated the bounded candidate contract")
         except Exception as error:
@@ -158,6 +191,11 @@ def run_canary(collector, sources, now, *, session_factory=BoundedSession):
                 "detail_fetch_count": None,
                 "manifest_sha256": None,
                 "error_type": type(error).__name__,
+                "schema_contract": {
+                    "status": "CONTENT_SHAPE_UNKNOWN",
+                    "reasons": ["COLLECTOR_DID_NOT_RETURN_VERIFIABLE_SNAPSHOT"],
+                    "review_required": False,
+                },
             })
         finally:
             record["http_calls"] = session.calls

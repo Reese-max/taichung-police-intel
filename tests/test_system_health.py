@@ -155,6 +155,16 @@ class SystemHealthTests(unittest.TestCase):
         self.assertEqual(result["lanes"]["publication"], "STALE")
         self.assertEqual(result["policy"]["active_source_ids"], sorted(health.load_current_policy()["active_source_ids"]))
 
+    def test_schema_contract_drift_is_explicit_discovery_failure(self):
+        good = health.schema_contract_stage({"overall": "HEALTHY", "sources": [{"status": "NO_DRIFT"}], "review_inbox": []})
+        self.assertEqual(good["outcome"], "SUCCESS")
+        broken = health.schema_contract_stage({
+            "overall": "BLOCKED",
+            "sources": [{"status": "BREAKING_DRIFT"}],
+            "review_inbox": [{"source_id": "S-007"}],
+        })
+        self.assertEqual((broken["outcome"], broken["error_class"], broken["review_inbox_count"]), ("FAILED", "SOURCE_CONTRACT_DRIFT", 1))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -139,6 +139,8 @@ The command uses the durable `state/v2-handoff-state.json`, makes repeated watch
 
 The saved [system-health.json](./apps/web/public/data/system-health.json) exposes the publication, query, and discovery lanes plus stage-level outcomes. `STALE` and `UNKNOWN` are intentional evidence states; they are not deployment or public-reachability claims.
 
+Source contract drift is fail-closed. `scripts/schema_drift.py` covers the three HTML candidate lists, council JSON APIs, and data.gov.tw JSON/CSV resources. A missing required field, changed type, failed HTML identity, missing pagination marker, or HTTP error becomes a drift receipt and preserves the last-known-good fingerprint; additive fields are recorded as compatible. The receipt is visible in the system-health discovery lane and Review Inbox. Running it without an observed input intentionally produces `UNKNOWN`, not a fabricated healthy result.
+
 ## Public deployment
 
 `.github/workflows/pages.yml` uses GitHub Pages and GitHub Actions:
@@ -168,6 +170,10 @@ npm test
 
 # Full gate including the production static build
 npm run check
+```
+
+```bash
+python scripts/schema_drift.py --self-check
 ```
 
 Expected final line:

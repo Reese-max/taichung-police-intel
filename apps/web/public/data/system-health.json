@@ -23,8 +23,23 @@
     "policy_hash": "79bdfae6210068dbe44b76214ed7cfc7605a1922798e0fc56cd87a94db109930",
     "policy_version": 1
   },
+  "review_inbox": [],
+  "schema_drift": {
+    "overall": "UNKNOWN",
+    "source_count": 8
+  },
   "schema_version": 1,
   "stages": [
+    {
+      "contract_overall": "UNKNOWN",
+      "ended_at": "2026-09-20T23:35:53+00:00",
+      "error_class": "SOURCE_CONTRACT_UNVERIFIED",
+      "lane": "discovery",
+      "last_success_at": null,
+      "outcome": "UNKNOWN",
+      "review_inbox_count": 0,
+      "stage": "source_contracts"
+    },
     {
       "active_source_ids": [
         "S-004",

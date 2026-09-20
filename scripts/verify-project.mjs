@@ -42,9 +42,12 @@ const required = [
   "scripts/query-gateway.py",
   "scripts/verify-current-checkout.py",
   "scripts/retention-policy.py",
+  "scripts/schema_drift.py",
   "docs/govintel/retention-rights-policy.v1.json",
   "tests/test_query_gateway.py",
   "tests/test_retention_policy.py",
+  "tests/test_schema_drift.py",
+  "apps/web/public/data/schema-drift.json",
   "apps/web/app/api/health.json/route.js",
   "apps/web/app/api/status.json/route.js",
   "evaluation/ingestion-record.schema.json",
@@ -108,10 +111,16 @@ if (!failures.length) {
   const status = JSON.parse(await read("apps/web/public/data/source-status.json"));
   const sourcePolicy = JSON.parse(await read("apps/web/public/data/source-policy.json"));
   const systemHealth = JSON.parse(await read("apps/web/public/data/system-health.json"));
+  const schemaDrift = JSON.parse(await read("apps/web/public/data/schema-drift.json"));
   if (systemHealth.schema_version !== 1 ||
       !["HEALTHY", "DEGRADED", "STALE", "PARTIAL", "BLOCKED", "UNKNOWN"].includes(systemHealth.overall) ||
       !systemHealth.lanes || typeof systemHealth.lanes !== "object" || !Array.isArray(systemHealth.stages)) {
     failures.push("system-health:invalid-machine-readable-receipt");
+  }
+  if (schemaDrift.schema_version !== 1 ||
+      !["HEALTHY", "DEGRADED", "BLOCKED", "UNKNOWN"].includes(schemaDrift.overall) ||
+      !Array.isArray(schemaDrift.sources) || !Array.isArray(schemaDrift.review_inbox)) {
+    failures.push("schema-drift:invalid-machine-readable-receipt");
   }
   const activeSourceIds = new Set(sourcePolicy.active_source_ids || []);
   const statusSourceIds = new Set((status.sources || []).map(source => source?.source_id));
@@ -233,6 +242,8 @@ if (["quick", "full"].includes(mode) && !failures.length) {
       ["contract-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "evaluation", "-p", "test_source_value_contract.py", "-v"]],
       ["ingestion-contract-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_source_ingestion.py", "-v"]],
       ["system-health-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_system_health.py", "-v"]],
+      ["schema-drift-receipt", ["-X", "utf8", "scripts/schema_drift.py", "--output", "apps/web/public/data/schema-drift.json"]],
+      ["schema-drift-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_schema_drift.py", "-v"]],
       ["system-health-receipt", ["-X", "utf8", "scripts/system-health.py", "--output", "apps/web/public/data/system-health.json"]],
       ["query-gateway-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_query_gateway.py", "-v"]],
       ["handoff-state-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_handoff_state.py", "-v"]],
