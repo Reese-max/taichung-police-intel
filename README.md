@@ -1,4 +1,6 @@
-# Taichung Police Public Intelligence
+# GovIntel AI｜跨機關公共事件整合、異動辨識與交班支援平台
+
+The former competition prototype name was **Taichung Police Public Intelligence**; this repository now documents the current GovIntel AI product.
 
 An evidence-first public-information monitor that helps police policy staff prepare for council questions in five minutes.
 

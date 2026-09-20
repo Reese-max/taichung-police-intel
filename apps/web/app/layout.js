@@ -5,8 +5,8 @@ import V2DailyDashboard from "../components/V2DailyDashboard.js";
 
 
 export const metadata = {
-  title: "臺中警政每日情資｜公開政策與議會監測",
-  description: "以官方公開來源整理本期真正新增、修正、狀態與時程變更，協助警政政策及議會工作快速判讀與查證。",
+  title: "GovIntel AI｜跨機關公共事件整合、異動辨識與交班支援平台",
+  description: "整合官方公開來源，辨識公共事件異動、保留證據與缺口，支援警政政策判讀及交班查證。",
 };
 
 export const viewport = {

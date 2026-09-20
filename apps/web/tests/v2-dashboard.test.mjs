@@ -84,7 +84,7 @@ test("formal layout renders V2 before the collapsed legacy interface", async () 
   assert.ok(dashboardIndex >= 0, "V2 dashboard must be rendered");
   assert.ok(legacyIndex > dashboardIndex, "legacy interface must follow V2");
   assert.ok(childrenIndex > legacyIndex, "legacy children must remain inside the collapsed section");
-  assert.match(source, /臺中警政每日情資/);
+  assert.match(source, /GovIntel AI/);
 });
 
 test("V2 dashboard is police-first, Top 3 capped, and evidence-bound", async () => {
