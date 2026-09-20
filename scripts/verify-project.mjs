@@ -31,6 +31,7 @@ const required = [
   "apps/web/scripts/migrate.mjs",
   "apps/web/next.config.mjs",
   "apps/web/public/data/source-status.json",
+  "apps/web/public/data/system-health.json",
   "apps/web/public/data/source-policy.json",
   "apps/web/scripts/sync-source-policy.mjs",
   "apps/web/public/data/intelligence-feed.json",
@@ -106,6 +107,12 @@ if (!failures.length) {
 
   const status = JSON.parse(await read("apps/web/public/data/source-status.json"));
   const sourcePolicy = JSON.parse(await read("apps/web/public/data/source-policy.json"));
+  const systemHealth = JSON.parse(await read("apps/web/public/data/system-health.json"));
+  if (systemHealth.schema_version !== 1 ||
+      !["HEALTHY", "DEGRADED", "STALE", "PARTIAL", "BLOCKED", "UNKNOWN"].includes(systemHealth.overall) ||
+      !systemHealth.lanes || typeof systemHealth.lanes !== "object" || !Array.isArray(systemHealth.stages)) {
+    failures.push("system-health:invalid-machine-readable-receipt");
+  }
   const activeSourceIds = new Set(sourcePolicy.active_source_ids || []);
   const statusSourceIds = new Set((status.sources || []).map(source => source?.source_id));
   if (status.mode !== "COMPETITION_DEMO") failures.push("demo-status:invalid-mode");
@@ -226,6 +233,7 @@ if (["quick", "full"].includes(mode) && !failures.length) {
       ["contract-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "evaluation", "-p", "test_source_value_contract.py", "-v"]],
       ["ingestion-contract-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_source_ingestion.py", "-v"]],
       ["system-health-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_system_health.py", "-v"]],
+      ["system-health-receipt", ["-X", "utf8", "scripts/system-health.py", "--output", "apps/web/public/data/system-health.json"]],
       ["query-gateway-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_query_gateway.py", "-v"]],
       ["handoff-state-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_handoff_state.py", "-v"]],
       ["current-checkout-tests", ["-X", "utf8", "scripts/verify-current-checkout.py", "--self-check"]],

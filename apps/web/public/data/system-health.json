@@ -1,0 +1,131 @@
+{
+  "lanes": {
+    "discovery": "UNKNOWN",
+    "publication": "STALE",
+    "query": "UNKNOWN"
+  },
+  "latency_metrics": {
+    "detect_to_verify_ms": null,
+    "publish_to_visible_ms": null,
+    "source_to_detect_ms": null,
+    "verify_to_publish_ms": null
+  },
+  "overall": "STALE",
+  "policy": {
+    "active_source_ids": [
+      "S-004",
+      "S-006",
+      "S-007",
+      "S-009",
+      "S-029"
+    ],
+    "catalog_hash": "ec200cc249fc5921c4c820f1346f566d1d3acc43c02c9197afce395dc92fe9e7",
+    "policy_hash": "79bdfae6210068dbe44b76214ed7cfc7605a1922798e0fc56cd87a94db109930",
+    "policy_version": 1
+  },
+  "schema_version": 1,
+  "stages": [
+    {
+      "active_source_ids": [
+        "S-004",
+        "S-006",
+        "S-007",
+        "S-009",
+        "S-029"
+      ],
+      "catalog_hash": "ec200cc249fc5921c4c820f1346f566d1d3acc43c02c9197afce395dc92fe9e7",
+      "ended_at": "2026-09-11T08:23:26+08:00",
+      "error_class": null,
+      "generation_id": "CR-DEMO-20260911-MORNING-SCHEDULE",
+      "lane": "publication",
+      "last_success_at": "2026-09-11T08:23:26+08:00",
+      "outcome": "SUCCESS",
+      "policy_hash": "79bdfae6210068dbe44b76214ed7cfc7605a1922798e0fc56cd87a94db109930",
+      "policy_version": 1,
+      "stage": "canonical_validation"
+    },
+    {
+      "active_source_ids": [
+        "S-004",
+        "S-006",
+        "S-007",
+        "S-009",
+        "S-029"
+      ],
+      "catalog_hash": "ec200cc249fc5921c4c820f1346f566d1d3acc43c02c9197afce395dc92fe9e7",
+      "ended_at": "2026-09-11T08:23:26+08:00",
+      "error_class": "SOURCE_FRESHNESS_STALE",
+      "generation_id": "CR-DEMO-20260911-MORNING-SCHEDULE",
+      "lane": "publication",
+      "last_success_at": null,
+      "outcome": "STALE",
+      "policy_hash": "79bdfae6210068dbe44b76214ed7cfc7605a1922798e0fc56cd87a94db109930",
+      "policy_version": 1,
+      "stage": "collection"
+    },
+    {
+      "active_source_ids": [
+        "S-004",
+        "S-006",
+        "S-007",
+        "S-009",
+        "S-029"
+      ],
+      "catalog_hash": "ec200cc249fc5921c4c820f1346f566d1d3acc43c02c9197afce395dc92fe9e7",
+      "error_class": "NO_DEPLOYMENT_RECEIPT_IN_CANONICAL_ARTIFACT",
+      "lane": "publication",
+      "outcome": "UNKNOWN",
+      "policy_hash": "79bdfae6210068dbe44b76214ed7cfc7605a1922798e0fc56cd87a94db109930",
+      "policy_version": 1,
+      "stage": "deployment"
+    },
+    {
+      "active_source_ids": [
+        "S-004",
+        "S-006",
+        "S-007",
+        "S-009",
+        "S-029"
+      ],
+      "catalog_hash": "ec200cc249fc5921c4c820f1346f566d1d3acc43c02c9197afce395dc92fe9e7",
+      "error_class": "NO_HTTP_HASH_RECEIPT_IN_CANONICAL_ARTIFACT",
+      "lane": "publication",
+      "outcome": "UNKNOWN",
+      "policy_hash": "79bdfae6210068dbe44b76214ed7cfc7605a1922798e0fc56cd87a94db109930",
+      "policy_version": 1,
+      "stage": "public_http_verification"
+    },
+    {
+      "active_source_ids": [
+        "S-004",
+        "S-006",
+        "S-007",
+        "S-009",
+        "S-029"
+      ],
+      "catalog_hash": "ec200cc249fc5921c4c820f1346f566d1d3acc43c02c9197afce395dc92fe9e7",
+      "error_class": "QUERY_RUNTIME_NOT_YET_WIRED",
+      "lane": "query",
+      "outcome": "UNKNOWN",
+      "policy_hash": "79bdfae6210068dbe44b76214ed7cfc7605a1922798e0fc56cd87a94db109930",
+      "policy_version": 1,
+      "stage": "mcp_web_query"
+    },
+    {
+      "active_source_ids": [
+        "S-004",
+        "S-006",
+        "S-007",
+        "S-009",
+        "S-029"
+      ],
+      "catalog_hash": "ec200cc249fc5921c4c820f1346f566d1d3acc43c02c9197afce395dc92fe9e7",
+      "error_class": "QUERY_INDEX_NOT_YET_WIRED",
+      "lane": "query",
+      "outcome": "UNKNOWN",
+      "policy_hash": "79bdfae6210068dbe44b76214ed7cfc7605a1922798e0fc56cd87a94db109930",
+      "policy_version": 1,
+      "stage": "query_index"
+    }
+  ]
+}

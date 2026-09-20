@@ -9,6 +9,7 @@ const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
 const BRIEF_URL = `${BASE_PATH}/data/v2-daily-brief.json`;
 const ARCHIVE_URL = `${BASE_PATH}/data/intelligence-feed.json`;
 const STATUS_URL = `${BASE_PATH}/data/source-status.json`;
+const SYSTEM_HEALTH_URL = `${BASE_PATH}/data/system-health.json`;
 
 const SOURCE_NAMES = {
   "S-004": "議事日程",
@@ -79,6 +80,35 @@ function Metric({ value, label, emphasis = false }) {
       <strong>{value}</strong>
       <span>{label}</span>
     </div>
+  );
+}
+
+function SystemHealthSummary({ health }) {
+  if (!health || !health.lanes || !Array.isArray(health.stages)) return null;
+  return (
+    <details className="v2-system-health" data-testid="v2-system-health">
+      <summary>端到端系統健康：{health.overall}</summary>
+      <div className="v2-system-health-content">
+        <div className="v2-health-lanes" aria-label="系統健康 lanes">
+          {Object.entries(health.lanes).map(([lane, status]) => (
+            <div key={lane} className="v2-health-lane">
+              <strong>{lane}</strong>
+              <span>{status}</span>
+            </div>
+          ))}
+        </div>
+        <ul className="v2-health-stage-list">
+          {health.stages.map((stage) => (
+            <li key={`${stage.lane}-${stage.stage}`}>
+              <span>{stage.lane} / {stage.stage}</span>
+              <strong>{stage.outcome}</strong>
+              <small>{stage.error_class || `最後觀測：${formatDateTime(stage.ended_at || stage.last_success_at)}`}</small>
+            </li>
+          ))}
+        </ul>
+        <p className="v2-health-note">此 receipt 只反映已保存的處理鏈證據；UNKNOWN 不會被解讀成成功。</p>
+      </div>
+    </details>
   );
 }
 
@@ -181,6 +211,7 @@ export default function V2DailyDashboard() {
   const [publication, setPublication] = useState(null);
   const [archive, setArchive] = useState(null);
   const [sourceStatus, setSourceStatus] = useState(null);
+  const [systemHealth, setSystemHealth] = useState(null);
   const [loadState, setLoadState] = useState("loading");
   const [loadError, setLoadError] = useState("");
   const [archiveQuery, setArchiveQuery] = useState("");
@@ -236,6 +267,12 @@ export default function V2DailyDashboard() {
     fetchJson(STATUS_URL)
       .then((data) => {
         if (!cancelled && data?.schema_version === 1) setSourceStatus(data);
+      })
+      .catch(() => {});
+
+    fetchJson(SYSTEM_HEALTH_URL)
+      .then((data) => {
+        if (!cancelled && data?.schema_version === 1) setSystemHealth(data);
       })
       .catch(() => {});
 
@@ -425,6 +462,7 @@ export default function V2DailyDashboard() {
             )}
           </section>
 
+          <SystemHealthSummary health={systemHealth} />
           <SourceHealthSummary sourceStatus={sourceStatus} canReassure={assessment.canReassure} />
         </>
       )}
