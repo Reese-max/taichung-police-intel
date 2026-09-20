@@ -83,11 +83,34 @@ def canonical_bytes_sha256(body: bytes) -> str:
 
 
 def roc_date(value: str) -> date | None:
-    match = re.search(r"(\d{2,3})[./](\d{1,2})[./](\d{1,2})", value)
-    if not match:
+    # Parse Gregorian dates first; otherwise the ROC matcher can start at the
+    # second digit of a four-digit year (for example, 2026 -> 026).
+    gregorian = re.search(
+        r"(?<!\d)(\d{4})\s*[-/.年]\s*(\d{1,2})\s*[-/.月]\s*(\d{1,2})\s*日?(?!\d)",
+        value,
+    )
+    if gregorian:
+        year, month, day = map(int, gregorian.groups())
+        if not 1912 <= year <= 2200:
+            return None
+        try:
+            return date(year, month, day)
+        except ValueError:
+            return None
+
+    roc = re.search(
+        r"(?<!\d)(\d{2,3})\s*[-/.年]\s*(\d{1,2})\s*[-/.月]\s*(\d{1,2})\s*日?(?!\d)",
+        value,
+    )
+    if not roc:
         return None
-    year, month, day = map(int, match.groups())
-    return date(year + 1911, month, day)
+    year, month, day = map(int, roc.groups())
+    if not 1 <= year <= 289:
+        return None
+    try:
+        return date(year + 1911, month, day)
+    except ValueError:
+        return None
 
 
 def published_at(value: str | date | None) -> str | None:
@@ -329,19 +352,157 @@ def collect_s029(session: requests.Session, start: date, end: date) -> dict:
     }
 
 
+# Candidate official news lists use a list-first rule: only a new or changed
+# list row fetches its detail page. They stay outside P0 publication until the
+# catalog promotion gates have fresh live evidence.
+NEWS_LIST_SOURCES = {
+    "S-001": {
+        "name": "臺中市政府警察局警政新聞",
+        "list_url": "https://www.police.taichung.gov.tw/ch/home.jsp?id=1&parentpath=0&mcustomize=news_list.jsp",
+        "id_pattern": r"news_view\.jsp[^\"']*dataserno=(\d+)",
+    },
+    "S-019": {
+        "name": "臺中市政府市政會議紀錄與專案報告",
+        "list_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186",
+        "id_pattern": r"/(\d+)/post\b",
+    },
+    "S-032": {
+        "name": "臺中市政府交通局最新消息",
+        "list_url": "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,7,218",
+        "id_pattern": r"Parser=9,4,(\d+)",
+    },
+}
+
+
+def parse_news_list(html: bytes, base_url: str, id_pattern: str) -> list[dict]:
+    """Extract stable IDs, titles, detail URLs, and row dates from a list page."""
+    soup = BeautifulSoup(html, "html.parser")
+    pattern = re.compile(id_pattern)
+    seen: dict[str, dict] = {}
+    for anchor in soup.find_all("a", href=True):
+        match = pattern.search(anchor["href"])
+        if not match:
+            continue
+        stable_key = match.group(1)
+        row = anchor.find_parent(["li", "tr", "dd", "div"]) or anchor.parent or anchor
+        row_text = " ".join(row.stripped_strings)
+        if stable_key not in seen:
+            seen[stable_key] = {
+                "stable_key": stable_key,
+                "title": re.sub(r"\s+", " ", anchor.get_text(strip=True)),
+                "detail_url": urllib.parse.urljoin(base_url, anchor["href"]),
+                "published": roc_date(row_text),
+            }
+    entries = list(seen.values())
+    if not entries:
+        raise ValueError("news list has no parseable entries")
+    return entries
+
+
+def collect_news_list(
+    session: requests.Session,
+    source_id: str,
+    start: date,
+    end: date,
+    existing: dict[str, dict] | None = None,
+    max_details: int | None = None,
+) -> dict:
+    """Collect a candidate list with bounded detail-page requests."""
+    config = NEWS_LIST_SOURCES[source_id]
+    listing = get(session, config["list_url"])
+    responses = [snapshot(listing, "LIST")]
+    entries = parse_news_list(listing.content, listing.url, config["id_pattern"])
+    existing = existing or {}
+    details_fetched = 0
+    items = []
+    for entry in entries:
+        list_payload = {
+            "title": entry["title"],
+            "detail_url": entry["detail_url"],
+            "published_at": published_at(entry["published"]),
+        }
+        list_sha = canonical_sha256(list_payload)
+        if existing.get(entry["stable_key"], {}).get("content_sha256") == list_sha:
+            payload = {**list_payload, "detail": "unchanged-skipped"}
+        elif max_details is not None and details_fetched >= max_details:
+            payload = {**list_payload, "detail": "skipped-detail-cap"}
+        else:
+            details_fetched += 1
+            detail = get(session, entry["detail_url"], timeout=120)
+            responses.append(snapshot(detail, "DETAIL"))
+            payload = {
+                **list_payload,
+                "detail": "fetched",
+                "body_sha256": canonical_bytes_sha256(detail.content),
+                "attachments": [
+                    urllib.parse.urljoin(detail.url, anchor["href"])
+                    for anchor in BeautifulSoup(detail.content, "html.parser").find_all("a", href=True)
+                    if re.search(r"\.(pdf|docx?|xlsx?|odt|zip)(\?|$)", anchor["href"], re.I)
+                ],
+            }
+        items.append(
+            {
+                "stable_key": entry["stable_key"],
+                "source_url": entry["detail_url"],
+                "published_at": list_payload["published_at"],
+                "content_sha256": list_sha,
+                "payload": payload,
+            }
+        )
+
+    dated = [date.fromisoformat(item["published_at"][:10]) for item in items if item["published_at"]]
+    window_items = [
+        item for item in items
+        if item["published_at"] and start <= date.fromisoformat(item["published_at"][:10]) <= end
+    ]
+    reverse_chronological = all(left >= right for left, right in zip(dated, dated[1:]))
+    reaches_before_window = bool(dated) and min(dated) < start
+    if window_items and reverse_chronological and reaches_before_window:
+        completeness = "COMPLETE_WITH_ITEMS"
+    elif dated and reverse_chronological and max(dated) < start:
+        completeness = "COMPLETE_ZERO"
+    else:
+        completeness = "PARTIAL"
+    manifest = [{key: item[key] for key in ("stable_key", "content_sha256", "published_at")} for item in items]
+    return {
+        "source_health": "PASS",
+        "window_completeness": completeness,
+        "window_item_count": len(window_items),
+        "snapshot_item_count": len(items),
+        "items": items,
+        "snapshots": responses,
+        "manifest_sha256": canonical_sha256(manifest),
+    }
+
+
 COLLECTORS = {
     "S-004": collect_download_list,
     "S-006": collect_download_list,
     "S-007": collect_s007,
     "S-009": collect_s009,
     "S-029": collect_s029,
+    "S-001": collect_news_list,
+    "S-019": collect_news_list,
+    "S-032": collect_news_list,
 }
 
 
-def collect_source(session: requests.Session, source_id: str, start: date, end: date) -> dict:
+def collect_source(
+    session: requests.Session,
+    source_id: str,
+    start: date,
+    end: date,
+    existing: dict[str, dict] | None = None,
+    *,
+    max_details: int | None = None,
+) -> dict:
     collector = COLLECTORS[source_id]
     if collector is collect_download_list:
         return collector(session, source_id, start, end)
+    if collector is collect_news_list:
+        return collector(session, source_id, start, end, existing, max_details=max_details)
+    if max_details is not None:
+        raise ValueError(f"max_details is only valid for list-news sources: {source_id}")
     return collector(session, start, end)
 
 
