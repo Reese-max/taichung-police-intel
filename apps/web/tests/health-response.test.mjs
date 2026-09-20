@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { buildHealthResponse } from "../lib/health-response.mjs";
+import { PUBLICATION_POLICY_BINDING } from "../lib/publication-freshness.mjs";
 
 const status = JSON.parse(await readFile(new URL("../public/data/source-status.json", import.meta.url)));
 const brief = JSON.parse(await readFile(new URL("../public/data/v2-daily-brief.json", import.meta.url)));
@@ -14,6 +15,7 @@ test("health endpoint does not call a stale checked-in snapshot ok", () => {
   assert.equal(response.stale_sources, 3);
   assert.equal(response.deployment_verified, false);
   assert.equal(response.public_http_verified, false);
+  assert.deepEqual(response.policy, PUBLICATION_POLICY_BINDING);
 });
 
 test("health response stays explicit when source state is incomplete", () => {

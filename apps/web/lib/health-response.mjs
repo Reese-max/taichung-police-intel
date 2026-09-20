@@ -1,4 +1,4 @@
-import { assessPublication } from "./publication-freshness.mjs";
+import { assessPublication, PUBLICATION_POLICY_BINDING } from "./publication-freshness.mjs";
 
 export function buildHealthResponse(sourceStatus, publication, nowMs = Date.now()) {
   if (!sourceStatus || sourceStatus.mode !== "COMPETITION_DEMO") {
@@ -21,6 +21,7 @@ export function buildHealthResponse(sourceStatus, publication, nowMs = Date.now(
     sources: sources.length,
     failed_sources: failedSources,
     stale_sources: staleSources,
+    policy: PUBLICATION_POLICY_BINDING,
     deployment_verified: false,
     public_http_verified: false,
   };

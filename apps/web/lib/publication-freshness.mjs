@@ -5,6 +5,12 @@ export const MAX_SNAPSHOT_AGE_MS = 16 * 60 * 60 * 1000;
 export const REQUIRED_PUBLICATION_SOURCE_IDS = Object.freeze(
   [...sourcePolicy.active_source_ids].sort(),
 );
+export const PUBLICATION_POLICY_BINDING = Object.freeze({
+  policy_version: sourcePolicy.policy_version,
+  policy_hash: sourcePolicy.policy_hash,
+  catalog_hash: sourcePolicy.catalog_hash,
+  active_source_ids: REQUIRED_PUBLICATION_SOURCE_IDS,
+});
 
 function time(value) {
   if (typeof value !== "string" || !/(Z|[+-]\d{2}:\d{2})$/i.test(value)) return NaN;
