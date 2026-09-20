@@ -116,6 +116,15 @@ python scripts/query-gateway.py --port 8788 --allow-origin http://localhost:3000
 
 Set `NEXT_PUBLIC_QUERY_GATEWAY_URL=http://127.0.0.1:8788/query` when starting the Web app to enable **Ask GovIntel**. The Gateway and MCP adapter share the same three typed operations: `search_evidence`, `get_current_brief`, and `get_source_health`. It reads only the checked-in canonical snapshot, rejects arbitrary URL/SQL/path arguments, applies a process-local request cap, and reports stale/partial/unknown states instead of converting them to zero events. `search_events`, `get_event`, version comparison, and statistics remain explicitly unavailable until their canonical stores are ready.
 
+Current-checkout integration receipt:
+
+```bash
+npm run verify:current-checkout
+python scripts/verify-current-checkout.py --output output/current-checkout-receipt.json
+```
+
+This starts an ephemeral local HTTP server, records the actual code SHA, lockfile hash, publication generation/hash and source-policy binding, and verifies Web/MCP parity plus fail-closed unsupported/generation paths. It is a candidate-version receipt, not production deployment or public-reachability evidence.
+
 ## Public deployment
 
 `.github/workflows/pages.yml` uses GitHub Pages and GitHub Actions:
