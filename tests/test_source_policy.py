@@ -35,6 +35,7 @@ class SourcePolicyTests(unittest.TestCase):
 
     def test_collector_inventory_matches_active_catalog_rows(self):
         from collect import P0_SOURCES
+        from online_collect import COLLECTORS
 
         expected = {
             row["source_id"]: (row["name"], row["entrypoint"])
@@ -42,6 +43,7 @@ class SourcePolicyTests(unittest.TestCase):
             if row["status"] == "PRODUCTION_ACTIVE"
         }
         self.assertEqual(P0_SOURCES, expected)
+        self.assertTrue(set(expected) <= set(COLLECTORS))
         self.assertEqual(self.baseline["catalog_hash"], sp.digest(self.catalog))
 
     def test_policy_build_is_deterministic(self):

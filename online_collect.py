@@ -775,6 +775,8 @@ def run_database_slot(slot: str, slot_date: date, now: datetime | None = None) -
 
 
 def self_check() -> None:
+    missing_collectors = sorted(set(P0_SOURCES) - set(COLLECTORS))
+    assert not missing_collectors, f"active source policy has no collector: {missing_collectors}"
     sample = b"""
     <div id='Fdownload_list'><div class='text02_1'>\xe7\xac\xac\xe5\x9b\x9b\xe5\xb1\x86 \xe7\xac\xac8\xe6\xac\xa1\xe5\xae\x9a\xe6\x9c\x9f\xe6\x9c\x83 \xe8\xad\xb0\xe4\xba\x8b\xe6\x97\xa5\xe7\xa8\x8b\xe8\xa1\xa8(115.07.27\xe4\xbf\xae\xe6\xad\xa3)</div>
     <div class='text02_2'><a href='a.pdf'>PDF</a></div></div>
