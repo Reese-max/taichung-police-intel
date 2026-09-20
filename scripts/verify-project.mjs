@@ -205,6 +205,7 @@ if (["quick", "full"].includes(mode) && !failures.length) {
     const checks = [
       ["contract-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "evaluation", "-p", "test_source_value_contract.py", "-v"]],
       ["ingestion-contract-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_source_ingestion.py", "-v"]],
+      ["system-health-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_system_health.py", "-v"]],
       ["audit-self-check", ["-X", "utf8", "build-seven-day-source-audit.py", "--self-check"]],
       ["canary-self-check", ["-X", "utf8", "canary-s026-s029.py", "--self-check"]],
       ["s028-165-self-check", ["-X", "utf8", "canary-s028-165.py", "--self-check"]],

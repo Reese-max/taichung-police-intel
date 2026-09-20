@@ -26,6 +26,8 @@ REQUIRED_PUBLICATION_STAGES = {
     "public_http_verification",
 }
 REQUIRED_PUBLICATION_SOURCE_IDS = {"S-004", "S-006", "S-007", "S-009", "S-029"}
+FRESH_SOURCE_STATES = {"FRESH", "RECENT"}
+STALE_SOURCE_STATES = {"STALE", "VERY_STALE"}
 
 
 def parse_time(value: Any) -> datetime | None:
@@ -154,14 +156,29 @@ def current_publication_stages(status: dict[str, Any], brief: dict[str, Any]) ->
     run_id = run.get("collection_run_id")
     run_status = run.get("status")
     sources, exact_coverage = _source_coverage(status.get("sources"))
+    freshness_states = {
+        str(source.get("freshness_status", "UNKNOWN")).upper()
+        for source in sources
+    }
+    has_stale_source = bool(freshness_states & STALE_SOURCE_STATES)
+    has_unknown_freshness = any(
+        state not in FRESH_SOURCE_STATES | STALE_SOURCE_STATES
+        for state in freshness_states
+    )
     has_source_gap = (not exact_coverage) or any(
         source.get("source_health") != "PASS"
         or source.get("window_completeness") not in {"COMPLETE_ZERO", "COMPLETE_WITH_ITEMS"}
         for source in sources
     )
-    if run_status == "SUCCEEDED" and exact_coverage and not has_source_gap:
+    if run_status == "SUCCEEDED" and exact_coverage and not has_source_gap and not has_unknown_freshness and not has_stale_source:
         collect_outcome = "SUCCESS"
         collect_error = None
+    elif run_status == "SUCCEEDED" and exact_coverage and has_stale_source and not has_unknown_freshness:
+        collect_outcome = "STALE"
+        collect_error = "SOURCE_FRESHNESS_STALE"
+    elif run_status == "SUCCEEDED" and exact_coverage and has_unknown_freshness:
+        collect_outcome = "UNKNOWN"
+        collect_error = "SOURCE_FRESHNESS_UNKNOWN"
     elif run_status in {"FAILED", "ERROR"}:
         collect_outcome = "FAILED"
         collect_error = "COLLECTION_RUN_FAILED"
