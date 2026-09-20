@@ -21,6 +21,8 @@ class QueryBoundaryTests(unittest.TestCase):
         self.feed, fh = qs.load_json(qs.DEFAULT_FEED)
         self.status, sh = qs.load_json(qs.DEFAULT_STATUS)
         self.brief, bh = qs.load_json(qs.DEFAULT_BRIEF)
+        for source in self.status["sources"]:
+            source["freshness_status"] = "FRESH"
         self.hashes = {'feed': fh, 'status': sh, 'brief': bh}
         self.now = max(qs.instant(d['generated_at']) for d in (self.feed, self.status, self.brief)) + timedelta(minutes=1)
 
@@ -88,6 +90,27 @@ class QueryBoundaryTests(unittest.TestCase):
         result = qs.query_store(self.build(), text='not-in-this-archive', now=self.now + timedelta(days=30))
         self.assertEqual(result['data_status'], 'STALE')
         self.assertFalse(result['answerable_no_match'])
+
+    def test_stale_source_data_cannot_be_reassured_as_empty(self):
+        for freshness in ('STALE', 'VERY_STALE'):
+            with self.subTest(freshness=freshness):
+                self.status['sources'][0]['freshness_status'] = freshness
+                result = qs.query_store(self.build(), text='not-in-this-archive', now=self.now)
+                self.assertEqual(result['data_status'], 'STALE')
+                self.assertFalse(result['answerable_no_match'])
+                self.assertIn('STALE_SOURCE_DATA', {gap['reason'] for gap in result['source_gaps']})
+
+    def test_missing_or_no_data_freshness_cannot_be_reassured_as_empty(self):
+        for freshness in (None, 'NO_DATA', 'UNKNOWN'):
+            with self.subTest(freshness=freshness):
+                if freshness is None:
+                    self.status['sources'][0].pop('freshness_status', None)
+                else:
+                    self.status['sources'][0]['freshness_status'] = freshness
+                result = qs.query_store(self.build(), text='not-in-this-archive', now=self.now)
+                self.assertEqual(result['data_status'], 'UNKNOWN')
+                self.assertFalse(result['answerable_no_match'])
+                self.assertIn('UNKNOWN_SOURCE_FRESHNESS', {gap['reason'] for gap in result['source_gaps']})
 
     def test_unsupported_source_is_not_a_complete_empty_answer(self):
         result = qs.query_store(self.build(), source_id='S-032', now=self.now)

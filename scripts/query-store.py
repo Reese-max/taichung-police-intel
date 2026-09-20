@@ -222,6 +222,12 @@ def assess_scope(store, source_id, now):
         if (source.get("source_health") != "PASS" or source.get("window_completeness") not in ("COMPLETE_ZERO", "COMPLETE_WITH_ITEMS") or
                 source.get("result") not in ("NEW_ITEMS", "NO_NEW_ITEM")):
             gaps.append({"source_id": sid, "reason": "SOURCE_INCOMPLETE", "source_health": source.get("source_health")})
+        freshness = source.get("freshness_status")
+        freshness = str(freshness).upper() if freshness is not None else "UNKNOWN"
+        if freshness in ("STALE", "VERY_STALE"):
+            gaps.append({"source_id": sid, "reason": "STALE_SOURCE_DATA", "freshness_status": freshness})
+        elif freshness not in ("FRESH", "RECENT"):
+            gaps.append({"source_id": sid, "reason": "UNKNOWN_SOURCE_FRESHNESS", "freshness_status": freshness})
         try:
             checked = instant(source.get("last_checked_at"))
             if checked > now:
