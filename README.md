@@ -141,6 +141,8 @@ The saved [system-health.json](./apps/web/public/data/system-health.json) expose
 
 Source contract drift is fail-closed. `scripts/schema_drift.py` covers the three HTML candidate lists, council JSON APIs, and data.gov.tw JSON/CSV resources. A missing required field, changed type, failed HTML identity, missing pagination marker, or HTTP error becomes a drift receipt and preserves the last-known-good fingerprint; additive fields are recorded as compatible. The receipt is visible in the system-health discovery lane and Review Inbox. Running it without an observed input intentionally produces `UNKNOWN`, not a fabricated healthy result.
 
+Schema replay uses the small registry in `scripts/migration_replay.py` (`1→2→3`). `dry-run` emits affected/error counts and hashes; `apply` writes only after all objects pass and saves a migration receipt; `replay` reuses `intel_v2` semantics so deterministic IDs and `FIRST_SEEN` wording remain stable. Watch/handoff inputs are copied unchanged and hash-bound. Query Store remains rebuildable from a pinned canonical generation with `python scripts/query-store.py build --feed ... --status ... --brief ...`.
+
 ## Public deployment
 
 `.github/workflows/pages.yml` uses GitHub Pages and GitHub Actions:
@@ -241,6 +243,7 @@ The retained current-workspace Kiro records show Auto as `qdev::auto`: 10.254967
 - The competition UI demonstrates one complete council-evidence journey, not every police workflow.
 - Source freshness can be stale even when the endpoint is healthy; the UI shows both states.
 - Some official endpoints provide no usable publication date or only partial date-window coverage.
+- The migration registry currently covers the JSON durable-object/replay contract; PostgreSQL DDL evolution and live raw-snapshot backfill still require a database-backed run and receipt.
 - Transcript quality is a historical baseline and has not received independent human sign-off.
 - The English path translates the product journey and source names; the official Chinese transcript remains Chinese and is explicitly labelled as navigation-only evidence.
 - The official `S-010` HLS CDN can fail in some Chrome sessions with `ERR_CONTENT_DECODING_FAILED`. A fatal media error or ten-second metadata timeout now preserves the transcript and provenance while showing a prominent link to the official council video. The local 2:43 product-demo MP4 is deliberately not substituted because it does not share the official evidence timeline.
