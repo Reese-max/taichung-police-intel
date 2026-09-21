@@ -50,6 +50,8 @@ class V2PublicationContractTests(unittest.TestCase):
         VERIFY.validate_profile_view_consistency([view(event()), view(event())])
         with self.assertRaisesRegex(ValueError, "canonical item differs"):
             VERIFY.validate_profile_view_consistency([view(event()), view(event(what_changed="被 profile 改寫"))])
+        with self.assertRaisesRegex(ValueError, "canonical item differs"):
+            VERIFY.validate_profile_view_consistency([view(event()), view(event(event_id="E-2"))])
 
     def test_profile_views_share_canonical_tracking_fields(self):
         first = view(event())
