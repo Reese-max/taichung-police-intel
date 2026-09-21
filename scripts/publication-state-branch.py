@@ -31,6 +31,7 @@ STATE_PATHS = (
     "state/v2-shadow-state.json",
     "state/v2-handoff-state.json",
 )
+LEGACY_BOOTSTRAP_PATHS = frozenset({"state/v2-handoff-state.json"})
 PUBLIC_PATHS = tuple(path for path in STATE_PATHS if path.startswith("apps/web/public/"))
 MANIFEST = "state/publication-checkpoint.json"
 MAX_FILE_BYTES = 32 * 1024 * 1024
@@ -93,15 +94,16 @@ def safe_target(repo, relative):
 
 
 def read_working_bundle(repo):
-    bundle = {}
-    for relative in STATE_PATHS:
-        path = safe_target(repo, relative)
-        if not path.is_file():
-            raise RuntimeError(f"missing required state path: {relative}")
-        if path.stat().st_size > MAX_FILE_BYTES:
-            raise RuntimeError(f"state path exceeds byte limit: {relative}")
-        bundle[relative] = path.read_bytes()
-    return bundle
+    return {relative: read_working_blob(repo, relative) for relative in STATE_PATHS}
+
+
+def read_working_blob(repo, relative):
+    path = safe_target(repo, relative)
+    if not path.is_file():
+        raise RuntimeError(f"missing required state path: {relative}")
+    if path.stat().st_size > MAX_FILE_BYTES:
+        raise RuntimeError(f"state path exceeds byte limit: {relative}")
+    return path.read_bytes()
 
 
 def read_blob(repo, commit, relative, *, optional=False):
@@ -118,10 +120,25 @@ def read_blob(repo, commit, relative, *, optional=False):
     return git(repo, "cat-file", "blob", oid)
 
 
-def read_checkpoint(repo, commit):
-    bundle = {name: read_blob(repo, commit, name) for name in STATE_PATHS}
+def read_checkpoint(repo, commit, *, allow_legacy_bootstrap=False):
+    bundle = {}
+    migrated = []
+    for name in STATE_PATHS:
+        blob = read_blob(
+            repo,
+            commit,
+            name,
+            optional=allow_legacy_bootstrap and name in LEGACY_BOOTSTRAP_PATHS,
+        )
+        if blob is None:
+            bundle[name] = read_working_blob(repo, name)
+            migrated.append(name)
+        else:
+            bundle[name] = blob
     raw = read_blob(repo, commit, MANIFEST, optional=True)
     manifest = json.loads(raw) if raw is not None else None
+    if migrated and manifest is not None:
+        raise RuntimeError("legacy checkpoint with missing state path cannot use a manifest")
     if manifest is not None:
         if (manifest.get("schema_version") != 1 or
                 manifest.get("state") not in {"PENDING_PUBLICATION", "PUBLISHED"} or
@@ -133,7 +150,7 @@ def read_checkpoint(repo, commit):
             expected = {p: hashes(bundle)[p] for p in PUBLIC_PATHS}
             if proof.get("verified_files") != expected or proof.get("generation_id") != generation(bundle):
                 raise RuntimeError("published checkpoint lacks matching public-data receipt")
-    return bundle, manifest
+    return bundle, manifest, bool(migrated)
 
 
 def receipt_path(repo):
@@ -141,10 +158,11 @@ def receipt_path(repo):
     return path if path.is_absolute() else repo / path
 
 
-def write_receipt(repo, commit, bundle):
+def write_receipt(repo, commit, bundle, *, legacy_bootstrap=False):
     path = receipt_path(repo)
     path.write_bytes(encoded({"schema_version": 1, "branch": STATE_BRANCH,
-                              "commit": commit, "generation_id": generation(bundle)}))
+                              "commit": commit, "generation_id": generation(bundle),
+                              "legacy_bootstrap": legacy_bootstrap}))
 
 
 def emit_outputs(**values):
@@ -155,21 +173,24 @@ def emit_outputs(**values):
                 handle.write(f"{key}={value}\n")
 
 
-def restore(repo, branch):
+def restore(repo, branch, *, allow_legacy_bootstrap=False):
     commit = fetch_state_branch(repo, branch)
     receipt_path(repo).unlink(missing_ok=True)
     # Fetch and validate the ENTIRE pinned checkpoint before touching any path.
-    bundle, manifest = read_checkpoint(repo, commit)
+    bundle, manifest, migrated = read_checkpoint(
+        repo, commit, allow_legacy_bootstrap=allow_legacy_bootstrap
+    )
     targets = {name: safe_target(repo, name) for name in STATE_PATHS}
     for name, path in targets.items():
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(bundle[name])
     # Written last. A crash/partial local write never permits a subsequent persist.
-    write_receipt(repo, commit, bundle)
+    write_receipt(repo, commit, bundle, legacy_bootstrap=migrated)
     pending = bool(manifest and manifest["state"] == "PENDING_PUBLICATION")
     emit_outputs(pending_recovery=str(pending).lower(), state_commit=commit,
-                 generation_id=generation(bundle))
-    print(f"PUBLICATION_STATE_RESTORED commit={commit} files={len(bundle)} pending_recovery={pending}")
+                 generation_id=generation(bundle), legacy_bootstrap=str(migrated).lower())
+    print(f"PUBLICATION_STATE_RESTORED commit={commit} files={len(bundle)} "
+          f"pending_recovery={pending} legacy_bootstrap={migrated}")
     return len(bundle)
 
 
@@ -212,7 +233,9 @@ def persist(repo, branch, run_id, run_attempt, slot):
     if receipt.get("branch") != branch or not SHA_RE.fullmatch(baseline):
         raise RuntimeError("invalid restore receipt")
     remote = fetch_state_branch(repo, branch)
-    previous, manifest = read_checkpoint(repo, remote)
+    previous, manifest, _ = read_checkpoint(
+        repo, remote, allow_legacy_bootstrap=receipt.get("legacy_bootstrap") is True
+    )
     same = previous == bundle
     # Permit a byte-identical retry, but never rebase old data over newer data.
     if remote != baseline and not (same and manifest is not None):
@@ -278,7 +301,7 @@ def acknowledge(repo, branch, expected_commit, expected_generation, base_url, *,
     remote = fetch_state_branch(repo, branch)
     if remote != expected_commit:
         raise RuntimeError("state advanced before acknowledgement")
-    bundle, manifest = read_checkpoint(repo, remote)
+    bundle, manifest, _ = read_checkpoint(repo, remote)
     if manifest is None or generation(bundle) != expected_generation:
         raise RuntimeError("acknowledgement generation mismatch")
     proof = (verifier or verify_public_files)(base_url, bundle)
@@ -308,10 +331,11 @@ def main():
     parser.add_argument("--expected-commit", default=os.environ.get("EXPECTED_STATE_COMMIT", ""))
     parser.add_argument("--expected-generation", default=os.environ.get("EXPECTED_GENERATION", ""))
     parser.add_argument("--base-url", default=os.environ.get("PUBLICATION_BASE_URL", ""))
+    parser.add_argument("--allow-legacy-bootstrap", action="store_true")
     args = parser.parse_args()
     repo = Path(args.repo).resolve()
     if args.command == "restore":
-        restore(repo, args.branch)
+        restore(repo, args.branch, allow_legacy_bootstrap=args.allow_legacy_bootstrap)
     elif args.command == "persist":
         persist(repo, args.branch, args.run_id, args.run_attempt, args.slot)
     else:

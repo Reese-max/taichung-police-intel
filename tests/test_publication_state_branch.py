@@ -61,7 +61,8 @@ class PublicationStateBranchTests(unittest.TestCase):
         return git(self.remote, "rev-parse", f"refs/heads/{branch}").stdout.strip()
 
     def checkpoint(self):
-        return module.read_checkpoint(self.work, module.fetch_state_branch(self.work, "publication-state"))
+        bundle, manifest, _ = module.read_checkpoint(self.work, module.fetch_state_branch(self.work, "publication-state"))
+        return bundle, manifest
 
     def save_pending(self):
         module.restore(self.work, "publication-state")
@@ -102,7 +103,7 @@ class PublicationStateBranchTests(unittest.TestCase):
 
     def test_missing_remote_file_rejects_entire_restore_without_mixed_writes(self):
         git(self.seed, "checkout", "publication-state")
-        git(self.seed, "rm", module.STATE_PATHS[-1])
+        git(self.seed, "rm", module.STATE_PATHS[0])
         git(self.seed, "commit", "-m", "incomplete fixture")
         git(self.seed, "push", "origin", "publication-state")
         self.write_bundle(self.work, "local")
@@ -111,6 +112,25 @@ class PublicationStateBranchTests(unittest.TestCase):
             module.restore(self.work, "publication-state")
         self.assertEqual(before, module.read_working_bundle(self.work))
         self.assertFalse(module.receipt_path(self.work).exists())
+
+    def test_legacy_remote_bootstraps_new_handoff_path_then_persists_it(self):
+        git(self.seed, "checkout", "publication-state")
+        git(self.seed, "rm", module.STATE_PATHS[-1])
+        git(self.seed, "commit", "-m", "legacy state fixture")
+        git(self.seed, "push", "origin", "publication-state")
+        expected = (self.work / module.STATE_PATHS[-1]).read_bytes()
+
+        for relative in module.STATE_PATHS[:-1]:
+            (self.work / relative).write_text("stale\n", encoding="utf-8")
+        self.assertEqual(
+            module.restore(self.work, "publication-state", allow_legacy_bootstrap=True),
+            len(module.STATE_PATHS),
+        )
+        self.assertEqual((self.work / module.STATE_PATHS[-1]).read_bytes(), expected)
+        receipt = json.loads(module.receipt_path(self.work).read_bytes())
+        self.assertTrue(receipt["legacy_bootstrap"])
+        module.persist(self.work, "publication-state", "legacy", "1", "evening")
+        self.assertIsNotNone(module.read_blob(self.work, self.head(), module.STATE_PATHS[-1]))
 
     def test_persist_fast_forwards_only_state_branch_and_is_idempotent(self):
         before = self.head("main")

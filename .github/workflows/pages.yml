@@ -82,7 +82,7 @@ jobs:
       # Code-only deploys also restore; checked-in JSON on main may be older.
       - name: Restore last durable publication state
         id: restore_state
-        run: python -X utf8 scripts/publication-state-branch.py restore --branch publication-state
+        run: python -X utf8 scripts/publication-state-branch.py restore --branch publication-state --allow-legacy-bootstrap
 
       - name: Refresh official-source publication bundle
         id: collect
