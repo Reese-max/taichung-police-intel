@@ -67,6 +67,8 @@ def feedback_id_for(fingerprint: str) -> str:
 
 
 def validate_state(state: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(state, dict):
+        raise ValueError("feedback state must be an object")
     if state.get("schema_version") != 1 or state.get("mode") != "FEEDBACK_LOOP":
         raise ValueError("feedback state must use schema_version=1 and mode=FEEDBACK_LOOP")
     items = state.get("items")

@@ -89,6 +89,10 @@ class FeedbackTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "conversation"):
             model.validate_state(broken)
 
+    def test_non_object_state_fails_closed(self):
+        with self.assertRaisesRegex(ValueError, "state must be an object"):
+            model.validate_state([])
+
     def test_invalid_target_and_unreviewed_regression_fail_closed(self):
         with self.assertRaises(ValueError):
             make_feedback(target_type="SOURCE")
