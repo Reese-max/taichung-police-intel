@@ -58,6 +58,7 @@ class CanaryContractTests(unittest.TestCase):
         self.assertEqual(report["failed_count"], 1)
         failed = report["sources"][1]
         self.assertEqual(failed["source_health"], "FAILED")
+        self.assertEqual(failed["error_message"], "fixture unavailable")
         self.assertIsNone(failed["window_item_count"])
         self.assertEqual(report["sources"][2]["source_health"], "PASS")
 

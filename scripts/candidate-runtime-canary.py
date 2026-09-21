@@ -191,6 +191,7 @@ def run_canary(collector, sources, now, *, session_factory=BoundedSession):
                 "detail_fetch_count": None,
                 "manifest_sha256": None,
                 "error_type": type(error).__name__,
+                "error_message": str(error).strip()[:256],
                 "schema_contract": {
                     "status": "CONTENT_SHAPE_UNKNOWN",
                     "reasons": ["COLLECTOR_DID_NOT_RETURN_VERIFIABLE_SNAPSHOT"],
