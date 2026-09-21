@@ -120,7 +120,11 @@ class FakeHTTPSession:
 class DetailRecheckHTTPTests(unittest.TestCase):
     def test_baseline_extracts_hashes_attachments_and_conditional_metadata(self):
         first = FakeHTTPResponse(
-            body=b"<html><body>notice</body><a href='/files/a.pdf'>PDF</a></html>",
+            body=(
+                b"<html><body>notice</body>"
+                b"<a href='/files/a.pdf'>PDF</a>"
+                b"<a href='https://evil.test/files/foreign.pdf'>foreign</a></html>"
+            ),
             headers={"Content-Type": "text/html", "ETag": '"v1"'},
         )
         result = recheck_detail(
@@ -134,6 +138,16 @@ class DetailRecheckHTTPTests(unittest.TestCase):
         self.assertEqual(len(result["observation"]["attachments"]), 1)
         self.assertEqual(result["observation"]["etag"], '"v1"')
         self.assertEqual(result["request_headers"], {})
+
+    def test_unapproved_attachment_host_is_not_treated_as_source_evidence(self):
+        result = recheck_detail(
+            FakeHTTPSession(FakeHTTPResponse(body=b"<a href='https://evil.test/files/a.pdf'>PDF</a>")),
+            "https://official.test/detail",
+            None,
+            observed_at=NOW,
+            allowed_hosts={"official.test"},
+        )
+        self.assertEqual(result["observation"]["attachments"], [])
 
     def test_attachment_url_change_is_reviewable_without_downloading_attachment(self):
         session = FakeHTTPSession(

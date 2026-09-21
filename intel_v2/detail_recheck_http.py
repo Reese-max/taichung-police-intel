@@ -97,7 +97,7 @@ def _read_body(response: Any, max_body_bytes: int) -> bytes:
     return bytes(body)
 
 
-def _attachment_rows(body: bytes, base_url: str) -> list[dict[str, str]]:
+def _attachment_rows(body: bytes, base_url: str, allowed_hosts: set[str]) -> list[dict[str, str]]:
     rows = []
     seen: set[str] = set()
     soup = BeautifulSoup(body, "html.parser")
@@ -109,6 +109,7 @@ def _attachment_rows(body: bytes, base_url: str) -> list[dict[str, str]]:
             if (
                 parts.scheme.lower() != "https"
                 or not parts.hostname
+                or parts.hostname.lower().rstrip(".") not in allowed_hosts
                 or parts.username
                 or parts.password
                 or parts.port not in (None, 443)
@@ -220,7 +221,7 @@ def recheck_detail(
                     "status_code": status_code,
                     "body_sha256": sha256(body),
                     "normalized_text_sha256": sha256(normalized),
-                    "attachments": _attachment_rows(body, final_url),
+                    "attachments": _attachment_rows(body, final_url, hosts),
                 }
                 for key, header_name in (("etag", "ETag"), ("last_modified", "Last-Modified")):
                     value = _header(response, header_name)
