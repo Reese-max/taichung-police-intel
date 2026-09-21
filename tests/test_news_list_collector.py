@@ -108,6 +108,27 @@ class ParseNewsListTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             oc.parse_news_list(_page("<li>no links</li>"), "https://x.test/", r"dataserno=(\d+)")
 
+    def test_external_detail_url_is_rejected_before_fetch(self):
+        external = _page(
+            '<li><a href="https://example.invalid/news_view.jsp?dataserno=1">外部連結 115-09-10</a></li>'
+        )
+        with self.assertRaisesRegex(ValueError, "outside the approved source origin"):
+            _collect("S-001", external)
+
+    def test_external_redirect_is_rejected_before_following(self):
+        redirect = mock.Mock(
+            status_code=302,
+            url=oc.NEWS_LIST_SOURCES["S-001"]["list_url"],
+            headers={"location": "https://example.invalid/redirected"},
+        )
+        redirect.close = mock.Mock()
+        session = mock.Mock()
+        session.get.return_value = redirect
+        with self.assertRaisesRegex(ValueError, "outside the approved source origin"):
+            oc.get(session, oc.NEWS_LIST_SOURCES["S-001"]["list_url"], source_id="S-001")
+        session.get.assert_called_once()
+        redirect.close.assert_called_once()
+
     def test_fire_live_parser_redacts_location_and_hashes_composite_identity(self):
         entries = oc.parse_fire_live(FIRE_LIVE)
         self.assertEqual(entries[0]["district"], "北屯區")

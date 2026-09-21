@@ -43,6 +43,8 @@ from intel_v2.located_facts import validate_document_url
 USER_AGENT = "TaichungPoliceIntel/0.2 (+public-source-monitor)"
 DETAIL_RECHECK_INTERVAL_HOURS = 24
 DETAIL_RECHECK_MAX_PER_RUN = 1
+REDIRECT_STATUSES = {301, 302, 303, 307, 308}
+MAX_REDIRECTS = 3
 API_S007 = "https://yishi.tccc.gov.tw/api/ProceedingsBackWeb/FrontList"
 API_S009 = "https://yishi.tccc.gov.tw/api/Proposal/FrontList"
 PARSER_VERSION = "p0-live-1"
@@ -65,10 +67,37 @@ def http_session() -> requests.Session:
     return session
 
 
-def get(session: requests.Session, url: str, **kwargs) -> requests.Response:
-    response = session.get(url, timeout=kwargs.pop("timeout", 60), **kwargs)
-    response.raise_for_status()
-    return response
+def get(
+    session: requests.Session,
+    url: str,
+    *,
+    source_id: str | None = None,
+    **kwargs,
+) -> requests.Response:
+    """Fetch one catalog-bound URL without following an unapproved redirect."""
+    timeout = kwargs.pop("timeout", 60)
+    for _ in range(MAX_REDIRECTS + 1):
+        if source_id:
+            validate_document_url(source_id, url)
+        response = session.get(
+            url,
+            timeout=timeout,
+            allow_redirects=False,
+            **kwargs,
+        )
+        final_url = str(getattr(response, "url", url) or url)
+        if source_id:
+            validate_document_url(source_id, final_url)
+        if response.status_code in REDIRECT_STATUSES:
+            location = response.headers.get("location")
+            response.close()
+            if not location:
+                raise ValueError("redirect response has no location")
+            url = urllib.parse.urljoin(url, location)
+            continue
+        response.raise_for_status()
+        return response
+    raise ValueError("redirect budget exhausted")
 
 
 def snapshot(response: requests.Response, purpose: str) -> dict:
@@ -158,14 +187,14 @@ def collect_download_list(
     end: date,
 ) -> dict:
     source_url = P0_SOURCES[source_id][1]
-    listing = get(session, source_url)
+    listing = get(session, source_url, source_id=source_id)
     responses = [snapshot(listing, "LIST")]
     entries = parse_download_entries(listing.content, listing.url)
     items = []
     for entry in entries:
         attachments = []
         for url in entry["attachment_urls"]:
-            response = get(session, url, timeout=120)
+            response = get(session, url, source_id=source_id, timeout=120)
             responses.append(snapshot(response, "ATTACHMENT"))
             attachments.append(
                 {
@@ -217,6 +246,7 @@ def paginated_api(
     url: str,
     params: dict,
     *,
+    source_id: str | None = None,
     page_size: int = 200,
 ) -> tuple[list[dict], list[dict]]:
     records = []
@@ -224,7 +254,12 @@ def paginated_api(
     page = 1
     total_pages = 1
     while page <= total_pages:
-        response = get(session, url, params={**params, "pageNumber": page, "pageSize": page_size})
+        response = get(
+            session,
+            url,
+            source_id=source_id,
+            params={**params, "pageNumber": page, "pageSize": page_size},
+        )
         responses.append(snapshot(response, "API"))
         payload = response.json()
         if payload.get("success") is not True or not isinstance(payload.get("data", {}).get("data"), list):
@@ -245,6 +280,7 @@ def collect_s007(session: requests.Session, start: date, end: date) -> dict:
         session,
         API_S007,
         {"keywordList": "警察局", "dateStart": start.isoformat(), "dateEnd": end.isoformat()},
+        source_id="S-007",
     )
     items = []
     for record in records:
@@ -266,7 +302,13 @@ def collect_s007(session: requests.Session, start: date, end: date) -> dict:
     # it's outside the current collection window.
     latest_date_str = None
     try:
-        probe_resp = get(session, API_S007, params={"keywordList": "警察局", "pageNumber": 1, "pageSize": 1}, timeout=30)
+        probe_resp = get(
+            session,
+            API_S007,
+            source_id="S-007",
+            params={"keywordList": "警察局", "pageNumber": 1, "pageSize": 1},
+            timeout=30,
+        )
         responses.append(snapshot(probe_resp, "PROBE_LATEST"))
         probe_data = probe_resp.json()
         if probe_data.get("success") and probe_data["data"]["data"]:
@@ -290,7 +332,9 @@ def collect_s007(session: requests.Session, start: date, end: date) -> dict:
 
 def collect_s009(session: requests.Session, start: date, end: date) -> dict:
     del start, end
-    records, responses = paginated_api(session, API_S009, {"keywordList": "警察局"})
+    records, responses = paginated_api(
+        session, API_S009, {"keywordList": "警察局"}, source_id="S-009"
+    )
     items = []
     for record in records:
         payload = {key: record.get(key) for key in sorted(record)}
@@ -335,7 +379,10 @@ def collect_s029(session: requests.Session, start: date, end: date) -> dict:
     urls = [(source["index"]["requested_url"], "LIST")]
     urls.extend((page["requested_url"], "LIST") for page in source["latest_session"]["list_pages"])
     urls.extend((item["url"], "ATTACHMENT") for item in source["police_attachments"])
-    responses = [snapshot(get(session, url, timeout=120), purpose) for url, purpose in urls]
+    responses = [
+        snapshot(get(session, url, source_id="S-029", timeout=120), purpose)
+        for url, purpose in urls
+    ]
     items = []
     for item in source["police_attachments"]:
         payload = {key: item[key] for key in sorted(item)}
@@ -521,7 +568,7 @@ def collect_fire_live(session: requests.Session, start: date, end: date) -> dict
     """Collect one transient snapshot; it cannot prove a historical date window."""
     del start, end
     config = NEWS_LIST_SOURCES["S-031"]
-    listing = get(session, config["list_url"])
+    listing = get(session, config["list_url"], source_id="S-031")
     entries = parse_fire_live(listing.content)
     items = []
     for entry in entries:
@@ -558,7 +605,7 @@ def collect_news_list(
 ) -> dict:
     """Collect a candidate list with bounded detail-page requests."""
     config = NEWS_LIST_SOURCES[source_id]
-    listing = get(session, config["list_url"])
+    listing = get(session, config["list_url"], source_id=source_id)
     responses = [snapshot(listing, "LIST")]
     if config.get("format") == "rss":
         entries = parse_news_rss(listing.content, listing.url)
@@ -580,7 +627,7 @@ def collect_news_list(
             payload = {**list_payload, "detail": "skipped-detail-cap"}
         else:
             details_fetched += 1
-            detail = get(session, entry["detail_url"], timeout=120)
+            detail = get(session, entry["detail_url"], source_id=source_id, timeout=120)
             responses.append(snapshot(detail, "DETAIL"))
             payload = {
                 **list_payload,
