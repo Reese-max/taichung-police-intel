@@ -153,6 +153,7 @@ def recheck_detail(
     timeout: float | tuple[float, float] = (5, 15),
     max_body_bytes: int = MAX_BODY_BYTES,
     max_redirects: int = MAX_REDIRECTS,
+    include_body: bool = False,
 ) -> dict[str, Any]:
     """Fetch one approved detail page without following unapproved redirects."""
     if not isinstance(max_body_bytes, int) or max_body_bytes <= 0:
@@ -219,10 +220,13 @@ def recheck_detail(
                 normalized = normalized_text(body, content_type)
                 observation = {
                     "status_code": status_code,
+                    "content_type": content_type,
                     "body_sha256": sha256(body),
                     "normalized_text_sha256": sha256(normalized),
                     "attachments": _attachment_rows(body, final_url, hosts),
                 }
+                if include_body:
+                    result["response_body"] = body
                 for key, header_name in (("etag", "ETag"), ("last_modified", "Last-Modified")):
                     value = _header(response, header_name)
                     if value is not None:

@@ -38,6 +38,7 @@ TABLES = {
     "gaps",
     "snapshot_blobs",
     "source_snapshots",
+    "detail_recheck_state",
 }
 
 
@@ -218,6 +219,8 @@ class SourceIngestionContractTests(unittest.TestCase):
         self.assertIn("result <> 'NOT_RUN'", compact)
         self.assertIn("change_count", compact)
         self.assertIn("status = 'RESOLVED'", compact)
+        self.assertIn("detail_recheck_state", compact)
+        self.assertIn("FOR UPDATE SKIP LOCKED", (ROOT / "online_collect.py").read_text(encoding="utf-8"))
 
     def test_d2_fixture_slot_is_idempotent_and_exposes_health_gaps_and_lkg(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -33,9 +33,14 @@ from collect import (
     scheduled_time,
     timestamp,
 )
+from intel_v2.detail_recheck import classify_observation
+from intel_v2.detail_recheck_http import recheck_detail
+from intel_v2.located_facts import validate_document_url
 
 
 USER_AGENT = "TaichungPoliceIntel/0.2 (+public-source-monitor)"
+DETAIL_RECHECK_INTERVAL_HOURS = 24
+DETAIL_RECHECK_MAX_PER_RUN = 1
 API_S007 = "https://yishi.tccc.gov.tw/api/ProceedingsBackWeb/FrontList"
 API_S009 = "https://yishi.tccc.gov.tw/api/Proposal/FrontList"
 PARSER_VERSION = "p0-live-1"
@@ -547,6 +552,278 @@ def current_items(connection, source_id: str) -> dict[str, dict]:
     return {row["stable_key"]: row for row in rows}
 
 
+def _detail_previous(row: dict | None) -> dict | None:
+    if not row or not row.get("document_version_id"):
+        return None
+    previous = {
+        "document_version_id": row["document_version_id"],
+        "body_sha256": row["body_sha256"],
+        "normalized_text_sha256": row["normalized_text_sha256"],
+        "attachments": row.get("attachments") or [],
+    }
+    for field in ("last_checked_at", "expires_at", "etag", "last_modified"):
+        value = row.get(field)
+        if value is not None:
+            previous[field] = timestamp(value) if isinstance(value, datetime) else value
+    return previous
+
+
+def detail_next_check(
+    classification: dict,
+    observed_at: datetime,
+    *,
+    interval_hours: float = DETAIL_RECHECK_INTERVAL_HOURS,
+) -> datetime:
+    if not isinstance(interval_hours, (int, float)) or interval_hours <= 0:
+        raise ValueError("detail recheck interval must be positive")
+    if observed_at.tzinfo is None:
+        raise ValueError("detail recheck observed_at requires timezone")
+    retry = classification.get("retry_after_seconds")
+    if classification.get("status") == "DEFERRED" and isinstance(retry, int):
+        return observed_at + timedelta(seconds=min(max(retry, 0), 86400))
+    return observed_at + timedelta(hours=interval_hours)
+
+
+def register_detail_recheck(
+    connection,
+    source_id: str,
+    stable_key: str,
+    requested_url: str,
+    next_check_at: datetime,
+) -> None:
+    if not isinstance(stable_key, str) or not stable_key.strip():
+        raise ValueError("detail recheck stable_key is required")
+    if next_check_at.tzinfo is None:
+        raise ValueError("detail recheck next_check_at requires timezone")
+    validate_document_url(source_id, requested_url)
+    connection.execute(
+        """
+        INSERT INTO detail_recheck_state (source_id, stable_key, requested_url, next_check_at)
+        VALUES (%s, %s, %s, %s)
+        ON CONFLICT (source_id, stable_key) DO UPDATE SET
+            requested_url = EXCLUDED.requested_url,
+            next_check_at = LEAST(detail_recheck_state.next_check_at, EXCLUDED.next_check_at),
+            updated_at = now()
+        """,
+        (source_id, stable_key, requested_url, next_check_at),
+    )
+
+
+def _seed_detail_rechecks(connection, source_id: str, items: list[dict], completed_at: datetime) -> int:
+    seeded = 0
+    next_check_at = completed_at + timedelta(hours=DETAIL_RECHECK_INTERVAL_HOURS)
+    for item in items:
+        payload = item.get("payload") if isinstance(item, dict) else None
+        if not isinstance(payload, dict) or payload.get("detail") != "fetched":
+            continue
+        register_detail_recheck(
+            connection,
+            source_id,
+            str(item["stable_key"]),
+            str(item["source_url"]),
+            next_check_at,
+        )
+        seeded += 1
+    return seeded
+
+
+def _detail_unavailable(requested_url: str, previous: dict | None, observed_at: datetime, error: Exception) -> dict:
+    observation = {"status_code": 0, "available": False}
+    return {
+        "requested_url": requested_url,
+        "final_url": None,
+        "http_status": None,
+        "redirect_count": 0,
+        "request_headers": {},
+        "plan": None,
+        "observation": observation,
+        "classification": classify_observation(previous, observation, observed_at=timestamp(observed_at)),
+        "transport_error": {
+            "type": type(error).__name__,
+            "message": str(error).strip()[:256],
+        },
+    }
+
+
+def _detail_json(value: object) -> str:
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def _save_detail_snapshot(
+    connection,
+    source_run_id: str,
+    source_id: str,
+    stable_key: str,
+    result: dict,
+    fetched_at: datetime,
+) -> str | None:
+    body = result.get("response_body")
+    observation = result.get("observation") or {}
+    if not isinstance(body, (bytes, bytearray)) or not observation.get("body_sha256"):
+        return None
+    snapshot_id = f"DR-{source_run_id}-{canonical_sha256(f'detail:{stable_key}')[:16]}"
+    connection.execute(
+        """
+        INSERT INTO snapshot_blobs (content_sha256, content_type, byte_count, body, created_at)
+        VALUES (%s, %s, %s, %s, %s)
+        ON CONFLICT (content_sha256) DO NOTHING
+        """,
+        (
+            observation["body_sha256"],
+            observation.get("content_type") or "application/octet-stream",
+            len(body),
+            bytes(body),
+            fetched_at,
+        ),
+    )
+    connection.execute(
+        """
+        INSERT INTO source_snapshots (
+            snapshot_id, source_run_id, source_id, purpose, requested_url, final_url,
+            http_status, fetched_at, content_sha256
+        ) VALUES (%s, %s, %s, 'DETAIL', %s, %s, %s, %s, %s)
+        ON CONFLICT (snapshot_id) DO NOTHING
+        """,
+        (
+            snapshot_id,
+            source_run_id,
+            source_id,
+            result["requested_url"],
+            result.get("final_url") or result["requested_url"],
+            result["http_status"],
+            fetched_at,
+            observation["body_sha256"],
+        ),
+    )
+    return snapshot_id
+
+
+def run_detail_rechecks(
+    connection,
+    session: requests.Session,
+    source_run_ids: dict[str, str],
+    observed_at: datetime,
+    *,
+    limit: int = DETAIL_RECHECK_MAX_PER_RUN,
+    interval_hours: float = DETAIL_RECHECK_INTERVAL_HOURS,
+) -> list[dict]:
+    if not isinstance(limit, int) or limit < 0:
+        raise ValueError("detail recheck limit must be non-negative")
+    if not source_run_ids or limit == 0:
+        return []
+    source_ids = sorted(source_run_ids)
+    placeholders = ", ".join(["%s"] * len(source_ids))
+    # ponytail: one row lock spans one bounded request; split claim/worker
+    # phases only if recheck throughput becomes a measured bottleneck.
+    with connection.transaction():
+        rows = connection.execute(
+            f"""
+            SELECT source_id, stable_key, requested_url, last_checked_at, next_check_at,
+                   etag, last_modified, document_version_id, body_sha256,
+                   normalized_text_sha256, attachments
+            FROM detail_recheck_state
+            WHERE next_check_at <= %s AND source_id IN ({placeholders})
+            ORDER BY next_check_at, source_id, stable_key
+            LIMIT %s
+            FOR UPDATE SKIP LOCKED
+            """,
+            (observed_at, *source_ids, limit),
+        ).fetchall()
+        outcomes = []
+        for row in rows:
+            previous = _detail_previous(row)
+            try:
+                source = validate_document_url(row["source_id"], row["requested_url"])
+                host = urllib.parse.urlsplit(source["entrypoint"]).hostname
+                if not host:
+                    raise ValueError("approved source entrypoint has no hostname")
+                result = recheck_detail(
+                    session,
+                    row["requested_url"],
+                    previous,
+                    observed_at=timestamp(observed_at),
+                    allowed_hosts={host},
+                    interval_hours=interval_hours,
+                    include_body=True,
+                )
+            except (ValueError, TypeError, OSError, requests.RequestException) as error:
+                result = _detail_unavailable(row["requested_url"], previous, observed_at, error)
+
+            classification = result["classification"]
+            snapshot_id = _save_detail_snapshot(
+                connection,
+                source_run_ids[row["source_id"]],
+                row["source_id"],
+                row["stable_key"],
+                result,
+                observed_at,
+            )
+            after = classification.get("after") or {}
+            current = {
+                "document_version_id": after.get("document_version_id") or row.get("document_version_id"),
+                "body_sha256": after.get("body_sha256") or row.get("body_sha256"),
+                "normalized_text_sha256": after.get("normalized_text_sha256") or row.get("normalized_text_sha256"),
+                "attachments": after.get("attachments") if "attachments" in after else (row.get("attachments") or []),
+                "etag": after.get("etag") if "etag" in after else row.get("etag"),
+                "last_modified": after.get("last_modified") if "last_modified" in after else row.get("last_modified"),
+            }
+            checked_at = datetime.fromisoformat(classification["last_checked_at"])
+            next_check_at = detail_next_check(classification, checked_at, interval_hours=interval_hours)
+            public_result = {key: value for key, value in result.items() if key != "response_body"}
+            connection.execute(
+                """
+                UPDATE detail_recheck_state
+                SET last_checked_at = %s,
+                    next_check_at = %s,
+                    etag = %s,
+                    last_modified = %s,
+                    document_version_id = %s,
+                    body_sha256 = %s,
+                    normalized_text_sha256 = %s,
+                    attachments = %s::jsonb,
+                    status = %s,
+                    review_required = %s,
+                    preserve_last_known_good = %s,
+                    event_cancelled = %s,
+                    changed_fields = %s::jsonb,
+                    last_result = %s::jsonb,
+                    last_snapshot_id = COALESCE(%s, last_snapshot_id),
+                    updated_at = %s
+                WHERE source_id = %s AND stable_key = %s
+                """,
+                (
+                    checked_at,
+                    next_check_at,
+                    current["etag"],
+                    current["last_modified"],
+                    current["document_version_id"],
+                    current["body_sha256"],
+                    current["normalized_text_sha256"],
+                    _detail_json(current["attachments"]),
+                    classification["status"],
+                    classification["review_required"],
+                    classification["preserve_last_known_good"],
+                    classification["event_cancelled"],
+                    _detail_json(classification.get("changed_fields", [])),
+                    _detail_json(public_result),
+                    snapshot_id,
+                    observed_at,
+                    row["source_id"],
+                    row["stable_key"],
+                ),
+            )
+            outcomes.append(
+                {
+                    "source_id": row["source_id"],
+                    "stable_key": row["stable_key"],
+                    "status": classification["status"],
+                    "review_required": classification["review_required"],
+                    "snapshot_id": snapshot_id,
+                }
+            )
+    return outcomes
+
+
 def prior_success(connection, source_id: str) -> str | None:
     row = connection.execute(
         """
@@ -661,6 +938,10 @@ def save_success(
             ),
         )
 
+    # Only detail pages explicitly fetched by a list-first collector become
+    # recheck targets; unchanged rows are never expanded into a site-wide crawl.
+    _seed_detail_rechecks(connection, source_id, collected["items"], completed_at)
+
 
 def save_failure(
     connection,
@@ -758,6 +1039,20 @@ def run_database_slot(slot: str, slot_date: date, now: datetime | None = None) -
                             attempted_at, completed_at, window_start, window_end, error,
                         )
 
+            source_run_ids = {
+                row["source_id"]: row["source_run_id"]
+                for row in connection.execute(
+                    "SELECT source_id, source_run_id FROM source_runs WHERE collection_run_id = %s",
+                    (collection_run_id,),
+                ).fetchall()
+            }
+            detail_rechecks = run_detail_rechecks(
+                connection,
+                session,
+                source_run_ids,
+                datetime.now(TZ),
+            )
+
             results = connection.execute(
                 "SELECT result FROM source_runs WHERE collection_run_id = %s",
                 (collection_run_id,),
@@ -769,7 +1064,12 @@ def run_database_slot(slot: str, slot_date: date, now: datetime | None = None) -
                 "UPDATE collection_runs SET status = %s, finished_at = %s WHERE collection_run_id = %s",
                 (status, datetime.now(TZ), collection_run_id),
             )
-            return {"collection_run_id": collection_run_id, "status": status, "replayed": False}
+            return {
+                "collection_run_id": collection_run_id,
+                "status": status,
+                "replayed": False,
+                "detail_rechecks": detail_rechecks,
+            }
         finally:
             connection.execute("SELECT pg_advisory_unlock(hashtext(%s))", (lock_name,))
 

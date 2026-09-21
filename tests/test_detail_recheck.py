@@ -149,6 +149,18 @@ class DetailRecheckHTTPTests(unittest.TestCase):
         )
         self.assertEqual(result["observation"]["attachments"], [])
 
+    def test_body_is_available_only_when_explicitly_requested_for_snapshot_persistence(self):
+        result = recheck_detail(
+            FakeHTTPSession(FakeHTTPResponse(body=b"<p>notice</p>", headers={"Content-Type": "text/html"})),
+            "https://official.test/detail",
+            None,
+            observed_at=NOW,
+            allowed_hosts={"official.test"},
+            include_body=True,
+        )
+        self.assertEqual(result["response_body"], b"<p>notice</p>")
+        self.assertEqual(result["observation"]["content_type"], "text/html")
+
     def test_attachment_url_change_is_reviewable_without_downloading_attachment(self):
         session = FakeHTTPSession(
             FakeHTTPResponse(body=b"<a href='/files/a.pdf'>PDF</a>"),
