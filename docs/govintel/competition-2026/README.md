@@ -30,6 +30,7 @@
 | 官方文件版本→located fact→evidence/PublicEvent input | `IMPLEMENTED_NOT_PRODUCTION` | #48 receipt、`scripts/located-facts.py` |
 | Taiwan Intel Dashboard discovery feed | `IMPLEMENTED_NOT_PRODUCTION` | #27 fixture、`scripts/discovery-adapter.py` |
 | 受限 Query Gateway（Web／HTTP MCP／STDIO MCP first slice） | `IMPLEMENTED_NOT_PRODUCTION` | #30 runtime boundary、#47 current-checkout `24/24` receipt |
+| 端到端健康 stage receipt／operator summary | `IMPLEMENTED_NOT_PRODUCTION` | `scripts/system-health.py`、`system-health.json`、Web health tests |
 | 版本化 Unit／Role Profile 與角色化 Priority Brief | `IMPLEMENTED_NOT_PRODUCTION` | #12、`role-profiles.v1.json`、role profile tests、current-checkout browser `13/13` |
 | S-001/S-019/S-031/S-032/S-033 擴源 | `CANDIDATE_CANARY` | #14/#22；尚缺完整 live canary/promotion |
 | 排程發布、晨晚自然 run、匿名版本/hash | `BLOCKED` | #20；需正常 review/merge 與正式環境證據 |
