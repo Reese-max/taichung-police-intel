@@ -368,8 +368,8 @@ NEWS_LIST_SOURCES = {
     },
     "S-032": {
         "name": "臺中市政府交通局最新消息",
-        "list_url": "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,7,218",
-        "id_pattern": r"Parser=9,4,(\d+)",
+        "list_url": "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,20",
+        "id_pattern": r"index-1\.asp\?Parser=9,4,20,,,,(\d+)",
     },
 }
 

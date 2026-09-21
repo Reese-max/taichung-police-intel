@@ -26,8 +26,8 @@ RDEC_LIST = _page(
 
 TRAFFIC_LIST = _page(
     """
-    <tr><td>115-09-11</td><td><a href="../news/index.asp?Parser=9,4,632">大眾運輸優惠</a></td></tr>
-    <tr><td>115-09-01</td><td><a href="../news/index.asp?Parser=9,4,631">停車費率調整</a></td></tr>
+    <li><a href="index-1.asp?Parser=9,4,20,,,,21750">大眾運輸優惠</a><span>運輸管理科 2026-09-11</span></li>
+    <li><a href="index-1.asp?Parser=9,4,20,,,,21749">停車費率調整</a><span>運輸管理科 2026-09-01</span></li>
     """
 )
 
@@ -67,13 +67,17 @@ def _collect(cfg_id: str, list_html: bytes, existing=None, max_details=None, **e
 class ParseNewsListTests(unittest.TestCase):
     def test_source_patterns_extract_stable_ids_and_dates(self):
         cases = (
-            ("S-001", POLICE_LIST, r"dataserno=(\d+)", ["202609100003", "202609080003", "202607010001"]),
-            ("S-019", RDEC_LIST, r"/(\d+)/post\b", ["873338", "873320"]),
-            ("S-032", TRAFFIC_LIST, r"Parser=9,4,(\d+)", ["632", "631"]),
+            ("S-001", POLICE_LIST, ["202609100003", "202609080003", "202607010001"]),
+            ("S-019", RDEC_LIST, ["873338", "873320"]),
+            ("S-032", TRAFFIC_LIST, ["21750", "21749"]),
         )
-        for source_id, html, pattern, expected in cases:
+        for source_id, html, expected in cases:
             with self.subTest(source_id=source_id):
-                entries = oc.parse_news_list(html, "https://official.example.test/", pattern)
+                entries = oc.parse_news_list(
+                    html,
+                    oc.NEWS_LIST_SOURCES[source_id]["list_url"],
+                    oc.NEWS_LIST_SOURCES[source_id]["id_pattern"],
+                )
                 self.assertEqual([entry["stable_key"] for entry in entries], expected)
                 self.assertEqual(entries[0]["published"], date(2026, 9, 10) if source_id != "S-032" else date(2026, 9, 11))
 

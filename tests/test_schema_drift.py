@@ -27,7 +27,7 @@ class SchemaDriftTests(unittest.TestCase):
         html = {
             "S-001": '<li><a href="news_view.jsp?dataserno=1">警政新聞 115-09-10</a></li>',
             "S-019": '<li><a href="/12047/12142/12186/873338/post">會議紀錄 115-09-10</a></li>',
-            "S-032": '<li><a href="index.asp?Parser=9,4,632">交通消息 115-09-10</a></li>',
+            "S-032": '<li><a href="index-1.asp?Parser=9,4,20,,,,21750">交通消息 115-09-10</a></li>',
         }
         for source_id, body in html.items():
             with self.subTest(source_id=source_id):

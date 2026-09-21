@@ -57,7 +57,7 @@ CONTRACTS: dict[str, dict[str, Any]] = {
     "S-032": _news(
         "S-032",
         "臺中市政府交通局最新消息",
-        r"Parser=9,4,(\d+)",
+        r"index-1\.asp\?Parser=9,4,20,,,,(\d+)",
     ),
     "S-007": {
         "source_id": "S-007",
@@ -524,7 +524,7 @@ def self_check() -> None:
     html_by_source = {
         "S-001": '<li><a href="home.jsp?mcustomize=news_view.jsp&dataserno=1">標題 115-09-10</a></li>',
         "S-019": '<li><a href="/12047/12142/12186/873338/post">標題 115-09-10</a></li>',
-        "S-032": '<li><a href="news/index.asp?Parser=9,4,632">標題 115-09-10</a></li>',
+        "S-032": '<li><a href="index-1.asp?Parser=9,4,20,,,,21750">標題 115-09-10</a></li>',
     }
     for source_id, html in html_by_source.items():
         result = observe(CONTRACTS[source_id], html, content_type="text/html; charset=utf-8", final_url="https://official.test/list")
