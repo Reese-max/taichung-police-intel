@@ -10,6 +10,8 @@ import importlib.util
 import json
 from pathlib import Path
 from http.server import BaseHTTPRequestHandler, HTTPServer
+import shutil
+import subprocess
 import time
 from typing import Any, Callable
 from urllib.parse import urlsplit
@@ -18,6 +20,7 @@ import uuid
 ROOT = Path(__file__).resolve().parents[1]
 QUERY_STORE_PATH = ROOT / "scripts" / "query-store.py"
 RETENTION_POLICY_PATH = ROOT / "scripts" / "retention-policy.py"
+ANSWER_GATE_RUNNER = ROOT / "scripts" / "answer-gate-runner.mjs"
 MAX_REQUEST_BYTES = 64 * 1024
 SERVER_VERSION = "query-gateway-v1"
 DEFAULT_RATE_LIMIT = 60
@@ -38,6 +41,7 @@ CAPABILITIES = (
     "search_evidence",
     "get_current_brief",
     "get_source_health",
+    "validate_answer",
 )
 UNIMPLEMENTED = frozenset({
     "search_events",
@@ -77,6 +81,20 @@ MCP_TOOLS = [
             "type": "object",
             "additionalProperties": False,
             "properties": {"source_id": {"type": "string", "maxLength": 64}},
+        },
+        "annotations": {"readOnlyHint": True, "openWorldHint": False, "destructiveHint": False},
+    },
+    {
+        "name": "validate_answer",
+        "description": "Validate structured answer claims against the server-controlled canonical evidence catalog.",
+        "inputSchema": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["claims"],
+            "properties": {
+                "claims": {"type": "array", "maxItems": 32, "items": {"type": "object"}},
+                "expected_generation": {"type": "string", "maxLength": 128},
+            },
         },
         "annotations": {"readOnlyHint": True, "openWorldHint": False, "destructiveHint": False},
     },
@@ -179,6 +197,7 @@ class QueryGateway:
         source_id: str | None = None,
         now: datetime | None = None,
         capability_id: str = "publication_metadata",
+        expected_generation: str | None = None,
     ) -> dict[str, Any]:
         return qs.query_store(
             self.store,
@@ -186,7 +205,91 @@ class QueryGateway:
             limit=1,
             now=_now(now),
             capability_id=capability_id,
+            expected_generation=expected_generation,
         )
+
+    @staticmethod
+    def _trusted_evidence_catalog(
+        store: dict[str, Any],
+        now: datetime | None = None,
+    ) -> list[dict[str, Any]]:
+        sources = {source["source_id"]: source for source in store["sources"]}
+        source_status = {
+            source_id: qs.assess_scope(store, source_id, _now(now))[0]
+            for source_id in sources
+        } if now is not None else {}
+        catalog = []
+        for item in store["items"]:
+            source = sources.get(item["source_id"], {})
+            freshness = str(item.get("freshness_status") or source.get("freshness_status") or "UNKNOWN").upper()
+            current = (
+                (not source_status or source_status.get(item["source_id"]) == "SNAPSHOT_RECENT")
+                and
+                source.get("source_health") == "PASS"
+                and source.get("window_completeness") in {"COMPLETE_ZERO", "COMPLETE_WITH_ITEMS"}
+                and freshness in {"FRESH", "RECENT"}
+            )
+            canonical_id = item["canonical_id"]
+            official_url = item.get("official_url")
+            if not isinstance(official_url, str) or not official_url.startswith("https://"):
+                continue
+            catalog.append({
+                "schema_version": 1,
+                "evidence_id": f"PUB-{canonical_id}",
+                "evidence_type": "WRITTEN_OFFICIAL",
+                "source_id": item["source_id"],
+                "locator": f"{official_url}#publication:{canonical_id}",
+                "document_version": item["content_sha256"],
+                "content_sha256": item["content_sha256"],
+                "trust_tier": item["trust_tier"],
+                "verification_status": "CONFIRMED_OFFICIAL",
+                "freshness": freshness,
+                "is_current": current,
+                "published_at": item.get("published_at") or item.get("data_as_of") or item.get("fetched_at"),
+                "assertions": [
+                    {"subject": f"publication:{canonical_id}:title", "value": item["title"]},
+                    {"subject": f"publication:{canonical_id}:source_id", "value": item["source_id"]},
+                ],
+            })
+        return sorted(catalog, key=lambda row: row["evidence_id"])
+
+    def _run_answer_gate(self, claims: list[dict[str, Any]]) -> dict[str, Any]:
+        node = shutil.which("node")
+        if not node:
+            raise GatewayError("GATE_UNAVAILABLE", "answer evidence gate runtime is unavailable", 503)
+        evidence = self._trusted_evidence_catalog(self.store, self.clock())
+        catalog_hash = _json_hash(evidence)
+        payload = {
+            "claims": claims,
+            "evidence": evidence,
+            "generated_at": self.brief.get("generated_at"),
+            "publication_hash": self.store["generated_from"]["brief_sha256"],
+            "evidence_catalog_hash": catalog_hash,
+        }
+        try:
+            # ponytail: per-request Node subprocess keeps the shared JS gate authoritative; move to a long-lived service if throughput matters.
+            result = subprocess.run(
+                [node, str(ANSWER_GATE_RUNNER)],
+                cwd=ROOT,
+                input=json.dumps(payload, ensure_ascii=False),
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as error:
+            raise GatewayError("GATE_UNAVAILABLE", "answer evidence gate did not complete", 503) from error
+        if result.returncode != 0:
+            detail = (result.stderr or "answer evidence gate failed").strip()[:256]
+            raise GatewayError("GATE_FAILED", detail, 503)
+        try:
+            output = json.loads(result.stdout)
+        except json.JSONDecodeError as error:
+            raise GatewayError("GATE_FAILED", "answer evidence gate returned invalid JSON", 503) from error
+        receipt = output.get("receipt") if isinstance(output, dict) else None
+        if not isinstance(receipt, dict) or receipt.get("publication_hash") != payload["publication_hash"] or receipt.get("evidence_catalog_hash") != catalog_hash:
+            raise GatewayError("GATE_FAILED", "answer evidence receipt is not bound to this publication", 503)
+        return output
 
     def _envelope(
         self,
@@ -197,6 +300,7 @@ class QueryGateway:
         *,
         result_count: int = 0,
         truncated: bool = False,
+        result_type: str = "publication_metadata",
     ) -> dict[str, Any]:
         queried_at = scope.get("queried_at") or _now(None).isoformat()
         data_status = scope["data_status"]
@@ -225,7 +329,7 @@ class QueryGateway:
                 "public_projection": "METADATA_LINK_ONLY",
                 "full_text_allowed": False,
             },
-            "result_type": "publication_metadata",
+            "result_type": result_type,
             "receipt": {
                 "schema_version": 1,
                 "tool_name": tool,
@@ -250,6 +354,7 @@ class QueryGateway:
             "search_evidence": {"q", "source_id", "change_type", "limit", "cursor", "expected_generation"},
             "get_current_brief": set(),
             "get_source_health": {"source_id"},
+            "validate_answer": {"claims", "expected_generation"},
         }.get(tool)
         if allowed is None:
             raise GatewayError(
@@ -265,6 +370,39 @@ class QueryGateway:
     def execute(self, tool: str, arguments: Any = None) -> dict[str, Any]:
         args = self._arguments(tool, arguments)
         now = _now(self.clock())
+        if tool == "validate_answer":
+            claims = args.get("claims")
+            if not isinstance(claims, list) or not 1 <= len(claims) <= 32:
+                raise GatewayError("INVALID_ARGUMENTS", "validate_answer requires 1 to 32 structured claims")
+            claim_keys = {
+                "schema_version", "claim_id", "text", "claim_type", "temporal_scope",
+                "proposition", "cited_evidence_ids",
+            }
+            if any(not isinstance(claim, dict) or set(claim) - claim_keys for claim in claims):
+                raise GatewayError("INVALID_ARGUMENTS", "claims may not include evidence or trust fields")
+            scope = self._scope(
+                now=now,
+                capability_id="publication_metadata",
+                expected_generation=args.get("expected_generation"),
+            )
+            gate = self._run_answer_gate(claims)
+            gate_receipt = gate.get("receipt")
+            if not isinstance(gate_receipt, dict):
+                raise GatewayError("GATE_FAILED", "answer evidence receipt is missing", 503)
+            return self._envelope(
+                tool,
+                args,
+                scope,
+                {
+                    "gate_status": gate.get("gate_status"),
+                    "answer": gate.get("answer", []),
+                    "final_claims": gate.get("final_claims", []),
+                    "evidence_ids": gate_receipt.get("evidence_ids", []),
+                    "answer_evidence_receipt": gate_receipt,
+                },
+                result_count=len(gate.get("final_claims", [])),
+                result_type="answer_evidence",
+            )
         if tool == "search_evidence":
             query_args = {"text": args.get("q"), **{key: value for key, value in args.items() if key != "q"}}
             result = qs.query_store(self.store, now=now, **query_args)

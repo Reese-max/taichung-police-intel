@@ -51,6 +51,7 @@ const required = [
   "state/review-inbox.json",
   "state/feedback.json",
   "scripts/query-gateway.py",
+  "scripts/answer-gate-runner.mjs",
   "scripts/verify-current-checkout.py",
   "scripts/retention-policy.py",
   "scripts/schema_drift.py",

@@ -138,6 +138,58 @@ class QueryGatewayTests(unittest.TestCase):
         self.assertTrue(limiter.allow("other-client", now=12))
         self.assertTrue(limiter.allow("client", now=71))
 
+    def test_validate_answer_uses_server_catalog_and_controlled_renderer(self):
+        item = next(row for row in self.gateway.store["items"] if row["freshness_status"] == "FRESH")
+        claim = {
+            "claim_type": "STATUS",
+            "text": "官方文件標題（因豪雨提前）",
+            "temporal_scope": "CURRENT",
+            "proposition": {"subject": f"publication:{item['canonical_id']}:title", "value": item["title"]},
+        }
+        payload = {"tool": "validate_answer", "arguments": {"claims": [claim]}}
+        query_status, query = self.request("POST", "/query", payload)
+        mcp_status, mcp = self.request(
+            "POST",
+            "/mcp",
+            {"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {
+                "name": "validate_answer", "arguments": {"claims": [claim]}
+            }},
+        )
+        self.assertEqual(query_status, 200)
+        self.assertEqual(mcp_status, 200)
+        self.assertEqual(query["gate_status"], "PASS")
+        self.assertEqual(query["answer"], mcp["result"]["structuredContent"]["answer"])
+        self.assertNotIn("因豪雨提前", query["answer"][0])
+        receipt = query["answer_evidence_receipt"]
+        self.assertEqual(receipt["publication_hash"], query["publication_hash"])
+        self.assertRegex(receipt["evidence_catalog_hash"], r"^[0-9a-f]{64}$")
+        self.assertIn(f"PUB-{item['canonical_id']}", receipt["evidence_ids"])
+
+        stale_gateway = gateway_module.QueryGateway(
+            clock=lambda: datetime(2026, 9, 21, 9, 0, tzinfo=timezone.utc),
+        )
+        stale = stale_gateway.execute("validate_answer", {"claims": [claim]})
+        self.assertEqual(stale["gate_status"], "QUALIFIED")
+        self.assertEqual(stale["final_claims"][0]["support_status"], "STALE")
+
+        non_factual_status, non_factual = self.request(
+            "POST",
+            "/query",
+            {"tool": "validate_answer", "arguments": {"claims": [{
+                "claim_type": "OTHER", "text": "不應回顯", "proposition": {"subject": "caller", "value": "自由文字"}
+            }]}},
+        )
+        self.assertEqual(non_factual_status, 200)
+        self.assertEqual(non_factual["answer"], [])
+
+        bad_status, bad = self.request(
+            "POST",
+            "/query",
+            {"tool": "validate_answer", "arguments": {"claims": [{**claim, "evidence": []}]}},
+        )
+        self.assertEqual(bad_status, 400)
+        self.assertEqual(bad["error"]["code"], "INVALID_ARGUMENTS")
+
 
 if __name__ == "__main__":
     unittest.main()

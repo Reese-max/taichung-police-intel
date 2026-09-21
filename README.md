@@ -128,7 +128,7 @@ Read-only Query Gateway (Slice 1):
 python scripts/query-gateway.py --port 8788 --allow-origin http://localhost:3000
 ```
 
-Set `NEXT_PUBLIC_QUERY_GATEWAY_URL=http://127.0.0.1:8788/query` when starting the Web app to enable **Ask GovIntel**. The Gateway and MCP adapter share the same three typed operations: `search_evidence`, `get_current_brief`, and `get_source_health`. It reads only the checked-in canonical snapshot, rejects arbitrary URL/SQL/path arguments, applies a process-local request cap, and reports stale/partial/unknown states instead of converting them to zero events. `search_events`, `get_event`, version comparison, and statistics remain explicitly unavailable until their canonical stores are ready.
+Set `NEXT_PUBLIC_QUERY_GATEWAY_URL=http://127.0.0.1:8788/query` when starting the Web app to enable **Ask GovIntel**. The Gateway and MCP adapter share the same four typed operations: `search_evidence`, `get_current_brief`, `get_source_health`, and `validate_answer`. `validate_answer` accepts only structured claims, builds its evidence catalog from the canonical snapshot, and returns the shared gate receipt plus controlled final text; callers cannot provide evidence, freshness, or trust fields. It reads only the checked-in canonical snapshot, rejects arbitrary URL/SQL/path arguments, applies a process-local request cap, and reports stale/partial/unknown states instead of converting them to zero events. `search_events`, `get_event`, version comparison, and statistics remain explicitly unavailable until their canonical stores are ready.
 
 Every query response also carries the catalog-derived `query_coverage` projection: policy version/hash, supported capability, required and covered sources, collection completeness, missing or stale sources, coverage limitations, and whether a bounded no-match statement is allowed. A healthy index is not treated as complete coverage of the requested world.
 
@@ -235,7 +235,7 @@ Authenticated Kiro V3 sessions first reviewed all 16 Steering, Spec, and Hook ar
 - Every displayed source links to an HTTPS official page or endpoint.
 - Public aggregates are allowed; personal and operational police data are out of scope.
 - Missing post-meeting evidence remains an explicit gap, not an AI inference.
-- Answer drafts pass `apps/web/lib/answer-evidence-gate.js` before release: every factual claim needs exact official evidence (locator + document version), conflicting official sources surface as `CONFLICT` instead of a merged answer, stale sources cannot back current wording, and media-derived records never verify a claim. The shared gate emits one receipt with the publication hash and validator version for both Web Chat and MCP.
+- Answer drafts pass `apps/web/lib/answer-evidence-gate.js` before release: every factual claim needs exact official evidence (locator + document version), conflicting official sources surface as `CONFLICT` instead of a merged answer, stale sources cannot back current wording, and media-derived records never verify a claim. The shared gate emits one receipt with the publication hash and validator version for both Web Chat and MCP; the read-only `validate_answer` route binds that receipt to the server-controlled catalog and emits no free-text fallback.
 
 ## Historical Kiro competition package (2026-08)
 
