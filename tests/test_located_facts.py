@@ -143,6 +143,27 @@ class LocatedFactsTests(unittest.TestCase):
         altered_json["raw_value"] = "999"
         self.assertEqual(verify_fact(json_document, json_body, altered_json)["reason"], "FACT_VALUE_MISMATCH")
 
+    def test_valid_time_is_recomputed_from_its_source_locator(self):
+        body = HTML.read_bytes()
+        document = self.html_document(body)
+        fact = build_bundle(document, body, [{
+            "subject_id": "event:A",
+            "predicate": "event_start_at",
+            "needle": "18:00",
+            "date_needle": "2026-09-21",
+        }])["facts"][0]
+        altered = copy.deepcopy(fact)
+        altered["valid_time"] = "2099-01-01"
+        self.assertEqual(verify_fact(document, body, altered)["reason"], "VALID_TIME_MISMATCH")
+
+        altered_source = copy.deepcopy(fact)
+        altered_source["valid_time_source"]["quote"] = "2026-09-20"
+        self.assertEqual(verify_fact(document, body, altered_source)["reason"], "VALID_TIME_MISMATCH")
+
+        altered_identity = copy.deepcopy(fact)
+        altered_identity["predicate"] = "road_control_start_at"
+        self.assertEqual(verify_fact(document, body, altered_identity)["reason"], "FACT_ID_MISMATCH")
+
     def test_confirmation_rejects_stale_bundle_receipt(self):
         body = HTML.read_bytes()
         document = self.html_document(body)

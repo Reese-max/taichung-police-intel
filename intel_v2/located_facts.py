@@ -143,14 +143,33 @@ def _date_value(value: str) -> str | None:
         return None
 
 
-def _fact(document: dict[str, Any], rule: dict[str, Any], raw_value: Any, locator: dict[str, Any], status: str, reason: str | None, valid_time: str | None) -> dict[str, Any]:
+def _fact(
+    document: dict[str, Any],
+    rule: dict[str, Any],
+    raw_value: Any,
+    locator: dict[str, Any],
+    status: str,
+    reason: str | None,
+    valid_time: str | None,
+    valid_time_source: dict[str, Any] | None,
+) -> dict[str, Any]:
     subject_id = str(rule.get("subject_id") or "")
     predicate = str(rule.get("predicate") or "")
     normalizer = str(rule.get("normalizer") or "text")
     if not subject_id or not predicate:
         raise ValueError("fact rule requires subject_id and predicate")
     normalized = _normalise(raw_value, normalizer)
-    material = {"document_version_id": document["document_version_id"], "subject_id": subject_id, "predicate": predicate, "locator": locator}
+    material = {
+        "document_version_id": document["document_version_id"],
+        "subject_id": subject_id,
+        "predicate": predicate,
+        "normalizer": normalizer,
+        "raw_value": raw_value,
+        "normalized_value": normalized,
+        "valid_time": valid_time,
+        "valid_time_source": valid_time_source,
+        "locator": locator,
+    }
     fact_id = f"FACT-{sha256(material)[:20].upper()}"
     return {
         "fact_id": fact_id,
@@ -169,6 +188,7 @@ def _fact(document: dict[str, Any], rule: dict[str, Any], raw_value: Any, locato
         "normalized_value": normalized,
         "unit": rule.get("unit"),
         "valid_time": valid_time,
+        "valid_time_source": valid_time_source,
         "geography": rule.get("geography"),
         "locator": locator,
         "derivation_status": "FACT_CANDIDATE",
@@ -190,13 +210,23 @@ def extract_html_facts(document: dict[str, Any], body: bytes, rules: list[dict[s
             continue
         match = matches[0]
         valid_time = None
+        valid_time_source = None
         reason = None
         status = "FACT_CANDIDATE"
         date_needle = str(rule.get("date_needle") or "")
         if date_needle:
             date_matches = list(re.finditer(re.escape(date_needle), text))
             if len(date_matches) == 1:
+                date_match = date_matches[0]
                 valid_time = _date_value(date_needle)
+                valid_time_source = {
+                    "type": "HTML_TEXT_RANGE",
+                    "start": date_match.start(),
+                    "end": date_match.end(),
+                    "quote": date_match.group(0),
+                    "document_sha256": document["raw_bytes_sha256"],
+                    "text_sha256": document["extracted_text_sha256"],
+                }
                 if valid_time is None:
                     status, reason = "NEEDS_REVIEW", "INVALID_VALID_TIME"
             else:
@@ -211,7 +241,7 @@ def extract_html_facts(document: dict[str, Any], body: bytes, rules: list[dict[s
             "document_sha256": document["raw_bytes_sha256"],
             "text_sha256": document["extracted_text_sha256"],
         }
-        facts.append(_fact(document, rule, match.group(0), locator, status, reason, valid_time))
+        facts.append(_fact(document, rule, match.group(0), locator, status, reason, valid_time, valid_time_source))
     return facts
 
 
@@ -249,7 +279,8 @@ def extract_json_facts(document: dict[str, Any], body: bytes, rules: list[dict[s
             "text_sha256": document["extracted_text_sha256"],
         }
         valid_time = _date_value(str(raw_value)) if rule.get("value_is_date") else None
-        facts.append(_fact(document, rule, raw_value, locator, "FACT_CANDIDATE", None, valid_time))
+        valid_time_source = {"type": "JSON_VALUE"} if rule.get("value_is_date") else None
+        facts.append(_fact(document, rule, raw_value, locator, "FACT_CANDIDATE", None, valid_time, valid_time_source))
     return facts
 
 
@@ -292,6 +323,42 @@ def verify_fact(document: dict[str, Any], body: bytes, fact: dict[str, Any]) -> 
         return {"status": "REJECTED", "reason": "FACT_VALUE_MISMATCH", "fact_id": fact.get("fact_id")}
     if fact.get("raw_value") != actual or fact.get("normalized_value") != normalized:
         return {"status": "REJECTED", "reason": "FACT_VALUE_MISMATCH", "fact_id": fact.get("fact_id")}
+    valid_time_source = fact.get("valid_time_source")
+    valid_time = fact.get("valid_time")
+    if valid_time_source is None:
+        if valid_time is not None:
+            return {"status": "REJECTED", "reason": "VALID_TIME_MISMATCH", "fact_id": fact.get("fact_id")}
+    elif valid_time_source.get("type") == "JSON_VALUE":
+        if _date_value(str(actual)) != valid_time:
+            return {"status": "REJECTED", "reason": "VALID_TIME_MISMATCH", "fact_id": fact.get("fact_id")}
+    elif valid_time_source.get("type") == "HTML_TEXT_RANGE":
+        if (
+            valid_time_source.get("document_sha256") != raw_hash
+            or valid_time_source.get("text_sha256") != text_hash
+        ):
+            return {"status": "REJECTED", "reason": "VALID_TIME_MISMATCH", "fact_id": fact.get("fact_id")}
+        try:
+            date_text = text[int(valid_time_source["start"]): int(valid_time_source["end"])]
+        except (KeyError, TypeError, ValueError):
+            return {"status": "REJECTED", "reason": "VALID_TIME_MISMATCH", "fact_id": fact.get("fact_id")}
+        if date_text != valid_time_source.get("quote") or _date_value(date_text) != valid_time:
+            return {"status": "REJECTED", "reason": "VALID_TIME_MISMATCH", "fact_id": fact.get("fact_id")}
+    else:
+        return {"status": "REJECTED", "reason": "VALID_TIME_MISMATCH", "fact_id": fact.get("fact_id")}
+    fact_material = {
+        'document_version_id': document.get('document_version_id'),
+        'subject_id': fact.get('subject_id'),
+        'predicate': fact.get('predicate'),
+        'normalizer': normalizer,
+        'raw_value': fact.get('raw_value'),
+        'normalized_value': fact.get('normalized_value'),
+        'valid_time': valid_time,
+        'valid_time_source': valid_time_source,
+        'locator': locator,
+    }
+    expected_fact_id = f"FACT-{sha256(fact_material)[:20].upper()}"
+    if fact.get("fact_id") != expected_fact_id:
+        return {"status": "REJECTED", "reason": "FACT_ID_MISMATCH", "fact_id": fact.get("fact_id")}
     return {"status": "PASS", "reason": None, "fact_id": fact.get("fact_id")}
 
 
