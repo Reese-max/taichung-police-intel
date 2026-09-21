@@ -323,3 +323,43 @@ def schema_drift_candidates(receipt: dict[str, Any]) -> list[dict[str, Any]]:
             }
         )
     return candidates
+
+
+def detail_recheck_candidates(outcomes: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Convert material detail changes into local Review Inbox candidates."""
+    if not isinstance(outcomes, Iterable) or isinstance(outcomes, (str, bytes, dict)):
+        raise ValueError("detail rechecks must be an array")
+    candidates = []
+    for row in outcomes:
+        if not isinstance(row, dict):
+            raise ValueError("detail recheck outcome must be an object")
+        classification = row.get("classification")
+        if not isinstance(classification, dict):
+            raise ValueError("detail recheck classification is required")
+        if not classification.get("review_required"):
+            continue
+        source_id = row.get("source_id")
+        stable_key = row.get("stable_key")
+        after = classification.get("after")
+        if not isinstance(source_id, str) or not source_id.strip() or not isinstance(stable_key, str) or not stable_key.strip():
+            raise ValueError("detail recheck identity is required")
+        if not isinstance(after, dict) or not isinstance(after.get("document_version_id"), str):
+            raise ValueError("detail recheck after version is required")
+        identity = f"{source_id}:{stable_key}"
+        document_version = after["document_version_id"]
+        candidates.append(
+            {
+                "fingerprint": f"detail-recheck:{identity}:{document_version}",
+                "reason": "NEEDS_REVIEW",
+                "entity_ids": {"source_id": source_id, "document_id": document_version},
+                "source_version": document_version,
+                "evidence": {
+                    "status": classification.get("status"),
+                    "changed_fields": list(classification.get("changed_fields") or []),
+                    "before": classification.get("before"),
+                    "after": after,
+                },
+                "priority_reason": "官方正文或附件版本變更，需要重新核對交班與引用",
+            }
+        )
+    return candidates

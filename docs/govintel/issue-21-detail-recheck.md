@@ -8,6 +8,7 @@
 - 實質或附件變更標記 `review_required`，並保留 before/after 版本供既有 Review Inbox 與 handoff 層接續處理；附件只接受 approved host allowlist。
 - `intel_v2.detail_recheck_http.recheck_detail()` 僅允許核准 hostname、HTTPS、443、手動受限 redirect、條件式 request header 與 2 MiB response；304、429/5xx、超大回應與未核准 redirect 都 fail closed。
 - `migrations/0003_detail_recheck.sql` 與 DB collector 已接上 opt-in `detail_recheck_state`：只有 list-first collector 實際抓到的 detail 會註冊，排程每輪最多處理一筆到期 target，保存 snapshot blob、hash-only before/after classification、下次核對時間與 review flag；未註冊項目不會觸發全站重爬。
+- DB collector 的回傳結果保留 hash-only `classification`；可直接以 `scripts/review-inbox.py reconcile --input` 轉成 `NEEDS_REVIEW`，不會自動改寫 handoff 或 canonical truth。
 
 驗證：`tests/test_detail_recheck.py` 14 tests，以及 `tests/test_detail_recheck_database.py` 3 tests pass。
 

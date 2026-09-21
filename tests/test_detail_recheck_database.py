@@ -95,6 +95,8 @@ class DetailRecheckDatabaseTests(unittest.TestCase):
         )
         self.assertEqual(result[0]["status"], "BASELINE")
         self.assertTrue(result[0]["snapshot_id"].startswith("DR-SR-1-"))
+        self.assertEqual(result[0]["classification"]["status"], "BASELINE")
+        self.assertNotIn("response_body", result[0]["classification"])
         update = next(params for statement, params in connection.sql if statement.lstrip().startswith("UPDATE detail_recheck_state"))
         self.assertEqual(update[8], "BASELINE")
         self.assertEqual(update[14], result[0]["snapshot_id"])

@@ -816,8 +816,10 @@ def run_detail_rechecks(
                 {
                     "source_id": row["source_id"],
                     "stable_key": row["stable_key"],
+                    "requested_url": row["requested_url"],
                     "status": classification["status"],
                     "review_required": classification["review_required"],
+                    "classification": public_result["classification"],
                     "snapshot_id": snapshot_id,
                 }
             )

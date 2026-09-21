@@ -4,7 +4,7 @@ import copy
 import json
 import unittest
 
-from intel_v2.review import claim, decide, empty_state, project, reconcile, schema_drift_candidates, upsert, validate_state
+from intel_v2.review import claim, decide, detail_recheck_candidates, empty_state, project, reconcile, schema_drift_candidates, upsert, validate_state
 
 
 STAMP = "2026-09-21T00:00:00+00:00"
@@ -54,6 +54,31 @@ class ReviewInboxTests(unittest.TestCase):
         state = reconcile(empty_state(), mapped, observed_at=STAMP)
         state = reconcile(state, [], observed_at=STAMP)
         self.assertEqual(project(state)[0]["status"], "OPEN")
+
+    def test_detail_recheck_maps_material_change_to_review_candidate(self):
+        outcomes = [{
+            "source_id": "S-004",
+            "stable_key": "agenda-1",
+            "classification": {
+                "status": "MATERIAL_CHANGE",
+                "review_required": True,
+                "changed_fields": ["effective_at"],
+                "before": {"document_version_id": "DOCV-OLD", "normalized_text_sha256": "a" * 64},
+                "after": {"document_version_id": "DOCV-NEW", "normalized_text_sha256": "b" * 64},
+            },
+        }]
+        mapped = detail_recheck_candidates(outcomes)
+        self.assertEqual(mapped[0]["reason"], "NEEDS_REVIEW")
+        self.assertEqual(mapped[0]["entity_ids"]["document_id"], "DOCV-NEW")
+        state = reconcile(empty_state(), mapped, observed_at=STAMP)
+        self.assertEqual(project(state)[0]["source_version"], "DOCV-NEW")
+
+    def test_detail_recheck_ignores_unchanged_outcome(self):
+        self.assertEqual(detail_recheck_candidates([{
+            "source_id": "S-004",
+            "stable_key": "agenda-1",
+            "classification": {"status": "UNCHANGED", "review_required": False},
+        }]), [])
 
     def test_tampered_audit_and_evidence_receipts_fail_closed(self):
         state, item, _ = upsert(empty_state(), candidate("CONFLICT"), observed_at=STAMP)
