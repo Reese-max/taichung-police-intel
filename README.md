@@ -128,6 +128,11 @@ Read-only Query Gateway (Slice 1):
 python scripts/query-gateway.py --port 8788 --allow-origin http://localhost:3000
 ```
 
+For an MCP client using stdio, run `python scripts/query-gateway-stdio.py`; it
+reuses the same read-only JSON-RPC gateway. A reviewed located-facts bundle can
+be loaded with `--located-facts-bundle`; only hash-bound
+`CONFIRMED_OFFICIAL` facts enter the answer-evidence catalog.
+
 Set `NEXT_PUBLIC_QUERY_GATEWAY_URL=http://127.0.0.1:8788/query` when starting the Web app to enable **Ask GovIntel**. The Gateway and MCP adapter share the same four typed operations: `search_evidence`, `get_current_brief`, `get_source_health`, and `validate_answer`. `validate_answer` accepts only structured claims, builds its evidence catalog from the canonical snapshot, and returns the shared gate receipt plus controlled final text; callers cannot provide evidence, freshness, or trust fields. It reads only the checked-in canonical snapshot, rejects arbitrary URL/SQL/path arguments, applies a process-local request cap, and reports stale/partial/unknown states instead of converting them to zero events. `search_events`, `get_event`, version comparison, and statistics remain explicitly unavailable until their canonical stores are ready.
 
 Every query response also carries the catalog-derived `query_coverage` projection: policy version/hash, supported capability, required and covered sources, collection completeness, missing or stale sources, coverage limitations, and whether a bounded no-match statement is allowed. A healthy index is not treated as complete coverage of the requested world.
