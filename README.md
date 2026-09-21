@@ -146,6 +146,8 @@ Schema replay uses the small registry in `scripts/migration_replay.py` (`1→2�
 
 Review Inbox uses `intel_v2/review.py` and `scripts/review-inbox.py` for deterministic fingerprints, deduplication, claim/decision audit, source-version reopening, and bounded homepage projection. It accepts schema-drift candidates without auto-resolving missing or failed sources; the first version is local-first and does not add RBAC or notifications.
 
+The bounded PublicEvent core is runnable with `python scripts/public-event-fusion.py --self-check`. It only fuses explicitly official normalized documents, keeps document versions separate, carries forward partial/LKG events, and requires a confirmed event plus exact geography/period/source before adding `BACKGROUND_ONLY` context. It is not yet wired to live collectors or a write-capable public UI.
+
 Official document conversion is bounded by `intel_v2/located_facts.py` and `scripts/located-facts.py`: approved catalog origin → immutable raw/text hashes → HTML text-range or JSON Pointer locator → `FACT_CANDIDATE` / `NEEDS_REVIEW` fact and evidence projections. A locator/hash mismatch fails closed; the adapter does not promote candidates to verified truth or infer missing dates.
 
 ## Public deployment
