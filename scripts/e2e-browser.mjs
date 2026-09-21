@@ -83,7 +83,9 @@ async function main() {
     const target = await link.getAttribute("target");
     record("source_link_is_official_https", /^https:\/\//.test(href || "") && target === "_blank", `${href} target=${target}`);
     try {
-      const popupPromise = page.waitForEvent("popup", { timeout: 10000 });
+      // rel="noreferrer" intentionally removes the opener; Chromium reports
+      // the new tab on the context instead of the source page's popup event.
+      const popupPromise = page.context().waitForEvent("page", { timeout: 10000 });
       await link.click();
       const popup = await popupPromise;
       await popup.waitForLoadState("domcontentloaded", { timeout: 15000 }).catch(() => {});
