@@ -17,6 +17,8 @@ from typing import Any, Callable
 from urllib.parse import quote, urlsplit
 import uuid
 
+from intel_v2.located_facts import validate_document_url
+
 ROOT = Path(__file__).resolve().parents[1]
 QUERY_STORE_PATH = ROOT / "scripts" / "query-store.py"
 RETENTION_POLICY_PATH = ROOT / "scripts" / "retention-policy.py"
@@ -168,10 +170,13 @@ def validate_located_facts_bundle(bundle: Any, approved_source_ids: set[str]) ->
     if not isinstance(document, dict) or document.get("schema_version") != 1:
         raise ValueError("located-facts bundle document version is invalid")
     source_id = document.get("source_id")
-    final_url = urlsplit(str(document.get("final_url") or ""))
-    expected_host = approved_source_origins().get(str(source_id))
-    if source_id not in approved_source_ids or final_url.scheme != "https" or final_url.hostname != expected_host:
+    final_url = document.get("final_url")
+    if source_id not in approved_source_ids:
         raise ValueError("located-facts bundle source is not approved and HTTPS")
+    try:
+        validate_document_url(source_id, final_url)
+    except (TypeError, ValueError) as error:
+        raise ValueError("located-facts bundle source is not approved and HTTPS") from error
     raw_hash = document.get("raw_bytes_sha256")
     text_hash = document.get("extracted_text_sha256")
     if (

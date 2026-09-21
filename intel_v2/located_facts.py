@@ -52,9 +52,22 @@ def _approved_source(source_id: str, url: str) -> dict[str, Any]:
     row = next((item for item in catalog.get("sources", []) if item.get("source_id") == source_id), None)
     if not isinstance(row, dict):
         raise ValueError(f"source is not in the server catalog: {source_id}")
-    expected = urlsplit(str(row.get("entrypoint") or ""))
-    actual = urlsplit(url)
-    if expected.scheme != "https" or actual.scheme != "https" or actual.hostname != expected.hostname:
+    try:
+        expected = urlsplit(str(row.get("entrypoint") or ""))
+        actual = urlsplit(url)
+        expected_port = expected.port or 443
+        actual_port = actual.port or 443
+    except (TypeError, ValueError) as error:
+        raise ValueError("document URL is outside the approved source origin") from error
+    if (
+        expected.scheme != "https"
+        or actual.scheme != "https"
+        or not actual.hostname
+        or actual.hostname != expected.hostname
+        or actual.username is not None
+        or actual.password is not None
+        or actual_port != expected_port
+    ):
         raise ValueError("document URL is outside the approved source origin")
     return row
 

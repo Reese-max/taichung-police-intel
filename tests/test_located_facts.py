@@ -123,6 +123,14 @@ class LocatedFactsTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "outside the approved source origin"):
             validate_document_url("S-028", "https://example.invalid/dataset/88147")
 
+    def test_live_preflight_rejects_credentials_and_nonstandard_ports(self):
+        for url in (
+            "https://user:data.gov.tw@data.gov.tw/api/v2/rest/dataset/88147",
+            "https://data.gov.tw:8443/api/v2/rest/dataset/88147",
+        ):
+            with self.assertRaisesRegex(ValueError, "outside the approved source origin"):
+                validate_document_url("S-028", url)
+
 
 if __name__ == "__main__":
     unittest.main()

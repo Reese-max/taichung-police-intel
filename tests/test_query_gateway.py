@@ -382,6 +382,18 @@ class QueryGatewayTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "requires a bound review"):
             gateway_module.QueryGateway(snapshot=snapshot)
 
+    def test_located_facts_source_url_rejects_credentials_and_nonstandard_ports(self):
+        for url in (
+            "https://user:data.gov.tw@data.gov.tw/api/v2/rest/dataset/88147",
+            "https://data.gov.tw:8443/api/v2/rest/dataset/88147",
+        ):
+            snapshot = gateway_module.load_snapshot()
+            bundle = self.located_bundle()
+            bundle["document_version"]["final_url"] = url
+            snapshot["located_facts"] = bundle
+            with self.assertRaisesRegex(ValueError, "source is not approved"):
+                gateway_module.QueryGateway(snapshot=snapshot)
+
 
 if __name__ == "__main__":
     unittest.main()
