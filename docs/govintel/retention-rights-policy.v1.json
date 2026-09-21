@@ -3,6 +3,32 @@
   "policy_version": 1,
   "updated_at": "2026-09-21",
   "purpose": "Conservative public projection and retention defaults; not a legal rights determination.",
+  "retention_windows": {
+    "SOURCE_TERMS_REVIEW": {
+      "max_age_days": null,
+      "expired_action": "REVIEW_REQUIRED"
+    },
+    "SHORT_LIVED_SOURCE_TERMS_REVIEW": {
+      "max_age_days": 7,
+      "expired_action": "PURGE_RAW_KEEP_AUDIT"
+    },
+    "PROVENANCE_HISTORY": {
+      "max_age_days": null,
+      "expired_action": "KEEP_AUDIT_LINKAGE"
+    },
+    "PERIOD_AND_PROVENANCE_HISTORY": {
+      "max_age_days": null,
+      "expired_action": "KEEP_AUDIT_LINKAGE"
+    },
+    "DERIVATION_RECEIPT_ONLY": {
+      "max_age_days": null,
+      "expired_action": "KEEP_AUDIT_RECEIPT"
+    },
+    "DERIVATION_HISTORY": {
+      "max_age_days": null,
+      "expired_action": "KEEP_AUDIT_LINKAGE"
+    }
+  },
   "classes": {
     "OFFICIAL_METADATA_LINK": {
       "rights_status": "UNKNOWN",
