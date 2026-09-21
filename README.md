@@ -294,7 +294,7 @@ The retained current-workspace Kiro records show Auto as `qdev::auto`: 10.254967
 - The competition UI demonstrates one complete council-evidence journey, not every police workflow.
 - Source freshness can be stale even when the endpoint is healthy; the UI shows both states.
 - Some official endpoints provide no usable publication date or only partial date-window coverage.
-- The migration registry currently covers the JSON durable-object/replay contract; PostgreSQL DDL evolution and live raw-snapshot backfill still require a database-backed run and receipt.
+- The migration registry covers the JSON durable-object/replay contract, and the PostgreSQL DDL migration has passed an isolated ephemeral database gate; persistent database recheck/backfill and production execution remain unverified.
 - Transcript quality is a historical baseline and has not received independent human sign-off.
 - The English path translates the product journey and source names; the official Chinese transcript remains Chinese and is explicitly labelled as navigation-only evidence.
 - The official `S-010` HLS CDN can fail in some Chrome sessions with `ERR_CONTENT_DECODING_FAILED`. A fatal media error or ten-second metadata timeout now preserves the transcript and provenance while showing a prominent link to the official council video. The local 2:43 product-demo MP4 is deliberately not substituted because it does not share the official evidence timeline.
