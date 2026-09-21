@@ -2,10 +2,12 @@ import importlib.util
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
+import sys
 import unittest
 
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts/candidate-runtime-canary.py"
+sys.path.insert(0, str(SCRIPT.parent.parent))
 spec = importlib.util.spec_from_file_location("candidate_runtime_canary", SCRIPT)
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
@@ -82,6 +84,16 @@ class CanaryContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unapproved"):
             session.get("https://evil.example.test/")
         self.assertEqual(session.calls, 0)
+
+    def test_default_transport_reuses_collector_retry_policy(self):
+        session = module.BoundedSession("https://official.example.test/")
+        try:
+            retry = session.transport.adapters["https://"].max_retries
+            self.assertEqual(retry.total, 2)
+            self.assertEqual(set(retry.status_forcelist), {429, 500, 502, 503, 504})
+            self.assertIn("GET", retry.allowed_methods)
+        finally:
+            session.close()
 
 
 if __name__ == "__main__":

@@ -36,9 +36,11 @@ class BoundedSession:
     """Allow only same-host HTTPS requests with small call and body budgets."""
 
     def __init__(self, source_url, transport=None):
-        import requests
+        if transport is None:
+            from online_collect import http_session
 
-        self.transport = transport or requests.Session()
+            transport = http_session()
+        self.transport = transport
         self.transport.trust_env = False
         self.transport.headers.update({
             "User-Agent": "GovIntelCandidateCanary/1.0 (+public-source-monitor)",
