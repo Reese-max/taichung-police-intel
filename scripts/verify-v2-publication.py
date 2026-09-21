@@ -25,6 +25,31 @@ PUBLISHABLE_CHANGE_TYPES = {
     "REMOVED",
 }
 TEMPORAL_BASES = {"OFFICIAL_DATE", "FIRST_SEEN", "DETECTED_CHANGE"}
+CANONICAL_EVENT_FIELDS = (
+    "event_id",
+    "identity",
+    "watch_id",
+    "stable_key",
+    "source_id",
+    "source_name",
+    "change_type",
+    "headline",
+    "what_changed",
+    "why_it_matters",
+    "affected_roles",
+    "recommended_action",
+    "deadline",
+    "temporal_basis",
+    "date_status",
+    "detected_at",
+    "changed_fields",
+    "source_version",
+    "source_sha256",
+    "source_document_version",
+    "official_url",
+    "verification_status",
+    "evidence_status",
+)
 
 
 def load_json(path: Path) -> dict:
@@ -97,6 +122,26 @@ def validate_action_item(
         validate_profile_relevance(item, expected_profile, label=f"published item {event_id}")
 
 
+def validate_profile_view_consistency(profile_views: list[dict]) -> None:
+    """Profile views may reorder/select events, but cannot rewrite event truth."""
+    canonical_by_event: dict[str, str] = {}
+    for view in profile_views:
+        for key in ("priority_items", "other_changes"):
+            for item in view[key]:
+                event_id = item["event_id"]
+                canonical = json.dumps(
+                    {field: item.get(field) for field in CANONICAL_EVENT_FIELDS},
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    allow_nan=False,
+                )
+                previous = canonical_by_event.get(event_id)
+                if previous is not None and previous != canonical:
+                    fail(f"canonical event differs across profile views: {event_id}")
+                canonical_by_event[event_id] = canonical
+
+
 def verify(
     *,
     feed_path: Path,
@@ -158,6 +203,7 @@ def verify(
             validate_action_item(item, seen_view_events, "OTHER", view_profile)
         for item in view_tracking:
             validate_profile_relevance(item, view_profile, label=f"profile tracking item {profile_id}")
+    validate_profile_view_consistency(profile_views)
     if profile["profile_id"] not in view_by_id:
         fail("selected profile is missing from profile_views")
     selected_view = view_by_id[profile["profile_id"]]
