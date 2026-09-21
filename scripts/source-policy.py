@@ -200,14 +200,24 @@ def validate_policy(policy: dict[str, Any]) -> None:
     if type(policy.get("policy_version")) is not int or policy["policy_version"] < 1:
         raise ValueError("invalid policy_version")
     active = policy.get("active_source_ids")
-    if not isinstance(active, list) or not active or active != sorted(active) or len(active) != len(set(active)):
+    if (
+        not isinstance(active, list)
+        or not active
+        or not all(isinstance(source_id, str) and source_id for source_id in active)
+        or active != sorted(active)
+        or len(active) != len(set(active))
+    ):
         raise ValueError("invalid active_source_ids")
     supplied = policy.get("policy_hash")
     actual = digest({key: value for key, value in policy.items() if key != "policy_hash"})
     if supplied != actual:
         raise ValueError("policy hash mismatch")
     active_sources = policy.get("active_sources")
-    if not isinstance(active_sources, list) or [row.get("source_id") for row in active_sources if isinstance(row, dict)] != active:
+    if (
+        not isinstance(active_sources, list)
+        or not all(isinstance(row, dict) for row in active_sources)
+        or [row.get("source_id") for row in active_sources] != active
+    ):
         raise ValueError("active_sources do not match active_source_ids")
     for row in active_sources:
         if (
@@ -220,17 +230,23 @@ def validate_policy(policy: dict[str, Any]) -> None:
             raise ValueError("invalid active source projection")
     capabilities = policy.get("capabilities")
     expected_capability_ids = [row[0] for row in CAPABILITIES]
-    if not isinstance(capabilities, list) or [row.get("capability_id") for row in capabilities if isinstance(row, dict)] != expected_capability_ids:
+    if (
+        not isinstance(capabilities, list)
+        or not all(isinstance(row, dict) for row in capabilities)
+        or [row.get("capability_id") for row in capabilities] != expected_capability_ids
+    ):
         raise ValueError("invalid policy capabilities")
     for capability in capabilities:
         required = capability.get("required_sources")
         optional = capability.get("candidate_or_optional_sources")
         if (
             not isinstance(required, list)
+            or not all(isinstance(source_id, str) and source_id for source_id in required)
             or required != sorted(required)
             or len(required) != len(set(required))
             or not set(required) <= set(active)
             or not isinstance(optional, list)
+            or not all(isinstance(source_id, str) and source_id for source_id in optional)
             or optional != sorted(optional)
             or len(optional) != len(set(optional))
             or set(required) & set(optional)

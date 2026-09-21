@@ -157,6 +157,22 @@ class SourcePolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "active_sources"):
             sp.validate_policy(tampered)
 
+    def test_malformed_projection_types_fail_closed(self):
+        cases = []
+        for key, value in (("active_source_ids", [None]), ("capabilities", [None])):
+            tampered = copy.deepcopy(self.baseline)
+            tampered[key] = value
+            tampered["policy_hash"] = sp.digest({name: item for name, item in tampered.items() if name != "policy_hash"})
+            cases.append(tampered)
+        tampered = copy.deepcopy(self.baseline)
+        tampered["capabilities"][0]["required_sources"] = [None]
+        tampered["policy_hash"] = sp.digest({name: item for name, item in tampered.items() if name != "policy_hash"})
+        cases.append(tampered)
+        for policy in cases:
+            with self.subTest(policy=policy):
+                with self.assertRaises(ValueError):
+                    sp.validate_policy(policy)
+
 
 if __name__ == "__main__":
     unittest.main()
