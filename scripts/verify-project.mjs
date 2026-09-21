@@ -155,6 +155,17 @@ if (!failures.length) {
   for (const token of ["30 22 * * *", "30 10 * * *", "actions/configure-pages@v5", "actions/deploy-pages@v4", "--demo-output apps/web/public/data/source-status.json"]) {
     if (!workflow.includes(token)) failures.push(`pages:missing-${token}`);
   }
+  for (const token of [
+    "scripts/publication-state-branch.py restore",
+    "scripts/publication-state-branch.py persist",
+    "scripts/publication-state-branch.py acknowledge",
+    "--branch publication-state",
+  ]) {
+    if (!workflow.includes(token)) failures.push(`pages:missing-protected-state-lifecycle-${token}`);
+  }
+  if (/\bgit\s+push\b[^\n]*(?:\bmain\b|refs\/heads\/main)/i.test(workflow)) {
+    failures.push("pages:direct-main-push-forbidden");
+  }
 
   const status = JSON.parse(await read("apps/web/public/data/source-status.json"));
   const sourcePolicy = JSON.parse(await read("apps/web/public/data/source-policy.json"));
