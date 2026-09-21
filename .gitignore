@@ -22,6 +22,7 @@ hackathon-master-roadmap-v4.md
 source-catalog.md
 source-seven-day-audit-2026-08-14.md
 .runtime/
+state/live-meeting-session.json
 graphify-out/
 coverage/
 *.pre-sequential-fix-*.csv
