@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-09-09",
+  "updated_at": "2026-09-21",
   "purpose": "GovIntel AI prioritized public-source catalog for event detection, evidence, policy/reference data, and enrichment.",
   "status_semantics": {
     "PRODUCTION_ACTIVE": "Already used by the current production collector path.",
@@ -245,6 +245,36 @@
       "recommended_interval_minutes": 10080,
       "collection_rule": "Load only the selected approved dataset/period; record statistical period and use terms.",
       "evidence_rule": "Historical/simulated values are context only and must never be labelled as live crowd or live impact estimates."
+    },
+    {
+      "source_id": "S-036",
+      "name": "內政部警政署集會遊行資訊",
+      "authority": "內政部警政署",
+      "role": "PRIMARY_EVENT",
+      "priority": 1,
+      "status": "VERIFIED_CANDIDATE",
+      "entrypoint": "https://data.gov.tw/dataset/11307",
+      "transport": "data.gov.tw metadata + structured resource",
+      "cadence_class": "DAILY_EVENT",
+      "recommended_interval_minutes": 1440,
+      "collection_rule": "Check metadata/resource identity first; preserve event start/end, route or venue, authority and resource hash. A file refresh is not a per-event change.",
+      "evidence_rule": "Use time, route or venue and authority in the stable identity; revisions to event time or route are semantic changes.",
+      "notes": "Candidate and fixture-only in this checkout; no production collector promotion is claimed."
+    },
+    {
+      "source_id": "S-037",
+      "name": "全國警察局、分局、分駐所、派出所地址",
+      "authority": "內政部警政署",
+      "role": "ENRICHMENT",
+      "priority": 2,
+      "status": "VERIFIED_CANDIDATE",
+      "entrypoint": "https://data.gov.tw/dataset/5958",
+      "transport": "data.gov.tw metadata + structured resource",
+      "cadence_class": "REFERENCE",
+      "recommended_interval_minutes": 10080,
+      "collection_rule": "Load only after metadata/resource change; preserve unit, address, telephone and coordinates as service context.",
+      "evidence_rule": "Address data is a public service reference, not an operational dispatch or live availability signal.",
+      "notes": "Candidate and metadata-only in this checkout; coarse public service enrichment only."
     },
     {
       "source_id": "CTX-POP",
