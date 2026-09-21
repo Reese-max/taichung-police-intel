@@ -69,6 +69,7 @@ class BoundedSession:
             if self.calls >= 6:
                 raise RuntimeError("candidate HTTP budget exhausted")
             self.calls += 1
+            kwargs.pop("allow_redirects", None)
             response = self.transport.get(
                 url, timeout=(5, 15), allow_redirects=False, stream=True, **kwargs
             )

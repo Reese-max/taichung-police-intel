@@ -95,6 +95,35 @@ class CanaryContractTests(unittest.TestCase):
         finally:
             session.close()
 
+    def test_transport_keeps_redirects_disabled_when_collector_passes_option(self):
+        response = SimpleNamespace(status_code=200, headers={})
+        response.iter_content = lambda chunk_size: [b"ok"]
+        response.raise_for_status = lambda: None
+        response.close = lambda: None
+
+        class Transport:
+            headers = {}
+
+            def __init__(self):
+                self.calls = []
+                self.trust_env = True
+
+            def get(self, url, **kwargs):
+                self.calls.append((url, kwargs))
+                return response
+
+            def close(self):
+                pass
+
+        transport = Transport()
+        session = module.BoundedSession("https://official.example.test/", transport)
+        try:
+            session.get("https://official.example.test/list", allow_redirects=True)
+        finally:
+            session.close()
+        self.assertEqual(len(transport.calls), 1)
+        self.assertFalse(transport.calls[0][1]["allow_redirects"])
+
     def test_catalog_candidate_inventory_includes_live_adapters(self):
         import online_collect
 
