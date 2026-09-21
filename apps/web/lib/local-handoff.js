@@ -128,9 +128,11 @@ export function addLocalWatch(state, item, createdAt = new Date()) {
   const result = copy(validateLocalHandoff(state));
   const current = requiredItem(item);
   const watchId = watchIdFor(current.identity);
-  if (result.watch_items[watchId]) return result;
+  const existing = result.watch_items[watchId];
+  if (existing && !["RESOLVED", "DISMISSED"].includes(existing.status)) return result;
   const at = stamp(createdAt);
   result.watch_items[watchId] = {
+    ...(existing || {}),
     watch_id: watchId,
     ...current,
     created_at: at,
@@ -142,7 +144,7 @@ export function addLocalWatch(state, item, createdAt = new Date()) {
     last_reviewed_version: null,
     last_reviewed_sha256: null,
     last_handoff_id: null,
-    invalidations: [],
+    invalidations: existing?.invalidations || [],
   };
   result.last_updated_at = at;
   return result;

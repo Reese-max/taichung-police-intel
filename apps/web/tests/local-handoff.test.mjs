@@ -75,6 +75,16 @@ test("resolved watch leaves the active projection but remains in history", () =>
   assert.equal(resolved.watch_items[watchId].status, "RESOLVED");
 });
 
+test("terminal watch can be re-added against a newer source version", () => {
+  const watched = addLocalWatch(emptyLocalHandoff(), item(), T0);
+  const watchId = Object.keys(watched.watch_items)[0];
+  const resolved = setLocalWatchStatus(watched, watchId, "RESOLVED", T1);
+  const reopened = addLocalWatch(resolved, item(2), T1);
+  assert.equal(reopened.watch_items[watchId].status, "WATCHING");
+  assert.equal(reopened.watch_items[watchId].tracked_version, 2);
+  assert.equal(reopened.watch_items[watchId].created_at, "2026-09-20T17:00:00.000Z");
+});
+
 test("local storage round-trip validates the same state", () => {
   const storage = {
     value: null,
