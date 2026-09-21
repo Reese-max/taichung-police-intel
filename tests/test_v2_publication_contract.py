@@ -42,14 +42,24 @@ def event(**overrides):
 
 
 def view(item):
-    return {"priority_items": [item], "other_changes": []}
+    return {"priority_items": [item], "tracking_items": [], "other_changes": []}
 
 
 class V2PublicationContractTests(unittest.TestCase):
     def test_profile_views_share_canonical_event_fields(self):
         VERIFY.validate_profile_view_consistency([view(event()), view(event())])
-        with self.assertRaisesRegex(ValueError, "canonical event differs"):
+        with self.assertRaisesRegex(ValueError, "canonical item differs"):
             VERIFY.validate_profile_view_consistency([view(event()), view(event(what_changed="被 profile 改寫"))])
+
+    def test_profile_views_share_canonical_tracking_fields(self):
+        first = view(event())
+        second = view(event())
+        first["tracking_items"] = [event(event_id=None, tracking_id="TRACK-WATCH-1")]
+        second["tracking_items"] = [event(event_id=None, tracking_id="TRACK-WATCH-1")]
+        VERIFY.validate_profile_view_consistency([first, second])
+        second["tracking_items"][0]["what_changed"] = "被 profile 改寫"
+        with self.assertRaisesRegex(ValueError, "canonical item differs"):
+            VERIFY.validate_profile_view_consistency([first, second])
 
 
 if __name__ == "__main__":

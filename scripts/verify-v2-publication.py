@@ -123,12 +123,14 @@ def validate_action_item(
 
 
 def validate_profile_view_consistency(profile_views: list[dict]) -> None:
-    """Profile views may reorder/select events, but cannot rewrite event truth."""
-    canonical_by_event: dict[str, str] = {}
+    """Profile views may reorder/select items, but cannot rewrite canonical truth."""
+    canonical_by_item: dict[str, str] = {}
     for view in profile_views:
-        for key in ("priority_items", "other_changes"):
+        for key in ("priority_items", "other_changes", "tracking_items"):
             for item in view[key]:
-                event_id = item["event_id"]
+                item_id = item.get("event_id") or item.get("tracking_id") or item.get("identity")
+                if not item_id:
+                    fail(f"profile view item lacks a stable identity: {key}")
                 canonical = json.dumps(
                     {field: item.get(field) for field in CANONICAL_EVENT_FIELDS},
                     ensure_ascii=False,
@@ -136,10 +138,10 @@ def validate_profile_view_consistency(profile_views: list[dict]) -> None:
                     separators=(",", ":"),
                     allow_nan=False,
                 )
-                previous = canonical_by_event.get(event_id)
+                previous = canonical_by_item.get(item_id)
                 if previous is not None and previous != canonical:
-                    fail(f"canonical event differs across profile views: {event_id}")
-                canonical_by_event[event_id] = canonical
+                    fail(f"canonical item differs across profile views: {item_id}")
+                canonical_by_item[item_id] = canonical
 
 
 def verify(
