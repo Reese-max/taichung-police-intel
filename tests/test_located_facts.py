@@ -85,6 +85,12 @@ class LocatedFactsTests(unittest.TestCase):
         malformed_time_source["valid_time_source"] = []
         self.assertEqual(verify_fact(document, body, malformed_time_source)["reason"], "VALID_TIME_MISMATCH")
 
+        malformed_locator = copy.deepcopy(fact)
+        malformed_locator["locator"] = ["not-an-object"]
+        self.assertEqual(verify_fact(document, body, malformed_locator)["reason"], "LOCATOR_MISMATCH")
+        self.assertEqual(verify_fact(document, body, None)["reason"], "FACT_INPUT_INVALID")
+        self.assertEqual(verify_fact({**document, "content_type": None}, body, fact)["reason"], "CONTENT_TYPE_INVALID")
+
     def test_locator_hashes_are_bound_for_html_and_json(self):
         html_body = HTML.read_bytes()
         html_document = self.html_document(html_body)

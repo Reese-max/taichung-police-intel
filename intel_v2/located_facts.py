@@ -285,14 +285,24 @@ def extract_json_facts(document: dict[str, Any], body: bytes, rules: list[dict[s
 
 
 def verify_fact(document: dict[str, Any], body: bytes, fact: dict[str, Any]) -> dict[str, Any]:
+    fact_id = fact.get("fact_id") if isinstance(fact, dict) else None
+    if not isinstance(document, dict) or not isinstance(body, bytes) or not isinstance(fact, dict):
+        return {"status": "REJECTED", "reason": "FACT_INPUT_INVALID", "fact_id": fact_id}
+    if not isinstance(document.get("content_type"), str) or not document["content_type"]:
+        return {"status": "REJECTED", "reason": "CONTENT_TYPE_INVALID", "fact_id": fact_id}
     raw_hash = sha256(body)
     if raw_hash != document.get("raw_bytes_sha256") or raw_hash != fact.get("raw_bytes_sha256"):
         return {"status": "REJECTED", "reason": "RAW_HASH_MISMATCH", "fact_id": fact.get("fact_id")}
-    text = normalized_text(body, document["content_type"])
+    try:
+        text = normalized_text(body, document["content_type"])
+    except (UnicodeDecodeError, TypeError, ValueError):
+        return {"status": "REJECTED", "reason": "TEXT_INVALID", "fact_id": fact.get("fact_id")}
     text_hash = sha256(text)
     if text_hash != document.get("extracted_text_sha256") or text_hash != fact.get("extracted_text_sha256"):
         return {"status": "REJECTED", "reason": "TEXT_HASH_MISMATCH", "fact_id": fact.get("fact_id")}
-    locator = fact.get("locator") or {}
+    locator = fact.get("locator")
+    if not isinstance(locator, dict):
+        return {"status": "REJECTED", "reason": "LOCATOR_MISMATCH", "fact_id": fact.get("fact_id")}
     if (
         locator.get("document_sha256") != raw_hash
         or locator.get("text_sha256") != text_hash
