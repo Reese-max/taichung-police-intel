@@ -109,6 +109,10 @@ class PublicEventFusionTests(unittest.TestCase):
         self.assertEqual(event["occurrence_history"][0]["evidence_locator"], "paragraph:7")
         self.assertEqual(event["public_event_redirects"][0]["to_public_event_id"], event["public_event_id"])
         self.assertIn("official_reschedule", event["link_reasons"])
+        self.assertEqual(
+            fusion.reconcile_public_events(current, [after], snapshot_complete=True, entity_registry=registry),
+            current,
+        )
 
     def test_same_named_different_date_without_relation_stays_separate(self):
         before = fusion.fuse_documents([document("CITY"), document("POLICE")])
