@@ -36,6 +36,7 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "apps" / "web" / "public" / "data"
 CATALOG = ROOT / "docs" / "govintel" / "source-catalog.v2.json"
 QUERY_GATEWAY = ROOT / "scripts" / "query-gateway.py"
+QUERY_GATEWAY_STDIO = ROOT / "scripts" / "query-gateway-stdio.py"
 LOCKFILES = ("requirements.txt", "package-lock.json", "apps/web/package-lock.json")
 MODULES = {
     "query_store": "scripts/query-store.py",
@@ -56,6 +57,11 @@ UNAVAILABLE_CAPABILITIES = (
     "gold_evaluation", "chat_mcp", "live_collection", "persistent_handoff",
 )
 MAX_SABOTAGE_SECONDS = 300
+MCP_PROTOCOL_VERSION = "2025-06-18"
+EXPECTED_MCP_TOOLS = frozenset({
+    "search_evidence", "get_current_brief", "get_publication_receipt",
+    "get_source_health", "validate_answer",
+})
 
 
 def utcnow() -> datetime:
@@ -440,6 +446,83 @@ def check_served_store_consistency(ctx: dict[str, Any], base: str) -> dict[str, 
         served_generation=served, expected_generation=expected)
 
 
+def run_stdio_mcp_check(ctx: dict[str, Any]) -> dict[str, Any]:
+    requests = [
+        {"jsonrpc": "2.0", "id": 1, "method": "initialize"},
+        {"jsonrpc": "2.0", "method": "notifications/initialized"},
+        {"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
+        {"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {
+            "name": "get_publication_receipt", "arguments": {},
+        }},
+    ]
+    payload = "\n".join(json.dumps(request, ensure_ascii=False) for request in requests) + "\n"
+    try:
+        result = subprocess.run(
+            [sys.executable, "-X", "utf8", str(QUERY_GATEWAY_STDIO)],
+            cwd=ROOT,
+            input=payload,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=30,
+            check=False,
+        )
+        responses = [json.loads(line) for line in result.stdout.splitlines() if line.strip()]
+    except (OSError, subprocess.TimeoutExpired, UnicodeDecodeError, json.JSONDecodeError) as error:
+        return check_record(
+            "stdio_read_only_mcp_lifecycle",
+            False,
+            f"STDIO lifecycle failed: {type(error).__name__}: {error}",
+            capability="read_only_mcp",
+            transport="stdio",
+        )
+
+    initialize = next((response for response in responses if response.get("id") == 1), {})
+    tools_list = next((response for response in responses if response.get("id") == 2), {})
+    tool_call = next((response for response in responses if response.get("id") == 3), {})
+    tools = tools_list.get("result", {}).get("tools", []) if isinstance(tools_list, dict) else []
+    names = {tool.get("name") for tool in tools if isinstance(tool, dict)} if isinstance(tools, list) else set()
+    receipt = (
+        tool_call.get("result", {}).get("structuredContent", {}).get("publication_receipt")
+        if isinstance(tool_call, dict) else None
+    )
+    receipt_ok = (
+        isinstance(receipt, dict)
+        and receipt.get("publication_hash") == ctx["hashes"]["brief"]
+        and receipt.get("artifact_hashes") == ctx["hashes"]
+        and receipt.get("generation_id") == ctx["store"]["generation_id"]
+    )
+    tools_ok = (
+        isinstance(tools, list)
+        and names == EXPECTED_MCP_TOOLS
+        and len(tools) == len(EXPECTED_MCP_TOOLS)
+        and all(
+            isinstance(tool, dict)
+            and isinstance(tool.get("annotations"), dict)
+            and tool["annotations"].get("readOnlyHint") is True
+            and tool["annotations"].get("destructiveHint") is False
+            for tool in tools
+        )
+    )
+    ok = (
+        result.returncode == 0
+        and not result.stderr
+        and [response.get("id") for response in responses] == [1, 2, 3]
+        and initialize.get("result", {}).get("protocolVersion") == MCP_PROTOCOL_VERSION
+        and tools_ok
+        and tool_call.get("result", {}).get("isError") is False
+        and receipt_ok
+    )
+    return check_record(
+        "stdio_read_only_mcp_lifecycle",
+        ok,
+        f"STDIO initialize/tools/list/tools/call tools={len(tools) if isinstance(tools, list) else 0}, "
+        f"stderr={'empty' if not result.stderr else 'UNEXPECTED'}, hashes={'match' if receipt_ok else 'MISMATCH'}",
+        capability="read_only_mcp",
+        transport="stdio",
+    )
+
+
 def run_http_checks(ctx: dict[str, Any], base: str) -> list[dict[str, Any]]:
     qs = ctx["modules"]["query_store"]
     store = ctx["store"]
@@ -474,10 +557,7 @@ def run_http_checks(ctx: dict[str, Any], base: str) -> list[dict[str, Any]]:
         "id": 1,
         "method": "tools/list",
     })
-    expected_tools = {
-        "search_evidence", "get_current_brief", "get_publication_receipt",
-        "get_source_health", "validate_answer",
-    }
+    expected_tools = EXPECTED_MCP_TOOLS
     raw_mcp_tools = mcp.get("result", {}).get("tools", []) if isinstance(mcp, dict) else []
     mcp_tools = raw_mcp_tools if isinstance(raw_mcp_tools, list) else []
     mcp_names = {tool.get("name") for tool in mcp_tools if isinstance(tool, dict)}
@@ -512,6 +592,7 @@ def run_http_checks(ctx: dict[str, Any], base: str) -> list[dict[str, Any]]:
         f"POST /query receipt={receipt_status}, hashes={'match' if receipt_ok else 'MISMATCH'}",
         capability="read_only_mcp",
     ))
+    checks.append(run_stdio_mcp_check(ctx))
 
     status, doc = http_json(base + "/api/query?expected_generation=" + "0" * 64)
     checks.append(check_record("negative_foreign_generation_refused",
@@ -730,10 +811,13 @@ def build_health_receipt(ctx: dict[str, Any], http_checks: list[dict[str, Any]] 
     stages = health.current_publication_stages(status_doc, brief)
     stages = [s for s in stages if s["lane"] != "query"]
     now = utcnow().isoformat()
-    mcp_check = next((check for check in (http_checks or []) if check.get("id") == "http_read_only_mcp_publication_receipt"), None)
+    mcp_checks = [
+        check for check in (http_checks or [])
+        if check.get("id") in {"http_read_only_mcp_publication_receipt", "stdio_read_only_mcp_lifecycle"}
+    ]
     mcp_outcome = (
-        "SUCCESS" if mcp_check and mcp_check.get("status") == "PASS"
-        else "FAILED" if mcp_check else "SKIPPED"
+        "SUCCESS" if len(mcp_checks) == 2 and all(check.get("status") == "PASS" for check in mcp_checks)
+        else "FAILED" if mcp_checks else "SKIPPED"
     )
     stages += [
         {"lane": "query", "stage": "query_index",

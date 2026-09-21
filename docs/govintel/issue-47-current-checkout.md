@@ -15,11 +15,11 @@ the actual `code_sha`, dependency-lock hash, canonical artifact hashes, query
 generation, policy hash, capabilities, logs, screenshots, and request trace into
 `runtime-evidence/current-checkout/<timestamp>/receipt.json`.
 
-The latest local replay passed `23/23` checks, including:
+The latest local replay passed `24/24` checks, including:
 
 - static page and canonical bytes over HTTP;
 - query generation/policy/hash identity and bounded query results;
-- the local read-only MCP tool list and hash-bound `get_publication_receipt` projection;
+- the local read-only HTTP and STDIO MCP tool lists, full lifecycle handshake, and hash-bound `get_publication_receipt` projection;
 - foreign generation rejection, source-unavailable distinction, and capability unavailability;
 - mixed-generation cutover rejection while the previous index remains readable;
 - query service down (`503`) while static publication remains readable;
@@ -30,7 +30,7 @@ Loopback HTTP proves only the candidate query/static lane. It is recorded as a
 query-index success; formal `deployment` and `public_http_verification` stages
 remain `UNKNOWN` until a real deployment and anonymous public hash receipt exist.
 
-The companion Python contract suite has `24/24` tests. The verifier is local-only,
+The companion Python contract suite has `25/25` tests. The verifier is local-only,
 uses a preserved checked-in snapshot, and does not write canonical or production
 state.
 

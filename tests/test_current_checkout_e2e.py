@@ -90,6 +90,11 @@ class CandidateContextTests(unittest.TestCase):
                            "gold_evaluation", "chat_mcp", "live_collection"):
             self.assertEqual(unavailable[capability]["status"], "CAPABILITY_NOT_AVAILABLE", capability)
 
+    def test_stdio_mcp_lifecycle_is_hash_bound_and_read_only(self):
+        check = vc.run_stdio_mcp_check(self.ctx)
+        self.assertEqual(check["status"], "PASS", check)
+        self.assertEqual(check["transport"], "stdio")
+
 
 class ServerTests(unittest.TestCase):
     @classmethod
