@@ -173,6 +173,23 @@ class ReviewInboxTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "review state must be an object"):
             validate_state([])
 
+    def test_tampered_identity_and_state_transitions_fail_closed(self):
+        state, item, _ = upsert(empty_state(), candidate("CONFLICT"), observed_at=STAMP)
+        broken_identity = copy.deepcopy(state)
+        broken_identity["items"][item["review_id"]]["fingerprint"] = "other-fingerprint"
+        with self.assertRaisesRegex(ValueError, "review ID/fingerprint mismatch"):
+            validate_state(broken_identity)
+
+        broken_assignment = copy.deepcopy(state)
+        broken_assignment["items"][item["review_id"]]["status"] = "CLAIMED"
+        with self.assertRaisesRegex(ValueError, "claimed review assignment is invalid"):
+            validate_state(broken_assignment)
+
+        resolved = decide(state, item["review_id"], "merge", reviewer_ref="operator-1", decided_at=STAMP)
+        resolved["items"][item["review_id"]]["status"] = "DISMISSED"
+        with self.assertRaisesRegex(ValueError, "review decision/status mismatch"):
+            validate_state(resolved)
+
     def test_public_projection_keeps_bounded_ids_but_strips_private_review_data(self):
         state, item, _ = upsert(empty_state(), candidate("CONFLICT"), observed_at=STAMP)
         state = claim(state, item["review_id"], assignee_ref="operator-1", claimed_at=STAMP)

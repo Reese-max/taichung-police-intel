@@ -99,8 +99,12 @@ def validate_state(state: dict[str, Any]) -> dict[str, Any]:
             raise ValueError("review IDs must be stable object keys")
         if item.get("reason") not in REVIEW_REASONS or item.get("status") not in STATUSES:
             raise ValueError(f"invalid review item: {review_id}")
-        if item.get("fingerprint") != str(item.get("fingerprint") or ""):
+        if not isinstance(item.get("fingerprint"), str) or not item["fingerprint"].strip():
             raise ValueError(f"review fingerprint is required: {review_id}")
+        if review_id_for(item["fingerprint"]) != review_id:
+            raise ValueError(f"review ID/fingerprint mismatch: {review_id}")
+        if item.get("priority") != PRIORITIES[item["reason"]]:
+            raise ValueError(f"review priority mismatch: {review_id}")
         timestamp(item.get("created_at"))
         timestamp(item.get("updated_at"))
         if not isinstance(item.get("entity_ids"), dict) or not isinstance(item.get("evidence"), dict):
@@ -120,6 +124,15 @@ def validate_state(state: dict[str, Any]) -> dict[str, Any]:
             raise ValueError(f"review item requires audit history: {review_id}")
         for sequence, audit in enumerate(item["audit"], start=1):
             _validate_audit(review_id, sequence, audit)
+        assignment = item.get("assignment")
+        if not isinstance(assignment, dict):
+            raise ValueError(f"review assignment is required: {review_id}")
+        if item["status"] == "CLAIMED":
+            if assignment.get("state") != "CLAIMED" or not isinstance(assignment.get("assignee_ref"), str) or not assignment["assignee_ref"].strip():
+                raise ValueError(f"claimed review assignment is invalid: {review_id}")
+            timestamp(assignment.get("claimed_at"))
+        elif assignment != {"state": "UNASSIGNED", "assignee_ref": None, "claimed_at": None}:
+            raise ValueError(f"inactive review assignment is invalid: {review_id}")
         decision = item.get("decision")
         if decision is not None:
             if not isinstance(decision, dict) or decision.get("decision") not in DECISIONS:
@@ -136,6 +149,11 @@ def validate_state(state: dict[str, Any]) -> dict[str, Any]:
                 or version_receipt.get("evidence_sha256") != item["evidence_sha256"]
             ):
                 raise ValueError(f"review decision version receipt mismatch: {review_id}")
+            expected_status = "DISMISSED" if decision["decision"] == "DISMISS" else "OPEN" if decision["decision"] == "KEEP_WATCHING" else "RESOLVED"
+            if item["status"] != expected_status:
+                raise ValueError(f"review decision/status mismatch: {review_id}")
+        elif item["status"] in TERMINAL_STATUSES:
+            raise ValueError(f"terminal review decision is missing: {review_id}")
     if state.get("last_updated_at") is not None:
         timestamp(state["last_updated_at"])
     return state
