@@ -52,6 +52,17 @@
       "review_required": true,
       "withdrawal_behavior": "KEEP_LOCATOR_MARK_SOURCE_UNAVAILABLE"
     },
+    "OFFICIAL_TRANSIENT_METADATA": {
+      "rights_status": "UNKNOWN",
+      "public_projection": "METADATA_LINK_ONLY",
+      "public_fields": ["source_id", "source_name", "official_url", "observed_at", "data_as_of", "freshness_status", "change_type", "content_sha256"],
+      "full_text_allowed": false,
+      "excerpt_allowed": false,
+      "raw_retention_class": "SHORT_LIVED_SOURCE_TERMS_REVIEW",
+      "canonical_retention_class": "PROVENANCE_HISTORY",
+      "review_required": true,
+      "withdrawal_behavior": "KEEP_HASH_MARK_SOURCE_UNAVAILABLE"
+    },
     "REFERENCE_METADATA": {
       "rights_status": "UNKNOWN",
       "public_projection": "METADATA_LINK_ONLY",
@@ -87,7 +98,7 @@
     "S-026": "OFFICIAL_METADATA_LINK",
     "S-028": "REFERENCE_METADATA",
     "S-029": "OFFICIAL_METADATA_LINK",
-    "S-031": "OFFICIAL_METADATA_LINK",
+    "S-031": "OFFICIAL_TRANSIENT_METADATA",
     "S-032": "OFFICIAL_METADATA_LINK",
     "S-033": "OFFICIAL_METADATA_LINK",
     "S-034": "REFERENCE_METADATA",

@@ -66,6 +66,30 @@ class RetentionPolicyTests(unittest.TestCase):
         self.assertTrue(receipt["dry_run"])
         self.assertRegex(receipt["receipt_sha256"], r"^[0-9a-f]{64}$")
 
+    def test_transient_fire_source_uses_short_raw_window(self):
+        compiled = retention.compile_policy()
+        self.assertEqual(compiled["source_policies"]["S-031"]["raw_retention_class"], "SHORT_LIVED_SOURCE_TERMS_REVIEW")
+        receipt = retention.plan_expiry([
+            {
+                "record_id": "fire-raw-1",
+                "source_id": "S-031",
+                "layer": "raw_snapshot",
+                "captured_at": "2026-09-01T00:00:00+00:00",
+                "content_sha256": "d" * 64,
+                "audit_refs": ["AUDIT-FIRE-1"],
+            },
+            {
+                "record_id": "fire-event-1",
+                "source_id": "S-031",
+                "layer": "canonical_event",
+                "captured_at": "2026-01-01T00:00:00+00:00",
+                "content_sha256": "e" * 64,
+                "audit_refs": ["AUDIT-FIRE-2"],
+            },
+        ], observed_at="2026-09-21T00:00:00+00:00", policy=compiled)
+        self.assertEqual(receipt["records"][0]["action"], "PURGE_RAW_KEEP_AUDIT")
+        self.assertEqual(receipt["records"][1]["action"], "RETAIN")
+
     def test_expired_raw_without_audit_linkage_is_blocked_and_private_data_fails_closed(self):
         base = {
             "record_id": "raw-media-2",
