@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+from email.utils import parsedate_to_datetime
 import importlib.util
 import io
 import json
@@ -9,6 +10,7 @@ import os
 import re
 import time
 import urllib.parse
+import xml.etree.ElementTree as ET
 from collections import Counter
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -376,6 +378,11 @@ NEWS_LIST_SOURCES = {
         "list_url": "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,20",
         "id_pattern": r"index-1\.asp\?Parser=9,4,20,,,,(\d+)",
     },
+    "S-033": {
+        "name": "臺中市政府新聞局最新消息",
+        "list_url": "https://www.news.taichung.gov.tw/31034/564777/rss?nodeId=14813",
+        "format": "rss",
+    },
 }
 
 
@@ -404,6 +411,37 @@ def parse_news_list(html: bytes, base_url: str, id_pattern: str) -> list[dict]:
     return entries
 
 
+def parse_news_rss(xml: bytes, base_url: str) -> list[dict]:
+    """Extract the official RSS list without treating a malformed item as zero."""
+    try:
+        root = ET.fromstring(xml)
+    except ET.ParseError as error:
+        raise ValueError("news RSS is not valid XML") from error
+    entries = []
+    for item in root.findall("./channel/item"):
+        stable_key = (item.get("iCuItem") or "").strip()
+        title = " ".join((item.findtext("title") or "").split())
+        detail_url = urllib.parse.urljoin(base_url, (item.findtext("link") or "").strip())
+        raw_date = (item.findtext("pubDate") or "").strip()
+        if not stable_key or not title or not detail_url or not raw_date:
+            raise ValueError("news RSS item is missing stable ID, title, link, or pubDate")
+        try:
+            published = parsedate_to_datetime(raw_date)
+        except (TypeError, ValueError) as error:
+            raise ValueError(f"news RSS item has invalid pubDate: {raw_date!r}") from error
+        if published.tzinfo is None:
+            published = published.replace(tzinfo=TZ)
+        entries.append({
+            "stable_key": stable_key,
+            "title": title,
+            "detail_url": detail_url,
+            "published": published.astimezone(TZ).date(),
+        })
+    if not entries:
+        raise ValueError("news RSS has no parseable entries")
+    return entries
+
+
 def collect_news_list(
     session: requests.Session,
     source_id: str,
@@ -416,7 +454,10 @@ def collect_news_list(
     config = NEWS_LIST_SOURCES[source_id]
     listing = get(session, config["list_url"])
     responses = [snapshot(listing, "LIST")]
-    entries = parse_news_list(listing.content, listing.url, config["id_pattern"])
+    if config.get("format") == "rss":
+        entries = parse_news_rss(listing.content, listing.url)
+    else:
+        entries = parse_news_list(listing.content, listing.url, config["id_pattern"])
     existing = existing or {}
     details_fetched = 0
     items = []
@@ -489,6 +530,7 @@ COLLECTORS = {
     "S-001": collect_news_list,
     "S-019": collect_news_list,
     "S-032": collect_news_list,
+    "S-033": collect_news_list,
 }
 
 

@@ -48,6 +48,20 @@ def _news(source_id: str, name: str, pattern: str, *, published_required: bool =
     }
 
 
+def _rss_news(source_id: str, name: str) -> dict[str, Any]:
+    return {
+        "source_id": source_id,
+        "source_name": name,
+        "contract_version": CONTRACT_VERSION,
+        "transport": "RSS_LIST_DETAIL",
+        "expected_content_types": ["application/xml", "text/xml"],
+        "parser_version": "online_collect:p0-live-1",
+        "required_fields": ["stable_key", "title", "detail_url", "published"],
+        "optional_fields": ["detail", "body_sha256", "attachments"],
+        "published_required": True,
+    }
+
+
 CONTRACTS: dict[str, dict[str, Any]] = {
     "S-001": _news(
         "S-001",
@@ -65,6 +79,7 @@ CONTRACTS: dict[str, dict[str, Any]] = {
         "臺中市政府交通局最新消息",
         r"index-1\.asp\?Parser=9,4,20,,,,(\d+)",
     ),
+    "S-033": _rss_news("S-033", "臺中市政府新聞局最新消息"),
     "S-007": {
         "source_id": "S-007",
         "source_name": "臺中市議會議事資訊系統－議事錄",
@@ -279,6 +294,8 @@ def observe(
         )
     if transport == "HTML_LIST_DETAIL":
         result = _observe_html(contract, raw, result, previous)
+    elif transport == "RSS_LIST_DETAIL":
+        result = _observe_rss(contract, raw, result, previous)
     elif transport == "JSON_API":
         result = _observe_json_api(contract, raw, result, previous)
     elif transport == "DATA_GOV_JSON":
@@ -322,6 +339,29 @@ def _observe_html(contract: dict[str, Any], body: bytes, result: dict[str, Any],
         status = "BREAKING_DRIFT"
         reasons.append("REQUIRED_PUBLISHED_DATE_MISSING")
     return _finish(result, signature, status, reasons)
+
+
+def _observe_rss(contract: dict[str, Any], body: bytes, result: dict[str, Any], previous: dict[str, Any] | None) -> dict[str, Any]:
+    try:
+        if str(ROOT) not in sys.path:
+            sys.path.insert(0, str(ROOT))
+        from online_collect import parse_news_rss
+
+        entries = parse_news_rss(body, result["final_url"] or "https://invalid.local/")
+    except Exception as error:
+        result["reasons"] = ["RSS_LIST_SHAPE_FAILED", type(error).__name__.upper()]
+        result["status"] = "BREAKING_DRIFT"
+        result["observed_schema_fingerprint"] = canonical_hash({"transport": "RSS", "parse": "failed"})
+        result["review_required"] = True
+        return result
+    fields = sorted({key for entry in entries for key in entry})
+    signature = {
+        "transport": contract["transport"],
+        "entry_fields": fields,
+        "date_coverage": f"{sum(entry.get('published') is not None for entry in entries)}/{len(entries)}",
+    }
+    missing = set(contract["required_fields"]) - set(fields)
+    return _finish(result, signature, "BREAKING_DRIFT" if missing else "NO_DRIFT", ["REQUIRED_FIELD_MISSING"] if missing else [])
 
 
 def _decode_json(body: bytes) -> Any:
@@ -681,6 +721,11 @@ def self_check() -> None:
     for source_id, html in html_by_source.items():
         result = observe(CONTRACTS[source_id], html, content_type="text/html; charset=utf-8", final_url="https://official.test/list")
         assert result["status"] == "NO_DRIFT", source_id
+    rss = '''<?xml version="1.0"?><rss version="2.0"><channel>
+    <item iCuItem="3375296"><title>Official item</title><link>https://official.test/3375296/post</link><pubDate>Mon, 21 Sep 2026 02:57:54 GMT</pubDate></item>
+    </channel></rss>'''.encode("utf-8")
+    rss_result = observe(CONTRACTS["S-033"], rss, content_type="application/xml", final_url="https://official.test/rss")
+    assert rss_result["status"] == "NO_DRIFT"
     broken_html = observe(CONTRACTS["S-001"], b"<html><body>200 but changed</body></html>", content_type="text/html")
     assert broken_html["status"] == "BREAKING_DRIFT" and broken_html["window_completeness"] == "PARTIAL"
 

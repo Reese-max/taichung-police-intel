@@ -3,8 +3,8 @@
   "catalog_schema_version": 2,
   "catalog_updated_at": "2026-09-21",
   "policy_version": 1,
-  "policy_hash": "52c58dae5d805d930c7a58042f726e5d4a65adc14767cc2c51dffdbc14134f83",
-  "catalog_hash": "2bf8c0e9440f284e4d02bc427c2958583c27a4c96c876fed834461fbc0d4139f",
+  "policy_hash": "45361ecc96977fdf4ef1b587036df940105d1c8195bf4198ff74e3169e2fc4d3",
+  "catalog_hash": "415103de1c36f5ee7d23f3f4ea9f4b9e8aebdc17ab3140dde08e20f7b791f3ad",
   "active_source_ids": [
     "S-004",
     "S-006",

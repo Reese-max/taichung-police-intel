@@ -22,6 +22,10 @@ API = {
     },
 }
 
+RSS = '''<?xml version="1.0"?><rss version="2.0"><channel>
+<item iCuItem="3375296"><title>活動公告</title><link>https://official.test/3375296/post</link><pubDate>Mon, 21 Sep 2026 02:57:54 GMT</pubDate></item>
+</channel></rss>'''.encode("utf-8")
+
 
 class SchemaDriftTests(unittest.TestCase):
     def test_all_required_news_contracts_use_real_parser_shapes(self):
@@ -40,6 +44,19 @@ class SchemaDriftTests(unittest.TestCase):
                 )
                 self.assertEqual(result["status"], "NO_DRIFT")
                 self.assertEqual(result["window_completeness"], "COMPLETE_WITH_ITEMS")
+        result = drift.observe(
+            drift.CONTRACTS["S-033"], RSS, content_type="application/xml", final_url="https://official.test/rss"
+        )
+        self.assertEqual(result["status"], "NO_DRIFT")
+        self.assertEqual(result["window_completeness"], "COMPLETE_WITH_ITEMS")
+
+    def test_rss_shape_break_is_fail_closed(self):
+        result = drift.observe(
+            drift.CONTRACTS["S-033"], b"<rss><channel><item><title>missing identity</title></item></channel></rss>",
+            content_type="application/xml",
+        )
+        self.assertEqual(result["status"], "BREAKING_DRIFT")
+        self.assertEqual(result["window_completeness"], "PARTIAL")
 
     def test_http_200_selector_failure_is_breaking_and_partial(self):
         result = drift.observe(
