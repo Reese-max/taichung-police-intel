@@ -2,6 +2,22 @@
 
 基準：`e1d081bd04824c062c7ee99e7d74f9e478240743`。已知排程在資料 push 至受保護 main 被拒；不能為了展示關閉 PR／verify／分支保護。
 
+## 2026-09-21 external-state recheck
+
+- GitHub Pages is public and workflow-backed, but the latest scheduled run
+  `35547622167` still ran `main@e1d081bd04824c062c7ee99e7d74f9e478240743`
+  and failed at the protected-main push with `GH006`; build verification had
+  passed before that failure, so no new Pages deployment was produced.
+- The public `/api/status.json` currently returns HTTP 200 but reports
+  `generated_at=2026-09-11T08:23:26+08:00`; this is reachability, not current
+  publication freshness. The public `/api/health.json` likewise reports the
+  old `COMPETITION_DEMO` snapshot.
+- The effective `main` protection still requires one approving review,
+  code-owner review, resolved conversations, and the `verify` check; force
+  pushes and administrator bypass are disabled. The local
+  `publication-state` candidate therefore remains unmerged and unverified in
+  production.
+
 ## 本輪已改，仍須 CI／執行驗證
 
 1. build 的主要步驟有 outcome 輸出，留證步驟放在 push 及 Pages artifact 上傳之後，採 always()。
