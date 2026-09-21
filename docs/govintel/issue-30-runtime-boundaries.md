@@ -7,7 +7,7 @@ The first read-only query slice is now wired through the shared Query Gateway:
 - `scripts/query-gateway.py` serves HTTP `/query` and `/mcp`.
 - `scripts/query-gateway-stdio.py` serves the same MCP contract over bounded line-delimited stdio.
 - The Web `Ask GovIntel` panel uses the same `search_evidence`, `get_current_brief`, and `get_source_health` primitives; `validate_answer` also uses the server-controlled Answer Evidence Gate.
-- The current code and checked-in artifacts pass `npm run check`, including the HTTP/MCP parity suite and the stdio transport tests. The latest local boundary fix is `9ed2b94`.
+- The current code and checked-in artifacts pass `npm run check`, including the HTTP/MCP parity suite and the stdio transport tests. `9ed2b94` was the original local boundary fix; the current checkout includes later gateway hardening through `b31010b`.
 
 This is still a local/code-only receipt. It is not a production deployment, anonymous public reachability proof, or completion of the later event, comparison, and statistics slices.
 
@@ -26,7 +26,7 @@ Implemented in the existing PR #40, not a second query service. No production wi
 
 ## Actual local execution
 
-The existing 8 tests are unchanged, with 20 new boundary/CLI regressions. `python -m unittest discover -s tests -p 'test_query_store*.py' -v` passed **28 tests**. The portable Node bridge and the real CLI self-check passed too; bridge runs are not counted as independent validation.
+The bounded query-store suite currently passes **33 tests** with `python -m unittest discover -s tests -p 'test_query_store*.py' -v`. The portable Node bridge and the real CLI self-check passed too; bridge runs are not counted as independent validation.
 
 ```sh
 python scripts/query-store.py build --output /tmp/query-store.json
