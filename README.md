@@ -34,7 +34,7 @@ The current judge entry is [docs/govintel/competition-2026/README.md](./docs/gov
 | Deliverable | Current state |
 |---|---|
 | Working application | Local static production build passes |
-| Public demo | [https://reese-max.github.io/taichung-police-intel](https://reese-max.github.io/taichung-police-intel) returned anonymous HTTP 200 on 2026-09-22; public `status.json` is still the older 2026-09-11 snapshot, not this checkout's candidate |
+| Public demo | [https://reese-max.github.io/taichung-police-intel](https://reese-max.github.io/taichung-police-intel) returned anonymous HTTP 200 on 2026-09-22; public [`data/source-status.json`](https://reese-max.github.io/taichung-police-intel/data/source-status.json) is still the older 2026-09-11 snapshot, not this checkout's candidate |
 | Demo video | [2:43 English-captioned MP4](https://reese-max.github.io/taichung-police-intel/demo-video.mp4) — verified anonymously in Chrome 2026-08-24 |
 | Twice-daily updates | GitHub Actions schedules 06:30 and 18:30 Asia/Taipei; a current successful schedule pair is not proven here |
 | Source observability | Five official-source adapters emit health, completeness, gaps, SHA-256, and last-known-good; the checked-in snapshot remains subject to its recorded freshness |
@@ -212,7 +212,7 @@ candidate path is active.
 After the repository is public, enable Pages with **Source: GitHub Actions**. The deployed demo and repository URLs are recorded in [SUBMISSION.md](./SUBMISSION.md). A workflow file is not deployment evidence; acceptance requires an anonymous HTTPS check.
 
 Repository: `https://github.com/Reese-max/taichung-police-intel`
-Demo: `https://reese-max.github.io/taichung-police-intel` (anonymous HTTP 200 rechecked 2026-09-22; public `status.json` `generated_at=2026-09-11T08:23:26+08:00`). The public bytes are reachable but stale relative to this checkout; the workflow configuration is not deployment evidence.
+Demo: `https://reese-max.github.io/taichung-police-intel` (anonymous HTTP 200 rechecked 2026-09-22; public `data/source-status.json` `generated_at=2026-09-11T08:23:26+08:00`). The public bytes are reachable but stale relative to this checkout; the workflow configuration is not deployment evidence.
 
 ## Verification
 
