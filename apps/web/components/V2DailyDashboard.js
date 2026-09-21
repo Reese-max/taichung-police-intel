@@ -285,6 +285,13 @@ function SystemHealthSummary({ health, localReview, onDecision, onFeedback, onEx
             </div>
           ))}
         </div>
+        {health.operator_summary && (
+          <p className="v2-health-note" data-testid="v2-operator-summary">
+            操作提示：{health.operator_summary.message}
+            {health.operator_summary.primary_stage && ` · ${health.operator_summary.primary_stage.lane}/${health.operator_summary.primary_stage.stage}`}
+            {health.operator_summary.primary_stage?.error_class && ` · ${health.operator_summary.primary_stage.error_class}`}
+          </p>
+        )}
         <ul className="v2-health-stage-list">
           {health.stages.map((stage) => (
             <li key={`${stage.lane}-${stage.stage}`}>

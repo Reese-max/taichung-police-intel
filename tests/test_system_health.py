@@ -37,6 +37,10 @@ class SystemHealthTests(unittest.TestCase):
         self.assertEqual(result["lanes"]["publication"], "HEALTHY")
         self.assertEqual(result["lanes"]["query"], "BLOCKED")
         self.assertEqual(result["overall"], "DEGRADED")
+        self.assertTrue(result["operator_summary"]["requires_attention"])
+        self.assertEqual(result["operator_summary"]["primary_stage"]["stage"], "query_index")
+        self.assertEqual(result["operator_summary"]["primary_stage"]["error_class"], "INDEX_BUILD")
+        self.assertTrue(all("last_success_at" in row for row in result["stages"]))
 
     def test_publish_or_deploy_failure_blocks_publication_lane(self):
         result = health.build_health(complete_publication({"deployment": "FAILED"}))
@@ -154,6 +158,8 @@ class SystemHealthTests(unittest.TestCase):
         # Existing checked-in artifacts are stale and still lack deployment/HTTP
         # receipts; the model must not manufacture HEALTHY.
         self.assertEqual(result["lanes"]["publication"], "STALE")
+        self.assertEqual(result["operator_summary"]["status"], "STALE")
+        self.assertTrue(result["operator_summary"]["requires_attention"])
         self.assertEqual(result["policy"]["active_source_ids"], sorted(health.load_current_policy()["active_source_ids"]))
 
     def test_schema_contract_drift_is_explicit_discovery_failure(self):

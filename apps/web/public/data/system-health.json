@@ -10,6 +10,18 @@
     "source_to_detect_ms": null,
     "verify_to_publish_ms": null
   },
+  "operator_summary": {
+    "attention_count": 6,
+    "message": "資料仍可讀取但已過期，請確認來源新鮮度。",
+    "primary_stage": {
+      "error_class": "SOURCE_FRESHNESS_STALE",
+      "lane": "publication",
+      "outcome": "STALE",
+      "stage": "collection"
+    },
+    "requires_attention": true,
+    "status": "STALE"
+  },
   "overall": "STALE",
   "policy": {
     "active_source_ids": [
@@ -35,11 +47,13 @@
       "contract_overall": "UNKNOWN",
       "ended_at": "2026-09-20T23:35:53+00:00",
       "error_class": "SOURCE_CONTRACT_UNVERIFIED",
+      "generation_id": null,
       "lane": "discovery",
       "last_success_at": null,
       "outcome": "UNKNOWN",
       "review_inbox_count": 0,
-      "stage": "source_contracts"
+      "stage": "source_contracts",
+      "started_at": null
     },
     {
       "active_source_ids": [
@@ -58,7 +72,8 @@
       "outcome": "SUCCESS",
       "policy_hash": "1387c7e5a15c2fc0a07b6881b0ee40f70e789fcbe01862d9834bfe9b079464d5",
       "policy_version": 1,
-      "stage": "canonical_validation"
+      "stage": "canonical_validation",
+      "started_at": null
     },
     {
       "active_source_ids": [
@@ -77,7 +92,8 @@
       "outcome": "STALE",
       "policy_hash": "1387c7e5a15c2fc0a07b6881b0ee40f70e789fcbe01862d9834bfe9b079464d5",
       "policy_version": 1,
-      "stage": "collection"
+      "stage": "collection",
+      "started_at": null
     },
     {
       "active_source_ids": [
@@ -88,12 +104,16 @@
         "S-029"
       ],
       "catalog_hash": "886cd9c53e0431a09bb6573e6bcd328861c005ed410f95bdd226c1c2cc7c7356",
+      "ended_at": null,
       "error_class": "NO_DEPLOYMENT_RECEIPT_IN_CANONICAL_ARTIFACT",
+      "generation_id": null,
       "lane": "publication",
+      "last_success_at": null,
       "outcome": "UNKNOWN",
       "policy_hash": "1387c7e5a15c2fc0a07b6881b0ee40f70e789fcbe01862d9834bfe9b079464d5",
       "policy_version": 1,
-      "stage": "deployment"
+      "stage": "deployment",
+      "started_at": null
     },
     {
       "active_source_ids": [
@@ -104,12 +124,16 @@
         "S-029"
       ],
       "catalog_hash": "886cd9c53e0431a09bb6573e6bcd328861c005ed410f95bdd226c1c2cc7c7356",
+      "ended_at": null,
       "error_class": "NO_HTTP_HASH_RECEIPT_IN_CANONICAL_ARTIFACT",
+      "generation_id": null,
       "lane": "publication",
+      "last_success_at": null,
       "outcome": "UNKNOWN",
       "policy_hash": "1387c7e5a15c2fc0a07b6881b0ee40f70e789fcbe01862d9834bfe9b079464d5",
       "policy_version": 1,
-      "stage": "public_http_verification"
+      "stage": "public_http_verification",
+      "started_at": null
     },
     {
       "active_source_ids": [
@@ -120,12 +144,16 @@
         "S-029"
       ],
       "catalog_hash": "886cd9c53e0431a09bb6573e6bcd328861c005ed410f95bdd226c1c2cc7c7356",
+      "ended_at": null,
       "error_class": "QUERY_RUNTIME_NOT_YET_WIRED",
+      "generation_id": null,
       "lane": "query",
+      "last_success_at": null,
       "outcome": "UNKNOWN",
       "policy_hash": "1387c7e5a15c2fc0a07b6881b0ee40f70e789fcbe01862d9834bfe9b079464d5",
       "policy_version": 1,
-      "stage": "mcp_web_query"
+      "stage": "mcp_web_query",
+      "started_at": null
     },
     {
       "active_source_ids": [
@@ -136,12 +164,16 @@
         "S-029"
       ],
       "catalog_hash": "886cd9c53e0431a09bb6573e6bcd328861c005ed410f95bdd226c1c2cc7c7356",
+      "ended_at": null,
       "error_class": "QUERY_INDEX_NOT_YET_WIRED",
+      "generation_id": null,
       "lane": "query",
+      "last_success_at": null,
       "outcome": "UNKNOWN",
       "policy_hash": "1387c7e5a15c2fc0a07b6881b0ee40f70e789fcbe01862d9834bfe9b079464d5",
       "policy_version": 1,
-      "stage": "query_index"
+      "stage": "query_index",
+      "started_at": null
     }
   ]
 }

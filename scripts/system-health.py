@@ -180,6 +180,58 @@ def overall_health(lanes: dict[str, str]) -> str:
     return "HEALTHY"
 
 
+_OPERATOR_OUTCOME_PRIORITY = {
+    "FAILED": 0,
+    "PARTIAL": 1,
+    "STALE": 2,
+    "UNKNOWN": 3,
+    "SKIPPED": 4,
+    "SUCCESS": 5,
+}
+
+
+def operator_summary(overall: str, stages: list[dict[str, Any]]) -> dict[str, Any]:
+    attention = [stage for stage in stages if stage.get("outcome") != "SUCCESS"]
+    primary = min(
+        attention,
+        key=lambda stage: (
+            _OPERATOR_OUTCOME_PRIORITY.get(stage.get("outcome"), 99),
+            stage.get("lane", ""),
+            stage.get("stage", ""),
+        ),
+        default=None,
+    )
+    if overall == "HEALTHY":
+        message = "目前沒有需要處理的健康告警。"
+    elif primary is None:
+        message = "處理鏈狀態尚待核對，不能視為成功。"
+    elif overall == "DEGRADED" and primary.get("lane") != "publication":
+        message = "發布資料鏈仍可用，但下游服務需要處理。"
+    elif overall == "BLOCKED":
+        message = "處理鏈已阻塞，請先處理主要失敗階段。"
+    elif overall == "STALE":
+        message = "資料仍可讀取但已過期，請確認來源新鮮度。"
+    elif overall == "PARTIAL":
+        message = "處理鏈不完整，請先處理主要缺口。"
+    else:
+        message = "處理鏈狀態尚待核對，不能視為成功。"
+    return {
+        "status": overall,
+        "requires_attention": overall != "HEALTHY",
+        "message": message,
+        "primary_stage": (
+            {
+                "lane": primary.get("lane"),
+                "stage": primary.get("stage"),
+                "outcome": primary.get("outcome"),
+                "error_class": primary.get("error_class"),
+            }
+            if primary is not None else None
+        ),
+        "attention_count": len(attention),
+    }
+
+
 def latency_ms(start: Any, end: Any) -> int | None:
     left = parse_time(start)
     right = parse_time(end)
@@ -207,12 +259,19 @@ def build_health(stages: list[dict[str, Any]], timestamps: dict[str, Any] | None
         "verify_to_publish_ms": latency_ms(times.get("verified_at"), times.get("published_at")),
         "publish_to_visible_ms": latency_ms(times.get("published_at"), times.get("public_visible_at")),
     }
+    normalized_stages = []
+    for stage in sorted(stages, key=lambda row: (row["lane"], row["stage"])):
+        normalized = dict(stage)
+        for field in ("started_at", "ended_at", "last_success_at", "generation_id", "error_class"):
+            normalized.setdefault(field, None)
+        normalized_stages.append(normalized)
     return {
         "schema_version": 1,
         "overall": overall_health(lanes),
         "lanes": lanes,
-        "stages": sorted(stages, key=lambda row: (row["lane"], row["stage"])),
+        "stages": normalized_stages,
         "latency_metrics": metrics,
+        "operator_summary": operator_summary(overall_health(lanes), normalized_stages),
     }
 
 

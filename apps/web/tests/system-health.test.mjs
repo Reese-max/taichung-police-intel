@@ -12,6 +12,8 @@ test("system health receipt exposes lane and stage evidence", async () => {
   assert.deepEqual(Object.keys(health.lanes).sort(), ["discovery", "publication", "query"]);
   assert.ok(Array.isArray(health.stages) && health.stages.length >= 4);
   assert.ok(health.stages.some((stage) => stage.stage === "public_http_verification"));
+  assert.equal(typeof health.operator_summary?.message, "string");
+  assert.ok(health.stages.every((stage) => Object.hasOwn(stage, "last_success_at")));
   assert.ok(Array.isArray(health.review_inbox));
 });
 
@@ -20,6 +22,7 @@ test("dashboard renders the saved health receipt without treating UNKNOWN as suc
   assert.match(source, /system-health\.json/);
   assert.match(source, /v2-system-health/);
   assert.match(source, /v2-review-inbox/);
+  assert.match(source, /v2-operator-summary/);
   assert.match(source, /local-review\.js/);
   assert.match(source, /建立本機 feedback/);
   assert.match(source, /addLocalReviewFeedback/);
