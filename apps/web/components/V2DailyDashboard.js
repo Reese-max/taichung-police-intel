@@ -26,6 +26,7 @@ import {
   syncLocalReview,
 } from "../lib/local-review.js";
 import QueryGatewayPanel from "./QueryGatewayPanel.js";
+import PublicEventFusionDemo from "./PublicEventFusionDemo.js";
 
 
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
@@ -791,6 +792,7 @@ export default function V2DailyDashboard() {
       </header>
 
       <QueryGatewayPanel />
+      <PublicEventFusionDemo />
 
       {loadState === "loading" && (
         <section className="v2-system-message" role="status">

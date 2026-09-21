@@ -13,4 +13,6 @@
 
 驗證：`tests/test_public_event_fusion.py` 19 tests pass；`node --test apps/web/tests/public-event-fusion.test.mjs` 2 tests pass；CLI self-check 會重播三來源、版本衝突、entity registry receipt 與背景資料防護。
 
+首頁另有 `apps/web/public/data/public-event-demo.json` 的 `FIXTURE_ONLY` replay card：展示三份官方文件、同一 `public_event_id`、前後版本差異、`CONFLICT`、背景資料期別與 exact official links；confirm／merge／split 只做 browser-local preview，不寫入 canonical state。它是產品 demo 驗收，不是 live collector 或 production receipt。
+
 尚未宣稱完成的外部／產品 gate：現有正式 collector 尚未把真實來源輸出轉成此 normalized document contract；公開頁尚未提供寫入型 event merge/split UI；未做 production deployment、真實來源收件或跨服務持久化。這些仍需以 #14/#27/#47 的整合驗收接續，不以合成 fixture 代替。
