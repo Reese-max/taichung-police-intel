@@ -10,6 +10,11 @@ spec = importlib.util.spec_from_file_location("canary_s026_s029", SCRIPT)
 module = importlib.util.module_from_spec(spec)
 assert spec and spec.loader
 spec.loader.exec_module(module)
+S028_SCRIPT = ROOT / "canary-s028-165.py"
+s028_spec = importlib.util.spec_from_file_location("canary_s028_165", S028_SCRIPT)
+s028 = importlib.util.module_from_spec(s028_spec)
+assert s028_spec and s028_spec.loader
+s028_spec.loader.exec_module(s028)
 
 
 class Response:
@@ -63,6 +68,18 @@ class LiveCanaryTransportTests(unittest.TestCase):
         self.assertEqual(evidence["requested_url"], "https://official.test/start")
         self.assertEqual(evidence["final_url"], "https://official.test/next")
         self.assertEqual(len(session.calls), 2)
+
+    def test_s028_transport_rejects_external_redirect_before_following(self):
+        session = Session([
+            Response(
+                "https://official.test/start",
+                status_code=302,
+                location="https://example.invalid/redirected",
+            )
+        ])
+        with self.assertRaisesRegex(RuntimeError, "非白名單來源"):
+            s028.get(session, "https://official.test/start", self.HOSTS)
+        self.assertEqual(len(session.calls), 1)
 
 
 if __name__ == "__main__":
