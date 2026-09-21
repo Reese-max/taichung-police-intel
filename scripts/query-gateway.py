@@ -14,7 +14,7 @@ import shutil
 import subprocess
 import time
 from typing import Any, Callable
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -24,6 +24,7 @@ ANSWER_GATE_RUNNER = ROOT / "scripts" / "answer-gate-runner.mjs"
 MAX_REQUEST_BYTES = 64 * 1024
 SERVER_VERSION = "query-gateway-v1"
 DEFAULT_RATE_LIMIT = 60
+SOURCE_CATALOG = ROOT / "docs" / "govintel" / "source-catalog.v2.json"
 
 _query_store_spec = importlib.util.spec_from_file_location("govintel_query_store", QUERY_STORE_PATH)
 if _query_store_spec is None or _query_store_spec.loader is None:
@@ -130,7 +131,58 @@ class RateLimiter:
         return True
 
 
-def load_snapshot() -> dict[str, Any]:
+def _is_sha256(value: Any) -> bool:
+    return isinstance(value, str) and len(value) == 64 and all(char in "0123456789abcdef" for char in value)
+
+
+def approved_source_origins() -> dict[str, str]:
+    catalog = json.loads(SOURCE_CATALOG.read_text(encoding="utf-8"))
+    return {
+        str(row["source_id"]): str(urlsplit(row["entrypoint"]).hostname)
+        for row in catalog.get("sources", [])
+        if isinstance(row, dict) and row.get("source_id") and row.get("entrypoint")
+    }
+
+
+def validate_located_facts_bundle(bundle: Any, approved_source_ids: set[str]) -> dict[str, Any]:
+    document = bundle.get("document_version") if isinstance(bundle, dict) else None
+    if not isinstance(document, dict) or document.get("schema_version") != 1:
+        raise ValueError("located-facts bundle document version is invalid")
+    source_id = document.get("source_id")
+    final_url = urlsplit(str(document.get("final_url") or ""))
+    expected_host = approved_source_origins().get(str(source_id))
+    if source_id not in approved_source_ids or final_url.scheme != "https" or final_url.hostname != expected_host:
+        raise ValueError("located-facts bundle source is not approved and HTTPS")
+    if not _is_sha256(document.get("raw_bytes_sha256")) or not document.get("document_version_id"):
+        raise ValueError("located-facts bundle document hash/version is invalid")
+    facts = bundle.get("facts")
+    evidence = bundle.get("evidence_catalog")
+    events = bundle.get("public_event_inputs")
+    receipt = bundle.get("receipt")
+    if not isinstance(facts, list) or not isinstance(evidence, list) or not isinstance(events, list) or not isinstance(receipt, dict):
+        raise ValueError("located-facts bundle shape is invalid")
+    if receipt.get("bundle_sha256") != _json_hash({"facts": facts, "evidence_catalog": evidence, "public_event_inputs": events}):
+        raise ValueError("located-facts bundle receipt hash mismatch")
+    fact_by_id = {}
+    for fact in facts:
+        if not isinstance(fact, dict) or not isinstance(fact.get("fact_id"), str) or fact["fact_id"] in fact_by_id:
+            raise ValueError("located-facts bundle fact IDs must be unique")
+        if fact.get("source_id") != document["source_id"] or fact.get("document_version_id") != document["document_version_id"]:
+            raise ValueError("located-facts fact is not bound to its document version")
+        fact_by_id[fact["fact_id"]] = fact
+    seen = set()
+    for row in evidence:
+        if not isinstance(row, dict) or not isinstance(row.get("evidence_id"), str) or row["evidence_id"] in seen:
+            raise ValueError("located-facts evidence IDs must be unique")
+        if row.get("fact_id") not in fact_by_id or row.get("source_id") != document["source_id"]:
+            raise ValueError("located-facts evidence is not bound to a fact")
+        if row.get("document_version_id") != document["document_version_id"] or row.get("content_sha256") != document["raw_bytes_sha256"]:
+            raise ValueError("located-facts evidence hash/version binding is invalid")
+        seen.add(row["evidence_id"])
+    return bundle
+
+
+def load_snapshot(located_facts_path: Path | None = None) -> dict[str, Any]:
     feed, feed_hash = qs.load_json(qs.DEFAULT_FEED)
     status, status_hash = qs.load_json(qs.DEFAULT_STATUS)
     brief, brief_hash = qs.load_json(qs.DEFAULT_BRIEF)
@@ -140,7 +192,11 @@ def load_snapshot() -> dict[str, Any]:
         brief,
         {"feed": feed_hash, "status": status_hash, "brief": brief_hash},
     )
-    return {"store": store, "status": status, "brief": brief}
+    snapshot = {"store": store, "status": status, "brief": brief}
+    if located_facts_path is not None:
+        bundle = json.loads(located_facts_path.read_text(encoding="utf-8"))
+        snapshot["located_facts"] = validate_located_facts_bundle(bundle, set(approved_source_origins()))
+    return snapshot
 
 
 def _json_hash(value: Any) -> str:
@@ -190,6 +246,12 @@ class QueryGateway:
         self.store = self.snapshot["store"]
         self.status = self.snapshot["status"]
         self.brief = self.snapshot["brief"]
+        self.located_facts = (
+            validate_located_facts_bundle(
+                self.snapshot["located_facts"], set(approved_source_origins())
+            )
+            if self.snapshot.get("located_facts") is not None else None
+        )
         self.clock = clock or (lambda: datetime.now(timezone.utc))
 
     def _scope(
@@ -258,6 +320,38 @@ class QueryGateway:
         if not node:
             raise GatewayError("GATE_UNAVAILABLE", "answer evidence gate runtime is unavailable", 503)
         evidence = self._trusted_evidence_catalog(self.store, self.clock())
+        if self.located_facts is not None:
+            document = self.located_facts["document_version"]
+            facts = {fact["fact_id"]: fact for fact in self.located_facts["facts"]}
+            for row in self.located_facts["evidence_catalog"]:
+                if row.get("verification_status") != "CONFIRMED_OFFICIAL":
+                    continue
+                fact = facts[row["fact_id"]]
+                locator = quote(json.dumps(row["locator"], ensure_ascii=False, sort_keys=True, separators=(",", ":")))
+                value = fact.get("normalized_value")
+                if value is None:
+                    continue
+                evidence.append({
+                    "schema_version": 1,
+                    "evidence_id": row["evidence_id"],
+                    "evidence_type": "WRITTEN_OFFICIAL",
+                    "source_id": row["source_id"],
+                    "locator": f"{document['final_url']}#located-fact={quote(row['evidence_id'])}&locator={locator}",
+                    "document_version": row["document_version_id"],
+                    "content_sha256": row["content_sha256"],
+                    "trust_tier": "PRIMARY_REFERENCE",
+                    "verification_status": row["verification_status"],
+                    "freshness": "STALE",
+                    "is_current": False,
+                    "published_at": fact.get("valid_time") or document.get("fetched_at"),
+                    "assertions": [{
+                        "subject": f"{fact['subject_id']}:{fact['predicate']}",
+                        "value": value,
+                    }],
+                })
+        evidence_ids = [row["evidence_id"] for row in evidence]
+        if len(evidence_ids) != len(set(evidence_ids)):
+            raise GatewayError("GATE_FAILED", "evidence catalog contains duplicate IDs", 503)
         catalog_hash = _json_hash(evidence)
         payload = {
             "claims": claims,
@@ -666,12 +760,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--port", type=int, default=8788)
     parser.add_argument("--allow-origin", default=None)
     parser.add_argument("--rate-limit", type=int, default=DEFAULT_RATE_LIMIT)
+    parser.add_argument("--located-facts-bundle", type=Path)
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
-    server = build_server(args.host, args.port, QueryGateway(), args.allow_origin, args.rate_limit)
+    server = build_server(
+        args.host, args.port, QueryGateway(load_snapshot(args.located_facts_bundle)),
+        args.allow_origin, args.rate_limit,
+    )
     print(f"QUERY_GATEWAY_LISTENING http://{args.host}:{server.server_port}", flush=True)
     try:
         server.serve_forever()

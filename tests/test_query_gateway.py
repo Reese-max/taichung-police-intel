@@ -16,6 +16,46 @@ spec.loader.exec_module(gateway_module)
 
 
 class QueryGatewayTests(unittest.TestCase):
+    @staticmethod
+    def located_bundle(status="CONFIRMED_OFFICIAL"):
+        document = {
+            "schema_version": 1,
+            "document_id": "DOC-LOCATED-1",
+            "document_version_id": "DOCV-LOCATED-1",
+            "source_id": "S-028",
+            "original_source_identity": "S-028:dataset-88147",
+            "requested_url": "https://data.gov.tw/api/v2/rest/dataset/88147",
+            "final_url": "https://data.gov.tw/api/v2/rest/dataset/88147",
+            "fetched_at": "2026-09-21T00:00:00+00:00",
+            "raw_bytes_sha256": "a" * 64,
+            "extracted_text_sha256": "b" * 64,
+            "rights_status": "METADATA_LINK_ONLY",
+        }
+        fact = {
+            "fact_id": "FACT-LOCATED-1",
+            "document_id": document["document_id"],
+            "document_version_id": document["document_version_id"],
+            "source_id": document["source_id"],
+            "subject_id": "dataset:88147",
+            "predicate": "dataset_title",
+            "normalized_value": "臺中市受理刑事案件",
+            "valid_time": None,
+        }
+        evidence = {
+            "evidence_id": "EVID-LOCATED-1",
+            "fact_id": fact["fact_id"],
+            "source_id": document["source_id"],
+            "document_version_id": document["document_version_id"],
+            "official_url": document["final_url"],
+            "locator": {"type": "JSON_POINTER", "pointer": "/result/title"},
+            "content_sha256": document["raw_bytes_sha256"],
+            "verification_status": status,
+        }
+        events = [{"stable_id": fact["fact_id"], "source_id": document["source_id"]}]
+        bundle = {"document_version": document, "facts": [fact], "evidence_catalog": [evidence], "public_event_inputs": events}
+        bundle["receipt"] = {"bundle_sha256": gateway_module._json_hash({"facts": [fact], "evidence_catalog": [evidence], "public_event_inputs": events})}
+        return bundle
+
     @classmethod
     def setUpClass(cls):
         clock = lambda: datetime(2026, 9, 11, 9, 0, tzinfo=timezone.utc)
@@ -189,6 +229,39 @@ class QueryGatewayTests(unittest.TestCase):
         )
         self.assertEqual(bad_status, 400)
         self.assertEqual(bad["error"]["code"], "INVALID_ARGUMENTS")
+
+    def test_located_facts_enter_gate_only_after_server_side_confirmation(self):
+        snapshot = gateway_module.load_snapshot()
+        snapshot["located_facts"] = self.located_bundle()
+        gateway = gateway_module.QueryGateway(
+            snapshot=snapshot,
+            clock=lambda: datetime(2026, 9, 21, 9, 0, tzinfo=timezone.utc),
+        )
+        claim = {
+            "claim_type": "STATISTIC",
+            "text": "官方資料標題",
+            "temporal_scope": "HISTORICAL",
+            "proposition": {"subject": "dataset:88147:dataset_title", "value": "臺中市受理刑事案件"},
+        }
+        result = gateway.execute("validate_answer", {"claims": [claim]})
+        self.assertEqual(result["gate_status"], "PASS")
+        self.assertIn("EVID-LOCATED-1", result["answer_evidence_receipt"]["evidence_ids"])
+
+        candidate = gateway_module.load_snapshot()
+        candidate["located_facts"] = self.located_bundle("FACT_CANDIDATE")
+        blocked = gateway_module.QueryGateway(snapshot=candidate, clock=gateway.clock).execute(
+            "validate_answer", {"claims": [claim]}
+        )
+        self.assertNotIn("EVID-LOCATED-1", blocked["answer_evidence_receipt"]["evidence_ids"])
+        self.assertNotEqual(blocked["gate_status"], "PASS")
+
+    def test_located_facts_receipt_hash_is_fail_closed(self):
+        snapshot = gateway_module.load_snapshot()
+        bundle = self.located_bundle()
+        bundle["receipt"]["bundle_sha256"] = "0" * 64
+        snapshot["located_facts"] = bundle
+        with self.assertRaisesRegex(ValueError, "receipt hash mismatch"):
+            gateway_module.QueryGateway(snapshot=snapshot)
 
 
 if __name__ == "__main__":
