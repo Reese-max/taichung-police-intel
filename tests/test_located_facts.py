@@ -143,6 +143,25 @@ class LocatedFactsTests(unittest.TestCase):
         altered_json["raw_value"] = "999"
         self.assertEqual(verify_fact(json_document, json_body, altered_json)["reason"], "FACT_VALUE_MISMATCH")
 
+    def test_confirmation_rejects_stale_bundle_receipt(self):
+        body = HTML.read_bytes()
+        document = self.html_document(body)
+        bundle = build_bundle(document, body, [{
+            "subject_id": "event:A",
+            "predicate": "event_start_at",
+            "needle": "18:00",
+        }])
+        altered = copy.deepcopy(bundle)
+        altered["facts"][0]["valid_time"] = "2099-01-01"
+        with self.assertRaisesRegex(ValueError, "bundle receipt hash mismatch"):
+            confirm_facts(
+                altered,
+                body,
+                [altered["facts"][0]["fact_id"]],
+                reviewer_ref="officer-1",
+                verified_at=STAMP,
+            )
+
     def test_confirmation_requires_locator_recheck_and_binds_reviewer(self):
         body = HTML.read_bytes()
         document = self.html_document(body)

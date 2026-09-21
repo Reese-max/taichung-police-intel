@@ -33,9 +33,10 @@ python -X utf8 scripts/located-facts.py confirm `
 
 `confirm` rechecks the exact raw/text hash, locator, source value, and
 normalization before binding the reviewer reference to the fact, evidence row,
-and PublicEvent input. The gateway rejects a `CONFIRMED_OFFICIAL` status
-without that bound review, so editing a status or normalized value alone cannot
-promote a candidate.
+and PublicEvent input. It also rejects a stale bundle receipt or inconsistent
+fact/evidence/event linkage before writing the review. The gateway rejects a
+`CONFIRMED_OFFICIAL` status without that bound review, so editing a status or
+normalized value alone cannot promote a candidate.
 
 `self-check` replays both HTML and JSON adapters offline. The checked-in
 `official-document-receipt.v1.json` records one live official data.gov.tw

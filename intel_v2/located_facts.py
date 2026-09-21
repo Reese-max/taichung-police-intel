@@ -332,6 +332,12 @@ def confirm_facts(
     document = result.get("document_version")
     if not isinstance(facts, list) or not isinstance(evidence, list) or not isinstance(events, list) or not isinstance(document, dict):
         raise ValueError("located-facts bundle shape is invalid")
+    receipt = result.get("receipt")
+    if not isinstance(receipt, dict):
+        raise ValueError("located-facts receipt is required")
+    expected_bundle_hash = sha256({"facts": facts, "evidence_catalog": evidence, "public_event_inputs": events})
+    if receipt.get("bundle_sha256") != expected_bundle_hash:
+        raise ValueError("located-facts bundle receipt hash mismatch")
     fact_by_id = {fact.get("fact_id"): fact for fact in facts if isinstance(fact, dict)}
     evidence_by_fact = {row.get("fact_id"): row for row in evidence if isinstance(row, dict)}
     event_by_id = {row.get("stable_id"): row for row in events if isinstance(row, dict)}
@@ -347,6 +353,25 @@ def confirm_facts(
         event = event_by_id.get(fact_id)
         if not isinstance(fact, dict) or not isinstance(row, dict) or not isinstance(event, dict):
             raise ValueError(f"fact is not fully linked: {fact_id}")
+        if (
+            fact.get("source_id") != document.get("source_id")
+            or fact.get("document_id") != document.get("document_id")
+            or fact.get("document_version_id") != document.get("document_version_id")
+            or row.get("source_id") != fact.get("source_id")
+            or row.get("document_version_id") != fact.get("document_version_id")
+            or row.get("locator") != fact.get("locator")
+            or row.get("verification_status") != fact.get("verification_status")
+            or event.get("source_id") != fact.get("source_id")
+            or event.get("source_snapshot_ref") != document.get("snapshot_ref")
+            or event.get("content_sha256") != fact.get("raw_bytes_sha256")
+            or event.get("official_url") != document.get("final_url")
+            or event.get("subject_id") != fact.get("subject_id")
+            or event.get("predicate") != fact.get("predicate")
+            or event.get("normalized_value") != fact.get("normalized_value")
+            or event.get("valid_time") != fact.get("valid_time")
+            or event.get("verification_status") != fact.get("verification_status")
+        ):
+            raise ValueError(f"fact links are inconsistent: {fact_id}")
         if fact.get("verification_status") not in {"FACT_CANDIDATE", "NEEDS_REVIEW", CONFIRMATION_STATUS}:
             raise ValueError(f"fact verification status is invalid: {fact_id}")
         verification = verify_fact(document, body, fact)
@@ -358,9 +383,6 @@ def confirm_facts(
             target["verification_status"] = CONFIRMATION_STATUS
             target["review"] = copy.deepcopy(review)
 
-    receipt = result.get("receipt")
-    if not isinstance(receipt, dict):
-        raise ValueError("located-facts receipt is required")
     receipt["reviewed_fact_count"] = sum(
         fact.get("verification_status") == CONFIRMATION_STATUS for fact in facts
     )
