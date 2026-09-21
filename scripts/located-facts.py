@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from intel_v2.located_facts import MAX_DOCUMENT_BYTES, acquire_document, build_bundle, validate_document_url, verify_fact
+from intel_v2.located_facts import MAX_DOCUMENT_BYTES, acquire_document, build_bundle, confirm_facts, validate_document_url, verify_fact
 
 
 class _NoRedirect(HTTPRedirectHandler):
@@ -41,6 +41,14 @@ def write_json(path: Path, value: dict) -> None:
             temporary.unlink(missing_ok=True)
 
 
+def read_snapshot(path: Path) -> bytes:
+    with path.open("rb") as handle:
+        body = handle.read(MAX_DOCUMENT_BYTES + 1)
+    if len(body) > MAX_DOCUMENT_BYTES:
+        raise ValueError("document exceeds bounded byte limit")
+    return body
+
+
 def self_check() -> None:
     body = "<article><p>2026-09-21 活動開始 18:00，道路管制 16:00。</p></article>".encode("utf-8")
     document = acquire_document(
@@ -54,6 +62,14 @@ def self_check() -> None:
     bundle = build_bundle(document, body, [{"subject_id": "event:A", "predicate": "event_start_at", "needle": "18:00", "date_needle": "2026-09-21"}])
     assert bundle["facts"][0]["valid_time"] == "2026-09-21"
     assert verify_fact(document, body, bundle["facts"][0])["status"] == "PASS"
+    confirmed = confirm_facts(
+        bundle,
+        body,
+        [bundle["facts"][0]["fact_id"]],
+        reviewer_ref="self-check",
+        verified_at="2026-09-21T00:00:00+00:00",
+    )
+    assert confirmed["facts"][0]["verification_status"] == "CONFIRMED_OFFICIAL"
     json_body = (ROOT / "tests/fixtures/located-facts/official-data.json").read_bytes()
     json_document = acquire_document(
         source_id="S-028",
@@ -93,17 +109,21 @@ def fetch_live(source_id: str, requested_url: str, fetched_at: str, rights_statu
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("build", "live", "self-check"))
+    parser.add_argument("command", choices=("build", "live", "confirm", "self-check"))
     parser.add_argument("--source-id")
     parser.add_argument("--requested-url")
     parser.add_argument("--final-url")
     parser.add_argument("--body", type=Path)
     parser.add_argument("--content-type", default="text/html; charset=utf-8")
     parser.add_argument("--fetched-at")
+    parser.add_argument("--verified-at")
     parser.add_argument("--rights-status", default="METADATA_LINK_ONLY")
     parser.add_argument("--snapshot-output", type=Path)
     parser.add_argument("--rules", type=Path)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--bundle", type=Path)
+    parser.add_argument("--fact-id", action="append", default=[])
+    parser.add_argument("--reviewer-ref")
     args = parser.parse_args()
     if args.command == "self-check":
         self_check()
@@ -124,10 +144,25 @@ def main() -> int:
         write_json(args.output, bundle)
         print(f"LOCATED_FACTS_LIVE_OK source={args.source_id} facts={len(bundle['facts'])} raw_sha256={document['raw_bytes_sha256']} output={args.output}")
         return 0
+    if args.command == "confirm":
+        required = (args.bundle, args.body, args.output, args.reviewer_ref, args.verified_at)
+        if any(value is None for value in required) or not args.fact_id:
+            parser.error("confirm requires --bundle --body --fact-id --reviewer-ref --verified-at --output")
+        bundle = json.loads(args.bundle.read_text(encoding="utf-8"))
+        confirmed = confirm_facts(
+            bundle,
+            read_snapshot(args.body),
+            args.fact_id,
+            reviewer_ref=args.reviewer_ref,
+            verified_at=args.verified_at,
+        )
+        write_json(args.output, confirmed)
+        print(f"LOCATED_FACTS_CONFIRM_OK facts={len(args.fact_id)} reviewer={args.reviewer_ref} output={args.output}")
+        return 0
     required = (args.source_id, args.requested_url, args.final_url, args.body, args.fetched_at, args.rules, args.output)
     if any(value is None for value in required):
         parser.error("build requires --source-id --requested-url --final-url --body --fetched-at --rules --output")
-    body = args.body.read_bytes()
+    body = read_snapshot(args.body)
     rules = json.loads(args.rules.read_text(encoding="utf-8"))
     document = acquire_document(
         source_id=args.source_id,

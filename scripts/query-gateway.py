@@ -136,6 +136,23 @@ def _is_sha256(value: Any) -> bool:
     return isinstance(value, str) and len(value) == 64 and all(char in "0123456789abcdef" for char in value)
 
 
+def _valid_fact_review(review: Any) -> bool:
+    if not isinstance(review, dict):
+        return False
+    if review.get("decision") != "CONFIRMED_OFFICIAL" or review.get("method") != "EXACT_LOCATOR_RECHECK":
+        return False
+    if not isinstance(review.get("reviewer_ref"), str) or not review["reviewer_ref"].strip():
+        return False
+    verified_at = review.get("verified_at")
+    if not isinstance(verified_at, str) or not verified_at:
+        return False
+    try:
+        parsed = datetime.fromisoformat(verified_at.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return parsed.tzinfo is not None
+
+
 def approved_source_origins() -> dict[str, str]:
     catalog = json.loads(SOURCE_CATALOG.read_text(encoding="utf-8"))
     return {
@@ -170,6 +187,8 @@ def validate_located_facts_bundle(bundle: Any, approved_source_ids: set[str]) ->
             raise ValueError("located-facts bundle fact IDs must be unique")
         if fact.get("source_id") != document["source_id"] or fact.get("document_version_id") != document["document_version_id"]:
             raise ValueError("located-facts fact is not bound to its document version")
+        if fact.get("verification_status") not in {"FACT_CANDIDATE", "NEEDS_REVIEW", "CONFIRMED_OFFICIAL"}:
+            raise ValueError("located-facts fact verification status is invalid")
         fact_by_id[fact["fact_id"]] = fact
     seen = set()
     for row in evidence:
@@ -179,7 +198,28 @@ def validate_located_facts_bundle(bundle: Any, approved_source_ids: set[str]) ->
             raise ValueError("located-facts evidence is not bound to a fact")
         if row.get("document_version_id") != document["document_version_id"] or row.get("content_sha256") != document["raw_bytes_sha256"]:
             raise ValueError("located-facts evidence hash/version binding is invalid")
+        fact = fact_by_id[row["fact_id"]]
+        if row.get("verification_status") != fact.get("verification_status"):
+            raise ValueError("located-facts evidence status is not bound to its fact")
+        if row.get("verification_status") == "CONFIRMED_OFFICIAL":
+            if not _valid_fact_review(row.get("review")) or fact.get("review") != row.get("review"):
+                raise ValueError("located-facts confirmed evidence requires a bound review")
         seen.add(row["evidence_id"])
+    event_by_id = {}
+    for event in events:
+        if not isinstance(event, dict) or event.get("stable_id") not in fact_by_id:
+            continue
+        if event["stable_id"] in event_by_id:
+            raise ValueError("located-facts event IDs must be unique")
+        event_by_id[event["stable_id"]] = event
+        fact = fact_by_id[event["stable_id"]]
+        if event.get("verification_status") != fact.get("verification_status"):
+            raise ValueError("located-facts event status is not bound to its fact")
+        if fact.get("verification_status") == "CONFIRMED_OFFICIAL" and event.get("review") != fact.get("review"):
+            raise ValueError("located-facts confirmed event requires a bound review")
+    for fact_id, fact in fact_by_id.items():
+        if fact.get("verification_status") == "CONFIRMED_OFFICIAL" and fact_id not in event_by_id:
+            raise ValueError("located-facts confirmed fact requires a bound event")
     return bundle
 
 

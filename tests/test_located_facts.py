@@ -4,7 +4,7 @@ import copy
 from pathlib import Path
 import unittest
 
-from intel_v2.located_facts import acquire_document, build_bundle, extract_json_facts, validate_document_url, verify_fact
+from intel_v2.located_facts import acquire_document, build_bundle, confirm_facts, extract_json_facts, validate_document_url, verify_fact
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -67,6 +67,32 @@ class LocatedFactsTests(unittest.TestCase):
         altered["locator"]["quote"] = "17:00"
         self.assertEqual(verify_fact(document, body, altered)["status"], "REJECTED")
         self.assertEqual(verify_fact(document, body + b" ", fact)["reason"], "RAW_HASH_MISMATCH")
+
+    def test_confirmation_requires_locator_recheck_and_binds_reviewer(self):
+        body = HTML.read_bytes()
+        document = self.html_document(body)
+        bundle = build_bundle(document, body, [{"subject_id": "event:A", "predicate": "event_start_at", "needle": "18:00"}])
+        old_hash = bundle["receipt"]["bundle_sha256"]
+        confirmed = confirm_facts(
+            bundle,
+            body,
+            [bundle["facts"][0]["fact_id"]],
+            reviewer_ref="officer-1",
+            verified_at=STAMP,
+        )
+        fact = confirmed["facts"][0]
+        self.assertEqual(fact["verification_status"], "CONFIRMED_OFFICIAL")
+        self.assertEqual(confirmed["evidence_catalog"][0]["review"]["reviewer_ref"], "officer-1")
+        self.assertEqual(confirmed["public_event_inputs"][0]["verification_status"], "CONFIRMED_OFFICIAL")
+        self.assertNotEqual(confirmed["receipt"]["bundle_sha256"], old_hash)
+        with self.assertRaisesRegex(ValueError, "locator verification failed"):
+            confirm_facts(
+                bundle,
+                body + b"tampered",
+                [bundle["facts"][0]["fact_id"]],
+                reviewer_ref="officer-1",
+                verified_at=STAMP,
+            )
 
     def test_unapproved_origin_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "outside the approved source origin"):

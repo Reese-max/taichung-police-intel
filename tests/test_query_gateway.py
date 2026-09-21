@@ -40,6 +40,7 @@ class QueryGatewayTests(unittest.TestCase):
             "predicate": "dataset_title",
             "normalized_value": "臺中市受理刑事案件",
             "valid_time": None,
+            "verification_status": status,
         }
         evidence = {
             "evidence_id": "EVID-LOCATED-1",
@@ -51,7 +52,21 @@ class QueryGatewayTests(unittest.TestCase):
             "content_sha256": document["raw_bytes_sha256"],
             "verification_status": status,
         }
-        events = [{"stable_id": fact["fact_id"], "source_id": document["source_id"]}]
+        events = [{
+            "stable_id": fact["fact_id"],
+            "source_id": document["source_id"],
+            "verification_status": status,
+        }]
+        if status == "CONFIRMED_OFFICIAL":
+            review = {
+                "decision": "CONFIRMED_OFFICIAL",
+                "reviewer_ref": "test-reviewer",
+                "verified_at": "2026-09-21T00:00:00+00:00",
+                "method": "EXACT_LOCATOR_RECHECK",
+            }
+            fact["review"] = review
+            evidence["review"] = review
+            events[0]["review"] = review
         bundle = {"document_version": document, "facts": [fact], "evidence_catalog": [evidence], "public_event_inputs": events}
         bundle["receipt"] = {"bundle_sha256": gateway_module._json_hash({"facts": [fact], "evidence_catalog": [evidence], "public_event_inputs": events})}
         return bundle
@@ -271,6 +286,19 @@ class QueryGatewayTests(unittest.TestCase):
         bundle["receipt"]["bundle_sha256"] = "0" * 64
         snapshot["located_facts"] = bundle
         with self.assertRaisesRegex(ValueError, "receipt hash mismatch"):
+            gateway_module.QueryGateway(snapshot=snapshot)
+
+    def test_located_facts_confirmation_requires_review_receipt(self):
+        snapshot = gateway_module.load_snapshot()
+        bundle = self.located_bundle()
+        bundle["evidence_catalog"][0].pop("review")
+        bundle["receipt"]["bundle_sha256"] = gateway_module._json_hash({
+            "facts": bundle["facts"],
+            "evidence_catalog": bundle["evidence_catalog"],
+            "public_event_inputs": bundle["public_event_inputs"],
+        })
+        snapshot["located_facts"] = bundle
+        with self.assertRaisesRegex(ValueError, "requires a bound review"):
             gateway_module.QueryGateway(snapshot=snapshot)
 
 

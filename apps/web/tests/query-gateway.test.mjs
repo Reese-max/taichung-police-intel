@@ -24,6 +24,6 @@ test("read-only Query Gateway HTTP/MCP parity suite passes", () => {
     { cwd: repo, encoding: "utf8", timeout: 60000 },
   );
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-  assert.match(result.stderr, /Ran 11 tests?/);
+  assert.match(result.stderr, /Ran 12 tests?/);
   assert.match(result.stderr, /OK/);
 });

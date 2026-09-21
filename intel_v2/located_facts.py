@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import copy
+from datetime import datetime
 import hashlib
 import json
 import re
@@ -16,6 +18,7 @@ CATALOG = ROOT / "docs/govintel/source-catalog.v2.json"
 MAX_DOCUMENT_BYTES = 2 * 1024 * 1024
 EXTRACTOR_VERSION = "located-facts-v1"
 RIGHTS_STATUSES = {"UNKNOWN", "METADATA_LINK_ONLY", "PUBLIC_DERIVED"}
+CONFIRMATION_STATUS = "CONFIRMED_OFFICIAL"
 DATE_RE = re.compile(r"(?<!\d)(?:(\d{4})|([0-9]{2,3}))\s*[-/.年]\s*(\d{1,2})\s*[-/.月]\s*(\d{1,2})\s*日?(?!\d)")
 
 
@@ -246,6 +249,82 @@ def verify_fact(document: dict[str, Any], body: bytes, fact: dict[str, Any]) -> 
     else:
         valid = False
     return {"status": "PASS" if valid else "REJECTED", "reason": None if valid else "LOCATOR_MISMATCH", "fact_id": fact.get("fact_id")}
+
+
+def _review_timestamp(value: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise ValueError("verified_at must be ISO-8601")
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise ValueError("verified_at must be ISO-8601") from error
+    if parsed.tzinfo is None:
+        raise ValueError("verified_at must include timezone")
+    return parsed.isoformat(timespec="seconds")
+
+
+def confirm_facts(
+    bundle: dict[str, Any],
+    body: bytes,
+    fact_ids: list[str],
+    *,
+    reviewer_ref: str,
+    verified_at: str,
+) -> dict[str, Any]:
+    """Promote only explicitly reviewed, locator-verified facts in a copy."""
+    if not isinstance(bundle, dict) or not isinstance(body, bytes):
+        raise ValueError("bundle and body are required")
+    if not isinstance(reviewer_ref, str) or not reviewer_ref.strip() or len(reviewer_ref) > 128:
+        raise ValueError("reviewer_ref must be a non-empty short string")
+    verified_at = _review_timestamp(verified_at)
+    selected = [fact_id.strip() for fact_id in fact_ids if isinstance(fact_id, str) and fact_id.strip()]
+    if not selected or len(selected) != len(set(selected)):
+        raise ValueError("fact_ids must be a non-empty unique list")
+
+    result = copy.deepcopy(bundle)
+    facts = result.get("facts")
+    evidence = result.get("evidence_catalog")
+    events = result.get("public_event_inputs")
+    document = result.get("document_version")
+    if not isinstance(facts, list) or not isinstance(evidence, list) or not isinstance(events, list) or not isinstance(document, dict):
+        raise ValueError("located-facts bundle shape is invalid")
+    fact_by_id = {fact.get("fact_id"): fact for fact in facts if isinstance(fact, dict)}
+    evidence_by_fact = {row.get("fact_id"): row for row in evidence if isinstance(row, dict)}
+    event_by_id = {row.get("stable_id"): row for row in events if isinstance(row, dict)}
+    review = {
+        "decision": CONFIRMATION_STATUS,
+        "reviewer_ref": reviewer_ref.strip(),
+        "verified_at": verified_at,
+        "method": "EXACT_LOCATOR_RECHECK",
+    }
+    for fact_id in selected:
+        fact = fact_by_id.get(fact_id)
+        row = evidence_by_fact.get(fact_id)
+        event = event_by_id.get(fact_id)
+        if not isinstance(fact, dict) or not isinstance(row, dict) or not isinstance(event, dict):
+            raise ValueError(f"fact is not fully linked: {fact_id}")
+        if fact.get("verification_status") not in {"FACT_CANDIDATE", "NEEDS_REVIEW", CONFIRMATION_STATUS}:
+            raise ValueError(f"fact verification status is invalid: {fact_id}")
+        verification = verify_fact(document, body, fact)
+        if verification["status"] != "PASS":
+            raise ValueError(f"fact locator verification failed: {fact_id}")
+        if fact.get("verification_status") == CONFIRMATION_STATUS and fact.get("review") != review:
+            raise ValueError(f"fact already has a different review: {fact_id}")
+        for target in (fact, row, event):
+            target["verification_status"] = CONFIRMATION_STATUS
+            target["review"] = copy.deepcopy(review)
+
+    receipt = result.get("receipt")
+    if not isinstance(receipt, dict):
+        raise ValueError("located-facts receipt is required")
+    receipt["reviewed_fact_count"] = sum(
+        fact.get("verification_status") == CONFIRMATION_STATUS for fact in facts
+    )
+    receipt["needs_review_count"] = sum(
+        fact.get("verification_status") == "NEEDS_REVIEW" for fact in facts
+    )
+    receipt["bundle_sha256"] = sha256({"facts": facts, "evidence_catalog": evidence, "public_event_inputs": events})
+    return result
 
 
 def build_bundle(document: dict[str, Any], body: bytes, rules: list[dict[str, Any]]) -> dict[str, Any]:

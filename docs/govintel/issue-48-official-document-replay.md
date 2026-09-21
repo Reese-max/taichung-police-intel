@@ -19,6 +19,23 @@ response size, records raw/text hashes and parser version, and emits
 Pointers are verified against the exact document version. Facts remain
 `FACT_CANDIDATE` or `NEEDS_REVIEW`; no LLM or caller can promote them to truth.
 
+An explicit human review step is available after inspecting the saved snapshot:
+
+```powershell
+python -X utf8 scripts/located-facts.py confirm `
+  --bundle .tmp/official-data-bundle.json `
+  --body .tmp/official-data.json `
+  --fact-id FACT-... `
+  --reviewer-ref officer-1 `
+  --verified-at 2026-09-21T08:00:00+00:00 `
+  --output .tmp/official-data-confirmed.json
+```
+
+`confirm` rechecks the exact raw/text hash and locator before binding the
+reviewer reference to the fact, evidence row, and PublicEvent input. The
+gateway rejects a `CONFIRMED_OFFICIAL` status without that bound review, so
+editing a status field alone cannot promote a candidate.
+
 `self-check` replays both HTML and JSON adapters offline. The checked-in
 `official-document-receipt.v1.json` records one live official data.gov.tw
 metadata/API replay separately from the offline fixtures. Raw live bytes are
