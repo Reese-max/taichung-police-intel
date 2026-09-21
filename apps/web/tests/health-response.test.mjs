@@ -20,6 +20,15 @@ test("health endpoint does not call a stale checked-in snapshot ok", () => {
   assert.match(response.policy.catalog_hash, /^[0-9a-f]{64}$/);
 });
 
+test("static export health never freezes a build-time ok status", () => {
+  const response = buildHealthResponse(status, brief);
+  assert.equal(response.status, "unknown");
+  assert.equal(response.health, "UNKNOWN");
+  assert.equal(response.can_reassure, false);
+  assert.equal(response.snapshot_age_ms, null);
+  assert.match(response.reason, /靜態輸出/);
+});
+
 test("health response stays explicit when source state is incomplete", () => {
   const incomplete = { ...status, sources: [] };
   const response = buildHealthResponse(incomplete, brief, Date.parse("2026-09-11T09:00:00+08:00"));

@@ -164,6 +164,11 @@ The command uses the durable `state/v2-handoff-state.json`, makes repeated watch
 
 The saved [system-health.json](./apps/web/public/data/system-health.json) exposes the publication, query, and discovery lanes plus stage-level outcomes. `STALE` and `UNKNOWN` are intentional evidence states; they are not deployment or public-reachability claims.
 
+Because GitHub Pages is a static export, `/api/health.json` does not freeze a
+build-time `ok` result as current health; it returns `UNKNOWN` unless a caller
+provides a request-time clock. The browser dashboard performs the current
+snapshot-age check locally.
+
 Source contract drift is fail-closed. `scripts/schema_drift.py --live` observes the three HTML candidate lists, council JSON APIs, and data.gov.tw JSON/CSV resources; `--input` remains available for deterministic replay. A missing required field, changed type, failed HTML identity, missing pagination marker, or HTTP error becomes a drift receipt and preserves the last-known-good fingerprint; additive fields are recorded as compatible. The current receipt is reconciled into the system-health discovery lane and public Review Inbox projection; `scripts/review-inbox.py reconcile` persists local audit state. Running it without an observed input intentionally produces `UNKNOWN`, not a fabricated healthy result.
 
 Schema replay uses the small registry in `scripts/migration_replay.py` (`1→2→3`). `dry-run` emits affected/error counts and hashes; `apply` writes only after all objects pass and saves a migration receipt; `replay` reuses `intel_v2` semantics so deterministic IDs and `FIRST_SEEN` wording remain stable. Watch/handoff inputs are copied unchanged and hash-bound. Query Store remains rebuildable from a pinned canonical generation with `python scripts/query-store.py build --feed ... --status ... --brief ...`.
