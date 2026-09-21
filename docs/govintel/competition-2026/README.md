@@ -29,15 +29,17 @@
 | Source Policy 跨 collector／Query Store／Health／UI | `IMPLEMENTED_NOT_PRODUCTION` | #49 receipt、`scripts/verify-source-policy-integration.py` |
 | 官方文件版本→located fact→evidence/PublicEvent input | `IMPLEMENTED_NOT_PRODUCTION` | #48 receipt、`scripts/located-facts.py` |
 | Taiwan Intel Dashboard discovery feed | `IMPLEMENTED_NOT_PRODUCTION` | #27 fixture、`scripts/discovery-adapter.py` |
+| 受限 Query Gateway（Web／HTTP MCP／STDIO MCP first slice） | `IMPLEMENTED_NOT_PRODUCTION` | #30 runtime boundary、#47 current-checkout `24/24` receipt |
 | S-001/S-019/S-031/S-032/S-033 擴源 | `CANDIDATE_CANARY` | #14/#22；尚缺完整 live canary/promotion |
 | 排程發布、晨晚自然 run、匿名版本/hash | `BLOCKED` | #20；需正常 review/merge 與正式環境證據 |
 | 真人成效／機關採用／得獎 | `NOT_RUN` / `UNVERIFIED` | `evaluation-manifest.template.json` 保持 null |
 
 ## 1. 這輪真的交付什麼
 
-本分支增加前端快照年齡判斷、發布階段留證與測試，並包含 #20 的
+本分支目前包含前端快照年齡判斷、發布階段留證、bounded detail-recheck／handoff／事件融合核心、受限 Query Gateway 與測試，並包含 #20 的
 `publication-state` 分支修復候選，**尚未合併／部署**。因此不能把候選流程
-當成正式排程已修復，也未實作全文抽取、事件融合、跨日追蹤或 Twinkle client。
+當成正式排程已修復，也不能把 metadata-only 查詢、local-first 核心或 fixture
+重播寫成 production；完整全文抽取與 Twinkle client 仍未實作。
 
 | 能力 | 此輪狀態 | 證據／後續 |
 |---|---|---|
@@ -45,10 +47,10 @@
 | 前端快照逾期／不完整／版本不一致提示 | 本分支實作，離線測試可執行 | `apps/web/lib/publication-freshness.mjs`、#21 |
 | 推送／產物／部署階段結果與留證 | 本分支實作，實際 Actions 驗收待完成 | `.github/workflows/pages.yml`、#20 |
 | main 分支保護導致推送阻塞 | 候選流程已改寫入 `publication-state`，不再直接推送受保護 `main`；尚未 merge／正式排程驗收 | #20；[後續修復邊界](PUBLICATION_RECOVERY.md) |
-| 三個新聞候選來源 | PR #16 與 #22 尚需處理，未由本分支合併 | #14、#22 |
-| 正文更正與摘要失效 | 待實作；本輪只完成 #21 的部分前端時效保護 | #21 |
-| 跨日追蹤、確認與交班版本 | 待實作 | #23 |
-| 跨來源事件融合、背景卡 | 待實作 | #24 |
+| 五個新聞／跨機關候選來源 | `CANDIDATE_CANARY`；有 bounded live observation，尚未 promotion | #14、#22 最新 canary receipt |
+| 正文更正與摘要失效 | `IMPLEMENTED_NOT_PRODUCTION`；detail recheck 與 review/invalidation core 已有測試，尚缺正式 DB／7-day canary | #21、`docs/govintel/issue-21-detail-recheck.md` |
+| 跨日追蹤、確認與交班版本 | `IMPLEMENTED_NOT_PRODUCTION`；local-first handoff state 已可重播，尚缺正式部署／使用者驗證 | #23、`docs/govintel/issue-23-handoff-flow.md` |
+| 跨來源事件融合、背景卡 | `IMPLEMENTED_NOT_PRODUCTION`；保守融合與回歸 fixture 已有，尚缺正式來源／部署驗證 | #24、`docs/govintel/issue-24-public-event-fusion.md` |
 | Twinkle / public-apis | 來源策略／候選，不等於可用 API client | #14 |
 | 當屆資格與報名、真人測試、AI 成效 | 待確認／待測 | 私有回執、匿名評測；不得預填成功 |
 
