@@ -14,7 +14,11 @@ spec.loader.exec_module(check)
 class SourcePolicyIntegrationTests(unittest.TestCase):
     def test_all_consumers_and_replay_share_current_policy(self):
         result = check.run_checks()
-        self.assertEqual(result["consumer_count"], 5)
+        self.assertEqual(result["consumer_count"], 6)
+        self.assertEqual(
+            result["consumer_names"],
+            ["query_store", "system_health", "ui", "collector", "online_collector", "publication_validator"],
+        )
         self.assertTrue(result["mixed_policy_rejected"])
         self.assertTrue(result["partial_gap_preserved"])
         self.assertTrue(result["unsupported_explicit"])

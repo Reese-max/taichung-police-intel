@@ -58,6 +58,12 @@ def run_checks() -> dict[str, Any]:
         raise ValueError("online collector source set differs from policy")
     if publication.load_expected_sources() != set(expected["active_source_ids"]):
         raise ValueError("publication validator source set differs from policy")
+    consumer_names = [
+        *projections,
+        "collector",
+        "online_collector",
+        "publication_validator",
+    ]
 
     old_store = query_store.build_from_paths(query_store.DEFAULT_FEED, query_store.DEFAULT_STATUS, query_store.DEFAULT_BRIEF)
     if old_store["policy"] != expected:
@@ -113,7 +119,8 @@ def run_checks() -> dict[str, Any]:
     return {
         "active": len(current["active_source_ids"]),
         "policy_version": current["policy_version"],
-        "consumer_count": len(projections) + 2,
+        "consumer_count": len(consumer_names),
+        "consumer_names": consumer_names,
         "promoted_policy_version": promoted["policy_version"],
         "old_replay_generation": old_store["generation_id"],
         "mixed_policy_rejected": True,
