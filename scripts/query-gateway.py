@@ -33,6 +33,7 @@ SERVER_VERSION = "query-gateway-v1"
 MCP_PROTOCOL_VERSION = "2025-06-18"
 DEFAULT_RATE_LIMIT = 60
 SOURCE_CATALOG = ROOT / "docs" / "govintel" / "source-catalog.v2.json"
+PUBLIC_EVIDENCE_SOURCE_STATUSES = frozenset({"PRODUCTION_ACTIVE", "AUDITED_EXISTING"})
 
 _query_store_spec = importlib.util.spec_from_file_location("govintel_query_store", QUERY_STORE_PATH)
 if _query_store_spec is None or _query_store_spec.loader is None:
@@ -207,7 +208,12 @@ def approved_source_origins() -> dict[str, str]:
     return {
         str(row["source_id"]): str(urlsplit(row["entrypoint"]).hostname)
         for row in catalog.get("sources", [])
-        if isinstance(row, dict) and row.get("source_id") and row.get("entrypoint")
+        if (
+            isinstance(row, dict)
+            and row.get("source_id")
+            and row.get("entrypoint")
+            and row.get("status") in PUBLIC_EVIDENCE_SOURCE_STATUSES
+        )
     }
 
 

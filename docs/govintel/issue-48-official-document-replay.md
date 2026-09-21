@@ -47,7 +47,10 @@ The read-only Query Gateway can load a saved bundle with
 bindings, and bundle receipt before startup; only explicitly
 `CONFIRMED_OFFICIAL` facts enter the server-controlled Answer Evidence Gate.
 `FACT_CANDIDATE` and `NEEDS_REVIEW` remain excluded until a separate review
-step promotes them, so a caller cannot inject its own evidence catalog.
+step promotes them, so a caller cannot inject its own evidence catalog. The
+source itself must also be `PRODUCTION_ACTIVE` or `AUDITED_EXISTING` in the
+server catalog; unpromoted `VERIFIED_CANDIDATE` sources are rejected before
+their facts can enter the trusted catalog.
 
 ## 2026-09-21 local replay
 

@@ -377,6 +377,16 @@ class QueryGatewayTests(unittest.TestCase):
         self.assertNotIn("EVID-LOCATED-1", blocked["answer_evidence_receipt"]["evidence_ids"])
         self.assertNotEqual(blocked["gate_status"], "PASS")
 
+    def test_located_facts_candidate_source_is_not_approved(self):
+        self.assertIn("S-028", gateway_module.approved_source_origins())
+        self.assertNotIn("S-032", gateway_module.approved_source_origins())
+        snapshot = gateway_module.load_snapshot()
+        bundle = self.located_bundle()
+        bundle["document_version"]["source_id"] = "S-032"
+        snapshot["located_facts"] = bundle
+        with self.assertRaisesRegex(ValueError, "source is not approved"):
+            gateway_module.QueryGateway(snapshot=snapshot)
+
     def test_located_facts_receipt_hash_is_fail_closed(self):
         snapshot = gateway_module.load_snapshot()
         bundle = self.located_bundle()
