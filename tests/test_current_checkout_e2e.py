@@ -227,6 +227,14 @@ class ServerTests(unittest.TestCase):
         finally:
             self.server.query_down = False
 
+    def test_health_endpoint_keeps_formal_deployment_unknown(self):
+        status, health = http_json(self.base + "/api/health")
+        self.assertEqual(status, 200)
+        stages = {(row["lane"], row["stage"]): row for row in health["stages"]}
+        self.assertEqual(stages[("publication", "deployment")]["outcome"], "UNKNOWN")
+        self.assertEqual(stages[("publication", "public_http_verification")]["outcome"], "UNKNOWN")
+        self.assertNotEqual(health["lanes"]["publication"], "HEALTHY")
+
 
 class ReceiptGuardTests(unittest.TestCase):
     def test_loopback_receipt_does_not_promote_formal_publication_stages(self):

@@ -29,7 +29,7 @@ Loopback HTTP proves only the candidate query/static lane. It is recorded as a
 query-index success; formal `deployment` and `public_http_verification` stages
 remain `UNKNOWN` until a real deployment and anonymous public hash receipt exist.
 
-The companion Python contract suite has `23/23` tests. The verifier is local-only,
+The companion Python contract suite has `24/24` tests. The verifier is local-only,
 uses a preserved checked-in snapshot, and does not write canonical or production
 state.
 
@@ -38,7 +38,7 @@ state.
 | Dimension | State |
 |---|---|
 | `IMPLEMENTED` | YES — one build/start/verify entry, receipt, static fallback, browser lane and sabotage lane |
-| `CORE_TESTED` | YES — 23/23 current-checkout tests and full project gate |
+| `CORE_TESTED` | YES — 24/24 current-checkout tests and full project gate |
 | `INTEGRATED` | YES — local Web → same-origin Gateway → Query Store → official locator replay |
 | `LIVE_SOURCE_TESTED` | NO — checked-in snapshot only for this candidate replay |
 | `DEPLOYMENT_VERIFIED` | NO — no Pages/public HTTPS/hash receipt |
