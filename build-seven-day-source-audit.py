@@ -652,7 +652,9 @@ def fetch_s017(rows: list[dict[str, str]], start: date, end: date, fetched_at: s
         match = re.search(r"zipfile=(\d{3})-(\d{2})-(\d{2})\.zip", anchor.get("href", ""))
         if not match:
             continue
-        iso_date = f"{int(match.group(1)) + 1911:04d}-{match.group(2)}-{match.group(3)}"
+        iso_date = roc_dash_to_iso(f"{match.group(1)}-{match.group(2)}-{match.group(3)}")
+        if not iso_date:
+            continue
         if in_window(iso_date, start, end):
             links.append((iso_date, urllib.parse.urljoin(base, anchor["href"])))
     zip_evidence = []
