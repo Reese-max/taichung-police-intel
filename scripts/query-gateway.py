@@ -49,6 +49,7 @@ RETENTION_POLICY = retention_policy_module.compile_policy()
 CAPABILITIES = (
     "search_evidence",
     "get_current_brief",
+    "get_publication_receipt",
     "get_source_health",
     "validate_answer",
 )
@@ -80,6 +81,12 @@ MCP_TOOLS = [
     {
         "name": "get_current_brief",
         "description": "Read the checked-in canonical brief with its freshness and publication receipt.",
+        "inputSchema": {"type": "object", "additionalProperties": False, "properties": {}},
+        "annotations": {"readOnlyHint": True, "openWorldHint": False, "destructiveHint": False},
+    },
+    {
+        "name": "get_publication_receipt",
+        "description": "Read the current publication and canonical artifact hashes without exposing raw content.",
         "inputSchema": {"type": "object", "additionalProperties": False, "properties": {}},
         "annotations": {"readOnlyHint": True, "openWorldHint": False, "destructiveHint": False},
     },
@@ -614,6 +621,7 @@ class QueryGateway:
         allowed = {
             "search_evidence": {"q", "source_id", "change_type", "limit", "cursor", "expected_generation"},
             "get_current_brief": set(),
+            "get_publication_receipt": set(),
             "get_source_health": {"source_id"},
             "validate_answer": {"claims", "expected_generation"},
         }.get(tool)
@@ -701,6 +709,37 @@ class QueryGateway:
                     "brief": brief,
                 },
                 result_count=1,
+            )
+        if tool == "get_publication_receipt":
+            scope = self._scope(now=now, capability_id="publication_metadata")
+            publication = self.store["generated_from"]
+            publication_receipt = {
+                "schema_version": 1,
+                "receipt_type": "PUBLICATION_PROJECTION",
+                "publication_id": publication["collection_run_id"],
+                "publication_hash": publication["brief_sha256"],
+                "generation_id": self.store["generation_id"],
+                "artifact_hashes": {
+                    "feed": publication["feed_sha256"],
+                    "status": publication["status_sha256"],
+                    "brief": publication["brief_sha256"],
+                },
+                "generated_at": publication["brief_generated_at"],
+                "collection_status": publication["collection_status"],
+                "publication_status": publication["publication_status"],
+                "snapshot_complete": publication["snapshot_complete"],
+                "freshness": _freshness(scope["data_status"]),
+                "current_as_of_server_clock": scope["data_status"] == "SNAPSHOT_RECENT",
+                "source_gaps": scope["source_gaps"],
+                "policy_hash": self.store["policy"]["policy_hash"],
+            }
+            return self._envelope(
+                tool,
+                args,
+                scope,
+                {"publication_receipt": publication_receipt},
+                result_count=1,
+                result_type="publication_receipt",
             )
         source_id = args.get("source_id")
         scope = self._scope(source_id=source_id, now=now, capability_id="source_health")

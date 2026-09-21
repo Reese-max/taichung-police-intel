@@ -6,9 +6,9 @@ The first read-only query slice is now wired through the shared Query Gateway:
 
 - `scripts/query-gateway.py` serves HTTP `/query` and `/mcp`.
 - `scripts/query-gateway-stdio.py` serves the same MCP contract over bounded line-delimited stdio.
-- The Web `Ask GovIntel` panel uses the same `search_evidence`, `get_current_brief`, and `get_source_health` primitives; `validate_answer` also uses the server-controlled Answer Evidence Gate.
+- The Web `Ask GovIntel` panel uses the same `search_evidence`, `get_current_brief`, and `get_source_health` primitives; `get_publication_receipt` exposes the bound artifact hashes, and `validate_answer` uses the server-controlled Answer Evidence Gate.
 - The controlled answer renderer uses only the Gate's normalized, evaluated propositions; caller claim text and raw proposition whitespace are not rendered as verified output.
-- The current code and checked-in artifacts pass `npm run check`, including the HTTP/MCP parity suite and the stdio transport tests. `9ed2b94` was the original local boundary fix; the current checkout includes later gateway hardening through `b31010b`.
+- The current code and checked-in artifacts pass `npm run check`, including the HTTP/MCP parity suite and the stdio transport tests; the gateway also exposes the bounded publication receipt projection.
 
 This is still a local/code-only receipt. It is not a production deployment, anonymous public reachability proof, or completion of the later event, comparison, and statistics slices.
 

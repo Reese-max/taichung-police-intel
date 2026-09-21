@@ -165,6 +165,30 @@ class QueryGatewayTests(unittest.TestCase):
         self.assertIn("過期", response["verification_summary"])
         self.assertEqual(response["query_coverage"]["status"], "STALE")
 
+    def test_publication_receipt_is_bound_to_current_artifact_hashes(self):
+        status, response = self.request("POST", "/query", {"tool": "get_publication_receipt", "arguments": {}})
+        self.assertEqual(status, 200)
+        receipt = response["publication_receipt"]
+        generated_from = self.gateway.store["generated_from"]
+        self.assertEqual(receipt["publication_id"], generated_from["collection_run_id"])
+        self.assertEqual(receipt["publication_hash"], generated_from["brief_sha256"])
+        self.assertEqual(receipt["generation_id"], self.gateway.store["generation_id"])
+        self.assertEqual(receipt["artifact_hashes"], {
+            "feed": generated_from["feed_sha256"],
+            "status": generated_from["status_sha256"],
+            "brief": generated_from["brief_sha256"],
+        })
+        self.assertFalse(receipt["current_as_of_server_clock"])
+        self.assertNotIn("items", receipt)
+        mcp_status, mcp = self.request(
+            "POST",
+            "/mcp",
+            {"jsonrpc": "2.0", "id": 6, "method": "tools/call", "params": {"name": "get_publication_receipt", "arguments": {}}},
+        )
+        self.assertEqual(mcp_status, 200)
+        self.assertFalse(mcp["result"]["isError"])
+        self.assertEqual(mcp["result"]["structuredContent"]["publication_receipt"], receipt)
+
     def test_no_result_source_gap_and_unsupported_capability_are_explicit(self):
         status, response = self.request(
             "POST", "/query", {"tool": "search_evidence", "arguments": {"q": "不存在的測試字串"}}
