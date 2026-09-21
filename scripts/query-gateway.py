@@ -22,6 +22,7 @@ QUERY_STORE_PATH = ROOT / "scripts" / "query-store.py"
 RETENTION_POLICY_PATH = ROOT / "scripts" / "retention-policy.py"
 ANSWER_GATE_RUNNER = ROOT / "scripts" / "answer-gate-runner.mjs"
 MAX_REQUEST_BYTES = 64 * 1024
+MAX_RESPONSE_BYTES = 256 * 1024
 SERVER_VERSION = "query-gateway-v1"
 DEFAULT_RATE_LIMIT = 60
 SOURCE_CATALOG = ROOT / "docs" / "govintel" / "source-catalog.v2.json"
@@ -201,6 +202,10 @@ def load_snapshot(located_facts_path: Path | None = None) -> dict[str, Any]:
 
 def _json_hash(value: Any) -> str:
     return hashlib.sha256(qs.canonical_json(value)).hexdigest()
+
+
+def _json_bytes(value: Any) -> bytes:
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
 
 def _now(value: datetime | None) -> datetime:
@@ -652,7 +657,13 @@ class GatewayHandler(BaseHTTPRequestHandler):
     server_version = "GovIntelQueryGateway/1"
 
     def _send(self, payload: Any, status: int = 200) -> None:
-        body = json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
+        body = _json_bytes(payload)
+        if len(body) > MAX_RESPONSE_BYTES:
+            error = _error_payload(GatewayError("RESPONSE_TOO_LARGE", "response exceeds the byte limit", 500))
+            if isinstance(payload, dict) and payload.get("jsonrpc") == "2.0":
+                error = {"jsonrpc": "2.0", "id": payload.get("id"), "error": error["error"]}
+            body = _json_bytes(error)
+            status = 500
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))

@@ -16,6 +16,17 @@ gateway_module = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(gateway_module)
 
 
+def emit(response: dict) -> None:
+    encoded = json.dumps(response, ensure_ascii=False, separators=(",", ":"))
+    if len(encoded.encode("utf-8")) > gateway_module.MAX_RESPONSE_BYTES:
+        encoded = json.dumps({
+            "jsonrpc": "2.0",
+            "id": response.get("id"),
+            "error": {"code": "RESPONSE_TOO_LARGE", "message": "response exceeds the byte limit"},
+        }, ensure_ascii=False, separators=(",", ":"))
+    print(encoded, flush=True)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run the read-only GovIntel MCP gateway over stdio")
     parser.add_argument("--located-facts-bundle", type=Path)
@@ -35,20 +46,20 @@ def main() -> int:
                 if not chunk:
                     break
                 has_newline = chunk.endswith(b"\n")
-            print(json.dumps({
+            emit({
                 "jsonrpc": "2.0",
                 "id": None,
                 "error": {"code": "REQUEST_TOO_LARGE", "message": "request line exceeds the byte limit"},
-            }, ensure_ascii=False, separators=(",", ":")), flush=True)
+            })
             continue
         try:
             line = raw_bytes.decode("utf-8")
         except UnicodeDecodeError as error:
-            print(json.dumps({
+            emit({
                 "jsonrpc": "2.0",
                 "id": None,
                 "error": {"code": -32700, "message": str(error)},
-            }, ensure_ascii=False, separators=(",", ":")), flush=True)
+            })
             continue
         if not line.strip():
             continue
@@ -69,7 +80,7 @@ def main() -> int:
                 continue
             else:
                 response = {"jsonrpc": "2.0", "id": request["id"], "error": gateway_module._error_payload(error)["error"]}
-        print(json.dumps(response, ensure_ascii=False, separators=(",", ":")), flush=True)
+        emit(response)
     return 0
 
 

@@ -178,6 +178,16 @@ class QueryGatewayTests(unittest.TestCase):
         self.assertTrue(limiter.allow("other-client", now=12))
         self.assertTrue(limiter.allow("client", now=71))
 
+    def test_response_byte_limit_fails_closed(self):
+        original = gateway_module.MAX_RESPONSE_BYTES
+        gateway_module.MAX_RESPONSE_BYTES = 256
+        try:
+            status, response = self.request("POST", "/query", {"tool": "get_current_brief", "arguments": {}})
+        finally:
+            gateway_module.MAX_RESPONSE_BYTES = original
+        self.assertEqual(status, 500)
+        self.assertEqual(response["error"]["code"], "RESPONSE_TOO_LARGE")
+
     def test_validate_answer_uses_server_catalog_and_controlled_renderer(self):
         item = next(row for row in self.gateway.store["items"] if row["freshness_status"] == "FRESH")
         claim = {
