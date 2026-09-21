@@ -150,6 +150,13 @@ class SourcePolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "hash"):
             sp.validate_policy(tampered)
 
+    def test_recomputed_tampered_projection_fails_closed(self):
+        tampered = copy.deepcopy(self.baseline)
+        tampered["active_source_ids"] = tampered["active_source_ids"][:-1]
+        tampered["policy_hash"] = sp.digest({key: value for key, value in tampered.items() if key != "policy_hash"})
+        with self.assertRaisesRegex(ValueError, "active_sources"):
+            sp.validate_policy(tampered)
+
 
 if __name__ == "__main__":
     unittest.main()
