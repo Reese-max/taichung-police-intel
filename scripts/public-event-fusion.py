@@ -13,6 +13,7 @@ import copy
 from collections import defaultdict
 from datetime import datetime
 import hashlib
+import importlib.util
 import json
 from pathlib import Path
 from typing import Any
@@ -21,6 +22,58 @@ from zoneinfo import ZoneInfo
 
 TZ = ZoneInfo("Asia/Taipei")
 FUSION_STATUSES = {"CONFIRMED", "CANDIDATE", "CONFLICT", "SPLIT_REQUIRED"}
+ENTITY_REGISTRY_PATH = Path(__file__).with_name("entity-registry.py")
+_entity_registry_module = None
+
+
+def _load_entity_registry_module():
+    global _entity_registry_module
+    if _entity_registry_module is None:
+        spec = importlib.util.spec_from_file_location("govintel_entity_registry", ENTITY_REGISTRY_PATH)
+        if spec is None or spec.loader is None:
+            raise RuntimeError("entity registry module is unavailable")
+        _entity_registry_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(_entity_registry_module)
+    return _entity_registry_module
+
+
+def load_entity_registry(path: Path | None = None) -> dict[str, Any]:
+    return _load_entity_registry_module().load_registry(path or _load_entity_registry_module().DEFAULT_REGISTRY)
+
+
+def bind_document_entities(document: dict[str, Any], registry: dict[str, Any]) -> dict[str, Any]:
+    module = _load_entity_registry_module()
+    module.validate_registry(registry)
+    result = copy.deepcopy(document)
+    for kind, label_field, id_field in (
+        ("agency", "agency_labels", "agency_ids"),
+        ("location", "location_labels", "location_ids"),
+    ):
+        labels = result.pop(label_field, None)
+        existing = result.get(id_field, [])
+        if not isinstance(existing, list) or any(not isinstance(item, str) or not item for item in existing):
+            raise ValueError(f"{id_field} must be a string array")
+        known_ids = {
+            entity["entity_id"] for entity in registry["entities"] if entity["kind"] == kind
+        }
+        if any(item not in known_ids for item in existing):
+            raise ValueError(f"unknown {kind} entity ID")
+        if labels is None:
+            continue
+        if not isinstance(labels, list) or any(not isinstance(label, str) or not label.strip() for label in labels):
+            raise ValueError(f"{label_field} must be a string array")
+        jurisdiction = result.get(f"{kind}_jurisdiction") or result.get("jurisdiction")
+        if not isinstance(jurisdiction, str) or not jurisdiction.strip():
+            raise ValueError(f"{label_field} requires an explicit jurisdiction")
+        resolved = []
+        for label in labels:
+            match = module.resolve(registry, kind, label, jurisdiction)
+            if match.get("status") != "RESOLVED":
+                raise ValueError(f"unresolved {kind} label: {label}")
+            resolved.append(match["entity_id"])
+        result[id_field] = sorted(set(existing + resolved))
+    result["entity_registry"] = module.registry_receipt(registry)
+    return result
 
 
 def _https(value: Any) -> str:
@@ -88,10 +141,17 @@ def validate_document(document: dict[str, Any]) -> None:
     for field in ("event_start_at", "event_end_at", "observed_at", "created_at", "updated_at"):
         if field in document and document[field] is not None:
             _parse_timestamp(document[field])
+    if "occurrence_id" in document and (not isinstance(document["occurrence_id"], str) or not document["occurrence_id"].strip()):
+        raise ValueError("occurrence_id must be a nonempty string")
 
 
 def cluster_key(document: dict[str, Any]) -> tuple[str, str, str] | None:
     named_event_id = document.get("named_event_id") or document.get("cross_reference_id")
+    occurrence_id = document.get("occurrence_id")
+    if occurrence_id is not None:
+        if not isinstance(named_event_id, str) or not named_event_id:
+            return None
+        return document["event_type"], named_event_id, f"occurrence:{occurrence_id}"
     day = _iso_date(document.get("event_start_at"))
     if not isinstance(named_event_id, str) or not named_event_id or day is None:
         return None
@@ -165,7 +225,12 @@ def _linked_documents(documents: list[dict[str, Any]]) -> list[dict[str, Any]]:
     ]
 
 
-def build_public_event(key: tuple[str, str, str] | None, documents: list[dict[str, Any]]) -> dict[str, Any]:
+def build_public_event(
+    key: tuple[str, str, str] | None,
+    documents: list[dict[str, Any]],
+    *,
+    entity_registry_receipt: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     if not documents:
         raise ValueError("cannot build PublicEvent without documents")
     for document in documents:
@@ -200,7 +265,7 @@ def build_public_event(key: tuple[str, str, str] | None, documents: list[dict[st
         "event_type": ordered[0]["event_type"],
         "named_event_id": named_event_id,
         "canonical_title": canonical_title,
-        "event_date": key[2] if key else _iso_date(ordered[0].get("event_start_at")),
+        "event_date": _iso_date(ordered[0].get("event_start_at")),
         "start_at": _consistent_raw_value(ordered, "event_start_at") if not time_conflicts else None,
         "end_at": _consistent_raw_value(ordered, "event_end_at") if not time_conflicts else None,
         "district_id": district,
@@ -210,7 +275,11 @@ def build_public_event(key: tuple[str, str, str] | None, documents: list[dict[st
         "independent_source_ids": independent_sources,
         "independent_source_count": len(independent_sources),
         "linked_document_versions": _linked_documents(ordered),
-        "link_reasons": ["stable_named_event_id", "event_date"] if key else ["insufficient_identity_for_auto_merge"],
+        "link_reasons": (
+            ["stable_occurrence_id"] if key and key[2].startswith("occurrence:")
+            else ["stable_named_event_id", "event_date"] if key
+            else ["insufficient_identity_for_auto_merge"]
+        ),
         "fusion_status": fusion_status,
         "conflict_fields": sorted(conflict_fields),
         "uncertain_fields": sorted(uncertain_fields),
@@ -220,22 +289,33 @@ def build_public_event(key: tuple[str, str, str] | None, documents: list[dict[st
         "background": [],
         "source_state": "CURRENT",
         "lkg": False,
+        **({"entity_registry": copy.deepcopy(entity_registry_receipt)} if entity_registry_receipt is not None else {}),
     }
 
 
-def fuse_documents(documents: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def fuse_documents(
+    documents: list[dict[str, Any]],
+    *,
+    entity_registry: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
     if not isinstance(documents, list):
         raise ValueError("documents must be an array")
+    registry_receipt = None
+    if entity_registry is not None:
+        registry_receipt = _load_entity_registry_module().registry_receipt(entity_registry)
+        documents = [bind_document_entities(document, entity_registry) for document in documents]
+    elif any(isinstance(document, dict) and "entity_registry" in document for document in documents):
+        raise ValueError("entity_registry requires explicit registry binding")
     keyed: dict[tuple[str, str, str], list[dict[str, Any]]] = defaultdict(list)
     candidates: list[dict[str, Any]] = []
     for document in documents:
         validate_document(document)
         key = cluster_key(document)
         if key is None:
-            candidates.append(build_public_event(None, [document]))
+            candidates.append(build_public_event(None, [document], entity_registry_receipt=registry_receipt))
         else:
             keyed[key].append(document)
-    events = [build_public_event(key, docs) for key, docs in keyed.items()]
+    events = [build_public_event(key, docs, entity_registry_receipt=registry_receipt) for key, docs in keyed.items()]
     events.extend(candidates)
     return sorted(events, key=lambda event: event["public_event_id"])
 
@@ -245,6 +325,7 @@ def reconcile_public_events(
     documents: list[dict[str, Any]],
     *,
     snapshot_complete: bool,
+    entity_registry: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """Keep prior events when a partial source cannot prove removal.
 
@@ -253,7 +334,7 @@ def reconcile_public_events(
     """
     if not isinstance(previous_events, list):
         raise ValueError("previous_events must be an array")
-    current = fuse_documents(documents)
+    current = fuse_documents(documents, entity_registry=entity_registry)
     if snapshot_complete:
         return current
 
@@ -409,13 +490,15 @@ def _demo_document(source: str, agency: str, title: str, *, version: str = "v1",
 
 
 def self_check() -> None:
+    registry = load_entity_registry()
     documents = [
         _demo_document("S-CITY", "agency:tc-news", "大型活動公告"),
         _demo_document("S-POLICE", "agency:tc-police", "大型活動交通疏導"),
         _demo_document("S-TRAFFIC", "agency:tc-traffic", "大型活動交通資訊"),
     ]
-    events = fuse_documents(documents)
+    events = fuse_documents(documents, entity_registry=registry)
     assert len(events) == 1 and events[0]["fusion_status"] == "CONFIRMED"
+    assert events[0]["entity_registry"]["registry_hash"] == _load_entity_registry_module().registry_hash(registry)
     event = attach_background(
         events[0],
         {
@@ -427,10 +510,17 @@ def self_check() -> None:
             "source_url": "https://data.gov.tw/dataset/example",
         },
     )
-    revised = fuse_documents([*documents[:2], _demo_document("S-TRAFFIC", "agency:tc-traffic", "大型活動交通資訊", version="v2", start="16:00")])[0]
+    revised = fuse_documents(
+        [*documents[:2], _demo_document("S-TRAFFIC", "agency:tc-traffic", "大型活動交通資訊", version="v2", start="16:00")],
+        entity_registry=registry,
+    )[0]
     assert revised["public_event_id"] == event["public_event_id"]
     assert revised["fusion_status"] == "CONFLICT"
-    candidate = confirm_candidate(fuse_documents([documents[0]])[0], operator="demo", decided_at="2026-09-21T10:00:00+08:00")
+    candidate = confirm_candidate(
+        fuse_documents([documents[0]], entity_registry=registry)[0],
+        operator="demo",
+        decided_at="2026-09-21T10:00:00+08:00",
+    )
     assert candidate["fusion_status"] == "CONFIRMED"
     assert event["background"][0]["role"] == "BACKGROUND_ONLY"
     print(f"PUBLIC_EVENT_FUSION_SELF_CHECK_OK event={event['public_event_id']} sources=3 revision=conflict")
@@ -440,6 +530,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", type=Path)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--entity-registry", type=Path)
     parser.add_argument("--self-check", action="store_true")
     return parser.parse_args()
 
@@ -455,7 +546,8 @@ def main() -> int:
     documents = payload.get("documents") if isinstance(payload, dict) else None
     if not isinstance(documents, list):
         raise SystemExit("input must be an object with a documents array")
-    output = {"schema_version": 1, "public_events": fuse_documents(documents)}
+    registry = load_entity_registry(args.entity_registry) if args.entity_registry else None
+    output = {"schema_version": 1, "public_events": fuse_documents(documents, entity_registry=registry)}
     text = json.dumps(output, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)

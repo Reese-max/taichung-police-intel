@@ -58,6 +58,35 @@ class PublicEventFusionTests(unittest.TestCase):
         self.assertEqual(len(events), 2)
         self.assertEqual(len({event["public_event_id"] for event in events}), 2)
 
+    def test_explicit_occurrence_id_survives_official_date_change(self):
+        before = document("CITY", day="2026-09-20", version="v1")
+        after = document("CITY", day="2026-09-21", version="v2")
+        before["occurrence_id"] = after["occurrence_id"] = "occ:demo-1"
+        event = fusion.fuse_documents([before, after])[0]
+        self.assertEqual(event["link_reasons"], ["stable_occurrence_id"])
+        self.assertEqual(event["event_date"], "2026-09-20")
+        split = dict(after, occurrence_id="occ:demo-2")
+        self.assertEqual(len(fusion.fuse_documents([before, split])), 2)
+
+    def test_entity_registry_binds_labels_and_receipt_before_fusion(self):
+        registry = fusion.load_entity_registry()
+        source = document("POLICE")
+        source.update({
+            "jurisdiction": "臺中市",
+            "agency_ids": [],
+            "location_ids": [],
+            "agency_labels": ["中市警"],
+            "location_labels": ["西屯"],
+        })
+        events = fusion.fuse_documents([source], entity_registry=registry)
+        self.assertEqual(events[0]["agency_ids"], ["agency:tc-police"])
+        self.assertEqual(events[0]["location_ids"], ["location:tc-xitun"])
+        self.assertEqual(events[0]["entity_registry"]["registry_version"], registry["registry_version"])
+        with self.assertRaisesRegex(ValueError, "unresolved agency label"):
+            fusion.fuse_documents([dict(source, agency_labels=["不存在機關"])], entity_registry=registry)
+        with self.assertRaisesRegex(ValueError, "explicit registry binding"):
+            fusion.fuse_documents([dict(source, entity_registry={"registry_version": 99, "registry_hash": "fake"})])
+
     def test_same_identity_with_district_conflict_stays_conflict(self):
         event = fusion.fuse_documents([document("POLICE"), document("TRAFFIC", district="location:tc-fengyuan")])[0]
         self.assertEqual(event["fusion_status"], "CONFLICT")
