@@ -95,28 +95,27 @@ def sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def roc_slash_to_iso(value: str) -> str:
-    match = re.search(r"(\d{2,3})/(\d{1,2})/(\d{1,2})", value or "")
+def _roc_to_iso(pattern: str, value: str) -> str:
+    match = re.search(pattern, value or "")
     if not match:
         return ""
     year, month, day = map(int, match.groups())
-    return f"{year + 1911:04d}-{month:02d}-{day:02d}"
+    try:
+        return date(year + 1911, month, day).isoformat()
+    except ValueError:
+        return ""
+
+
+def roc_slash_to_iso(value: str) -> str:
+    return _roc_to_iso(r"(?<!\d)(\d{2,3})/(\d{1,2})/(\d{1,2})(?!\d)", value)
 
 
 def roc_dash_to_iso(value: str) -> str:
-    match = re.search(r"(\d{2,3})-(\d{1,2})-(\d{1,2})", value or "")
-    if not match:
-        return ""
-    year, month, day = map(int, match.groups())
-    return f"{year + 1911:04d}-{month:02d}-{day:02d}"
+    return _roc_to_iso(r"(?<!\d)(\d{2,3})-(\d{1,2})-(\d{1,2})(?!\d)", value)
 
 
 def roc_text_to_iso(value: str) -> str:
-    match = re.search(r"(?:中華民國)?(\d{2,3})年(\d{1,2})月(\d{1,2})日", value or "")
-    if not match:
-        return ""
-    year, month, day = map(int, match.groups())
-    return f"{year + 1911:04d}-{month:02d}-{day:02d}"
+    return _roc_to_iso(r"(?<!\d)(?:中華民國)?(\d{2,3})年(\d{1,2})月(\d{1,2})日(?!\d)", value)
 
 
 def in_window(value: str, start: date, end: date) -> bool:
@@ -740,6 +739,8 @@ def self_check() -> None:
     assert roc_slash_to_iso("115/08/10") == "2026-08-10"
     assert roc_dash_to_iso("115-08-10") == "2026-08-10"
     assert roc_text_to_iso("中華民國115年8月13日") == "2026-08-13"
+    assert roc_dash_to_iso("2026-08-10") == ""
+    assert roc_dash_to_iso("115-02-29") == ""
     assert in_window("2026-08-08", date(2026, 8, 8), date(2026, 8, 14))
     assert not in_window("2026-08-07", date(2026, 8, 8), date(2026, 8, 14))
     sample = BeautifulSoup('<tr><td><a href="v2_index.asp?ano=580"><b>第8次會議</b></a></td><td>2026-08-10</td></tr>', "html.parser")
