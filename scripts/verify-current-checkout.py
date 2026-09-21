@@ -488,6 +488,15 @@ def run_http_checks(ctx: dict[str, Any], base: str) -> list[dict[str, Any]]:
                                and doc.get("lanes", {}).get("query") in ("HEALTHY", "DEGRADED", "BLOCKED", "UNKNOWN")
                                and doc.get("lanes", {}).get("publication") != "BLOCKED",
                                f"GET /api/health -> {status} lanes={doc.get('lanes') if isinstance(doc, dict) else 'n/a'}"))
+    stages = {(row.get("lane"), row.get("stage")): row for row in doc.get("stages", [])} if isinstance(doc, dict) else {}
+    checks.append(check_record(
+        "negative_loopback_not_public_deployment",
+        status == 200
+        and stages.get(("publication", "deployment"), {}).get("outcome") == "UNKNOWN"
+        and stages.get(("publication", "public_http_verification"), {}).get("outcome") == "UNKNOWN",
+        "loopback health keeps formal deployment/public HTTP UNKNOWN",
+        negative_case="loopback_not_production_receipt",
+    ))
 
     status, doc = http_json(base + "/api/version")
     before = doc.get("generation_id") if isinstance(doc, dict) else None
