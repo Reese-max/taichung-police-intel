@@ -15,10 +15,11 @@ the actual `code_sha`, dependency-lock hash, canonical artifact hashes, query
 generation, policy hash, capabilities, logs, screenshots, and request trace into
 `runtime-evidence/current-checkout/<timestamp>/receipt.json`.
 
-The latest local replay passed `22/22` checks, including:
+The latest local replay passed `23/23` checks, including:
 
 - static page and canonical bytes over HTTP;
 - query generation/policy/hash identity and bounded query results;
+- the local read-only MCP tool list and hash-bound `get_publication_receipt` projection;
 - foreign generation rejection, source-unavailable distinction, and capability unavailability;
 - mixed-generation cutover rejection while the previous index remains readable;
 - query service down (`503`) while static publication remains readable;

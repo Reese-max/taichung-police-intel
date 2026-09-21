@@ -85,6 +85,7 @@ class CandidateContextTests(unittest.TestCase):
 
     def test_unavailable_capabilities_are_explicit(self):
         unavailable = {row["capability_id"]: row for row in self.ctx["unavailable_capabilities"]}
+        self.assertIn("read_only_mcp", self.ctx["enabled_capabilities"])
         for capability in ("event_fusion", "entity_registry", "answer_evidence_gate",
                            "gold_evaluation", "chat_mcp", "live_collection"):
             self.assertEqual(unavailable[capability]["status"], "CAPABILITY_NOT_AVAILABLE", capability)

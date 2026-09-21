@@ -148,7 +148,9 @@ def build_candidate_context(root: Path, modules: dict[str, Any]) -> dict[str, An
         "artifacts": {"feed": feed, "status": status, "brief": brief},
         "hashes": {"feed": feed_hash, "status": status_hash, "brief": brief_hash},
         "store": store, "policy": policy,
-        "enabled_capabilities": supported + ["canonical_query_index", "static_site_http", "loopback_query_api"],
+        "enabled_capabilities": supported + [
+            "canonical_query_index", "static_site_http", "loopback_query_api", "read_only_mcp",
+        ],
         "unavailable_capabilities": unsupported,
         "candidate_id": candidate_id,
         "identity": identity,
@@ -398,6 +400,25 @@ def http_json(url: str) -> tuple[int, Any]:
         return status, None
 
 
+def http_post_json(url: str, payload: dict[str, Any]) -> tuple[int, Any]:
+    request = urllib.request.Request(
+        url,
+        data=canonical_json(payload),
+        method="POST",
+        headers={"Accept": "application/json", "Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=15) as response:
+            return response.status, json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as error:
+        try:
+            return error.code, json.loads(error.read().decode("utf-8"))
+        except ValueError:
+            return error.code, None
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return 200, None
+
+
 def check_record(check_id: str, ok: bool, detail: str, **extra) -> dict[str, Any]:
     return {"id": check_id, "status": "PASS" if ok else "FAIL", "detail": detail, **extra}
 
@@ -447,6 +468,50 @@ def run_http_checks(ctx: dict[str, Any], base: str) -> list[dict[str, Any]]:
           and doc.get("result_count", 99) <= 3 and all(r["source_id"] == "S-004" for r in doc.get("results", [])))
     checks.append(check_record("http_query_same_generation_bounded", ok,
                                f"GET /api/query?q=S-004&limit=3 -> {status}, {doc.get('result_count') if isinstance(doc, dict) else 'n/a'} results"))
+
+    mcp_status, mcp = http_post_json(base + "/mcp", {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/list",
+    })
+    expected_tools = {
+        "search_evidence", "get_current_brief", "get_publication_receipt",
+        "get_source_health", "validate_answer",
+    }
+    raw_mcp_tools = mcp.get("result", {}).get("tools", []) if isinstance(mcp, dict) else []
+    mcp_tools = raw_mcp_tools if isinstance(raw_mcp_tools, list) else []
+    mcp_names = {tool.get("name") for tool in mcp_tools if isinstance(tool, dict)}
+    mcp_ok = (
+        mcp_status == 200
+        and mcp_names == expected_tools
+        and len(mcp_tools) == len(expected_tools)
+        and all(
+            isinstance(tool, dict)
+            and isinstance(tool.get("annotations"), dict)
+            and tool["annotations"].get("readOnlyHint") is True
+            and tool["annotations"].get("destructiveHint") is False
+            for tool in mcp_tools
+        )
+    )
+    receipt_status, receipt_doc = http_post_json(base + "/query", {
+        "tool": "get_publication_receipt",
+        "arguments": {},
+    })
+    publication_receipt = receipt_doc.get("publication_receipt") if isinstance(receipt_doc, dict) else None
+    receipt_ok = (
+        receipt_status == 200
+        and isinstance(publication_receipt, dict)
+        and publication_receipt.get("publication_hash") == ctx["hashes"]["brief"]
+        and publication_receipt.get("artifact_hashes") == ctx["hashes"]
+        and publication_receipt.get("generation_id") == ctx["store"]["generation_id"]
+    )
+    checks.append(check_record(
+        "http_read_only_mcp_publication_receipt",
+        mcp_ok and receipt_ok,
+        f"POST /mcp tools={len(mcp_tools) if isinstance(mcp_tools, list) else 0}, "
+        f"POST /query receipt={receipt_status}, hashes={'match' if receipt_ok else 'MISMATCH'}",
+        capability="read_only_mcp",
+    ))
 
     status, doc = http_json(base + "/api/query?expected_generation=" + "0" * 64)
     checks.append(check_record("negative_foreign_generation_refused",
@@ -665,10 +730,18 @@ def build_health_receipt(ctx: dict[str, Any], http_checks: list[dict[str, Any]] 
     stages = health.current_publication_stages(status_doc, brief)
     stages = [s for s in stages if s["lane"] != "query"]
     now = utcnow().isoformat()
+    mcp_check = next((check for check in (http_checks or []) if check.get("id") == "http_read_only_mcp_publication_receipt"), None)
+    mcp_outcome = (
+        "SUCCESS" if mcp_check and mcp_check.get("status") == "PASS"
+        else "FAILED" if mcp_check else "SKIPPED"
+    )
     stages += [
         {"lane": "query", "stage": "query_index",
          "outcome": "SUCCESS" if http_checks is not None else "SKIPPED",
          "generation_id": ctx["store"]["generation_id"], "ended_at": now},
+        {"lane": "query", "stage": "read_only_mcp",
+         "outcome": mcp_outcome,
+         "error_class": None if mcp_outcome == "SUCCESS" else "MCP_RUNTIME_NOT_VERIFIED"},
         {"lane": "query", "stage": "mcp_web_query",
          "outcome": "SKIPPED", "error_class": "CAPABILITY_NOT_AVAILABLE"},
     ]
