@@ -61,6 +61,26 @@ async function main() {
     const generationText = generation ? await generation.innerText() : "";
     record("generation_surface_present", /[0-9a-f]{12,}/i.test(generationText), generationText || "missing");
 
+    const profileSelector = page.locator("[data-testid=role-profile-selector]");
+    const profileCount = await profileSelector.locator("option").count().catch(() => 0);
+    const initialProfile = await profileSelector.inputValue().catch(() => "");
+    record(
+      "role_profile_selector_present",
+      profileCount >= 3 && initialProfile === "general",
+      `profiles=${profileCount} selected=${initialProfile || "missing"}`,
+    );
+    if (profileCount >= 3) {
+      await profileSelector.selectOption("council-liaison");
+      const selectedProfile = await profileSelector.inputValue();
+      const profileUrl = new URL(page.url());
+      record(
+        "role_profile_switch_updates_url",
+        selectedProfile === "council-liaison"
+          && profileUrl.searchParams.get("profile") === "council-liaison",
+        `selected=${selectedProfile} url_profile=${profileUrl.searchParams.get("profile") || "missing"}`,
+      );
+    }
+
     const queryInput = page.locator(".v2-query-form input");
     await queryInput.fill("警察");
     await page.locator(".v2-query-form button").click();
