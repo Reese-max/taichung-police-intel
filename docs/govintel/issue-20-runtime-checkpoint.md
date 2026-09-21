@@ -20,7 +20,14 @@ Python 3.13.5, Git 2.47.3. Command:
 python -m unittest discover -s tests -p 'test_publication_*.py' -v
 ```
 
-28 tests passed: 17 checkpoint/Git/HTTP/CLI tests and 11 outcome/wiring tests. Real temporary bare Git repositories exercise stale-writer rejection, missing blobs, idempotence, symlinks, pending replay and main-ref invariance. Loopback HTTP tests exercise matching bytes and HTTP 200 with old bytes. Loopback is test-only and has no CLI switch.
+35 tests passed: 17 checkpoint/Git/HTTP/CLI tests, 14 outcome/health tests, and 4 publication-bundle tests. Real temporary bare Git repositories exercise stale-writer rejection, missing blobs, idempotence, symlinks, pending replay and main-ref invariance. Loopback HTTP tests exercise matching bytes and HTTP 200 with old bytes. Loopback is test-only and has no CLI switch.
+
+The workflow's final `publication_outcome` job now also writes and retains
+`runtime-evidence/publication-health.json`. It binds the durable generation and
+state commit, separates collection/canonical-validation/deployment/public-HTTP
+outcomes, and leaves unavailable query/MCP stages explicit. This is wiring and
+machine-readable failure evidence; it is not a production or natural-schedule
+receipt until the workflow is merged and actually runs.
 
 Local checkout is a focused source copy obtained through the connected GitHub reader; container DNS cannot resolve GitHub. This is not a claim of a local full-repository build. Full-repository CI must separately pass on the exact pushed head. Existing regression checks remain enabled.
 

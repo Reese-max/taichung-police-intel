@@ -41,6 +41,7 @@ jobs:
       v1: ${{ steps.v1.outcome }}
       v2: ${{ steps.v2.outcome }}
       v2_verify: ${{ steps.v2_verify.outcome }}
+      schema_drift: ${{ steps.schema_drift.outcome }}
       verify: ${{ steps.verify.outcome }}
       preserve: ${{ steps.preserve.outcome }}
       state_commit: ${{ steps.preserve.outputs.state_commit }}
@@ -230,7 +231,6 @@ jobs:
           ref: ${{ github.sha }}
           persist-credentials: false
       - name: Report actual build and deployment outcomes
-        run: python scripts/publication-outcome.py
         env:
           BUILD_RESULT: ${{ needs.build.result }}
           DEPLOY_RESULT: ${{ needs.deploy.result }}
@@ -239,9 +239,22 @@ jobs:
           V1: ${{ needs.build.outputs.v1 }}
           V2: ${{ needs.build.outputs.v2 }}
           V2_VERIFY: ${{ needs.build.outputs.v2_verify }}
+          SCHEMA_DRIFT: ${{ needs.build.outputs.schema_drift }}
           VERIFY: ${{ needs.build.outputs.verify }}
           PRESERVE: ${{ needs.build.outputs.preserve }}
           PAGES_UPLOAD: ${{ needs.build.outputs.pages_upload }}
           EVIDENCE: ${{ needs.build.outputs.evidence }}
           EVIDENCE_URL: ${{ needs.build.outputs.evidence_url }}
           PUBLIC_VERIFY: ${{ needs.deploy.outputs.public_verify }}
+          GENERATION_ID: ${{ needs.build.outputs.generation_id }}
+          STATE_COMMIT: ${{ needs.build.outputs.state_commit }}
+        run: python scripts/publication-outcome.py --health-output runtime-evidence/publication-health.json
+
+      - name: Retain end-to-end runtime health receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: publication-health-${{ github.run_id }}-${{ github.run_attempt }}
+          path: runtime-evidence/publication-health.json
+          if-no-files-found: error
+          retention-days: 14

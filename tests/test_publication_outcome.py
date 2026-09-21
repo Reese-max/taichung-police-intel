@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import os
 import subprocess
 import sys
@@ -13,6 +14,84 @@ spec.loader.exec_module(module)
 
 
 class OutcomeTests(unittest.TestCase):
+    def test_runtime_health_receipt_distinguishes_deploy_and_public_probe(self):
+        env = {
+            "BUILD_RESULT": "failure",
+            "DEPLOY_RESULT": "skipped",
+            "COLLECT": "failure",
+            "SCHEMA_DRIFT": "success",
+            "V1": "failure",
+            "V2": "skipped",
+            "V2_VERIFY": "skipped",
+            "VERIFY": "failure",
+            "PRESERVE": "failure",
+            "PAGES_UPLOAD": "skipped",
+            "PUBLIC_VERIFY": "skipped",
+            "GENERATION_ID": "generation-1",
+            "STATE_COMMIT": "a" * 40,
+        }
+        receipt = module.runtime_health(env, observed_at="2026-09-21T05:00:00+00:00")
+        stages = {(row["lane"], row["stage"]): row for row in receipt["stages"]}
+        self.assertEqual(stages[("publication", "collection")]["outcome"], "FAILED")
+        self.assertEqual(stages[("publication", "canonical_validation")]["outcome"], "FAILED")
+        self.assertEqual(stages[("publication", "deployment")]["outcome"], "SKIPPED")
+        self.assertEqual(stages[("publication", "public_http_verification")]["outcome"], "SKIPPED")
+        self.assertEqual(stages[("publication", "deployment")]["generation_id"], "generation-1")
+        self.assertEqual(receipt["overall"], "BLOCKED")
+        self.assertFalse(receipt["public_data_verified"])
+
+    def test_runtime_health_receipt_records_verified_public_data(self):
+        env = {
+            "BUILD_RESULT": "success",
+            "DEPLOY_RESULT": "success",
+            "COLLECT": "success",
+            "SCHEMA_DRIFT": "success",
+            "V1": "success",
+            "V2": "success",
+            "V2_VERIFY": "success",
+            "VERIFY": "success",
+            "PRESERVE": "success",
+            "PAGES_UPLOAD": "success",
+            "PUBLIC_VERIFY": "success",
+            "GENERATION_ID": "generation-2",
+            "STATE_COMMIT": "b" * 40,
+        }
+        receipt = module.runtime_health(env, observed_at="2026-09-21T05:00:00+00:00")
+        stages = {(row["lane"], row["stage"]): row for row in receipt["stages"]}
+        self.assertEqual(stages[("publication", "deployment")]["outcome"], "SUCCESS")
+        self.assertEqual(stages[("publication", "public_http_verification")]["outcome"], "SUCCESS")
+        self.assertEqual(receipt["lanes"]["publication"], "HEALTHY")
+        self.assertTrue(receipt["public_data_verified"])
+
+    def test_cli_writes_machine_readable_runtime_health_receipt(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "health.json"
+            env = {
+                **os.environ,
+                "BUILD_RESULT": "success",
+                "DEPLOY_RESULT": "success",
+                "COLLECT": "success",
+                "SCHEMA_DRIFT": "success",
+                "V1": "success",
+                "V2": "success",
+                "V2_VERIFY": "success",
+                "VERIFY": "success",
+                "PRESERVE": "success",
+                "PAGES_UPLOAD": "success",
+                "PUBLIC_VERIFY": "success",
+                "GENERATION_ID": "generation-cli",
+                "STATE_COMMIT": "c" * 40,
+            }
+            result = subprocess.run(
+                [sys.executable, str(ROOT / "scripts/publication-outcome.py"), "--health-output", str(output)],
+                env=env, capture_output=True, text=True, timeout=10, check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            receipt = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(receipt["schema_version"], 1)
+            self.assertEqual(receipt["kind"], "GOVINTEL_RUNTIME_HEALTH_RECEIPT")
+            self.assertEqual(receipt["generation_id"], "generation-cli")
+
     def test_success_is_not_a_live_verification_receipt(self):
         text, code = module.report({"BUILD_RESULT": "success", "DEPLOY_RESULT": "success"})
         self.assertEqual(code, 0)
@@ -119,6 +198,9 @@ class OutcomeTests(unittest.TestCase):
         self.assertIn("needs: [build, deploy]", text)
         self.assertIn("if: always()", text[text.index("publication_outcome:"):])
         self.assertIn("python scripts/publication-outcome.py", text)
+        self.assertIn("--health-output runtime-evidence/publication-health.json", text)
+        self.assertIn("publication-health-${{ github.run_id }}-${{ github.run_attempt }}", text)
+        self.assertIn("path: runtime-evidence/publication-health.json", text)
         self.assertIn("if-no-files-found: error", text)
         self.assertIn("npm run check", text)
         self.assertNotIn("continue-on-error", text)
@@ -134,6 +216,9 @@ class OutcomeTests(unittest.TestCase):
         self.assertIn("EXPECTED_GENERATION: ${{ needs.build.outputs.generation_id }}", text)
         self.assertIn("PUBLICATION_BASE_URL: ${{ steps.deployment.outputs.page_url }}", text)
         self.assertIn("PUBLIC_VERIFY: ${{ needs.deploy.outputs.public_verify }}", text)
+        self.assertIn("GENERATION_ID: ${{ needs.build.outputs.generation_id }}", text)
+        self.assertIn("STATE_COMMIT: ${{ needs.build.outputs.state_commit }}", text)
+        self.assertIn("SCHEMA_DRIFT: ${{ needs.build.outputs.schema_drift }}", text)
 
     def test_explicit_failed_public_probe_cannot_report_success(self):
         for status in ("failure", "skipped", "", "unknown"):
