@@ -655,14 +655,6 @@ def _live_session():
     return session
 
 
-def _live_get(session, url: str, *, params: dict[str, Any] | None = None, timeout: int = 60):
-    response = session.get(url, params=params, timeout=timeout)
-    response.raise_for_status()
-    if not response.content:
-        raise RuntimeError("HTTP succeeded with an empty body")
-    return response
-
-
 def _load_s028_module():
     path = ROOT / "canary-s028-165.py"
     spec = importlib.util.spec_from_file_location("schema_drift_s028_165", path)
@@ -676,20 +668,22 @@ def _load_s028_module():
 def _fetch_live_source(session, source_id: str):
     if str(ROOT) not in sys.path:
         sys.path.insert(0, str(ROOT))
-    from online_collect import API_S007, API_S009, NEWS_LIST_SOURCES
+    from online_collect import API_S007, API_S009, NEWS_LIST_SOURCES, get as bounded_get
 
     if source_id in NEWS_LIST_SOURCES:
-        return _live_get(session, NEWS_LIST_SOURCES[source_id]["list_url"]), None
+        return bounded_get(session, NEWS_LIST_SOURCES[source_id]["list_url"], source_id=source_id), None
     if source_id == "S-007":
-        return _live_get(
+        return bounded_get(
             session,
             API_S007,
+            source_id=source_id,
             params={"keywordList": "警察局", "pageNumber": 1, "pageSize": 200},
         ), None
     if source_id == "S-009":
-        return _live_get(
+        return bounded_get(
             session,
             API_S009,
+            source_id=source_id,
             params={"keywordList": "警察局", "pageNumber": 1, "pageSize": 200},
         ), None
 

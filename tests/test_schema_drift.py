@@ -4,6 +4,9 @@ import copy
 import json
 import unittest
 from types import SimpleNamespace
+from unittest import mock
+
+import online_collect
 
 from scripts import schema_drift as drift
 
@@ -197,6 +200,18 @@ class SchemaDriftTests(unittest.TestCase):
         failed = next(item for item in observations if item["source_id"] == "S-009")
         self.assertEqual(failed["http_status"], 503)
         self.assertEqual(failed["error_reason"], "LIVE_FETCH_RUNTIMEERROR")
+
+    def test_live_catalog_sources_use_bound_collector_transport(self):
+        response = SimpleNamespace(content=b"sample", status_code=200, headers={}, url="https://official.test/source")
+        with mock.patch("online_collect.get", return_value=response) as bounded_get:
+            result, resource_id = drift._fetch_live_source(object(), "S-001")
+        self.assertIs(result, response)
+        self.assertIsNone(resource_id)
+        bounded_get.assert_called_once_with(
+            mock.ANY,
+            online_collect.NEWS_LIST_SOURCES["S-001"]["list_url"],
+            source_id="S-001",
+        )
 
     def test_receipt_rejects_duplicate_and_unknown_observation_ids(self):
         sample = {"source_id": "S-001", "body": b"<li><a href=\"news_view.jsp?dataserno=1\">news 115-09-10</a></li>"}
