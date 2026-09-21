@@ -2,7 +2,7 @@
 
 基準：`e1d081bd04824c062c7ee99e7d74f9e478240743`。已知排程在資料 push 至受保護 main 被拒；不能為了展示關閉 PR／verify／分支保護。
 
-## 2026-09-21 external-state recheck
+## 2026-09-22 external-state recheck
 
 - GitHub Pages is public and workflow-backed, but the latest scheduled run
   `35547622167` still ran `main@e1d081bd04824c062c7ee99e7d74f9e478240743`
