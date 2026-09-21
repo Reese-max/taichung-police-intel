@@ -309,6 +309,7 @@ if (["quick", "full"].includes(mode) && !failures.length) {
       ["current-checkout-tests", ["-X", "utf8", "scripts/verify-current-checkout.py", "--mode", "core"]],
       ["retention-policy-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_retention_policy.py", "-v"]],
       ["news-list-collector-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_news_list_collector.py", "-v"]],
+      ["live-canary-transport-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_live_canary_transport.py", "-v"]],
       ["candidate-canary-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_candidate_runtime_canary.py", "-v"]],
       ["candidate-observation-window-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_candidate_observation_window.py", "-v"]],
       ["publication-bundle-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_publication_bundle.py", "-v"]],

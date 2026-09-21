@@ -25,6 +25,10 @@ S026_CURRENT_URL = "https://law.taichung.gov.tw/DraftForum.aspx"
 S026_HISTORY_URL = f"{S026_CURRENT_URL}?Type=H"
 S026_POLICE_PROBE_URL = "https://law.taichung.gov.tw/DraftOpinion.aspx?id=111637&Type=H"
 S029_INDEX_URL = "https://www.rdec.taichung.gov.tw/12047/12142/12145"
+S026_HOSTS = {"lawsearch.taichung.gov.tw", "law.taichung.gov.tw"}
+S029_HOSTS = {"www.rdec.taichung.gov.tw"}
+REDIRECT_STATUSES = {301, 302, 303, 307, 308}
+MAX_REDIRECTS = 3
 
 
 def sha256(data: bytes) -> str:
@@ -55,15 +59,50 @@ def in_window(value: str, start: date, end: date) -> bool:
     return start <= parsed <= end
 
 
-def get(session: requests.Session, url: str, timeout: int = 60) -> requests.Response:
+def _approved_url(url: str, allowed_hosts: set[str]) -> None:
+    try:
+        parsed = urlparse(url)
+        port = parsed.port
+    except ValueError as error:
+        raise RuntimeError(f"網址格式無效：{url}") from error
+    if (
+        parsed.scheme.lower() != "https"
+        or parsed.hostname is None
+        or parsed.hostname.lower().rstrip(".") not in allowed_hosts
+        or parsed.username
+        or parsed.password
+        or port not in (None, 443)
+    ):
+        raise RuntimeError(f"非白名單來源：{url}")
+
+
+def get(
+    session: requests.Session,
+    url: str,
+    allowed_hosts: set[str],
+    timeout: int = 60,
+) -> requests.Response:
     last_error: requests.RequestException | None = None
     for attempt in range(3):
+        current_url = url
         try:
-            response = session.get(url, timeout=timeout, allow_redirects=True)
-            response.raise_for_status()
-            if not response.content:
-                raise requests.RequestException("HTTP 成功但內容為空")
-            return response
+            for _ in range(MAX_REDIRECTS + 1):
+                _approved_url(current_url, allowed_hosts)
+                response = session.get(current_url, timeout=timeout, allow_redirects=False)
+                _approved_url(str(response.url or current_url), allowed_hosts)
+                if response.status_code in REDIRECT_STATUSES:
+                    location = response.headers.get("location")
+                    response.close()
+                    if not location:
+                        raise RuntimeError("redirect response 沒有 location")
+                    current_url = urljoin(current_url, location)
+                    continue
+                response.raise_for_status()
+                if not response.content:
+                    raise requests.RequestException("HTTP 成功但內容為空")
+                response._govintel_requested_url = url
+                return response
+            raise RuntimeError("redirect budget exhausted")
         except requests.RequestException as exc:
             last_error = exc
             status = exc.response.status_code if exc.response is not None else None
@@ -75,11 +114,7 @@ def get(session: requests.Session, url: str, timeout: int = 60) -> requests.Resp
 
 def response_evidence(response: requests.Response) -> dict:
     return {
-        "requested_url": (
-            response.history[0].request.url
-            if response.history
-            else response.request.url
-        ),
+        "requested_url": getattr(response, "_govintel_requested_url", response.request.url),
         "final_url": response.url,
         "http_status": response.status_code,
         "content_type": response.headers.get("Content-Type", ""),
@@ -88,7 +123,7 @@ def response_evidence(response: requests.Response) -> dict:
     }
 
 
-def download_pdfs(session: requests.Session, anchors, base_url: str) -> list[dict]:
+def download_pdfs(session: requests.Session, anchors, base_url: str, allowed_hosts: set[str]) -> list[dict]:
     attachments: list[dict] = []
     seen: set[str] = set()
     for anchor in anchors:
@@ -96,7 +131,7 @@ def download_pdfs(session: requests.Session, anchors, base_url: str) -> list[dic
         if not url or url in seen:
             continue
         seen.add(url)
-        response = get(session, url, 120)
+        response = get(session, url, allowed_hosts, 120)
         if not response.content.startswith(b"%PDF-"):
             raise RuntimeError(f"附件不是 PDF：{url}")
         attachments.append({
@@ -131,11 +166,11 @@ def parse_law_items(soup: BeautifulSoup, base_url: str) -> list[dict]:
 
 
 def fetch_s026(session: requests.Session, start: date, end: date) -> dict:
-    legacy = get(session, S026_LEGACY_URL)
+    legacy = get(session, S026_LEGACY_URL, S026_HOSTS)
     if urlparse(legacy.url).netloc != "law.taichung.gov.tw":
         raise RuntimeError(f"舊入口未導向目前官方網域：{legacy.url}")
 
-    current = get(session, S026_CURRENT_URL)
+    current = get(session, S026_CURRENT_URL, S026_HOSTS)
     current_soup = BeautifulSoup(current.content, "html.parser")
     current_text = " ".join(current_soup.stripped_strings)
     active_items = parse_law_items(current_soup, current.url)
@@ -143,7 +178,7 @@ def fetch_s026(session: requests.Session, start: date, end: date) -> dict:
     if not active_items and not explicit_zero:
         raise RuntimeError("最新草案頁沒有項目，也沒有正式零筆說明")
 
-    history = get(session, S026_HISTORY_URL)
+    history = get(session, S026_HISTORY_URL, S026_HOSTS)
     history_soup = BeautifulSoup(history.content, "html.parser")
     history_text = " ".join(history_soup.stripped_strings)
     history_items = parse_law_items(history_soup, history.url)
@@ -162,7 +197,7 @@ def fetch_s026(session: requests.Session, start: date, end: date) -> dict:
     if page_count > 1 and date.fromisoformat(history_dates[-1]) > start:
         raise RuntimeError("歷史首頁尚未覆蓋完整 7 日窗口")
 
-    probe = get(session, S026_POLICE_PROBE_URL)
+    probe = get(session, S026_POLICE_PROBE_URL, S026_HOSTS)
     probe_soup = BeautifulSoup(probe.content, "html.parser")
     probe_text = " ".join(probe_soup.stripped_strings)
     if "臺中市交通義勇警察協勤派遣與管理辦法" not in probe_text:
@@ -171,7 +206,7 @@ def fetch_s026(session: requests.Session, start: date, end: date) -> dict:
         anchor for anchor in probe_soup.select('a[href*="Download.ashx"]')
         if "id=111637" in anchor.get("href", "")
     ]
-    probe_attachments = download_pdfs(session, probe_anchors, probe.url)
+    probe_attachments = download_pdfs(session, probe_anchors, probe.url, S026_HOSTS)
     if len(probe_attachments) != 2:
         raise RuntimeError(f"警政草案探針附件數不一致：預期 2，取得 {len(probe_attachments)}")
 
@@ -252,7 +287,7 @@ def parse_rdec_items(soup: BeautifulSoup, base_url: str) -> list[dict]:
 
 
 def fetch_s029(session: requests.Session, start: date, end: date) -> dict:
-    index = get(session, S029_INDEX_URL)
+    index = get(session, S029_INDEX_URL, S029_HOSTS)
     index_soup = BeautifulSoup(index.content, "html.parser")
     sessions = parse_session_links(index_soup, index.url)
     if not sessions:
@@ -260,7 +295,7 @@ def fetch_s029(session: requests.Session, start: date, end: date) -> dict:
     latest = sessions[0]
 
     first_url = f"{latest['url']}?Page=1&PageSize=30&type="
-    first = get(session, first_url)
+    first = get(session, first_url, S029_HOSTS)
     first_soup = BeautifulSoup(first.content, "html.parser")
     first_text = " ".join(first_soup.stripped_strings)
     count_match = re.search(r"共\s*([\d,]+)\s*筆資料.*?第\s*(\d+)\s*/\s*(\d+)\s*頁", first_text)
@@ -274,7 +309,7 @@ def fetch_s029(session: requests.Session, start: date, end: date) -> dict:
 
     pages = [first]
     for page in range(2, page_count + 1):
-        pages.append(get(session, f"{latest['url']}?Page={page}&PageSize=30&type="))
+        pages.append(get(session, f"{latest['url']}?Page={page}&PageSize=30&type=", S029_HOSTS))
     items_by_url: dict[str, dict] = {}
     for response in pages:
         for item in parse_rdec_items(BeautifulSoup(response.content, "html.parser"), response.url):
@@ -290,7 +325,7 @@ def fetch_s029(session: requests.Session, start: date, end: date) -> dict:
         raise RuntimeError("最新會期沒有可驗證的警政專案報告")
     police_attachments = []
     for item in police_items:
-        response = get(session, item["url"], 120)
+        response = get(session, item["url"], S029_HOSTS, 120)
         if not response.content.startswith(b"%PDF-"):
             raise RuntimeError(f"警政專案附件不是 PDF：{item['url']}")
         police_attachments.append({
