@@ -491,22 +491,29 @@ def runtime_candidates(payload: dict[str, Any]) -> list[dict[str, Any]]:
     if not isinstance(payload, dict):
         raise ValueError("review input must be an object")
     candidates = []
+    recognized = False
     if isinstance(payload.get("schema_drift"), dict):
+        recognized = True
         candidates.extend(schema_drift_candidates(payload["schema_drift"]))
     if "detail_rechecks" in payload:
+        recognized = True
         candidates.extend(detail_recheck_candidates(payload["detail_rechecks"]))
-    if "candidates" in payload and any(
-        isinstance(row, dict) and "verification_status" in row for row in (payload.get("candidates") or [])
+    discovery_rows = payload.get("candidates")
+    if isinstance(discovery_rows, list) and (
+        not discovery_rows or any(isinstance(row, dict) and "verification_status" in row for row in discovery_rows)
     ):
+        recognized = True
         candidates.extend(discovery_candidates(payload))
     if "public_events" in payload:
+        recognized = True
         candidates.extend(fusion_candidates(payload))
     if "sources" in payload and any(
         isinstance(row, dict) and ("source_health" in row or "freshness_status" in row)
         for row in (payload.get("sources") or [])
     ):
+        recognized = True
         candidates.extend(source_health_candidates(payload))
-    if candidates:
+    if recognized:
         return candidates
     rows = payload.get("items", payload.get("candidates", []))
     if not isinstance(rows, list):

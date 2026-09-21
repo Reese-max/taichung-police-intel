@@ -153,6 +153,10 @@ class ReviewInboxTests(unittest.TestCase):
         state = reconcile(state, runtime_candidates(payload), observed_at=STAMP)
         self.assertEqual(len(state["items"]), len(mapped))
         self.assertTrue(all(len(item["audit"]) == 1 for item in state["items"].values()))
+        self.assertEqual(
+            runtime_candidates({"candidates": [{"candidate_id": "gd-verified", "verification_status": "VERIFIED_OFFICIAL"}]}),
+            [],
+        )
 
     def test_tampered_audit_and_evidence_receipts_fail_closed(self):
         state, item, _ = upsert(empty_state(), candidate("CONFLICT"), observed_at=STAMP)
