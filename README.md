@@ -133,11 +133,11 @@ Set `NEXT_PUBLIC_QUERY_GATEWAY_URL=http://127.0.0.1:8788/query` when starting th
 Current-checkout integration receipt:
 
 ```bash
+npm ci
 npm run verify:current-checkout
-python scripts/verify-current-checkout.py --output output/current-checkout-receipt.json
 ```
 
-This starts an ephemeral local HTTP server, records the actual code SHA, lockfile hash, publication generation/hash and source-policy binding, and verifies Web/MCP parity plus fail-closed unsupported/generation paths. It is a candidate-version receipt, not production deployment or public-reachability evidence.
+This builds the static site, starts an ephemeral loopback server, records the actual code SHA, lockfile hash, publication generation/hash and source-policy binding, and verifies HTTP/static fallback, Web/MCP parity, browser interaction, mixed-generation rejection, and sabotage detection. It writes a machine-readable receipt under `runtime-evidence/current-checkout/`. `--mode core` omits the site/browser lane. It is a candidate-version receipt, not production deployment or public-reachability evidence.
 
 Rights/retention defaults are compiled from [retention-rights-policy.v1.json](./docs/govintel/retention-rights-policy.v1.json). Rights remain `UNKNOWN` until reviewed; outward Query Gateway data is metadata/link-only and never a legal permission or full-text archive.
 

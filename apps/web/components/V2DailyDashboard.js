@@ -42,6 +42,17 @@ async function fetchJson(url) {
   return response.json();
 }
 
+function samePublicationGeneration(brief, feed, sourceStatus) {
+  const briefRun = brief?.source_collection_run_id || brief?.collection_run_id;
+  const feedRun = feed?.collection_run_id || feed?.source_collection_run_id;
+  const statusRun = sourceStatus?.latest_collection_run?.collection_run_id || sourceStatus?.collection_run_id;
+  return Boolean(
+    briefRun && briefRun === feedRun && briefRun === statusRun
+      && brief?.generated_at === feed?.generated_at
+      && brief?.generated_at === sourceStatus?.generated_at,
+  );
+}
+
 function formatDateTime(value) {
   if (!value) return "未提供";
   const parsed = new Date(value);
@@ -83,6 +94,36 @@ function Metric({ value, label, emphasis = false }) {
       <strong>{value}</strong>
       <span>{label}</span>
     </div>
+  );
+}
+
+function PublicationProvenance({ publication, archive, sourceStatus, candidate, generationMixed }) {
+  const briefRun = publication?.source_collection_run_id || publication?.collection_run_id;
+  const feedRun = archive?.collection_run_id || archive?.source_collection_run_id;
+  const statusRun = sourceStatus?.latest_collection_run?.collection_run_id || sourceStatus?.collection_run_id;
+  return (
+    <section className="v2-provenance" data-testid="candidate-version" aria-labelledby="v2-provenance-title">
+      <div className="v2-section-heading">
+        <div>
+          <p className="v2-eyebrow">版本識別</p>
+          <h2 id="v2-provenance-title">資料版本與涵蓋範圍</h2>
+        </div>
+        <span data-testid="generation-badge">{generationMixed ? "世代不一致 · 已拒絕混版" : "同一世代"}</span>
+      </div>
+      <dl>
+        <div><dt>簡報世代</dt><dd>{briefRun || "未提供"}</dd></div>
+        <div><dt>資料庫世代</dt><dd>{feedRun || "未提供"}</dd></div>
+        <div><dt>來源狀態世代</dt><dd>{statusRun || "未提供"}</dd></div>
+        <div><dt>資料性質</dt><dd>保存快照 · 非即時資料</dd></div>
+        <div><dt>查詢索引世代</dt><dd data-testid="query-generation">{candidate?.query_generation_id || "查詢後提供"}</dd></div>
+        {candidate?.policy_hash && <div><dt>來源政策</dt><dd>v{candidate.policy_version} · {candidate.policy_hash.slice(0, 12)}…</dd></div>}
+      </dl>
+      {candidate?.unavailable_capabilities?.length > 0 && (
+        <p data-testid="candidate-capabilities">
+          未提供能力：{candidate.unavailable_capabilities.map((row) => `${row.capability_id} · ${row.status}`).join("、")}
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -228,6 +269,7 @@ export default function V2DailyDashboard() {
   const [archive, setArchive] = useState(null);
   const [sourceStatus, setSourceStatus] = useState(null);
   const [systemHealth, setSystemHealth] = useState(null);
+  const [candidate, setCandidate] = useState(null);
   const [loadState, setLoadState] = useState("loading");
   const [loadError, setLoadError] = useState("");
   const [archiveQuery, setArchiveQuery] = useState("");
@@ -292,6 +334,14 @@ export default function V2DailyDashboard() {
       })
       .catch(() => {});
 
+    fetchJson(`${BASE_PATH}/data/candidate.json`)
+      .then((data) => {
+        if (!cancelled && data?.schema_version === 1 && data?.kind === "GOVINTEL_CANDIDATE_MANIFEST") {
+          setCandidate(data);
+        }
+      })
+      .catch(() => {});
+
     return () => {
       cancelled = true;
     };
@@ -322,6 +372,10 @@ export default function V2DailyDashboard() {
   const otherChanges = Array.isArray(publication?.other_changes)
     ? publication.other_changes
     : [];
+  const generationMixed = Boolean(
+    publication && archive && sourceStatus
+      && !samePublicationGeneration(publication, archive, sourceStatus),
+  );
 
   return (
     <main className="v2-home" id="v2-daily-intelligence">
@@ -360,6 +414,14 @@ export default function V2DailyDashboard() {
 
       {loadState === "ready" && publication && (
         <>
+          {generationMixed && (
+            <section className="v2-system-message error" role="alert" data-testid="generation-mixed">
+              <strong>資料世代不一致，已拒絕混版呈現</strong>
+              <p>簡報、歷史資料庫與來源狀態不是同一批發布；本期彙整已停止，歷史索引仍可單獨查閱。</p>
+            </section>
+          )}
+          {!generationMixed && (
+            <>
           <PublicationStatus publication={publication} assessment={assessment} />
           <section className={`v2-system-message ${assessment.canReassure ? "" : "error"}`}
             role={assessment.canReassure ? "status" : "alert"} data-testid="publication-freshness">
@@ -442,6 +504,9 @@ export default function V2DailyDashboard() {
             </details>
           )}
 
+            </>
+          )}
+
           <section className="v2-archive" aria-labelledby="v2-archive-title">
             <div className="v2-section-heading">
               <div>
@@ -479,7 +544,14 @@ export default function V2DailyDashboard() {
           </section>
 
           <SystemHealthSummary health={systemHealth} />
-          <SourceHealthSummary sourceStatus={sourceStatus} canReassure={assessment.canReassure} />
+          {!generationMixed && <SourceHealthSummary sourceStatus={sourceStatus} canReassure={assessment.canReassure} />}
+          <PublicationProvenance
+            publication={publication}
+            archive={archive}
+            sourceStatus={sourceStatus}
+            candidate={candidate}
+            generationMixed={generationMixed}
+          />
         </>
       )}
     </main>

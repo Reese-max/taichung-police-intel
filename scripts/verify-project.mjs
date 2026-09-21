@@ -294,7 +294,7 @@ if (["quick", "full"].includes(mode) && !failures.length) {
       ["located-facts-self-check", ["-X", "utf8", "scripts/located-facts.py", "self-check"]],
       ["discovery-adapter-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_discovery_adapter.py", "-v"]],
       ["discovery-adapter-self-check", ["-X", "utf8", "scripts/discovery-adapter.py", "self-check"]],
-      ["current-checkout-tests", ["-X", "utf8", "scripts/verify-current-checkout.py", "--self-check"]],
+      ["current-checkout-tests", ["-X", "utf8", "scripts/verify-current-checkout.py", "--mode", "core"]],
       ["retention-policy-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_retention_policy.py", "-v"]],
       ["news-list-collector-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_news_list_collector.py", "-v"]],
       ["candidate-canary-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_candidate_runtime_canary.py", "-v"]],

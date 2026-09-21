@@ -44,6 +44,7 @@ function QueryResult({ response }) {
         </p>
       ) : null}
       <small className="v2-query-receipt">publication hash: {response.publication_hash}</small>
+      <small className="v2-query-receipt" data-testid="query-generation">query generation: {response.query_generation_id}</small>
       {response.retention && (
         <small className="v2-query-receipt">公開投影：{response.retention.public_projection} · 權利狀態需審查</small>
       )}

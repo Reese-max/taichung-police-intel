@@ -12,6 +12,8 @@ venv/
 .gstack/
 .playwright-cli/
 output/playwright/
+output/current-checkout-*/
+runtime-evidence/
 
 # Internal Chinese planning documents excluded from public submission
 daily-five-minute-homepage-sample-2026-08-13.md
