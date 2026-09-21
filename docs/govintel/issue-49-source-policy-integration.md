@@ -9,3 +9,5 @@
 - 混用新舊 policy 的 query artifact fail closed；required source 缺失保留 `PARTIAL` gap；未支援能力回報 `CAPABILITY_NOT_AVAILABLE`。
 
 這是 code-only／fixture integration receipt，不是 source promotion、live canary、部署或公開可達性證據。候選來源仍由 #14/#22/#28 的獨立 fixture/canary/approval 流程控制。
+
+2026-09-22 self-check 實際回報 `consumers=6`：`query_store`、`system_health`、`ui`、`collector`、`online_collector`、`publication_validator`；這個數字只代表目前被檢查的 policy bindings，不代表已部署或已啟用候選來源。

@@ -6,7 +6,7 @@ An evidence-first public-information monitor that helps police policy staff prep
 
 The demo compresses official Taichung council and government sources into one workflow: identify a priority issue, inspect source health and intelligence gaps, then jump to the exact official video timestamp. Chinese is the end-user language; the homepage toggle provides the complete English judge path.
 
-## Current GovIntel state (2026-09-21)
+## Current GovIntel state (2026-09-22)
 
 | Area | State | Evidence boundary |
 |---|---|---|
