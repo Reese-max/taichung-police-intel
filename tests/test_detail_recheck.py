@@ -1,6 +1,7 @@
 import unittest
 
 from intel_v2.detail_recheck import classify_observation, plan_recheck
+from intel_v2.detail_recheck_http import recheck_detail
 
 
 NOW = "2026-09-21T12:00:00+08:00"
@@ -88,6 +89,125 @@ class DetailRecheckTests(unittest.TestCase):
         self.assertEqual(result["status"], "DEFERRED")
         self.assertTrue(result["preserve_last_known_good"])
         self.assertFalse(result["event_cancelled"])
+
+
+class FakeHTTPResponse:
+    def __init__(self, status_code=200, body=b"", *, url="https://official.test/detail", headers=None):
+        self.status_code = status_code
+        self.url = url
+        self.headers = headers or {}
+        self.body = body
+        self.closed = False
+
+    def iter_content(self, chunk_size):
+        for start in range(0, len(self.body), chunk_size):
+            yield self.body[start:start + chunk_size]
+
+    def close(self):
+        self.closed = True
+
+
+class FakeHTTPSession:
+    def __init__(self, *responses):
+        self.responses = list(responses)
+        self.calls = []
+
+    def get(self, url, **kwargs):
+        self.calls.append((url, kwargs))
+        return self.responses.pop(0)
+
+
+class DetailRecheckHTTPTests(unittest.TestCase):
+    def test_baseline_extracts_hashes_attachments_and_conditional_metadata(self):
+        first = FakeHTTPResponse(
+            body=b"<html><body>notice</body><a href='/files/a.pdf'>PDF</a></html>",
+            headers={"Content-Type": "text/html", "ETag": '"v1"'},
+        )
+        result = recheck_detail(
+            FakeHTTPSession(first),
+            "https://official.test/detail",
+            None,
+            observed_at=NOW,
+            allowed_hosts={"official.test"},
+        )
+        self.assertEqual(result["classification"]["status"], "BASELINE")
+        self.assertEqual(len(result["observation"]["attachments"]), 1)
+        self.assertEqual(result["observation"]["etag"], '"v1"')
+        self.assertEqual(result["request_headers"], {})
+
+    def test_attachment_url_change_is_reviewable_without_downloading_attachment(self):
+        session = FakeHTTPSession(
+            FakeHTTPResponse(body=b"<a href='/files/a.pdf'>PDF</a>"),
+            FakeHTTPResponse(body=b"<a href='/files/b.pdf'>PDF</a>"),
+        )
+        first = recheck_detail(
+            session,
+            "https://official.test/detail",
+            None,
+            observed_at=NOW,
+            allowed_hosts={"official.test"},
+        )
+        second = recheck_detail(
+            session,
+            "https://official.test/detail",
+            first["classification"]["after"],
+            observed_at="2026-09-22T12:00:00+08:00",
+            allowed_hosts={"official.test"},
+        )
+        self.assertEqual(second["classification"]["status"], "ATTACHMENT_CHANGED")
+        self.assertTrue(second["classification"]["review_required"])
+
+    def test_304_preserves_lkg_and_requires_attachment_recheck(self):
+        session = FakeHTTPSession(FakeHTTPResponse(304, headers={"ETag": '"v1"'}))
+        result = recheck_detail(
+            session,
+            "https://official.test/detail",
+            BEFORE,
+            observed_at=NOW,
+            allowed_hosts={"official.test"},
+        )
+        self.assertEqual(result["classification"]["status"], "NOT_MODIFIED")
+        self.assertTrue(result["classification"]["attachment_recheck_required"])
+        self.assertEqual(session.calls[0][1]["headers"]["If-None-Match"], '"old"')
+
+    def test_deferred_and_transport_bounds_fail_closed(self):
+        deferred = recheck_detail(
+            FakeHTTPSession(FakeHTTPResponse(429, headers={"Retry-After": "120"})),
+            "https://official.test/detail",
+            BEFORE,
+            observed_at=NOW,
+            allowed_hosts={"official.test"},
+        )
+        self.assertEqual(deferred["classification"]["status"], "DEFERRED")
+        self.assertEqual(deferred["classification"]["retry_after_seconds"], 120)
+
+        oversized = recheck_detail(
+            FakeHTTPSession(FakeHTTPResponse(body=b"12345")),
+            "https://official.test/detail",
+            None,
+            observed_at=NOW,
+            allowed_hosts={"official.test"},
+            max_body_bytes=4,
+        )
+        self.assertEqual(oversized["classification"]["status"], "UNAVAILABLE")
+        self.assertEqual(oversized["transport_error"]["type"], "ValueError")
+
+    def test_unapproved_redirect_is_not_followed(self):
+        session = FakeHTTPSession(
+            FakeHTTPResponse(
+                302,
+                headers={"Location": "https://evil.test/detail"},
+            )
+        )
+        result = recheck_detail(
+            session,
+            "https://official.test/detail",
+            None,
+            observed_at=NOW,
+            allowed_hosts={"official.test"},
+        )
+        self.assertEqual(result["classification"]["status"], "UNAVAILABLE")
+        self.assertEqual(len(session.calls), 1)
 
 
 if __name__ == "__main__":
