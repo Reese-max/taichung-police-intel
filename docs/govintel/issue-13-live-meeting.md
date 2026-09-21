@@ -13,6 +13,9 @@ provider adapter and does not auto-start ASR.
   `UNVERIFIED`); the state machine never turns them into names.
 - Every segment is provisional until a reconciliation receipt binds it to an
   official media/minutes URL and locator.
+- Optional role highlighting is computed from the versioned public profile
+  catalog, hash-bound to the segment text, and copied to a bookmark only from
+  a selected segment; it is navigation metadata, not a formal fact.
 - Stream/ASR/budget gaps are intervals, not empty-result claims.
 - The fixed snapshot and scheduled publication paths do not depend on this
   state machine.
@@ -25,8 +28,9 @@ python -m unittest discover -s tests -p test_live_meeting.py -q
 ```
 
 The replay covers interim→final revision, disconnect/reconnect gap,
-bookmarking, explicit stop, official reconciliation, and the rule that
-reconciled output is `OFFICIAL_RECONCILED`, never `AUTO_PASS`.
+bookmarking, deterministic profile highlighting, serialized restart,
+cross-type overlap rejection, explicit stop, official reconciliation, and the
+rule that reconciled output is `OFFICIAL_RECONCILED`, never `AUTO_PASS`.
 
 The remaining runtime boundary is intentional: an authorized public stream,
 provider latency/cost canary, browser live search/seek UI, and real post-event

@@ -79,7 +79,7 @@ def _parse_time(value: object) -> datetime | None:
     return parsed if parsed.tzinfo else None
 
 
-def validate_catalog(value: dict[str, Any]) -> dict[str, Any]:
+def validate_catalog(value: dict[str, Any], *, require_general: bool = True) -> dict[str, Any]:
     if not isinstance(value, dict):
         _fail("catalog must be an object")
     if value.get("schema_version") != PROFILE_SCHEMA_VERSION:
@@ -136,13 +136,22 @@ def validate_catalog(value: dict[str, Any]) -> dict[str, Any]:
         profile["profile_hash"] = _canonical_sha256(profile)
         profiles[profile_id] = profile
 
-    if DEFAULT_PROFILE_ID not in profiles:
+    if require_general and DEFAULT_PROFILE_ID not in profiles:
         _fail("general profile is required")
     return {
         "schema_version": PROFILE_SCHEMA_VERSION,
         "ranking_policy_version": policy,
         "profiles": profiles,
     }
+
+
+def validate_profile(value: dict[str, Any], *, ranking_policy_version: str = RANKING_POLICY_VERSION) -> dict[str, Any]:
+    catalog = validate_catalog({
+        "schema_version": PROFILE_SCHEMA_VERSION,
+        "ranking_policy_version": ranking_policy_version,
+        "profiles": [value],
+    }, require_general=False)
+    return next(iter(catalog["profiles"].values()))
 
 
 def load_catalog(path: str | Path) -> dict[str, Any]:

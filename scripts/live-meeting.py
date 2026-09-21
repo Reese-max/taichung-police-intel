@@ -29,6 +29,7 @@ from intel_v2.live_meeting import (
     stop_session,
     validate_session,
 )
+from intel_v2.role_profiles import load_catalog
 
 
 DEFAULT_STATE = ROOT / "state" / "live-meeting-session.json"
@@ -81,7 +82,14 @@ def command_activate(args: argparse.Namespace) -> int:
 
 
 def command_append(args: argparse.Namespace) -> int:
-    state = append_segment(read(args.state), sequence=args.sequence, start_seconds=args.start, end_seconds=args.end, text=args.text, received_at=args.at or now(), finalized=args.finalized, partial=args.partial, confidence=args.confidence, speaker_label=args.speaker_label)
+    profile = None
+    if args.profile_id:
+        catalog = load_catalog(args.profile_catalog)
+        try:
+            profile = catalog["profiles"][args.profile_id]
+        except KeyError as error:
+            raise ValueError(f"unknown profile: {args.profile_id}") from error
+    state = append_segment(read(args.state), sequence=args.sequence, start_seconds=args.start, end_seconds=args.end, text=args.text, received_at=args.at or now(), finalized=args.finalized, partial=args.partial, confidence=args.confidence, speaker_label=args.speaker_label, profile=profile)
     write(args.state, state)
     revision = next(item["revision"] for item in state["segments"] if item["sequence"] == args.sequence)
     print(f"LIVE_SEGMENT_APPENDED session_id={state['session_id']} sequence={args.sequence} revision={revision}")
@@ -148,6 +156,7 @@ def command_formal(args: argparse.Namespace) -> int:
 
 
 def self_check() -> None:
+    profile = load_catalog(ROOT / "docs" / "govintel" / "role-profiles.v1.json")["profiles"]["traffic-policy"]
     state = start_session(
         source_id="S-010",
         official_source_url="https://www.tccc.gov.tw/",
@@ -177,6 +186,7 @@ def self_check() -> None:
         text="交通議題正式暫定文字",
         received_at="2026-09-21T10:00:02+08:00",
         finalized=True,
+        profile=profile,
     )
     state = record_gap(
         state,
@@ -208,6 +218,7 @@ def self_check() -> None:
     )
     assert state["status"] == "RECONCILED"
     assert len(state["segments"][0]["revision_history"]) == 1
+    assert state["segments"][0]["profile_relevance"]["profile_id"] == "traffic-policy"
     assert len(state["gap_intervals"]) == 1
     assert formal_candidates(state)[0]["provisional"] is False
     print("LIVE_MEETING_SELF_CHECK_OK revision=true gap=true bookmark=true official_reconciliation=true")
@@ -249,6 +260,8 @@ def parser() -> argparse.ArgumentParser:
     append.add_argument("--text", required=True)
     append.add_argument("--confidence", type=float)
     append.add_argument("--speaker-label")
+    append.add_argument("--profile-id")
+    append.add_argument("--profile-catalog", type=Path, default=ROOT / "docs" / "govintel" / "role-profiles.v1.json")
     append.add_argument("--finalized", action="store_true")
     append.add_argument("--partial", action="store_true")
     append.add_argument("--at")

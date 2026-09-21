@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import copy
+import json
+from pathlib import Path
 import unittest
 
 from intel_v2.live_meeting import (
@@ -9,6 +11,7 @@ from intel_v2.live_meeting import (
     append_segment,
     budget_stop,
     formal_candidates,
+    highlight_profile,
     reconcile_session,
     record_gap,
     resume_session,
@@ -16,12 +19,14 @@ from intel_v2.live_meeting import (
     stop_session,
     validate_session,
 )
+from intel_v2.role_profiles import load_catalog
 
 
 T0 = "2026-09-21T10:00:00+08:00"
 T1 = "2026-09-21T10:01:00+08:00"
 SOURCE_URL = "https://www.tccc.gov.tw/"
 STREAM_URL = "https://vod.tccc.gov.tw/live/demo.m3u8"
+PROFILE = load_catalog(Path(__file__).resolve().parents[1] / "docs" / "govintel" / "role-profiles.v1.json")["profiles"]["traffic-policy"]
 
 
 def started(*, authorized: bool = True, transport: bool = True, budget: int | None = 60):
@@ -224,6 +229,70 @@ class LiveMeetingTests(unittest.TestCase):
         tampered = copy.deepcopy(state)
         tampered["stream_url"] = "https://evil.example/live.m3u8"
         with self.assertRaisesRegex(ValueError, "allowlisted"):
+            validate_session(tampered)
+
+    def test_profile_highlight_is_deterministic_and_bookmark_bound(self):
+        text = "交通與道路安全議題進入討論"
+        relevance = highlight_profile(text, PROFILE)
+        self.assertIn("topic_match", relevance["reason_codes"])
+        self.assertIn("交通", relevance["matched_terms"])
+        state = append_segment(
+            started(),
+            sequence=0,
+            start_seconds=0,
+            end_seconds=5,
+            text=text,
+            received_at=T0,
+            finalized=True,
+            profile=PROFILE,
+        )
+        self.assertEqual(state["segments"][0]["profile_relevance"], relevance)
+        state = add_bookmark(
+            state,
+            segment_ids=[state["segments"][0]["segment_id"]],
+            reason_code="TOPIC_MATCH",
+            bookmarked_at=T1,
+        )
+        self.assertEqual(state["bookmarks"][0]["profile_relevance"], relevance)
+        with self.assertRaisesRegex(ValueError, "derived from a selected segment"):
+            add_bookmark(
+                state,
+                segment_ids=[state["segments"][0]["segment_id"]],
+                reason_code="TOPIC_MATCH",
+                bookmarked_at=T1,
+                profile_relevance={**relevance, "profile_id": "general"},
+            )
+
+    def test_serialized_restart_and_cross_type_overlap_fail_closed(self):
+        state = append_segment(
+            started(),
+            sequence=0,
+            start_seconds=0,
+            end_seconds=5,
+            text="可重啟的暫定片段",
+            received_at=T0,
+            finalized=True,
+        )
+        restored = json.loads(json.dumps(state, ensure_ascii=False))
+        resumed = append_segment(
+            restored,
+            sequence=1,
+            start_seconds=5,
+            end_seconds=10,
+            text="重啟後的片段",
+            received_at=T1,
+            finalized=True,
+        )
+        self.assertEqual(len(resumed["segments"]), 2)
+        tampered = copy.deepcopy(state)
+        tampered["gap_intervals"].append({
+            "gap_id": "GAP-TAMPERED",
+            "start_seconds": 4.0,
+            "end_seconds": 6.0,
+            "reason": "STREAM_DISCONNECT",
+            "detected_at": T1,
+        })
+        with self.assertRaisesRegex(ValueError, "overlaps"):
             validate_session(tampered)
 
 
