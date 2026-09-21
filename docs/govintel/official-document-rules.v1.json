@@ -1,0 +1,24 @@
+{
+  "html": [
+    {
+      "subject_id": "dataset:88147",
+      "predicate": "dataset_title",
+      "needle": "10952-01-01-2 臺中市受(處)理刑事案件-分局別"
+    }
+  ],
+  "json": [
+    {
+      "subject_id": "dataset:88147",
+      "predicate": "dataset_title",
+      "pointer": "/result/title",
+      "normalizer": "text"
+    },
+    {
+      "subject_id": "dataset:88147",
+      "predicate": "dataset_modified_at",
+      "pointer": "/result/modifiedDate",
+      "normalizer": "text",
+      "value_is_date": true
+    }
+  ]
+}

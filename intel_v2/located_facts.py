@@ -56,6 +56,12 @@ def _approved_source(source_id: str, url: str) -> dict[str, Any]:
     return row
 
 
+def validate_document_url(source_id: str, url: str) -> dict[str, Any]:
+    """Check an acquisition URL before any network request is made."""
+
+    return _approved_source(source_id, url)
+
+
 def acquire_document(
     *,
     source_id: str,

@@ -4,7 +4,7 @@ import copy
 from pathlib import Path
 import unittest
 
-from intel_v2.located_facts import acquire_document, build_bundle, extract_json_facts, verify_fact
+from intel_v2.located_facts import acquire_document, build_bundle, extract_json_facts, validate_document_url, verify_fact
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -78,6 +78,11 @@ class LocatedFactsTests(unittest.TestCase):
                 content_type="text/html",
                 fetched_at=STAMP,
             )
+
+    def test_live_preflight_accepts_catalog_api_and_rejects_other_host(self):
+        self.assertEqual(validate_document_url("S-028", "https://data.gov.tw/api/v2/rest/dataset/88147")["source_id"], "S-028")
+        with self.assertRaisesRegex(ValueError, "outside the approved source origin"):
+            validate_document_url("S-028", "https://example.invalid/dataset/88147")
 
 
 if __name__ == "__main__":
