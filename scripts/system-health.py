@@ -67,7 +67,7 @@ def load_schema_drift(path: Path = DEFAULT_SCHEMA_DRIFT) -> dict[str, Any] | Non
 
 def load_review_inbox(path: Path = DEFAULT_REVIEW_STATE) -> list[dict[str, Any]] | None:
     try:
-        return project_review_items(load_review_state(path))
+        return project_review_items(load_review_state(path), public=True)
     except (OSError, ValueError, json.JSONDecodeError):
         return None
 

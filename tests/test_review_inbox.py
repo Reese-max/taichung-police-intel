@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import copy
+import json
 import unittest
 
-from intel_v2.review import claim, decide, empty_state, project, reconcile, schema_drift_candidates, upsert
+from intel_v2.review import claim, decide, empty_state, project, reconcile, schema_drift_candidates, upsert, validate_state
 
 
 STAMP = "2026-09-21T00:00:00+00:00"
@@ -52,6 +54,37 @@ class ReviewInboxTests(unittest.TestCase):
         state = reconcile(empty_state(), mapped, observed_at=STAMP)
         state = reconcile(state, [], observed_at=STAMP)
         self.assertEqual(project(state)[0]["status"], "OPEN")
+
+    def test_tampered_audit_and_evidence_receipts_fail_closed(self):
+        state, item, _ = upsert(empty_state(), candidate("CONFLICT"), observed_at=STAMP)
+        broken_audit = copy.deepcopy(state)
+        broken_audit["items"][item["review_id"]]["audit"][0]["payload"]["reason"] = "STALE_SOURCE"
+        with self.assertRaisesRegex(ValueError, "audit receipt hash mismatch"):
+            validate_state(broken_audit)
+
+        broken_evidence = copy.deepcopy(state)
+        broken_evidence["items"][item["review_id"]]["evidence"]["after"]["version"] = 99
+        with self.assertRaisesRegex(ValueError, "evidence hash mismatch"):
+            validate_state(broken_evidence)
+
+    def test_public_projection_keeps_bounded_ids_but_strips_private_review_data(self):
+        state, item, _ = upsert(empty_state(), candidate("CONFLICT"), observed_at=STAMP)
+        state = claim(state, item["review_id"], assignee_ref="operator-1", claimed_at=STAMP)
+        state = decide(
+            state,
+            item["review_id"],
+            "merge",
+            reviewer_ref="operator-1",
+            decided_at=STAMP,
+            evidence={"event_ids": ["E-1", "E-2"], "private_notes": "do not publish"},
+        )
+        public = project(state, include_closed=True, public=True)
+        self.assertEqual(public[0]["entity_ids"], {"source_id": "S-001", "event_id": "E-1"})
+        self.assertNotIn("assignment", public[0])
+        self.assertNotIn("decision", public[0])
+        self.assertNotIn("audit", public[0])
+        self.assertNotIn("private_notes", json.dumps(public, ensure_ascii=False))
+        self.assertEqual(state["items"][item["review_id"]]["decision"]["version_receipt"]["source_version"], 1)
 
 
 if __name__ == "__main__":

@@ -34,6 +34,7 @@ PRIORITIES = {
 }
 ACTIVE_STATUSES = frozenset({"OPEN", "CLAIMED"})
 TERMINAL_STATUSES = frozenset({"RESOLVED", "DISMISSED"})
+PUBLIC_ENTITY_ID_KEYS = frozenset({"source_id", "event_id", "document_id", "candidate_id", "public_event_id", "entity_id"})
 
 
 def canonical(value: Any) -> bytes:
@@ -72,6 +73,19 @@ def _audit(item: dict[str, Any], action: str, at: str, payload: dict[str, Any]) 
     return {"audit_id": f"AUDIT-{sha256(material).upper()[:20]}", **material}
 
 
+def _validate_audit(review_id: str, sequence: int, audit: Any) -> None:
+    if not isinstance(audit, dict) or audit.get("review_id") != review_id:
+        raise ValueError(f"invalid audit receipt: {review_id}")
+    if audit.get("sequence") != sequence or not isinstance(audit.get("action"), str) or not audit["action"]:
+        raise ValueError(f"invalid audit sequence: {review_id}")
+    timestamp(audit.get("at"))
+    if not isinstance(audit.get("payload"), dict):
+        raise ValueError(f"invalid audit payload: {review_id}")
+    material = {"review_id": review_id, "sequence": sequence, "action": audit["action"], "at": audit["at"], "payload": audit["payload"]}
+    if audit.get("audit_id") != f"AUDIT-{sha256(material).upper()[:20]}":
+        raise ValueError(f"audit receipt hash mismatch: {review_id}")
+
+
 def validate_state(state: dict[str, Any]) -> dict[str, Any]:
     if state.get("schema_version") != 1 or state.get("mode") != "REVIEW_INBOX":
         raise ValueError("review state must use schema_version=1 and mode=REVIEW_INBOX")
@@ -89,8 +103,37 @@ def validate_state(state: dict[str, Any]) -> dict[str, Any]:
         timestamp(item.get("updated_at"))
         if not isinstance(item.get("entity_ids"), dict) or not isinstance(item.get("evidence"), dict):
             raise ValueError(f"review item requires entity_ids and evidence: {review_id}")
+        if item.get("evidence_sha256") != sha256(item["evidence"]):
+            raise ValueError(f"evidence hash mismatch: {review_id}")
+        history = item.get("evidence_history")
+        if not isinstance(history, list):
+            raise ValueError(f"review evidence history is required: {review_id}")
+        for entry in history:
+            if not isinstance(entry, dict) or not isinstance(entry.get("evidence"), dict):
+                raise ValueError(f"invalid evidence history: {review_id}")
+            timestamp(entry.get("observed_at"))
+            if entry.get("evidence_sha256") != sha256(entry["evidence"]):
+                raise ValueError(f"evidence history hash mismatch: {review_id}")
         if not isinstance(item.get("audit"), list) or not item["audit"]:
             raise ValueError(f"review item requires audit history: {review_id}")
+        for sequence, audit in enumerate(item["audit"], start=1):
+            _validate_audit(review_id, sequence, audit)
+        decision = item.get("decision")
+        if decision is not None:
+            if not isinstance(decision, dict) or decision.get("decision") not in DECISIONS:
+                raise ValueError(f"invalid review decision: {review_id}")
+            if not isinstance(decision.get("reviewer_ref"), str) or not decision["reviewer_ref"].strip():
+                raise ValueError(f"review decision reviewer is required: {review_id}")
+            timestamp(decision.get("decided_at"))
+            if not isinstance(decision.get("evidence"), dict) or decision.get("evidence_sha256") != sha256(decision["evidence"]):
+                raise ValueError(f"review decision evidence hash mismatch: {review_id}")
+            version_receipt = decision.get("version_receipt")
+            if version_receipt is not None and (
+                not isinstance(version_receipt, dict)
+                or version_receipt.get("source_version") != item.get("source_version")
+                or version_receipt.get("evidence_sha256") != item["evidence_sha256"]
+            ):
+                raise ValueError(f"review decision version receipt mismatch: {review_id}")
     if state.get("last_updated_at") is not None:
         timestamp(state["last_updated_at"])
     return state
@@ -223,18 +266,39 @@ def decide(state: dict[str, Any] | None, review_id: str, decision: str, *, revie
         "decided_at": stamp,
         "evidence": decision_evidence,
         "evidence_sha256": sha256(decision_evidence),
+        "version_receipt": {
+            "source_version": item["source_version"],
+            "evidence_sha256": item["evidence_sha256"],
+        },
     }
     item["assignment"] = {"state": "UNASSIGNED", "assignee_ref": None, "claimed_at": None}
     item["updated_at"] = stamp
-    item["audit"].append(_audit(item, "DECISION", stamp, {"decision": decision, "reviewer_ref": reviewer_ref, "evidence_sha256": sha256(decision_evidence)}))
+    item["audit"].append(_audit(item, "DECISION", stamp, {
+        "decision": decision,
+        "reviewer_ref": reviewer_ref,
+        "evidence_sha256": sha256(decision_evidence),
+        "version_receipt": item["decision"]["version_receipt"],
+    }))
     result["last_updated_at"] = stamp
     return result
 
 
-def project(state: dict[str, Any] | None, *, include_closed: bool = False) -> list[dict[str, Any]]:
+def project(state: dict[str, Any] | None, *, include_closed: bool = False, public: bool = False) -> list[dict[str, Any]]:
     candidate = copy_state(state)
     rows = [copy.deepcopy(item) for item in candidate["items"].values() if include_closed or item["status"] in ACTIVE_STATUSES]
     rows.sort(key=lambda item: (-item["priority"], item["updated_at"], item["review_id"]))
+    if public:
+        return [
+            {
+                key: item[key]
+                for key in ("review_id", "reason", "status", "priority", "source_version", "evidence_sha256", "created_at", "updated_at")
+            }
+            | {
+                "priority_reason": f"{item['reason']}_REQUIRES_HUMAN_REVIEW",
+                "entity_ids": {key: value for key, value in item["entity_ids"].items() if key in PUBLIC_ENTITY_ID_KEYS and isinstance(value, str) and value.strip()},
+            }
+            for item in rows
+        ]
     return rows
 
 
