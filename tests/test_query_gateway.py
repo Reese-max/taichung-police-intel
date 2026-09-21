@@ -42,7 +42,7 @@ class QueryGatewayTests(unittest.TestCase):
             "text_sha256": document["extracted_text_sha256"],
         }
         fact = {
-            "fact_id": "FACT-LOCATED-1",
+            "fact_id": None,
             "document_id": document["document_id"],
             "document_version_id": document["document_version_id"],
             "source_id": document["source_id"],
@@ -52,13 +52,27 @@ class QueryGatewayTests(unittest.TestCase):
             "extractor_version": document["extractor_version"],
             "subject_id": "dataset:88147",
             "predicate": "dataset_title",
+            "normalizer": "text",
+            "raw_value": "臺中市受理刑事案件",
             "normalized_value": "臺中市受理刑事案件",
             "valid_time": None,
+            "valid_time_source": None,
             "locator": locator,
             "verification_status": status,
         }
+        fact["fact_id"] = "FACT-" + gateway_module._json_hash({
+            "document_version_id": fact["document_version_id"],
+            "subject_id": fact["subject_id"],
+            "predicate": fact["predicate"],
+            "normalizer": fact["normalizer"],
+            "raw_value": fact["raw_value"],
+            "normalized_value": fact["normalized_value"],
+            "valid_time": fact["valid_time"],
+            "valid_time_source": fact["valid_time_source"],
+            "locator": fact["locator"],
+        })[:20].upper()
         evidence = {
-            "evidence_id": "EVID-LOCATED-1",
+            "evidence_id": "EVID-" + fact["fact_id"][5:],
             "fact_id": fact["fact_id"],
             "source_id": document["source_id"],
             "document_version_id": document["document_version_id"],
@@ -354,7 +368,8 @@ class QueryGatewayTests(unittest.TestCase):
 
     def test_located_facts_enter_gate_only_after_server_side_confirmation(self):
         snapshot = gateway_module.load_snapshot()
-        snapshot["located_facts"] = self.located_bundle()
+        confirmed_bundle = self.located_bundle()
+        snapshot["located_facts"] = confirmed_bundle
         gateway = gateway_module.QueryGateway(
             snapshot=snapshot,
             clock=lambda: datetime(2026, 9, 21, 9, 0, tzinfo=timezone.utc),
@@ -367,14 +382,15 @@ class QueryGatewayTests(unittest.TestCase):
         }
         result = gateway.execute("validate_answer", {"claims": [claim]})
         self.assertEqual(result["gate_status"], "PASS")
-        self.assertIn("EVID-LOCATED-1", result["answer_evidence_receipt"]["evidence_ids"])
+        evidence_id = confirmed_bundle["evidence_catalog"][0]["evidence_id"]
+        self.assertIn(evidence_id, result["answer_evidence_receipt"]["evidence_ids"])
 
         candidate = gateway_module.load_snapshot()
         candidate["located_facts"] = self.located_bundle("FACT_CANDIDATE")
         blocked = gateway_module.QueryGateway(snapshot=candidate, clock=gateway.clock).execute(
             "validate_answer", {"claims": [claim]}
         )
-        self.assertNotIn("EVID-LOCATED-1", blocked["answer_evidence_receipt"]["evidence_ids"])
+        self.assertNotIn(evidence_id, blocked["answer_evidence_receipt"]["evidence_ids"])
         self.assertNotEqual(blocked["gate_status"], "PASS")
 
     def test_located_facts_candidate_source_is_not_approved(self):
@@ -406,6 +422,31 @@ class QueryGatewayTests(unittest.TestCase):
         })
         snapshot["located_facts"] = bundle
         with self.assertRaisesRegex(ValueError, "fact is not bound"):
+            gateway_module.QueryGateway(snapshot=snapshot)
+
+    def test_located_facts_derivation_and_id_bindings_are_fail_closed(self):
+        snapshot = gateway_module.load_snapshot()
+        bundle = self.located_bundle()
+        bundle["facts"][0].pop("normalizer")
+        bundle["receipt"]["bundle_sha256"] = gateway_module._json_hash({
+            "facts": bundle["facts"],
+            "evidence_catalog": bundle["evidence_catalog"],
+            "public_event_inputs": bundle["public_event_inputs"],
+        })
+        snapshot["located_facts"] = bundle
+        with self.assertRaisesRegex(ValueError, "fact is not bound"):
+            gateway_module.QueryGateway(snapshot=snapshot)
+
+        snapshot = gateway_module.load_snapshot()
+        bundle = self.located_bundle()
+        bundle["facts"][0]["predicate"] = "tampered_predicate"
+        bundle["receipt"]["bundle_sha256"] = gateway_module._json_hash({
+            "facts": bundle["facts"],
+            "evidence_catalog": bundle["evidence_catalog"],
+            "public_event_inputs": bundle["public_event_inputs"],
+        })
+        snapshot["located_facts"] = bundle
+        with self.assertRaisesRegex(ValueError, "fact ID binding"):
             gateway_module.QueryGateway(snapshot=snapshot)
 
     def test_located_facts_confirmation_requires_review_receipt(self):

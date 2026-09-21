@@ -46,7 +46,8 @@ link-only rights decision.
 
 The read-only Query Gateway can load a saved bundle with
 `--located-facts-bundle`. It revalidates the document origin, version/hash
-bindings, and bundle receipt before startup; only explicitly
+bindings, derivation fields, deterministic fact IDs, and bundle receipt before
+startup; only explicitly
 `CONFIRMED_OFFICIAL` facts enter the server-controlled Answer Evidence Gate.
 `FACT_CANDIDATE` and `NEEDS_REVIEW` remain excluded until a separate review
 step promotes them, so a caller cannot inject its own evidence catalog. The

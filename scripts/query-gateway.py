@@ -186,6 +186,16 @@ def _valid_locator(locator: Any, raw_hash: str, text_hash: str) -> bool:
     return False
 
 
+def _valid_valid_time_source(source: Any, valid_time: Any, raw_hash: str, text_hash: str) -> bool:
+    if source is None:
+        return valid_time is None
+    if not isinstance(source, dict):
+        return False
+    if source.get("type") == "JSON_VALUE":
+        return True
+    return source.get("type") == "HTML_TEXT_RANGE" and _valid_locator(source, raw_hash, text_hash)
+
+
 def _valid_fact_review(review: Any) -> bool:
     if not isinstance(review, dict):
         return False
@@ -282,15 +292,32 @@ def validate_located_facts_bundle(bundle: Any, approved_source_ids: set[str]) ->
             or fact.get("extractor_version") != document.get("extractor_version")
             or not _nonempty_string(fact.get("subject_id"))
             or not _nonempty_string(fact.get("predicate"))
+            or not _nonempty_string(fact.get("normalizer"))
+            or "raw_value" not in fact
             or "normalized_value" not in fact
             or not _valid_scalar(fact.get("normalized_value"))
             or "valid_time" not in fact
             or (fact.get("valid_time") is not None and not _nonempty_string(fact.get("valid_time")))
+            or not _valid_valid_time_source(fact.get("valid_time_source"), fact.get("valid_time"), raw_hash, text_hash)
         ):
             raise ValueError("located-facts fact is not bound to its document version")
         locator = fact.get("locator")
         if not _valid_locator(locator, raw_hash, text_hash):
             raise ValueError("located-facts fact locator hash binding is invalid")
+        fact_material = {
+            'document_version_id': fact.get('document_version_id'),
+            'subject_id': fact.get('subject_id'),
+            'predicate': fact.get('predicate'),
+            'normalizer': fact.get('normalizer'),
+            'raw_value': fact.get('raw_value'),
+            'normalized_value': fact.get('normalized_value'),
+            'valid_time': fact.get('valid_time'),
+            'valid_time_source': fact.get('valid_time_source'),
+            'locator': locator,
+        }
+        expected_fact_id = f"FACT-{_json_hash(fact_material)[:20].upper()}"
+        if fact.get("fact_id") != expected_fact_id:
+            raise ValueError("located-facts fact ID binding is invalid")
         if fact.get("verification_status") not in {"FACT_CANDIDATE", "NEEDS_REVIEW", "CONFIRMED_OFFICIAL"}:
             raise ValueError("located-facts fact verification status is invalid")
         if fact.get("verification_status") == "CONFIRMED_OFFICIAL" and not _valid_fact_review(fact.get("review")):
