@@ -27,6 +27,7 @@ class QueryGatewayTests(unittest.TestCase):
             "requested_url": "https://data.gov.tw/api/v2/rest/dataset/88147",
             "final_url": "https://data.gov.tw/api/v2/rest/dataset/88147",
             "fetched_at": "2026-09-21T00:00:00+00:00",
+            "content_type": "application/json",
             "raw_bytes_sha256": "a" * 64,
             "extracted_text_sha256": "b" * 64,
             "extractor_version": "located-facts-v1",
@@ -72,6 +73,10 @@ class QueryGatewayTests(unittest.TestCase):
             "source_snapshot_ref": document["snapshot_ref"],
             "content_sha256": document["raw_bytes_sha256"],
             "official_url": document["final_url"],
+            "subject_id": fact["subject_id"],
+            "predicate": fact["predicate"],
+            "normalized_value": fact["normalized_value"],
+            "valid_time": fact["valid_time"],
             "verification_status": status,
         }]
         if status == "CONFIRMED_OFFICIAL":
@@ -393,6 +398,32 @@ class QueryGatewayTests(unittest.TestCase):
             snapshot["located_facts"] = bundle
             with self.assertRaisesRegex(ValueError, "source is not approved"):
                 gateway_module.QueryGateway(snapshot=snapshot)
+
+    def test_located_facts_rejects_orphan_event_rows(self):
+        snapshot = gateway_module.load_snapshot()
+        bundle = self.located_bundle()
+        bundle["public_event_inputs"].append({"stable_id": "FACT-ORPHAN"})
+        bundle["receipt"]["bundle_sha256"] = gateway_module._json_hash({
+            "facts": bundle["facts"],
+            "evidence_catalog": bundle["evidence_catalog"],
+            "public_event_inputs": bundle["public_event_inputs"],
+        })
+        snapshot["located_facts"] = bundle
+        with self.assertRaisesRegex(ValueError, "event is not bound"):
+            gateway_module.QueryGateway(snapshot=snapshot)
+
+    def test_located_facts_requires_evidence_for_every_fact(self):
+        snapshot = gateway_module.load_snapshot()
+        bundle = self.located_bundle()
+        bundle["evidence_catalog"] = []
+        bundle["receipt"]["bundle_sha256"] = gateway_module._json_hash({
+            "facts": bundle["facts"],
+            "evidence_catalog": bundle["evidence_catalog"],
+            "public_event_inputs": bundle["public_event_inputs"],
+        })
+        snapshot["located_facts"] = bundle
+        with self.assertRaisesRegex(ValueError, "evidence must link exactly"):
+            gateway_module.QueryGateway(snapshot=snapshot)
 
 
 if __name__ == "__main__":

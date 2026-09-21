@@ -143,12 +143,47 @@ def _is_sha256(value: Any) -> bool:
     return isinstance(value, str) and len(value) == 64 and all(char in "0123456789abcdef" for char in value)
 
 
+def _nonempty_string(value: Any) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
+def _valid_timestamp(value: Any) -> bool:
+    if not isinstance(value, str) or not value:
+        return False
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return parsed.tzinfo is not None
+
+
+def _valid_scalar(value: Any) -> bool:
+    return value is None or isinstance(value, (str, int, float, bool))
+
+
+def _valid_locator(locator: Any, raw_hash: str, text_hash: str) -> bool:
+    if not isinstance(locator, dict) or locator.get("document_sha256") != raw_hash or locator.get("text_sha256") != text_hash:
+        return False
+    if locator.get("type") == "HTML_TEXT_RANGE":
+        return (
+            type(locator.get("start")) is int
+            and type(locator.get("end")) is int
+            and 0 <= locator["start"] <= locator["end"]
+            and _nonempty_string(locator.get("quote"))
+        )
+    if locator.get("type") == "JSON_POINTER":
+        return isinstance(locator.get("pointer"), str) and (
+            locator["pointer"] == "" or locator["pointer"].startswith("/")
+        )
+    return False
+
+
 def _valid_fact_review(review: Any) -> bool:
     if not isinstance(review, dict):
         return False
     if review.get("decision") != "CONFIRMED_OFFICIAL" or review.get("method") != "EXACT_LOCATOR_RECHECK":
         return False
-    if not isinstance(review.get("reviewer_ref"), str) or not review["reviewer_ref"].strip():
+    if not isinstance(review.get("reviewer_ref"), str) or not review["reviewer_ref"].strip() or len(review["reviewer_ref"]) > 128:
         return False
     verified_at = review.get("verified_at")
     if not isinstance(verified_at, str) or not verified_at:
@@ -171,25 +206,31 @@ def approved_source_origins() -> dict[str, str]:
 
 def validate_located_facts_bundle(bundle: Any, approved_source_ids: set[str]) -> dict[str, Any]:
     document = bundle.get("document_version") if isinstance(bundle, dict) else None
-    if not isinstance(document, dict) or document.get("schema_version") != 1:
+    if not isinstance(document, dict) or type(document.get("schema_version")) is not int or document.get("schema_version") != 1:
         raise ValueError("located-facts bundle document version is invalid")
     source_id = document.get("source_id")
+    requested_url = document.get("requested_url")
     final_url = document.get("final_url")
-    if source_id not in approved_source_ids:
+    if not _nonempty_string(source_id) or source_id not in approved_source_ids:
         raise ValueError("located-facts bundle source is not approved and HTTPS")
     try:
+        validate_document_url(source_id, requested_url)
         validate_document_url(source_id, final_url)
     except (TypeError, ValueError) as error:
         raise ValueError("located-facts bundle source is not approved and HTTPS") from error
     raw_hash = document.get("raw_bytes_sha256")
     text_hash = document.get("extracted_text_sha256")
     if (
-        not isinstance(document.get("document_id"), str)
-        or not isinstance(document.get("original_source_identity"), str)
-        or not isinstance(document.get("snapshot_ref"), str)
-        or not isinstance(document.get("extractor_version"), str)
-        or not document["extractor_version"].strip()
-        or not isinstance(document.get("document_version_id"), str)
+        not _nonempty_string(document.get("document_id"))
+        or not _nonempty_string(document.get("original_source_identity"))
+        or not _nonempty_string(requested_url)
+        or not _nonempty_string(final_url)
+        or not _valid_timestamp(document.get("fetched_at"))
+        or not _nonempty_string(document.get("content_type"))
+        or document.get("rights_status") not in {"UNKNOWN", "METADATA_LINK_ONLY", "PUBLIC_DERIVED"}
+        or not _nonempty_string(document.get("snapshot_ref"))
+        or not _nonempty_string(document.get("extractor_version"))
+        or not _nonempty_string(document.get("document_version_id"))
         or not _is_sha256(raw_hash)
         or not _is_sha256(text_hash)
         or document["snapshot_ref"] != f"sha256:{raw_hash}"
@@ -216,7 +257,7 @@ def validate_located_facts_bundle(bundle: Any, approved_source_ids: set[str]) ->
         raise ValueError("located-facts bundle receipt hash mismatch")
     fact_by_id = {}
     for fact in facts:
-        if not isinstance(fact, dict) or not isinstance(fact.get("fact_id"), str) or fact["fact_id"] in fact_by_id:
+        if not isinstance(fact, dict) or not _nonempty_string(fact.get("fact_id")) or fact["fact_id"] in fact_by_id:
             raise ValueError("located-facts bundle fact IDs must be unique")
         if (
             fact.get("source_id") != document["source_id"]
@@ -226,30 +267,37 @@ def validate_located_facts_bundle(bundle: Any, approved_source_ids: set[str]) ->
             or fact.get("raw_bytes_sha256") != raw_hash
             or fact.get("extracted_text_sha256") != text_hash
             or fact.get("extractor_version") != document.get("extractor_version")
+            or not _nonempty_string(fact.get("subject_id"))
+            or not _nonempty_string(fact.get("predicate"))
+            or "normalized_value" not in fact
+            or not _valid_scalar(fact.get("normalized_value"))
+            or "valid_time" not in fact
+            or (fact.get("valid_time") is not None and not _nonempty_string(fact.get("valid_time")))
         ):
             raise ValueError("located-facts fact is not bound to its document version")
         locator = fact.get("locator")
-        if (
-            not isinstance(locator, dict)
-            or locator.get("type") not in {"HTML_TEXT_RANGE", "JSON_POINTER"}
-            or locator.get("document_sha256") != raw_hash
-            or locator.get("text_sha256") != text_hash
-        ):
+        if not _valid_locator(locator, raw_hash, text_hash):
             raise ValueError("located-facts fact locator hash binding is invalid")
         if fact.get("verification_status") not in {"FACT_CANDIDATE", "NEEDS_REVIEW", "CONFIRMED_OFFICIAL"}:
             raise ValueError("located-facts fact verification status is invalid")
+        if fact.get("verification_status") == "CONFIRMED_OFFICIAL" and not _valid_fact_review(fact.get("review")):
+            raise ValueError("located-facts confirmed fact requires a bound review")
         fact_by_id[fact["fact_id"]] = fact
     seen = set()
+    evidence_fact_ids = set()
     for row in evidence:
-        if not isinstance(row, dict) or not isinstance(row.get("evidence_id"), str) or row["evidence_id"] in seen:
+        if not isinstance(row, dict) or not _nonempty_string(row.get("evidence_id")) or row["evidence_id"] in seen:
             raise ValueError("located-facts evidence IDs must be unique")
-        if row.get("fact_id") not in fact_by_id or row.get("source_id") != document["source_id"]:
+        if not _nonempty_string(row.get("fact_id")) or row.get("fact_id") not in fact_by_id or row.get("source_id") != document["source_id"]:
             raise ValueError("located-facts evidence is not bound to a fact")
         fact = fact_by_id[row["fact_id"]]
         if (
             row.get("document_version_id") != document["document_version_id"]
+            or not _is_sha256(row.get("content_sha256"))
             or row.get("content_sha256") != raw_hash
+            or not _nonempty_string(row.get("official_url"))
             or row.get("official_url") != document["final_url"]
+            or not _valid_locator(row.get("locator"), raw_hash, text_hash)
             or row.get("locator") != fact.get("locator")
         ):
             raise ValueError("located-facts evidence hash/version binding is invalid")
@@ -259,28 +307,41 @@ def validate_located_facts_bundle(bundle: Any, approved_source_ids: set[str]) ->
             if not _valid_fact_review(row.get("review")) or fact.get("review") != row.get("review"):
                 raise ValueError("located-facts confirmed evidence requires a bound review")
         seen.add(row["evidence_id"])
+        evidence_fact_ids.add(row["fact_id"])
+    if evidence_fact_ids != set(fact_by_id):
+        raise ValueError("located-facts evidence must link exactly one row to every fact")
     event_by_id = {}
     for event in events:
-        if not isinstance(event, dict) or event.get("stable_id") not in fact_by_id:
-            continue
+        if not isinstance(event, dict) or not _nonempty_string(event.get("stable_id")):
+            raise ValueError("located-facts event IDs must be valid")
         if event["stable_id"] in event_by_id:
             raise ValueError("located-facts event IDs must be unique")
+        if event["stable_id"] not in fact_by_id:
+            raise ValueError("located-facts event is not bound to a fact")
         event_by_id[event["stable_id"]] = event
         fact = fact_by_id[event["stable_id"]]
         if (
             event.get("source_id") != document["source_id"]
             or event.get("source_snapshot_ref") != document["snapshot_ref"]
+            or not _is_sha256(event.get("content_sha256"))
             or event.get("content_sha256") != raw_hash
+            or not _nonempty_string(event.get("official_url"))
             or event.get("official_url") != document["final_url"]
+            or event.get("subject_id") != fact.get("subject_id")
+            or event.get("predicate") != fact.get("predicate")
+            or "normalized_value" not in event
+            or event.get("normalized_value") != fact.get("normalized_value")
+            or "valid_time" not in event
+            or event.get("valid_time") != fact.get("valid_time")
         ):
             raise ValueError("located-facts event is not bound to its document version")
         if event.get("verification_status") != fact.get("verification_status"):
             raise ValueError("located-facts event status is not bound to its fact")
-        if fact.get("verification_status") == "CONFIRMED_OFFICIAL" and event.get("review") != fact.get("review"):
-            raise ValueError("located-facts confirmed event requires a bound review")
-    for fact_id, fact in fact_by_id.items():
-        if fact.get("verification_status") == "CONFIRMED_OFFICIAL" and fact_id not in event_by_id:
-            raise ValueError("located-facts confirmed fact requires a bound event")
+        if fact.get("verification_status") == "CONFIRMED_OFFICIAL":
+            if not _valid_fact_review(event.get("review")) or event.get("review") != fact.get("review"):
+                raise ValueError("located-facts confirmed event requires a bound review")
+    if set(event_by_id) != set(fact_by_id):
+        raise ValueError("located-facts events must link exactly one row to every fact")
     return bundle
 
 
