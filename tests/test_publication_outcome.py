@@ -205,6 +205,9 @@ class OutcomeTests(unittest.TestCase):
         self.assertIn("npm run check", text)
         self.assertNotIn("continue-on-error", text)
         self.assertNotIn("--force", text)
+        self.assertIn("image: postgres:16", text)
+        self.assertIn("TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/govintel_test", text)
+        self.assertIn("pg_isready -U postgres -d govintel_test", text)
 
     def test_pending_replay_and_public_acknowledgement_are_wired(self):
         text = (ROOT / ".github/workflows/pages.yml").read_text(encoding="utf-8")
@@ -219,6 +222,13 @@ class OutcomeTests(unittest.TestCase):
         self.assertIn("GENERATION_ID: ${{ needs.build.outputs.generation_id }}", text)
         self.assertIn("STATE_COMMIT: ${{ needs.build.outputs.state_commit }}", text)
         self.assertIn("SCHEMA_DRIFT: ${{ needs.build.outputs.schema_drift }}", text)
+
+    def test_ci_runs_postgresql_migration_gate_against_ephemeral_service(self):
+        text = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+        self.assertIn("image: postgres:16", text)
+        self.assertIn("POSTGRES_DB: govintel_test", text)
+        self.assertIn("TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/govintel_test", text)
+        self.assertIn("pg_isready -U postgres -d govintel_test", text)
 
     def test_explicit_failed_public_probe_cannot_report_success(self):
         for status in ("failure", "skipped", "", "unknown"):

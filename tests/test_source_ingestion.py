@@ -4,8 +4,6 @@ import copy
 import json
 import os
 import re
-import shutil
-import subprocess
 import tempfile
 import unittest
 import uuid
@@ -350,37 +348,24 @@ class SourceIngestionContractTests(unittest.TestCase):
 
     @unittest.skipUnless(os.environ.get("TEST_DATABASE_URL"), "TEST_DATABASE_URL not set")
     def test_migration_applies_to_postgresql(self) -> None:
-        psql = shutil.which("psql")
-        if not psql:
-            self.skipTest("psql not found")
+        try:
+            import psycopg
+        except ImportError:
+            self.skipTest("psycopg not installed")
         schema = f"kiro_d1_{uuid.uuid4().hex}"
         table_names = ", ".join(f"'{name}'" for name in sorted(TABLES))
-        command = [
-            psql,
-            "-X",
-            "-qAt",
-            "-v",
-            "ON_ERROR_STOP=1",
-            "-d",
-            os.environ["TEST_DATABASE_URL"],
-            "-c",
-            f'BEGIN; CREATE SCHEMA "{schema}"; SET LOCAL search_path TO "{schema}";',
-        ]
-        for migration in MIGRATIONS:
-            command.extend(["-f", str(migration)])
-        command.extend([
-            "-c",
-            (
-                "SELECT count(*) FROM information_schema.tables "
-                f"WHERE table_schema = '{schema}' AND table_name IN ({table_names});"
-            ),
-            "-c",
-            "ROLLBACK;",
-        ])
-        env = {**os.environ, "PGCONNECT_TIMEOUT": "5"}
-        result = subprocess.run(command, capture_output=True, text=True, env=env, timeout=30)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn(str(len(TABLES)), result.stdout.splitlines())
+        with psycopg.connect(os.environ["TEST_DATABASE_URL"], connect_timeout=5) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(f'CREATE SCHEMA "{schema}"')
+                cursor.execute(f'SET LOCAL search_path TO "{schema}"')
+                for migration in MIGRATIONS:
+                    cursor.execute(migration.read_text(encoding="utf-8"))
+                cursor.execute(
+                    "SELECT count(*) FROM information_schema.tables "
+                    f"WHERE table_schema = '{schema}' AND table_name IN ({table_names})"
+                )
+                self.assertEqual(cursor.fetchone()[0], len(TABLES))
+            connection.rollback()
 
 
 if __name__ == "__main__":

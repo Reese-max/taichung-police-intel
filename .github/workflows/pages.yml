@@ -35,6 +35,8 @@ concurrency:
 jobs:
   build:
     if: github.ref == 'refs/heads/main'
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/govintel_test
     outputs:
       restore: ${{ steps.restore_state.outcome }}
       collect: ${{ steps.collect.outcome }}
@@ -50,6 +52,19 @@ jobs:
       evidence: ${{ steps.evidence.outcome }}
       evidence_url: ${{ steps.evidence.outputs.artifact-url }}
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: govintel_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d govintel_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Checkout
         uses: actions/checkout@v4
