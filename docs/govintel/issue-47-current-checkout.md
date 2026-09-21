@@ -43,6 +43,14 @@ candidate `rc-9a6ea6f65dde-20260921T232927Z` and `24/24` checks. The receipt is
 foreign-generation rejection, query-down static fallback, and sabotage
 detection. Its `production_verified` field remains `false` by design.
 
+## 2026-09-22 final local replay
+
+After the source-policy receipt and Next workspace-root fixes, commit
+`40e28aa42b40e3f1a0cc1c7de9c0318aeac7fbf4` passed the full verifier with
+candidate `rc-40e28aa42b40-20260921T234108Z` and `24/24` checks. The receipt is
+`runtime-evidence/current-checkout/20260921T234108Z/receipt.json`; the local
+candidate remains loopback-only and `production_verified=false`.
+
 ## Evidence boundary
 
 | Dimension | State |
