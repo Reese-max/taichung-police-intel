@@ -19,10 +19,13 @@ if str(ROOT) not in sys.path:
 from intel_v2.handoff import (
     add_watch,
     confirm_handoff,
+    empty_state,
     find_handoff,
     handoff_markdown,
     load_state,
     set_watch_status,
+    sync_with_publication,
+    tracking_projection,
 )
 
 
@@ -144,6 +147,92 @@ def command_export(args: argparse.Namespace) -> int:
     return 0
 
 
+def self_check() -> None:
+    """Replay the minimum cross-day watch -> correction -> v2 handoff flow."""
+    t0 = "2026-09-01T09:00:00+08:00"
+    t1 = "2026-09-02T09:00:00+08:00"
+    t2 = "2026-09-03T09:00:00+08:00"
+    identity = "S-032:traffic-demo-1"
+
+    def source(version: int) -> dict:
+        return {
+            "identity": identity,
+            "source_id": "S-032",
+            "stable_key": "traffic-demo-1",
+            "title": "歷史重播：交通管制公告",
+            "official_url": "https://example.gov.tw/traffic-demo-1",
+            "version_no": version,
+            "normalized_sha256": ("a" if version == 1 else "b") * 64,
+            "date_status": "KNOWN",
+        }
+
+    first = source(1)
+    state, watch, created = add_watch(empty_state(), first, created_at=t0, reason_code="DEMO")
+    assert created
+    state, first_handoff = confirm_handoff(
+        state,
+        current_items={identity: first},
+        publication={"collection_run_id": "DEMO-RUN-1"},
+        generated_at=t0,
+        confirmed_at=t0,
+    )
+    rows, total = tracking_projection(
+        state, current_items={identity: first}, events=[], source_status={"sources": []}
+    )
+    assert total == 1 and rows[0]["watch_status"] == "WATCHING"
+
+    state = sync_with_publication(
+        state,
+        previous_items={identity: first},
+        current_items={identity: first},
+        events=[],
+        observed_at=t1,
+        collection_run_id="DEMO-RUN-2",
+    )
+    rows, total = tracking_projection(
+        state, current_items={identity: first}, events=[], source_status={"sources": []}
+    )
+    assert total == 1 and rows[0]["watch_status"] == "WATCHING"
+
+    second = source(2)
+    state = sync_with_publication(
+        state,
+        previous_items={identity: first},
+        current_items={identity: second},
+        events=[
+            {
+                "event_id": "DEMO-EVENT-1",
+                "identity": identity,
+                "change_type": "DEADLINE_CHANGED",
+                "detected_at": t2,
+                "before_version": 1,
+                "after_version": 2,
+                "changed_fields": ["payload.effective_at"],
+                "publishable": True,
+            }
+        ],
+        observed_at=t2,
+        collection_run_id="DEMO-RUN-3",
+    )
+    tracked = state["watch_items"][watch["watch_id"]]
+    assert tracked["status"] == "NEEDS_REVIEW"
+    assert tracked["invalidations"][-1]["before"]["version"] == 1
+    assert tracked["invalidations"][-1]["after"]["version"] == 2
+
+    state, second_handoff = confirm_handoff(
+        state,
+        current_items={identity: second},
+        publication={"collection_run_id": "DEMO-RUN-3"},
+        generated_at=t2,
+        confirmed_at=t2,
+    )
+    assert first_handoff["items"][0]["source_version"] == 1
+    assert second_handoff["items"][0]["source_version"] == 2
+    assert second_handoff["items"][0]["evidence"]["locator"] == f"{identity}#v2"
+    assert state["watch_items"][watch["watch_id"]]["status"] == "WATCHING"
+    print("HANDOFF_DEMO_OK cross_day=true invalidation=true versions=1->2 exact_locator=true")
+
+
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(description="Manage local-first GovIntel watch and handoff state.")
     result.add_argument("--handoff-state", type=Path, default=DEFAULT_HANDOFF_STATE)
@@ -179,6 +268,7 @@ def parser() -> argparse.ArgumentParser:
     export.add_argument("--format", choices=("markdown", "json"), default="markdown")
     export.add_argument("--output", type=Path)
     export.set_defaults(handler=command_export)
+    commands.add_parser("self-check").set_defaults(handler=lambda _: self_check() or 0)
     return result
 
 

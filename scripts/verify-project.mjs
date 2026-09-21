@@ -260,6 +260,7 @@ if (["quick", "full"].includes(mode) && !failures.length) {
       ["system-health-receipt", ["-X", "utf8", "scripts/system-health.py", "--output", "apps/web/public/data/system-health.json"]],
       ["query-gateway-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_query_gateway.py", "-v"]],
       ["handoff-state-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_handoff_state.py", "-v"]],
+      ["handoff-state-self-check", ["-X", "utf8", "scripts/handoff-state.py", "self-check"]],
       ["review-inbox-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_review_inbox.py", "-v"]],
       ["review-inbox-self-check", ["-X", "utf8", "scripts/review-inbox.py", "self-check"]],
       ["located-facts-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_located_facts.py", "-v"]],

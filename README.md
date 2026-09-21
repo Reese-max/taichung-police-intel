@@ -133,6 +133,7 @@ Local-first handoff state:
 python scripts/handoff-state.py watch --identity S-009:FEED-S-009-example
 python scripts/handoff-state.py confirm
 python scripts/handoff-state.py export --format markdown --output output/handoff.md
+python scripts/handoff-state.py self-check
 ```
 
 The command uses the durable `state/v2-handoff-state.json`, makes repeated watch adds idempotent, preserves confirmed handoff versions, and reopens only affected watches as `NEEDS_REVIEW` when a source version changes. The static Web page is read-only; write operations currently use this local CLI and never store private notes or operational police fields.
