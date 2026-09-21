@@ -48,3 +48,15 @@ bindings, and bundle receipt before startup; only explicitly
 `CONFIRMED_OFFICIAL` facts enter the server-controlled Answer Evidence Gate.
 `FACT_CANDIDATE` and `NEEDS_REVIEW` remain excluded until a separate review
 step promotes them, so a caller cannot inject its own evidence catalog.
+
+## 2026-09-21 local replay
+
+The live S-028 bundle was confirmed into a temporary test-only output using
+`reviewer_ref=test-only-local-check`, then loaded by the local gateway. A
+`validate_answer` claim for `dataset:88147:dataset_title` returned `gate_status=PASS`
+with evidence `EVID-79778138CAE1F24005C5` and document version
+`DOCV-94D57674E75896E14B34`. The same response reported `freshness=STALE`,
+which is intentional: locator/evidence confirmation does not make an old
+publication current. The temporary confirmed bundle was not copied into the
+repository or deployed, and this replay is not a production human-approval or
+public-reachability receipt.
