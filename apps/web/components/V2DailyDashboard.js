@@ -15,6 +15,8 @@ import {
   syncLocalHandoff,
 } from "../lib/local-handoff.js";
 import {
+  FEEDBACK_REASONS,
+  addLocalReviewFeedback,
   emptyLocalReview,
   exportLocalReview,
   loadLocalReview,
@@ -73,6 +75,18 @@ const REVIEW_STATUS_LABELS = {
   RESOLVED: "本機已處理",
   DISMISSED: "本機暫時忽略",
   CANONICAL_ONLY: "尚未建立本機覆核紀錄",
+};
+
+const FEEDBACK_REASON_LABELS = {
+  FALSE_MERGE: "誤合併",
+  MISSED_MERGE: "漏合併",
+  WRONG_ENTITY: "實體錯誤",
+  NOT_RELEVANT: "不相關",
+  MISSING_EVENT: "漏事件",
+  WRONG_CHANGE_CLASSIFICATION: "異動分類錯誤",
+  UNSUPPORTED_ANSWER: "回答缺少支持",
+  WRONG_STATISTIC_SCOPE: "統計範圍錯誤",
+  BAD_SOURCE_MAPPING: "來源 mapping 錯誤",
 };
 
 async function fetchJson(url) {
@@ -166,7 +180,35 @@ function PublicationProvenance({ publication, archive, sourceStatus, candidate, 
   );
 }
 
-function ReviewInboxPanel({ health, localReview, onDecision, onExport, notice, error }) {
+function defaultFeedbackReason(reason) {
+  if (reason === "CONFLICT" || reason === "SPLIT_REQUIRED") return "FALSE_MERGE";
+  if (reason === "MERGE_CANDIDATE") return "MISSED_MERGE";
+  if (reason === "DISCOVERY_UNVERIFIED" || reason === "PARTIAL_SOURCE") return "BAD_SOURCE_MAPPING";
+  return "WRONG_CHANGE_CLASSIFICATION";
+}
+
+function ReviewFeedbackForm({ item, enabled, onCreate }) {
+  const [reason, setReason] = useState(defaultFeedbackReason(item.reason));
+  return (
+    <form
+      className="v2-review-feedback"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onCreate(item, reason);
+      }}
+    >
+      <label>
+        <span>回報類型</span>
+        <select value={reason} onChange={(event) => setReason(event.target.value)} disabled={!enabled}>
+          {FEEDBACK_REASONS.map((value) => <option key={value} value={value}>{FEEDBACK_REASON_LABELS[value] || value}</option>)}
+        </select>
+      </label>
+      <button type="submit" disabled={!enabled}>建立本機 feedback</button>
+    </form>
+  );
+}
+
+function ReviewInboxPanel({ health, localReview, onDecision, onFeedback, onExport, notice, error }) {
   const canonicalItems = Array.isArray(health.review_inbox) ? health.review_inbox : [];
   const items = projectLocalReview(localReview, canonicalItems);
   const hasLocalItems = Boolean(localReview && Object.keys(localReview.items || {}).length);
@@ -210,13 +252,14 @@ function ReviewInboxPanel({ health, localReview, onDecision, onExport, notice, e
                     </button>
                   )}
                 </div>
+                <ReviewFeedbackForm item={item} enabled={!localActionDisabled} onCreate={onFeedback} />
               </li>
             );
           })}
         </ul>
       ) : <span>目前沒有需要人工覆核的契約漂移。</span>}
       <div className="v2-review-footer">
-        <small>合併、拆分、修正 mapping 仍須由 canonical writer 執行；本頁不提供假寫入。</small>
+        <small>feedback 先保存為本機草稿；合併、拆分、修正 mapping 仍須由 canonical writer 執行。</small>
         <button type="button" onClick={onExport} disabled={!hasLocalItems}>
           匯出本機覆核紀錄
         </button>
@@ -227,7 +270,7 @@ function ReviewInboxPanel({ health, localReview, onDecision, onExport, notice, e
   );
 }
 
-function SystemHealthSummary({ health, localReview, onDecision, onExport, notice, error }) {
+function SystemHealthSummary({ health, localReview, onDecision, onFeedback, onExport, notice, error }) {
   if (!health || !health.lanes || !Array.isArray(health.stages)) return null;
   return (
     <details className="v2-system-health" data-testid="v2-system-health">
@@ -254,6 +297,7 @@ function SystemHealthSummary({ health, localReview, onDecision, onExport, notice
           health={health}
           localReview={localReview}
           onDecision={onDecision}
+          onFeedback={onFeedback}
           onExport={onExport}
           notice={notice}
           error={error}
@@ -668,6 +712,22 @@ export default function V2DailyDashboard() {
     }
   };
 
+  const handleReviewFeedback = (item, reason) => {
+    if (!localReview) {
+      setReviewError("本機覆核尚未載入，未建立 feedback 草稿。");
+      return;
+    }
+    try {
+      const next = addLocalReviewFeedback(localReview, item, reason);
+      saveLocalReview(next);
+      setLocalReview(next);
+      setReviewNotice(`已建立本機 feedback 草稿：${reason}。`);
+      setReviewError("");
+    } catch (error) {
+      setReviewError(error.message);
+    }
+  };
+
   const handleReviewExport = () => {
     try {
       const artifact = exportLocalReview(localReview || emptyLocalReview(), "markdown");
@@ -914,6 +974,7 @@ export default function V2DailyDashboard() {
             health={systemHealth}
             localReview={localReview}
             onDecision={handleReviewDecision}
+            onFeedback={handleReviewFeedback}
             onExport={handleReviewExport}
             notice={reviewNotice}
             error={reviewError}

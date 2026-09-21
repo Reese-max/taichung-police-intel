@@ -21,4 +21,4 @@ python scripts/feedback.py review --feedback-id FEEDBACK-... --status ACCEPTED -
 python scripts/feedback.py stats
 ```
 
-`state/feedback.json` 是可重播的本地狀態；公開 Web 仍是 read-only。這一版完成 feedback record、review gate、dedupe、regression link 與 statistics，尚未宣稱已接上真人 UI、遠端通知或自動 online learning。
+`state/feedback.json` 是 canonical、可重播的本地狀態；公開 Web 不直接寫入它。V2 Review Inbox 現在可建立 9 類、版本／evidence hash 綁定的瀏覽器本機 feedback draft，並匯出 Markdown/JSON；這些草稿仍須人工轉入 `scripts/feedback.py` 才會進入 canonical review gate。這一版完成 feedback record、review gate、dedupe、regression link、statistics 與 bounded local UI draft，尚未宣稱已接上遠端通知或自動 online learning。

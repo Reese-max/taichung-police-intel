@@ -1,7 +1,19 @@
 export const REVIEW_STORAGE_KEY = "govintel.review-inbox.local.v1";
+export const FEEDBACK_REASONS = [
+  "FALSE_MERGE",
+  "MISSED_MERGE",
+  "WRONG_ENTITY",
+  "NOT_RELEVANT",
+  "MISSING_EVENT",
+  "WRONG_CHANGE_CLASSIFICATION",
+  "UNSUPPORTED_ANSWER",
+  "WRONG_STATISTIC_SCOPE",
+  "BAD_SOURCE_MAPPING",
+];
 
 const LOCAL_STATUSES = new Set(["OPEN", "KEEP_WATCHING", "RESOLVED", "DISMISSED"]);
 const DECISIONS = new Set(["KEEP_WATCHING", "RESOLVED", "DISMISSED"]);
+const FEEDBACK_REASON_SET = new Set(FEEDBACK_REASONS);
 
 function copy(value) {
   return JSON.parse(JSON.stringify(value));
@@ -51,6 +63,7 @@ export function emptyLocalReview() {
     schema_version: 1,
     mode: "LOCAL_REVIEW_OVERLAY",
     items: {},
+    feedback: {},
     last_updated_at: null,
   };
 }
@@ -110,6 +123,43 @@ export function validateLocalReview(value) {
     }
     if (item.decision) stamp(item.decision.decided_at);
   }
+  const feedback = value.feedback || {};
+  if (!feedback || Array.isArray(feedback)) throw new Error("本機 feedback 資料結構不完整，已停止載入");
+  for (const [feedbackId, draft] of Object.entries(feedback)) {
+    const binding = draft?.source_binding;
+    if (
+      !draft
+      || draft.feedback_id !== feedbackId
+      || draft.status !== "DRAFT"
+      || !FEEDBACK_REASON_SET.has(draft.reason)
+      || typeof draft.review_id !== "string"
+      || !draft.target
+      || !["EVENT", "ENTITY", "QUERY", "ANSWER"].includes(draft.target.type)
+      || typeof draft.target.id !== "string"
+      || typeof draft.target.version !== "string"
+      || !binding
+      || typeof binding.review_id !== "string"
+      || binding.review_id !== draft.review_id
+      || typeof binding.source_version !== "string"
+      || !/^[0-9a-f]{64}$/.test(binding.evidence_sha256)
+      || binding.binding_id !== bindingId({
+        review_id: binding.review_id,
+        source_version: binding.source_version,
+        evidence_sha256: binding.evidence_sha256,
+      })
+      || draft.binding_id !== binding.binding_id
+      || feedbackId !== feedbackIdFor({
+        review_id: binding.review_id,
+        source_version: binding.source_version,
+        evidence_sha256: binding.evidence_sha256,
+      }, draft.reason)
+      || !Array.isArray(draft.evidence_refs)
+      || draft.evidence_refs.some((ref) => typeof ref !== "string")
+    ) {
+      throw new Error(`本機 feedback 無法驗證：${feedbackId}`);
+    }
+    stamp(draft.created_at);
+  }
   if (value.last_updated_at !== null) stamp(value.last_updated_at);
   return value;
 }
@@ -132,6 +182,7 @@ export function saveLocalReview(state, storage = null) {
 
 export function syncLocalReview(state, items, observedAt = new Date()) {
   const result = copy(validateLocalReview(state));
+  result.feedback ||= {};
   const at = stamp(observedAt);
   for (const raw of Array.isArray(items) ? items : []) {
     const current = publicItem(raw);
@@ -162,6 +213,52 @@ export function syncLocalReview(state, items, observedAt = new Date()) {
     existing.canonical_status = current.canonical_status;
     existing.entity_ids = current.entity_ids;
   }
+  result.last_updated_at = at;
+  return result;
+}
+
+function feedbackIdFor(item, reason) {
+  return `FEEDBACK-${encodeURIComponent(`${item.review_id}|${reason}|${bindingId(item)}`)}`;
+}
+
+function feedbackTarget(item) {
+  const ids = item.entity_ids || {};
+  const eventId = ids.public_event_id || ids.event_id;
+  if (eventId) return { type: "EVENT", id: eventId, version: item.source_version };
+  return { type: "ENTITY", id: ids.entity_id || ids.source_id || item.review_id, version: item.source_version };
+}
+
+export function addLocalReviewFeedback(state, item, reason, createdAt = new Date()) {
+  const result = copy(validateLocalReview(state));
+  result.feedback ||= {};
+  const current = publicItem(item);
+  const local = current && result.items[current.review_id];
+  const normalized = String(reason || "").toUpperCase().replace(/-/g, "_");
+  if (!current || !local || local.binding_id !== bindingId(current)) {
+    throw new Error("此 feedback 缺少可驗證的目前來源 binding");
+  }
+  if (!FEEDBACK_REASON_SET.has(normalized)) throw new Error(`不支援的 feedback reason：${reason}`);
+  const feedbackId = feedbackIdFor(current, normalized);
+  if (result.feedback[feedbackId]) return result;
+  const at = stamp(createdAt);
+  result.feedback[feedbackId] = {
+    feedback_id: feedbackId,
+    review_id: current.review_id,
+    status: "DRAFT",
+    reason: normalized,
+    target: feedbackTarget(current),
+    source_binding: {
+      review_id: current.review_id,
+      source_version: current.source_version,
+      evidence_sha256: current.evidence_sha256,
+      binding_id: bindingId(current),
+    },
+    binding_id: bindingId(current),
+    evidence_refs: Object.entries(current.entity_ids || {})
+      .filter(([, value]) => typeof value === "string" && value)
+      .map(([key, value]) => `${key}:${value}`),
+    created_at: at,
+  };
   result.last_updated_at = at;
   return result;
 }
@@ -226,6 +323,20 @@ function reviewMarkdown(state) {
       `- history_entries: ${item.history.length}`,
       "",
     );
+  }
+  const feedback = Object.values(valid.feedback || {});
+  if (feedback.length) {
+    lines.push("## 本機 feedback drafts", "", "> 僅為待人工轉入 canonical feedback 的草稿。", "");
+    for (const draft of feedback) {
+      lines.push(
+        `### ${draft.feedback_id}`,
+        `- review_id: \`${draft.review_id}\``,
+        `- reason: \`${draft.reason}\``,
+        `- target: \`${draft.target.type}:${draft.target.id}@${draft.target.version}\``,
+        `- source binding: \`${draft.binding_id}\``,
+        "",
+      );
+    }
   }
   return lines.join("\n");
 }

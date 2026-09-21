@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  addLocalReviewFeedback,
   emptyLocalReview,
   exportLocalReview,
   loadLocalReview,
@@ -9,6 +10,7 @@ import {
   saveLocalReview,
   setLocalReviewDecision,
   syncLocalReview,
+  validateLocalReview,
 } from "../lib/local-review.js";
 
 const T0 = "2026-09-21T00:00:00+00:00";
@@ -47,6 +49,17 @@ test("local decisions keep the source binding and export an explicit local-only 
   assert.match(exportLocalReview(decided, "json").content, /KEEP_WATCHING/);
 });
 
+test("review feedback drafts are deduplicated and stay bound to the reviewed event version", () => {
+  const state = syncLocalReview(emptyLocalReview(), [item()], T0);
+  const first = addLocalReviewFeedback(state, item(), "FALSE_MERGE", T1);
+  const same = addLocalReviewFeedback(first, item(), "FALSE_MERGE", T1);
+  const drafts = Object.values(same.feedback);
+  assert.equal(drafts.length, 1);
+  assert.equal(drafts[0].target.type, "EVENT");
+  assert.equal(drafts[0].source_binding.evidence_sha256, "a".repeat(64));
+  assert.match(exportLocalReview(same, "markdown").content, /feedback drafts/);
+});
+
 test("local review storage round-trips and rejects an altered binding", () => {
   const storage = {
     value: null,
@@ -59,4 +72,13 @@ test("local review storage round-trips and rejects an altered binding", () => {
   const tampered = JSON.parse(storage.value);
   tampered.items["REVIEW-S-007"].evidence_sha256 = "c".repeat(64);
   assert.throws(() => loadLocalReview({ getItem: () => JSON.stringify(tampered) }), /本機覆核資料無法驗證/);
+
+  const withFeedback = addLocalReviewFeedback(state, item(), "FALSE_MERGE", T1);
+  const brokenFeedback = JSON.parse(JSON.stringify(withFeedback));
+  const feedbackId = Object.keys(brokenFeedback.feedback)[0];
+  brokenFeedback.feedback[feedbackId].binding_id = "tampered";
+  assert.throws(() => validateLocalReview(brokenFeedback), /本機 feedback 無法驗證/);
+  const missingBinding = JSON.parse(JSON.stringify(withFeedback));
+  delete missingBinding.feedback[feedbackId].source_binding;
+  assert.throws(() => validateLocalReview(missingBinding), /本機 feedback 無法驗證/);
 });

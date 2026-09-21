@@ -719,6 +719,12 @@
 .v2-review-footer button { padding: 5px 8px; color: #dbeafe; background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(96, 165, 250, 0.28); border-radius: 6px; cursor: pointer; font: 700 0.68rem/1.2 var(--mono); }
 .v2-review-actions button:disabled,
 .v2-review-footer button:disabled { cursor: not-allowed; opacity: 0.5; }
+.v2-review-feedback { display: flex; flex-wrap: wrap; gap: 6px; align-items: end; }
+.v2-review-feedback label { display: grid; gap: 3px; color: var(--text-muted); font-size: 0.68rem; }
+.v2-review-feedback select { min-height: 27px; padding: 3px 6px; color: #dbeafe; background: rgba(15, 25, 35, 0.8); border: 1px solid rgba(96, 165, 250, 0.28); border-radius: 6px; font: 600 0.68rem/1.2 var(--mono); }
+.v2-review-feedback button { min-height: 27px; padding: 5px 8px; color: #dbeafe; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(52, 211, 153, 0.28); border-radius: 6px; cursor: pointer; font: 700 0.68rem/1.2 var(--mono); }
+.v2-review-feedback button:disabled,
+.v2-review-feedback select:disabled { cursor: not-allowed; opacity: 0.5; }
 .v2-review-footer { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; }
 .v2-review-footer small { flex: 1 1 300px; }
 .v2-review-inbox small.error { color: #fca5a5; }
