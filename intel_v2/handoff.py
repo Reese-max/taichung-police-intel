@@ -52,6 +52,32 @@ def watch_id_for(identity: str) -> str:
     return f"WATCH-{_sha(identity).upper()[:20]}"
 
 
+def claim_id_for(identity: str, source_version: int) -> str:
+    if not identity or ":" not in identity or not isinstance(source_version, int) or source_version < 1:
+        raise ValueError("claim requires a canonical identity and positive source version")
+    return f"CLAIM-{_sha([identity, source_version]).upper()[:20]}"
+
+
+def _affected_claims(state: dict[str, Any], identity: str, source_version: int) -> list[dict[str, Any]]:
+    rows = []
+    for handoff in state["handoffs"]:
+        for entry in handoff["items"]:
+            if entry.get("identity") != identity or entry.get("source_version") != source_version:
+                continue
+            evidence = entry.get("evidence") if isinstance(entry.get("evidence"), dict) else {}
+            rows.append(
+                {
+                    "brief_id": handoff["brief_id"],
+                    "brief_version": handoff["brief_version"],
+                    "claim_id": entry.get("claim_id") or claim_id_for(identity, source_version),
+                    "source_version": source_version,
+                    "source_document_version": entry.get("source_document_version"),
+                    "evidence_locator": evidence.get("locator"),
+                }
+            )
+    return sorted(rows, key=lambda row: (row["brief_version"], row["claim_id"]))
+
+
 def validate_state(state: dict[str, Any]) -> dict[str, Any]:
     if state.get("schema_version") != 1 or state.get("mode") != "V2_HANDOFF":
         raise ValueError("handoff state must use schema_version=1 and mode=V2_HANDOFF")
@@ -201,6 +227,7 @@ def sync_with_publication(
                             "normalized_sha256": after_hash,
                             "official_url": (current or {}).get("official_url") or watch["official_url"],
                         },
+                        "affected_claims": _affected_claims(result, identity, tracked_version),
                     }
                 )
             watch["status"] = "NEEDS_REVIEW"
@@ -320,6 +347,8 @@ def confirm_handoff(
                 "title": current.get("title") or watch["title"],
                 "source_version": current["version_no"],
                 "source_sha256": current.get("normalized_sha256"),
+                "claim_id": claim_id_for(watch["identity"], current["version_no"]),
+                "source_document_version": current.get("document_version_id") or current.get("normalized_sha256"),
                 "evidence": {
                     "official_url": current["official_url"],
                     "locator": f"{watch['identity']}#v{current['version_no']}",
@@ -411,7 +440,9 @@ def handoff_markdown(handoff: dict[str, Any]) -> str:
             [
                 f"### {item['title']}",
                 f"- watch_id: `{item['watch_id']}`",
+                f"- claim_id: `{item.get('claim_id') or claim_id_for(item['identity'], item['source_version'])}`",
                 f"- source version: `v{item['source_version']}`",
+                f"- source document version: `{item.get('source_document_version') or 'UNKNOWN'}`",
                 f"- evidence: [{evidence['official_url']}]({evidence['official_url']})",
                 f"- locator: `{evidence['locator']}`",
                 "",

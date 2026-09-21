@@ -4,6 +4,7 @@ from pathlib import Path
 
 from intel_v2.handoff import (
     add_watch,
+    claim_id_for,
     confirm_handoff,
     empty_state,
     handoff_markdown,
@@ -80,6 +81,11 @@ class HandoffStateTests(unittest.TestCase):
         self.assertEqual(tracked["status"], "NEEDS_REVIEW")
         self.assertEqual(tracked["invalidations"][0]["before"]["version"], 1)
         self.assertEqual(tracked["invalidations"][0]["after"]["version"], 2)
+        self.assertEqual(tracked["invalidations"][0]["affected_claims"][0]["brief_id"], first_handoff["brief_id"])
+        self.assertEqual(
+            tracked["invalidations"][0]["affected_claims"][0]["claim_id"],
+            claim_id_for(item()["identity"], 1),
+        )
         self.assertEqual(updated["handoffs"][0]["brief_id"], first_handoff["brief_id"])
 
     def test_failed_or_partial_source_does_not_resolve_watch(self):
@@ -150,7 +156,9 @@ class HandoffStateTests(unittest.TestCase):
         self.assertEqual(len(state["handoffs"]), 2)
         self.assertEqual(state["handoffs"][0]["brief_id"], first_handoff["brief_id"])
         self.assertEqual(state["handoffs"][0]["items"][0]["source_version"], 1)
+        self.assertEqual(state["handoffs"][0]["items"][0]["claim_id"], claim_id_for(first_item["identity"], 1))
         self.assertEqual(second_handoff["items"][0]["source_version"], 2)
+        self.assertEqual(second_handoff["items"][0]["claim_id"], claim_id_for(first_item["identity"], 2))
         self.assertEqual(state["watch_items"][first_watch["watch_id"]]["status"], "WATCHING")
         self.assertEqual(state["watch_items"][second_watch["watch_id"]]["status"], "WATCHING")
 
@@ -185,6 +193,7 @@ class HandoffStateTests(unittest.TestCase):
 
         markdown = handoff_markdown(handoff)
         self.assertIn("HANDOFF-", markdown)
+        self.assertIn("CLAIM-", markdown)
         self.assertIn("https://example.gov.tw/event-1", markdown)
         self.assertIn("S-001:event-1#v1", markdown)
 
