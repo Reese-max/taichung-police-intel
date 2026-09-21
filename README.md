@@ -291,7 +291,7 @@ Official competition deadline: **2026-08-23 23:59 UTC**, which is **2026-08-24 0
 | jsDelivr `hls.js@1` | Apache-2.0 library delivered by jsDelivr | CDN availability applies only to the legacy standalone `asr-timestamp-demo.html` | Not used by the primary Next.js demo |
 | Official Taichung sources | Publisher-owned public pages, APIs, records, and HLS; linked, not claimed as project-owned | No guaranteed quota; five adapters run twice daily with one bounded retry | No credentials |
 
-Default verification performs no paid operation and no external write. Scheduled refresh writes only its generated status JSON back to the public repository.
+Default verification performs no paid operation and no external write. Scheduled refresh writes its generated status and durable publication checkpoint to the dedicated `publication-state` branch, then deploys the verified Pages artifact; it does not push generated data directly to protected `main`.
 
 The five scheduled inputs are `S-004` council agendas, `S-006` questioning-order tables, `S-007` meeting records, `S-009` proposals, and `S-029` city-government council project reports. The evidence path also uses `S-010`, the official Taichung City Council page, minutes, and HLS video. Exact official URLs remain visible in the checked-in status JSON and the UI.
 
