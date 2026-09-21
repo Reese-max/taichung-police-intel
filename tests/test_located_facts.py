@@ -112,6 +112,37 @@ class LocatedFactsTests(unittest.TestCase):
         altered_json["locator"]["text_sha256"] = "0" * 64
         self.assertEqual(verify_fact(json_document, json_body, altered_json)["reason"], "LOCATOR_HASH_MISMATCH")
 
+    def test_source_values_are_recomputed_before_confirmation(self):
+        html_body = HTML.read_bytes()
+        html_document = self.html_document(html_body)
+        html_fact = build_bundle(html_document, html_body, [{
+            "subject_id": "event:A",
+            "predicate": "event_start_at",
+            "needle": "18:00",
+        }])["facts"][0]
+        altered_html = copy.deepcopy(html_fact)
+        altered_html["normalized_value"] = "17:00"
+        self.assertEqual(verify_fact(html_document, html_body, altered_html)["reason"], "FACT_VALUE_MISMATCH")
+
+        json_body = JSON.read_bytes()
+        json_document = acquire_document(
+            source_id="S-028",
+            requested_url="https://data.gov.tw/dataset/88147",
+            final_url="https://data.gov.tw/dataset/88147",
+            body=json_body,
+            content_type="application/json",
+            fetched_at=STAMP,
+        )
+        json_fact = extract_json_facts(json_document, json_body, [{
+            "subject_id": "crime:A",
+            "predicate": "count",
+            "pointer": "/event/count",
+            "normalizer": "integer",
+        }])[0]
+        altered_json = copy.deepcopy(json_fact)
+        altered_json["raw_value"] = "999"
+        self.assertEqual(verify_fact(json_document, json_body, altered_json)["reason"], "FACT_VALUE_MISMATCH")
+
     def test_confirmation_requires_locator_recheck_and_binds_reviewer(self):
         body = HTML.read_bytes()
         document = self.html_document(body)

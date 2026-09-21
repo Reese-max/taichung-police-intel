@@ -146,9 +146,10 @@ def _date_value(value: str) -> str | None:
 def _fact(document: dict[str, Any], rule: dict[str, Any], raw_value: Any, locator: dict[str, Any], status: str, reason: str | None, valid_time: str | None) -> dict[str, Any]:
     subject_id = str(rule.get("subject_id") or "")
     predicate = str(rule.get("predicate") or "")
+    normalizer = str(rule.get("normalizer") or "text")
     if not subject_id or not predicate:
         raise ValueError("fact rule requires subject_id and predicate")
-    normalized = _normalise(raw_value, str(rule.get("normalizer") or "text"))
+    normalized = _normalise(raw_value, normalizer)
     material = {"document_version_id": document["document_version_id"], "subject_id": subject_id, "predicate": predicate, "locator": locator}
     fact_id = f"FACT-{sha256(material)[:20].upper()}"
     return {
@@ -163,6 +164,7 @@ def _fact(document: dict[str, Any], rule: dict[str, Any], raw_value: Any, locato
         "subject_id": subject_id,
         "subject_type": str(rule.get("subject_type") or "PUBLIC_EVENT"),
         "predicate": predicate,
+        "normalizer": normalizer,
         "raw_value": raw_value,
         "normalized_value": normalized,
         "unit": rule.get("unit"),
@@ -266,13 +268,31 @@ def verify_fact(document: dict[str, Any], body: bytes, fact: dict[str, Any]) -> 
     ):
         return {"status": "REJECTED", "reason": "LOCATOR_HASH_MISMATCH", "fact_id": fact.get("fact_id")}
     if locator.get("type") == "HTML_TEXT_RANGE":
-        actual = text[int(locator["start"]): int(locator["end"])]
+        try:
+            actual = text[int(locator["start"]): int(locator["end"])]
+        except (KeyError, TypeError, ValueError):
+            return {"status": "REJECTED", "reason": "LOCATOR_MISMATCH", "fact_id": fact.get("fact_id")}
         valid = actual == locator.get("quote")
     elif locator.get("type") == "JSON_POINTER":
-        valid = _pointer(json.loads(body.decode("utf-8")), locator.get("pointer", "")) == locator.get("raw_value")
+        try:
+            actual = _pointer(json.loads(body.decode("utf-8")), locator.get("pointer", ""))
+        except (KeyError, IndexError, TypeError, ValueError):
+            return {"status": "REJECTED", "reason": "LOCATOR_MISMATCH", "fact_id": fact.get("fact_id")}
+        valid = actual == locator.get("raw_value")
     else:
-        valid = False
-    return {"status": "PASS" if valid else "REJECTED", "reason": None if valid else "LOCATOR_MISMATCH", "fact_id": fact.get("fact_id")}
+        return {"status": "REJECTED", "reason": "LOCATOR_MISMATCH", "fact_id": fact.get("fact_id")}
+    if not valid:
+        return {"status": "REJECTED", "reason": "LOCATOR_MISMATCH", "fact_id": fact.get("fact_id")}
+    normalizer = fact.get("normalizer")
+    if not isinstance(normalizer, str) or not normalizer:
+        return {"status": "REJECTED", "reason": "FACT_NORMALIZER_MISSING", "fact_id": fact.get("fact_id")}
+    try:
+        normalized = _normalise(actual, normalizer)
+    except (TypeError, ValueError):
+        return {"status": "REJECTED", "reason": "FACT_VALUE_MISMATCH", "fact_id": fact.get("fact_id")}
+    if fact.get("raw_value") != actual or fact.get("normalized_value") != normalized:
+        return {"status": "REJECTED", "reason": "FACT_VALUE_MISMATCH", "fact_id": fact.get("fact_id")}
+    return {"status": "PASS", "reason": None, "fact_id": fact.get("fact_id")}
 
 
 def _review_timestamp(value: str) -> str:
