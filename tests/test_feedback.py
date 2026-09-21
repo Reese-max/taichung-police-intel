@@ -96,6 +96,18 @@ class FeedbackTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "accepted"):
             model.link_regression(state, item["feedback_id"], "gold-1", reviewer_ref="reviewer:1", linked_at="2026-09-21T00:01:00+08:00")
 
+    def test_tampered_feedback_identity_and_audit_fail_closed(self):
+        state, item, _ = make_feedback()
+        broken_identity = copy.deepcopy(state)
+        broken_identity["items"][item["feedback_id"]]["fingerprint"] = "b" * 64
+        with self.assertRaisesRegex(ValueError, "fingerprint"):
+            model.validate_state(broken_identity)
+
+        broken_audit = copy.deepcopy(state)
+        broken_audit["items"][item["feedback_id"]]["audit"][0]["payload"]["reason"] = "WRONG_ENTITY"
+        with self.assertRaisesRegex(ValueError, "audit binding"):
+            model.validate_state(broken_audit)
+
 
 if __name__ == "__main__":
     unittest.main()

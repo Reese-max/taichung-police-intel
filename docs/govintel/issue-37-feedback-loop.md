@@ -6,6 +6,7 @@
 - target 可指向 `EVENT`、`ENTITY`、`QUERY` 或 `ANSWER` 的 id/version，也可連結既有 Review Inbox item。
 - 原始輸出只保存 SHA-256，不保存私人對話、prompt 或全文；evidence/reference 以最小 ID／locator 保存。
 - 相同 fingerprint 去重；每筆保留 `model_version`、`parser_version`、`registry_hash`、audit 與 review status。
+- 載入狀態時會驗證 feedback ID／fingerprint、audit sequence／hash binding 與 review decision 一致；被竄改或未完成 review 的記錄 fail closed。
 - `ACCEPTED` 才會產生 `FEEDBACK_REGRESSION` link，且明確標成需要後續 gold promotion review；不會自動修改 entity registry、event fusion、evidence gate 或 production rule。
 - `statistics` 可按 reason、review status、model/parser/registry 版本查詢錯誤分布。
 

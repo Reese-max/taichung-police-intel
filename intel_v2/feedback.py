@@ -55,6 +55,11 @@ def _audit(item: dict[str, Any], action: str, at: str, payload: dict[str, Any]) 
     return {"audit_id": f"AUDIT-{sha256(material).upper()[:20]}", **material}
 
 
+def _audit_id(entry: dict[str, Any]) -> str:
+    material = {key: entry.get(key) for key in ("feedback_id", "sequence", "action", "at", "payload")}
+    return f"AUDIT-{sha256(material).upper()[:20]}"
+
+
 def feedback_id_for(fingerprint: str) -> str:
     if not isinstance(fingerprint, str) or not fingerprint.strip():
         raise ValueError("feedback fingerprint is required")
@@ -106,13 +111,37 @@ def validate_record(item: dict[str, Any]) -> None:
             raise ValueError(f"feedback record must not contain {forbidden}")
     if not isinstance(item.get("fingerprint"), str) or not item["fingerprint"]:
         raise ValueError("feedback fingerprint is required")
+    if item.get("feedback_id") != feedback_id_for(item["fingerprint"]):
+        raise ValueError("feedback ID does not match fingerprint")
     timestamp(item.get("created_at"))
     timestamp(item.get("updated_at"))
-    if not isinstance(item.get("audit"), list) or not item["audit"]:
+    audit = item.get("audit")
+    if not isinstance(audit, list) or not audit:
         raise ValueError("feedback record requires audit history")
+    for sequence, entry in enumerate(audit, start=1):
+        if not isinstance(entry, dict) or entry.get("feedback_id") != item["feedback_id"]:
+            raise ValueError("feedback audit identity is invalid")
+        if entry.get("sequence") != sequence or not isinstance(entry.get("action"), str) or not entry["action"].strip():
+            raise ValueError("feedback audit sequence is invalid")
+        timestamp(entry.get("at"))
+        if not isinstance(entry.get("payload"), dict) or entry.get("audit_id") != _audit_id(entry):
+            raise ValueError("feedback audit binding is invalid")
     regression = item.get("regression_fixture")
     if regression is not None and (not isinstance(regression, dict) or not regression.get("fixture_id")):
         raise ValueError("regression_fixture must contain fixture_id")
+    decision = item.get("decision")
+    if item["review_status"] == "NEW":
+        if decision is not None or regression is not None:
+            raise ValueError("new feedback cannot contain a review decision")
+    elif (
+        not isinstance(decision, dict)
+        or decision.get("status") != item["review_status"]
+        or not isinstance(decision.get("reviewer_ref"), str)
+        or not decision["reviewer_ref"].strip()
+    ):
+        raise ValueError("reviewed feedback requires a bound decision")
+    if isinstance(decision, dict):
+        timestamp(decision.get("decided_at"))
 
 
 def copy_state(state: dict[str, Any] | None) -> dict[str, Any]:
