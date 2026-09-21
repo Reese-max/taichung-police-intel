@@ -30,12 +30,17 @@ HASH = re.compile(r"[a-f0-9]{64}\Z")
 CHANGES = frozenset(("NEW", "REVISED", "STATUS_CHANGED", "DEADLINE_CHANGED", "CONFIRMED", "UNCHANGED", "LKG", "REMOVED"))
 
 
-def load_current_policy() -> dict[str, Any]:
+def load_policy_module():
     spec = importlib.util.spec_from_file_location("query_store_source_policy", SOURCE_POLICY)
     if spec is None or spec.loader is None:
         raise ValueError("source policy module is unavailable")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    return module
+
+
+def load_current_policy() -> dict[str, Any]:
+    module = load_policy_module()
     return module.compile_policy(module.load_catalog())
 
 
@@ -275,8 +280,33 @@ def assess_scope(store, source_id, now):
     return ("STALE" if gaps else "SNAPSHOT_RECENT"), gaps
 
 
+def query_coverage(store, capability_id, *, requested_scope=None):
+    policy_module = load_policy_module()
+    policy = policy_module.compile_policy(policy_module.load_catalog())
+    states = {source["source_id"]: source for source in store["sources"]}
+    coverage = policy_module.assess_query(policy, capability_id, states)
+    required = set(coverage.get("required_sources", []))
+    missing = set(coverage.get("missing_required_sources", []))
+    stale = set(coverage.get("stale_required_sources", []))
+    covered = sorted(required - missing - stale)
+    coverage.update({
+        "supported_capabilities": [
+            row["capability_id"] for row in policy["capabilities"] if row["supported"]
+        ],
+        "covered_sources": covered,
+        "collection_completeness": {
+            source_id: states[source_id].get("window_completeness")
+            for source_id in coverage.get("required_sources", [])
+            if source_id in states
+        },
+        "requested_scope": requested_scope or {},
+    })
+    return coverage
+
+
 def query_store(store: dict[str, Any], *, text=None, source_id=None, change_type=None,
-                limit=20, cursor=None, expected_generation=None, now=None) -> dict[str, Any]:
+                limit=20, cursor=None, expected_generation=None, now=None,
+                capability_id="publication_metadata") -> dict[str, Any]:
     validate_store(store)
     if type(limit) is not int or not 1 <= limit <= 100:
         raise ValueError("limit must be an integer between 1 and 100")
@@ -285,6 +315,8 @@ def query_store(store: dict[str, Any], *, text=None, source_id=None, change_type
             raise ValueError(f"invalid {name}")
     if change_type and change_type not in CHANGES:
         raise ValueError("unknown change_type")
+    if not isinstance(capability_id, str) or not capability_id.strip() or len(capability_id) > 64:
+        raise ValueError("invalid capability_id")
     if expected_generation is not None and expected_generation != store["generation_id"]:
         raise ValueError("query generation mismatch; retry against the requested snapshot")
     now = datetime.now(timezone.utc) if now is None else now
@@ -331,11 +363,25 @@ def query_store(store: dict[str, Any], *, text=None, source_id=None, change_type
         next_cursor = base64.urlsafe_b64encode(canonical_json({"generation": store["generation_id"],
                     "filters": filter_hash, "offset": offset + len(results)})).decode()
     assessment, gaps = assess_scope(store, source_id, now)
+    coverage = query_coverage(
+        store,
+        capability_id,
+        requested_scope={
+            key: value
+            for key, value in {
+                "text": text,
+                "source_id": source_id,
+                "change_type": change_type,
+            }.items()
+            if value is not None
+        },
+    )
     return {
         "schema_version": 2, "query_generation_id": store["generation_id"],
         "canonical_artifact_hashes": {k: store["generated_from"][f"{k}_sha256"] for k in ("feed", "status", "brief")},
         "publication_deployment_verified": False,
         "policy": store["policy"],
+        "query_coverage": coverage,
         "data_status": assessment, "source_gaps": gaps,
         "source_status": [s for s in store["sources"] if not source_id or s["source_id"] == source_id],
         "answerable_no_match": total == 0 and not gaps,

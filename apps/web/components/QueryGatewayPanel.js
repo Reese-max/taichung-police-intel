@@ -8,6 +8,7 @@ function QueryResult({ response }) {
   const results = Array.isArray(response.results) ? response.results : [];
   const sources = Array.isArray(response.sources) ? response.sources : [];
   const brief = response.brief;
+  const coverage = response.query_coverage;
   return (
     <div className="v2-query-result" role="status">
       <div className="v2-query-result-heading">
@@ -15,6 +16,13 @@ function QueryResult({ response }) {
         <span>{response.result_type}</span>
       </div>
       <p>{response.verification_summary}</p>
+      {coverage && (
+        <p className="v2-query-coverage">
+          覆蓋狀態：{coverage.status} · 已核對 {coverage.covered_sources?.length || 0}/{coverage.required_sources?.length || 0} 個必要來源
+          {coverage.missing_required_sources?.length ? ` · 缺口：${coverage.missing_required_sources.join(", ")}` : ""}
+          {coverage.stale_required_sources?.length ? ` · 過期：${coverage.stale_required_sources.join(", ")}` : ""}
+        </p>
+      )}
       {brief && (
         <p>
           Brief 狀態：{brief.publication_status || "未提供"} · 快照變更 {brief.overview?.current_change_count || 0} 件

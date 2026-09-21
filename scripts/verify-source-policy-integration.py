@@ -62,6 +62,12 @@ def run_checks() -> dict[str, Any]:
     old_store = query_store.build_from_paths(query_store.DEFAULT_FEED, query_store.DEFAULT_STATUS, query_store.DEFAULT_BRIEF)
     if old_store["policy"] != expected:
         raise ValueError("query store was not built from current policy")
+    query = query_store.query_store(old_store, text="議事", limit=1)
+    if query["query_coverage"]["policy_hash"] != expected["policy_hash"]:
+        raise ValueError("query coverage was not bound to current policy")
+    unsupported_query = query_store.query_store(old_store, capability_id="traffic_events", limit=1)
+    if unsupported_query["query_coverage"]["status"] != "CAPABILITY_NOT_AVAILABLE":
+        raise ValueError("unsupported query capability was not explicit")
     replay = query_store.build_from_paths(query_store.DEFAULT_FEED, query_store.DEFAULT_STATUS, query_store.DEFAULT_BRIEF)
     if replay["generation_id"] != old_store["generation_id"] or replay["policy"] != old_store["policy"]:
         raise ValueError("old publication replay is not deterministic")
@@ -113,6 +119,7 @@ def run_checks() -> dict[str, Any]:
         "mixed_policy_rejected": True,
         "partial_gap_preserved": True,
         "unsupported_explicit": True,
+        "query_coverage_bound": True,
     }
 
 
@@ -123,7 +130,8 @@ def self_check() -> None:
         f"active={result['active']} consumers={result['consumer_count']} "
         f"version={result['policy_version']} promoted={result['promoted_policy_version']} "
         f"old_replay=true mixed_rejected={result['mixed_policy_rejected']} "
-        f"partial_gap={result['partial_gap_preserved']} unsupported={result['unsupported_explicit']}"
+        f"partial_gap={result['partial_gap_preserved']} unsupported={result['unsupported_explicit']} "
+        f"query_coverage={result['query_coverage_bound']}"
     )
 
 

@@ -56,6 +56,9 @@ class QueryStoreTests(unittest.TestCase):
         self.assertEqual(store["policy"]["policy_hash"], policy["policy_hash"])
         result = qs.query_store(store, source_id="S-004")
         self.assertEqual(result["policy"], store["policy"])
+        self.assertEqual(result["query_coverage"]["capability_id"], "publication_metadata")
+        self.assertEqual(result["query_coverage"]["policy_hash"], policy["policy_hash"])
+        self.assertIn("publication_metadata", result["query_coverage"]["supported_capabilities"])
 
     def test_tampered_source_policy_binding_fails_closed(self):
         store = qs.build_from_paths(qs.DEFAULT_FEED, qs.DEFAULT_STATUS, qs.DEFAULT_BRIEF)

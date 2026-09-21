@@ -112,6 +112,12 @@ class QueryBoundaryTests(unittest.TestCase):
                 self.assertFalse(result['answerable_no_match'])
                 self.assertIn('UNKNOWN_SOURCE_FRESHNESS', {gap['reason'] for gap in result['source_gaps']})
 
+    def test_unsupported_policy_capability_stays_explicit(self):
+        result = qs.query_store(self.build(), capability_id='traffic_events', now=self.now)
+        self.assertEqual(result['query_coverage']['status'], 'CAPABILITY_NOT_AVAILABLE')
+        self.assertFalse(result['query_coverage']['can_state_bounded_no_match'])
+        self.assertNotIn('traffic_events', result['query_coverage']['supported_capabilities'])
+
     def test_unsupported_source_is_not_a_complete_empty_answer(self):
         result = qs.query_store(self.build(), source_id='S-032', now=self.now)
         self.assertEqual(result['data_status'], 'SOURCE_NOT_AVAILABLE')

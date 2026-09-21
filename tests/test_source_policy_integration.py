@@ -18,6 +18,7 @@ class SourcePolicyIntegrationTests(unittest.TestCase):
         self.assertTrue(result["mixed_policy_rejected"])
         self.assertTrue(result["partial_gap_preserved"])
         self.assertTrue(result["unsupported_explicit"])
+        self.assertTrue(result["query_coverage_bound"])
         self.assertEqual(result["promoted_policy_version"], result["policy_version"] + 1)
 
 

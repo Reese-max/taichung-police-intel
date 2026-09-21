@@ -174,8 +174,19 @@ class QueryGateway:
         self.brief = self.snapshot["brief"]
         self.clock = clock or (lambda: datetime.now(timezone.utc))
 
-    def _scope(self, source_id: str | None = None, now: datetime | None = None) -> dict[str, Any]:
-        return qs.query_store(self.store, source_id=source_id, limit=1, now=_now(now))
+    def _scope(
+        self,
+        source_id: str | None = None,
+        now: datetime | None = None,
+        capability_id: str = "publication_metadata",
+    ) -> dict[str, Any]:
+        return qs.query_store(
+            self.store,
+            source_id=source_id,
+            limit=1,
+            now=_now(now),
+            capability_id=capability_id,
+        )
 
     def _envelope(
         self,
@@ -204,6 +215,7 @@ class QueryGateway:
             "event_ids": [],
             "evidence_ids": [],
             "source_gaps": scope["source_gaps"],
+            "query_coverage": scope["query_coverage"],
             "discovery_unverified_count": 0,
             "truncated": truncated,
             "policy": self.store["policy"],
@@ -274,7 +286,7 @@ class QueryGateway:
                 truncated=result["truncated"],
             )
         if tool == "get_current_brief":
-            scope = self._scope(now=now)
+            scope = self._scope(now=now, capability_id="publication_metadata")
             allowed = (
                 "schema_version", "mode", "generator_version", "generated_at", "source_collection_run_id",
                 "source_status_generated_at", "publication_status", "snapshot_complete", "status_message",
@@ -292,7 +304,7 @@ class QueryGateway:
                 result_count=1,
             )
         source_id = args.get("source_id")
-        scope = self._scope(source_id=source_id, now=now)
+        scope = self._scope(source_id=source_id, now=now, capability_id="source_health")
         selected = [
             _public_source(row)
             for row in self.status.get("sources", [])
@@ -332,6 +344,7 @@ class QueryGateway:
             "publication_freshness": _freshness(scope["data_status"]),
             "publication_id": self.store["generated_from"]["collection_run_id"],
             "publication_hash": self.store["generated_from"]["brief_sha256"],
+            "query_coverage": scope["query_coverage"],
             "policy": self.store["policy"],
             "retention": {
                 "policy_version": RETENTION_POLICY["policy_version"],

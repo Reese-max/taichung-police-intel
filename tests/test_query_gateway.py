@@ -64,6 +64,9 @@ class QueryGatewayTests(unittest.TestCase):
         )
         self.assertEqual(query["publication_hash"], structured["publication_hash"])
         self.assertEqual(query["policy"], structured["policy"])
+        self.assertEqual(query["query_coverage"]["capability_id"], "publication_metadata")
+        self.assertEqual(query["query_coverage"]["policy_hash"], query["policy"]["policy_hash"])
+        self.assertIn("supported_capabilities", query["query_coverage"])
         self.assertFalse(query["retention"]["full_text_allowed"])
         self.assertRegex(query["retention"]["policy_hash"], r"^[0-9a-f]{64}$")
 
@@ -73,6 +76,7 @@ class QueryGatewayTests(unittest.TestCase):
         self.assertEqual(response["freshness"], "STALE")
         self.assertFalse(response["current_as_of_server_clock"])
         self.assertIn("過期", response["verification_summary"])
+        self.assertEqual(response["query_coverage"]["status"], "STALE")
 
     def test_no_result_source_gap_and_unsupported_capability_are_explicit(self):
         status, response = self.request(
@@ -82,6 +86,7 @@ class QueryGatewayTests(unittest.TestCase):
         self.assertEqual(response["result_count"], 0)
         self.assertFalse(response["answerable_no_match"])
         self.assertTrue(response["source_gaps"])
+        self.assertFalse(response["query_coverage"]["can_state_bounded_no_match"])
 
         unsupported_status, unsupported = self.request(
             "POST", "/query", {"tool": "search_events", "arguments": {}}
@@ -123,6 +128,7 @@ class QueryGatewayTests(unittest.TestCase):
         self.assertEqual(source["source_id"], "S-004")
         self.assertTrue(source["source_url"].startswith("https://"))
         self.assertNotIn("password", source)
+        self.assertEqual(response["query_coverage"]["capability_id"], "source_health")
 
     def test_rate_limiter_is_bounded_per_client(self):
         limiter = gateway_module.RateLimiter(limit=2, window_seconds=60)
