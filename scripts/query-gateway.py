@@ -12,14 +12,18 @@ from pathlib import Path
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import shutil
 import subprocess
+import sys
 import time
 from typing import Any, Callable
 from urllib.parse import quote, urlsplit
 import uuid
 
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from intel_v2.located_facts import validate_document_url
 
-ROOT = Path(__file__).resolve().parents[1]
 QUERY_STORE_PATH = ROOT / "scripts" / "query-store.py"
 RETENTION_POLICY_PATH = ROOT / "scripts" / "retention-policy.py"
 ANSWER_GATE_RUNNER = ROOT / "scripts" / "answer-gate-runner.mjs"
