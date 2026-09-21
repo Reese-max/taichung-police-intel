@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
+import hashlib
 import json
 from pathlib import Path
 from urllib.parse import urlsplit
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 from typing import Any
 
 
@@ -15,6 +18,13 @@ DEFAULT_CATALOG = ROOT / "docs/govintel/source-catalog.v2.json"
 DEFAULT_FIXTURE = ROOT / "tests/fixtures/npa/batch1.json"
 ROLES = {"PRIMARY_EVENT", "PRIMARY_REFERENCE", "ENRICHMENT", "EXCLUDE_OR_AGGREGATE_ONLY"}
 STATUSES = {"CATALOG_CANDIDATE", "FIXTURE_ONLY", "METADATA_ONLY", "EXISTING_CATALOG", "EXCLUDED"}
+METADATA_API_BASE = "https://data.gov.tw/api/v2/rest/dataset/"
+MAX_METADATA_BYTES = 2 * 1024 * 1024
+
+
+class _NoRedirect(HTTPRedirectHandler):
+    def redirect_request(self, request, fp, code, msg, headers, newurl):
+        raise ValueError("metadata redirect is not allowed")
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -22,6 +32,151 @@ def load_json(path: Path) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError(f"{path} must contain an object")
     return value
+
+
+def _canonical(value: Any) -> bytes:
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+
+
+def _resource_id(url: str) -> str | None:
+    parts = [part for part in urlsplit(url).path.split("/") if part]
+    try:
+        index = parts.index("resource")
+    except ValueError:
+        return None
+    return parts[index + 1] if index + 1 < len(parts) else None
+
+
+def _resource_receipt(resource: dict[str, Any]) -> dict[str, Any]:
+    url = str(resource.get("resourceDownloadUrl") or "").strip()
+    parsed = urlsplit(url)
+    if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
+        raise ValueError("resource URL must be credential-free HTTPS")
+    fields = resource.get("resourceField")
+    return {
+        "resource_id": _resource_id(url),
+        "resource_url": url,
+        "format": resource.get("resourceFormat"),
+        "field_count": len(fields) if isinstance(fields, list) else None,
+        "metadata_sha256": hashlib.sha256(_canonical(resource)).hexdigest(),
+    }
+
+
+def fetch_live_metadata(
+    row: dict[str, Any], *, opener=None, observed_at: str | None = None
+) -> dict[str, Any]:
+    """Fetch one data.gov.tw metadata document; never downloads its resources."""
+    dataset_id = str(row.get("dataset_id") or "")
+    if not dataset_id.isdigit():
+        raise ValueError(f"{row.get('inventory_id')} has no numeric dataset_id")
+    metadata_url = f"{METADATA_API_BASE}{dataset_id}"
+    request = Request(
+        metadata_url,
+        headers={
+            "Accept": "application/json",
+            "User-Agent": "GovIntel-NPA-metadata-check/1",
+        },
+    )
+    client = opener or build_opener(_NoRedirect)
+    with client.open(request, timeout=30) as response:
+        body = response.read(MAX_METADATA_BYTES + 1)
+        if len(body) > MAX_METADATA_BYTES:
+            raise ValueError("metadata response exceeds bounded byte limit")
+        response_status = getattr(response, "status", None)
+        status = int(response_status if response_status is not None else response.getcode())
+        final_url = response.geturl()
+        content_type = response.headers.get("Content-Type", "")
+    if final_url != metadata_url:
+        raise ValueError("metadata final URL changed")
+    parsed_url = urlsplit(final_url)
+    if parsed_url.scheme != "https" or parsed_url.hostname != "data.gov.tw":
+        raise ValueError("metadata final URL is not data.gov.tw")
+    payload = json.loads(body.decode("utf-8"))
+    if not isinstance(payload, dict) or payload.get("success") is not True:
+        raise ValueError("metadata API did not return success=true")
+    result = payload.get("result")
+    if not isinstance(result, dict) or str(result.get("datasetId")) != dataset_id:
+        raise ValueError("metadata dataset identity mismatch")
+    distributions = result.get("distribution")
+    if isinstance(distributions, dict):
+        distributions = [distributions]
+    if not isinstance(distributions, list):
+        raise ValueError("metadata distribution shape is unknown")
+    resources = [_resource_receipt(item) for item in distributions if isinstance(item, dict)]
+    if len(resources) != len(distributions):
+        raise ValueError("metadata distribution contains a non-object resource")
+    resource_status = "PASS" if resources else "PARTIAL"
+    return {
+        "inventory_id": row["inventory_id"],
+        "dataset_id": dataset_id,
+        "metadata_url": metadata_url,
+        "final_url": final_url,
+        "http_status": status,
+        "content_type": content_type,
+        "raw_bytes": len(body),
+        "raw_sha256": hashlib.sha256(body).hexdigest(),
+        "title": result.get("title"),
+        "published_at": result.get("publishedDate"),
+        "modified_at": result.get("modifiedDate"),
+        "resource_status": resource_status,
+        "resource_count": len(resources),
+        "resources": resources,
+        "observed_at": observed_at or datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "status": "PASS" if status == 200 and resource_status == "PASS" else "PARTIAL",
+    }
+
+
+def live_metadata_report(
+    inventory: dict[str, Any], *, source_ids: list[str] | None = None, opener=None, observed_at: str | None = None
+) -> dict[str, Any]:
+    rows = inventory.get("sources", [])
+    selected = [row for row in rows if source_ids is None or row.get("inventory_id") in source_ids]
+    if source_ids:
+        missing = sorted(set(source_ids) - {row.get("inventory_id") for row in selected})
+        if missing:
+            raise ValueError(f"unknown inventory_id: {','.join(missing)}")
+    if not selected:
+        raise ValueError("no inventory rows selected")
+    observed = observed_at or datetime.now(timezone.utc).isoformat(timespec="seconds")
+    records = []
+    skipped = []
+    for row in selected:
+        if not row.get("dataset_id"):
+            skipped.append({"inventory_id": row.get("inventory_id"), "status": "SKIPPED", "reason": "NO_DATASET_ID"})
+            continue
+        try:
+            records.append(fetch_live_metadata(row, opener=opener, observed_at=observed))
+        except Exception as error:
+            records.append({
+                "inventory_id": row.get("inventory_id"),
+                "dataset_id": str(row.get("dataset_id")),
+                "metadata_url": f"{METADATA_API_BASE}{row.get('dataset_id')}",
+                "status": "FAILED",
+                "error_class": type(error).__name__,
+                "error": str(error),
+                "observed_at": observed,
+            })
+    failed = sum(record.get("status") == "FAILED" for record in records)
+    partial = sum(record.get("status") == "PARTIAL" for record in records)
+    passed = sum(record.get("status") == "PASS" for record in records)
+    status = "FAILED" if failed else "PARTIAL" if partial or (not records and skipped) else "PASS"
+    return {
+        "schema_version": 1,
+        "kind": "NPA_LIVE_METADATA_RESOURCE_RECEIPT",
+        "observed_at": observed,
+        "status": status,
+        "requested_count": len(selected),
+        "eligible_count": len(records),
+        "observed_count": len(records),
+        "skipped_count": len(skipped),
+        "pass_count": passed,
+        "partial_count": partial,
+        "failed_count": failed,
+        "resource_count": sum(record.get("resource_count", 0) for record in records),
+        "records": records,
+        "skipped": skipped,
+        "verification_boundary": "Metadata and resource URLs only; resource bytes, parser compatibility, production persistence, and promotion remain separate gates.",
+    }
 
 
 def validate_inventory(inventory: dict[str, Any], catalog: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -159,10 +314,26 @@ def main() -> int:
     parser.add_argument("--inventory", type=Path, default=DEFAULT_INVENTORY)
     parser.add_argument("--catalog", type=Path, default=DEFAULT_CATALOG)
     parser.add_argument("--self-check", action="store_true")
+    parser.add_argument("--live-metadata", action="store_true")
+    parser.add_argument("--source-id", action="append", dest="source_ids", default=[])
+    parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     if args.self_check:
         self_check()
         return 0
+    if args.live_metadata:
+        report = live_metadata_report(load_json(args.inventory), source_ids=args.source_ids or None)
+        text = json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+        if args.output:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(text, encoding="utf-8")
+            print(
+                f"NPA_METADATA_RECEIPT status={report['status']} pass={report['pass_count']} "
+                f"partial={report['partial_count']} failed={report['failed_count']} output={args.output}"
+            )
+        else:
+            print(text, end="")
+        return 0 if report["status"] == "PASS" else 1
     summary = validate_inventory(load_json(args.inventory), load_json(args.catalog))
     print(json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True))
     return 0

@@ -12,12 +12,15 @@
 - A1 CSV／JSON 共用 `NPA-A1-ACCIDENTS`；臺中 `S-034` 與全國 reference 以穩定事故 identity 合併，不新增第二個事件。
 - 個別失蹤人口、失竊車／車牌與失物個案明確阻擋在公開 canonical feed 外；只允許後續採用彙總統計。
 - self-check 會輸出離線 fixture 的資料量、更新頻率類別、解析失敗、schema drift、實際事件數與交班數；它不是成功下載或 live receipt。
+- `--live-metadata` 會對 inventory 中有 `dataset_id` 的來源讀取 data.gov.tw metadata，保存 raw hash、dataset identity、resource URL／format／欄位數與逐來源 PASS/PARTIAL/FAILED；不下載 resource bytes。
 
 驗證：
 
 ```bash
 python -X utf8 scripts/npa-source-inventory.py --self-check
 python -X utf8 -m unittest discover -s tests -p "test_npa_source_inventory.py" -v
+# live metadata/resource receipt（不寫 canonical；失敗來源不折算為零筆）
+python -X utf8 scripts/npa-source-inventory.py --live-metadata --output runtime-evidence/npa-metadata-receipt.json
 ```
 
-尚未宣稱完成的外部 gate：live metadata/resource receipt、production collector、資料庫持久化、公開 UI 寫入、部署與真實使用者收件。來源故障仍遵循既有 `FAILED/PARTIAL` 不覆蓋 last-known-good 規則。
+尚未宣稱完成的外部 gate：resource bytes／parser compatibility、production collector、資料庫持久化、公開 UI 寫入、部署與真實使用者收件。metadata 來源故障仍遵循既有 `FAILED/PARTIAL` 不覆蓋 last-known-good 規則。

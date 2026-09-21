@@ -127,6 +127,82 @@ class NpaSourceInventoryTests(unittest.TestCase):
         self.assertEqual(len(events), 1)
         self.assertEqual(events[0]["event_type"], "traffic_accident")
 
+    def test_live_metadata_receipt_binds_dataset_and_resource_identity(self):
+        class Response:
+            status = 200
+            headers = {"Content-Type": "application/json"}
+
+            def __init__(self, url, payload):
+                self.url = url
+                self.body = json.dumps(payload).encode("utf-8")
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def read(self, limit):
+                return self.body
+
+            def geturl(self):
+                return self.url
+
+            def getcode(self):
+                return self.status
+
+        class Opener:
+            def __init__(self, payloads):
+                self.payloads = payloads
+
+            def open(self, request, timeout):
+                return Response(request.full_url, self.payloads[request.full_url])
+
+        row = next(item for item in self.inventory["sources"] if item["inventory_id"] == "NPA-11307")
+        payload = {
+            "success": True,
+            "result": {
+                "datasetId": "11307",
+                "title": "集會遊行資訊",
+                "distribution": [{
+                    "resourceFormat": "CSV",
+                    "resourceDownloadUrl": "https://opdadm.moi.gov.tw/api/v1/resource/RESOURCE-1/download",
+                    "resourceField": [{"name": "actStTime"}],
+                }],
+            },
+        }
+        url = "https://data.gov.tw/api/v2/rest/dataset/11307"
+        report = inventory_script.live_metadata_report(
+            {"sources": [row]},
+            source_ids=["NPA-11307"],
+            opener=Opener({url: payload}),
+            observed_at="2026-09-21T12:00:00+00:00",
+        )
+        self.assertEqual(report["status"], "PASS")
+        self.assertEqual(report["failed_count"], 0)
+        self.assertEqual(report["resource_count"], 1)
+        self.assertEqual(report["records"][0]["resources"][0]["resource_id"], "RESOURCE-1")
+        self.assertRegex(report["records"][0]["raw_sha256"], r"^[0-9a-f]{64}$")
+
+    def test_live_metadata_failure_is_not_reported_as_zero_success(self):
+        class Opener:
+            def open(self, request, timeout):
+                raise OSError("upstream unavailable")
+
+        row = next(item for item in self.inventory["sources"] if item["inventory_id"] == "NPA-11307")
+        report = inventory_script.live_metadata_report({"sources": [row]}, opener=Opener())
+        self.assertEqual(report["status"], "FAILED")
+        self.assertEqual(report["failed_count"], 1)
+        self.assertEqual(report["records"][0]["status"], "FAILED")
+        self.assertNotEqual(report["observed_count"], 0)
+
+    def test_live_metadata_without_dataset_id_is_not_success(self):
+        row = next(item for item in self.inventory["sources"] if not item.get("dataset_id"))
+        report = inventory_script.live_metadata_report({"sources": [row]})
+        self.assertEqual(report["status"], "PARTIAL")
+        self.assertEqual(report["eligible_count"], 0)
+        self.assertEqual(report["skipped_count"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()
