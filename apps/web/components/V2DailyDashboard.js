@@ -180,6 +180,7 @@ function ReviewInboxPanel({ health, localReview, onDecision, onExport, notice, e
         <ul>
           {items.slice(0, 5).map((item) => {
             const status = item.local_status || "OPEN";
+            const localActionDisabled = !localReview || status === "CANONICAL_ONLY";
             return (
               <li key={item.review_id || `${item.source_id}-${item.observed_at}`} className="v2-review-item">
                 <div>
@@ -189,22 +190,22 @@ function ReviewInboxPanel({ health, localReview, onDecision, onExport, notice, e
                 </div>
                 <div className="v2-review-actions">
                   {status !== "KEEP_WATCHING" && (
-                    <button type="button" onClick={() => onDecision(item.review_id, "KEEP_WATCHING")} disabled={!localReview}>
+                    <button type="button" onClick={() => onDecision(item.review_id, "KEEP_WATCHING")} disabled={localActionDisabled}>
                       保持追蹤
                     </button>
                   )}
                   {status !== "RESOLVED" && (
-                    <button type="button" onClick={() => onDecision(item.review_id, "RESOLVED")} disabled={!localReview}>
+                    <button type="button" onClick={() => onDecision(item.review_id, "RESOLVED")} disabled={localActionDisabled}>
                       標記已處理
                     </button>
                   )}
                   {status !== "DISMISSED" && (
-                    <button type="button" onClick={() => onDecision(item.review_id, "DISMISSED")} disabled={!localReview}>
+                    <button type="button" onClick={() => onDecision(item.review_id, "DISMISSED")} disabled={localActionDisabled}>
                       暫時忽略
                     </button>
                   )}
                   {status !== "OPEN" && (
-                    <button type="button" onClick={() => onDecision(item.review_id, "OPEN")} disabled={!localReview}>
+                    <button type="button" onClick={() => onDecision(item.review_id, "OPEN")} disabled={localActionDisabled}>
                       重新開啟
                     </button>
                   )}
