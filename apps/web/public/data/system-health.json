@@ -24,6 +24,7 @@
     "policy_version": 1
   },
   "review_inbox": [],
+  "review_inbox_total": 0,
   "schema_drift": {
     "overall": "UNKNOWN",
     "source_count": 8
