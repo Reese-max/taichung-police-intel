@@ -4,7 +4,18 @@ import copy
 import json
 import unittest
 
-from intel_v2.review import claim, decide, detail_recheck_candidates, empty_state, project, reconcile, schema_drift_candidates, upsert, validate_state
+from intel_v2.review import (
+    claim,
+    decide,
+    detail_recheck_candidates,
+    empty_state,
+    project,
+    reconcile,
+    runtime_candidates,
+    schema_drift_candidates,
+    upsert,
+    validate_state,
+)
 
 
 STAMP = "2026-09-21T00:00:00+00:00"
@@ -79,6 +90,69 @@ class ReviewInboxTests(unittest.TestCase):
             "stable_key": "agenda-1",
             "classification": {"status": "UNCHANGED", "review_required": False},
         }]), [])
+
+    def test_runtime_envelopes_project_all_review_reason_types(self):
+        payload = {
+            "schema_drift": {
+                "generated_at": STAMP,
+                "review_inbox": [{"source_id": "S-001", "status": "SOURCE_UNAVAILABLE", "observed_at": STAMP}],
+            },
+            "detail_rechecks": [{
+                "source_id": "S-004",
+                "stable_key": "agenda-1",
+                "classification": {
+                    "status": "MATERIAL_CHANGE",
+                    "review_required": True,
+                    "after": {"document_version_id": "DOCV-NEW"},
+                },
+            }],
+            "candidates": [{
+                "candidate_id": "gd-1",
+                "verification_status": "NO_OFFICIAL_MATCH",
+                "observed_at": STAMP,
+                "upstream_generation_id": "g-1",
+            }],
+            "public_events": [
+                {"public_event_id": "PE-CONFLICT", "fusion_status": "CONFLICT", "updated_at": STAMP},
+                {"public_event_id": "PE-SPLIT", "fusion_status": "SPLIT_REQUIRED", "updated_at": STAMP},
+                {"public_event_id": "PE-CANDIDATE", "fusion_status": "CANDIDATE", "updated_at": STAMP},
+            ],
+            "sources": [
+                {
+                    "source_id": "S-007",
+                    "source_health": "PASS",
+                    "window_completeness": "COMPLETE_ZERO",
+                    "freshness_status": "STALE",
+                    "last_checked_at": STAMP,
+                    "current_source_run_id": "run-7",
+                },
+                {
+                    "source_id": "S-009",
+                    "source_health": "FAILED",
+                    "window_completeness": "PARTIAL",
+                    "freshness_status": "RECENT",
+                    "last_checked_at": STAMP,
+                    "current_source_run_id": "run-9",
+                },
+            ],
+        }
+        mapped = runtime_candidates(payload)
+        self.assertEqual(
+            {row["reason"] for row in mapped},
+            {
+                "NEEDS_REVIEW",
+                "CONFLICT",
+                "DISCOVERY_UNVERIFIED",
+                "MERGE_CANDIDATE",
+                "SPLIT_REQUIRED",
+                "STALE_SOURCE",
+                "PARTIAL_SOURCE",
+            },
+        )
+        state = reconcile(empty_state(), mapped, observed_at=STAMP)
+        state = reconcile(state, runtime_candidates(payload), observed_at=STAMP)
+        self.assertEqual(len(state["items"]), len(mapped))
+        self.assertTrue(all(len(item["audit"]) == 1 for item in state["items"].values()))
 
     def test_tampered_audit_and_evidence_receipts_fail_closed(self):
         state, item, _ = upsert(empty_state(), candidate("CONFLICT"), observed_at=STAMP)

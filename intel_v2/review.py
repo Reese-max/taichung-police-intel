@@ -363,3 +363,152 @@ def detail_recheck_candidates(outcomes: Iterable[dict[str, Any]]) -> list[dict[s
             }
         )
     return candidates
+
+
+def discovery_candidates(result: dict[str, Any]) -> list[dict[str, Any]]:
+    """Project unverified discovery outcomes without promoting them."""
+    rows = result.get("candidates", []) if isinstance(result, dict) else []
+    if not isinstance(rows, list):
+        raise ValueError("discovery candidates must be an array")
+    candidates = []
+    for row in rows:
+        if not isinstance(row, dict) or not isinstance(row.get("candidate_id"), str):
+            continue
+        status = row.get("verification_status")
+        if status == "CONFLICT":
+            reason = "CONFLICT"
+        elif status in {"DISCOVERY_UNVERIFIED", "NO_OFFICIAL_MATCH", "EXPIRED"}:
+            reason = "DISCOVERY_UNVERIFIED"
+        else:
+            continue
+        generation = row.get("upstream_generation_id")
+        candidates.append(
+            {
+                "fingerprint": f"discovery:{row['candidate_id']}",
+                "reason": reason,
+                "entity_ids": {"candidate_id": row["candidate_id"]},
+                "source_version": generation,
+                "observed_at": row.get("observed_at"),
+                "evidence": {
+                    "verification_status": status,
+                    "verification_reason": row.get("verification_reason"),
+                    "official_document_versions": row.get("official_document_versions", []),
+                    "source_url": row.get("source_url"),
+                    "expires_at": row.get("expires_at"),
+                },
+                "priority_reason": "媒體／外部發現訊號尚未完成官方來源核對" if reason == "DISCOVERY_UNVERIFIED" else "官方來源對同一發現訊號的結果需要人工覆核",
+            }
+        )
+    return candidates
+
+
+def fusion_candidates(result: dict[str, Any] | list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Project PublicEvent conflict and identity decisions into review."""
+    rows = result.get("public_events", []) if isinstance(result, dict) else result
+    if not isinstance(rows, list):
+        raise ValueError("public events must be an array")
+    candidates = []
+    for row in rows:
+        if not isinstance(row, dict) or not isinstance(row.get("public_event_id"), str):
+            continue
+        status = row.get("fusion_status")
+        reason = {
+            "CONFLICT": "CONFLICT",
+            "SPLIT_REQUIRED": "SPLIT_REQUIRED",
+            "CANDIDATE": "MERGE_CANDIDATE",
+        }.get(status)
+        if reason is None:
+            continue
+        candidates.append(
+            {
+                "fingerprint": f"fusion:{row['public_event_id']}",
+                "reason": reason,
+                "entity_ids": {"public_event_id": row["public_event_id"]},
+                "source_version": row.get("updated_at"),
+                "observed_at": row.get("updated_at") or row.get("created_at"),
+                "evidence": {
+                    "fusion_status": status,
+                    "conflict_fields": row.get("conflict_fields", []),
+                    "uncertain_fields": row.get("uncertain_fields", []),
+                    "linked_document_versions": row.get("linked_document_versions", []),
+                    "merged_from_public_event_ids": row.get("merged_from_public_event_ids", []),
+                    "split_into_public_event_ids": row.get("split_into_public_event_ids", []),
+                },
+                "priority_reason": {
+                    "CONFLICT": "官方事件欄位互相矛盾，需要人工判定保留版本",
+                    "SPLIT_REQUIRED": "既有 PublicEvent 疑似誤合併，需要人工拆分",
+                    "MERGE_CANDIDATE": "事件身份仍不足以自動合併，需要人工確認關聯",
+                }[reason],
+            }
+        )
+    return candidates
+
+
+def source_health_candidates(receipt: dict[str, Any]) -> list[dict[str, Any]]:
+    """Project stale or incomplete source rows without closing prior review."""
+    rows = receipt.get("sources", []) if isinstance(receipt, dict) else []
+    if not isinstance(rows, list):
+        raise ValueError("source status rows must be an array")
+    candidates = []
+    for row in rows:
+        if not isinstance(row, dict) or not isinstance(row.get("source_id"), str) or not row["source_id"].strip():
+            continue
+        freshness = str(row.get("freshness_status") or "UNKNOWN").upper()
+        health = str(row.get("source_health") or "UNKNOWN").upper()
+        completeness = str(row.get("window_completeness") or "UNKNOWN").upper()
+        if freshness in {"STALE", "VERY_STALE"} and health == "PASS" and completeness in {"COMPLETE_ZERO", "COMPLETE_WITH_ITEMS"}:
+            reason = "STALE_SOURCE"
+        elif health != "PASS" or completeness not in {"COMPLETE_ZERO", "COMPLETE_WITH_ITEMS"} or freshness not in {"FRESH", "RECENT"}:
+            reason = "PARTIAL_SOURCE"
+        else:
+            continue
+        source_id = row["source_id"]
+        candidates.append(
+            {
+                "fingerprint": f"source-health:{source_id}",
+                "reason": reason,
+                "entity_ids": {"source_id": source_id},
+                "source_version": row.get("current_source_run_id") or row.get("manifest_sha256"),
+                "observed_at": row.get("last_checked_at") or receipt.get("generated_at"),
+                "evidence": {
+                    "before": row.get("last_known_good"),
+                    "after": {
+                        "source_health": row.get("source_health"),
+                        "window_completeness": row.get("window_completeness"),
+                        "freshness_status": row.get("freshness_status"),
+                        "intelligence_gaps": row.get("intelligence_gaps", []),
+                        "last_checked_at": row.get("last_checked_at"),
+                    },
+                },
+                "priority_reason": "來源抓取失敗或窗口不完整，需要人工確認資料缺口" if reason == "PARTIAL_SOURCE" else "官方來源資料已過期，需要人工確認時效限制",
+            }
+        )
+    return candidates
+
+
+def runtime_candidates(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Collect bounded candidates from the supported runtime result envelopes."""
+    if not isinstance(payload, dict):
+        raise ValueError("review input must be an object")
+    candidates = []
+    if isinstance(payload.get("schema_drift"), dict):
+        candidates.extend(schema_drift_candidates(payload["schema_drift"]))
+    if "detail_rechecks" in payload:
+        candidates.extend(detail_recheck_candidates(payload["detail_rechecks"]))
+    if "candidates" in payload and any(
+        isinstance(row, dict) and "verification_status" in row for row in (payload.get("candidates") or [])
+    ):
+        candidates.extend(discovery_candidates(payload))
+    if "public_events" in payload:
+        candidates.extend(fusion_candidates(payload))
+    if "sources" in payload and any(
+        isinstance(row, dict) and ("source_health" in row or "freshness_status" in row)
+        for row in (payload.get("sources") or [])
+    ):
+        candidates.extend(source_health_candidates(payload))
+    if candidates:
+        return candidates
+    rows = payload.get("items", payload.get("candidates", []))
+    if not isinstance(rows, list):
+        raise ValueError("input must contain items or candidates array")
+    return rows

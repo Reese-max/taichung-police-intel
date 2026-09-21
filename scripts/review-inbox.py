@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from intel_v2.review import claim, decide, detail_recheck_candidates, empty_state, load_state, project, reconcile, schema_drift_candidates, sha256, upsert, validate_state
+from intel_v2.review import claim, decide, empty_state, load_state, project, reconcile, runtime_candidates, schema_drift_candidates, sha256, upsert, validate_state
 
 
 DEFAULT_STATE = ROOT / "state" / "review-inbox.json"
@@ -50,12 +50,7 @@ def write_json(path: Path, value: dict) -> None:
 
 def input_candidates(path: Path) -> list[dict]:
     payload = read_json(path)
-    if "detail_rechecks" in payload:
-        return detail_recheck_candidates(payload["detail_rechecks"])
-    rows = payload.get("items", payload.get("candidates", []))
-    if not isinstance(rows, list):
-        raise ValueError("input must contain items or candidates array")
-    return rows
+    return runtime_candidates(payload)
 
 
 def command_reconcile(args: argparse.Namespace) -> int:
