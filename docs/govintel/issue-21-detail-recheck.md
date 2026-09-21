@@ -10,6 +10,6 @@
 - `migrations/0003_detail_recheck.sql` 與 DB collector 已接上 opt-in `detail_recheck_state`：只有 list-first collector 實際抓到的 detail 會註冊，排程每輪最多處理一筆到期 target，保存 snapshot blob、hash-only before/after classification、下次核對時間與 review flag；未註冊項目不會觸發全站重爬。
 - DB collector 的回傳結果保留 hash-only `classification`；可直接以 `scripts/review-inbox.py reconcile --input` 轉成 `NEEDS_REVIEW`，不會自動改寫 handoff 或 canonical truth。
 
-驗證：`tests/test_detail_recheck.py` 14 tests，以及 `tests/test_detail_recheck_database.py` 3 tests pass。
+驗證：`tests/test_detail_recheck.py` 14 tests，以及 `tests/test_detail_recheck_database.py` 3 tests pass。2026-09-22 另以隔離、短命的 PostgreSQL 17 Docker 容器執行 `python -X utf8 -m unittest discover -s tests -p "test_source_ingestion.py" -v`，包含 migration case 在內共 11 tests pass；容器於測試後清理，未使用既有資料庫。
 
-刻意保留的界線：尚未在 `TEST_DATABASE_URL` 或正式 DB 執行 migration/排程，也沒有 7-day canary；因此不能宣稱 production recheck、公開部署或真實來源收件已完成。
+刻意保留的界線：目前只有一次隔離 ephemeral DB migration 驗證，尚未在持久／正式 DB 執行排程，也沒有 7-day canary；因此不能宣稱 production recheck、公開部署或真實來源收件已完成。
