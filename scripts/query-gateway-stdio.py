@@ -21,7 +21,35 @@ def main() -> int:
     parser.add_argument("--located-facts-bundle", type=Path)
     args = parser.parse_args()
     gateway = gateway_module.QueryGateway(gateway_module.load_snapshot(args.located_facts_bundle))
-    for line in sys.stdin:
+    stdin = getattr(sys.stdin, "buffer", sys.stdin)
+    while True:
+        raw_line = stdin.readline(gateway_module.MAX_REQUEST_BYTES + 1)
+        if not raw_line:
+            break
+        raw_bytes = raw_line if isinstance(raw_line, bytes) else raw_line.encode("utf-8")
+        has_newline = raw_bytes.endswith(b"\n")
+        content_bytes = raw_bytes[:-1] if has_newline else raw_bytes
+        if len(content_bytes) > gateway_module.MAX_REQUEST_BYTES:
+            while not has_newline:
+                chunk = stdin.readline(gateway_module.MAX_REQUEST_BYTES + 1)
+                if not chunk:
+                    break
+                has_newline = chunk.endswith(b"\n")
+            print(json.dumps({
+                "jsonrpc": "2.0",
+                "id": None,
+                "error": {"code": "REQUEST_TOO_LARGE", "message": "request line exceeds the byte limit"},
+            }, ensure_ascii=False, separators=(",", ":")), flush=True)
+            continue
+        try:
+            line = raw_bytes.decode("utf-8")
+        except UnicodeDecodeError as error:
+            print(json.dumps({
+                "jsonrpc": "2.0",
+                "id": None,
+                "error": {"code": -32700, "message": str(error)},
+            }, ensure_ascii=False, separators=(",", ":")), flush=True)
+            continue
         if not line.strip():
             continue
         request = None

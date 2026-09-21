@@ -64,6 +64,21 @@ class QueryGatewayStdioTests(unittest.TestCase):
         self.assertEqual(response["error"]["code"], "INVALID_JSON_RPC")
         self.assertEqual(result.stderr, "")
 
+    def test_oversized_request_line_is_rejected(self):
+        result = subprocess.run(
+            [sys.executable, "-X", "utf8", str(SCRIPT)],
+            cwd=ROOT,
+            input=json.dumps({"jsonrpc": "2.0", "id": 4, "method": "initialize", "padding": "x" * 70000}) + "\n",
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        response = json.loads(result.stdout)
+        self.assertEqual(response["error"]["code"], "REQUEST_TOO_LARGE")
+        self.assertEqual(result.stderr, "")
+
 
 if __name__ == "__main__":
     unittest.main()
