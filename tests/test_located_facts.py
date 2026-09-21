@@ -59,6 +59,19 @@ class LocatedFactsTests(unittest.TestCase):
         self.assertEqual(bundle["facts"][0]["verification_status"], "NEEDS_REVIEW")
         self.assertIsNone(bundle["facts"][0]["valid_time"])
 
+    def test_invalid_calendar_date_stays_needs_review(self):
+        body = "<p>公告日期 2026-02-31，活動 18:00</p>".encode("utf-8")
+        document = self.html_document(body)
+        bundle = build_bundle(document, body, [{
+            "subject_id": "event:A",
+            "predicate": "event_start_at",
+            "needle": "18:00",
+            "date_needle": "2026-02-31",
+        }])
+        self.assertEqual(bundle["facts"][0]["verification_status"], "NEEDS_REVIEW")
+        self.assertEqual(bundle["facts"][0]["review_reason"], "INVALID_VALID_TIME")
+        self.assertIsNone(bundle["facts"][0]["valid_time"])
+
     def test_hash_or_locator_change_fails_closed(self):
         body = HTML.read_bytes()
         document = self.html_document(body)

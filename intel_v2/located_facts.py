@@ -124,7 +124,10 @@ def _date_value(value: str) -> str | None:
     year = int(gregorian) if gregorian else int(roc) + 1911
     if not 1912 <= year <= 2200:
         return None
-    return f"{year:04d}-{int(month):02d}-{int(day):02d}"
+    try:
+        return datetime(year, int(month), int(day)).date().isoformat()
+    except ValueError:
+        return None
 
 
 def _fact(document: dict[str, Any], rule: dict[str, Any], raw_value: Any, locator: dict[str, Any], status: str, reason: str | None, valid_time: str | None) -> dict[str, Any]:
@@ -179,6 +182,8 @@ def extract_html_facts(document: dict[str, Any], body: bytes, rules: list[dict[s
             date_matches = list(re.finditer(re.escape(date_needle), text))
             if len(date_matches) == 1:
                 valid_time = _date_value(date_needle)
+                if valid_time is None:
+                    status, reason = "NEEDS_REVIEW", "INVALID_VALID_TIME"
             else:
                 status, reason = "NEEDS_REVIEW", "AMBIGUOUS_VALID_TIME"
         if len(matches) != 1:
