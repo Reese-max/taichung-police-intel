@@ -34,6 +34,15 @@ The companion Python contract suite has `25/25` tests. The verifier is local-onl
 uses a preserved checked-in snapshot, and does not write canonical or production
 state.
 
+## 2026-09-22 replay after workflow guard
+
+Commit `9a6ea6f65ddeb92b0470503148bd52536f044e07` passed the full verifier with
+candidate `rc-9a6ea6f65dde-20260921T232927Z` and `24/24` checks. The receipt is
+`runtime-evidence/current-checkout/20260921T232927Z/receipt.json`; it records
+`code_sha` equal to that commit, browser `13/13`, STDIO/HTTP MCP lifecycle,
+foreign-generation rejection, query-down static fallback, and sabotage
+detection. Its `production_verified` field remains `false` by design.
+
 ## Evidence boundary
 
 | Dimension | State |
