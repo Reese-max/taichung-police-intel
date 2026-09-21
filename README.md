@@ -150,6 +150,8 @@ The bounded PublicEvent core is runnable with `python scripts/public-event-fusio
 
 The NPA source matrix is maintained in [npa-source-inventory.v1.json](./docs/govintel/npa-source-inventory.v1.json), with Batch 1 fixture adapters and explicit `PRIMARY_EVENT` / `PRIMARY_REFERENCE` / `ENRICHMENT` / `EXCLUDE_OR_AGGREGATE_ONLY` roles. Run `python scripts/npa-source-inventory.py --self-check` to verify the inventory. Candidate sources are not production or deployment evidence; personal case-level sources remain blocked from the public canonical feed. Details are in [issue-28-npa-source-matrix.md](./docs/govintel/issue-28-npa-source-matrix.md).
 
+Correction feedback is local-first and review-gated in [issue-37-feedback-loop.md](./docs/govintel/issue-37-feedback-loop.md). `python scripts/feedback.py self-check` covers all nine feedback reasons, dedupe, trace hashes, privacy boundaries, accepted regression links, and the rule that feedback never directly changes production truth.
+
 Official document conversion is bounded by `intel_v2/located_facts.py` and `scripts/located-facts.py`: approved catalog origin → immutable raw/text hashes → HTML text-range or JSON Pointer locator → `FACT_CANDIDATE` / `NEEDS_REVIEW` fact and evidence projections. A locator/hash mismatch fails closed; the adapter does not promote candidates to verified truth or infer missing dates.
 
 ## Public deployment
