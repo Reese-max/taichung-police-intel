@@ -171,7 +171,20 @@ def validate_located_facts_bundle(bundle: Any, approved_source_ids: set[str]) ->
     expected_host = approved_source_origins().get(str(source_id))
     if source_id not in approved_source_ids or final_url.scheme != "https" or final_url.hostname != expected_host:
         raise ValueError("located-facts bundle source is not approved and HTTPS")
-    if not _is_sha256(document.get("raw_bytes_sha256")) or not document.get("document_version_id"):
+    raw_hash = document.get("raw_bytes_sha256")
+    text_hash = document.get("extracted_text_sha256")
+    if (
+        not isinstance(document.get("document_id"), str)
+        or not isinstance(document.get("original_source_identity"), str)
+        or not isinstance(document.get("snapshot_ref"), str)
+        or not isinstance(document.get("extractor_version"), str)
+        or not document["extractor_version"].strip()
+        or not isinstance(document.get("document_version_id"), str)
+        or not _is_sha256(raw_hash)
+        or not _is_sha256(text_hash)
+        or document["snapshot_ref"] != f"sha256:{raw_hash}"
+        or document["document_version_id"] != f"DOCV-{raw_hash[:20].upper()}"
+    ):
         raise ValueError("located-facts bundle document hash/version is invalid")
     facts = bundle.get("facts")
     evidence = bundle.get("evidence_catalog")
@@ -179,14 +192,40 @@ def validate_located_facts_bundle(bundle: Any, approved_source_ids: set[str]) ->
     receipt = bundle.get("receipt")
     if not isinstance(facts, list) or not isinstance(evidence, list) or not isinstance(events, list) or not isinstance(receipt, dict):
         raise ValueError("located-facts bundle shape is invalid")
+    required_receipt = {
+        "source_id": document["source_id"],
+        "document_version_id": document["document_version_id"],
+        "raw_bytes_sha256": raw_hash,
+        "extracted_text_sha256": text_hash,
+        "extractor_version": document.get("extractor_version"),
+        "fact_count": len(facts),
+    }
+    if any(receipt.get(key) != value for key, value in required_receipt.items()):
+        raise ValueError("located-facts receipt is not bound to its document version")
     if receipt.get("bundle_sha256") != _json_hash({"facts": facts, "evidence_catalog": evidence, "public_event_inputs": events}):
         raise ValueError("located-facts bundle receipt hash mismatch")
     fact_by_id = {}
     for fact in facts:
         if not isinstance(fact, dict) or not isinstance(fact.get("fact_id"), str) or fact["fact_id"] in fact_by_id:
             raise ValueError("located-facts bundle fact IDs must be unique")
-        if fact.get("source_id") != document["source_id"] or fact.get("document_version_id") != document["document_version_id"]:
+        if (
+            fact.get("source_id") != document["source_id"]
+            or fact.get("document_id") != document["document_id"]
+            or fact.get("document_version_id") != document["document_version_id"]
+            or fact.get("original_source_identity") != document["original_source_identity"]
+            or fact.get("raw_bytes_sha256") != raw_hash
+            or fact.get("extracted_text_sha256") != text_hash
+            or fact.get("extractor_version") != document.get("extractor_version")
+        ):
             raise ValueError("located-facts fact is not bound to its document version")
+        locator = fact.get("locator")
+        if (
+            not isinstance(locator, dict)
+            or locator.get("type") not in {"HTML_TEXT_RANGE", "JSON_POINTER"}
+            or locator.get("document_sha256") != raw_hash
+            or locator.get("text_sha256") != text_hash
+        ):
+            raise ValueError("located-facts fact locator hash binding is invalid")
         if fact.get("verification_status") not in {"FACT_CANDIDATE", "NEEDS_REVIEW", "CONFIRMED_OFFICIAL"}:
             raise ValueError("located-facts fact verification status is invalid")
         fact_by_id[fact["fact_id"]] = fact
@@ -196,9 +235,14 @@ def validate_located_facts_bundle(bundle: Any, approved_source_ids: set[str]) ->
             raise ValueError("located-facts evidence IDs must be unique")
         if row.get("fact_id") not in fact_by_id or row.get("source_id") != document["source_id"]:
             raise ValueError("located-facts evidence is not bound to a fact")
-        if row.get("document_version_id") != document["document_version_id"] or row.get("content_sha256") != document["raw_bytes_sha256"]:
-            raise ValueError("located-facts evidence hash/version binding is invalid")
         fact = fact_by_id[row["fact_id"]]
+        if (
+            row.get("document_version_id") != document["document_version_id"]
+            or row.get("content_sha256") != raw_hash
+            or row.get("official_url") != document["final_url"]
+            or row.get("locator") != fact.get("locator")
+        ):
+            raise ValueError("located-facts evidence hash/version binding is invalid")
         if row.get("verification_status") != fact.get("verification_status"):
             raise ValueError("located-facts evidence status is not bound to its fact")
         if row.get("verification_status") == "CONFIRMED_OFFICIAL":
@@ -213,6 +257,13 @@ def validate_located_facts_bundle(bundle: Any, approved_source_ids: set[str]) ->
             raise ValueError("located-facts event IDs must be unique")
         event_by_id[event["stable_id"]] = event
         fact = fact_by_id[event["stable_id"]]
+        if (
+            event.get("source_id") != document["source_id"]
+            or event.get("source_snapshot_ref") != document["snapshot_ref"]
+            or event.get("content_sha256") != raw_hash
+            or event.get("official_url") != document["final_url"]
+        ):
+            raise ValueError("located-facts event is not bound to its document version")
         if event.get("verification_status") != fact.get("verification_status"):
             raise ValueError("located-facts event status is not bound to its fact")
         if fact.get("verification_status") == "CONFIRMED_OFFICIAL" and event.get("review") != fact.get("review"):

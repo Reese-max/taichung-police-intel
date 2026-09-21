@@ -21,7 +21,7 @@ class QueryGatewayTests(unittest.TestCase):
         document = {
             "schema_version": 1,
             "document_id": "DOC-LOCATED-1",
-            "document_version_id": "DOCV-LOCATED-1",
+            "document_version_id": "DOCV-AAAAAAAAAAAAAAAAAAAA",
             "source_id": "S-028",
             "original_source_identity": "S-028:dataset-88147",
             "requested_url": "https://data.gov.tw/api/v2/rest/dataset/88147",
@@ -29,17 +29,31 @@ class QueryGatewayTests(unittest.TestCase):
             "fetched_at": "2026-09-21T00:00:00+00:00",
             "raw_bytes_sha256": "a" * 64,
             "extracted_text_sha256": "b" * 64,
+            "extractor_version": "located-facts-v1",
+            "snapshot_ref": "sha256:" + "a" * 64,
             "rights_status": "METADATA_LINK_ONLY",
+        }
+        locator = {
+            "type": "JSON_POINTER",
+            "pointer": "/result/title",
+            "raw_value": "臺中市受理刑事案件",
+            "document_sha256": document["raw_bytes_sha256"],
+            "text_sha256": document["extracted_text_sha256"],
         }
         fact = {
             "fact_id": "FACT-LOCATED-1",
             "document_id": document["document_id"],
             "document_version_id": document["document_version_id"],
             "source_id": document["source_id"],
+            "original_source_identity": document["original_source_identity"],
+            "raw_bytes_sha256": document["raw_bytes_sha256"],
+            "extracted_text_sha256": document["extracted_text_sha256"],
+            "extractor_version": document["extractor_version"],
             "subject_id": "dataset:88147",
             "predicate": "dataset_title",
             "normalized_value": "臺中市受理刑事案件",
             "valid_time": None,
+            "locator": locator,
             "verification_status": status,
         }
         evidence = {
@@ -48,13 +62,16 @@ class QueryGatewayTests(unittest.TestCase):
             "source_id": document["source_id"],
             "document_version_id": document["document_version_id"],
             "official_url": document["final_url"],
-            "locator": {"type": "JSON_POINTER", "pointer": "/result/title"},
+            "locator": locator,
             "content_sha256": document["raw_bytes_sha256"],
             "verification_status": status,
         }
         events = [{
             "stable_id": fact["fact_id"],
             "source_id": document["source_id"],
+            "source_snapshot_ref": document["snapshot_ref"],
+            "content_sha256": document["raw_bytes_sha256"],
+            "official_url": document["final_url"],
             "verification_status": status,
         }]
         if status == "CONFIRMED_OFFICIAL":
@@ -68,7 +85,15 @@ class QueryGatewayTests(unittest.TestCase):
             evidence["review"] = review
             events[0]["review"] = review
         bundle = {"document_version": document, "facts": [fact], "evidence_catalog": [evidence], "public_event_inputs": events}
-        bundle["receipt"] = {"bundle_sha256": gateway_module._json_hash({"facts": [fact], "evidence_catalog": [evidence], "public_event_inputs": events})}
+        bundle["receipt"] = {
+            "source_id": document["source_id"],
+            "document_version_id": document["document_version_id"],
+            "raw_bytes_sha256": document["raw_bytes_sha256"],
+            "extracted_text_sha256": document["extracted_text_sha256"],
+            "extractor_version": document["extractor_version"],
+            "fact_count": 1,
+            "bundle_sha256": gateway_module._json_hash({"facts": [fact], "evidence_catalog": [evidence], "public_event_inputs": events}),
+        }
         return bundle
 
     @classmethod
@@ -286,6 +311,19 @@ class QueryGatewayTests(unittest.TestCase):
         bundle["receipt"]["bundle_sha256"] = "0" * 64
         snapshot["located_facts"] = bundle
         with self.assertRaisesRegex(ValueError, "receipt hash mismatch"):
+            gateway_module.QueryGateway(snapshot=snapshot)
+
+    def test_located_facts_hash_bindings_are_fail_closed(self):
+        snapshot = gateway_module.load_snapshot()
+        bundle = self.located_bundle()
+        bundle["facts"][0]["raw_bytes_sha256"] = "0" * 64
+        bundle["receipt"]["bundle_sha256"] = gateway_module._json_hash({
+            "facts": bundle["facts"],
+            "evidence_catalog": bundle["evidence_catalog"],
+            "public_event_inputs": bundle["public_event_inputs"],
+        })
+        snapshot["located_facts"] = bundle
+        with self.assertRaisesRegex(ValueError, "fact is not bound"):
             gateway_module.QueryGateway(snapshot=snapshot)
 
     def test_located_facts_confirmation_requires_review_receipt(self):
