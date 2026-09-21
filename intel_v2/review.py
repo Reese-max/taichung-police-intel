@@ -87,6 +87,8 @@ def _validate_audit(review_id: str, sequence: int, audit: Any) -> None:
 
 
 def validate_state(state: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(state, dict):
+        raise ValueError("review state must be an object")
     if state.get("schema_version") != 1 or state.get("mode") != "REVIEW_INBOX":
         raise ValueError("review state must use schema_version=1 and mode=REVIEW_INBOX")
     items = state.get("items")

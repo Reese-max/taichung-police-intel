@@ -67,6 +67,9 @@ class ReviewInboxTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "evidence hash mismatch"):
             validate_state(broken_evidence)
 
+        with self.assertRaisesRegex(ValueError, "review state must be an object"):
+            validate_state([])
+
     def test_public_projection_keeps_bounded_ids_but_strips_private_review_data(self):
         state, item, _ = upsert(empty_state(), candidate("CONFLICT"), observed_at=STAMP)
         state = claim(state, item["review_id"], assignee_ref="operator-1", claimed_at=STAMP)
