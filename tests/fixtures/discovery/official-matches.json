@@ -1,0 +1,24 @@
+[
+  {
+    "candidate_id": "gd-1111111111111111",
+    "document_id": "DOC-OFFICIAL-ROAD-1",
+    "document_version_id": "DOCV-OFFICIAL-ROAD-1",
+    "source_id": "S-032",
+    "authority": "official",
+    "original_source_identity": "S-032:traffic-road-1",
+    "official_url": "https://www.traffic.taichung.gov.tw/news/road-1",
+    "fact_fingerprint": "road-control:2026-09-20",
+    "public_event_id": null
+  },
+  {
+    "candidate_id": "gd-2222222222222222",
+    "document_id": "DOC-OFFICIAL-FIRE-1",
+    "document_version_id": "DOCV-OFFICIAL-FIRE-1",
+    "source_id": "S-031",
+    "authority": "official",
+    "original_source_identity": "city-fire:incident-1",
+    "official_url": "https://fire.example.test/incident-1",
+    "fact_fingerprint": "fire:incident-1",
+    "public_event_id": "PUB-EXISTING-1"
+  }
+]
