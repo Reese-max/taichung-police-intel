@@ -20,6 +20,7 @@ const required = [
   "collect.py",
   "online_collect.py",
   "scripts/candidate-runtime-canary.py",
+  "scripts/verify-candidate-observation-window.py",
   "scripts/verify-publication-bundle.py",
   ".github/workflows/pages.yml",
   "SUBMISSION.md",
@@ -309,6 +310,7 @@ if (["quick", "full"].includes(mode) && !failures.length) {
       ["retention-policy-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_retention_policy.py", "-v"]],
       ["news-list-collector-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_news_list_collector.py", "-v"]],
       ["candidate-canary-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_candidate_runtime_canary.py", "-v"]],
+      ["candidate-observation-window-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_candidate_observation_window.py", "-v"]],
       ["publication-bundle-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_publication_bundle.py", "-v"]],
       ["v2-publication-check", ["-X", "utf8", "scripts/verify-v2-publication.py"]],
       ["publication-bundle-check", ["-X", "utf8", "scripts/verify-publication-bundle.py"]],
@@ -319,6 +321,7 @@ if (["quick", "full"].includes(mode) && !failures.length) {
       ["asr-self-check", ["-X", "utf8", "groq-asr-canary.py", "--self-check"]],
       ["cer-self-check", ["-X", "utf8", "evaluation/evaluate-asr-cer.py", "--self-check"]],
       ["online-collector-self-check", ["-X", "utf8", "online_collect.py", "--self-check"]],
+      ["candidate-observation-window-self-check", ["-X", "utf8", "scripts/verify-candidate-observation-window.py", "--self-check"]],
     ];
     for (const [label, args] of checks) run(python.command, [...python.prefix, ...args], label);
   }
