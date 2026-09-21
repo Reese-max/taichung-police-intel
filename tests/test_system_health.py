@@ -1,6 +1,7 @@
 import importlib.util
 import json
 from pathlib import Path
+import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -164,6 +165,23 @@ class SystemHealthTests(unittest.TestCase):
             "review_inbox": [{"source_id": "S-007"}],
         })
         self.assertEqual((broken["outcome"], broken["error_class"], broken["review_inbox_count"]), ("FAILED", "SOURCE_CONTRACT_DRIFT", 1))
+
+    def test_schema_drift_candidates_reach_public_review_projection(self):
+        receipt = {
+            "generated_at": "2026-09-21T00:00:00+00:00",
+            "review_inbox": [{
+                "source_id": "S-007",
+                "status": "SOURCE_UNAVAILABLE",
+                "reasons": ["HTTP_503"],
+                "observed_at": "2026-09-21T00:00:00+00:00",
+            }],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            rows = health.load_review_inbox(Path(directory) / "review.json", receipt)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["reason"], "PARTIAL_SOURCE")
+        self.assertNotIn("evidence", rows[0])
+        self.assertNotIn("audit", rows[0])
 
 
 if __name__ == "__main__":
