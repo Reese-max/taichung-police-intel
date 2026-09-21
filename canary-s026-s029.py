@@ -37,11 +37,14 @@ def manifest_sha256(value: object) -> str:
 
 
 def roc_dot_to_iso(value: str) -> str:
-    match = re.search(r"(\d{2,3})\.(\d{1,2})\.(\d{1,2})", value or "")
+    match = re.search(r"(?<!\d)(\d{2,3})\.(\d{1,2})\.(\d{1,2})(?!\d)", value or "")
     if not match:
         return ""
     year, month, day = map(int, match.groups())
-    return f"{year + 1911:04d}-{month:02d}-{day:02d}"
+    try:
+        return date(year + 1911, month, day).isoformat()
+    except ValueError:
+        return ""
 
 
 def in_window(value: str, start: date, end: date) -> bool:
@@ -331,6 +334,8 @@ def fetch_s029(session: requests.Session, start: date, end: date) -> dict:
 def self_check() -> None:
     assert roc_dot_to_iso("115.07.27") == "2026-07-27"
     assert roc_dot_to_iso("日期缺失") == ""
+    assert roc_dot_to_iso("2026.07.27") == ""
+    assert roc_dot_to_iso("115.02.29") == ""
     assert in_window("2026-08-10", date(2026, 8, 8), date(2026, 8, 14))
     assert not in_window("2026-08-01", date(2026, 8, 8), date(2026, 8, 14))
     assert manifest_sha256({"b": 2, "a": 1}) == manifest_sha256({"a": 1, "b": 2})
