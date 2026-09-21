@@ -18,6 +18,7 @@ from intel_v2.handoff import (
     load_state as load_handoff_state,
     sync_with_publication,
     tracking_projection,
+    watch_id_for,
 )
 from intel_v2.role_profiles import DEFAULT_PROFILE_ID, load_catalog, project_profile
 from intel_v2.semantics import ChangeEvent, compare_snapshot, feed_item_to_version, shadow_brief
@@ -159,7 +160,15 @@ def source_health_projection(source_status: dict | None) -> dict:
     }
 
 
-def event_projection(event: ChangeEvent, publication_tier: str) -> dict:
+def event_projection(
+    event: ChangeEvent,
+    publication_tier: str,
+    current_item: dict | None = None,
+) -> dict:
+    current_item = current_item or {}
+    source_version = current_item.get("version_no")
+    if not isinstance(source_version, int):
+        source_version = event.after_version
     context = SOURCE_CONTEXT.get(
         event.source_id,
         {
@@ -170,6 +179,9 @@ def event_projection(event: ChangeEvent, publication_tier: str) -> dict:
     )
     return {
         "event_id": event.event_id,
+        "identity": event.identity,
+        "watch_id": watch_id_for(event.identity),
+        "stable_key": event.stable_key,
         "source_id": event.source_id,
         "source_name": context["source_name"],
         "change_type": event.change_type,
@@ -186,6 +198,9 @@ def event_projection(event: ChangeEvent, publication_tier: str) -> dict:
         "date_status": event.date_status,
         "detected_at": event.detected_at,
         "changed_fields": list(event.changed_fields),
+        "source_version": source_version,
+        "source_sha256": current_item.get("normalized_sha256"),
+        "source_document_version": current_item.get("document_version_id"),
         "official_url": event.official_url,
         "verification_status": "DETERMINISTIC_PASS",
         "evidence_status": "OFFICIAL_URL_BOUND",
@@ -210,7 +225,10 @@ def enrich_for_police_users(
     if catalog["profiles"][profile_id]["status"] != "active":
         raise ValueError(f"role profile is not active: {profile_id}")
     publishable = [event for event in events if event.publishable]
-    event_items = [event_projection(event, "OTHER") for event in publishable]
+    event_items = [
+        event_projection(event, "OTHER", current_items.get(event.identity))
+        for event in publishable
+    ]
 
     brief["generator_version"] = GENERATOR_VERSION
     brief["audience"] = ["議會聯絡", "局本部幕僚", "業管承辦", "分局主管"]

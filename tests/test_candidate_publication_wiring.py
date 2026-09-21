@@ -116,6 +116,9 @@ class CandidatePublicationWiringTests(unittest.TestCase):
         projected = v2.event_projection(event, "TOP")
         self.assertEqual(projected["source_name"], "臺中市政府交通局最新消息")
         self.assertEqual(projected["official_url"], event.official_url)
+        self.assertEqual(projected["identity"], event.identity)
+        self.assertEqual(projected["source_version"], 1)
+        self.assertTrue(projected["watch_id"].startswith("WATCH-"))
 
 
 if __name__ == "__main__":

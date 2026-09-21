@@ -2,6 +2,18 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { assessPublication } from "../lib/publication-freshness.mjs";
+import {
+  addLocalWatch,
+  confirmLocalHandoff,
+  emptyLocalHandoff,
+  exportLocalHandoff,
+  latestHandoff,
+  loadLocalHandoff,
+  projectLocalTracking,
+  saveLocalHandoff,
+  setLocalWatchStatus,
+  syncLocalHandoff,
+} from "../lib/local-handoff.js";
 import QueryGatewayPanel from "./QueryGatewayPanel.js";
 
 
@@ -179,7 +191,7 @@ function SystemHealthSummary({ health }) {
   );
 }
 
-function ActionCard({ item, index }) {
+function ActionCard({ item, index, tracked, onAddWatch, storageReady }) {
   const affectedRoles = Array.isArray(item.affected_roles) ? item.affected_roles : [];
   const relevanceReasons = Array.isArray(item.profile_relevance?.reason_codes)
     ? item.profile_relevance.reason_codes
@@ -243,9 +255,20 @@ function ActionCard({ item, index }) {
             ? "規則驗證通過"
             : "待驗證"}
         </span>
-        <a href={item.official_url} target="_blank" rel="noreferrer">
-          開啟官方來源
-        </a>
+        <div className="v2-action-buttons">
+          <button
+            type="button"
+            className="v2-secondary-button"
+            disabled={tracked || !item.identity || !Number.isInteger(item.source_version) || !storageReady}
+            onClick={() => onAddWatch(item)}
+            title={!item.identity || !Number.isInteger(item.source_version) ? "缺少可驗證的來源版本" : undefined}
+          >
+            {tracked ? "已加入追蹤" : "加入追蹤"}
+          </button>
+          <a href={item.official_url} target="_blank" rel="noreferrer">
+            開啟官方來源
+          </a>
+        </div>
       </div>
     </article>
   );
@@ -286,6 +309,24 @@ function SourceHealthSummary({ sourceStatus, canReassure }) {
   );
 }
 
+function collectPublishedItems(publication) {
+  const views = [
+    ...(Array.isArray(publication?.profile_views) ? publication.profile_views : []),
+    publication,
+  ];
+  const rows = [];
+  for (const view of views) {
+    for (const key of ["priority_items", "tracking_items", "other_changes"]) {
+      if (Array.isArray(view?.[key])) rows.push(...view[key]);
+    }
+  }
+  const unique = new Map();
+  for (const item of rows) {
+    if (item?.identity && !unique.has(item.identity)) unique.set(item.identity, item);
+  }
+  return [...unique.values()];
+}
+
 export default function V2DailyDashboard() {
   const [publication, setPublication] = useState(null);
   const [archive, setArchive] = useState(null);
@@ -297,6 +338,9 @@ export default function V2DailyDashboard() {
   const [archiveQuery, setArchiveQuery] = useState("");
   const [selectedProfileId, setSelectedProfileId] = useState("general");
   const [nowMs, setNowMs] = useState(null);
+  const [localHandoff, setLocalHandoff] = useState(null);
+  const [handoffNotice, setHandoffNotice] = useState("");
+  const [handoffError, setHandoffError] = useState("");
 
   useEffect(() => {
     const updateClock = () => setNowMs(Date.now());
@@ -308,6 +352,25 @@ export default function V2DailyDashboard() {
       window.removeEventListener("focus", updateClock);
     };
   }, []);
+
+  useEffect(() => {
+    if (!publication || loadState !== "ready") return;
+    try {
+      const loaded = loadLocalHandoff();
+      const synced = syncLocalHandoff(
+        loaded,
+        collectPublishedItems(publication),
+        publication,
+        publication.generated_at,
+      );
+      saveLocalHandoff(synced);
+      setLocalHandoff(synced);
+      setHandoffError("");
+    } catch (error) {
+      setLocalHandoff(null);
+      setHandoffError(error.message);
+    }
+  }, [publication, loadState]);
 
   const assessment = assessPublication(publication, sourceStatus, nowMs);
 
@@ -398,15 +461,102 @@ export default function V2DailyDashboard() {
   const activeView = profileViews.find((view) => view?.profile?.profile_id === selectedProfileId) || publication || {};
   const activeProfile = activeView.profile || publication?.profile;
   const overview = { ...(publication?.overview || {}), ...(activeView.overview || {}) };
+  const currentItems = useMemo(
+    () => collectPublishedItems(publication),
+    [publication],
+  );
   const priorityItems = Array.isArray(activeView.priority_items)
     ? activeView.priority_items.slice(0, 3)
     : [];
-  const trackingItems = Array.isArray(activeView.tracking_items)
+  const serverTrackingItems = Array.isArray(activeView.tracking_items)
     ? activeView.tracking_items.slice(0, 5)
     : [];
+  const localTrackingItems = localHandoff
+    ? projectLocalTracking(localHandoff, currentItems)
+    : [];
+  const localByWatchId = new Map(localTrackingItems.map((item) => [item.watch_id, item]));
+  const trackingItems = [
+    ...serverTrackingItems
+      .filter((item) => !localHandoff || !localHandoff.watch_items[item.watch_id]
+        || ["WATCHING", "NEEDS_REVIEW"].includes(localHandoff.watch_items[item.watch_id].status))
+      .map((item) => localByWatchId.get(item.watch_id) || item),
+    ...localTrackingItems.filter((item) => !serverTrackingItems.some((row) => row.watch_id === item.watch_id)),
+  ].slice(0, 5);
   const otherChanges = Array.isArray(activeView.other_changes)
     ? activeView.other_changes
     : [];
+  const activeWatchIds = new Set(
+    Object.values(localHandoff?.watch_items || {})
+      .filter((watch) => ["WATCHING", "NEEDS_REVIEW"].includes(watch.status))
+      .map((watch) => watch.watch_id),
+  );
+  const activeWatchIdentities = new Set(
+    Object.values(localHandoff?.watch_items || {})
+      .filter((watch) => ["WATCHING", "NEEDS_REVIEW"].includes(watch.status))
+      .map((watch) => watch.identity),
+  );
+
+  const persistHandoff = (next, notice) => {
+    try {
+      saveLocalHandoff(next);
+      setLocalHandoff(next);
+      setHandoffError("");
+      setHandoffNotice(notice);
+    } catch (error) {
+      setHandoffError(error.message);
+    }
+  };
+
+  const handleAddWatch = (item) => {
+    if (!localHandoff) {
+      setHandoffError("本機追蹤尚未載入，未覆寫既有資料。");
+      return;
+    }
+    try {
+      persistHandoff(
+        addLocalWatch(localHandoff, item),
+        `已加入本機追蹤：${item.headline}`,
+      );
+    } catch (error) {
+      setHandoffError(error.message);
+    }
+  };
+
+  const handleConfirmHandoff = () => {
+    try {
+      const next = confirmLocalHandoff(localHandoff || emptyLocalHandoff(), currentItems, publication);
+      persistHandoff(next, `已確認本機交班版本 v${latestHandoff(next).brief_version}。`);
+    } catch (error) {
+      setHandoffError(error.message);
+    }
+  };
+
+  const handleWatchStatus = (watchId, status) => {
+    try {
+      persistHandoff(
+        setLocalWatchStatus(localHandoff || emptyLocalHandoff(), watchId, status),
+        status === "RESOLVED" ? "已標記為已處理。" : "已標記為不再追蹤。",
+      );
+    } catch (error) {
+      setHandoffError(error.message);
+    }
+  };
+
+  const handleExport = (format) => {
+    try {
+      const artifact = exportLocalHandoff(localHandoff || emptyLocalHandoff(), format);
+      const url = URL.createObjectURL(new Blob([artifact.content], { type: artifact.mime }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = artifact.filename;
+      link.click();
+      URL.revokeObjectURL(url);
+      setHandoffNotice(`已匯出本機交班版本：${artifact.filename}`);
+      setHandoffError("");
+    } catch (error) {
+      setHandoffError(error.message);
+    }
+  };
   const generationMixed = Boolean(
     publication && archive && sourceStatus
       && !samePublicationGeneration(publication, archive, sourceStatus),
@@ -518,13 +668,20 @@ export default function V2DailyDashboard() {
             ) : (
               <div className="v2-action-list">
                 {priorityItems.map((item, index) => (
-                  <ActionCard key={item.event_id} item={item} index={index} />
+                  <ActionCard
+                    key={item.event_id}
+                    item={item}
+                    index={index}
+                    tracked={activeWatchIds.has(item.watch_id) || activeWatchIdentities.has(item.identity)}
+                    onAddWatch={handleAddWatch}
+                    storageReady={Boolean(localHandoff)}
+                  />
                 ))}
               </div>
             )}
           </section>
 
-          {trackingItems.length > 0 && (
+          {(trackingItems.length > 0 || localHandoff) && (
             <section className="v2-tracking-section" aria-labelledby="v2-tracking-title">
               <div className="v2-section-heading">
                 <div>
@@ -533,17 +690,43 @@ export default function V2DailyDashboard() {
                 </div>
                 <span>最多 5 件</span>
               </div>
+              <div className="v2-handoff-toolbar" data-testid="local-handoff-toolbar">
+                <span>本機保存 · 不會寫入公開網站</span>
+                <div>
+                  <button type="button" onClick={handleConfirmHandoff} disabled={!localTrackingItems.length}>
+                    確認／更新交班版本
+                  </button>
+                  <button type="button" onClick={() => handleExport("markdown")} disabled={!localHandoff?.handoffs?.length}>
+                    匯出 Markdown
+                  </button>
+                  <button type="button" onClick={() => handleExport("json")} disabled={!localHandoff?.handoffs?.length}>
+                    匯出 JSON
+                  </button>
+                </div>
+                {handoffNotice && <small role="status">{handoffNotice}</small>}
+                {handoffError && <small className="error" role="alert">{handoffError}</small>}
+              </div>
               <div className="v2-tracking-list" data-testid="v2-tracking-list">
-                {trackingItems.map((item) => (
-                  <a key={item.tracking_id || item.watch_id || item.event_id} href={item.official_url} target="_blank" rel="noreferrer">
-                    <strong>{item.headline}</strong>
-                    <span>
-                      {item.watch_status === "NEEDS_REVIEW" ? "需重新核對" : "持續追蹤"}
-                      {item.source_health && item.source_health !== "PASS" ? ` · 來源 ${item.source_health}` : ""}
-                    </span>
-                    <small>{item.recommended_action}</small>
-                  </a>
-                ))}
+                {trackingItems.length > 0 ? (
+                  trackingItems.map((item) => (
+                  <article key={item.tracking_id || item.watch_id || item.event_id}>
+                    <a href={item.official_url} target="_blank" rel="noreferrer">
+                      <strong>{item.headline}</strong>
+                      <span>
+                        {item.watch_status === "NEEDS_REVIEW" ? "需重新核對" : "持續追蹤"}
+                        {item.source_health && item.source_health !== "PASS" ? ` · 來源 ${item.source_health}` : ""}
+                      </span>
+                      <small>{item.recommended_action}</small>
+                    </a>
+                    {item.watch_id && activeWatchIds.has(item.watch_id) && (
+                      <div className="v2-tracking-actions">
+                        <button type="button" onClick={() => handleWatchStatus(item.watch_id, "RESOLVED")}>標記已處理</button>
+                        <button type="button" onClick={() => handleWatchStatus(item.watch_id, "DISMISSED")}>停止追蹤</button>
+                      </div>
+                    )}
+                  </article>
+                  ))
+                ) : <p className="v2-handoff-empty">尚未加入本機追蹤項目；可從快照重點加入。</p>}
               </div>
             </section>
           )}

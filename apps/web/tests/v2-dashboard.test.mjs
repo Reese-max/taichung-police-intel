@@ -106,6 +106,11 @@ test("V2 dashboard is police-first, Top 3 capped, and evidence-bound", async () 
   assert.match(source, /profile_relevance/);
   assert.match(source, /reason_codes/);
   assert.match(source, /開啟官方來源/);
+  assert.match(source, /加入追蹤/);
+  assert.match(source, /確認／更新交班版本/);
+  assert.match(source, /本機保存 · 不會寫入公開網站/);
+  assert.match(source, /標記已處理/);
+  assert.match(source, /匯出 Markdown/);
   assert.match(source, /DETERMINISTIC_PASS/);
   assert.doesNotMatch(source, /AUTO_PASS/);
 });
