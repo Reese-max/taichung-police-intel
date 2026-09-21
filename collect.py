@@ -191,6 +191,9 @@ SOURCE_FRESHNESS_POLICY: dict[str, tuple[float, float]] = {
     "S-007": (24 * 90, 24 * 180),  # Meeting records: published after meeting periods
     "S-009": (24 * 14, 24 * 60),   # Proposals: session-based, API-confirmed
     "S-029": (24 * 45, 24 * 90),   # Project reports: updated per session cycle
+    "S-001": (13, 24),              # Police news: event/news cadence
+    "S-019": (36, 72),              # City meetings: daily publication cadence
+    "S-032": (13, 24),              # Traffic news: event/news cadence
 }
 
 

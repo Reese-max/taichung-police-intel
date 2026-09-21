@@ -100,6 +100,13 @@ test("every source in the competition snapshot has an English display name", asy
   );
 });
 
+test("first promotion candidates have stable bilingual display names", () => {
+  assert.deepEqual(
+    ["S-001", "S-019", "S-032"].filter((sourceId) => !SOURCE_NAMES_EN[sourceId]),
+    [],
+  );
+});
+
 // ── R6: shared evidence identifiers ──────────────────────────────────────────
 
 test("PRIORITY_ITEM evidence_source_id is S-010", () => {

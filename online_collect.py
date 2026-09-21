@@ -908,6 +908,7 @@ def project_feed_item(
     return {
         "stable_id": stable_id,
         "source_id": source_id,
+        "source_name": source_name,
         "source_role": "PRIMARY_OFFICIAL",
         "title": title,
         "official_url": item.get("source_url") or source_url,

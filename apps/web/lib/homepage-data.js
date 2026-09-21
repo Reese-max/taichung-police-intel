@@ -39,6 +39,9 @@ export const SOURCE_NAMES_EN = {
   "S-007": "Taichung City Council proceedings records",
   "S-009": "Taichung City Council proposals",
   "S-029": "Taichung City Government council project reports",
+  "S-001": "Taichung City Police Bureau news",
+  "S-019": "Taichung City Government meeting records and project reports",
+  "S-032": "Taichung City Transportation Bureau news",
 };
 
 // ── Central-policy cap ────────────────────────────────────────────────────────
