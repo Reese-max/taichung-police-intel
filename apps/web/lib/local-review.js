@@ -69,19 +69,46 @@ export function validateLocalReview(value) {
       || typeof item.source_version !== "string"
       || typeof item.evidence_sha256 !== "string"
       || !/^[0-9a-f]{64}$/.test(item.evidence_sha256)
+      || !item.entity_ids
+      || typeof item.entity_ids !== "object"
       || item.binding_id !== bindingId(item)
       || !Array.isArray(item.history)
       || !item.history.length
+      || typeof item.updated_at !== "string"
     ) {
       throw new Error(`本機覆核資料無法驗證：${reviewId}`);
+    }
+    stamp(item.updated_at);
+    for (const entry of item.history) {
+      if (
+        !entry
+        || typeof entry.action !== "string"
+        || !entry.action
+        || typeof entry.binding_id !== "string"
+        || typeof entry.source_version !== "string"
+        || typeof entry.evidence_sha256 !== "string"
+        || !/^[0-9a-f]{64}$/.test(entry.evidence_sha256)
+      ) {
+        throw new Error(`本機覆核歷史無法驗證：${reviewId}`);
+      }
+      stamp(entry.at);
+      if (entry.binding_id !== bindingId({
+        review_id: reviewId,
+        source_version: entry.source_version,
+        evidence_sha256: entry.evidence_sha256,
+      })) {
+        throw new Error(`本機覆核歷史 binding 無法驗證：${reviewId}`);
+      }
     }
     if (item.decision !== null && (
       !item.decision
       || !DECISIONS.has(item.decision.decision)
+      || typeof item.decision.decided_at !== "string"
       || item.decision.binding_id !== item.binding_id
     )) {
       throw new Error(`本機覆核決策無法驗證：${reviewId}`);
     }
+    if (item.decision) stamp(item.decision.decided_at);
   }
   if (value.last_updated_at !== null) stamp(value.last_updated_at);
   return value;
