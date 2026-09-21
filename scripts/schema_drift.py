@@ -570,7 +570,16 @@ def build_receipt(
     contracts: dict[str, dict[str, Any]] = CONTRACTS,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     state = state or empty_state()
-    observations_by_id = {item["source_id"]: item for item in (observations or [])}
+    observations_by_id: dict[str, dict[str, Any]] = {}
+    for item in observations or []:
+        if not isinstance(item, dict) or not isinstance(item.get("source_id"), str) or not item["source_id"].strip():
+            raise ValueError("schema-drift observation requires a source_id")
+        source_id = item["source_id"]
+        if source_id not in contracts:
+            raise ValueError(f"schema-drift observation has unknown source_id: {source_id}")
+        if source_id in observations_by_id:
+            raise ValueError(f"schema-drift observation has duplicate source_id: {source_id}")
+        observations_by_id[source_id] = item
     receipt_sources = []
     review_inbox = []
     for source_id, contract in contracts.items():

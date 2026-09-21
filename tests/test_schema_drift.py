@@ -198,6 +198,13 @@ class SchemaDriftTests(unittest.TestCase):
         self.assertEqual(failed["http_status"], 503)
         self.assertEqual(failed["error_reason"], "LIVE_FETCH_RUNTIMEERROR")
 
+    def test_receipt_rejects_duplicate_and_unknown_observation_ids(self):
+        sample = {"source_id": "S-001", "body": b"<li><a href=\"news_view.jsp?dataserno=1\">news 115-09-10</a></li>"}
+        with self.assertRaisesRegex(ValueError, "duplicate source_id"):
+            drift.build_receipt([sample, dict(sample)])
+        with self.assertRaisesRegex(ValueError, "unknown source_id"):
+            drift.build_receipt([{**sample, "source_id": "S-UNKNOWN"}])
+
 
 if __name__ == "__main__":
     unittest.main()
