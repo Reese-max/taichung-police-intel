@@ -250,7 +250,21 @@ class ReceiptGuardTests(unittest.TestCase):
         stages = {(row["lane"], row["stage"]): row for row in result["stages"]}
         self.assertEqual(stages[("publication", "deployment")]["outcome"], "UNKNOWN")
         self.assertEqual(stages[("publication", "public_http_verification")]["outcome"], "UNKNOWN")
+        self.assertEqual(stages[("query", "query_index")]["outcome"], "UNKNOWN")
         self.assertNotEqual(result["lanes"]["publication"], "HEALTHY")
+
+    def test_failed_query_check_blocks_query_stage(self):
+        modules = vc.load_checkout_modules(ROOT)
+        ctx = vc.build_candidate_context(ROOT, modules)
+        result = vc.build_health_receipt(ctx, [
+            {"id": "http_query_same_generation_bounded", "status": "FAIL"},
+            {"id": "http_read_only_mcp_publication_receipt", "status": "PASS"},
+            {"id": "stdio_read_only_mcp_lifecycle", "status": "PASS"},
+        ])
+        stages = {(row["lane"], row["stage"]): row for row in result["stages"]}
+        self.assertEqual(stages[("query", "query_index")]["outcome"], "FAILED")
+        self.assertEqual(stages[("query", "query_index")]["error_class"], "QUERY_CHECK_FAILED")
+        self.assertEqual(result["lanes"]["query"], "BLOCKED")
 
     def test_receipt_fails_with_any_failed_check(self):
         receipt = {"checks": [{"id": "a", "status": "PASS"}, {"id": "b", "status": "FAIL"}]}

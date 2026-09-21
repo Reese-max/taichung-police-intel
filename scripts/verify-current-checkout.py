@@ -62,6 +62,18 @@ EXPECTED_MCP_TOOLS = frozenset({
     "search_evidence", "get_current_brief", "get_publication_receipt",
     "get_source_health", "validate_answer",
 })
+QUERY_INDEX_CHECK_IDS = frozenset({
+    "served_store_consistency",
+    "http_query_same_generation_bounded",
+    "negative_foreign_generation_refused",
+    "negative_source_unavailable_distinct",
+    "distinguishable_data_status",
+    "http_query_bounds_enforced",
+    "capability_not_available_typed",
+    "negative_mixed_generation_refused_history_kept",
+    "negative_http_200_wrong_generation_detected",
+    "negative_query_down_static_readable",
+})
 
 
 def utcnow() -> datetime:
@@ -819,9 +831,21 @@ def build_health_receipt(ctx: dict[str, Any], http_checks: list[dict[str, Any]] 
         "SUCCESS" if len(mcp_checks) == 2 and all(check.get("status") == "PASS" for check in mcp_checks)
         else "FAILED" if mcp_checks else "SKIPPED"
     )
+    query_checks = [
+        check for check in (http_checks or [])
+        if check.get("id") in QUERY_INDEX_CHECK_IDS
+    ]
+    if http_checks is None:
+        query_outcome, query_error = "SKIPPED", "QUERY_RUNTIME_NOT_VERIFIED"
+    elif not query_checks:
+        query_outcome, query_error = "UNKNOWN", "QUERY_CHECKS_MISSING"
+    elif all(check.get("status") == "PASS" for check in query_checks):
+        query_outcome, query_error = "SUCCESS", None
+    else:
+        query_outcome, query_error = "FAILED", "QUERY_CHECK_FAILED"
     stages += [
         {"lane": "query", "stage": "query_index",
-         "outcome": "SUCCESS" if http_checks is not None else "SKIPPED",
+         "outcome": query_outcome, "error_class": query_error,
          "generation_id": ctx["store"]["generation_id"], "ended_at": now},
         {"lane": "query", "stage": "read_only_mcp",
          "outcome": mcp_outcome,
