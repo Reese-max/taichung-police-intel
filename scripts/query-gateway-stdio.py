@@ -30,8 +30,11 @@ def emit(response: dict) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run the read-only GovIntel MCP gateway over stdio")
     parser.add_argument("--located-facts-bundle", type=Path)
+    parser.add_argument("--query-store", type=Path)
     args = parser.parse_args()
-    gateway = gateway_module.QueryGateway(gateway_module.load_snapshot(args.located_facts_bundle))
+    gateway = gateway_module.QueryGateway(
+        gateway_module.load_snapshot(args.located_facts_bundle, args.query_store)
+    )
     stdin = getattr(sys.stdin, "buffer", sys.stdin)
     while True:
         raw_line = stdin.readline(gateway_module.MAX_REQUEST_BYTES + 1)

@@ -2,6 +2,7 @@ import importlib.util
 import json
 from datetime import datetime, timezone
 from threading import Thread
+import tempfile
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 import unittest
@@ -170,6 +171,25 @@ class QueryGatewayTests(unittest.TestCase):
         self.assertIn("supported_capabilities", query["query_coverage"])
         self.assertFalse(query["retention"]["full_text_allowed"])
         self.assertRegex(query["retention"]["policy_hash"], r"^[0-9a-f]{64}$")
+
+    def test_saved_query_store_must_match_canonical_artifacts(self):
+        snapshot = gateway_module.load_snapshot()
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "query-store.json"
+            path.write_text(json.dumps(snapshot["store"], ensure_ascii=False), encoding="utf-8")
+            loaded = gateway_module.load_snapshot(query_store_path=path)
+            self.assertEqual(loaded["store"], snapshot["store"])
+
+            tampered = json.loads(path.read_text(encoding="utf-8"))
+            tampered["items"][0]["title"] = "不屬於 canonical artifact 的標題"
+            tampered["projection_sha256"] = gateway_module.qs.sha256_bytes(
+                gateway_module.qs.canonical_json({
+                    key: value for key, value in tampered.items() if key != "projection_sha256"
+                })
+            )
+            path.write_text(json.dumps(tampered, ensure_ascii=False), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "does not match canonical"):
+                gateway_module.load_snapshot(query_store_path=path)
 
     def test_stale_snapshot_is_not_presented_as_current(self):
         status, response = self.request("POST", "/query", {"tool": "get_current_brief", "arguments": {}})

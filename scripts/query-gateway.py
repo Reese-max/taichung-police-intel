@@ -385,16 +385,27 @@ def validate_located_facts_bundle(bundle: Any, approved_source_ids: set[str]) ->
     return bundle
 
 
-def load_snapshot(located_facts_path: Path | None = None) -> dict[str, Any]:
+def load_snapshot(
+    located_facts_path: Path | None = None,
+    query_store_path: Path | None = None,
+) -> dict[str, Any]:
     feed, feed_hash = qs.load_json(qs.DEFAULT_FEED)
     status, status_hash = qs.load_json(qs.DEFAULT_STATUS)
     brief, brief_hash = qs.load_json(qs.DEFAULT_BRIEF)
-    store = qs.build_store(
+    artifact_hashes = {"feed": feed_hash, "status": status_hash, "brief": brief_hash}
+    expected_store = qs.build_store(
         feed,
         status,
         brief,
-        {"feed": feed_hash, "status": status_hash, "brief": brief_hash},
+        artifact_hashes,
     )
+    if query_store_path is None:
+        store = expected_store
+    else:
+        store, _ = qs.load_json(query_store_path)
+        qs.validate_store(store)
+        if store != expected_store:
+            raise ValueError("query store does not match canonical publication artifacts")
     snapshot = {"store": store, "status": status, "brief": brief}
     if located_facts_path is not None:
         bundle = json.loads(located_facts_path.read_text(encoding="utf-8"))
@@ -1025,13 +1036,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--allow-origin", default=None)
     parser.add_argument("--rate-limit", type=int, default=DEFAULT_RATE_LIMIT)
     parser.add_argument("--located-facts-bundle", type=Path)
+    parser.add_argument("--query-store", type=Path)
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
     server = build_server(
-        args.host, args.port, QueryGateway(load_snapshot(args.located_facts_bundle)),
+        args.host, args.port,
+        QueryGateway(load_snapshot(args.located_facts_bundle, args.query_store)),
         args.allow_origin, args.rate_limit,
     )
     print(f"QUERY_GATEWAY_LISTENING http://{args.host}:{server.server_port}", flush=True)

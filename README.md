@@ -131,6 +131,14 @@ Read-only Query Gateway (Slice 1):
 python scripts/query-gateway.py --port 8788 --allow-origin http://localhost:3000
 ```
 
+若要讓 Gateway 使用保存的索引，先建立並以 `--query-store` 傳入；啟動時會
+重新核對它與 canonical feed、source status、brief 的 hash，不一致就拒絕服務：
+
+```bash
+python scripts/query-store.py build --output runtime/query-store.json
+python scripts/query-gateway.py --query-store runtime/query-store.json --port 8788 --allow-origin http://localhost:3000
+```
+
 For an MCP client using stdio, run `python scripts/query-gateway-stdio.py`; it
 reuses the same read-only JSON-RPC gateway. A reviewed located-facts bundle can
 be loaded with `--located-facts-bundle`; only hash-bound
