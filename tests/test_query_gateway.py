@@ -273,6 +273,26 @@ class QueryGatewayTests(unittest.TestCase):
         self.assertEqual(query["gate_status"], "PASS")
         self.assertEqual(query["answer"], mcp["result"]["structuredContent"]["answer"])
         self.assertNotIn("因豪雨提前", query["answer"][0])
+        normalized_claim = {
+            **claim,
+            "text": "官方文件標題\n（caller 不得控制輸出）",
+            "proposition": {
+                "subject": f"  publication:{item['canonical_id']}:title  ",
+                "value": f" {item['title']}\n",
+            },
+        }
+        normalized_status, normalized = self.request(
+            "POST",
+            "/query",
+            {"tool": "validate_answer", "arguments": {"claims": [normalized_claim]}},
+        )
+        self.assertEqual(normalized_status, 200)
+        self.assertEqual(normalized["gate_status"], "PASS")
+        normalized_title = "".join(item["title"].split())
+        self.assertEqual(
+            normalized["answer"],
+            [f"官方來源已核對：publication:{item['canonical_id']}:title={normalized_title}。"],
+        )
         receipt = query["answer_evidence_receipt"]
         self.assertEqual(receipt["publication_hash"], query["publication_hash"])
         self.assertRegex(receipt["evidence_catalog_hash"], r"^[0-9a-f]{64}$")

@@ -369,6 +369,7 @@ function evaluateClaim(raw, index) {
       claim_id: claimId(raw),
       text: String(raw?.text ?? ""),
       claim_type: CLAIM_TYPES.includes(raw?.claim_type) ? raw.claim_type : "OTHER",
+      propositions: [],
       support_status: "UNSUPPORTED",
       reason_code: error,
       requires_evidence: true,
@@ -382,6 +383,7 @@ function evaluateClaim(raw, index) {
       claim_id: claim.claim_id,
       text: claim.text,
       claim_type: claim.claim_type,
+      propositions: [],
       support_status: "SUPPORTED",
       reason_code: "NON_FACTUAL",
       requires_evidence: false,
@@ -428,6 +430,7 @@ function evaluateClaim(raw, index) {
   const base = {
     claim_id: claim.claim_id,
     claim_type: claim.claim_type,
+    propositions: claim.propositions,
     requires_evidence: true,
     supporting_evidence: supporting,
     ...(conflictValues.length ? { conflict_values: conflictValues } : {}),
@@ -565,6 +568,7 @@ export function gateAnswer({ claims, evidence, generated_at } = {}) {
         claims: evaluated.map((entry) => ({
           claim_id: entry.claim_id,
           claim_type: entry.claim_type,
+          propositions: entry.propositions ?? [],
           support_status: entry.support_status,
           reason_code: entry.reason_code ?? null,
           requires_evidence: entry.requires_evidence,

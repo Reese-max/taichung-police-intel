@@ -13,19 +13,19 @@ function hash(value) {
 }
 
 function propositions(raw) {
-  const values = Array.isArray(raw?.proposition)
-    ? raw.proposition
-    : raw?.proposition && typeof raw.proposition === "object"
-      ? [raw.proposition]
+  const values = Array.isArray(raw)
+    ? raw
+    : raw && typeof raw === "object"
+      ? [raw]
       : [];
   return values
     .filter((value) => value && typeof value === "object" && value.subject !== undefined && value.value !== undefined)
     .map((value) => `${String(value.subject)}=${String(value.value)}`);
 }
 
-function controlledText(entry, raw) {
-  if (!FACTUAL_TYPES.has(raw?.claim_type)) return null;
-  const facts = propositions(raw);
+function controlledText(entry) {
+  if (!FACTUAL_TYPES.has(entry?.claim_type)) return null;
+  const facts = propositions(entry.propositions);
   if (!facts.length) return null;
   const subjects = facts.map((fact) => fact.split("=")[0]).join("、");
   if (entry.support_status === "CONFLICT") {
@@ -61,11 +61,11 @@ const result = gateAnswer({
   generated_at: input.generated_at,
 });
 const receiptClaims = Array.isArray(result.receipt?.claims) ? result.receipt.claims : [];
-const finalClaims = receiptClaims.map((entry, index) => ({
+const finalClaims = receiptClaims.map((entry) => ({
   claim_id: entry.claim_id,
   claim_type: entry.claim_type,
   support_status: entry.support_status,
-  text: controlledText(entry, input.claims[index]),
+  text: controlledText(entry),
 }));
 const answer = finalClaims.map((entry) => entry.text).filter(Boolean);
 const receipt = {
