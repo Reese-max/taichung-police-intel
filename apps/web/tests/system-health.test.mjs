@@ -20,5 +20,7 @@ test("dashboard renders the saved health receipt without treating UNKNOWN as suc
   assert.match(source, /system-health\.json/);
   assert.match(source, /v2-system-health/);
   assert.match(source, /v2-review-inbox/);
+  assert.match(source, /local-review\.js/);
+  assert.match(source, /canonical writer/);
   assert.match(source, /UNKNOWN 不會被解讀成成功/);
 });

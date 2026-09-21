@@ -14,6 +14,15 @@ import {
   setLocalWatchStatus,
   syncLocalHandoff,
 } from "../lib/local-handoff.js";
+import {
+  emptyLocalReview,
+  exportLocalReview,
+  loadLocalReview,
+  projectLocalReview,
+  saveLocalReview,
+  setLocalReviewDecision,
+  syncLocalReview,
+} from "../lib/local-review.js";
 import QueryGatewayPanel from "./QueryGatewayPanel.js";
 
 
@@ -56,6 +65,14 @@ const RELEVANCE_LABELS = {
   status_changed: "狀態變更",
   explicit_follow_up: "明確後續追蹤",
   default: "綜合預設",
+};
+
+const REVIEW_STATUS_LABELS = {
+  OPEN: "待覆核",
+  KEEP_WATCHING: "保持追蹤",
+  RESOLVED: "本機已處理",
+  DISMISSED: "本機暫時忽略",
+  CANONICAL_ONLY: "尚未建立本機覆核紀錄",
 };
 
 async function fetchJson(url) {
@@ -149,9 +166,68 @@ function PublicationProvenance({ publication, archive, sourceStatus, candidate, 
   );
 }
 
-function SystemHealthSummary({ health }) {
+function ReviewInboxPanel({ health, localReview, onDecision, onExport, notice, error }) {
+  const canonicalItems = Array.isArray(health.review_inbox) ? health.review_inbox : [];
+  const items = projectLocalReview(localReview, canonicalItems);
+  const hasLocalItems = Boolean(localReview && Object.keys(localReview.items || {}).length);
+  return (
+    <section className="v2-review-inbox" data-testid="v2-review-inbox" aria-label="Review Inbox">
+      <div className="v2-review-heading">
+        <strong>Review Inbox：{health.review_inbox_total ?? canonicalItems.length} 件</strong>
+        <span>公開摘要；本機操作不會修改 canonical state。</span>
+      </div>
+      {items.length > 0 ? (
+        <ul>
+          {items.slice(0, 5).map((item) => {
+            const status = item.local_status || "OPEN";
+            return (
+              <li key={item.review_id || `${item.source_id}-${item.observed_at}`} className="v2-review-item">
+                <div>
+                  <strong>{item.reason || item.status}</strong>
+                  <span>{item.entity_ids?.source_id || item.source_id || "UNKNOWN"}</span>
+                  <small>{REVIEW_STATUS_LABELS[status] || status} · v{item.source_version || "?"}</small>
+                </div>
+                <div className="v2-review-actions">
+                  {status !== "KEEP_WATCHING" && (
+                    <button type="button" onClick={() => onDecision(item.review_id, "KEEP_WATCHING")} disabled={!localReview}>
+                      保持追蹤
+                    </button>
+                  )}
+                  {status !== "RESOLVED" && (
+                    <button type="button" onClick={() => onDecision(item.review_id, "RESOLVED")} disabled={!localReview}>
+                      標記已處理
+                    </button>
+                  )}
+                  {status !== "DISMISSED" && (
+                    <button type="button" onClick={() => onDecision(item.review_id, "DISMISSED")} disabled={!localReview}>
+                      暫時忽略
+                    </button>
+                  )}
+                  {status !== "OPEN" && (
+                    <button type="button" onClick={() => onDecision(item.review_id, "OPEN")} disabled={!localReview}>
+                      重新開啟
+                    </button>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      ) : <span>目前沒有需要人工覆核的契約漂移。</span>}
+      <div className="v2-review-footer">
+        <small>合併、拆分、修正 mapping 仍須由 canonical writer 執行；本頁不提供假寫入。</small>
+        <button type="button" onClick={onExport} disabled={!hasLocalItems}>
+          匯出本機覆核紀錄
+        </button>
+      </div>
+      {notice && <small role="status">{notice}</small>}
+      {error && <small className="error" role="alert">{error}</small>}
+    </section>
+  );
+}
+
+function SystemHealthSummary({ health, localReview, onDecision, onExport, notice, error }) {
   if (!health || !health.lanes || !Array.isArray(health.stages)) return null;
-  const reviewItems = Array.isArray(health.review_inbox) ? health.review_inbox : [];
   return (
     <details className="v2-system-health" data-testid="v2-system-health">
       <summary>端到端系統健康：{health.overall}</summary>
@@ -173,18 +249,14 @@ function SystemHealthSummary({ health }) {
             </li>
           ))}
         </ul>
-        <section className="v2-review-inbox" data-testid="v2-review-inbox" aria-label="Review Inbox">
-          <strong>Review Inbox：{health.review_inbox_total ?? reviewItems.length} 件</strong>
-          {reviewItems.length > 0 ? (
-            <ul>
-              {reviewItems.slice(0, 5).map((item) => (
-                <li key={item.review_id || `${item.source_id}-${item.observed_at}`}>
-                  {item.reason || item.status} · {item.entity_ids?.source_id || item.source_id || "UNKNOWN"} · {item.priority_reason || (item.reasons || []).join(", ")}
-                </li>
-              ))}
-            </ul>
-          ) : <span>目前沒有需要人工覆核的契約漂移。</span>}
-        </section>
+        <ReviewInboxPanel
+          health={health}
+          localReview={localReview}
+          onDecision={onDecision}
+          onExport={onExport}
+          notice={notice}
+          error={error}
+        />
         <p className="v2-health-note">此 receipt 只反映已保存的處理鏈證據；UNKNOWN 不會被解讀成成功。</p>
       </div>
     </details>
@@ -341,6 +413,9 @@ export default function V2DailyDashboard() {
   const [localHandoff, setLocalHandoff] = useState(null);
   const [handoffNotice, setHandoffNotice] = useState("");
   const [handoffError, setHandoffError] = useState("");
+  const [localReview, setLocalReview] = useState(null);
+  const [reviewNotice, setReviewNotice] = useState("");
+  const [reviewError, setReviewError] = useState("");
 
   useEffect(() => {
     const updateClock = () => setNowMs(Date.now());
@@ -371,6 +446,24 @@ export default function V2DailyDashboard() {
       setHandoffError(error.message);
     }
   }, [publication, loadState]);
+
+  useEffect(() => {
+    if (!systemHealth || !Array.isArray(systemHealth.review_inbox)) return;
+    try {
+      const loaded = loadLocalReview();
+      const synced = syncLocalReview(
+        loaded,
+        systemHealth.review_inbox,
+        systemHealth.generated_at || systemHealth.observed_at || new Date(),
+      );
+      saveLocalReview(synced);
+      setLocalReview(synced);
+      setReviewError("");
+    } catch (error) {
+      setLocalReview(null);
+      setReviewError(error.message);
+    }
+  }, [systemHealth]);
 
   const assessment = assessPublication(publication, sourceStatus, nowMs);
 
@@ -555,6 +648,38 @@ export default function V2DailyDashboard() {
       setHandoffError("");
     } catch (error) {
       setHandoffError(error.message);
+    }
+  };
+
+  const handleReviewDecision = (reviewId, decision) => {
+    if (!localReview) {
+      setReviewError("本機覆核尚未載入，未覆寫既有資料。");
+      return;
+    }
+    try {
+      const next = setLocalReviewDecision(localReview, reviewId, decision);
+      saveLocalReview(next);
+      setLocalReview(next);
+      setReviewNotice(`已在本機標記：${REVIEW_STATUS_LABELS[decision] || decision}。`);
+      setReviewError("");
+    } catch (error) {
+      setReviewError(error.message);
+    }
+  };
+
+  const handleReviewExport = () => {
+    try {
+      const artifact = exportLocalReview(localReview || emptyLocalReview(), "markdown");
+      const url = URL.createObjectURL(new Blob([artifact.content], { type: artifact.mime }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = artifact.filename;
+      link.click();
+      URL.revokeObjectURL(url);
+      setReviewNotice(`已匯出本機覆核紀錄：${artifact.filename}`);
+      setReviewError("");
+    } catch (error) {
+      setReviewError(error.message);
     }
   };
   const generationMixed = Boolean(
@@ -784,7 +909,14 @@ export default function V2DailyDashboard() {
             )}
           </section>
 
-          <SystemHealthSummary health={systemHealth} />
+          <SystemHealthSummary
+            health={systemHealth}
+            localReview={localReview}
+            onDecision={handleReviewDecision}
+            onExport={handleReviewExport}
+            notice={reviewNotice}
+            error={reviewError}
+          />
           {!generationMixed && <SourceHealthSummary sourceStatus={sourceStatus} canReassure={assessment.canReassure} />}
           <PublicationProvenance
             publication={publication}

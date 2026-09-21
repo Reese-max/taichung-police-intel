@@ -707,8 +707,21 @@
 .v2-health-stage-list strong { color: #bfdbfe; font: 700 0.72rem/1.3 var(--mono); }
 .v2-health-stage-list small { grid-column: 1 / -1; font-size: 0.72rem; }
 .v2-review-inbox { display: grid; gap: 8px; padding: 12px; border: 1px solid rgba(248, 113, 113, 0.28); border-radius: 9px; color: var(--text-muted); font-size: 0.78rem; }
+.v2-review-heading { display: grid; gap: 3px; }
 .v2-review-inbox strong { color: #fecaca; }
-.v2-review-inbox ul { margin: 0; padding-left: 18px; }
+.v2-review-inbox ul { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.v2-review-item { display: grid; gap: 8px; padding: 9px; border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; }
+.v2-review-item > div:first-child { display: grid; grid-template-columns: auto auto 1fr; gap: 6px 10px; align-items: baseline; }
+.v2-review-item > div:first-child span,
+.v2-review-item > div:first-child small { color: var(--text-muted); }
+.v2-review-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.v2-review-actions button,
+.v2-review-footer button { padding: 5px 8px; color: #dbeafe; background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(96, 165, 250, 0.28); border-radius: 6px; cursor: pointer; font: 700 0.68rem/1.2 var(--mono); }
+.v2-review-actions button:disabled,
+.v2-review-footer button:disabled { cursor: not-allowed; opacity: 0.5; }
+.v2-review-footer { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; justify-content: space-between; }
+.v2-review-footer small { flex: 1 1 300px; }
+.v2-review-inbox small.error { color: #fca5a5; }
 .v2-health-note { margin: 0; color: var(--text-muted); font-size: 0.78rem; line-height: 1.6; }
 
 .v2-source-dot {
