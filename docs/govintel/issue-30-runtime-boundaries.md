@@ -1,5 +1,16 @@
 # #30: Query projection runtime boundary follow-up
 
+## Current local integration status (2026-09-21)
+
+The first read-only query slice is now wired through the shared Query Gateway:
+
+- `scripts/query-gateway.py` serves HTTP `/query` and `/mcp`.
+- `scripts/query-gateway-stdio.py` serves the same MCP contract over bounded line-delimited stdio.
+- The Web `Ask GovIntel` panel uses the same `search_evidence`, `get_current_brief`, and `get_source_health` primitives; `validate_answer` also uses the server-controlled Answer Evidence Gate.
+- The current code and checked-in artifacts pass `npm run check`, including the HTTP/MCP parity suite and the stdio transport tests. The latest local boundary fix is `9ed2b94`.
+
+This is still a local/code-only receipt. It is not a production deployment, anonymous public reachability proof, or completion of the later event, comparison, and statistics slices.
+
 Implemented in the existing PR #40, not a second query service. No production wiring/deployment is implied.
 
 ## Corrections
@@ -30,4 +41,4 @@ Container source came from the exact Actions replay artifact for PR #16 plus fet
 
 ## Still needed
 
-This remains a bounded linear metadata index, not full document-text search, an implemented PublicEvent store, statistics adapter, Web Chat, MCP endpoint or measured performance improvement. Those downstream integration criteria remain open under #30/#29/#15/#24/#28. The 16-hour age threshold is an explicit local policy, not a data-provider SLA.
+This remains a bounded linear metadata index, not full document-text search, an implemented PublicEvent store, event comparison, or statistics adapter. The Web/MCP first slice is implemented, but later query primitives and production/runtime acceptance remain open under #29/#15/#24/#28. The 16-hour age threshold is an explicit local policy, not a data-provider SLA.
