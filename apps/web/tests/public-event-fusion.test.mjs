@@ -26,7 +26,7 @@ function runPython(args) {
 test("public event fusion regression suite passes", () => {
   const result = runPython(["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_public_event_fusion.py", "-v"]);
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-  assert.match(result.stderr, /Ran 15 tests/);
+  assert.match(result.stderr, /Ran 19 tests/);
   assert.match(result.stderr, /OK/);
 });
 

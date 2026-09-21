@@ -22,6 +22,8 @@ from zoneinfo import ZoneInfo
 
 TZ = ZoneInfo("Asia/Taipei")
 FUSION_STATUSES = {"CONFIRMED", "CANDIDATE", "CONFLICT", "SPLIT_REQUIRED"}
+OCCURRENCE_RELATION_TYPES = {"RESCHEDULES"}
+OCCURRENCE_REVIEW_STATUSES = {"PENDING_REVIEW", "CONFIRMED", "REJECTED"}
 ENTITY_REGISTRY_PATH = Path(__file__).with_name("entity-registry.py")
 _entity_registry_module = None
 
@@ -124,6 +126,55 @@ def _manual_record(action: str, operator: str, decided_at: Any, payload: dict[st
     return {"action": action, "operator": operator.strip(), "at": stamp, "payload": copy.deepcopy(payload)}
 
 
+def _valid_sha256(value: Any) -> bool:
+    return isinstance(value, str) and len(value) == 64 and all(char in "0123456789abcdefABCDEF" for char in value)
+
+
+def _validate_occurrence_relations(document: dict[str, Any]) -> None:
+    relations = document.get("occurrence_relations", [])
+    if not isinstance(relations, list):
+        raise ValueError("occurrence_relations must be an array")
+    for relation in relations:
+        if not isinstance(relation, dict):
+            raise ValueError("occurrence relation must be an object")
+        if relation.get("relation") not in OCCURRENCE_RELATION_TYPES:
+            raise ValueError("unsupported occurrence relation")
+        for field in ("target_document_id", "target_document_version_id", "evidence_locator", "reason"):
+            if not isinstance(relation.get(field), str) or not relation[field].strip():
+                raise ValueError(f"occurrence relation missing {field}")
+        if relation["target_document_version_id"] == document["document_version_id"]:
+            raise ValueError("occurrence relation cannot target itself")
+        review = relation.get("review_decision")
+        if not isinstance(review, dict) or review.get("status") not in OCCURRENCE_REVIEW_STATUSES:
+            raise ValueError("occurrence relation review_decision is invalid")
+        if review["status"] != "CONFIRMED":
+            continue
+        if review.get("reviewer_type") != "HUMAN":
+            raise ValueError("confirmed occurrence relation requires HUMAN review")
+        if not isinstance(review.get("operator"), str) or not review["operator"].strip():
+            raise ValueError("confirmed occurrence relation requires operator")
+        if _stamp(review.get("decided_at")) is None:
+            raise ValueError("confirmed occurrence relation requires decided_at")
+        if not isinstance(review.get("registry_version"), int) or isinstance(review["registry_version"], bool) or review["registry_version"] < 1:
+            raise ValueError("confirmed occurrence relation requires registry_version")
+        if not _valid_sha256(review.get("registry_hash")):
+            raise ValueError("confirmed occurrence relation requires registry_hash")
+
+
+def _relation_projection(document: dict[str, Any], relation: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "relation": relation["relation"],
+        "source_document_id": document["document_id"],
+        "source_document_version_id": document["document_version_id"],
+        "target_document_id": relation["target_document_id"],
+        "target_document_version_id": relation["target_document_version_id"],
+        "official_url": _https(document["official_url"]),
+        "evidence_locator": relation["evidence_locator"],
+        "reason": relation["reason"],
+        "review_decision": copy.deepcopy(relation["review_decision"]),
+    }
+
+
 def validate_document(document: dict[str, Any]) -> None:
     required = ("document_id", "document_version_id", "source_id", "title", "event_type")
     if not isinstance(document, dict):
@@ -143,6 +194,7 @@ def validate_document(document: dict[str, Any]) -> None:
             _parse_timestamp(document[field])
     if "occurrence_id" in document and (not isinstance(document["occurrence_id"], str) or not document["occurrence_id"].strip()):
         raise ValueError("occurrence_id must be a nonempty string")
+    _validate_occurrence_relations(document)
 
 
 def cluster_key(document: dict[str, Any]) -> tuple[str, str, str] | None:
@@ -255,6 +307,11 @@ def build_public_event(
 
     named_event_id = key[1] if key else ordered[0].get("named_event_id")
     canonical_title = min((doc["title"] for doc in ordered), key=lambda value: (len(value), value))
+    occurrence_relations = [
+        _relation_projection(document, relation)
+        for document in ordered
+        for relation in document.get("occurrence_relations", [])
+    ]
     agencies = sorted({agency for doc in ordered for agency in doc.get("agency_ids", [])})
     locations = sorted({location for doc in ordered for location in doc.get("location_ids", [])})
     all_districts = _field_values(ordered, "district_id")
@@ -275,6 +332,7 @@ def build_public_event(
         "independent_source_ids": independent_sources,
         "independent_source_count": len(independent_sources),
         "linked_document_versions": _linked_documents(ordered),
+        "occurrence_relations": occurrence_relations,
         "link_reasons": (
             ["stable_occurrence_id"] if key and key[2].startswith("occurrence:")
             else ["stable_named_event_id", "event_date"] if key
@@ -320,6 +378,96 @@ def fuse_documents(
     return sorted(events, key=lambda event: event["public_event_id"])
 
 
+def _unique_dicts(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    unique = {
+        json.dumps(item, ensure_ascii=False, sort_keys=True): item
+        for item in items
+    }
+    return list(unique.values())
+
+
+def _overlay_event_evidence(base: dict[str, Any], extra: dict[str, Any]) -> dict[str, Any]:
+    result = copy.deepcopy(base)
+    for field in ("linked_document_versions", "occurrence_relations"):
+        result[field] = _unique_dicts([*result.get(field, []), *extra.get(field, [])])
+    for field in ("agency_ids", "location_candidates", "location_ids", "independent_source_ids"):
+        result[field] = sorted(set(result.get(field, [])) | set(extra.get(field, [])))
+    result["independent_source_count"] = len(result["independent_source_ids"])
+    return result
+
+
+def _apply_official_reschedule(
+    target: dict[str, Any], replacement: dict[str, Any], relation: dict[str, Any]
+) -> dict[str, Any]:
+    if target.get("fusion_status") != "CONFIRMED":
+        raise ValueError("official reschedule target must be CONFIRMED")
+    if target.get("event_type") != replacement.get("event_type"):
+        raise ValueError("official reschedule event_type mismatch")
+    relation_id = _stable_id(
+        "OR",
+        "|".join(
+            [
+                relation["source_document_version_id"],
+                relation["target_document_version_id"],
+                relation["relation"],
+                relation["evidence_locator"],
+            ]
+        ),
+    )
+    result = _overlay_event_evidence(target, replacement)
+    result["public_event_id"] = target["public_event_id"]
+    result["canonical_title"] = replacement.get("canonical_title") or target.get("canonical_title")
+    result["event_date"] = replacement.get("event_date") or target.get("event_date")
+    result["start_at"] = replacement.get("start_at") or target.get("start_at")
+    result["end_at"] = replacement.get("end_at") or target.get("end_at")
+    result["updated_at"] = replacement.get("updated_at") or target.get("updated_at")
+    result["conflict_fields"] = sorted(set(target.get("conflict_fields", [])) | set(replacement.get("conflict_fields", [])))
+    result["uncertain_fields"] = sorted(set(target.get("uncertain_fields", [])) | set(replacement.get("uncertain_fields", [])))
+    result["fusion_status"] = "CONFLICT" if replacement.get("fusion_status") == "CONFLICT" else "CONFIRMED"
+    result["link_reasons"] = list(dict.fromkeys([*target.get("link_reasons", []), *replacement.get("link_reasons", []), "official_reschedule"]))
+    result["manual_history"] = _unique_dicts([*target.get("manual_history", []), *replacement.get("manual_history", [])])
+    result["background"] = _unique_dicts([*target.get("background", []), *replacement.get("background", [])])
+    result["source_state"] = "CURRENT"
+    result["lkg"] = False
+
+    canonical_name = target.get("named_event_id") or replacement.get("named_event_id")
+    result["named_event_id"] = canonical_name
+    names = {
+        name
+        for name in [target.get("named_event_id"), replacement.get("named_event_id"), *target.get("named_event_aliases", []), *replacement.get("named_event_aliases", [])]
+        if isinstance(name, str) and name
+    }
+    result["named_event_aliases"] = sorted(names - {canonical_name}) if canonical_name else sorted(names)
+
+    history = [*target.get("occurrence_history", []), *replacement.get("occurrence_history", [])]
+    history_record = {
+        "relation_id": relation_id,
+        **copy.deepcopy(relation),
+        "from_public_event_id": replacement["public_event_id"],
+        "to_public_event_id": target["public_event_id"],
+        "previous_event_date": target.get("event_date"),
+        "new_event_date": replacement.get("event_date"),
+    }
+    if not any(item.get("relation_id") == relation_id for item in history):
+        history.append(history_record)
+    result["occurrence_history"] = _unique_dicts(history)
+
+    redirects = [*target.get("public_event_redirects", []), *replacement.get("public_event_redirects", [])]
+    if replacement["public_event_id"] != target["public_event_id"]:
+        redirects.append(
+            {
+                "from_public_event_id": replacement["public_event_id"],
+                "to_public_event_id": target["public_event_id"],
+                "reason": "OFFICIAL_RESCHEDULE",
+                "relation_id": relation_id,
+            }
+        )
+    result["public_event_redirects"] = _unique_dicts(redirects)
+    if replacement.get("entity_registry") is not None:
+        result["entity_registry"] = copy.deepcopy(replacement["entity_registry"])
+    return result
+
+
 def reconcile_public_events(
     previous_events: list[dict[str, Any]],
     documents: list[dict[str, Any]],
@@ -335,10 +483,66 @@ def reconcile_public_events(
     if not isinstance(previous_events, list):
         raise ValueError("previous_events must be an array")
     current = fuse_documents(documents, entity_registry=entity_registry)
-    if snapshot_complete:
-        return current
-
     by_id = {event["public_event_id"]: event for event in current}
+    current_by_document_version = {
+        link["document_version_id"]: event
+        for event in current
+        for link in event.get("linked_document_versions", [])
+    }
+    previous_by_document_version: dict[str, dict[str, dict[str, Any]]] = defaultdict(dict)
+    for previous in previous_events:
+        if not isinstance(previous, dict) or not previous.get("public_event_id"):
+            continue
+        for link in previous.get("linked_document_versions", []):
+            document_version_id = link.get("document_version_id") if isinstance(link, dict) else None
+            if document_version_id:
+                previous_by_document_version[document_version_id][previous["public_event_id"]] = previous
+
+    grouped_relations: dict[str, list[tuple[dict[str, Any], dict[str, Any]]]] = defaultdict(list)
+    registry_receipt = _load_entity_registry_module().registry_receipt(entity_registry) if entity_registry is not None else None
+    for document in documents:
+        for raw_relation in document.get("occurrence_relations", []):
+            if raw_relation["review_decision"]["status"] != "CONFIRMED":
+                continue
+            if registry_receipt is None:
+                raise ValueError("confirmed occurrence relation requires explicit entity registry")
+            review = raw_relation["review_decision"]
+            if {"registry_version": review["registry_version"], "registry_hash": review["registry_hash"]} != registry_receipt:
+                raise ValueError("occurrence relation registry binding mismatch")
+            current_event = current_by_document_version.get(document["document_version_id"])
+            if current_event is None:
+                raise ValueError("occurrence relation source document is not fused")
+            grouped_relations[current_event["public_event_id"]].append(
+                (_relation_projection(document, raw_relation), current_event)
+            )
+
+    for current_id, relations in grouped_relations.items():
+        target_versions = {relation["target_document_version_id"] for relation, _ in relations}
+        if len(target_versions) != 1:
+            raise ValueError("one current event cannot reschedule multiple target occurrences")
+        target_version = next(iter(target_versions))
+        target_candidates = list(previous_by_document_version.get(target_version, {}).values())
+        if len(target_candidates) != 1:
+            raise ValueError("occurrence relation target must resolve to one previous event")
+        previous_target = target_candidates[0]
+        target_document_ids = {
+            link.get("document_id")
+            for link in previous_target.get("linked_document_versions", [])
+            if link.get("document_version_id") == target_version
+        }
+        if any(relation["target_document_id"] not in target_document_ids for relation, _ in relations):
+            raise ValueError("occurrence relation target document mismatch")
+        target_id = previous_target["public_event_id"]
+        target = _overlay_event_evidence(previous_target, by_id[target_id]) if target_id in by_id and target_id != current_id else copy.deepcopy(previous_target)
+        for relation, replacement in relations:
+            target = _apply_official_reschedule(target, replacement, relation)
+        if current_id != target_id:
+            by_id.pop(current_id, None)
+        by_id[target_id] = target
+
+    if snapshot_complete:
+        return sorted(by_id.values(), key=lambda event: event["public_event_id"])
+
     for previous in previous_events:
         event_id = previous.get("public_event_id") if isinstance(previous, dict) else None
         if not event_id:

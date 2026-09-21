@@ -68,6 +68,96 @@ class PublicEventFusionTests(unittest.TestCase):
         split = dict(after, occurrence_id="occ:demo-2")
         self.assertEqual(len(fusion.fuse_documents([before, split])), 2)
 
+    def test_reviewed_official_reschedule_preserves_public_event_and_redirects_new_id(self):
+        registry = fusion.load_entity_registry()
+        receipt = fusion._load_entity_registry_module().registry_receipt(registry)
+        before = document("POLICE", day="2026-09-20", version="v1")
+        companion = document("TRAFFIC", day="2026-09-20", version="v1")
+        after = document("POLICE", day="2026-09-21", version="v2")
+        for value, agency in ((before, "agency:tc-police"), (companion, "agency:tc-traffic"), (after, "agency:tc-police")):
+            value["agency_ids"] = [agency]
+        previous = fusion.fuse_documents([before, companion], entity_registry=registry)
+        relation = {
+            "relation": "RESCHEDULES",
+            "target_document_id": before["document_id"],
+            "target_document_version_id": before["document_version_id"],
+            "evidence_locator": "paragraph:7",
+            "reason": "官方延期公告明示改至翌日",
+            "review_decision": {
+                "status": "CONFIRMED",
+                "reviewer_type": "HUMAN",
+                "operator": "reviewer-1",
+                "decided_at": "2026-09-21T10:00:00+08:00",
+                **receipt,
+            },
+        }
+        after["occurrence_relations"] = [relation]
+        current = fusion.reconcile_public_events(
+            previous,
+            [after],
+            snapshot_complete=True,
+            entity_registry=registry,
+        )
+        self.assertEqual(len(current), 1)
+        event = current[0]
+        self.assertEqual(event["public_event_id"], previous[0]["public_event_id"])
+        self.assertEqual(event["event_date"], "2026-09-21")
+        self.assertEqual(
+            {link["document_version_id"] for link in event["linked_document_versions"]},
+            {before["document_version_id"], companion["document_version_id"], after["document_version_id"]},
+        )
+        self.assertEqual(event["occurrence_history"][0]["evidence_locator"], "paragraph:7")
+        self.assertEqual(event["public_event_redirects"][0]["to_public_event_id"], event["public_event_id"])
+        self.assertIn("official_reschedule", event["link_reasons"])
+
+    def test_same_named_different_date_without_relation_stays_separate(self):
+        before = fusion.fuse_documents([document("CITY"), document("POLICE")])
+        after = document("CITY", day="2026-09-21", version="v2")
+        current = fusion.reconcile_public_events(before, [after], snapshot_complete=True)
+        self.assertEqual(len(current), 1)
+        self.assertNotEqual(current[0]["public_event_id"], before[0]["public_event_id"])
+
+    def test_pending_reschedule_is_not_auto_merged(self):
+        previous = fusion.fuse_documents([document("CITY"), document("POLICE")])
+        after = document("CITY", day="2026-09-21", version="v2")
+        after["occurrence_relations"] = [{
+            "relation": "RESCHEDULES",
+            "target_document_id": "doc-CITY",
+            "target_document_version_id": "doc-CITY:v1",
+            "evidence_locator": "paragraph:7",
+            "reason": "待人工核對的延期候選",
+            "review_decision": {"status": "PENDING_REVIEW"},
+        }]
+        current = fusion.reconcile_public_events(previous, [after], snapshot_complete=False)
+        self.assertEqual({event["public_event_id"] for event in current}, {previous[0]["public_event_id"], fusion.fuse_documents([after])[0]["public_event_id"]})
+        self.assertFalse(any(event.get("occurrence_history") for event in current))
+
+    def test_confirmed_reschedule_requires_current_registry_binding(self):
+        registry = fusion.load_entity_registry()
+        receipt = fusion._load_entity_registry_module().registry_receipt(registry)
+        before = document("POLICE", version="v1")
+        companion = document("TRAFFIC", version="v1")
+        after = document("POLICE", day="2026-09-21", version="v2")
+        for value, agency in ((before, "agency:tc-police"), (companion, "agency:tc-traffic"), (after, "agency:tc-police")):
+            value["agency_ids"] = [agency]
+        after["occurrence_relations"] = [{
+            "relation": "RESCHEDULES",
+            "target_document_id": before["document_id"],
+            "target_document_version_id": before["document_version_id"],
+            "evidence_locator": "paragraph:7",
+            "reason": "官方延期公告",
+            "review_decision": {
+                "status": "CONFIRMED",
+                "reviewer_type": "HUMAN",
+                "operator": "reviewer-1",
+                "decided_at": "2026-09-21T10:00:00+08:00",
+                **receipt,
+            },
+        }]
+        previous = fusion.fuse_documents([before, companion], entity_registry=registry)
+        with self.assertRaisesRegex(ValueError, "explicit entity registry"):
+            fusion.reconcile_public_events(previous, [after], snapshot_complete=True)
+
     def test_entity_registry_binds_labels_and_receipt_before_fusion(self):
         registry = fusion.load_entity_registry()
         source = document("POLICE")
