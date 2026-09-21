@@ -64,6 +64,26 @@
   font-size: 0.92rem;
 }
 
+.v2-profile-selector {
+  display: grid;
+  gap: 5px;
+  margin-top: 10px;
+}
+
+.v2-profile-selector span {
+  color: var(--text-muted);
+  font: 600 0.7rem/1.3 var(--mono);
+}
+
+.v2-profile-selector select {
+  min-height: 34px;
+  padding: 6px 28px 6px 9px;
+  color: #e0f2fe;
+  background: rgba(15, 25, 35, 0.9);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
 .v2-system-message {
   margin-top: 18px;
   padding: 18px 20px;
@@ -299,6 +319,24 @@
   border-radius: 999px;
   font-size: 0.7rem;
   font-weight: 700;
+}
+
+.v2-profile-relevance {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: center;
+  margin-top: 14px;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.v2-profile-relevance span:not(:first-child) {
+  padding: 4px 8px;
+  color: #bbf7d0;
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.24);
+  border-radius: 999px;
 }
 
 .v2-change-type {

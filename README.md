@@ -84,6 +84,8 @@ GitHub Actions: 06:30 and 18:30 Asia/Taipei
 
 The repository also contains PostgreSQL migrations for the post-competition durable-history path. The public competition demo deliberately does not require that infrastructure.
 
+V2 可用 [role-profiles.v1.json](./docs/govintel/role-profiles.v1.json) 的版本化公開職能檔切換綜合、議會聯絡與交通／公共安全排序；profile 只產生可重播的 relevance projection，不改寫事件事實、官方證據或來源缺口。每日 brief 同時保存 profile hash 與 ranking policy version，首頁可用 `?profile=council-liaison` 或角色選單切換。
+
 ## Setup
 
 Requirements:

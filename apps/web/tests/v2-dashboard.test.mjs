@@ -23,6 +23,10 @@ test("checked-in V2 brief uses the police-user publication schema", async () => 
   assert.ok(Array.isArray(brief.priority_items));
   assert.ok(Array.isArray(brief.tracking_items));
   assert.ok(Array.isArray(brief.other_changes));
+  assert.equal(brief.profile.profile_id, "general");
+  assert.equal(brief.profile.profile_version, 1);
+  assert.match(brief.profile.profile_hash, /^[0-9a-f]{64}$/);
+  assert.ok(Array.isArray(brief.profile_views) && brief.profile_views.length >= 3);
   assert.ok(brief.priority_items.length <= 3);
   assert.ok(brief.tracking_items.length <= 5);
 });
@@ -98,6 +102,9 @@ test("V2 dashboard is police-first, Top 3 capped, and evidence-bound", async () 
   assert.match(source, /watch_status/);
   assert.match(source, /data-testid="v2-tracking-list"/);
   assert.match(source, /affected_roles/);
+  assert.match(source, /role-profile-selector/);
+  assert.match(source, /profile_relevance/);
+  assert.match(source, /reason_codes/);
   assert.match(source, /開啟官方來源/);
   assert.match(source, /DETERMINISTIC_PASS/);
   assert.doesNotMatch(source, /AUTO_PASS/);

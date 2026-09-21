@@ -37,7 +37,38 @@ def fail(message: str) -> None:
     raise ValueError(f"V2_PUBLICATION_INVALID: {message}")
 
 
-def validate_action_item(item: dict, seen_event_ids: set[str], expected_tier: str) -> None:
+def validate_profile_metadata(profile: dict, *, label: str = "profile") -> None:
+    if not isinstance(profile, dict):
+        fail(f"{label} must be an object")
+    if not isinstance(profile.get("profile_id"), str) or not profile["profile_id"]:
+        fail(f"{label} is missing profile_id")
+    if not isinstance(profile.get("profile_version"), int) or profile["profile_version"] < 1:
+        fail(f"{label} has an invalid profile_version")
+    if not isinstance(profile.get("profile_hash"), str) or len(profile["profile_hash"]) != 64:
+        fail(f"{label} has an invalid profile_hash")
+    if not isinstance(profile.get("ranking_policy_version"), str) or not profile["ranking_policy_version"]:
+        fail(f"{label} is missing ranking_policy_version")
+    if not isinstance(profile.get("label"), str) or not profile["label"].strip():
+        fail(f"{label} is missing label")
+
+
+def validate_profile_relevance(item: dict, profile: dict, *, label: str) -> None:
+    relevance = item.get("profile_relevance")
+    if not isinstance(relevance, dict):
+        fail(f"{label} is missing profile_relevance")
+    for key in ("profile_id", "profile_version", "profile_hash", "ranking_policy_version"):
+        if relevance.get(key) != profile[key]:
+            fail(f"{label} profile metadata mismatch: {key}")
+    if not isinstance(relevance.get("reason_codes"), list) or not relevance["reason_codes"]:
+        fail(f"{label} must expose deterministic reason_codes")
+
+
+def validate_action_item(
+    item: dict,
+    seen_event_ids: set[str],
+    expected_tier: str,
+    expected_profile: dict | None = None,
+) -> None:
     event_id = item.get("event_id")
     if not event_id or event_id in seen_event_ids:
         fail("published event IDs must be present and unique")
@@ -62,6 +93,8 @@ def validate_action_item(item: dict, seen_event_ids: set[str], expected_tier: st
         fail(f"published item lacks official evidence binding: {event_id}")
     if item.get("publication_tier") != expected_tier:
         fail(f"published item tier mismatch: {event_id}")
+    if expected_profile:
+        validate_profile_relevance(item, expected_profile, label=f"published item {event_id}")
 
 
 def verify(
@@ -96,6 +129,44 @@ def verify(
         fail("brief must use police-user generator_version=2")
     if not isinstance(brief.get("audience"), list) or not brief["audience"]:
         fail("brief must declare its police-user audience")
+    profile = brief.get("profile")
+    validate_profile_metadata(profile)
+    profile_views = brief.get("profile_views")
+    if not isinstance(profile_views, list) or not profile_views:
+        fail("brief must include at least one profile view")
+    view_by_id = {}
+    for view in profile_views:
+        if not isinstance(view, dict):
+            fail("profile view must be an object")
+        view_profile = view.get("profile")
+        validate_profile_metadata(view_profile, label="profile view")
+        profile_id = view_profile["profile_id"]
+        if profile_id in view_by_id:
+            fail(f"duplicate profile view: {profile_id}")
+        view_by_id[profile_id] = view
+        view_priority = view.get("priority_items")
+        view_tracking = view.get("tracking_items")
+        view_other = view.get("other_changes")
+        if not isinstance(view_priority, list) or not isinstance(view_tracking, list) or not isinstance(view_other, list):
+            fail(f"profile view arrays are invalid: {profile_id}")
+        if len(view_priority) > 3 or len(view_tracking) > 5:
+            fail(f"profile view caps are invalid: {profile_id}")
+        seen_view_events: set[str] = set()
+        for item in view_priority:
+            validate_action_item(item, seen_view_events, "TOP", view_profile)
+        for item in view_other:
+            validate_action_item(item, seen_view_events, "OTHER", view_profile)
+        for item in view_tracking:
+            validate_profile_relevance(item, view_profile, label=f"profile tracking item {profile_id}")
+    if profile["profile_id"] not in view_by_id:
+        fail("selected profile is missing from profile_views")
+    selected_view = view_by_id[profile["profile_id"]]
+    if brief.get("priority_items") != selected_view["priority_items"]:
+        fail("brief priority_items do not match selected profile view")
+    if brief.get("tracking_items") != selected_view["tracking_items"]:
+        fail("brief tracking_items do not match selected profile view")
+    if brief.get("other_changes") != selected_view["other_changes"]:
+        fail("brief other_changes do not match selected profile view")
 
     run_id = feed.get("collection_run_id")
     status_run_id = (status.get("latest_collection_run") or {}).get("collection_run_id")
@@ -147,9 +218,11 @@ def verify(
 
     seen_event_ids: set[str] = set()
     for item in priority_items:
-        validate_action_item(item, seen_event_ids, "TOP")
+        validate_action_item(item, seen_event_ids, "TOP", profile)
     for item in other_changes:
-        validate_action_item(item, seen_event_ids, "OTHER")
+        validate_action_item(item, seen_event_ids, "OTHER", profile)
+    for item in tracking_items:
+        validate_profile_relevance(item, profile, label="tracking item")
 
     state_identities = set(state["items"])
     if len(state_identities) != len(state["items"]):

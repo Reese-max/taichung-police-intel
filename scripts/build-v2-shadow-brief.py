@@ -19,6 +19,7 @@ from intel_v2.handoff import (
     sync_with_publication,
     tracking_projection,
 )
+from intel_v2.role_profiles import DEFAULT_PROFILE_ID, load_catalog, project_profile
 from intel_v2.semantics import ChangeEvent, compare_snapshot, feed_item_to_version, shadow_brief
 
 
@@ -29,6 +30,7 @@ DEFAULT_STATUS = ROOT / "apps" / "web" / "public" / "data" / "source-status.json
 DEFAULT_STATE = ROOT / "state" / "v2-shadow-state.json"
 DEFAULT_HANDOFF_STATE = ROOT / "state" / "v2-handoff-state.json"
 DEFAULT_OUTPUT = ROOT / "apps" / "web" / "public" / "data" / "v2-daily-brief.json"
+DEFAULT_ROLE_PROFILES = ROOT / "docs" / "govintel" / "role-profiles.v1.json"
 
 SOURCE_CONTEXT = {
     "S-004": {
@@ -198,21 +200,20 @@ def enrich_for_police_users(
     handoff_state: dict,
     current_items: dict,
     source_status: dict | None,
+    profile_id: str = DEFAULT_PROFILE_ID,
+    profiles_path: Path = DEFAULT_ROLE_PROFILES,
+    observed_at: str | None = None,
 ) -> None:
+    catalog = load_catalog(profiles_path)
+    if profile_id not in catalog["profiles"]:
+        raise ValueError(f"unknown role profile: {profile_id}")
+    if catalog["profiles"][profile_id]["status"] != "active":
+        raise ValueError(f"role profile is not active: {profile_id}")
     publishable = [event for event in events if event.publishable]
-    publishable.sort(
-        key=lambda event: (
-            CHANGE_PRIORITY.get(event.change_type, 99),
-            event.source_id,
-            event.identity,
-        )
-    )
-    priority_items = [event_projection(event, "TOP") for event in publishable[:3]]
-    other_changes = [event_projection(event, "OTHER") for event in publishable[3:23]]
+    event_items = [event_projection(event, "OTHER") for event in publishable]
 
     brief["generator_version"] = GENERATOR_VERSION
     brief["audience"] = ["議會聯絡", "局本部幕僚", "業管承辦", "分局主管"]
-    brief["priority_items"] = priority_items
     tracking_items, tracking_total = tracking_projection(
         handoff_state,
         current_items=current_items,
@@ -220,12 +221,28 @@ def enrich_for_police_users(
         source_status=source_status,
         limit=5,
     )
-    brief["tracking_items"] = tracking_items
-    brief["other_changes"] = other_changes
-    brief["overview"]["priority_count"] = len(priority_items)
-    brief["overview"]["tracking_count"] = len(tracking_items)
+    profile_views = [
+        project_profile(
+            event_items,
+            tracking_items,
+            profile,
+            ranking_policy_version=catalog["ranking_policy_version"],
+            observed_at=observed_at,
+        )
+        for profile in catalog["profiles"].values()
+        if profile["status"] == "active"
+    ]
+    selected_view = next(view for view in profile_views if view["profile"]["profile_id"] == profile_id)
+    brief["profile"] = selected_view["profile"]
+    brief["available_profiles"] = [view["profile"] for view in profile_views]
+    brief["profile_views"] = profile_views
+    brief["priority_items"] = selected_view["priority_items"]
+    brief["tracking_items"] = selected_view["tracking_items"]
+    brief["other_changes"] = selected_view["other_changes"]
+    brief["overview"]["priority_count"] = selected_view["overview"]["priority_count"]
+    brief["overview"]["tracking_count"] = selected_view["overview"]["tracking_count"]
     brief["overview"]["tracking_total"] = tracking_total
-    brief["overview"]["other_change_count"] = len(other_changes)
+    brief["overview"]["other_change_count"] = selected_view["overview"]["other_change_count"]
     if tracking_total:
         suffix = f"另有 {tracking_total} 件跨日追蹤仍保留。"
         brief["status_message"] = f"{brief['status_message']} {suffix}"
@@ -240,6 +257,8 @@ def main() -> int:
     parser.add_argument("--state", type=Path, default=DEFAULT_STATE)
     parser.add_argument("--handoff-state", type=Path, default=DEFAULT_HANDOFF_STATE)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument("--profiles", type=Path, default=DEFAULT_ROLE_PROFILES)
+    parser.add_argument("--profile", default=DEFAULT_PROFILE_ID)
     parser.add_argument("--observed-at")
     parser.add_argument("--reset-baseline", action="store_true")
     parser.add_argument("--snapshot-partial", action="store_true")
@@ -294,6 +313,9 @@ def main() -> int:
         handoff_state=handoff_state,
         current_items=state["items"],
         source_status=source_status,
+        profile_id=args.profile,
+        profiles_path=args.profiles,
+        observed_at=observed_at,
     )
     brief["publication_status"] = "READY" if snapshot_complete else "PARTIAL"
     brief["snapshot_complete"] = snapshot_complete

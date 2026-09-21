@@ -36,6 +36,16 @@ const TIME_BASIS_LABELS = {
   DETECTED_CHANGE: "系統偵測變更",
 };
 
+const RELEVANCE_LABELS = {
+  affected_role_match: "職責命中",
+  topic_match: "議題命中",
+  source_priority: "來源優先",
+  deadline_within_72h: "72 小時內期限",
+  status_changed: "狀態變更",
+  explicit_follow_up: "明確後續追蹤",
+  default: "綜合預設",
+};
+
 async function fetchJson(url) {
   const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) throw new Error(`${url} HTTP ${response.status}`);
@@ -171,6 +181,9 @@ function SystemHealthSummary({ health }) {
 
 function ActionCard({ item, index }) {
   const affectedRoles = Array.isArray(item.affected_roles) ? item.affected_roles : [];
+  const relevanceReasons = Array.isArray(item.profile_relevance?.reason_codes)
+    ? item.profile_relevance.reason_codes
+    : [];
   return (
     <article className="v2-action-card" data-testid="v2-priority-card">
       <div className="v2-action-card-heading">
@@ -214,6 +227,15 @@ function ActionCard({ item, index }) {
           <span key={role}>{role}</span>
         ))}
       </div>
+
+      {relevanceReasons.length > 0 && (
+        <div className="v2-profile-relevance" data-testid="profile-relevance" aria-label="角色檔排序依據">
+          <span>排序依據</span>
+          {relevanceReasons.map((reason) => (
+            <span key={reason} title={reason}>{RELEVANCE_LABELS[reason] || reason}</span>
+          ))}
+        </div>
+      )}
 
       <div className="v2-action-footer">
         <span>
@@ -273,6 +295,7 @@ export default function V2DailyDashboard() {
   const [loadState, setLoadState] = useState("loading");
   const [loadError, setLoadError] = useState("");
   const [archiveQuery, setArchiveQuery] = useState("");
+  const [selectedProfileId, setSelectedProfileId] = useState("general");
   const [nowMs, setNowMs] = useState(null);
 
   useEffect(() => {
@@ -306,6 +329,15 @@ export default function V2DailyDashboard() {
           return;
         }
         setPublication(data);
+        const profileIds = Array.isArray(data.profile_views)
+          ? data.profile_views.map((view) => view?.profile?.profile_id).filter(Boolean)
+          : [];
+        const requestedProfile = new URLSearchParams(window.location.search).get("profile");
+        setSelectedProfileId(
+          profileIds.includes(requestedProfile)
+            ? requestedProfile
+            : data.profile?.profile_id || profileIds[0] || "general",
+        );
         setLoadState("ready");
       })
       .catch((error) => {
@@ -362,15 +394,18 @@ export default function V2DailyDashboard() {
       .slice(0, 20);
   }, [archive, archiveQuery]);
 
-  const overview = publication?.overview || {};
-  const priorityItems = Array.isArray(publication?.priority_items)
-    ? publication.priority_items.slice(0, 3)
+  const profileViews = Array.isArray(publication?.profile_views) ? publication.profile_views : [];
+  const activeView = profileViews.find((view) => view?.profile?.profile_id === selectedProfileId) || publication || {};
+  const activeProfile = activeView.profile || publication?.profile;
+  const overview = { ...(publication?.overview || {}), ...(activeView.overview || {}) };
+  const priorityItems = Array.isArray(activeView.priority_items)
+    ? activeView.priority_items.slice(0, 3)
     : [];
-  const trackingItems = Array.isArray(publication?.tracking_items)
-    ? publication.tracking_items.slice(0, 5)
+  const trackingItems = Array.isArray(activeView.tracking_items)
+    ? activeView.tracking_items.slice(0, 5)
     : [];
-  const otherChanges = Array.isArray(publication?.other_changes)
-    ? publication.other_changes
+  const otherChanges = Array.isArray(activeView.other_changes)
+    ? activeView.other_changes
     : [];
   const generationMixed = Boolean(
     publication && archive && sourceStatus
@@ -392,6 +427,29 @@ export default function V2DailyDashboard() {
             <span>快照產生時間（非官方發布時間）</span>
             <strong>{formatDateTime(publication.generated_at)}</strong>
             <small>Asia/Taipei</small>
+            {profileViews.length > 1 && (
+              <label className="v2-profile-selector" htmlFor="v2-profile-select">
+                <span>工作角色</span>
+                <select
+                  id="v2-profile-select"
+                  data-testid="role-profile-selector"
+                  value={activeProfile?.profile_id || selectedProfileId}
+                  onChange={(event) => {
+                    const nextProfile = event.target.value;
+                    setSelectedProfileId(nextProfile);
+                    const url = new URL(window.location.href);
+                    url.searchParams.set("profile", nextProfile);
+                    window.history.replaceState({}, "", url);
+                  }}
+                >
+                  {profileViews.map((view) => (
+                    <option key={view.profile.profile_id} value={view.profile.profile_id}>
+                      {view.profile.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
           </div>
         )}
       </header>
@@ -443,7 +501,7 @@ export default function V2DailyDashboard() {
                 <p className="v2-eyebrow">10 秒掌握</p>
                 <h2 id="v2-priority-title">快照重點</h2>
               </div>
-              <span>最多 3 件</span>
+              <span>{activeProfile?.label || "綜合視圖"} · 最多 3 件</span>
             </div>
 
             {priorityItems.length === 0 ? (
