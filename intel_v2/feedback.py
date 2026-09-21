@@ -168,9 +168,13 @@ def create_feedback(
 ) -> tuple[dict[str, Any], dict[str, Any], bool]:
     """Create one minimal record; identical fingerprints are returned unchanged."""
     result = copy_state(state)
+    if any(not isinstance(value, str) or not value.strip() for value in (target_type, target_id, target_version)):
+        raise ValueError("target type/id/version are required")
+    if not isinstance(reason, str) or not reason.strip():
+        raise ValueError("feedback reason is required")
     target_type = target_type.upper()
     reason = reason.upper()
-    if target_type not in TARGET_TYPES or not target_id.strip() or not target_version.strip():
+    if target_type not in TARGET_TYPES:
         raise ValueError("target type/id/version are required")
     if reason not in REASONS:
         raise ValueError(f"unsupported feedback reason: {reason}")

@@ -96,6 +96,9 @@ class FeedbackTests(unittest.TestCase):
     def test_invalid_target_and_unreviewed_regression_fail_closed(self):
         with self.assertRaises(ValueError):
             make_feedback(target_type="SOURCE")
+        for field in ("target_type", "target_id", "target_version", "reason"):
+            with self.assertRaises(ValueError):
+                make_feedback(**{field: None})
         state, item, _ = make_feedback()
         with self.assertRaisesRegex(ValueError, "accepted"):
             model.link_regression(state, item["feedback_id"], "gold-1", reviewer_ref="reviewer:1", linked_at="2026-09-21T00:01:00+08:00")
