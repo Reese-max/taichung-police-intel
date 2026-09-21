@@ -328,6 +328,8 @@ def verify_fact(document: dict[str, Any], body: bytes, fact: dict[str, Any]) -> 
     if valid_time_source is None:
         if valid_time is not None:
             return {"status": "REJECTED", "reason": "VALID_TIME_MISMATCH", "fact_id": fact.get("fact_id")}
+    elif not isinstance(valid_time_source, dict):
+        return {"status": "REJECTED", "reason": "VALID_TIME_MISMATCH", "fact_id": fact.get("fact_id")}
     elif valid_time_source.get("type") == "JSON_VALUE":
         if _date_value(str(actual)) != valid_time:
             return {"status": "REJECTED", "reason": "VALID_TIME_MISMATCH", "fact_id": fact.get("fact_id")}
