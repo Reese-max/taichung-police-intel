@@ -275,7 +275,7 @@ if (["quick", "full"].includes(mode) && !failures.length) {
       ["contract-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "evaluation", "-p", "test_source_value_contract.py", "-v"]],
       ["ingestion-contract-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_source_ingestion.py", "-v"]],
       ["system-health-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_system_health.py", "-v"]],
-      ["schema-drift-receipt", ["-X", "utf8", "scripts/schema_drift.py", "--output", "apps/web/public/data/schema-drift.json"]],
+      ["schema-drift-self-check", ["-X", "utf8", "scripts/schema_drift.py", "--self-check"]],
       ["schema-drift-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_schema_drift.py", "-v"]],
       ["npa-source-inventory-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_npa_source_inventory.py", "-v"]],
       ["npa-source-inventory-self-check", ["-X", "utf8", "scripts/npa-source-inventory.py", "--self-check"]],

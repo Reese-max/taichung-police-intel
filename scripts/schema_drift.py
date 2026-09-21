@@ -7,6 +7,7 @@ import argparse
 import base64
 import csv
 import hashlib
+import importlib.util
 import io
 import json
 import re
@@ -29,7 +30,10 @@ GOOD_STATUSES = {"NO_DRIFT", "ADDITIVE_COMPATIBLE"}
 CONTRACT_VERSION = "1.0"
 
 
-def _news(source_id: str, name: str, pattern: str) -> dict[str, Any]:
+def _news(source_id: str, name: str, pattern: str, *, published_required: bool = True) -> dict[str, Any]:
+    required_fields = ["stable_key", "title", "detail_url"]
+    if published_required:
+        required_fields.append("published")
     return {
         "source_id": source_id,
         "source_name": name,
@@ -37,8 +41,9 @@ def _news(source_id: str, name: str, pattern: str) -> dict[str, Any]:
         "transport": "HTML_LIST_DETAIL",
         "expected_content_types": ["text/html"],
         "parser_version": "online_collect:p0-live-1",
-        "required_fields": ["stable_key", "title", "detail_url", "published"],
-        "optional_fields": ["detail", "body_sha256", "attachments"],
+        "required_fields": required_fields,
+        "optional_fields": ["detail", "body_sha256", "attachments"] + ([] if published_required else ["published"]),
+        "published_required": published_required,
         "id_pattern": pattern,
     }
 
@@ -53,6 +58,7 @@ CONTRACTS: dict[str, dict[str, Any]] = {
         "S-019",
         "臺中市政府市政會議紀錄與專案報告",
         r"/(\d+)/post\b",
+        published_required=False,
     ),
     "S-032": _news(
         "S-032",
@@ -107,7 +113,7 @@ CONTRACTS: dict[str, dict[str, Any]] = {
         "source_name": "臺中市受（處）理刑事案件－分局別",
         "contract_version": CONTRACT_VERSION,
         "transport": "DATA_GOV_JSON",
-        "expected_content_types": ["application/json"],
+        "expected_content_types": ["application/json", "application/octet-stream"],
         "parser_version": "canary-s028-165:1",
         "dataset_id": "88147",
         "required_fields": ["項目", "欄位名稱", "數值", "資料時間日期", "資料週期"],
@@ -119,7 +125,7 @@ CONTRACTS: dict[str, dict[str, Any]] = {
         "source_name": "臺中市各區戶數、人口數按戶別及性別分",
         "contract_version": CONTRACT_VERSION,
         "transport": "DATA_GOV_JSON",
-        "expected_content_types": ["application/json"],
+        "expected_content_types": ["application/json", "application/octet-stream"],
         "parser_version": "canary-s028-165:1",
         "dataset_id": "103703",
         "required_fields": ["地區", "項目", "欄位名稱", "數值", "資料時間日期", "資料週期"],
@@ -242,6 +248,7 @@ def observe(
     observed_at: str | None = None,
     requested_url: str | None = None,
     final_url: str | None = None,
+    error_reason: str | None = None,
     previous: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     raw = body.encode("utf-8") if isinstance(body, str) else body
@@ -254,7 +261,7 @@ def observe(
         final_url=final_url,
     )
     if http_status < 200 or http_status >= 300:
-        result["reasons"] = [f"HTTP_{http_status}"]
+        result["reasons"] = [error_reason or f"HTTP_{http_status}"]
         result["status"] = "SOURCE_UNAVAILABLE"
         result["review_required"] = True
         return result
@@ -263,6 +270,13 @@ def observe(
         return result
 
     transport = contract["transport"]
+    if contract.get("resource_id_required") and not resource_id:
+        return _finish(
+            result,
+            {"transport": transport, "resource_id": None},
+            "BREAKING_DRIFT",
+            ["RESOURCE_ID_MISSING"],
+        )
     if transport == "HTML_LIST_DETAIL":
         result = _observe_html(contract, raw, result, previous)
     elif transport == "JSON_API":
@@ -304,7 +318,7 @@ def _observe_html(contract: dict[str, Any], body: bytes, result: dict[str, Any],
     if set(contract["required_fields"]) - set(fields):
         status = "BREAKING_DRIFT"
         reasons.append("REQUIRED_FIELD_MISSING")
-    elif date_coverage != len(entries):
+    elif contract.get("published_required", True) and date_coverage != len(entries):
         status = "BREAKING_DRIFT"
         reasons.append("REQUIRED_PUBLISHED_DATE_MISSING")
     return _finish(result, signature, status, reasons)
@@ -520,6 +534,144 @@ def _load_observations(path: Path) -> list[dict[str, Any]]:
     return decoded
 
 
+def _live_session():
+    import requests
+    from requests.adapters import HTTPAdapter
+    from urllib3.util.retry import Retry
+
+    retry = Retry(
+        total=2,
+        backoff_factor=1,
+        status_forcelist=(429, 500, 502, 503, 504),
+        allowed_methods=("GET",),
+    )
+    session = requests.Session()
+    session.headers.update({
+        "User-Agent": "TaichungPoliceIntelSchemaDrift/1.0 (+public-source-monitor)",
+        "Accept-Language": "zh-TW,zh;q=0.9",
+    })
+    session.mount("https://", HTTPAdapter(max_retries=retry))
+    return session
+
+
+def _live_get(session, url: str, *, params: dict[str, Any] | None = None, timeout: int = 60):
+    response = session.get(url, params=params, timeout=timeout)
+    response.raise_for_status()
+    if not response.content:
+        raise RuntimeError("HTTP succeeded with an empty body")
+    return response
+
+
+def _load_s028_module():
+    path = ROOT / "canary-s028-165.py"
+    spec = importlib.util.spec_from_file_location("schema_drift_s028_165", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("S-028/CTX-165 canary is unavailable")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _fetch_live_source(session, source_id: str):
+    if str(ROOT) not in sys.path:
+        sys.path.insert(0, str(ROOT))
+    from online_collect import API_S007, API_S009, NEWS_LIST_SOURCES
+
+    if source_id in NEWS_LIST_SOURCES:
+        return _live_get(session, NEWS_LIST_SOURCES[source_id]["list_url"]), None
+    if source_id == "S-007":
+        return _live_get(
+            session,
+            API_S007,
+            params={"keywordList": "警察局", "pageNumber": 1, "pageSize": 200},
+        ), None
+    if source_id == "S-009":
+        return _live_get(
+            session,
+            API_S009,
+            params={"keywordList": "警察局", "pageNumber": 1, "pageSize": 200},
+        ), None
+
+    canary = _load_s028_module()
+    if source_id == "S-028":
+        dataset = canary.fetch_dataset_page(
+            session,
+            canary.CRIME_DATASET_ID,
+            "10952-01-01-2 臺中市受(處)理刑事案件-分局別",
+            "newdatacenter.taichung.gov.tw",
+        )
+        resource = canary.latest_dated_resource(dataset["resources"], r"\b(20\d{2})-(\d{2})_")
+        return canary.get(session, resource["url"], {"newdatacenter.taichung.gov.tw"}, 120), resource["resource_id"]
+    if source_id == "CTX-POP":
+        dataset = canary.fetch_dataset_page(
+            session,
+            canary.POPULATION_DATASET_ID,
+            "10122-00-01-2 臺中市各區戶數、人口數按戶別及性別分",
+            "newdatacenter.taichung.gov.tw",
+        )
+        resource = canary.latest_dated_resource(dataset["resources"], r"\b(20\d{2})_")
+        return canary.get(session, resource["url"], {"newdatacenter.taichung.gov.tw"}, 120), resource["resource_id"]
+    if source_id == "CTX-165":
+        dataset = canary.fetch_dataset_page(
+            session,
+            canary.FRAUD_DATASET_ID,
+            "165反詐騙諮詢專線_遭停止解析涉詐網站",
+            "opdadm.moi.gov.tw",
+        )
+        if len(dataset["resources"]) != 1:
+            raise RuntimeError(f"165 dataset resource count is {len(dataset['resources'])}")
+        resource = dataset["resources"][0]
+        return canary.get(session, resource["url"], {"opdadm.moi.gov.tw"}, 120), resource["resource_id"]
+    raise KeyError(f"no live schema source: {source_id}")
+
+
+def _response_observation(source_id: str, response, resource_id: str | None = None) -> dict[str, Any]:
+    request = getattr(response, "request", None)
+    return {
+        "source_id": source_id,
+        "body": response.content,
+        "http_status": response.status_code,
+        "content_type": response.headers.get("content-type", ""),
+        "resource_id": resource_id,
+        "observed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "requested_url": getattr(request, "url", None) or response.url,
+        "final_url": response.url,
+    }
+
+
+def _failed_observation(source_id: str, error: Exception) -> dict[str, Any]:
+    response = getattr(error, "response", None)
+    reason = f"LIVE_FETCH_{type(error).__name__.upper()}"
+    if response is not None:
+        observation = _response_observation(source_id, response)
+        observation["error_reason"] = reason
+        return observation
+    return {
+        "source_id": source_id,
+        "body": b"",
+        "http_status": 503,
+        "content_type": "",
+        "resource_id": None,
+        "observed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "requested_url": None,
+        "final_url": None,
+        "error_reason": reason,
+    }
+
+
+def live_observations(*, session=None, fetch_source=None) -> list[dict[str, Any]]:
+    session = session or _live_session()
+    fetch_source = fetch_source or _fetch_live_source
+    observations = []
+    for source_id in CONTRACTS:
+        try:
+            response, resource_id = fetch_source(session, source_id)
+            observations.append(_response_observation(source_id, response, resource_id))
+        except Exception as error:
+            observations.append(_failed_observation(source_id, error))
+    return observations
+
+
 def self_check() -> None:
     html_by_source = {
         "S-001": '<li><a href="home.jsp?mcustomize=news_view.jsp&dataserno=1">標題 115-09-10</a></li>',
@@ -569,6 +721,7 @@ def self_check() -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", type=Path)
+    parser.add_argument("--live", action="store_true")
     parser.add_argument("--state", type=Path, default=DEFAULT_STATE)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--self-check", action="store_true")
@@ -576,8 +729,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.self_check:
         self_check()
         return 0
+    if args.live and args.input:
+        parser.error("--live and --input are mutually exclusive")
     state = json.loads(args.state.read_text(encoding="utf-8")) if args.state.exists() else empty_state()
-    observations = _load_observations(args.input) if args.input else []
+    observations = live_observations() if args.live else _load_observations(args.input) if args.input else []
     receipt, next_state = build_receipt(observations, state=state)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(receipt, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")

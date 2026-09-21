@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import json
 import unittest
+from types import SimpleNamespace
 
 from scripts import schema_drift as drift
 
@@ -26,7 +27,7 @@ class SchemaDriftTests(unittest.TestCase):
     def test_all_required_news_contracts_use_real_parser_shapes(self):
         html = {
             "S-001": '<li><a href="news_view.jsp?dataserno=1">警政新聞 115-09-10</a></li>',
-            "S-019": '<li><a href="/12047/12142/12186/873338/post">會議紀錄 115-09-10</a></li>',
+            "S-019": '<li><a href="/12047/12142/12186/873338/post">會議紀錄</a></li>',
             "S-032": '<li><a href="index-1.asp?Parser=9,4,20,,,,21750">交通消息 115-09-10</a></li>',
         }
         for source_id, body in html.items():
@@ -94,6 +95,11 @@ class SchemaDriftTests(unittest.TestCase):
         self.assertEqual(changed_resource["status"], "ADDITIVE_COMPATIBLE")
         self.assertTrue(changed_resource["resource_id_changed"])
         self.assertIn("RESOURCE_ID_CHANGED", changed_resource["reasons"])
+        missing_resource = drift.observe(
+            drift.CONTRACTS["S-028"], json.dumps(rows), content_type="application/json"
+        )
+        self.assertEqual(missing_resource["status"], "BREAKING_DRIFT")
+        self.assertIn("RESOURCE_ID_MISSING", missing_resource["reasons"])
 
         missing = rows[0].copy()
         missing.pop("數值")
@@ -136,6 +142,26 @@ class SchemaDriftTests(unittest.TestCase):
         )
         self.assertEqual(result["status"], "SOURCE_UNAVAILABLE")
         self.assertEqual(result["window_completeness"], "PARTIAL")
+
+    def test_live_observations_cover_every_contract_and_fail_closed_per_source(self):
+        response = SimpleNamespace(
+            content=b"sample",
+            status_code=200,
+            headers={"content-type": "text/plain"},
+            url="https://official.test/source",
+            request=SimpleNamespace(url="https://official.test/source"),
+        )
+
+        def fetch(_session, source_id):
+            if source_id == "S-009":
+                raise RuntimeError("offline")
+            return response, "resource-1"
+
+        observations = drift.live_observations(session=object(), fetch_source=fetch)
+        self.assertEqual({item["source_id"] for item in observations}, set(drift.CONTRACTS))
+        failed = next(item for item in observations if item["source_id"] == "S-009")
+        self.assertEqual(failed["http_status"], 503)
+        self.assertEqual(failed["error_reason"], "LIVE_FETCH_RUNTIMEERROR")
 
 
 if __name__ == "__main__":

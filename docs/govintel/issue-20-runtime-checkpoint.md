@@ -4,7 +4,7 @@ Status: implemented in PR #26; not merged or production-verified. Scope is the f
 
 ## Changes
 
-- Restore all configured publication-state files from one pinned commit or fail before writing any file. Symlinks and oversized blobs are rejected. The local restore receipt is written last. A workflow-explicit one-time legacy bootstrap may seed only the newly added handoff file from the checked-out schema-compatible baseline; all other missing files still fail closed.
+- Restore all configured publication-state files from one pinned commit or fail before writing any file. Symlinks and oversized blobs are rejected. The local restore receipt is written last. A workflow-explicit one-time legacy bootstrap may seed only newly added schema-compatible state paths (`state/schema-drift-state.json` and `state/v2-handoff-state.json`) from the checked-out baseline; all other missing files still fail closed.
 - Persist requires the restored baseline; an intervening writer is not silently adopted. Normal fast-forward push rejects later races. No main write, force push, policy bypass, or code execution from the data branch.
 - A data-only `state/publication-checkpoint.json` records generation hashes and PENDING_PUBLICATION. Existing code files inherited when the data branch was created remain untouched; they are never executed.
 - A pending bundle is replayed on the next run without recollection or advancing V2 state. An unsuccessful upload/deploy/HTTP probe cannot consume its changes.

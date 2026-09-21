@@ -29,9 +29,10 @@ STATE_PATHS = (
     "apps/web/public/data/feed-export.csv",
     "apps/web/public/data/v2-daily-brief.json",
     "state/v2-shadow-state.json",
+    "state/schema-drift-state.json",
     "state/v2-handoff-state.json",
 )
-LEGACY_BOOTSTRAP_PATHS = frozenset({"state/v2-handoff-state.json"})
+LEGACY_BOOTSTRAP_PATHS = frozenset({"state/schema-drift-state.json", "state/v2-handoff-state.json"})
 PUBLIC_PATHS = tuple(path for path in STATE_PATHS if path.startswith("apps/web/public/"))
 MANIFEST = "state/publication-checkpoint.json"
 MAX_FILE_BYTES = 32 * 1024 * 1024

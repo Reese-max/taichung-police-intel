@@ -129,7 +129,7 @@ jobs:
 
       - name: Build source contract drift receipt
         id: schema_drift
-        run: python -X utf8 scripts/schema_drift.py --output apps/web/public/data/schema-drift.json
+        run: python -X utf8 scripts/schema_drift.py --live --state state/schema-drift-state.json --output apps/web/public/data/schema-drift.json
 
       - name: Build machine-readable system health receipt
         id: system_health
@@ -188,6 +188,7 @@ jobs:
             apps/web/public/data/system-health.json
             apps/web/public/data/schema-drift.json
             state/v2-shadow-state.json
+            state/schema-drift-state.json
             state/v2-handoff-state.json
           if-no-files-found: error
           retention-days: 14
