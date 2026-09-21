@@ -26,6 +26,12 @@ RSS = '''<?xml version="1.0"?><rss version="2.0"><channel>
 <item iCuItem="3375296"><title>活動公告</title><link>https://official.test/3375296/post</link><pubDate>Mon, 21 Sep 2026 02:57:54 GMT</pubDate></item>
 </channel></rss>'''.encode("utf-8")
 
+FIRE_LIVE = """<div class="update">最後異動時間：2026-09-21 19:24:23</div>
+<ul class="list rwd-table"><li class="list_head">標題</li><li>
+<span data-th="受理時間：">2026/09/21 19:21:44</span><span data-th="案類：">緊急救護</span>
+<span data-th="案別">車禍</span><span data-th="發生地點：">北屯區軍榮二街</span>
+<span data-th="派遣分隊：">東山分隊</span><span data-th="執行狀況："></span></li></ul>""".encode("utf-8")
+
 
 class SchemaDriftTests(unittest.TestCase):
     def test_all_required_news_contracts_use_real_parser_shapes(self):
@@ -49,6 +55,11 @@ class SchemaDriftTests(unittest.TestCase):
         )
         self.assertEqual(result["status"], "NO_DRIFT")
         self.assertEqual(result["window_completeness"], "COMPLETE_WITH_ITEMS")
+        result = drift.observe(
+            drift.CONTRACTS["S-031"], FIRE_LIVE, content_type="text/html", final_url="https://official.test/caselist"
+        )
+        self.assertEqual(result["status"], "NO_DRIFT")
+        self.assertEqual(result["window_completeness"], "PARTIAL")
 
     def test_rss_shape_break_is_fail_closed(self):
         result = drift.observe(
@@ -57,6 +68,13 @@ class SchemaDriftTests(unittest.TestCase):
         )
         self.assertEqual(result["status"], "BREAKING_DRIFT")
         self.assertEqual(result["window_completeness"], "PARTIAL")
+
+    def test_fire_live_shape_break_is_fail_closed(self):
+        result = drift.observe(
+            drift.CONTRACTS["S-031"], FIRE_LIVE.replace("最後異動時間".encode(), "頁面更新".encode()), content_type="text/html"
+        )
+        self.assertEqual(result["status"], "BREAKING_DRIFT")
+        self.assertTrue(result["review_required"])
 
     def test_http_200_selector_failure_is_breaking_and_partial(self):
         result = drift.observe(

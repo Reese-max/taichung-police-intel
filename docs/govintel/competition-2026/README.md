@@ -29,7 +29,7 @@
 | Source Policy 跨 collector／Query Store／Health／UI | `IMPLEMENTED_NOT_PRODUCTION` | #49 receipt、`scripts/verify-source-policy-integration.py` |
 | 官方文件版本→located fact→evidence/PublicEvent input | `IMPLEMENTED_NOT_PRODUCTION` | #48 receipt、`scripts/located-facts.py` |
 | Taiwan Intel Dashboard discovery feed | `IMPLEMENTED_NOT_PRODUCTION` | #27 fixture、`scripts/discovery-adapter.py` |
-| S-001/S-019/S-032/S-033 擴源 | `CANDIDATE_CANARY` | #14/#22；尚缺完整 live canary/promotion |
+| S-001/S-019/S-031/S-032/S-033 擴源 | `CANDIDATE_CANARY` | #14/#22；尚缺完整 live canary/promotion |
 | 排程發布、晨晚自然 run、匿名版本/hash | `BLOCKED` | #20；需正常 review/merge 與正式環境證據 |
 | 真人成效／機關採用／得獎 | `NOT_RUN` / `UNVERIFIED` | `evaluation-manifest.template.json` 保持 null |
 

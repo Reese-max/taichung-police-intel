@@ -383,6 +383,11 @@ NEWS_LIST_SOURCES = {
         "list_url": "https://www.news.taichung.gov.tw/31034/564777/rss?nodeId=14813",
         "format": "rss",
     },
+    "S-031": {
+        "name": "臺中市政府消防局即時災情",
+        "list_url": "https://www.fire.taichung.gov.tw/caselist/index.asp?Parser=99,8,226",
+        "format": "fire_live",
+    },
 }
 
 
@@ -440,6 +445,107 @@ def parse_news_rss(xml: bytes, base_url: str) -> list[dict]:
     if not entries:
         raise ValueError("news RSS has no parseable entries")
     return entries
+
+
+def _fire_datetime(value: str, label: str) -> datetime:
+    raw = " ".join(value.split())
+    for fmt in ("%Y/%m/%d %H:%M:%S", "%Y-%m-%d %H:%M:%S"):
+        try:
+            return datetime.strptime(raw, fmt).replace(tzinfo=TZ)
+        except ValueError:
+            pass
+    raise ValueError(f"fire live {label} has invalid timestamp: {raw!r}")
+
+
+def parse_fire_live(html: bytes) -> list[dict]:
+    """Parse only coarse, transient incident metadata from the official table."""
+    soup = BeautifulSoup(html, "html.parser")
+    update = soup.select_one(".update")
+    update_text = " ".join(update.stripped_strings) if update else ""
+    update_match = re.search(
+        r"最後異動時間\s*[：:]?\s*(\d{4}[-/]\d{2}[-/]\d{2}\s+\d{2}:\d{2}:\d{2})",
+        update_text,
+    )
+    if not update_match:
+        raise ValueError("fire live page has no last-update marker")
+    source_modified_at = _fire_datetime(update_match.group(1), "last-update marker")
+    table = soup.select_one("ul.list.rwd-table")
+    if not table:
+        raise ValueError("fire live page has no incident table")
+    rows = [row for row in table.find_all("li", recursive=False) if "list_head" not in row.get("class", [])]
+    if not rows:
+        raise ValueError("fire live page has no incident rows")
+
+    required = {"受理時間", "案類", "案別", "發生地點", "派遣分隊", "執行狀況"}
+    entries = []
+    for row in rows:
+        values = {}
+        for span in row.find_all("span", attrs={"data-th": True}, recursive=False):
+            label = re.sub(r"[：:]$", "", span["data-th"].strip())
+            direct_text = " ".join("".join(span.find_all(string=True, recursive=False)).split())
+            values[label] = direct_text
+        missing = required - set(values)
+        if missing:
+            raise ValueError(f"fire live row is missing fields: {sorted(missing)}")
+        received_at = _fire_datetime(values["受理時間"], "reception")
+        category = values["案類"].strip()
+        event_type = values["案別"].strip()
+        location = values["發生地點"].strip()
+        dispatch_unit = values["派遣分隊"].strip()
+        if not category or not event_type or not location or not dispatch_unit:
+            raise ValueError("fire live row has an empty required value")
+        districts = re.findall(r"[\u4e00-\u9fff]{1,3}區", location)
+        if not districts:
+            raise ValueError("fire live row has no district")
+        identity = {
+            "received_at": received_at.isoformat(),
+            "category": category,
+            "event_type": event_type,
+            "location": location,
+            "dispatch_unit": dispatch_unit,
+        }
+        entries.append({
+            "stable_key": f"S-031:{canonical_sha256(identity)[:24]}",
+            "category": category,
+            "event_type": event_type,
+            "district": districts[-1],
+            "observed_at": received_at.isoformat(),
+            "dispatch_unit": dispatch_unit,
+            "status": values["執行狀況"].strip() or "UNKNOWN",
+            "source_modified_at": source_modified_at.isoformat(),
+        })
+    return entries
+
+
+def collect_fire_live(session: requests.Session, start: date, end: date) -> dict:
+    """Collect one transient snapshot; it cannot prove a historical date window."""
+    del start, end
+    config = NEWS_LIST_SOURCES["S-031"]
+    listing = get(session, config["list_url"])
+    entries = parse_fire_live(listing.content)
+    items = []
+    for entry in entries:
+        payload = {key: value for key, value in entry.items() if key != "stable_key"}
+        items.append({
+            "stable_key": entry["stable_key"],
+            "source_url": listing.url,
+            "published_at": None,
+            "content_sha256": canonical_sha256(payload),
+            "payload": payload,
+        })
+    manifest = [
+        {key: item[key] for key in ("stable_key", "content_sha256", "published_at")}
+        for item in items
+    ]
+    return {
+        "source_health": "PASS",
+        "window_completeness": "PARTIAL",
+        "window_item_count": None,
+        "snapshot_item_count": len(items),
+        "items": items,
+        "snapshots": [snapshot(listing, "LIST")],
+        "manifest_sha256": canonical_sha256(manifest),
+    }
 
 
 def collect_news_list(
@@ -531,6 +637,7 @@ COLLECTORS = {
     "S-019": collect_news_list,
     "S-032": collect_news_list,
     "S-033": collect_news_list,
+    "S-031": collect_fire_live,
 }
 
 
@@ -548,6 +655,8 @@ def collect_source(
         return collector(session, source_id, start, end)
     if collector is collect_news_list:
         return collector(session, source_id, start, end, existing, max_details=max_details)
+    if collector is collect_fire_live:
+        return collector(session, start, end)
     if max_details is not None:
         raise ValueError(f"max_details is only valid for list-news sources: {source_id}")
     return collector(session, start, end)

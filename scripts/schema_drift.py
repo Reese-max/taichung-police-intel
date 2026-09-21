@@ -62,6 +62,28 @@ def _rss_news(source_id: str, name: str) -> dict[str, Any]:
     }
 
 
+def _fire_live(source_id: str, name: str) -> dict[str, Any]:
+    return {
+        "source_id": source_id,
+        "source_name": name,
+        "contract_version": CONTRACT_VERSION,
+        "transport": "HTML_LIVE_SNAPSHOT",
+        "expected_content_types": ["text/html"],
+        "parser_version": "online_collect:p0-live-1",
+        "required_fields": [
+            "stable_key",
+            "category",
+            "event_type",
+            "district",
+            "observed_at",
+            "dispatch_unit",
+            "status",
+            "source_modified_at",
+        ],
+        "optional_fields": [],
+    }
+
+
 CONTRACTS: dict[str, dict[str, Any]] = {
     "S-001": _news(
         "S-001",
@@ -80,6 +102,7 @@ CONTRACTS: dict[str, dict[str, Any]] = {
         r"index-1\.asp\?Parser=9,4,20,,,,(\d+)",
     ),
     "S-033": _rss_news("S-033", "臺中市政府新聞局最新消息"),
+    "S-031": _fire_live("S-031", "臺中市政府消防局即時災情"),
     "S-007": {
         "source_id": "S-007",
         "source_name": "臺中市議會議事資訊系統－議事錄",
@@ -296,6 +319,8 @@ def observe(
         result = _observe_html(contract, raw, result, previous)
     elif transport == "RSS_LIST_DETAIL":
         result = _observe_rss(contract, raw, result, previous)
+    elif transport == "HTML_LIVE_SNAPSHOT":
+        result = _observe_fire_live(contract, raw, result, previous)
     elif transport == "JSON_API":
         result = _observe_json_api(contract, raw, result, previous)
     elif transport == "DATA_GOV_JSON":
@@ -362,6 +387,33 @@ def _observe_rss(contract: dict[str, Any], body: bytes, result: dict[str, Any], 
     }
     missing = set(contract["required_fields"]) - set(fields)
     return _finish(result, signature, "BREAKING_DRIFT" if missing else "NO_DRIFT", ["REQUIRED_FIELD_MISSING"] if missing else [])
+
+
+def _observe_fire_live(contract: dict[str, Any], body: bytes, result: dict[str, Any], previous: dict[str, Any] | None) -> dict[str, Any]:
+    try:
+        if str(ROOT) not in sys.path:
+            sys.path.insert(0, str(ROOT))
+        from online_collect import parse_fire_live
+
+        entries = parse_fire_live(body)
+    except Exception as error:
+        result["reasons"] = ["HTML_LIVE_SHAPE_FAILED", type(error).__name__.upper()]
+        result["status"] = "BREAKING_DRIFT"
+        result["observed_schema_fingerprint"] = canonical_hash({"transport": "HTML_LIVE", "parse": "failed"})
+        result["review_required"] = True
+        return result
+    fields = sorted({key for entry in entries for key in entry})
+    signature = {
+        "transport": contract["transport"],
+        "entry_fields": fields,
+        "entry_count": len(entries),
+    }
+    missing = sorted(set(contract["required_fields"]) - set(fields))
+    status = "BREAKING_DRIFT" if missing else "NO_DRIFT"
+    result = _finish(result, signature, status, ["REQUIRED_FIELD_MISSING"] if missing else [])
+    if status in GOOD_STATUSES:
+        result["window_completeness"] = "PARTIAL"
+    return result
 
 
 def _decode_json(body: bytes) -> Any:
@@ -726,6 +778,14 @@ def self_check() -> None:
     </channel></rss>'''.encode("utf-8")
     rss_result = observe(CONTRACTS["S-033"], rss, content_type="application/xml", final_url="https://official.test/rss")
     assert rss_result["status"] == "NO_DRIFT"
+    fire_live = """<div class='update'>最後異動時間：2026-09-21 19:24:23</div>
+    <ul class='list rwd-table'><li class='list_head'>標題</li><li>
+    <span data-th='受理時間：'>2026/09/21 19:21:44</span>
+    <span data-th='案類：'>緊急救護</span><span data-th='案別'>車禍</span>
+    <span data-th='發生地點：'>北屯區軍榮二街</span><span data-th='派遣分隊：'>東山分隊</span>
+    <span data-th='執行狀況：'></span></li></ul>"""
+    fire_result = observe(CONTRACTS["S-031"], fire_live, content_type="text/html", final_url="https://official.test/caselist")
+    assert fire_result["status"] == "NO_DRIFT" and fire_result["window_completeness"] == "PARTIAL"
     broken_html = observe(CONTRACTS["S-001"], b"<html><body>200 but changed</body></html>", content_type="text/html")
     assert broken_html["status"] == "BREAKING_DRIFT" and broken_html["window_completeness"] == "PARTIAL"
 

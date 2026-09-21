@@ -19,8 +19,8 @@
       "S-009",
       "S-029"
     ],
-    "catalog_hash": "415103de1c36f5ee7d23f3f4ea9f4b9e8aebdc17ab3140dde08e20f7b791f3ad",
-    "policy_hash": "45361ecc96977fdf4ef1b587036df940105d1c8195bf4198ff74e3169e2fc4d3",
+    "catalog_hash": "886cd9c53e0431a09bb6573e6bcd328861c005ed410f95bdd226c1c2cc7c7356",
+    "policy_hash": "1387c7e5a15c2fc0a07b6881b0ee40f70e789fcbe01862d9834bfe9b079464d5",
     "policy_version": 1
   },
   "review_inbox": [],
@@ -49,14 +49,14 @@
         "S-009",
         "S-029"
       ],
-      "catalog_hash": "415103de1c36f5ee7d23f3f4ea9f4b9e8aebdc17ab3140dde08e20f7b791f3ad",
+      "catalog_hash": "886cd9c53e0431a09bb6573e6bcd328861c005ed410f95bdd226c1c2cc7c7356",
       "ended_at": "2026-09-11T08:23:26+08:00",
       "error_class": null,
       "generation_id": "CR-DEMO-20260911-MORNING-SCHEDULE",
       "lane": "publication",
       "last_success_at": "2026-09-11T08:23:26+08:00",
       "outcome": "SUCCESS",
-      "policy_hash": "45361ecc96977fdf4ef1b587036df940105d1c8195bf4198ff74e3169e2fc4d3",
+      "policy_hash": "1387c7e5a15c2fc0a07b6881b0ee40f70e789fcbe01862d9834bfe9b079464d5",
       "policy_version": 1,
       "stage": "canonical_validation"
     },
@@ -68,14 +68,14 @@
         "S-009",
         "S-029"
       ],
-      "catalog_hash": "415103de1c36f5ee7d23f3f4ea9f4b9e8aebdc17ab3140dde08e20f7b791f3ad",
+      "catalog_hash": "886cd9c53e0431a09bb6573e6bcd328861c005ed410f95bdd226c1c2cc7c7356",
       "ended_at": "2026-09-11T08:23:26+08:00",
       "error_class": "SOURCE_FRESHNESS_STALE",
       "generation_id": "CR-DEMO-20260911-MORNING-SCHEDULE",
       "lane": "publication",
       "last_success_at": null,
       "outcome": "STALE",
-      "policy_hash": "45361ecc96977fdf4ef1b587036df940105d1c8195bf4198ff74e3169e2fc4d3",
+      "policy_hash": "1387c7e5a15c2fc0a07b6881b0ee40f70e789fcbe01862d9834bfe9b079464d5",
       "policy_version": 1,
       "stage": "collection"
     },
@@ -87,11 +87,11 @@
         "S-009",
         "S-029"
       ],
-      "catalog_hash": "415103de1c36f5ee7d23f3f4ea9f4b9e8aebdc17ab3140dde08e20f7b791f3ad",
+      "catalog_hash": "886cd9c53e0431a09bb6573e6bcd328861c005ed410f95bdd226c1c2cc7c7356",
       "error_class": "NO_DEPLOYMENT_RECEIPT_IN_CANONICAL_ARTIFACT",
       "lane": "publication",
       "outcome": "UNKNOWN",
-      "policy_hash": "45361ecc96977fdf4ef1b587036df940105d1c8195bf4198ff74e3169e2fc4d3",
+      "policy_hash": "1387c7e5a15c2fc0a07b6881b0ee40f70e789fcbe01862d9834bfe9b079464d5",
       "policy_version": 1,
       "stage": "deployment"
     },
@@ -103,11 +103,11 @@
         "S-009",
         "S-029"
       ],
-      "catalog_hash": "415103de1c36f5ee7d23f3f4ea9f4b9e8aebdc17ab3140dde08e20f7b791f3ad",
+      "catalog_hash": "886cd9c53e0431a09bb6573e6bcd328861c005ed410f95bdd226c1c2cc7c7356",
       "error_class": "NO_HTTP_HASH_RECEIPT_IN_CANONICAL_ARTIFACT",
       "lane": "publication",
       "outcome": "UNKNOWN",
-      "policy_hash": "45361ecc96977fdf4ef1b587036df940105d1c8195bf4198ff74e3169e2fc4d3",
+      "policy_hash": "1387c7e5a15c2fc0a07b6881b0ee40f70e789fcbe01862d9834bfe9b079464d5",
       "policy_version": 1,
       "stage": "public_http_verification"
     },
@@ -119,11 +119,11 @@
         "S-009",
         "S-029"
       ],
-      "catalog_hash": "415103de1c36f5ee7d23f3f4ea9f4b9e8aebdc17ab3140dde08e20f7b791f3ad",
+      "catalog_hash": "886cd9c53e0431a09bb6573e6bcd328861c005ed410f95bdd226c1c2cc7c7356",
       "error_class": "QUERY_RUNTIME_NOT_YET_WIRED",
       "lane": "query",
       "outcome": "UNKNOWN",
-      "policy_hash": "45361ecc96977fdf4ef1b587036df940105d1c8195bf4198ff74e3169e2fc4d3",
+      "policy_hash": "1387c7e5a15c2fc0a07b6881b0ee40f70e789fcbe01862d9834bfe9b079464d5",
       "policy_version": 1,
       "stage": "mcp_web_query"
     },
@@ -135,11 +135,11 @@
         "S-009",
         "S-029"
       ],
-      "catalog_hash": "415103de1c36f5ee7d23f3f4ea9f4b9e8aebdc17ab3140dde08e20f7b791f3ad",
+      "catalog_hash": "886cd9c53e0431a09bb6573e6bcd328861c005ed410f95bdd226c1c2cc7c7356",
       "error_class": "QUERY_INDEX_NOT_YET_WIRED",
       "lane": "query",
       "outcome": "UNKNOWN",
-      "policy_hash": "45361ecc96977fdf4ef1b587036df940105d1c8195bf4198ff74e3169e2fc4d3",
+      "policy_hash": "1387c7e5a15c2fc0a07b6881b0ee40f70e789fcbe01862d9834bfe9b079464d5",
       "policy_version": 1,
       "stage": "query_index"
     }

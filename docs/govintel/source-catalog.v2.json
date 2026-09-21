@@ -180,6 +180,7 @@
       "priority": 2,
       "status": "VERIFIED_CANDIDATE",
       "entrypoint": "https://www.fire.taichung.gov.tw/",
+      "list_endpoint": "https://www.fire.taichung.gov.tw/caselist/index.asp?Parser=99,8,226",
       "transport": "Public HTML live table",
       "cadence_class": "FAST_EVENT",
       "recommended_interval_minutes": 10,

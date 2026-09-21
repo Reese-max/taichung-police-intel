@@ -95,11 +95,13 @@ class CanaryContractTests(unittest.TestCase):
         finally:
             session.close()
 
-    def test_catalog_candidate_inventory_includes_s033_after_adapter_registration(self):
+    def test_catalog_candidate_inventory_includes_live_adapters(self):
         import online_collect
 
         self.assertIn("S-033", module.candidate_source_ids(online_collect))
         self.assertIs(online_collect.COLLECTORS["S-033"], online_collect.collect_news_list)
+        self.assertIn("S-031", module.candidate_source_ids(online_collect))
+        self.assertIs(online_collect.COLLECTORS["S-031"], online_collect.collect_fire_live)
 
 
 if __name__ == "__main__":

@@ -36,6 +36,13 @@ RSS_LIST = '''<?xml version="1.0"?><rss version="2.0"><channel>
 <item iCuItem="3372712"><title>課程公告</title><link>/3372712/post</link><pubDate>Thu, 17 Sep 2026 01:40:58 GMT</pubDate></item>
 </channel></rss>'''.encode("utf-8")
 
+FIRE_LIVE = """<div class="update"><strong>最後異動時間：</strong>2026-09-21 19:24:23</div>
+<ul class="list rwd-table"><li class="list_head">標題</li><li>
+<span data-th="受理時間：">2026/09/21 19:21:44</span>
+<span data-th="案類：">緊急救護</span><span data-th="案別">車禍</span>
+<span data-th="發生地點：">北屯區軍榮二街</span><span data-th="派遣分隊：">東山分隊</span>
+<span data-th="執行狀況："></span></li></ul>""".encode("utf-8")
+
 DETAIL = _page("<div>detail body</div><a href='files/a.pdf'>附件</a>")
 
 
@@ -101,6 +108,23 @@ class ParseNewsListTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             oc.parse_news_list(_page("<li>no links</li>"), "https://x.test/", r"dataserno=(\d+)")
 
+    def test_fire_live_parser_redacts_location_and_hashes_composite_identity(self):
+        entries = oc.parse_fire_live(FIRE_LIVE)
+        self.assertEqual(entries[0]["district"], "北屯區")
+        self.assertEqual(entries[0]["status"], "UNKNOWN")
+        self.assertRegex(entries[0]["stable_key"], r"^S-031:[0-9a-f]{24}$")
+        self.assertNotIn("軍榮二街", str(entries[0]))
+        self.assertEqual(entries, oc.parse_fire_live(FIRE_LIVE))
+
+    def test_fire_live_parser_requires_update_and_rows(self):
+        with self.assertRaises(ValueError):
+            oc.parse_fire_live(FIRE_LIVE.replace("最後異動時間".encode(), "頁面更新".encode()))
+        empty = FIRE_LIVE.replace(
+            '<span data-th="受理時間：">2026/09/21 19:21:44</span>'.encode(), b""
+        )
+        with self.assertRaises(ValueError):
+            oc.parse_fire_live(empty)
+
 
 class ListFirstGatingTests(unittest.TestCase):
     def test_unchanged_items_skip_detail_fetch(self):
@@ -143,6 +167,17 @@ class ListFirstGatingTests(unittest.TestCase):
         )
         self.assertEqual(result["source_health"], "PASS")
         self.assertEqual(len([url for url in session.fetched if "news_view" in url]), 1)
+
+    def test_fire_live_collects_one_snapshot_without_detail_fetches(self):
+        url = oc.NEWS_LIST_SOURCES["S-031"]["list_url"]
+        session = FakeSession({url: FIRE_LIVE})
+        result = oc.collect_source(
+            session, "S-031", date(2026, 9, 4), date(2026, 9, 11), {}, max_details=1
+        )
+        self.assertEqual(result["source_health"], "PASS")
+        self.assertEqual(result["window_completeness"], "PARTIAL")
+        self.assertIsNone(result["window_item_count"])
+        self.assertEqual(session.fetched, [url])
 
     def test_window_completeness_requires_boundary_evidence(self):
         result, _ = _collect("S-001", POLICE_LIST)
