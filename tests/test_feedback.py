@@ -100,8 +100,15 @@ class FeedbackTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 make_feedback(**{field: None})
         state, item, _ = make_feedback()
+        with self.assertRaisesRegex(ValueError, "review status"):
+            model.review(state, item["feedback_id"], None, reviewer_ref="reviewer:1", decided_at="2026-09-21T00:01:00+08:00")
+        with self.assertRaisesRegex(ValueError, "reviewer_ref"):
+            model.review(state, item["feedback_id"], "ACCEPTED", reviewer_ref=None, decided_at="2026-09-21T00:01:00+08:00")
         with self.assertRaisesRegex(ValueError, "accepted"):
             model.link_regression(state, item["feedback_id"], "gold-1", reviewer_ref="reviewer:1", linked_at="2026-09-21T00:01:00+08:00")
+        accepted = model.review(state, item["feedback_id"], "ACCEPTED", reviewer_ref="reviewer:1", decided_at="2026-09-21T00:01:00+08:00")
+        with self.assertRaisesRegex(ValueError, "fixture_id"):
+            model.link_regression(accepted, item["feedback_id"], None, reviewer_ref="reviewer:1", linked_at="2026-09-21T00:01:00+08:00")
 
     def test_tampered_feedback_identity_and_audit_fail_closed(self):
         state, item, _ = make_feedback()

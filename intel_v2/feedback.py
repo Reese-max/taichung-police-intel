@@ -245,13 +245,15 @@ def review(
 ) -> dict[str, Any]:
     result = copy_state(state)
     item = result["items"].get(feedback_id)
-    status = status.upper()
     if item is None:
         raise ValueError(f"unknown feedback ID: {feedback_id}")
+    if not isinstance(status, str):
+        raise ValueError("review status is required")
+    if not isinstance(reviewer_ref, str) or not reviewer_ref.strip():
+        raise ValueError("reviewer_ref is required")
+    status = status.upper()
     if status not in {"ACCEPTED", "REJECTED", "DUPLICATE"}:
         raise ValueError("review status must be ACCEPTED, REJECTED, or DUPLICATE")
-    if not reviewer_ref.strip():
-        raise ValueError("reviewer_ref is required")
     if item["review_status"] != "NEW":
         raise ValueError(f"feedback is already reviewed: {feedback_id}")
     stamp = timestamp(decided_at)
@@ -270,7 +272,7 @@ def link_regression(state: dict[str, Any] | None, feedback_id: str, fixture_id: 
     item = result["items"].get(feedback_id)
     if item is None or item.get("review_status") != "ACCEPTED":
         raise ValueError("only accepted feedback can link a regression fixture")
-    if not fixture_id.strip() or not reviewer_ref.strip():
+    if not isinstance(fixture_id, str) or not fixture_id.strip() or not isinstance(reviewer_ref, str) or not reviewer_ref.strip():
         raise ValueError("fixture_id and reviewer_ref are required")
     stamp = timestamp(linked_at)
     item["regression_fixture"] = {
