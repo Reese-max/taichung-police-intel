@@ -8,6 +8,7 @@ function QueryResult({ response }) {
   const results = Array.isArray(response.results) ? response.results : [];
   const sources = Array.isArray(response.sources) ? response.sources : [];
   const brief = response.brief;
+  const publicationReceipt = response.publication_receipt;
   const coverage = response.query_coverage;
   return (
     <div className="v2-query-result" role="status">
@@ -26,6 +27,11 @@ function QueryResult({ response }) {
       {brief && (
         <p>
           Brief 狀態：{brief.publication_status || "未提供"} · 快照變更 {brief.overview?.current_change_count || 0} 件
+        </p>
+      )}
+      {publicationReceipt && (
+        <p data-testid="publication-receipt">
+          發布收據：{publicationReceipt.publication_id} · {publicationReceipt.collection_status || "UNKNOWN"} / {publicationReceipt.publication_status || "UNKNOWN"} · {publicationReceipt.current_as_of_server_clock ? "目前可用" : "需注意新鮮度"}
         </p>
       )}
       {sources.length > 0 && (
@@ -118,6 +124,7 @@ export default function QueryGatewayPanel() {
       </form>
       <div className="v2-query-actions" aria-label="GovIntel 快速查詢">
         <button type="button" onClick={() => run("get_current_brief", {})} disabled={state === "loading"}>目前 Brief</button>
+        <button type="button" onClick={() => run("get_publication_receipt", {})} disabled={state === "loading"}>發布收據</button>
         <button type="button" onClick={() => run("get_source_health", {})} disabled={state === "loading"}>來源健康</button>
       </div>
       {state === "loading" && <p className="v2-query-message" role="status">正在核對公開快照……</p>}
