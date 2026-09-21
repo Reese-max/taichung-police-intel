@@ -22,6 +22,7 @@ Implemented in the existing PR #40, not a second query service. No production wi
 - Pagination cursor binds generation and filters; old cursors cannot silently page into a new snapshot. Date sorting compares instants, not timezone-bearing strings.
 - Projection hash detects accidental corruption. This is not authentication: only a server-controlled canonical artifact source may populate the index. Clients cannot supply their own evidence catalog or write truth through the query API.
 - Byte/row/input/result limits are explicit. Failed atomic swap preserves the previous complete index and cleans the temporary file.
+- HTTP `/mcp` rejects an explicit `Origin` unless it exactly matches the configured allow-origin; requests without `Origin` remain available for non-browser clients, and `*` never authorizes a browser origin.
 - Schema 2 is a disposable projection upgrade: rebuild from canonical files, do not mutate old canonical artifacts. No database migration is introduced.
 
 ## Actual local execution

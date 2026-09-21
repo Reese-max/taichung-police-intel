@@ -24,6 +24,7 @@ ANSWER_GATE_RUNNER = ROOT / "scripts" / "answer-gate-runner.mjs"
 MAX_REQUEST_BYTES = 64 * 1024
 MAX_RESPONSE_BYTES = 256 * 1024
 SERVER_VERSION = "query-gateway-v1"
+MCP_PROTOCOL_VERSION = "2025-06-18"
 DEFAULT_RATE_LIMIT = 60
 SOURCE_CATALOG = ROOT / "docs" / "govintel" / "source-catalog.v2.json"
 
@@ -699,7 +700,7 @@ def dispatch_mcp(gateway: QueryGateway, request: dict[str, Any]) -> dict[str, An
             "jsonrpc": "2.0",
             "id": request_id,
             "result": {
-                "protocolVersion": "2025-06-18",
+                "protocolVersion": MCP_PROTOCOL_VERSION,
                 "capabilities": {"tools": {"listChanged": False}},
                 "serverInfo": {"name": "govintel-query-gateway", "version": SERVER_VERSION},
             },
@@ -758,6 +759,8 @@ class GatewayHandler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
+        if urlsplit(self.path).path == "/mcp":
+            self.send_header("MCP-Protocol-Version", MCP_PROTOCOL_VERSION)
         allow_origin = getattr(self.server, "allow_origin", None)
         if allow_origin:
             self.send_header("Access-Control-Allow-Origin", allow_origin)
@@ -770,6 +773,19 @@ class GatewayHandler(BaseHTTPRequestHandler):
         if limiter is None or limiter.allow(self.client_address[0]):
             return True
         self._send(_error_payload(GatewayError("RATE_LIMITED", "request rate limit exceeded", 429)), 429)
+        return False
+
+    def _mcp_origin_allowed(self) -> bool:
+        origin = self.headers.get("Origin")
+        if not origin:
+            return True
+        allowed = getattr(self.server, "allow_origin", None)
+        return bool(allowed and allowed != "*" and origin == allowed)
+
+    def _require_mcp_origin(self) -> bool:
+        if self._mcp_origin_allowed():
+            return True
+        self._send(_error_payload(GatewayError("ORIGIN_NOT_ALLOWED", "MCP Origin is not allowed", 403)), 403)
         return False
 
     def _body(self) -> dict[str, Any]:
@@ -788,6 +804,8 @@ class GatewayHandler(BaseHTTPRequestHandler):
         return value
 
     def do_OPTIONS(self) -> None:
+        if urlsplit(self.path).path == "/mcp" and not self._require_mcp_origin():
+            return
         allow_origin = getattr(self.server, "allow_origin", None)
         self.send_response(204)
         if allow_origin:
@@ -818,6 +836,8 @@ class GatewayHandler(BaseHTTPRequestHandler):
         gateway = self.server.gateway
         path = urlsplit(self.path).path
         try:
+            if path == "/mcp" and not self._require_mcp_origin():
+                return
             body = self._body()
             if path == "/query":
                 tool = body.get("tool")

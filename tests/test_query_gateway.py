@@ -100,7 +100,7 @@ class QueryGatewayTests(unittest.TestCase):
     def setUpClass(cls):
         clock = lambda: datetime(2026, 9, 11, 9, 0, tzinfo=timezone.utc)
         cls.gateway = gateway_module.QueryGateway(clock=clock)
-        cls.server = gateway_module.build_server("127.0.0.1", 0, cls.gateway, "*")
+        cls.server = gateway_module.build_server("127.0.0.1", 0, cls.gateway, "http://allowed.example")
         cls.thread = Thread(target=cls.server.serve_forever, daemon=True)
         cls.thread.start()
         cls.base_url = f"http://127.0.0.1:{cls.server.server_port}"
@@ -112,13 +112,15 @@ class QueryGatewayTests(unittest.TestCase):
         cls.thread.join(timeout=5)
 
     @classmethod
-    def request(cls, method, path, payload=None):
+    def request(cls, method, path, payload=None, headers=None):
         data = None if payload is None else json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        request_headers = {"Content-Type": "application/json"} if data is not None else {}
+        request_headers.update(headers or {})
         request = Request(
             cls.base_url + path,
             data=data,
             method=method,
-            headers={"Content-Type": "application/json"} if data is not None else {},
+            headers=request_headers,
         )
         try:
             with urlopen(request, timeout=5) as response:
@@ -181,6 +183,27 @@ class QueryGatewayTests(unittest.TestCase):
         self.assertEqual([tool["name"] for tool in tools], list(gateway_module.CAPABILITIES))
         self.assertTrue(all(tool["annotations"]["readOnlyHint"] for tool in tools))
         self.assertTrue(all(tool["annotations"]["destructiveHint"] is False for tool in tools))
+
+    def test_mcp_rejects_unapproved_origin_and_advertises_protocol_version(self):
+        status, response = self.request(
+            "POST",
+            "/mcp",
+            {"jsonrpc": "2.0", "id": 4, "method": "tools/list"},
+            headers={"Origin": "https://evil.example"},
+        )
+        self.assertEqual(status, 403)
+        self.assertEqual(response["error"]["code"], "ORIGIN_NOT_ALLOWED")
+
+        request = Request(
+            self.base_url + "/mcp",
+            data=json.dumps({"jsonrpc": "2.0", "id": 5, "method": "initialize"}).encode("utf-8"),
+            method="POST",
+            headers={"Content-Type": "application/json", "Origin": "http://allowed.example"},
+        )
+        with urlopen(request, timeout=5) as allowed_response:
+            self.assertEqual(allowed_response.headers["MCP-Protocol-Version"], gateway_module.MCP_PROTOCOL_VERSION)
+            allowed = json.loads(allowed_response.read().decode("utf-8"))
+        self.assertEqual(allowed["result"]["protocolVersion"], gateway_module.MCP_PROTOCOL_VERSION)
 
     def test_argument_boundary_rejects_url_sql_and_bad_generation(self):
         for bad_arguments in ({"url": "https://example.invalid"}, {"sql": "select 1"}):
