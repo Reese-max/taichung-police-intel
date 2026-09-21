@@ -256,12 +256,18 @@ def verify_fact(document: dict[str, Any], body: bytes, fact: dict[str, Any]) -> 
     if raw_hash != document.get("raw_bytes_sha256") or raw_hash != fact.get("raw_bytes_sha256"):
         return {"status": "REJECTED", "reason": "RAW_HASH_MISMATCH", "fact_id": fact.get("fact_id")}
     text = normalized_text(body, document["content_type"])
-    if sha256(text) != fact.get("extracted_text_sha256"):
+    text_hash = sha256(text)
+    if text_hash != document.get("extracted_text_sha256") or text_hash != fact.get("extracted_text_sha256"):
         return {"status": "REJECTED", "reason": "TEXT_HASH_MISMATCH", "fact_id": fact.get("fact_id")}
     locator = fact.get("locator") or {}
+    if (
+        locator.get("document_sha256") != raw_hash
+        or locator.get("text_sha256") != text_hash
+    ):
+        return {"status": "REJECTED", "reason": "LOCATOR_HASH_MISMATCH", "fact_id": fact.get("fact_id")}
     if locator.get("type") == "HTML_TEXT_RANGE":
         actual = text[int(locator["start"]): int(locator["end"])]
-        valid = actual == locator.get("quote") and locator.get("text_sha256") == sha256(text)
+        valid = actual == locator.get("quote")
     elif locator.get("type") == "JSON_POINTER":
         valid = _pointer(json.loads(body.decode("utf-8")), locator.get("pointer", "")) == locator.get("raw_value")
     else:
