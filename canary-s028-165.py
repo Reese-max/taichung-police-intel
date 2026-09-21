@@ -223,7 +223,10 @@ def analyze_population(rows: list[dict]) -> dict:
 def roc_month_to_iso(value: str) -> str:
     if not re.fullmatch(r"\d{5}", value or ""):
         raise ValueError(f"無效民國年月：{value!r}")
-    year, month = int(value[:3]) + 1911, int(value[3:])
+    roc_year, month = int(value[:3]), int(value[3:])
+    if not 1 <= roc_year <= 289:
+        raise ValueError(f"無效民國年份：{value!r}")
+    year = roc_year + 1911
     if not 1 <= month <= 12:
         raise ValueError(f"無效月份：{value!r}")
     return f"{year:04d}-{month:02d}"
@@ -418,6 +421,12 @@ def self_check() -> None:
     assert resource_id("https://example.test/x?rid=abc") == "abc"
     assert resource_id("https://example.test/dataset/d/resource/r/download") == "r"
     assert roc_month_to_iso("11507") == "2026-07"
+    try:
+        roc_month_to_iso("00001")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("out-of-range ROC year must fail closed")
     assert rate_per_100k(1670, 2_868_465) == "58.22"
     crime_rows = [
         {"項目": CRIME_ITEM, "欄位名稱": f"{unit}_詐欺", "數值": "1", "資料時間日期": "2026-06-01T00:00:00", "資料週期": "月"}
