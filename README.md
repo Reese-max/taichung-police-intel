@@ -6,6 +6,20 @@ An evidence-first public-information monitor that helps police policy staff prep
 
 The demo compresses official Taichung council and government sources into one workflow: identify a priority issue, inspect source health and intelligence gaps, then jump to the exact official video timestamp. Chinese is the end-user language; the homepage toggle provides the complete English judge path.
 
+## Current GovIntel state (2026-09-21)
+
+| Area | State | Evidence boundary |
+|---|---|---|
+| Five-source council publication baseline | `PRODUCTION_ACTIVE` in the repository path | Checked-in source/status contracts pass; current public deployment is not verified here |
+| Shared source policy, query coverage, official document replay, Dashboard discovery adapter | `IMPLEMENTED_NOT_PRODUCTION` | Local deterministic tests and receipts; no scheduled activation or public deployment claim |
+| S-001/S-019/S-032/S-033 source expansion | `CANDIDATE_CANARY` | List-first adapters and fixtures exist; live seven-day promotion evidence remains open under #14/#22 |
+| PublicEvent fusion and NPA source matrix | `IMPLEMENTED_NOT_PRODUCTION` | Conservative core and offline fixtures; no live collector/UI write path |
+| Twinkle/public API overlay and full cross-agency real-time coverage | `DESIGN_ONLY` | Strategy and candidate metadata only; no automatic promotion |
+| Scheduled publication merge, natural MORNING/EVENING proof, current anonymous hash check | `BLOCKED` | #20 still needs normal review/merge and real production evidence |
+| Human task evaluation, adoption, award, and official submission receipt | `NOT_RUN` / `UNVERIFIED` | No scores or institutional adoption claims are populated |
+
+The current judge entry is [docs/govintel/competition-2026/README.md](./docs/govintel/competition-2026/README.md). Historical Kiro/prototype receipts remain below and are labelled as historical.
+
 ## Judge path
 
 1. Read the priority brief on the homepage.
@@ -14,7 +28,7 @@ The demo compresses official Taichung council and government sources into one wo
 4. Click a transcript segment or word to seek the official council video.
 5. Review `.kiro/` and [Kiro usage evidence](./docs/KIRO_USAGE.md).
 
-## Status
+## Historical prototype receipts (not current deployment evidence)
 
 | Deliverable | Current state |
 |---|---|
@@ -221,7 +235,10 @@ Authenticated Kiro V3 sessions first reviewed all 16 Steering, Spec, and Hook ar
 - Missing post-meeting evidence remains an explicit gap, not an AI inference.
 - Answer drafts pass `apps/web/lib/answer-evidence-gate.js` before release: every factual claim needs exact official evidence (locator + document version), conflicting official sources surface as `CONFLICT` instead of a merged answer, stale sources cannot back current wording, and media-derived records never verify a claim. The shared gate emits one receipt with the publication hash and validator version for both Web Chat and MCP.
 
-## Competition package
+## Historical Kiro competition package (2026-08)
+
+The following files describe the earlier Kiro competition submission path. They
+are preserved for provenance and are not the current GovIntel release status.
 
 - [Submission draft](./SUBMISSION.md)
 - [Three-minute demo script](./docs/DEMO_SCRIPT.md)

@@ -1,10 +1,37 @@
 # GovIntel AI｜內政黑客松交付與驗證入口
 
-更新：2026-09-16。本文是參賽準備與交付計畫，不是獲獎保證、報名回執或正式採用證明。
+更新：2026-09-21。本文是參賽準備與交付計畫，不是獲獎保證、報名回執或正式採用證明。
 
 **價值主張：讓承辦人知道跨機關公告改了什麼、哪份舊交班稿需要重核，並能回到原文確認。**
 
 沿用 [GovIntel 主計畫](../GOVINTEL_PLAN.md)。README 既有 Kiro 競賽證據屬歷史原型；不得把其八月截止日期、舊影片或舊試用當成本次比賽的規則與成果。當屆資格、報名期間、評分比重、既有作品認定及格式須取得官方原件確認，本頁不重複未重新驗證的數字。
+
+## 0. Current judge path（3–5 分鐘）
+
+1. 先看本頁的 current status 與 limitation，再看根目錄 README 的 evidence links。
+2. 在 checkout 重播三個核心 receipt：
+
+   ```powershell
+   python -X utf8 scripts/discovery-adapter.py self-check
+   python -X utf8 scripts/located-facts.py self-check
+   python -X utf8 scripts/verify-source-policy-integration.py --self-check
+   ```
+
+3. 執行 `npm --prefix apps/web run dev`，檢查首頁、source health、evidence drawer 與官方回查連結；若需完整工程驗收，再執行 `npm run check`。
+
+目前公開 Pages 的版本/hash 尚未在本 checkout 重新核對；本地 receipts、HTTP 200 或 CI 成功都不替代 deployment/public reachability/user validation。
+
+## 0.1 Current status snapshot
+
+| 能力 | 固定狀態 | 可重播證據 |
+|---|---|---|
+| 五個議會／市政正式來源基線 | `PRODUCTION_ACTIVE`（repository baseline） | `source-policy.json`、source status、既有 full gate |
+| Source Policy 跨 collector／Query Store／Health／UI | `IMPLEMENTED_NOT_PRODUCTION` | #49 receipt、`scripts/verify-source-policy-integration.py` |
+| 官方文件版本→located fact→evidence/PublicEvent input | `IMPLEMENTED_NOT_PRODUCTION` | #48 receipt、`scripts/located-facts.py` |
+| Taiwan Intel Dashboard discovery feed | `IMPLEMENTED_NOT_PRODUCTION` | #27 fixture、`scripts/discovery-adapter.py` |
+| S-001/S-019/S-032/S-033 擴源 | `CANDIDATE_CANARY` | #14/#22；尚缺完整 live canary/promotion |
+| 排程發布、晨晚自然 run、匿名版本/hash | `BLOCKED` | #20；需正常 review/merge 與正式環境證據 |
+| 真人成效／機關採用／得獎 | `NOT_RUN` / `UNVERIFIED` | `evaluation-manifest.template.json` 保持 null |
 
 ## 1. 這輪真的交付什麼
 
