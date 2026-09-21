@@ -14,6 +14,23 @@ class EntityRegistryTests(unittest.TestCase):
     def setUp(self):
         self.registry = er.load_registry()
 
+    @staticmethod
+    def small_registry():
+        return {
+            "schema_version": 1,
+            "registry_version": 1,
+            "updated_at": "2026-09-21",
+            "entities": [{
+                "entity_id": "location:demo",
+                "kind": "location",
+                "canonical_label": "甲路",
+                "aliases": ["乙路", "丙路"],
+                "jurisdiction": "臺中市",
+                "status": "CONFIRMED",
+                "evidence": "fixture:demo",
+            }],
+        }
+
     def test_core_police_aliases_resolve_to_one_id(self):
         ids = {
             er.resolve(self.registry, "agency", name, "臺中市")["entity_id"]
@@ -107,6 +124,73 @@ class EntityRegistryTests(unittest.TestCase):
         self.assertEqual(result["status"], "NO_MATCH")
         self.assertEqual(result["registry_version"], 1)
         self.assertEqual(result["registry_hash"], er.registry_hash(self.registry))
+
+    def test_manual_correction_keeps_alias_evidence_and_increments_identity(self):
+        changed = er.correct_alias(
+            self.registry,
+            "agency:tc-police",
+            "臺中警察局",
+            evidence="operator-note:alias-1",
+            operator="reviewer-1",
+            decided_at="2026-09-21T10:00:00+08:00",
+        )
+        self.assertEqual(changed["registry_version"], 2)
+        self.assertEqual(er.resolve(changed, "agency", "臺中警察局", "臺中市")["entity_id"], "agency:tc-police")
+        audit = changed["audit_history"][0]
+        self.assertEqual(audit["action"], "CORRECTION")
+        self.assertIn("臺中警察局", audit["payload"]["after"]["entity"]["aliases"])
+        er.validate_registry(changed)
+
+    def test_manual_merge_retires_source_but_keeps_full_before_snapshot(self):
+        registry = {
+            "schema_version": 1,
+            "registry_version": 4,
+            "entities": [
+                {"entity_id": "agency:a", "kind": "agency", "canonical_label": "甲局", "aliases": ["甲"], "jurisdiction": "臺中市", "status": "CONFIRMED", "evidence": "a"},
+                {"entity_id": "agency:b", "kind": "agency", "canonical_label": "乙局", "aliases": ["乙"], "jurisdiction": "臺中市", "status": "CONFIRMED", "evidence": "b"},
+            ],
+        }
+        changed = er.merge_entities(
+            registry,
+            "agency:a",
+            "agency:b",
+            evidence="operator-note:merge-1",
+            operator="reviewer-1",
+            decided_at="2026-09-21T10:01:00+08:00",
+        )
+        self.assertEqual(len(changed["entities"]), 1)
+        self.assertEqual(er.resolve(changed, "agency", "乙局", "臺中市")["entity_id"], "agency:a")
+        self.assertEqual(changed["audit_history"][0]["payload"]["before"]["source"]["evidence"], "b")
+
+    def test_manual_split_partitions_names_and_keeps_retired_snapshot(self):
+        registry = self.small_registry()
+        changed = er.split_entity(
+            registry,
+            "location:demo",
+            [
+                {"entity_id": "location:demo-a", "canonical_label": "甲路", "aliases": ["乙路"]},
+                {"entity_id": "location:demo-b", "canonical_label": "丙路", "aliases": []},
+            ],
+            evidence="operator-note:split-1",
+            operator="reviewer-1",
+            decided_at="2026-09-21T10:02:00+08:00",
+        )
+        self.assertEqual({item["entity_id"] for item in changed["entities"]}, {"location:demo-a", "location:demo-b"})
+        self.assertEqual(er.resolve(changed, "location", "乙路", "臺中市")["entity_id"], "location:demo-a")
+        self.assertEqual(changed["audit_history"][0]["payload"]["before"]["entity"]["entity_id"], "location:demo")
+
+    def test_tampered_manual_audit_fails_closed(self):
+        changed = er.correct_alias(
+            self.registry,
+            "agency:tc-police",
+            "臺中警察局",
+            evidence="operator-note:alias-2",
+            operator="reviewer-1",
+            decided_at="2026-09-21T10:00:00+08:00",
+        )
+        changed["audit_history"][0]["payload"]["evidence"] = "tampered"
+        with self.assertRaisesRegex(ValueError, "audit hash mismatch"):
+            er.validate_registry(changed)
 
 
 if __name__ == "__main__":
