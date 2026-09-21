@@ -1,0 +1,259 @@
+"""Deterministic, local-first Review Inbox state and audit operations."""
+
+from __future__ import annotations
+
+import copy
+import hashlib
+import json
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Iterable
+
+
+REVIEW_REASONS = frozenset(
+    {
+        "NEEDS_REVIEW",
+        "CONFLICT",
+        "DISCOVERY_UNVERIFIED",
+        "MERGE_CANDIDATE",
+        "SPLIT_REQUIRED",
+        "STALE_SOURCE",
+        "PARTIAL_SOURCE",
+    }
+)
+STATUSES = frozenset({"OPEN", "CLAIMED", "RESOLVED", "DISMISSED"})
+DECISIONS = frozenset({"CONFIRM", "MERGE", "SPLIT", "DISMISS", "KEEP_WATCHING", "RESOLVE", "CORRECT_MAPPING"})
+PRIORITIES = {
+    "CONFLICT": 100,
+    "SPLIT_REQUIRED": 100,
+    "NEEDS_REVIEW": 90,
+    "PARTIAL_SOURCE": 80,
+    "STALE_SOURCE": 70,
+    "DISCOVERY_UNVERIFIED": 60,
+    "MERGE_CANDIDATE": 50,
+}
+ACTIVE_STATUSES = frozenset({"OPEN", "CLAIMED"})
+TERMINAL_STATUSES = frozenset({"RESOLVED", "DISMISSED"})
+
+
+def canonical(value: Any) -> bytes:
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
+
+
+def sha256(value: Any) -> str:
+    return hashlib.sha256(value if isinstance(value, bytes) else canonical(value)).hexdigest()
+
+
+def timestamp(value: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise ValueError("timestamp is required")
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise ValueError("timestamp must be ISO-8601") from error
+    if parsed.tzinfo is None:
+        raise ValueError("timestamp must include timezone")
+    return parsed.isoformat(timespec="seconds")
+
+
+def empty_state() -> dict[str, Any]:
+    return {"schema_version": 1, "mode": "REVIEW_INBOX", "items": {}, "last_updated_at": None}
+
+
+def review_id_for(fingerprint: str) -> str:
+    if not isinstance(fingerprint, str) or not fingerprint.strip():
+        raise ValueError("review fingerprint is required")
+    return f"REVIEW-{sha256(fingerprint.strip().encode('utf-8')).upper()[:20]}"
+
+
+def _audit(item: dict[str, Any], action: str, at: str, payload: dict[str, Any]) -> dict[str, Any]:
+    sequence = len(item.get("audit", [])) + 1
+    material = {"review_id": item["review_id"], "sequence": sequence, "action": action, "at": at, "payload": payload}
+    return {"audit_id": f"AUDIT-{sha256(material).upper()[:20]}", **material}
+
+
+def validate_state(state: dict[str, Any]) -> dict[str, Any]:
+    if state.get("schema_version") != 1 or state.get("mode") != "REVIEW_INBOX":
+        raise ValueError("review state must use schema_version=1 and mode=REVIEW_INBOX")
+    items = state.get("items")
+    if not isinstance(items, dict):
+        raise ValueError("review items must be an object")
+    for review_id, item in items.items():
+        if not isinstance(item, dict) or item.get("review_id") != review_id:
+            raise ValueError("review IDs must be stable object keys")
+        if item.get("reason") not in REVIEW_REASONS or item.get("status") not in STATUSES:
+            raise ValueError(f"invalid review item: {review_id}")
+        if item.get("fingerprint") != str(item.get("fingerprint") or ""):
+            raise ValueError(f"review fingerprint is required: {review_id}")
+        timestamp(item.get("created_at"))
+        timestamp(item.get("updated_at"))
+        if not isinstance(item.get("entity_ids"), dict) or not isinstance(item.get("evidence"), dict):
+            raise ValueError(f"review item requires entity_ids and evidence: {review_id}")
+        if not isinstance(item.get("audit"), list) or not item["audit"]:
+            raise ValueError(f"review item requires audit history: {review_id}")
+    if state.get("last_updated_at") is not None:
+        timestamp(state["last_updated_at"])
+    return state
+
+
+def copy_state(state: dict[str, Any] | None) -> dict[str, Any]:
+    return validate_state(copy.deepcopy(state) if state is not None else empty_state())
+
+
+def load_state(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return empty_state()
+    return copy_state(json.loads(path.read_text(encoding="utf-8")))
+
+
+def _candidate(candidate: dict[str, Any], observed_at: str) -> dict[str, Any]:
+    if not isinstance(candidate, dict) or candidate.get("reason") not in REVIEW_REASONS:
+        raise ValueError("review candidate has an unsupported reason")
+    reason = candidate["reason"]
+    entity_ids = candidate.get("entity_ids") if isinstance(candidate.get("entity_ids"), dict) else {}
+    fingerprint = str(candidate.get("fingerprint") or sha256({"reason": reason, "entity_ids": entity_ids}))
+    evidence = copy.deepcopy(candidate.get("evidence") if isinstance(candidate.get("evidence"), dict) else {})
+    return {
+        "reason": reason,
+        "fingerprint": fingerprint,
+        "entity_ids": copy.deepcopy(entity_ids),
+        "evidence": evidence,
+        "observed_at": timestamp(str(candidate.get("observed_at") or observed_at)),
+        "source_version": candidate.get("source_version"),
+        "priority_reason": str(candidate.get("priority_reason") or f"{reason}_REQUIRES_HUMAN_REVIEW"),
+    }
+
+
+def upsert(state: dict[str, Any] | None, candidate: dict[str, Any], *, observed_at: str) -> tuple[dict[str, Any], dict[str, Any], bool]:
+    result = copy_state(state)
+    stamp = timestamp(observed_at)
+    value = _candidate(candidate, stamp)
+    review_id = review_id_for(value["fingerprint"])
+    evidence_hash = sha256(value["evidence"])
+    existing = result["items"].get(review_id)
+    if existing is None:
+        item = {
+            "review_id": review_id,
+            "fingerprint": value["fingerprint"],
+            "reason": value["reason"],
+            "status": "OPEN",
+            "priority": PRIORITIES[value["reason"]],
+            "priority_reason": value["priority_reason"],
+            "entity_ids": value["entity_ids"],
+            "evidence": value["evidence"],
+            "evidence_sha256": evidence_hash,
+            "source_version": value["source_version"],
+            "created_at": stamp,
+            "updated_at": stamp,
+            "assignment": {"state": "UNASSIGNED", "assignee_ref": None, "claimed_at": None},
+            "decision": None,
+            "evidence_history": [],
+            "audit": [],
+        }
+        item["audit"].append(_audit(item, "CREATED", stamp, {"reason": item["reason"], "evidence_sha256": evidence_hash}))
+        result["items"][review_id] = item
+        result["last_updated_at"] = stamp
+        return result, item, True
+
+    changed = existing.get("evidence_sha256") != evidence_hash or existing.get("source_version") != value["source_version"]
+    if changed:
+        old = {"evidence": existing.get("evidence"), "evidence_sha256": existing.get("evidence_sha256"), "source_version": existing.get("source_version")}
+        existing["evidence_history"].append({"observed_at": stamp, **old})
+        existing["evidence"] = value["evidence"]
+        existing["evidence_sha256"] = evidence_hash
+        existing["source_version"] = value["source_version"]
+        existing["entity_ids"] = value["entity_ids"] or existing["entity_ids"]
+        existing["updated_at"] = stamp
+        action = "REOPENED" if existing["status"] in TERMINAL_STATUSES else "UPDATED"
+        if action == "REOPENED":
+            existing["status"] = "OPEN"
+            existing["assignment"] = {"state": "UNASSIGNED", "assignee_ref": None, "claimed_at": None}
+            existing["decision"] = None
+        existing["audit"].append(_audit(existing, action, stamp, {"evidence_sha256": evidence_hash, "source_version": value["source_version"]}))
+        result["last_updated_at"] = stamp
+    return result, existing, changed
+
+
+def reconcile(state: dict[str, Any] | None, candidates: Iterable[dict[str, Any]], *, observed_at: str) -> dict[str, Any]:
+    result = copy_state(state)
+    for candidate in candidates:
+        result, _, _ = upsert(result, candidate, observed_at=observed_at)
+    return result
+
+
+def claim(state: dict[str, Any] | None, review_id: str, *, assignee_ref: str, claimed_at: str) -> dict[str, Any]:
+    result = copy_state(state)
+    item = result["items"].get(review_id)
+    if item is None:
+        raise ValueError(f"unknown review ID: {review_id}")
+    if not assignee_ref.strip():
+        raise ValueError("assignee_ref is required")
+    stamp = timestamp(claimed_at)
+    if item["status"] == "CLAIMED" and item["assignment"].get("assignee_ref") == assignee_ref:
+        return result
+    if item["status"] not in ACTIVE_STATUSES:
+        raise ValueError(f"review is not active: {review_id}")
+    item["status"] = "CLAIMED"
+    item["assignment"] = {"state": "CLAIMED", "assignee_ref": assignee_ref, "claimed_at": stamp}
+    item["updated_at"] = stamp
+    item["audit"].append(_audit(item, "CLAIMED", stamp, {"assignee_ref": assignee_ref}))
+    result["last_updated_at"] = stamp
+    return result
+
+
+def decide(state: dict[str, Any] | None, review_id: str, decision: str, *, reviewer_ref: str, decided_at: str, evidence: dict[str, Any] | None = None) -> dict[str, Any]:
+    result = copy_state(state)
+    item = result["items"].get(review_id)
+    decision = decision.upper().replace("-", "_")
+    if item is None:
+        raise ValueError(f"unknown review ID: {review_id}")
+    if decision not in DECISIONS:
+        raise ValueError(f"unsupported review decision: {decision}")
+    if not reviewer_ref.strip():
+        raise ValueError("reviewer_ref is required")
+    if item["status"] not in ACTIVE_STATUSES:
+        raise ValueError(f"review is not active: {review_id}")
+    stamp = timestamp(decided_at)
+    decision_evidence = copy.deepcopy(evidence or {})
+    outcome = "DISMISSED" if decision == "DISMISS" else "OPEN" if decision == "KEEP_WATCHING" else "RESOLVED"
+    item["status"] = outcome
+    item["decision"] = {
+        "decision": decision,
+        "reviewer_ref": reviewer_ref,
+        "decided_at": stamp,
+        "evidence": decision_evidence,
+        "evidence_sha256": sha256(decision_evidence),
+    }
+    item["assignment"] = {"state": "UNASSIGNED", "assignee_ref": None, "claimed_at": None}
+    item["updated_at"] = stamp
+    item["audit"].append(_audit(item, "DECISION", stamp, {"decision": decision, "reviewer_ref": reviewer_ref, "evidence_sha256": sha256(decision_evidence)}))
+    result["last_updated_at"] = stamp
+    return result
+
+
+def project(state: dict[str, Any] | None, *, include_closed: bool = False) -> list[dict[str, Any]]:
+    candidate = copy_state(state)
+    rows = [copy.deepcopy(item) for item in candidate["items"].values() if include_closed or item["status"] in ACTIVE_STATUSES]
+    rows.sort(key=lambda item: (-item["priority"], item["updated_at"], item["review_id"]))
+    return rows
+
+
+def schema_drift_candidates(receipt: dict[str, Any]) -> list[dict[str, Any]]:
+    rows = receipt.get("review_inbox", []) if isinstance(receipt, dict) else []
+    candidates = []
+    for row in rows:
+        if not isinstance(row, dict) or not row.get("source_id"):
+            continue
+        status = row.get("status")
+        reason = "PARTIAL_SOURCE" if status == "SOURCE_UNAVAILABLE" else "NEEDS_REVIEW"
+        candidates.append(
+            {
+                "fingerprint": f"schema-drift:{row['source_id']}",
+                "reason": reason,
+                "entity_ids": {"source_id": row["source_id"]},
+                "observed_at": row.get("observed_at") or receipt.get("generated_at"),
+                "evidence": {"before": row.get("last_known_good"), "after": {"status": status, "reasons": row.get("reasons", []), "observed_at": row.get("observed_at")}},
+                "priority_reason": "官方來源契約／可用性需要人工覆核",
+            }
+        )
+    return candidates

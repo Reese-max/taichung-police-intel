@@ -143,6 +143,8 @@ Source contract drift is fail-closed. `scripts/schema_drift.py` covers the three
 
 Schema replay uses the small registry in `scripts/migration_replay.py` (`1→2→3`). `dry-run` emits affected/error counts and hashes; `apply` writes only after all objects pass and saves a migration receipt; `replay` reuses `intel_v2` semantics so deterministic IDs and `FIRST_SEEN` wording remain stable. Watch/handoff inputs are copied unchanged and hash-bound. Query Store remains rebuildable from a pinned canonical generation with `python scripts/query-store.py build --feed ... --status ... --brief ...`.
 
+Review Inbox uses `intel_v2/review.py` and `scripts/review-inbox.py` for deterministic fingerprints, deduplication, claim/decision audit, source-version reopening, and bounded homepage projection. It accepts schema-drift candidates without auto-resolving missing or failed sources; the first version is local-first and does not add RBAC or notifications.
+
 ## Public deployment
 
 `.github/workflows/pages.yml` uses GitHub Pages and GitHub Actions:

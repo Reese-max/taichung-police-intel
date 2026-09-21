@@ -107,13 +107,13 @@ function SystemHealthSummary({ health }) {
             </li>
           ))}
         </ul>
-        <section className="v2-review-inbox" data-testid="v2-review-inbox" aria-label="來源契約 Review Inbox">
-          <strong>Review Inbox：{reviewItems.length} 件</strong>
+        <section className="v2-review-inbox" data-testid="v2-review-inbox" aria-label="Review Inbox">
+          <strong>Review Inbox：{health.review_inbox_total ?? reviewItems.length} 件</strong>
           {reviewItems.length > 0 ? (
             <ul>
               {reviewItems.slice(0, 5).map((item) => (
-                <li key={`${item.source_id}-${item.observed_at}`}>
-                  {item.source_id} · {item.status} · {(item.reasons || []).join(", ")}
+                <li key={item.review_id || `${item.source_id}-${item.observed_at}`}>
+                  {item.reason || item.status} · {item.entity_ids?.source_id || item.source_id || "UNKNOWN"} · {item.priority_reason || (item.reasons || []).join(", ")}
                 </li>
               ))}
             </ul>

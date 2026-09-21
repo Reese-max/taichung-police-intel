@@ -13,12 +13,19 @@ from datetime import datetime
 import importlib.util
 import json
 from pathlib import Path
+import sys
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from intel_v2.review import load_state as load_review_state, project as project_review_items
+
 DEFAULT_STATUS = ROOT / "apps/web/public/data/source-status.json"
 DEFAULT_BRIEF = ROOT / "apps/web/public/data/v2-daily-brief.json"
 DEFAULT_SCHEMA_DRIFT = ROOT / "apps/web/public/data/schema-drift.json"
+DEFAULT_REVIEW_STATE = ROOT / "state" / "review-inbox.json"
 SOURCE_POLICY = ROOT / "scripts/source-policy.py"
 VALID_OUTCOMES = {"SUCCESS", "FAILED", "PARTIAL", "STALE", "UNKNOWN", "SKIPPED"}
 VALID_LANES = {"publication", "query", "discovery"}
@@ -56,6 +63,13 @@ def load_schema_drift(path: Path = DEFAULT_SCHEMA_DRIFT) -> dict[str, Any] | Non
     except (OSError, json.JSONDecodeError):
         return None
     return payload if isinstance(payload, dict) else None
+
+
+def load_review_inbox(path: Path = DEFAULT_REVIEW_STATE) -> list[dict[str, Any]] | None:
+    try:
+        return project_review_items(load_review_state(path))
+    except (OSError, ValueError, json.JSONDecodeError):
+        return None
 
 
 def schema_contract_stage(receipt: dict[str, Any] | None) -> dict[str, Any]:
@@ -340,13 +354,15 @@ def load_current(status_path: Path = DEFAULT_STATUS, brief_path: Path = DEFAULT_
     except (OSError, ValueError, json.JSONDecodeError):
         policy = None
     schema_drift = load_schema_drift()
+    review_items = load_review_inbox()
     result = build_health(current_publication_stages(status, brief, policy, schema_drift))
     result["policy"] = policy_binding(policy) if policy else {"policy_status": "UNKNOWN"}
     result["schema_drift"] = {
         "overall": schema_drift.get("overall") if schema_drift else "UNKNOWN",
         "source_count": len(schema_drift.get("sources", [])) if schema_drift else 0,
     }
-    result["review_inbox"] = schema_drift.get("review_inbox", []) if schema_drift else []
+    result["review_inbox"] = review_items if review_items is not None else (schema_drift.get("review_inbox", []) if schema_drift else [])
+    result["review_inbox_total"] = len(result["review_inbox"])
     return result
 
 
