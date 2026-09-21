@@ -66,3 +66,20 @@ which is intentional: locator/evidence confirmation does not make an old
 publication current. The temporary confirmed bundle was not copied into the
 repository or deployed, and this replay is not a production human-approval or
 public-reachability receipt.
+
+## 2026-09-22 live recheck
+
+The same bounded `live` command was rerun read-only against the approved S-028
+HTML and JSON URLs. The JSON response remained reproducible: 2 facts and 2
+`FACT_CANDIDATE` evidence rows, raw SHA-256
+`94d57674e75896e14b34288f6b333e0816d4295d4e20bbbbcf9526bef1102b71`, and
+bundle SHA-256
+`96e70abd78dc0e2c239a58958066da00c49107df51644d13a81000e3f7aa112a`.
+
+The HTML response changed version: raw SHA-256
+`93d1a132b86c81dba37247748ea2bce13a68a29ed1f2fba78f28b4a19f657504`,
+document version `DOCV-93D1A132B86C81DBA372`, and bundle SHA-256
+`cc2c037e92f93044df7f05cce8794c231f1b71238c087f58094ce486b9313b2b`.
+Its single extracted fact remains `NEEDS_REVIEW`; the changed page therefore
+does not enter the trusted catalog automatically. This recheck is current
+source evidence only, not human review, publication, deployment, or promotion.
