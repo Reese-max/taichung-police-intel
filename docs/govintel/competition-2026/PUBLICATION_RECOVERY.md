@@ -17,6 +17,12 @@
   pushes and administrator bypass are disabled. The local
   `publication-state` candidate therefore remains unmerged and unverified in
   production.
+- The remote `publication-state` branch currently still points to
+  `e1d081bd04824c062c7ee99e7d74f9e478240743` and has no
+  `state/publication-checkpoint.json`; the remote `pages.yml` blob is still
+  `a5750eee7fdc87f56422c9dd484f54475eab5d4c`. The state branch's existing
+  legacy files therefore do not prove that the candidate checkpoint workflow
+  has run.
 
 ## 本地候選已改，仍須合併／正式執行驗證
 
