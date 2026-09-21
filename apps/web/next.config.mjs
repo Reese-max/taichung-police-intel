@@ -4,4 +4,7 @@ export default {
   output: "export",
   basePath,
   trailingSlash: true,
+  turbopack: {
+    root: process.cwd(),
+  },
 };
