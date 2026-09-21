@@ -229,6 +229,15 @@ class ServerTests(unittest.TestCase):
 
 
 class ReceiptGuardTests(unittest.TestCase):
+    def test_loopback_receipt_does_not_promote_formal_publication_stages(self):
+        modules = vc.load_checkout_modules(ROOT)
+        ctx = vc.build_candidate_context(ROOT, modules)
+        result = vc.build_health_receipt(ctx, [{"id": "loopback", "status": "PASS"}])
+        stages = {(row["lane"], row["stage"]): row for row in result["stages"]}
+        self.assertEqual(stages[("publication", "deployment")]["outcome"], "UNKNOWN")
+        self.assertEqual(stages[("publication", "public_http_verification")]["outcome"], "UNKNOWN")
+        self.assertNotEqual(result["lanes"]["publication"], "HEALTHY")
+
     def test_receipt_fails_with_any_failed_check(self):
         receipt = {"checks": [{"id": "a", "status": "PASS"}, {"id": "b", "status": "FAIL"}]}
         self.assertEqual(vc.finalize_status(receipt), "FAIL")

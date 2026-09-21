@@ -25,6 +25,10 @@ The latest local replay passed `21/21` checks, including:
 - real Chrome input, stale-status and publication-hash display, refresh generation stability, filtered archive results, and an official HTML link opening in a new browser page;
 - a temporary sabotaged checkout failing its own module-binding check.
 
+Loopback HTTP proves only the candidate query/static lane. It is recorded as a
+query-index success; formal `deployment` and `public_http_verification` stages
+remain `UNKNOWN` until a real deployment and anonymous public hash receipt exist.
+
 The companion Python contract suite has `22/22` tests. The verifier is local-only,
 uses a preserved checked-in snapshot, and does not write canonical or production
 state.

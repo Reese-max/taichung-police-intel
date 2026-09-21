@@ -296,24 +296,12 @@ def make_handler(ctx: dict[str, Any], serve_dir: Path):
             status_doc = ctx["artifacts"]["status"]
             brief = ctx["artifacts"]["brief"]
             stages = health.current_publication_stages(status_doc, brief)
-            stages = [s for s in stages if s["stage"] not in ("deployment", "public_http_verification", "query_index")]
+            stages = [s for s in stages if s["stage"] != "query_index"]
             try:
                 generation = served_store()["generation_id"]
             except Exception:
                 generation = None
             down = self._query_down() or generation is None
-            stages.append({
-                "lane": "publication", "stage": "deployment",
-                "outcome": "SUCCESS",
-                "generation_id": generation,
-                "detail": "LOOPBACK_HTTP_NOT_PUBLIC_DEPLOYMENT",
-            })
-            stages.append({
-                "lane": "publication", "stage": "public_http_verification",
-                "outcome": "SUCCESS" if not down else "UNKNOWN",
-                "generation_id": generation,
-                "detail": "LOOPBACK_HASH_VERIFIED" if not down else "QUERY_INDEX_UNREADABLE",
-            })
             stages.append({
                 "lane": "query", "stage": "query_index",
                 "outcome": "FAILED" if down else "SUCCESS",
@@ -666,18 +654,9 @@ def build_health_receipt(ctx: dict[str, Any], http_checks: list[dict[str, Any]] 
     status_doc = ctx["artifacts"]["status"]
     brief = ctx["artifacts"]["brief"]
     stages = health.current_publication_stages(status_doc, brief)
-    stages = [s for s in stages if s["stage"] not in ("deployment", "public_http_verification", "query_index", "mcp_web_query")]
-    verified = bool(http_checks) and all(c["status"] == "PASS" for c in http_checks)
+    stages = [s for s in stages if s["lane"] != "query"]
     now = utcnow().isoformat()
     stages += [
-        {"lane": "publication", "stage": "deployment",
-         "outcome": "SUCCESS" if http_checks is not None else "SKIPPED",
-         "generation_id": ctx["store"]["generation_id"], "ended_at": now,
-         "detail": "LOOPBACK_HTTP_NOT_PUBLIC_DEPLOYMENT"},
-        {"lane": "publication", "stage": "public_http_verification",
-         "outcome": "SUCCESS" if verified else ("FAILED" if http_checks is not None else "SKIPPED"),
-         "generation_id": ctx["store"]["generation_id"], "ended_at": now,
-         "detail": "LOOPBACK_HASH_AND_GENERATION_VERIFIED"},
         {"lane": "query", "stage": "query_index",
          "outcome": "SUCCESS" if http_checks is not None else "SKIPPED",
          "generation_id": ctx["store"]["generation_id"], "ended_at": now},
