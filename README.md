@@ -93,7 +93,7 @@ Requirements:
 
 - Node.js 20 or newer
 - Python 3.11 or newer
-- Git only for the scheduled evidence commit
+- Git for the scheduled publication-state checkpoint and local replay
 - Kiro CLI V3 only for reproducing the Kiro workflow
 
 Install dependencies:
@@ -186,11 +186,15 @@ The read-only Taiwan Intel Dashboard discovery consumer is replayable with `pyth
 
 `.github/workflows/pages.yml` uses GitHub Pages and GitHub Actions:
 
-- a push to `main` builds and deploys the checked-in snapshot;
+- a push to `main` restores the durable publication checkpoint, then builds and deploys the reviewed snapshot;
 - `30 22 * * *` UTC refreshes the morning slot at 06:30 Asia/Taipei;
 - `30 10 * * *` UTC refreshes the evening slot at 18:30 Asia/Taipei;
-- each scheduled run commits only `apps/web/public/data/source-status.json`, then deploys the static export;
+- the current candidate workflow persists the generated V1/V2 checkpoint to the dedicated `publication-state` branch, never directly to protected `main`, then deploys the same verified static artifact;
 - manual dispatch can refresh either slot.
+
+The `publication-state` workflow change is present in this checkout but remains
+unmerged; the remote `main` deployment is therefore not evidence that this
+candidate path is active.
 
 After the repository is public, enable Pages with **Source: GitHub Actions**. The deployed demo and repository URLs are recorded in [SUBMISSION.md](./SUBMISSION.md). A workflow file is not deployment evidence; acceptance requires an anonymous HTTPS check.
 
