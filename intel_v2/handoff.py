@@ -240,6 +240,112 @@ def sync_with_publication(
     return result
 
 
+def _detail_version(value: Any) -> dict[str, Any] | None:
+    if not isinstance(value, dict):
+        return None
+    keys = (
+        "document_version_id",
+        "body_sha256",
+        "normalized_text_sha256",
+        "attachments",
+        "published_at",
+        "source_modified_at",
+        "effective_at",
+        "expires_at",
+        "observed_at",
+        "last_checked_at",
+    )
+    return {key: value[key] for key in keys if key in value}
+
+
+def _detail_claims(
+    state: dict[str, Any],
+    identity: str,
+    before: dict[str, Any],
+) -> list[dict[str, Any]]:
+    document_version = before.get("document_version_id")
+    normalized_hash = before.get("normalized_text_sha256")
+    rows = []
+    for handoff in state["handoffs"]:
+        for entry in handoff["items"]:
+            if entry.get("identity") != identity:
+                continue
+            if document_version and entry.get("source_document_version") == document_version:
+                matched = True
+            elif normalized_hash and entry.get("source_sha256") == normalized_hash:
+                matched = True
+            else:
+                matched = False
+            if not matched:
+                continue
+            evidence = entry.get("evidence") if isinstance(entry.get("evidence"), dict) else {}
+            rows.append(
+                {
+                    "brief_id": handoff["brief_id"],
+                    "brief_version": handoff["brief_version"],
+                    "claim_id": entry.get("claim_id") or claim_id_for(identity, entry["source_version"]),
+                    "source_version": entry.get("source_version"),
+                    "source_document_version": entry.get("source_document_version"),
+                    "evidence_locator": evidence.get("locator"),
+                }
+            )
+    return sorted(rows, key=lambda row: (row["brief_version"], row["claim_id"]))
+
+
+def sync_with_detail_rechecks(
+    state: dict[str, Any] | None,
+    outcomes: Iterable[Any],
+    *,
+    observed_at: datetime | str,
+) -> dict[str, Any]:
+    """Invalidate only tracked handoff claims affected by a detail recheck."""
+    result = copy_state(state)
+    stamp = _timestamp(observed_at)
+    if not isinstance(outcomes, Iterable) or isinstance(outcomes, (str, bytes, dict)):
+        raise ValueError("detail rechecks must be an array")
+    for raw_outcome in outcomes:
+        outcome = _as_dict(raw_outcome)
+        classification = outcome.get("classification")
+        if not isinstance(classification, dict):
+            raise ValueError("detail recheck classification is required")
+        if not classification.get("review_required"):
+            continue
+        source_id = outcome.get("source_id")
+        stable_key = outcome.get("stable_key")
+        before = classification.get("before")
+        after = classification.get("after")
+        if not isinstance(source_id, str) or not source_id.strip() or not isinstance(stable_key, str) or not stable_key.strip():
+            raise ValueError("detail recheck identity is required")
+        if not isinstance(before, dict) or not isinstance(after, dict):
+            raise ValueError("detail recheck versions are required")
+        identity = f"{source_id}:{stable_key}"
+        watch = next((item for item in result["watch_items"].values() if item.get("identity") == identity), None)
+        if watch is None:
+            continue
+        after_version = after.get("document_version_id")
+        if not isinstance(after_version, str) or not after_version.strip():
+            raise ValueError("detail recheck after document version is required")
+        invalidation_id = "INV-" + _sha([watch["watch_id"], "DETAIL_RECHECK", after_version]).upper()[:20]
+        known = {entry.get("invalidation_id") for entry in watch["invalidations"]}
+        if invalidation_id not in known:
+            watch["invalidations"].append(
+                {
+                    "invalidation_id": invalidation_id,
+                    "event_id": outcome.get("event_id"),
+                    "reason": classification.get("status") or "DETAIL_RECHECK",
+                    "detected_at": classification.get("observed_at") or stamp,
+                    "changed_fields": list(classification.get("changed_fields") or []),
+                    "before": _detail_version(before),
+                    "after": _detail_version(after),
+                    "affected_claims": _detail_claims(result, identity, before),
+                }
+            )
+        watch["status"] = "NEEDS_REVIEW"
+        watch["updated_at"] = stamp
+    result["last_updated_at"] = stamp
+    return result
+
+
 def tracking_projection(
     state: dict[str, Any] | None,
     *,

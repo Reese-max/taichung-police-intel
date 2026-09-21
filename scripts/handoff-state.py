@@ -24,6 +24,7 @@ from intel_v2.handoff import (
     handoff_markdown,
     load_state,
     set_watch_status,
+    sync_with_detail_rechecks,
     sync_with_publication,
     tracking_projection,
 )
@@ -115,6 +116,20 @@ def command_status(args: argparse.Namespace) -> int:
         print(f"HANDOFF_STATUS active={len(active)} handoffs={len(state['handoffs'])}")
         for watch in sorted(active, key=lambda value: value["watch_id"]):
             print(f"{watch['watch_id']} status={watch['status']} identity={watch['identity']}")
+    return 0
+
+
+def command_recheck(args: argparse.Namespace) -> int:
+    state = load_state(args.handoff_state)
+    payload = load_json(args.detail_rechecks)
+    updated = sync_with_detail_rechecks(
+        state,
+        payload.get("detail_rechecks"),
+        observed_at=args.at or now(),
+    )
+    save_json(args.handoff_state, updated)
+    active = sum(item.get("status") in {"WATCHING", "NEEDS_REVIEW"} for item in updated["watch_items"].values())
+    print(f"HANDOFF_RECHECKED active={active} handoffs={len(updated['handoffs'])}")
     return 0
 
 
@@ -256,6 +271,11 @@ def parser() -> argparse.ArgumentParser:
     status = commands.add_parser("status")
     status.add_argument("--json", action="store_true")
     status.set_defaults(handler=command_status)
+
+    recheck = commands.add_parser("recheck")
+    recheck.add_argument("--detail-rechecks", type=Path, required=True)
+    recheck.add_argument("--at")
+    recheck.set_defaults(handler=command_recheck)
 
     for name, value in (("resolve", "RESOLVED"), ("dismiss", "DISMISSED")):
         command = commands.add_parser(name)

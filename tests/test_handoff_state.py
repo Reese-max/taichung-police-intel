@@ -9,6 +9,7 @@ from intel_v2.handoff import (
     empty_state,
     handoff_markdown,
     sync_with_publication,
+    sync_with_detail_rechecks,
     tracking_projection,
 )
 
@@ -87,6 +88,54 @@ class HandoffStateTests(unittest.TestCase):
             claim_id_for(item()["identity"], 1),
         )
         self.assertEqual(updated["handoffs"][0]["brief_id"], first_handoff["brief_id"])
+
+    def test_detail_recheck_reopens_only_matching_confirmed_claim(self):
+        current = dict(item(), document_version_id="DOCV-OLD")
+        state, watch, _ = add_watch(empty_state(), current, created_at=T0)
+        state, first_handoff = confirm_handoff(
+            state,
+            current_items={current["identity"]: current},
+            publication={"collection_run_id": "RUN-1"},
+            generated_at=T0,
+            confirmed_at=T0,
+        )
+        updated = sync_with_detail_rechecks(
+            state,
+            [{
+                "source_id": "S-001",
+                "stable_key": "event-1",
+                "classification": {
+                    "status": "MATERIAL_CHANGE",
+                    "review_required": True,
+                    "observed_at": T1,
+                    "changed_fields": ["effective_at"],
+                    "before": {"document_version_id": "DOCV-OLD", "normalized_text_sha256": "a" * 64},
+                    "after": {"document_version_id": "DOCV-NEW", "normalized_text_sha256": "b" * 64},
+                },
+            }],
+            observed_at=T1,
+        )
+        tracked = updated["watch_items"][watch["watch_id"]]
+        self.assertEqual(tracked["status"], "NEEDS_REVIEW")
+        self.assertEqual(len(tracked["invalidations"]), 1)
+        self.assertEqual(tracked["invalidations"][0]["affected_claims"][0]["brief_id"], first_handoff["brief_id"])
+        self.assertEqual(tracked["invalidations"][0]["affected_claims"][0]["source_document_version"], "DOCV-OLD")
+        rerun = sync_with_detail_rechecks(updated, [
+            {
+                "source_id": "S-001",
+                "stable_key": "event-1",
+                "classification": {
+                    "status": "MATERIAL_CHANGE",
+                    "review_required": True,
+                    "before": {"document_version_id": "DOCV-OLD"},
+                    "after": {"document_version_id": "DOCV-NEW"},
+                },
+            }
+        ], observed_at=T1)
+        self.assertEqual(
+            len(rerun["watch_items"][watch["watch_id"]]["invalidations"]),
+            len(tracked["invalidations"]),
+        )
 
     def test_failed_or_partial_source_does_not_resolve_watch(self):
         state, watch, _ = add_watch(empty_state(), item(), created_at=T0)
