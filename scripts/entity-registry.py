@@ -21,7 +21,8 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_REGISTRY = ROOT / "config/entity-registry.v1.json"
 ALLOWED_KINDS = {"agency", "location", "named_event"}
-MANUAL_ACTIONS = {"CORRECTION", "MERGE", "SPLIT"}
+MANUAL_ACTIONS = {"CORRECTION", "MERGE", "SPLIT", "REVERT"}
+REVERSIBLE_ACTIONS = {"CORRECTION", "MERGE", "SPLIT"}
 
 
 def normalize(value: str) -> str:
@@ -82,6 +83,11 @@ def _validate_audit_history(history: Any) -> None:
         _stamp(record.get("at"))
         if not isinstance(record.get("payload"), dict):
             raise ValueError("entity audit payload must be an object")
+        if record.get("action") == "REVERT":
+            before = record["payload"].get("before")
+            sequence = before.get("reverted_sequence") if isinstance(before, dict) else None
+            if type(sequence) is not int or sequence < 1 or sequence >= record["sequence"]:
+                raise ValueError("invalid entity revert sequence")
         if record.get("audit_id") != _audit_id(record):
             raise ValueError("entity audit hash mismatch")
 
@@ -151,6 +157,19 @@ def validate_registry(registry: dict[str, Any]) -> None:
             if previous and previous != entity_id:
                 raise ValueError(f"alias collision: {name!r} maps to {previous} and {entity_id}")
             alias_keys[key] = entity_id
+    redirects = registry.get("redirects", {})
+    if not isinstance(redirects, dict):
+        raise ValueError("redirects must be an object")
+    for retired_id, target_ids in redirects.items():
+        if not isinstance(retired_id, str) or not retired_id or retired_id in ids:
+            raise ValueError("redirect source must be a retired entity ID")
+        if (
+            not isinstance(target_ids, list)
+            or not target_ids
+            or any(not isinstance(target_id, str) or target_id not in ids for target_id in target_ids)
+            or len(target_ids) != len(set(target_ids))
+        ):
+            raise ValueError(f"redirect targets are invalid: {retired_id}")
 
 
 def _find_entity(registry: dict[str, Any], entity_id: str) -> dict[str, Any]:
@@ -250,7 +269,12 @@ def merge_entities(
         *copy.deepcopy(source.get("alias_evidence", [])),
     ]
     result["entities"] = [item for item in result["entities"] if item["entity_id"] != source_id]
-    after = {"target": copy.deepcopy(merged), "retired_entity": copy.deepcopy(source)}
+    result.setdefault("redirects", {})[source_id] = [target_id]
+    after = {
+        "target": copy.deepcopy(merged),
+        "retired_entity": copy.deepcopy(source),
+        "redirect_entity_ids": [target_id],
+    }
     return _manual_change(result, "MERGE", operator, decided_at, before, after, evidence)
 
 
@@ -270,6 +294,7 @@ def split_entity(
     assigned: list[str] = []
     children = []
     existing_ids = {item["entity_id"] for item in registry["entities"]}
+    existing_ids.update(registry.get("redirects", {}))
     for group in groups:
         if not isinstance(group, dict):
             raise ValueError("manual split groups must be objects")
@@ -298,8 +323,114 @@ def split_entity(
     result = copy.deepcopy(registry)
     before = {"entity": copy.deepcopy(entity)}
     result["entities"] = [item for item in result["entities"] if item["entity_id"] != entity_id] + children
-    after = {"children": copy.deepcopy(children), "retired_entity": copy.deepcopy(entity)}
+    result.setdefault("redirects", {})[entity_id] = [child["entity_id"] for child in children]
+    after = {
+        "children": copy.deepcopy(children),
+        "retired_entity": copy.deepcopy(entity),
+        "redirect_entity_ids": [child["entity_id"] for child in children],
+    }
     return _manual_change(result, "SPLIT", operator, decided_at, before, after, evidence)
+
+
+def _entity_map(entities: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    return {entity["entity_id"]: entity for entity in entities}
+
+
+def revert_manual_change(
+    registry: dict[str, Any],
+    audit_sequence: int,
+    *,
+    evidence: str,
+    operator: str,
+    decided_at: Any,
+) -> dict[str, Any]:
+    """Restore one reversible manual mapping while retaining the audit trail."""
+    validate_registry(registry)
+    if type(audit_sequence) is not int or audit_sequence < 1:
+        raise ValueError("audit_sequence must be a positive integer")
+    history = registry.get("audit_history", [])
+    record = next((item for item in history if item.get("sequence") == audit_sequence), None)
+    if not isinstance(record, dict) or record.get("action") not in REVERSIBLE_ACTIONS:
+        raise ValueError("audit sequence is not reversible")
+    payload = record["payload"]
+    before = payload.get("before")
+    after = payload.get("after")
+    if not isinstance(before, dict) or not isinstance(after, dict):
+        raise ValueError("reversible audit snapshot is invalid")
+
+    result = copy.deepcopy(registry)
+    current_by_id = _entity_map(result["entities"])
+    redirects = result.setdefault("redirects", {})
+    if record["action"] == "CORRECTION":
+        expected = after.get("entity")
+        restored = before.get("entity")
+        if not isinstance(expected, dict) or not isinstance(restored, dict):
+            raise ValueError("correction audit snapshot is invalid")
+        if current_by_id.get(expected.get("entity_id")) != expected:
+            raise ValueError("current registry no longer matches correction")
+        result["entities"] = [
+            restored if entity["entity_id"] == restored["entity_id"] else entity
+            for entity in result["entities"]
+        ]
+    elif record["action"] == "MERGE":
+        expected = after.get("target")
+        target = before.get("target")
+        source = before.get("source")
+        source_id = source.get("entity_id") if isinstance(source, dict) else None
+        if not isinstance(expected, dict) or not isinstance(target, dict) or not isinstance(source, dict):
+            raise ValueError("merge audit snapshot is invalid")
+        if current_by_id.get(expected.get("entity_id")) != expected or source_id in current_by_id:
+            raise ValueError("current registry no longer matches merge")
+        if redirects.get(source_id) != [expected["entity_id"]]:
+            raise ValueError("merge redirect is missing")
+        result["entities"] = [
+            target if entity["entity_id"] == target["entity_id"] else entity
+            for entity in result["entities"]
+        ] + [source]
+        redirects.pop(source_id, None)
+    else:
+        expected_children = after.get("children")
+        restored = before.get("entity")
+        if not isinstance(expected_children, list) or not isinstance(restored, dict):
+            raise ValueError("split audit snapshot is invalid")
+        child_ids = [child.get("entity_id") for child in expected_children if isinstance(child, dict)]
+        if len(child_ids) != len(expected_children) or any(current_by_id.get(child_id) != child for child_id, child in zip(child_ids, expected_children)):
+            raise ValueError("current registry no longer matches split")
+        if redirects.get(restored.get("entity_id")) != child_ids:
+            raise ValueError("split redirect is missing")
+        result["entities"] = [
+            entity for entity in result["entities"] if entity["entity_id"] not in child_ids
+        ] + [restored]
+        redirects.pop(restored["entity_id"], None)
+
+    return _manual_change(
+        result,
+        "REVERT",
+        operator,
+        decided_at,
+        {"reverted_sequence": audit_sequence, "current": copy.deepcopy(registry)},
+        {"restored": copy.deepcopy(result["entities"])},
+        evidence,
+    )
+
+
+def resolve_entity_id(registry: dict[str, Any], entity_id: str) -> dict[str, Any]:
+    """Resolve an active ID or return its explicit historical redirect."""
+    validate_registry(registry)
+    if not isinstance(entity_id, str) or not entity_id.strip():
+        raise ValueError("entity_id is required")
+    active = {entity["entity_id"] for entity in registry["entities"]}
+    if entity_id in active:
+        return {"status": "ACTIVE", "entity_id": entity_id, **registry_receipt(registry)}
+    targets = registry.get("redirects", {}).get(entity_id)
+    if targets:
+        return {
+            "status": "REDIRECT",
+            "entity_id": entity_id,
+            "redirect_entity_ids": list(targets),
+            **registry_receipt(registry),
+        }
+    return {"status": "NO_MATCH", "entity_id": entity_id, **registry_receipt(registry)}
 
 
 def build_index(registry: dict[str, Any]) -> dict[tuple[str, str, str, str], dict[str, Any]]:
@@ -389,6 +520,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--text")
     parser.add_argument("--jurisdiction")
     parser.add_argument("--event-date")
+    parser.add_argument("--entity-id")
     parser.add_argument("--self-check", action="store_true")
     return parser.parse_args()
 
@@ -420,8 +552,11 @@ def main() -> int:
     if args.self_check:
         self_check(registry)
         return 0
+    if args.entity_id:
+        print(json.dumps(resolve_entity_id(registry, args.entity_id), ensure_ascii=False, indent=2, sort_keys=True))
+        return 0
     if not args.kind or not args.text:
-        raise SystemExit("--kind and --text are required unless --self-check is used")
+        raise SystemExit("--kind and --text or --entity-id are required unless --self-check is used")
     print(json.dumps(resolve(registry, args.kind, args.text, args.jurisdiction, args.event_date), ensure_ascii=False, indent=2, sort_keys=True))
     return 0
 

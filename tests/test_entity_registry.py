@@ -196,6 +196,44 @@ class EntityRegistryTests(unittest.TestCase):
         self.assertEqual(len(changed["entities"]), 1)
         self.assertEqual(er.resolve(changed, "agency", "乙局", "臺中市")["entity_id"], "agency:a")
         self.assertEqual(changed["audit_history"][0]["payload"]["before"]["source"]["evidence"], "b")
+        self.assertEqual(er.resolve_entity_id(changed, "agency:b")["redirect_entity_ids"], ["agency:a"])
+
+    def test_manual_merge_redirect_can_be_reverted_without_losing_audit(self):
+        registry = {
+            "schema_version": 1,
+            "registry_version": 4,
+            "entities": [
+                {"entity_id": "agency:a", "kind": "agency", "canonical_label": "甲局", "aliases": [], "jurisdiction": "臺中市", "status": "CONFIRMED", "evidence": "a"},
+                {"entity_id": "agency:b", "kind": "agency", "canonical_label": "乙局", "aliases": [], "jurisdiction": "臺中市", "status": "CONFIRMED", "evidence": "b"},
+            ],
+        }
+        merged = er.merge_entities(
+            registry,
+            "agency:a",
+            "agency:b",
+            evidence="operator-note:merge-revert",
+            operator="reviewer-1",
+            decided_at="2026-09-21T10:01:00+08:00",
+        )
+        reverted = er.revert_manual_change(
+            merged,
+            1,
+            evidence="operator-note:revert-1",
+            operator="reviewer-1",
+            decided_at="2026-09-21T10:03:00+08:00",
+        )
+        self.assertEqual({item["entity_id"] for item in reverted["entities"]}, {"agency:a", "agency:b"})
+        self.assertEqual(er.resolve_entity_id(reverted, "agency:b")["status"], "ACTIVE")
+        self.assertEqual([item["action"] for item in reverted["audit_history"]], ["MERGE", "REVERT"])
+        with self.assertRaisesRegex(ValueError, "no longer matches merge"):
+            er.revert_manual_change(
+                reverted,
+                1,
+                evidence="operator-note:revert-twice",
+                operator="reviewer-1",
+                decided_at="2026-09-21T10:04:00+08:00",
+            )
+        er.validate_registry(reverted)
 
     def test_manual_split_partitions_names_and_keeps_retired_snapshot(self):
         registry = self.small_registry()
@@ -212,7 +250,20 @@ class EntityRegistryTests(unittest.TestCase):
         )
         self.assertEqual({item["entity_id"] for item in changed["entities"]}, {"location:demo-a", "location:demo-b"})
         self.assertEqual(er.resolve(changed, "location", "乙路", "臺中市")["entity_id"], "location:demo-a")
+        self.assertEqual(er.resolve_entity_id(changed, "location:demo")["redirect_entity_ids"], ["location:demo-a", "location:demo-b"])
         self.assertEqual(changed["audit_history"][0]["payload"]["before"]["entity"]["entity_id"], "location:demo")
+
+        reverted = er.revert_manual_change(
+            changed,
+            1,
+            evidence="operator-note:split-revert",
+            operator="reviewer-1",
+            decided_at="2026-09-21T10:04:00+08:00",
+        )
+        self.assertEqual({item["entity_id"] for item in reverted["entities"]}, {"location:demo"})
+        self.assertEqual(er.resolve_entity_id(reverted, "location:demo")["status"], "ACTIVE")
+        self.assertEqual(reverted["audit_history"][-1]["action"], "REVERT")
+        er.validate_registry(reverted)
 
     def test_tampered_manual_audit_fails_closed(self):
         changed = er.correct_alias(
