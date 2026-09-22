@@ -54,6 +54,14 @@ class MigrationReplayTests(unittest.TestCase):
                 mr.atomic_write(output, migrated)
             self.assertEqual(output.read_text(encoding="utf-8"), "sentinel\n")
 
+    def test_duplicate_migrated_identity_fails_closed(self):
+        invalid = bundle()
+        invalid["objects"]["PublicEvent"].append(dict(invalid["objects"]["PublicEvent"][0], raw_item_id="RI-2"))
+        migrated, report = mr.migrate_bundle(invalid)
+        self.assertIsNone(migrated)
+        self.assertEqual(report["error_count"], 1)
+        self.assertIn("duplicate PublicEvent identity", report["errors"][0]["error"])
+
     def test_replay_is_deterministic_and_keeps_first_seen_semantics(self):
         feed = {
             "schema_version": 1,

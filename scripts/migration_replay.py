@@ -145,6 +145,7 @@ def migrate_bundle(bundle: dict[str, Any], *, target_version: int = TARGET_SCHEM
             errors.append({"kind": kind, "index": None, "error": "objects value must be an array"})
             continue
         output_rows = []
+        seen_identities: set[str] = set()
         for index, item in enumerate(rows):
             try:
                 current = copy.deepcopy(item)
@@ -156,6 +157,10 @@ def migrate_bundle(bundle: dict[str, Any], *, target_version: int = TARGET_SCHEM
                     version += 1
                     affected += 1
                 validate_object(kind, current, target_version)
+                identity = current[IDENTITY_KEYS[kind]]
+                if identity in seen_identities:
+                    raise ValueError(f"duplicate {kind} identity: {identity}")
+                seen_identities.add(identity)
                 output_rows.append(current)
             except (TypeError, ValueError, KeyError) as error:
                 errors.append({"kind": kind, "index": index, "error": str(error)})
