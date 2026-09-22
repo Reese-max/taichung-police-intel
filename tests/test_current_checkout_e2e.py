@@ -5,6 +5,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 import urllib.error
 import urllib.request
@@ -31,6 +32,17 @@ def http_get(url):
 def http_json(url):
     status, body = http_get(url)
     return status, json.loads(body.decode("utf-8"))
+
+
+def unlink_after_http_release(path, attempts=100):
+    for attempt in range(attempts):
+        try:
+            path.unlink(missing_ok=True)
+            return
+        except PermissionError:
+            if attempt == attempts - 1:
+                raise
+            time.sleep(0.01)
 
 
 class IdentityTests(unittest.TestCase):
@@ -214,7 +226,7 @@ class ServerTests(unittest.TestCase):
             self.assertEqual(json.loads(body)["generation_id"], old_generation)
         finally:
             store_file.write_bytes(original)
-            archive.unlink(missing_ok=True)
+            unlink_after_http_release(archive)
 
     def test_query_down_keeps_static_readable(self):
         try:
