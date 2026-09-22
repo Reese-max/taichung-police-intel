@@ -1,10 +1,91 @@
 "use client";
 
 import { useState } from "react";
+import { FEEDBACK_REASONS } from "../lib/local-review.js";
 
 const ENDPOINT = process.env.NEXT_PUBLIC_QUERY_GATEWAY_URL || "/query";
+const FEEDBACK_REASON_LABELS = {
+  FALSE_MERGE: "誤合併",
+  MISSED_MERGE: "漏合併",
+  WRONG_ENTITY: "實體錯誤",
+  NOT_RELEVANT: "不相關",
+  MISSING_EVENT: "漏事件",
+  WRONG_CHANGE_CLASSIFICATION: "異動分類錯誤",
+  UNSUPPORTED_ANSWER: "回答缺少支持",
+  WRONG_STATISTIC_SCOPE: "統計範圍錯誤",
+  BAD_SOURCE_MAPPING: "來源 mapping 錯誤",
+};
 
-function QueryResult({ response }) {
+async function sha256Json(value) {
+  if (!globalThis.crypto?.subtle) throw new Error("瀏覽器不提供輸出 hash，未建立 feedback 草稿");
+  const bytes = new TextEncoder().encode(JSON.stringify(value));
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function gatewayFeedbackItem(response, targetType) {
+  const queryId = response?.query_id;
+  const version = response?.query_generation_id || response?.publication_id;
+  if (!queryId || !version) throw new Error("查詢收據缺少可驗證的版本 binding");
+  const outputHash = await sha256Json(response);
+  const answerHash = response.answer_evidence_receipt?.answer_sha256;
+  return {
+    review_id: `${targetType}-${queryId}`,
+    reason: "WRONG_CHANGE_CLASSIFICATION",
+    status: "OPEN",
+    source_version: String(version),
+    evidence_sha256: outputHash,
+    original_output_sha256: outputHash,
+    feedback_target: {
+      type: targetType,
+      id: targetType === "ANSWER" && answerHash ? answerHash : String(queryId),
+      version: String(version),
+    },
+    entity_ids: {
+      query_id: String(queryId),
+      publication_id: String(response.publication_id || ""),
+      publication_hash: String(response.publication_hash || ""),
+      output_sha256: outputHash,
+      ...(answerHash ? { answer_sha256: String(answerHash) } : {}),
+    },
+  };
+}
+
+function GatewayFeedbackForm({ response, targetType, onFeedback, disabled }) {
+  const [reason, setReason] = useState(targetType === "ANSWER" ? "UNSUPPORTED_ANSWER" : "NOT_RELEVANT");
+  const [state, setState] = useState("idle");
+  const [error, setError] = useState("");
+
+  async function submit(event) {
+    event.preventDefault();
+    setState("saving");
+    setError("");
+    try {
+      const saved = await onFeedback(await gatewayFeedbackItem(response, targetType), reason);
+      if (saved === false) throw new Error("本機覆核尚未載入，未建立 feedback 草稿");
+      setState("saved");
+    } catch (caught) {
+      setState("error");
+      setError(caught?.message || "未建立 feedback 草稿");
+    }
+  }
+
+  return (
+    <form className="v2-review-feedback v2-query-feedback" onSubmit={submit}>
+      <label>
+        <span>{targetType === "ANSWER" ? "回報回答" : "回報查詢"}</span>
+        <select value={reason} onChange={(event) => setReason(event.target.value)} disabled={disabled || state === "saving"}>
+          {FEEDBACK_REASONS.map((value) => <option key={value} value={value}>{FEEDBACK_REASON_LABELS[value] || value}</option>)}
+        </select>
+      </label>
+      <button type="submit" disabled={disabled || state === "saving"}>建立本機 feedback</button>
+      {state === "saved" && <small role="status">已建立本機 feedback 草稿。</small>}
+      {error && <small className="error" role="alert">{error}</small>}
+    </form>
+  );
+}
+
+function QueryResult({ response, onFeedback, feedbackReady }) {
   const results = Array.isArray(response.results) ? response.results : [];
   const sources = Array.isArray(response.sources) ? response.sources : [];
   const brief = response.brief;
@@ -62,11 +143,29 @@ function QueryResult({ response }) {
       {response.retention && (
         <small className="v2-query-receipt">公開投影：{response.retention.public_projection} · 權利狀態需審查</small>
       )}
+      {onFeedback && (
+        <div className="v2-query-feedback-list" aria-label="查詢 feedback">
+          <GatewayFeedbackForm
+            response={response}
+            targetType="QUERY"
+            onFeedback={onFeedback}
+            disabled={!feedbackReady}
+          />
+          {response.result_type === "answer_evidence" && (
+            <GatewayFeedbackForm
+              response={response}
+              targetType="ANSWER"
+              onFeedback={onFeedback}
+              disabled={!feedbackReady}
+            />
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-export default function QueryGatewayPanel() {
+export default function QueryGatewayPanel({ onFeedback, feedbackReady = false }) {
   const [query, setQuery] = useState("");
   const [response, setResponse] = useState(null);
   const [state, setState] = useState("idle");
@@ -129,7 +228,9 @@ export default function QueryGatewayPanel() {
       </div>
       {state === "loading" && <p className="v2-query-message" role="status">正在核對公開快照……</p>}
       {state === "error" && <p className="v2-query-message error" role="alert">{error}</p>}
-      {state === "ready" && response && <QueryResult response={response} />}
+      {state === "ready" && response && (
+        <QueryResult response={response} onFeedback={onFeedback} feedbackReady={feedbackReady} />
+      )}
     </section>
   );
 }

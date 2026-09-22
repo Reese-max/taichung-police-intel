@@ -723,7 +723,7 @@ export default function V2DailyDashboard() {
   const handleReviewFeedback = (item, reason) => {
     if (!localReview) {
       setReviewError("本機覆核尚未載入，未建立 feedback 草稿。");
-      return;
+      return false;
     }
     try {
       const next = addLocalReviewFeedback(localReview, item, reason);
@@ -731,8 +731,10 @@ export default function V2DailyDashboard() {
       setLocalReview(next);
       setReviewNotice(`已建立本機 feedback 草稿：${reason}。`);
       setReviewError("");
+      return true;
     } catch (error) {
       setReviewError(error.message);
+      return false;
     }
   };
 
@@ -798,7 +800,7 @@ export default function V2DailyDashboard() {
         )}
       </header>
 
-      <QueryGatewayPanel />
+      <QueryGatewayPanel onFeedback={handleReviewFeedback} feedbackReady={Boolean(localReview)} />
       <PublicEventFusionDemo />
 
       {loadState === "loading" && (

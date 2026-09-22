@@ -152,6 +152,8 @@
 .v2-query-result-list small { display: block; margin-top: 2px; }
 .v2-query-empty { color: #fcd34d !important; }
 .v2-query-receipt { display: block; margin-top: 12px; overflow-wrap: anywhere; }
+.v2-query-feedback-list { display: grid; gap: 8px; margin-top: 12px; }
+.v2-query-feedback small { color: var(--text-muted); }
 
 .v2-publication-status {
   display: flex;

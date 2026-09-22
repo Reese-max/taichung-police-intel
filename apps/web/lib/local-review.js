@@ -14,6 +14,11 @@ export const FEEDBACK_REASONS = [
 const LOCAL_STATUSES = new Set(["OPEN", "KEEP_WATCHING", "RESOLVED", "DISMISSED"]);
 const DECISIONS = new Set(["KEEP_WATCHING", "RESOLVED", "DISMISSED"]);
 const FEEDBACK_REASON_SET = new Set(FEEDBACK_REASONS);
+const FEEDBACK_TARGET_TYPES = new Set(["EVENT", "ENTITY", "QUERY", "ANSWER"]);
+
+function isSha256(value) {
+  return typeof value === "string" && /^[0-9a-f]{64}$/i.test(value);
+}
 
 function copy(value) {
   return JSON.parse(JSON.stringify(value));
@@ -32,7 +37,14 @@ function sourceVersion(item) {
 
 function publicItem(item) {
   if (!item || typeof item.review_id !== "string" || !item.review_id.trim()) return null;
-  if (typeof item.evidence_sha256 !== "string" || !/^[0-9a-f]{64}$/i.test(item.evidence_sha256)) return null;
+  if (!isSha256(item.evidence_sha256)) return null;
+  const target = item.feedback_target;
+  const validTarget = target
+    && FEEDBACK_TARGET_TYPES.has(target.type)
+    && typeof target.id === "string"
+    && target.id.trim()
+    && typeof target.version === "string"
+    && target.version.trim();
   return {
     review_id: item.review_id,
     reason: item.reason || "NEEDS_REVIEW",
@@ -40,6 +52,10 @@ function publicItem(item) {
     source_version: sourceVersion(item),
     evidence_sha256: item.evidence_sha256.toLowerCase(),
     entity_ids: item.entity_ids && typeof item.entity_ids === "object" ? copy(item.entity_ids) : {},
+    ...(validTarget ? { feedback_target: copy(target) } : {}),
+    ...(isSha256(item.original_output_sha256)
+      ? { original_output_sha256: item.original_output_sha256.toLowerCase() }
+      : {}),
   };
 }
 
@@ -155,6 +171,10 @@ export function validateLocalReview(value) {
       }, draft.reason)
       || !Array.isArray(draft.evidence_refs)
       || draft.evidence_refs.some((ref) => typeof ref !== "string")
+      || (draft.original_output_sha256 !== undefined
+        && (!isSha256(draft.original_output_sha256) || draft.original_output_sha256 !== binding.evidence_sha256))
+      || ((draft.target.type === "QUERY" || draft.target.type === "ANSWER")
+        && draft.original_output_sha256 !== binding.evidence_sha256)
     ) {
       throw new Error(`本機 feedback 無法驗證：${feedbackId}`);
     }
@@ -222,6 +242,16 @@ function feedbackIdFor(item, reason) {
 }
 
 function feedbackTarget(item) {
+  if (
+    item.feedback_target
+    && FEEDBACK_TARGET_TYPES.has(item.feedback_target.type)
+    && typeof item.feedback_target.id === "string"
+    && item.feedback_target.id
+    && typeof item.feedback_target.version === "string"
+    && item.feedback_target.version
+  ) {
+    return copy(item.feedback_target);
+  }
   const ids = item.entity_ids || {};
   const eventId = ids.public_event_id || ids.event_id;
   if (eventId) return { type: "EVENT", id: eventId, version: item.source_version };
@@ -234,7 +264,7 @@ export function addLocalReviewFeedback(state, item, reason, createdAt = new Date
   const current = publicItem(item);
   const local = current && result.items[current.review_id];
   const normalized = String(reason || "").toUpperCase().replace(/-/g, "_");
-  if (!current || !local || local.binding_id !== bindingId(current)) {
+  if (!current || (local && local.binding_id !== bindingId(current)) || (!local && !current.feedback_target)) {
     throw new Error("此 feedback 缺少可驗證的目前來源 binding");
   }
   if (!FEEDBACK_REASON_SET.has(normalized)) throw new Error(`不支援的 feedback reason：${reason}`);
@@ -254,6 +284,9 @@ export function addLocalReviewFeedback(state, item, reason, createdAt = new Date
       binding_id: bindingId(current),
     },
     binding_id: bindingId(current),
+    ...(current.original_output_sha256
+      ? { original_output_sha256: current.original_output_sha256 }
+      : {}),
     evidence_refs: Object.entries(current.entity_ids || {})
       .filter(([, value]) => typeof value === "string" && value)
       .map(([key, value]) => `${key}:${value}`),
@@ -333,6 +366,9 @@ function reviewMarkdown(state) {
         `- review_id: \`${draft.review_id}\``,
         `- reason: \`${draft.reason}\``,
         `- target: \`${draft.target.type}:${draft.target.id}@${draft.target.version}\``,
+        ...(draft.original_output_sha256
+          ? [`- original_output_sha256: \`${draft.original_output_sha256}\``]
+          : []),
         `- source binding: \`${draft.binding_id}\``,
         "",
       );

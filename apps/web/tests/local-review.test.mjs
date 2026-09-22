@@ -27,6 +27,20 @@ function item(version = 1, hash = "a".repeat(64)) {
   };
 }
 
+function gatewayItem(type, id) {
+  const hash = "c".repeat(64);
+  return {
+    review_id: `${type}-${id}`,
+    reason: "WRONG_CHANGE_CLASSIFICATION",
+    status: "OPEN",
+    source_version: "query-generation-1",
+    evidence_sha256: hash,
+    original_output_sha256: hash,
+    feedback_target: { type, id, version: "query-generation-1" },
+    entity_ids: { query_id: id, output_sha256: hash },
+  };
+}
+
 test("local review is deduplicated and a new evidence binding reopens it", () => {
   const first = syncLocalReview(emptyLocalReview(), [item()], T0);
   const same = syncLocalReview(first, [item()], T1);
@@ -58,6 +72,16 @@ test("review feedback drafts are deduplicated and stay bound to the reviewed eve
   assert.equal(drafts[0].target.type, "EVENT");
   assert.equal(drafts[0].source_binding.evidence_sha256, "a".repeat(64));
   assert.match(exportLocalReview(same, "markdown").content, /feedback drafts/);
+});
+
+test("gateway query and answer feedback drafts keep output hashes without a Review Inbox item", () => {
+  const query = addLocalReviewFeedback(emptyLocalReview(), gatewayItem("QUERY", "query-1"), "NOT_RELEVANT", T1);
+  const answer = addLocalReviewFeedback(query, gatewayItem("ANSWER", "answer-1"), "UNSUPPORTED_ANSWER", T1);
+  const drafts = Object.values(answer.feedback);
+  assert.deepEqual(drafts.map((draft) => draft.target.type).sort(), ["ANSWER", "QUERY"]);
+  assert.ok(drafts.every((draft) => draft.original_output_sha256 === "c".repeat(64)));
+  assert.match(exportLocalReview(answer, "markdown").content, /original_output_sha256/);
+  assert.doesNotThrow(() => validateLocalReview(answer));
 });
 
 test("local review storage round-trips and rejects an altered binding", () => {
