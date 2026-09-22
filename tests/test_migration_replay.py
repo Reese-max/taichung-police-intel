@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import tempfile
 import unittest
@@ -61,6 +62,17 @@ class MigrationReplayTests(unittest.TestCase):
         self.assertIsNone(migrated)
         self.assertEqual(report["error_count"], 1)
         self.assertIn("duplicate PublicEvent identity", report["errors"][0]["error"])
+
+    def test_dry_run_errors_return_nonzero_and_preserve_report(self):
+        invalid = bundle()
+        invalid["objects"]["PublicEvent"][0].pop("raw_item_id")
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "input.json"
+            report_path = Path(directory) / "report.json"
+            source.write_text(json.dumps(invalid), encoding="utf-8")
+            self.assertEqual(mr.main(["dry-run", "--input", str(source), "--output", str(report_path)]), 1)
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            self.assertEqual(report["error_count"], 1)
 
     def test_replay_is_deterministic_and_keeps_first_seen_semantics(self):
         feed = {

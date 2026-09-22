@@ -312,12 +312,14 @@ def main(argv: list[str] | None = None) -> int:
         migrated, report = migrate_bundle(payload)
         if args.command == "dry-run":
             atomic_write(args.output, report)
-        elif migrated is None:
+            status = "OK" if report["error_count"] == 0 else "FAILED"
+            print(f"MIGRATION_DRY_RUN_{status} errors={report['error_count']} affected={report['affected_count']} output={args.output}")
+            return 0 if report["error_count"] == 0 else 1
+        if migrated is None:
             raise ValueError(f"migration refused with {report['error_count']} errors; existing output was not changed")
-        else:
-            atomic_write(args.output, migrated)
-            report_path = args.output.with_name(f"{args.output.stem}.migration-receipt.json")
-            atomic_write(report_path, report)
+        atomic_write(args.output, migrated)
+        report_path = args.output.with_name(f"{args.output.stem}.migration-receipt.json")
+        atomic_write(report_path, report)
         print(f"MIGRATION_{args.command.upper().replace('-', '_')}_OK errors={report['error_count']} affected={report['affected_count']} output={args.output}")
         return 0
     replayed = replay_publication(payload)
