@@ -35,6 +35,7 @@ def binding(policy: dict[str, Any]) -> dict[str, Any]:
 def run_checks() -> dict[str, Any]:
     source_policy = load_module("source_policy_integration", "scripts/source-policy.py")
     query_store = load_module("query_store_integration", "scripts/query-store.py")
+    query_gateway = load_module("query_gateway_integration", "scripts/query-gateway.py")
     system_health = load_module("system_health_integration", "scripts/system-health.py")
     publication = load_module("publication_bundle_integration", "scripts/verify-publication-bundle.py")
     collect = load_module("collect_integration", "collect.py")
@@ -48,6 +49,8 @@ def run_checks() -> dict[str, Any]:
         "system_health": binding(system_health.load_current_policy()),
         "ui": None,
     }
+    gateway = query_gateway.QueryGateway()
+    projections["query_gateway"] = binding(gateway.store["policy"])
     ui_policy = json.loads((ROOT / "apps/web/public/data/source-policy.json").read_text(encoding="utf-8"))
     projections["ui"] = {key: ui_policy[key] for key in expected}
     if any(value != expected for value in projections.values()):
@@ -71,6 +74,9 @@ def run_checks() -> dict[str, Any]:
     query = query_store.query_store(old_store, text="議事", limit=1)
     if query["query_coverage"]["policy_hash"] != expected["policy_hash"]:
         raise ValueError("query coverage was not bound to current policy")
+    gateway_response = gateway.execute("get_source_health", {})
+    if gateway_response["query_coverage"]["policy_hash"] != expected["policy_hash"]:
+        raise ValueError("query gateway response was not bound to current policy")
     unsupported_query = query_store.query_store(old_store, capability_id="traffic_events", limit=1)
     if unsupported_query["query_coverage"]["status"] != "CAPABILITY_NOT_AVAILABLE":
         raise ValueError("unsupported query capability was not explicit")
