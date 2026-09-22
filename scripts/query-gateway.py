@@ -784,8 +784,21 @@ class QueryGateway:
 
     def _domain_scope(self, store: dict[str, Any], now: datetime) -> dict[str, Any]:
         scope = self._scope(now=now, capability_id="publication_metadata")
+        scope["data_status"] = "UNKNOWN"
+        scope["source_gaps"] = [
+            *scope["source_gaps"],
+            {
+                "source_id": None,
+                "reason": "DOMAIN_STORE_SOURCE_HEALTH_UNBOUND",
+                "domain_store_generation_id": store["generation_id"],
+            },
+        ]
         scope["query_coverage"] = {
             **scope["query_coverage"],
+            "can_state_bounded_no_match": False,
+            "domain_store_coverage_status": "UNVERIFIED",
+            "domain_store_freshness": "UNKNOWN",
+            "domain_store_source_health_bound": False,
             "domain_store_type": store["store_type"],
             "domain_store_generation_id": store["generation_id"],
             "domain_store_sha256": store["store_sha256"],

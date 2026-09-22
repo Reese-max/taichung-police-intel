@@ -10,6 +10,7 @@ The first read-only query slice is now wired through the shared Query Gateway:
 - The controlled answer renderer uses only the Gate's normalized, evaluated propositions; caller claim text and raw proposition whitespace are not rendered as verified output.
 - The current code and checked-in artifacts pass `npm run check`, including the HTTP/MCP parity suite and the stdio transport tests; the gateway also exposes the bounded publication receipt projection.
 - The gateway now has validated, read-only adapters for optional `PublicEvent` and typed-statistics stores. They are advertised only when an explicitly supplied store passes hash/schema validation; the checked-in publication snapshot does not contain either store, so the domain tools remain unavailable by default.
+- Optional domain-store responses do not inherit the publication snapshot's freshness or no-match guarantee: without a bound source-health receipt they report `freshness=UNKNOWN`, `domain_store_coverage_status=UNVERIFIED`, and keep bounded no-match disabled.
 - `scripts/build-query-domain.py build` now provides the bounded rebuild boundary for canonical domain inputs. It validates and atomically writes deterministic PublicEvent/statistics projections; the fixture-only dashboard demo is rejected and no domain store is enabled by default.
 
 This is still a local/code-only receipt. It is not a production deployment, anonymous public reachability proof, or completion of the later event, comparison, and statistics slices.

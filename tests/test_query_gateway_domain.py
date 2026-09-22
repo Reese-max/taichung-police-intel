@@ -84,6 +84,10 @@ class QueryGatewayDomainTests(unittest.TestCase):
         self.assertEqual(query["event_ids"], mcp["result"]["structuredContent"]["event_ids"])
         self.assertEqual(query["events"], mcp["result"]["structuredContent"]["events"])
         self.assertEqual(query["domain_query_generation_id"], mcp["result"]["structuredContent"]["domain_query_generation_id"])
+        self.assertEqual(query["freshness"], "UNKNOWN")
+        self.assertEqual(query["query_coverage"]["domain_store_coverage_status"], "UNVERIFIED")
+        self.assertFalse(query["query_coverage"]["can_state_bounded_no_match"])
+        self.assertIn("DOMAIN_STORE_SOURCE_HEALTH_UNBOUND", {gap["reason"] for gap in query["source_gaps"]})
 
     def test_get_event_and_statistics_keep_receipts_and_typed_fields(self):
         event_result = self.gateway.execute("get_event", {"event_id": "PE-DOMAIN-1"})
