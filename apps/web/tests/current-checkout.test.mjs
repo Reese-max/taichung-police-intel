@@ -8,6 +8,7 @@ import test from "node:test";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, "../../..");
 const component = path.resolve(here, "../components/V2DailyDashboard.js");
+const skipDirtyFixtureRuntime = process.env.GOVINTEL_SKIP_DIRTY_FIXTURE_RUNTIME === "1";
 
 function python() {
   for (const candidate of process.platform === "win32" ? ["python", "py"] : ["python3", "python"]) {
@@ -17,7 +18,11 @@ function python() {
   throw new Error("Python is required for the current-checkout bridge");
 }
 
-test("current-checkout runtime contract passes", () => {
+test("current-checkout runtime contract passes", {
+  skip: skipDirtyFixtureRuntime
+    ? "fixture regression intentionally dirties tracked publication files"
+    : false,
+}, () => {
   const result = spawnSync(python(), ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_current_checkout_e2e.py", "-v"], {
     cwd: repo,
     encoding: "utf8",
