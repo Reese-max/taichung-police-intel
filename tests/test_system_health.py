@@ -130,6 +130,28 @@ class SystemHealthTests(unittest.TestCase):
                 )
                 self.assertEqual(collection["outcome"], expected)
 
+    def test_collection_keeps_last_known_success_when_current_sources_are_stale(self):
+        status = json.loads(health.DEFAULT_STATUS.read_text(encoding="utf-8"))
+        brief = json.loads(health.DEFAULT_BRIEF.read_text(encoding="utf-8"))
+        for source in status["sources"]:
+            source["freshness_status"] = "STALE"
+        collection = next(
+            row for row in health.current_publication_stages(status, brief)
+            if row["stage"] == "collection"
+        )
+        self.assertEqual(collection["outcome"], "STALE")
+        self.assertEqual(collection["last_success_at"], "2026-09-11T08:23:26+08:00")
+
+    def test_collection_last_success_stays_unknown_when_any_source_lacks_it(self):
+        status = json.loads(health.DEFAULT_STATUS.read_text(encoding="utf-8"))
+        brief = json.loads(health.DEFAULT_BRIEF.read_text(encoding="utf-8"))
+        status["sources"][0].pop("last_success_at", None)
+        collection = next(
+            row for row in health.current_publication_stages(status, brief)
+            if row["stage"] == "collection"
+        )
+        self.assertIsNone(collection["last_success_at"])
+
     def test_stale_source_cannot_become_healthy_with_complete_publication_receipt(self):
         status = json.loads(health.DEFAULT_STATUS.read_text(encoding="utf-8"))
         brief = json.loads(health.DEFAULT_BRIEF.read_text(encoding="utf-8"))

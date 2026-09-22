@@ -131,7 +131,7 @@
       "error_class": "SOURCE_FRESHNESS_STALE",
       "generation_id": "CR-DEMO-20260911-MORNING-SCHEDULE",
       "lane": "publication",
-      "last_success_at": null,
+      "last_success_at": "2026-09-11T08:23:26+08:00",
       "outcome": "STALE",
       "policy_hash": "1387c7e5a15c2fc0a07b6881b0ee40f70e789fcbe01862d9834bfe9b079464d5",
       "policy_version": 1,

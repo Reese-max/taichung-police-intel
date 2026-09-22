@@ -293,6 +293,14 @@ def _source_coverage(sources: Any, required_source_ids: set[str]) -> tuple[list[
     return sources, exact
 
 
+def aggregate_last_success_at(sources: list[dict[str, Any]]) -> str | None:
+    values = [source.get("last_success_at") for source in sources]
+    parsed = [parse_time(value) for value in values]
+    if not sources or any(value is None for value in parsed):
+        return None
+    return values[parsed.index(min(parsed))]
+
+
 def current_publication_stages(
     status: dict[str, Any],
     brief: dict[str, Any],
@@ -345,6 +353,9 @@ def current_publication_stages(
     else:
         collect_outcome = "UNKNOWN"
         collect_error = "COLLECTION_RECEIPT_INCOMPLETE"
+    collection_last_success_at = aggregate_last_success_at(sources)
+    if collection_last_success_at is None and collect_outcome == "SUCCESS":
+        collection_last_success_at = generated_at
 
     publication_status = brief.get("publication_status")
     snapshot_complete = brief.get("snapshot_complete") is True
@@ -372,7 +383,7 @@ def current_publication_stages(
             "outcome": collect_outcome,
             "generation_id": run_id,
             "ended_at": generated_at,
-            "last_success_at": generated_at if collect_outcome == "SUCCESS" else None,
+            "last_success_at": collection_last_success_at,
             "error_class": collect_error,
             **binding,
         },
