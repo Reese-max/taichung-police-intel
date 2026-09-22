@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import argparse
 import copy
-from datetime import datetime
+from datetime import date, datetime
 import hashlib
 import json
 from pathlib import Path
@@ -52,6 +52,15 @@ def _stamp(value: Any) -> str:
     if parsed.tzinfo is None:
         raise ValueError("decided_at must be a timezone-aware timestamp")
     return parsed.isoformat(timespec="seconds")
+
+
+def _event_date(value: Any) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError("named_event event_date must be an ISO date")
+    try:
+        return date.fromisoformat(value).isoformat()
+    except ValueError as error:
+        raise ValueError("named_event event_date must be an ISO date") from error
 
 
 def _audit_id(record: dict[str, Any]) -> str:
@@ -103,6 +112,7 @@ def validate_registry(registry: dict[str, Any]) -> None:
         jurisdiction = entity.get("jurisdiction") or ""
         status = entity.get("status")
         aliases = entity.get("aliases", [])
+        event_date = entity.get("event_date")
         if not isinstance(entity_id, str) or not entity_id:
             raise ValueError("entity_id missing")
         if entity_id in ids:
@@ -116,6 +126,10 @@ def validate_registry(registry: dict[str, Any]) -> None:
             raise ValueError(f"jurisdiction must be a string: {entity_id}")
         if status != "CONFIRMED":
             raise ValueError(f"unconfirmed entity cannot enter canonical registry: {entity_id}")
+        if kind == "named_event":
+            event_date = _event_date(event_date)
+        elif event_date is not None:
+            raise ValueError(f"event_date is only valid for named_event: {entity_id}")
         if not isinstance(aliases, list):
             raise ValueError(f"aliases must be an array of strings: {entity_id}")
         if any(not isinstance(alias, str) or not alias.strip() for alias in aliases):
@@ -132,7 +146,7 @@ def validate_registry(registry: dict[str, Any]) -> None:
             raise ValueError(f"alias_evidence must contain alias/evidence objects: {entity_id}")
         names = [label, *aliases]
         for name in names:
-            key = (kind, normalize(jurisdiction), normalize(name))
+            key = (kind, normalize(jurisdiction), event_date or "", normalize(name))
             previous = alias_keys.get(key)
             if previous and previous != entity_id:
                 raise ValueError(f"alias collision: {name!r} maps to {previous} and {entity_id}")
@@ -288,13 +302,14 @@ def split_entity(
     return _manual_change(result, "SPLIT", operator, decided_at, before, after, evidence)
 
 
-def build_index(registry: dict[str, Any]) -> dict[tuple[str, str, str], dict[str, Any]]:
+def build_index(registry: dict[str, Any]) -> dict[tuple[str, str, str, str], dict[str, Any]]:
     validate_registry(registry)
-    index: dict[tuple[str, str, str], dict[str, Any]] = {}
+    index: dict[tuple[str, str, str, str], dict[str, Any]] = {}
     for entity in registry["entities"]:
         jurisdiction = normalize(entity.get("jurisdiction") or "")
+        event_date = _event_date(entity.get("event_date")) if entity["kind"] == "named_event" else ""
         for name in [entity["canonical_label"], *entity.get("aliases", [])]:
-            index[(entity["kind"], jurisdiction, normalize(name))] = entity
+            index[(entity["kind"], jurisdiction, event_date, normalize(name))] = entity
     return index
 
 
@@ -308,26 +323,38 @@ def no_match(registry: dict[str, Any], kind: str, text: str, jurisdiction: str |
     }
 
 
-def resolve(registry: dict[str, Any], kind: str, text: str, jurisdiction: str | None = None) -> dict[str, Any]:
+def resolve(
+    registry: dict[str, Any],
+    kind: str,
+    text: str,
+    jurisdiction: str | None = None,
+    event_date: str | None = None,
+) -> dict[str, Any]:
     if kind not in ALLOWED_KINDS:
         raise ValueError(f"unsupported kind: {kind}")
     if not isinstance(text, str) or not text.strip():
         raise ValueError("query text must be a non-empty string")
     if jurisdiction is not None and (not isinstance(jurisdiction, str) or not jurisdiction.strip()):
         raise ValueError("jurisdiction must be a non-empty string when provided")
+    if event_date is not None:
+        if kind != "named_event":
+            raise ValueError("event_date is only valid for named_event")
+        event_date = _event_date(event_date)
     query = normalize(text)
     jurisdiction_norm = normalize(jurisdiction or "")
     index = build_index(registry)
 
-    if jurisdiction is not None:
-        entity = index.get((kind, jurisdiction_norm, query))
+    if jurisdiction is not None and not (kind == "named_event" and event_date is None):
+        entity = index.get((kind, jurisdiction_norm, event_date or "", query))
         if entity:
             return _resolved(entity, registry)
         return no_match(registry, kind, text, jurisdiction)
 
     matches: dict[str, dict[str, Any]] = {}
-    for (entry_kind, _entry_jurisdiction, alias), entity in index.items():
-        if entry_kind == kind and alias == query:
+    for (entry_kind, entry_jurisdiction, entry_date, alias), entity in index.items():
+        if (entry_kind == kind and alias == query
+                and (jurisdiction is None or entry_jurisdiction == jurisdiction_norm)
+                and (event_date is None or entry_date == event_date)):
             matches[entity["entity_id"]] = entity
     if len(matches) == 1:
         return _resolved(next(iter(matches.values())), registry)
@@ -349,8 +376,9 @@ def _resolved(entity: dict[str, Any], registry: dict[str, Any]) -> dict[str, Any
         "kind": entity["kind"],
         "canonical_label": entity["canonical_label"],
         "jurisdiction": entity.get("jurisdiction"),
+        **({"event_date": entity["event_date"]} if entity.get("event_date") else {}),
         **registry_receipt(registry),
-        "match_method": "EXACT_NORMALIZED_ALIAS",
+        "match_method": "EXACT_NORMALIZED_ALIAS_AND_DATE" if entity.get("event_date") else "EXACT_NORMALIZED_ALIAS",
     }
 
 
@@ -360,6 +388,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--kind", choices=sorted(ALLOWED_KINDS))
     parser.add_argument("--text")
     parser.add_argument("--jurisdiction")
+    parser.add_argument("--event-date")
     parser.add_argument("--self-check", action="store_true")
     return parser.parse_args()
 
@@ -393,7 +422,7 @@ def main() -> int:
         return 0
     if not args.kind or not args.text:
         raise SystemExit("--kind and --text are required unless --self-check is used")
-    print(json.dumps(resolve(registry, args.kind, args.text, args.jurisdiction), ensure_ascii=False, indent=2, sort_keys=True))
+    print(json.dumps(resolve(registry, args.kind, args.text, args.jurisdiction, args.event_date), ensure_ascii=False, indent=2, sort_keys=True))
     return 0
 
 

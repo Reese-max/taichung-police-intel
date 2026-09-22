@@ -125,6 +125,41 @@ class EntityRegistryTests(unittest.TestCase):
         self.assertEqual(result["registry_version"], 1)
         self.assertEqual(result["registry_hash"], er.registry_hash(self.registry))
 
+    def test_same_named_event_on_different_dates_never_shares_identity(self):
+        registry = {
+            "schema_version": 1,
+            "registry_version": 2,
+            "entities": [
+                {"entity_id": "named_event:a", "kind": "named_event", "canonical_label": "市政論壇", "aliases": [], "jurisdiction": "臺中市", "event_date": "2026-09-21", "status": "CONFIRMED"},
+                {"entity_id": "named_event:b", "kind": "named_event", "canonical_label": "市政論壇", "aliases": [], "jurisdiction": "臺中市", "event_date": "2026-09-22", "status": "CONFIRMED"},
+            ],
+        }
+        self.assertEqual(er.resolve(registry, "named_event", "市政論壇", "臺中市")["status"], "AMBIGUOUS")
+        self.assertEqual(
+            er.resolve(registry, "named_event", "市政論壇", "臺中市", "2026-09-21")["entity_id"],
+            "named_event:a",
+        )
+        self.assertEqual(
+            er.resolve(registry, "named_event", "市政論壇", "臺中市", "2026-09-23")["status"],
+            "NO_MATCH",
+        )
+
+    def test_named_event_requires_an_iso_date(self):
+        registry = {
+            "schema_version": 1,
+            "registry_version": 1,
+            "entities": [{
+                "entity_id": "named_event:missing-date",
+                "kind": "named_event",
+                "canonical_label": "市政論壇",
+                "aliases": [],
+                "jurisdiction": "臺中市",
+                "status": "CONFIRMED",
+            }],
+        }
+        with self.assertRaisesRegex(ValueError, "event_date"):
+            er.validate_registry(registry)
+
     def test_manual_correction_keeps_alias_evidence_and_increments_identity(self):
         changed = er.correct_alias(
             self.registry,
