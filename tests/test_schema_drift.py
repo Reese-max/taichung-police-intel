@@ -161,6 +161,22 @@ class SchemaDriftTests(unittest.TestCase):
         result = drift.observe(drift.CONTRACTS["S-028"], "[]", content_type="application/json", resource_id="r1")
         self.assertEqual(result["status"], "CONTENT_SHAPE_UNKNOWN")
         self.assertEqual(result["window_completeness"], "PARTIAL")
+        self.assertTrue(result["review_required"])
+
+    def test_unparseable_or_wrong_content_requires_review_with_fingerprint(self):
+        invalid_json = drift.observe(
+            drift.CONTRACTS["S-007"], b"not-json", content_type="application/json"
+        )
+        self.assertEqual(invalid_json["status"], "CONTENT_SHAPE_UNKNOWN")
+        self.assertTrue(invalid_json["review_required"])
+        self.assertRegex(invalid_json["observed_schema_fingerprint"], r"^[0-9a-f]{64}$")
+
+        wrong_content = drift.observe(
+            drift.CONTRACTS["S-007"], b"<html />", content_type="text/html"
+        )
+        self.assertEqual(wrong_content["status"], "CONTENT_SHAPE_UNKNOWN")
+        self.assertTrue(wrong_content["review_required"])
+        self.assertIn("CONTENT_TYPE_MISMATCH", wrong_content["reasons"])
 
     def test_lkg_and_fingerprint_history_survive_a_break(self):
         good = drift.observe(drift.CONTRACTS["S-007"], json.dumps(API), content_type="application/json")

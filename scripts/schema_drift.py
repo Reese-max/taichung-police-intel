@@ -252,7 +252,7 @@ def _finish(result: dict[str, Any], signature: Any, status: str, reasons: list[s
     result["observed_schema_fingerprint"] = canonical_hash(signature)
     result["status"] = status
     result["reasons"] = sorted(set(reasons))
-    result["review_required"] = status in {"BREAKING_DRIFT", "SOURCE_UNAVAILABLE"} or bool(result.get("resource_id_changed"))
+    result["review_required"] = status in {"BREAKING_DRIFT", "CONTENT_SHAPE_UNKNOWN", "SOURCE_UNAVAILABLE"} or bool(result.get("resource_id_changed"))
     if status in GOOD_STATUSES:
         result["window_completeness"] = "COMPLETE_WITH_ITEMS"
         result["source_health"] = "PASS"
@@ -304,8 +304,12 @@ def observe(
         result["review_required"] = True
         return result
     if not _content_type_ok(content_type, contract["expected_content_types"]):
-        result["reasons"] = ["CONTENT_TYPE_MISMATCH"]
-        return result
+        return _finish(
+            result,
+            {"transport": contract["transport"], "expected_content_types": contract["expected_content_types"], "actual_content_type": content_type},
+            "CONTENT_SHAPE_UNKNOWN",
+            ["CONTENT_TYPE_MISMATCH"],
+        )
 
     transport = contract["transport"]
     if contract.get("resource_id_required") and not resource_id:
@@ -330,7 +334,7 @@ def observe(
     else:
         result["reasons"] = ["UNSUPPORTED_TRANSPORT"]
     _resource_drift(result, previous)
-    result["review_required"] = result["status"] in {"BREAKING_DRIFT", "SOURCE_UNAVAILABLE"} or bool(result.get("resource_id_changed"))
+    result["review_required"] = result["status"] in {"BREAKING_DRIFT", "CONTENT_SHAPE_UNKNOWN", "SOURCE_UNAVAILABLE"} or bool(result.get("resource_id_changed"))
     return result
 
 
@@ -424,8 +428,7 @@ def _observe_json_api(contract: dict[str, Any], body: bytes, result: dict[str, A
     try:
         payload = _decode_json(body)
     except (UnicodeDecodeError, json.JSONDecodeError):
-        result["reasons"] = ["INVALID_JSON"]
-        return result
+        return _finish(result, {"transport": contract["transport"], "parse": "invalid_json"}, "CONTENT_SHAPE_UNKNOWN", ["INVALID_JSON"])
     missing = [path for path in contract["required_paths"] if not get_path(payload, path)[0]]
     wrong_types = [
         path for path, expected in contract["type_paths"].items()
@@ -469,8 +472,7 @@ def _observe_data_gov_json(contract: dict[str, Any], body: bytes, result: dict[s
     try:
         payload = _decode_json(body)
     except (UnicodeDecodeError, json.JSONDecodeError):
-        result["reasons"] = ["INVALID_JSON"]
-        return result
+        return _finish(result, {"transport": contract["transport"], "parse": "invalid_json"}, "CONTENT_SHAPE_UNKNOWN", ["INVALID_JSON"])
     if not isinstance(payload, list):
         return _finish(result, {"transport": contract["transport"], "top_level": type_name(payload)}, "BREAKING_DRIFT", ["JSON_RESOURCE_NOT_ARRAY"])
     if not payload:
@@ -502,8 +504,7 @@ def _observe_data_gov_csv(contract: dict[str, Any], body: bytes, result: dict[st
         text = body.decode("utf-8-sig")
         rows = list(csv.reader(io.StringIO(text)))
     except UnicodeDecodeError:
-        result["reasons"] = ["UNSUPPORTED_ENCODING"]
-        return result
+        return _finish(result, {"transport": contract["transport"], "parse": "unsupported_encoding"}, "CONTENT_SHAPE_UNKNOWN", ["UNSUPPORTED_ENCODING"])
     if not rows or not rows[0]:
         return _finish(result, {"transport": contract["transport"]}, "CONTENT_SHAPE_UNKNOWN", ["CSV_HEADER_MISSING"])
     header = rows[0]
