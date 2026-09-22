@@ -286,6 +286,13 @@ class ReceiptGuardTests(unittest.TestCase):
         self.assertEqual(vc.finalize_status({"checks": []}), "FAIL")
         self.assertEqual(vc.finalize_status({"checks": [{"id": "a", "status": "NOT_RUN"}]}), "FAIL")
 
+    def test_receipt_fails_with_dirty_worktree(self):
+        receipt = {
+            "worktree_dirty": True,
+            "checks": [{"id": "a", "status": "PASS"}],
+        }
+        self.assertEqual(vc.finalize_status(receipt), "FAIL")
+
     def test_receipt_passes_only_when_all_checks_pass(self):
         receipt = {"checks": [{"id": "a", "status": "PASS"}, {"id": "b", "status": "PASS"}]}
         self.assertEqual(vc.finalize_status(receipt), "PASS")

@@ -806,6 +806,8 @@ def build_web_site(root: Path, log_dir: Path) -> dict[str, Any]:
 
 
 def finalize_status(receipt: dict[str, Any]) -> str:
+    if receipt.get("worktree_dirty") is True:
+        return "FAIL"
     checks = receipt.get("checks") or []
     if not checks:
         return "FAIL"
