@@ -20,6 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 TARGET_SCHEMA_VERSION = 3
 HASH = re.compile(r"^[0-9a-f]{64}$")
 OBJECT_KEYS = ("PublicEvent", "ChangeEvent", "EvidenceEnvelope")
+MANUAL_STATE_KEYS = ("manual_state", "watch_state", "handoff_state", "fusion_state", "review_state")
 IDENTITY_KEYS = {
     "PublicEvent": "stable_id",
     "ChangeEvent": "event_id",
@@ -123,7 +124,7 @@ def validate_object(kind: str, item: dict[str, Any], expected_version: int = TAR
 def _manual_hashes(bundle: dict[str, Any]) -> dict[str, str | None]:
     return {
         key: sha256(bundle[key]) if key in bundle else None
-        for key in ("manual_state", "watch_state", "handoff_state")
+        for key in MANUAL_STATE_KEYS
     }
 
 
@@ -137,10 +138,17 @@ def migrate_bundle(bundle: dict[str, Any], *, target_version: int = TARGET_SCHEM
     migrated = copy.deepcopy(bundle)
     migrated["schema_version"] = target_version
     errors: list[dict[str, Any]] = []
+    missing_kinds = [kind for kind in OBJECT_KEYS if kind not in bundle["objects"]]
+    unknown_kinds = sorted(set(bundle["objects"]) - set(OBJECT_KEYS))
+    errors.extend({"kind": kind, "index": None, "error": "missing object collection"} for kind in missing_kinds)
+    errors.extend({"kind": kind, "index": None, "error": "unknown object collection"} for kind in unknown_kinds)
     affected = 0
     object_counts: dict[str, int] = {}
     for kind in OBJECT_KEYS:
-        rows = bundle["objects"].get(kind, [])
+        rows = bundle["objects"].get(kind)
+        if kind not in bundle["objects"]:
+            object_counts[kind] = 0
+            continue
         if not isinstance(rows, list):
             errors.append({"kind": kind, "index": None, "error": "objects value must be an array"})
             continue
@@ -223,7 +231,7 @@ def replay_publication(payload: dict[str, Any]) -> dict[str, Any]:
         observed_at,
         snapshot_complete=payload.get("snapshot_complete", True),
     )
-    manual = {key: payload[key] for key in ("watch_state", "handoff_state") if key in payload}
+    manual = {key: payload[key] for key in MANUAL_STATE_KEYS if key in payload}
     event_rows = [event.to_dict() for event in events]
     receipt = {
         "schema_version": 1,
@@ -237,6 +245,7 @@ def replay_publication(payload: dict[str, Any]) -> dict[str, Any]:
         "event_ids": [event["event_id"] for event in event_rows],
         "first_seen_event_count": sum(event.get("temporal_basis") == "FIRST_SEEN" for event in event_rows),
         "manual_state_hashes": {key: sha256(value) for key, value in manual.items()},
+        "manual_state_strategy": "PRESERVE_SEPARATELY_NO_AUTOMATIC_MUTATION",
     }
     return {"state": state, "events": event_rows, "replay_receipt": receipt, **manual}
 

@@ -55,6 +55,19 @@ class MigrationReplayTests(unittest.TestCase):
                 mr.atomic_write(output, migrated)
             self.assertEqual(output.read_text(encoding="utf-8"), "sentinel\n")
 
+    def test_missing_or_unknown_object_collection_fails_closed(self):
+        missing = bundle()
+        del missing["objects"]["EvidenceEnvelope"]
+        migrated, report = mr.migrate_bundle(missing)
+        self.assertIsNone(migrated)
+        self.assertIn("missing object collection", {error["error"] for error in report["errors"]})
+
+        unknown = bundle()
+        unknown["objects"]["Unexpected"] = []
+        migrated, report = mr.migrate_bundle(unknown)
+        self.assertIsNone(migrated)
+        self.assertIn("unknown object collection", {error["error"] for error in report["errors"]})
+
     def test_duplicate_migrated_identity_fails_closed(self):
         invalid = bundle()
         invalid["objects"]["PublicEvent"].append(dict(invalid["objects"]["PublicEvent"][0], raw_item_id="RI-2"))
@@ -108,11 +121,15 @@ class MigrationReplayTests(unittest.TestCase):
             "previous_state": {"schema_version": 1, "mode": "V2_SHADOW", "baseline_established_at": feed["generated_at"], "items": {}},
             "watch_state": {"watch_items": {"WATCH-1": {"status": "NEEDS_REVIEW"}}},
             "handoff_state": {"handoffs": [{"handoff_id": "H-1"}]},
+            "fusion_state": {"relations": [{"relation_id": "REL-1", "review_decision": "PENDING_REVIEW"}]},
         }
         result = mr.replay_publication(payload)
         self.assertEqual(result["watch_state"], payload["watch_state"])
         self.assertEqual(result["handoff_state"], payload["handoff_state"])
+        self.assertEqual(result["fusion_state"], payload["fusion_state"])
         self.assertEqual(result["replay_receipt"]["manual_state_hashes"]["watch_state"], mr.sha256(payload["watch_state"]))
+        self.assertEqual(result["replay_receipt"]["manual_state_hashes"]["fusion_state"], mr.sha256(payload["fusion_state"]))
+        self.assertEqual(result["replay_receipt"]["manual_state_strategy"], "PRESERVE_SEPARATELY_NO_AUTOMATIC_MUTATION")
 
 
 if __name__ == "__main__":
