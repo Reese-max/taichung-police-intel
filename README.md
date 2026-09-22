@@ -125,7 +125,7 @@ python -m http.server 8000 --directory apps/web/out
 
 Open `http://localhost:8000`. The live refresh performs read-only requests to the listed official public sources.
 
-Read-only Query Gateway (Slice 1):
+Read-only Query Gateway (publication slice; optional domain stores):
 
 ```bash
 python scripts/query-gateway.py --port 8788 --allow-origin http://localhost:3000
@@ -144,7 +144,7 @@ reuses the same read-only JSON-RPC gateway. A reviewed located-facts bundle can
 be loaded with `--located-facts-bundle`; only hash-bound
 `CONFIRMED_OFFICIAL` facts enter the answer-evidence catalog.
 
-Set `NEXT_PUBLIC_QUERY_GATEWAY_URL=http://127.0.0.1:8788/query` when starting the Web app to enable **Ask GovIntel**. The Gateway and MCP adapter share the same five typed operations: `search_evidence`, `get_current_brief`, `get_publication_receipt`, `get_source_health`, and `validate_answer`. `validate_answer` accepts only structured claims, builds its evidence catalog from the canonical snapshot, and returns the shared gate receipt plus controlled final text; callers cannot provide evidence, freshness, or trust fields. `get_publication_receipt` exposes only publication/generation/artifact hashes plus freshness and source gaps. The gateway reads only the checked-in canonical snapshot, rejects arbitrary URL/SQL/path arguments, applies a process-local request cap, and reports stale/partial/unknown states instead of converting them to zero events. `search_events`, `get_event`, version comparison, and statistics remain explicitly unavailable until their canonical stores are ready.
+Set `NEXT_PUBLIC_QUERY_GATEWAY_URL=http://127.0.0.1:8788/query` when starting the Web app to enable **Ask GovIntel**. The default checked-in snapshot exposes five typed operations: `search_evidence`, `get_current_brief`, `get_publication_receipt`, `get_source_health`, and `validate_answer`. A validated PublicEvent store can additionally be supplied with `--public-events` for `search_events`, `get_event`, and `compare_event_versions`; a validated typed statistics store can be supplied with `--statistics` for `query_statistics`. Without those canonical stores, the domain operations stay explicitly `CAPABILITY_NOT_AVAILABLE` and are not advertised by MCP. All operations share the same read-only Gateway, reject arbitrary URL/SQL/path arguments, apply a process-local request cap, and report stale/partial/unknown states instead of converting them to zero events.
 
 Every query response also carries the catalog-derived `query_coverage` projection: policy version/hash, supported capability, required and covered sources, collection completeness, missing or stale sources, coverage limitations, and whether a bounded no-match statement is allowed. A healthy index is not treated as complete coverage of the requested world.
 

@@ -31,9 +31,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Run the read-only GovIntel MCP gateway over stdio")
     parser.add_argument("--located-facts-bundle", type=Path)
     parser.add_argument("--query-store", type=Path)
+    parser.add_argument("--public-events", type=Path)
+    parser.add_argument("--statistics", type=Path)
     args = parser.parse_args()
     gateway = gateway_module.QueryGateway(
-        gateway_module.load_snapshot(args.located_facts_bundle, args.query_store)
+        gateway_module.load_snapshot(args.located_facts_bundle, args.query_store, args.public_events, args.statistics)
     )
     stdin = getattr(sys.stdin, "buffer", sys.stdin)
     while True:

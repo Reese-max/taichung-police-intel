@@ -22,6 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from intel_v2 import query_domain
 from intel_v2.located_facts import validate_document_url
 
 QUERY_STORE_PATH = ROOT / "scripts" / "query-store.py"
@@ -110,6 +111,92 @@ MCP_TOOLS = [
             "required": ["claims"],
             "properties": {
                 "claims": {"type": "array", "maxItems": 32, "items": {"type": "object"}},
+                "expected_generation": {"type": "string", "maxLength": 128},
+            },
+        },
+        "annotations": {"readOnlyHint": True, "openWorldHint": False, "destructiveHint": False},
+    },
+]
+
+DOMAIN_TOOL_ARGUMENTS = {
+    "search_events": {
+        "q", "region", "district", "agency", "category", "time_from", "time_to",
+        "verification_status", "event_status", "tracked", "changed_only", "public_event_id",
+        "limit", "cursor", "expected_generation",
+    },
+    "get_event": {"event_id"},
+    "compare_event_versions": {"event_id", "before_version", "after_version"},
+    "query_statistics": {
+        "dataset_id", "metric", "geography", "agency", "period_from", "period_to", "provisional",
+        "limit", "cursor", "expected_generation",
+    },
+}
+
+DOMAIN_MCP_TOOLS = [
+    {
+        "name": "search_events",
+        "description": "Search the validated PublicEvent store with typed, read-only filters.",
+        "inputSchema": {
+            "type": "object", "additionalProperties": False,
+            "properties": {
+                "q": {"type": "string", "maxLength": 512},
+                "region": {"type": "string", "maxLength": 256},
+                "district": {"type": "string", "maxLength": 256},
+                "agency": {"type": "string", "maxLength": 256},
+                "category": {"type": "string", "maxLength": 128},
+                "time_from": {"type": "string", "maxLength": 64},
+                "time_to": {"type": "string", "maxLength": 64},
+                "verification_status": {"type": "string", "maxLength": 64},
+                "event_status": {"type": "string", "maxLength": 64},
+                "tracked": {"type": "boolean"},
+                "changed_only": {"type": "boolean"},
+                "public_event_id": {"type": "string", "maxLength": 256},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 100},
+                "cursor": {"type": "string", "maxLength": 1024},
+                "expected_generation": {"type": "string", "maxLength": 128},
+            },
+        },
+        "annotations": {"readOnlyHint": True, "openWorldHint": False, "destructiveHint": False},
+    },
+    {
+        "name": "get_event",
+        "description": "Read one validated PublicEvent and its official document locators.",
+        "inputSchema": {
+            "type": "object", "additionalProperties": False,
+            "required": ["event_id"],
+            "properties": {"event_id": {"type": "string", "maxLength": 256}},
+        },
+        "annotations": {"readOnlyHint": True, "openWorldHint": False, "destructiveHint": False},
+    },
+    {
+        "name": "compare_event_versions",
+        "description": "Compare two stored PublicEvent document versions without changing canonical state.",
+        "inputSchema": {
+            "type": "object", "additionalProperties": False,
+            "required": ["event_id"],
+            "properties": {
+                "event_id": {"type": "string", "maxLength": 256},
+                "before_version": {"type": "string", "maxLength": 256},
+                "after_version": {"type": "string", "maxLength": 256},
+            },
+        },
+        "annotations": {"readOnlyHint": True, "openWorldHint": False, "destructiveHint": False},
+    },
+    {
+        "name": "query_statistics",
+        "description": "Query typed, period-bound statistics with source, unit, geography, and provisional state.",
+        "inputSchema": {
+            "type": "object", "additionalProperties": False,
+            "properties": {
+                "dataset_id": {"type": "string", "maxLength": 512},
+                "metric": {"type": "string", "maxLength": 512},
+                "geography": {"type": "string", "maxLength": 512},
+                "agency": {"type": "string", "maxLength": 256},
+                "period_from": {"type": "string", "maxLength": 128},
+                "period_to": {"type": "string", "maxLength": 128},
+                "provisional": {"type": "boolean"},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 100},
+                "cursor": {"type": "string", "maxLength": 1024},
                 "expected_generation": {"type": "string", "maxLength": 128},
             },
         },
@@ -388,6 +475,8 @@ def validate_located_facts_bundle(bundle: Any, approved_source_ids: set[str]) ->
 def load_snapshot(
     located_facts_path: Path | None = None,
     query_store_path: Path | None = None,
+    public_events_path: Path | None = None,
+    statistics_path: Path | None = None,
 ) -> dict[str, Any]:
     feed, feed_hash = qs.load_json(qs.DEFAULT_FEED)
     status, status_hash = qs.load_json(qs.DEFAULT_STATUS)
@@ -410,6 +499,10 @@ def load_snapshot(
     if located_facts_path is not None:
         bundle = json.loads(located_facts_path.read_text(encoding="utf-8"))
         snapshot["located_facts"] = validate_located_facts_bundle(bundle, set(approved_source_origins()))
+    if public_events_path is not None:
+        snapshot["event_store"] = query_domain.load_event_store(public_events_path)
+    if statistics_path is not None:
+        snapshot["statistics_store"] = query_domain.load_statistics_store(statistics_path)
     return snapshot
 
 
@@ -469,6 +562,14 @@ class QueryGateway:
                 self.snapshot["located_facts"], set(approved_source_origins())
             )
             if self.snapshot.get("located_facts") is not None else None
+        )
+        self.event_store = (
+            query_domain.validate_event_store(self.snapshot["event_store"])
+            if self.snapshot.get("event_store") is not None else None
+        )
+        self.statistics_store = (
+            query_domain.validate_statistics_store(self.snapshot["statistics_store"])
+            if self.snapshot.get("statistics_store") is not None else None
         )
         self.clock = clock or (lambda: datetime.now(timezone.utc))
 
@@ -668,6 +769,7 @@ class QueryGateway:
             "get_publication_receipt": set(),
             "get_source_health": {"source_id"},
             "validate_answer": {"claims", "expected_generation"},
+            **DOMAIN_TOOL_ARGUMENTS,
         }.get(tool)
         if allowed is None:
             raise GatewayError(
@@ -680,9 +782,114 @@ class QueryGateway:
             raise GatewayError("INVALID_ARGUMENTS", f"unsupported argument(s): {', '.join(unknown)}")
         return dict(arguments)
 
+    def _domain_scope(self, store: dict[str, Any], now: datetime) -> dict[str, Any]:
+        scope = self._scope(now=now, capability_id="publication_metadata")
+        scope["query_coverage"] = {
+            **scope["query_coverage"],
+            "domain_store_type": store["store_type"],
+            "domain_store_generation_id": store["generation_id"],
+            "domain_store_sha256": store["store_sha256"],
+            "domain_source_ids": store["source_ids"],
+        }
+        return scope
+
+    @staticmethod
+    def _require_string(arguments: dict[str, Any], name: str, *, required: bool = False, max_length: int = 512) -> str | None:
+        value = arguments.get(name)
+        if value is None:
+            if required:
+                raise GatewayError("INVALID_ARGUMENTS", f"{name} is required")
+            return None
+        if not isinstance(value, str) or not value.strip() or len(value) > max_length:
+            raise GatewayError("INVALID_ARGUMENTS", f"{name} must be a bounded non-empty string")
+        return value.strip()
+
+    def _execute_domain(self, tool: str, args: dict[str, Any], now: datetime) -> dict[str, Any]:
+        store = self.event_store if tool in {"search_events", "get_event", "compare_event_versions"} else self.statistics_store
+        if store is None:
+            raise GatewayError(
+                "CAPABILITY_NOT_AVAILABLE",
+                f"{tool} requires a validated canonical domain store; no such store is configured",
+                422,
+            )
+        if tool == "search_events":
+            for name in ("q", "region", "district", "agency", "category", "time_from", "time_to", "verification_status", "event_status", "public_event_id"):
+                args[name] = self._require_string(args, name)
+            for name in ("tracked", "changed_only"):
+                if name in args and not isinstance(args[name], bool):
+                    raise GatewayError("INVALID_ARGUMENTS", f"{name} must be boolean")
+            try:
+                result = query_domain.query_events(store, args)
+            except ValueError as error:
+                raise GatewayError("INVALID_ARGUMENTS", str(error)) from error
+            scope = self._domain_scope(store, now)
+            event_ids = [row["public_event_id"] for row in result["results"]]
+            return self._envelope(
+                tool, args, scope,
+                {"event_ids": event_ids, "events": result["results"], **{key: value for key, value in result.items() if key != "results"},
+                 "domain_query_generation_id": result["query_generation_id"]},
+                result_count=result["result_count"], truncated=result["truncated"], result_type="public_events",
+            )
+        event_id = self._require_string(args, "event_id", required=True, max_length=256)
+        try:
+            if tool == "get_event":
+                event = query_domain.get_event(store, event_id)
+                scope = self._domain_scope(store, now)
+                evidence_ids = [document["evidence_id"] for document in event["documents"]]
+                return self._envelope(
+                    tool, args, scope,
+                    {"event_ids": [event_id], "evidence_ids": evidence_ids, "event": event,
+                     "domain_query_generation_id": store["generation_id"]},
+                    result_count=1, result_type="public_event",
+                )
+            for name in ("before_version", "after_version"):
+                args[name] = self._require_string(args, name, max_length=256)
+            comparison = query_domain.compare_event_versions(
+                store, event_id, before_version=args.get("before_version"), after_version=args.get("after_version")
+            )
+        except KeyError as error:
+            missing = error.args[0] if error.args else event_id
+            code = "EVENT_NOT_FOUND" if missing == event_id or tool == "get_event" else "EVENT_VERSION_NOT_FOUND"
+            raise GatewayError(code, f"unknown event or version: {missing}", 404) from error
+        except ValueError as error:
+            raise GatewayError("INVALID_ARGUMENTS", str(error)) from error
+        scope = self._domain_scope(store, now)
+        return self._envelope(
+            tool, args, scope,
+            {"event_ids": [event_id], "comparison": comparison, "domain_query_generation_id": store["generation_id"]},
+            result_count=1, result_type="event_comparison",
+        )
+
+    def _execute_statistics(self, args: dict[str, Any], now: datetime) -> dict[str, Any]:
+        if self.statistics_store is None:
+            raise GatewayError(
+                "CAPABILITY_NOT_AVAILABLE",
+                "query_statistics requires a validated canonical statistics store; no such store is configured",
+                422,
+            )
+        for name in ("dataset_id", "metric", "geography", "agency", "period_from", "period_to"):
+            args[name] = self._require_string(args, name, max_length=512 if name in {"dataset_id", "metric", "geography"} else 128)
+        if "provisional" in args and not isinstance(args["provisional"], bool):
+            raise GatewayError("INVALID_ARGUMENTS", "provisional must be boolean")
+        try:
+            result = query_domain.query_statistics(self.statistics_store, args)
+        except ValueError as error:
+            raise GatewayError("INVALID_ARGUMENTS", str(error)) from error
+        scope = self._domain_scope(self.statistics_store, now)
+        return self._envelope(
+            "query_statistics", args, scope,
+            {"statistics": result["results"], **{key: value for key, value in result.items() if key != "results"},
+             "domain_query_generation_id": result["query_generation_id"]},
+            result_count=result["result_count"], truncated=result["truncated"], result_type="statistics",
+        )
+
     def execute(self, tool: str, arguments: Any = None) -> dict[str, Any]:
         args = self._arguments(tool, arguments)
         now = _now(self.clock())
+        if tool in {"search_events", "get_event", "compare_event_versions"}:
+            return self._execute_domain(tool, args, now)
+        if tool == "query_statistics":
+            return self._execute_statistics(args, now)
         if tool == "validate_answer":
             claims = args.get("claims")
             if not isinstance(claims, list) or not 1 <= len(claims) <= 32:
@@ -801,12 +1008,17 @@ class QueryGateway:
         )
 
     def capabilities(self) -> dict[str, Any]:
+        available = list(CAPABILITIES)
+        if self.event_store is not None:
+            available.extend(["search_events", "get_event", "compare_event_versions"])
+        if self.statistics_store is not None:
+            available.append("query_statistics")
         return {
             "schema_version": 1,
             "server_version": SERVER_VERSION,
             "read_only": True,
-            "capabilities": list(CAPABILITIES),
-            "unavailable_capabilities": sorted(UNIMPLEMENTED),
+            "capabilities": available,
+            "unavailable_capabilities": sorted(set(UNIMPLEMENTED) - set(available)),
             "policy": self.store["policy"],
             "retention": {
                 "policy_version": RETENTION_POLICY["policy_version"],
@@ -815,6 +1027,14 @@ class QueryGateway:
                 "full_text_allowed": False,
             },
         }
+
+    def mcp_tools(self) -> list[dict[str, Any]]:
+        tools = list(MCP_TOOLS)
+        if self.event_store is not None:
+            tools.extend(DOMAIN_MCP_TOOLS[:3])
+        if self.statistics_store is not None:
+            tools.append(DOMAIN_MCP_TOOLS[3])
+        return tools
 
     def health(self) -> dict[str, Any]:
         scope = self._scope()
@@ -859,7 +1079,7 @@ def dispatch_mcp(gateway: QueryGateway, request: dict[str, Any]) -> dict[str, An
             },
         }
     if method == "tools/list":
-        return {"jsonrpc": "2.0", "id": request_id, "result": {"tools": MCP_TOOLS}}
+        return {"jsonrpc": "2.0", "id": request_id, "result": {"tools": gateway.mcp_tools()}}
     if method != "tools/call":
         raise GatewayError("METHOD_NOT_FOUND", f"unsupported MCP method: {method}", 404)
     params = request.get("params")
@@ -1037,6 +1257,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--rate-limit", type=int, default=DEFAULT_RATE_LIMIT)
     parser.add_argument("--located-facts-bundle", type=Path)
     parser.add_argument("--query-store", type=Path)
+    parser.add_argument("--public-events", type=Path)
+    parser.add_argument("--statistics", type=Path)
     return parser.parse_args()
 
 
@@ -1044,7 +1266,7 @@ def main() -> int:
     args = parse_args()
     server = build_server(
         args.host, args.port,
-        QueryGateway(load_snapshot(args.located_facts_bundle, args.query_store)),
+        QueryGateway(load_snapshot(args.located_facts_bundle, args.query_store, args.public_events, args.statistics)),
         args.allow_origin, args.rate_limit,
     )
     print(f"QUERY_GATEWAY_LISTENING http://{args.host}:{server.server_port}", flush=True)
