@@ -90,7 +90,7 @@ export const COPY = {
     lang_toggle_current: "English",
 
     // ── Site header ───────────────────────────────────────────────────────────
-    site_kicker: "Taichung police intelligence",
+    site_kicker: "GovIntel AI",
     site_title: "Tonight's council preparation",
     freshness_live: "Data collected: ",
     freshness_static: "Static evidence: 2026-08-14",
@@ -217,7 +217,7 @@ export const COPY = {
     lang_toggle_current: "中文",
 
     // ── Site header ───────────────────────────────────────────────────────────
-    site_kicker: "Taichung police intelligence",
+    site_kicker: "GovIntel AI",
     site_title: "今晚議會準備",
     freshness_live: "資料蒐集於：",
     freshness_static: "靜態證據：2026-08-14",

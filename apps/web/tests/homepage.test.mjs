@@ -191,6 +191,11 @@ test("every COPY.zh value is a non-empty string", () => {
   }
 });
 
+test("legacy site headers use the current GovIntel brand", () => {
+  assert.equal(COPY.en.site_kicker, "GovIntel AI");
+  assert.equal(COPY.zh.site_kicker, "GovIntel AI");
+});
+
 // ── Language toggle labels ─────────────────────────────────────────────────────
 // The toggle label must be the OTHER language (pressing it switches to that language).
 
