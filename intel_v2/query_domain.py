@@ -13,6 +13,7 @@ from urllib.parse import quote, urlsplit
 
 MAX_ROWS = 10000
 MAX_LIMIT = 100
+MAX_BYTES = 32 * 1024 * 1024
 EVENT_STORE_SCHEMA_VERSION = 1
 STATISTICS_STORE_SCHEMA_VERSION = 1
 EVENT_STATUSES = frozenset({"CONFIRMED", "CANDIDATE", "CONFLICT", "SPLIT_REQUIRED", "PARTIAL_LKG"})
@@ -24,6 +25,13 @@ def canonical(value: Any) -> bytes:
 
 def digest(value: Any) -> str:
     return hashlib.sha256(value if isinstance(value, bytes) else canonical(value)).hexdigest()
+
+
+def _load_json(path: Path) -> Any:
+    raw = path.read_bytes()
+    if len(raw) > MAX_BYTES:
+        raise ValueError("domain store input exceeds byte limit")
+    return json.loads(raw.decode("utf-8"))
 
 
 def _text(value: Any, *, name: str, max_length: int = 256) -> str:
@@ -248,7 +256,7 @@ def validate_event_store(store: Any) -> dict[str, Any]:
 
 
 def load_event_store(path: Path) -> dict[str, Any]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload = _load_json(path)
     if isinstance(payload, dict) and payload.get("store_type") == "PUBLIC_EVENT_QUERY":
         return validate_event_store(payload)
     rows = payload.get("public_events") if isinstance(payload, dict) else None
@@ -324,7 +332,7 @@ def validate_statistics_store(store: Any) -> dict[str, Any]:
 
 
 def load_statistics_store(path: Path) -> dict[str, Any]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload = _load_json(path)
     if isinstance(payload, dict) and payload.get("store_type") == "TYPED_STATISTICS_QUERY":
         return validate_statistics_store(payload)
     rows = payload.get("statistics") if isinstance(payload, dict) else None

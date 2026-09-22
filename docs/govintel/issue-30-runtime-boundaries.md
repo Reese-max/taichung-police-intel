@@ -10,6 +10,7 @@ The first read-only query slice is now wired through the shared Query Gateway:
 - The controlled answer renderer uses only the Gate's normalized, evaluated propositions; caller claim text and raw proposition whitespace are not rendered as verified output.
 - The current code and checked-in artifacts pass `npm run check`, including the HTTP/MCP parity suite and the stdio transport tests; the gateway also exposes the bounded publication receipt projection.
 - The gateway now has validated, read-only adapters for optional `PublicEvent` and typed-statistics stores. They are advertised only when an explicitly supplied store passes hash/schema validation; the checked-in publication snapshot does not contain either store, so the domain tools remain unavailable by default.
+- `scripts/build-query-domain.py build` now provides the bounded rebuild boundary for canonical domain inputs. It validates and atomically writes deterministic PublicEvent/statistics projections; the fixture-only dashboard demo is rejected and no domain store is enabled by default.
 
 This is still a local/code-only receipt. It is not a production deployment, anonymous public reachability proof, or completion of the later event, comparison, and statistics slices.
 
@@ -44,4 +45,4 @@ Container source came from the exact Actions replay artifact for PR #16 plus fet
 
 ## Still needed
 
-This remains a bounded linear metadata index, not full document-text search or a production PublicEvent/statistics store. The Web/MCP first slice and opt-in domain adapters are implemented, but canonical domain-store generation, live collector wiring, and production/runtime acceptance remain open under #29/#15/#24/#28. The 16-hour age threshold is an explicit local policy, not a data-provider SLA.
+This remains a bounded linear metadata index, not full document-text search or a production PublicEvent/statistics store. Canonical domain-store generation now has a local rebuild boundary, but live collector wiring and production/runtime acceptance remain open under #29/#15/#24/#28. The 16-hour age threshold is an explicit local policy, not a data-provider SLA.
