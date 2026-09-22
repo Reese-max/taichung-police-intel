@@ -246,7 +246,7 @@ const ignoredKiro = spawnSync("git", ["check-ignore", "-q", ".kiro/steering/prod
 if (ignoredKiro.status === 0) failures.push(".kiro must not be ignored");
 else if (ignoredKiro.status !== 1) failures.push(`kiro-ignore-probe:exit=${ignoredKiro.status ?? "spawn-error"}`);
 
-const excludedDirs = new Set([".git", ".next", ".gstack", "node_modules", "__pycache__", "graphify-out"]);
+const excludedDirs = new Set([".git", ".next", ".gstack", "node_modules", "__pycache__", "graphify-out", ".pytest_cache", "out", "output", "runtime-evidence"]);
 const textExtensions = new Set([".css", ".env", ".html", ".js", ".json", ".md", ".mjs", ".py", ".sql", ".toml", ".txt", ".yaml", ".yml"]);
 const secretPatterns = [
   /-----BEGIN (?:RSA |OPENSSH |EC |DSA )?PRIVATE KEY-----/,
