@@ -221,7 +221,7 @@ function ReviewInboxPanel({ health, localReview, onDecision, onFeedback, onExpor
       </div>
       {items.length > 0 ? (
         <ul>
-          {items.slice(0, 5).map((item) => {
+          {items.map((item) => {
             const status = item.local_status || "OPEN";
             const localActionDisabled = !localReview || status === "CANONICAL_ONLY";
             return (

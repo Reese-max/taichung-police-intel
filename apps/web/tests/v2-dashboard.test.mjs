@@ -113,6 +113,7 @@ test("V2 dashboard is police-first, Top 3 capped, and evidence-bound", async () 
   assert.match(source, /匯出 Markdown/);
   assert.match(source, /DETERMINISTIC_PASS/);
   assert.doesNotMatch(source, /AUTO_PASS/);
+  assert.doesNotMatch(source, /\bitems\.slice\(0, 5\)/);
 });
 
 test("Ask GovIntel is a bounded shared-gateway entry rather than a fake chatbot", async () => {
