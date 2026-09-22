@@ -5,13 +5,18 @@
 ## 2026-09-22 external-state recheck
 
 - GitHub Pages is public and workflow-backed, but the latest scheduled run
-  `35626064887` still ran `main@e1d081bd04824c062c7ee99e7d74f9e478240743`
-  and failed at the protected-main push with `GH006`; build verification had
+  `35674266081` (2026-09-22 09:02 Asia/Taipei) still ran
+  `main@e1d081bd04824c062c7ee99e7d74f9e478240743` and failed at the
+  protected-main push with `GH006` (`Changes must be made through a pull
+  request`, required `verify` expected); build verification had
   passed before that failure, so no new Pages deployment was produced.
 - The public `/api/status.json` currently returns HTTP 200 but reports
-  `generated_at=2026-09-11T08:23:26+08:00`; this is reachability, not current
-  publication freshness. The public `/api/health.json` likewise reports the
-  old `COMPETITION_DEMO` snapshot.
+  `generated_at=2026-09-11T08:23:26+08:00`, mode `COMPETITION_DEMO`, and the
+  observed response UTF-8 SHA-256 is
+  `741e569dee959c068f5833b2f210e0941a96a1c158bcb0ad100b39746b766d0b`.
+  `/api/health.json` also returns HTTP 200 with `status=ok`, but the same old
+  generated time and demo mode; these are reachability receipts, not current
+  publication freshness.
 - The effective `main` protection still requires one approving review,
   code-owner review, resolved conversations, and the `verify` check; force
   pushes and administrator bypass are disabled. The local
