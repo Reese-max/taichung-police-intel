@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from intel_v2.review import load_state as load_review_state, project as project_review_items, reconcile as reconcile_review, schema_drift_candidates
+from intel_v2.review import load_state as load_review_state, project as project_review_items, reconcile as reconcile_review, schema_drift_candidates, source_health_candidates
 
 DEFAULT_STATUS = ROOT / "apps/web/public/data/source-status.json"
 DEFAULT_BRIEF = ROOT / "apps/web/public/data/v2-daily-brief.json"
@@ -65,13 +65,21 @@ def load_schema_drift(path: Path = DEFAULT_SCHEMA_DRIFT) -> dict[str, Any] | Non
     return payload if isinstance(payload, dict) else None
 
 
-def load_review_inbox(path: Path = DEFAULT_REVIEW_STATE, schema_drift: dict[str, Any] | None = None) -> list[dict[str, Any]] | None:
+def load_review_inbox(
+    path: Path = DEFAULT_REVIEW_STATE,
+    schema_drift: dict[str, Any] | None = None,
+    source_status: dict[str, Any] | None = None,
+) -> list[dict[str, Any]] | None:
     try:
         state = load_review_state(path)
         if isinstance(schema_drift, dict) and isinstance(schema_drift.get("generated_at"), str):
             candidates = schema_drift_candidates(schema_drift)
             if candidates:
                 state = reconcile_review(state, candidates, observed_at=schema_drift["generated_at"])
+        if isinstance(source_status, dict) and isinstance(source_status.get("generated_at"), str):
+            candidates = source_health_candidates(source_status)
+            if candidates:
+                state = reconcile_review(state, candidates, observed_at=source_status["generated_at"])
         return project_review_items(state, public=True)
     except (OSError, ValueError, json.JSONDecodeError):
         return None
@@ -418,7 +426,7 @@ def load_current(status_path: Path = DEFAULT_STATUS, brief_path: Path = DEFAULT_
     except (OSError, ValueError, json.JSONDecodeError):
         policy = None
     schema_drift = load_schema_drift()
-    review_items = load_review_inbox(DEFAULT_REVIEW_STATE, schema_drift)
+    review_items = load_review_inbox(DEFAULT_REVIEW_STATE, schema_drift, status)
     result = build_health(current_publication_stages(status, brief, policy, schema_drift))
     result["policy"] = policy_binding(policy) if policy else {"policy_status": "UNKNOWN"}
     result["schema_drift"] = {

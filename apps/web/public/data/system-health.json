@@ -35,8 +35,51 @@
     "policy_hash": "1387c7e5a15c2fc0a07b6881b0ee40f70e789fcbe01862d9834bfe9b079464d5",
     "policy_version": 1
   },
-  "review_inbox": [],
-  "review_inbox_total": 0,
+  "review_inbox": [
+    {
+      "created_at": "2026-09-11T08:23:26+08:00",
+      "entity_ids": {
+        "source_id": "S-007"
+      },
+      "evidence_sha256": "431954881465de5c1c2ba9a50af364fe32c7b690718944839a56bb56b2cc95a6",
+      "priority": 70,
+      "priority_reason": "STALE_SOURCE_REQUIRES_HUMAN_REVIEW",
+      "reason": "STALE_SOURCE",
+      "review_id": "REVIEW-0FA23A3E3F0B8D66EB3F",
+      "source_version": "SR-DEMO-20260911-MORNING-007",
+      "status": "OPEN",
+      "updated_at": "2026-09-11T08:23:26+08:00"
+    },
+    {
+      "created_at": "2026-09-11T08:23:26+08:00",
+      "entity_ids": {
+        "source_id": "S-029"
+      },
+      "evidence_sha256": "f0321b9ee40f031e32403422c6188c242d3105131c7d764a85c99aea67124680",
+      "priority": 70,
+      "priority_reason": "STALE_SOURCE_REQUIRES_HUMAN_REVIEW",
+      "reason": "STALE_SOURCE",
+      "review_id": "REVIEW-7CF46213C0EB433544C0",
+      "source_version": "SR-DEMO-20260911-MORNING-029",
+      "status": "OPEN",
+      "updated_at": "2026-09-11T08:23:26+08:00"
+    },
+    {
+      "created_at": "2026-09-11T08:23:26+08:00",
+      "entity_ids": {
+        "source_id": "S-004"
+      },
+      "evidence_sha256": "b08efeeb092d724e150fa903d21c70dffed2f82a431671abf9ff2852c68fb3e7",
+      "priority": 70,
+      "priority_reason": "STALE_SOURCE_REQUIRES_HUMAN_REVIEW",
+      "reason": "STALE_SOURCE",
+      "review_id": "REVIEW-ABB86811BA01B0DC87C8",
+      "source_version": "SR-DEMO-20260911-MORNING-004",
+      "status": "OPEN",
+      "updated_at": "2026-09-11T08:23:26+08:00"
+    }
+  ],
+  "review_inbox_total": 3,
   "schema_drift": {
     "overall": "UNKNOWN",
     "source_count": 8

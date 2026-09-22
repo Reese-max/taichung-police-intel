@@ -218,21 +218,31 @@ def upsert(state: dict[str, Any] | None, candidate: dict[str, Any], *, observed_
         result["last_updated_at"] = stamp
         return result, item, True
 
-    changed = existing.get("evidence_sha256") != evidence_hash or existing.get("source_version") != value["source_version"]
+    evidence_changed = existing.get("evidence_sha256") != evidence_hash or existing.get("source_version") != value["source_version"]
+    reason_changed = existing.get("reason") != value["reason"]
+    changed = evidence_changed or reason_changed
     if changed:
-        old = {"evidence": existing.get("evidence"), "evidence_sha256": existing.get("evidence_sha256"), "source_version": existing.get("source_version")}
-        existing["evidence_history"].append({"observed_at": stamp, **old})
-        existing["evidence"] = value["evidence"]
-        existing["evidence_sha256"] = evidence_hash
-        existing["source_version"] = value["source_version"]
+        if evidence_changed:
+            old = {"evidence": existing.get("evidence"), "evidence_sha256": existing.get("evidence_sha256"), "source_version": existing.get("source_version")}
+            existing["evidence_history"].append({"observed_at": stamp, **old})
+            existing["evidence"] = value["evidence"]
+            existing["evidence_sha256"] = evidence_hash
+            existing["source_version"] = value["source_version"]
+        previous_reason = existing["reason"]
+        existing["reason"] = value["reason"]
+        existing["priority"] = PRIORITIES[value["reason"]]
+        existing["priority_reason"] = value["priority_reason"]
         existing["entity_ids"] = value["entity_ids"] or existing["entity_ids"]
         existing["updated_at"] = stamp
-        action = "REOPENED" if existing["status"] in TERMINAL_STATUSES else "UPDATED"
+        action = "REOPENED" if existing["status"] in TERMINAL_STATUSES else "RECLASSIFIED" if reason_changed and not evidence_changed else "UPDATED"
         if action == "REOPENED":
             existing["status"] = "OPEN"
             existing["assignment"] = {"state": "UNASSIGNED", "assignee_ref": None, "claimed_at": None}
             existing["decision"] = None
-        existing["audit"].append(_audit(existing, action, stamp, {"evidence_sha256": evidence_hash, "source_version": value["source_version"]}))
+        audit_payload = {"evidence_sha256": evidence_hash, "source_version": value["source_version"], "reason": value["reason"]}
+        if reason_changed:
+            audit_payload["previous_reason"] = previous_reason
+        existing["audit"].append(_audit(existing, action, stamp, audit_payload))
         result["last_updated_at"] = stamp
     return result, existing, changed
 

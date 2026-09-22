@@ -58,6 +58,14 @@ class ReviewInboxTests(unittest.TestCase):
         self.assertEqual(len(stored["evidence_history"]), 1)
         self.assertEqual(stored["audit"][-1]["action"], "REOPENED")
 
+    def test_new_reason_reclassifies_existing_fingerprint(self):
+        state, item, _ = upsert(empty_state(), candidate("PARTIAL_SOURCE"), observed_at=STAMP)
+        state = reconcile(state, [candidate("STALE_SOURCE")], observed_at=STAMP)
+        stored = state["items"][item["review_id"]]
+        self.assertEqual(stored["reason"], "STALE_SOURCE")
+        self.assertEqual(stored["priority"], 70)
+        self.assertEqual(stored["audit"][-1]["action"], "RECLASSIFIED")
+
     def test_schema_drift_maps_to_controlled_candidate_and_missing_source_does_not_close(self):
         receipt = {"generated_at": STAMP, "review_inbox": [{"source_id": "S-007", "status": "SOURCE_UNAVAILABLE", "reasons": ["HTTP_503"], "observed_at": STAMP}]}
         mapped = schema_drift_candidates(receipt)

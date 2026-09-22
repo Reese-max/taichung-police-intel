@@ -189,6 +189,35 @@ class SystemHealthTests(unittest.TestCase):
         self.assertNotIn("evidence", rows[0])
         self.assertNotIn("audit", rows[0])
 
+    def test_source_health_candidates_reach_public_review_projection(self):
+        status = {
+            "generated_at": "2026-09-21T00:00:00+00:00",
+            "sources": [
+                {
+                    "source_id": "S-004",
+                    "source_health": "PASS",
+                    "window_completeness": "COMPLETE_ZERO",
+                    "freshness_status": "STALE",
+                    "last_checked_at": "2026-09-21T00:00:00+00:00",
+                    "current_source_run_id": "run-4",
+                },
+                {
+                    "source_id": "S-006",
+                    "source_health": "PASS",
+                    "window_completeness": "COMPLETE_WITH_ITEMS",
+                    "freshness_status": "FRESH",
+                    "last_checked_at": "2026-09-21T00:00:00+00:00",
+                    "current_source_run_id": "run-6",
+                },
+            ],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            rows = health.load_review_inbox(Path(directory) / "review.json", source_status=status)
+        self.assertEqual([row["reason"] for row in rows], ["STALE_SOURCE"])
+        self.assertEqual(rows[0]["entity_ids"], {"source_id": "S-004"})
+        self.assertNotIn("evidence", rows[0])
+        self.assertNotIn("audit", rows[0])
+
 
 if __name__ == "__main__":
     unittest.main()
