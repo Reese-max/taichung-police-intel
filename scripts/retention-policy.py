@@ -164,7 +164,11 @@ def plan_expiry(records: list[dict[str, Any]], *, observed_at: str, policy: dict
             status = "EXPIRED"
             action = window["expired_action"]
             if layer in CANONICAL_LAYERS:
-                action = "KEEP_AUDIT_LINKAGE"
+                if not audit_refs:
+                    status = "BLOCKED"
+                    action = "BLOCKED_NO_AUDIT_LINKAGE"
+                else:
+                    action = "KEEP_AUDIT_LINKAGE"
             elif action == "PURGE_RAW_KEEP_AUDIT" and not audit_refs:
                 status = "BLOCKED"
                 action = "BLOCKED_NO_AUDIT_LINKAGE"

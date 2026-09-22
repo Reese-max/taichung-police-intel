@@ -105,6 +105,23 @@ class RetentionPolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "prohibited"):
             retention.plan_expiry([private], observed_at="2026-09-21T00:00:00+00:00")
 
+    def test_expired_canonical_without_audit_linkage_is_blocked(self):
+        compiled = copy.deepcopy(retention.compile_policy())
+        compiled["retention_windows"]["PROVENANCE_HISTORY"] = {
+            "max_age_days": 7,
+            "expired_action": "KEEP_AUDIT_LINKAGE",
+        }
+        receipt = retention.plan_expiry([{
+            "record_id": "event-without-audit",
+            "source_id": "S-010",
+            "layer": "canonical_event",
+            "captured_at": "2026-01-01T00:00:00+00:00",
+            "content_sha256": "f" * 64,
+            "audit_refs": [],
+        }], observed_at="2026-09-21T00:00:00+00:00", policy=compiled)
+        self.assertEqual(receipt["records"][0]["status"], "BLOCKED")
+        self.assertEqual(receipt["records"][0]["action"], "BLOCKED_NO_AUDIT_LINKAGE")
+
 
 if __name__ == "__main__":
     unittest.main()
