@@ -8,6 +8,8 @@ from urllib.request import Request, urlopen
 import unittest
 from pathlib import Path
 
+from intel_v2.located_facts import acquire_document, build_bundle, confirm_facts
+
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "query-gateway.py"
@@ -412,6 +414,46 @@ class QueryGatewayTests(unittest.TestCase):
         )
         self.assertNotIn(evidence_id, blocked["answer_evidence_receipt"]["evidence_ids"])
         self.assertNotEqual(blocked["gate_status"], "PASS")
+
+    def test_saved_document_runs_through_adapter_review_and_answer_gate(self):
+        body = (ROOT / "tests/fixtures/located-facts/official-data.json").read_bytes()
+        document = acquire_document(
+            source_id="S-028",
+            requested_url="https://data.gov.tw/api/v2/rest/dataset/88147",
+            final_url="https://data.gov.tw/api/v2/rest/dataset/88147",
+            body=body,
+            content_type="application/json",
+            fetched_at="2026-09-21T00:00:00+00:00",
+            rights_status="METADATA_LINK_ONLY",
+        )
+        bundle = build_bundle(document, body, [{
+            "subject_id": "dataset:88147",
+            "predicate": "record_count",
+            "pointer": "/event/count",
+            "normalizer": "integer",
+        }])
+        confirmed = confirm_facts(
+            bundle,
+            body,
+            [bundle["facts"][0]["fact_id"]],
+            reviewer_ref="integration-test-reviewer",
+            verified_at="2026-09-21T08:00:00+08:00",
+        )
+        snapshot = gateway_module.load_snapshot()
+        snapshot["located_facts"] = confirmed
+        gateway = gateway_module.QueryGateway(
+            snapshot=snapshot,
+            clock=lambda: datetime(2026, 9, 21, 9, 0, tzinfo=timezone.utc),
+        )
+        result = gateway.execute("validate_answer", {"claims": [{
+            "claim_type": "STATISTIC",
+            "text": "官方資料筆數",
+            "temporal_scope": "HISTORICAL",
+            "proposition": {"subject": "dataset:88147:record_count", "value": 1234},
+        }]})
+        self.assertEqual(result["gate_status"], "PASS")
+        self.assertEqual(result["final_claims"][0]["support_status"], "SUPPORTED")
+        self.assertEqual(result["answer_evidence_receipt"]["evidence_ids"], [confirmed["evidence_catalog"][0]["evidence_id"]])
 
     def test_located_facts_candidate_source_is_not_approved(self):
         self.assertIn("S-028", gateway_module.approved_source_origins())
