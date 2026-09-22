@@ -100,6 +100,23 @@ class QueryGatewayDomainTests(unittest.TestCase):
         self.assertFalse(stats["statistics"][0]["provisional"])
         self.assertEqual(stats["result_type"], "statistics")
 
+    def test_date_only_event_bounds_resolve_in_requested_timezone(self):
+        query = self.gateway.execute("search_events", {
+            "time_from": "2026-09-20",
+            "time_to": "2026-09-20",
+            "time_zone": "Asia/Taipei",
+            "limit": 10,
+        })
+        self.assertEqual(query["event_ids"], ["PE-DOMAIN-1"])
+        self.assertEqual(query["time_resolution"]["time_zone"], "Asia/Taipei")
+        self.assertEqual(query["time_resolution"]["resolved"]["time_from"], "2026-09-19T16:00:00+00:00")
+        self.assertEqual(query["time_resolution"]["resolved"]["time_to"], "2026-09-20T15:59:59.999999+00:00")
+        self.assertEqual(query["time_resolution"]["server_clock"], "2026-09-21T09:00:00+00:00")
+
+    def test_invalid_event_timezone_fails_closed(self):
+        with self.assertRaisesRegex(gateway_module.GatewayError, "IANA timezone"):
+            self.gateway.execute("search_events", {"time_from": "2026-09-20", "time_zone": "Mars/Phobos"})
+
     def test_missing_domain_store_remains_unavailable(self):
         gateway = gateway_module.QueryGateway(clock=lambda: datetime(2026, 9, 21, 9, 0, tzinfo=timezone.utc))
         with self.assertRaisesRegex(gateway_module.GatewayError, "canonical domain store"):

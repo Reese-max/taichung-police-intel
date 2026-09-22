@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 from collections import deque
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 import hashlib
 import importlib.util
 import json
@@ -17,6 +17,7 @@ import time
 from typing import Any, Callable
 from urllib.parse import quote, urlsplit
 import uuid
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -33,6 +34,7 @@ MAX_RESPONSE_BYTES = 256 * 1024
 SERVER_VERSION = "query-gateway-v1"
 MCP_PROTOCOL_VERSION = "2025-06-18"
 DEFAULT_RATE_LIMIT = 60
+DEFAULT_QUERY_TIMEZONE = "Asia/Taipei"
 SOURCE_CATALOG = ROOT / "docs" / "govintel" / "source-catalog.v2.json"
 PUBLIC_EVIDENCE_SOURCE_STATUSES = frozenset({"PRODUCTION_ACTIVE", "AUDITED_EXISTING"})
 
@@ -121,6 +123,7 @@ MCP_TOOLS = [
 DOMAIN_TOOL_ARGUMENTS = {
     "search_events": {
         "q", "region", "district", "agency", "category", "time_from", "time_to",
+        "time_zone",
         "verification_status", "event_status", "tracked", "changed_only", "public_event_id",
         "limit", "cursor", "expected_generation",
     },
@@ -146,6 +149,7 @@ DOMAIN_MCP_TOOLS = [
                 "category": {"type": "string", "maxLength": 128},
                 "time_from": {"type": "string", "maxLength": 64},
                 "time_to": {"type": "string", "maxLength": 64},
+                "time_zone": {"type": "string", "maxLength": 64},
                 "verification_status": {"type": "string", "maxLength": 64},
                 "event_status": {"type": "string", "maxLength": 64},
                 "tracked": {"type": "boolean"},
@@ -250,6 +254,50 @@ def _valid_timestamp(value: Any) -> bool:
     except ValueError:
         return False
     return parsed.tzinfo is not None
+
+
+def _resolve_event_time_bounds(arguments: dict[str, Any], server_now: datetime) -> tuple[dict[str, Any], dict[str, Any] | None]:
+    time_zone_name = arguments.get("time_zone") or DEFAULT_QUERY_TIMEZONE
+    try:
+        time_zone = ZoneInfo(time_zone_name)
+    except (ZoneInfoNotFoundError, ValueError) as error:
+        raise ValueError("time_zone must be a valid IANA timezone") from error
+    if not arguments.get("time_from") and not arguments.get("time_to"):
+        return dict(arguments), None
+
+    resolved = dict(arguments)
+    requested: dict[str, str] = {}
+    normalized: dict[str, str] = {}
+    for name, end_of_day in (("time_from", False), ("time_to", True)):
+        raw = arguments.get(name)
+        if raw is None:
+            continue
+        requested[name] = raw
+        if len(raw) == 10:
+            try:
+                local_date = date.fromisoformat(raw)
+            except ValueError as error:
+                raise ValueError(f"{name} must be an ISO-8601 date or timestamp") from error
+            local = datetime.combine(local_date, datetime.min.time(), tzinfo=time_zone)
+            if end_of_day:
+                next_day = local_date + timedelta(days=1)
+                local = datetime.combine(next_day, datetime.min.time(), tzinfo=time_zone) - timedelta(microseconds=1)
+        else:
+            try:
+                local = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            except ValueError as error:
+                raise ValueError(f"{name} must be an ISO-8601 date or timestamp") from error
+            if local.tzinfo is None:
+                raise ValueError(f"{name} timestamp must include a timezone")
+        normalized[name] = local.astimezone(timezone.utc).isoformat()
+        resolved[name] = normalized[name]
+    return resolved, {
+        "schema_version": 1,
+        "time_zone": time_zone_name,
+        "requested": requested,
+        "resolved": normalized,
+        "server_clock": server_now.isoformat(),
+    }
 
 
 def _valid_scalar(value: Any) -> bool:
@@ -828,19 +876,28 @@ class QueryGateway:
         if tool == "search_events":
             for name in ("q", "region", "district", "agency", "category", "time_from", "time_to", "verification_status", "event_status", "public_event_id"):
                 args[name] = self._require_string(args, name)
+            if "time_zone" in args:
+                args["time_zone"] = self._require_string(args, "time_zone", max_length=64)
             for name in ("tracked", "changed_only"):
                 if name in args and not isinstance(args[name], bool):
                     raise GatewayError("INVALID_ARGUMENTS", f"{name} must be boolean")
             try:
-                result = query_domain.query_events(store, args)
+                query_args, time_resolution = _resolve_event_time_bounds(args, now)
+                result = query_domain.query_events(store, query_args)
             except ValueError as error:
                 raise GatewayError("INVALID_ARGUMENTS", str(error)) from error
             scope = self._domain_scope(store, now)
             event_ids = [row["public_event_id"] for row in result["results"]]
+            payload = {
+                "event_ids": event_ids, "events": result["results"],
+                **{key: value for key, value in result.items() if key != "results"},
+                "domain_query_generation_id": result["query_generation_id"],
+            }
+            if time_resolution is not None:
+                payload["time_resolution"] = time_resolution
             return self._envelope(
                 tool, args, scope,
-                {"event_ids": event_ids, "events": result["results"], **{key: value for key, value in result.items() if key != "results"},
-                 "domain_query_generation_id": result["query_generation_id"]},
+                payload,
                 result_count=result["result_count"], truncated=result["truncated"], result_type="public_events",
             )
         event_id = self._require_string(args, "event_id", required=True, max_length=256)
