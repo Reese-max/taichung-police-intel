@@ -278,6 +278,22 @@ class ReceiptGuardTests(unittest.TestCase):
         receipt = {"checks": [{"id": "a", "status": "PASS"}, {"id": "b", "status": "PASS"}]}
         self.assertEqual(vc.finalize_status(receipt), "PASS")
 
+    def test_full_receipt_is_partial_when_a_required_lane_is_not_run(self):
+        receipt = {
+            "test_mode": "CURRENT_CHECKOUT_LOOPBACK_HTTP",
+            "checks": [{"id": "a", "status": "PASS"}],
+            "not_run": [{"id": "browser_e2e", "status": "NOT_RUN", "reason": "--skip-browser"}],
+        }
+        self.assertEqual(vc.finalize_status(receipt), "PARTIAL")
+
+    def test_core_receipt_can_pass_with_expected_full_lane_omissions(self):
+        receipt = {
+            "test_mode": "CURRENT_CHECKOUT_CORE",
+            "checks": [{"id": "a", "status": "PASS"}],
+            "not_run": [{"id": "browser_e2e", "status": "NOT_RUN", "reason": "core mode"}],
+        }
+        self.assertEqual(vc.finalize_status(receipt), "PASS")
+
 
 class SabotageTests(unittest.TestCase):
     def test_sabotaged_checkout_copy_fails_verification(self):

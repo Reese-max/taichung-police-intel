@@ -813,6 +813,8 @@ def finalize_status(receipt: dict[str, Any]) -> str:
         return "FAIL"
     if not any(check.get("status") == "PASS" for check in checks):
         return "FAIL"
+    if receipt.get("test_mode") == "CURRENT_CHECKOUT_LOOPBACK_HTTP" and receipt.get("not_run"):
+        return "PARTIAL"
     return "PASS"
 
 

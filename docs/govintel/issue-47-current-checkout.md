@@ -30,7 +30,7 @@ Loopback HTTP proves only the candidate query/static lane. It is recorded as a
 query-index success; formal `deployment` and `public_http_verification` stages
 remain `UNKNOWN` until a real deployment and anonymous public hash receipt exist.
 
-The companion Python contract suite has `25/25` tests. The verifier is local-only,
+The companion Python contract suite has `28/28` tests. The verifier is local-only,
 uses a preserved checked-in snapshot, and does not write canonical or production
 state.
 
