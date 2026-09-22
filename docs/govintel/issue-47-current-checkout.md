@@ -51,6 +51,15 @@ candidate `rc-40e28aa42b40-20260921T234108Z` and `24/24` checks. The receipt is
 `runtime-evidence/current-checkout/20260921T234108Z/receipt.json`; the local
 candidate remains loopback-only and `production_verified=false`.
 
+## 2026-09-22 replay after timezone-bound event filters
+
+Commit `06d62e2014e17522c011fa3569a1ab30cbf351bf` passed the full verifier with
+candidate `rc-06d62e2014e1-20260922T021923Z` and `24/24` checks. The receipt is
+`runtime-evidence/current-checkout/20260922T021923Z/receipt.json`; it records
+browser `13/13`, STDIO/HTTP MCP lifecycle, foreign-generation rejection,
+query-down static fallback, and sabotage detection. Its `production_verified`
+field remains `false` by design.
+
 ## Evidence boundary
 
 | Dimension | State |
