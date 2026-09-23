@@ -12,6 +12,7 @@ on:
       - "apps/web/public/data/feed-export.csv"
       - "apps/web/public/data/v2-daily-brief.json"
       - "state/v2-shadow-state.json"
+      - "state/v2-handoff-state.json"
 
 permissions:
   contents: read
@@ -23,6 +24,21 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/govintel_test
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: govintel_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d govintel_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -46,6 +62,12 @@ jobs:
       - name: Install web dependencies
         run: npm ci --prefix apps/web
 
+      - name: Check source contract drift implementation
+        run: python -X utf8 scripts/schema_drift.py --self-check
+
+      - name: Build machine-readable system health receipt
+        run: python -X utf8 scripts/system-health.py --output apps/web/public/data/system-health.json
+
       - name: Run full verification gate
         run: npm run check
 
@@ -57,11 +79,12 @@ jobs:
 
       - name: Build conservative V2 baseline publication
         run: |
-          rm -f /tmp/v2-shadow-state.json /tmp/v2-shadow-brief.json
+          rm -f /tmp/v2-shadow-state.json /tmp/v2-handoff-state.json /tmp/v2-shadow-brief.json
           python -X utf8 scripts/build-v2-shadow-brief.py \
             --input apps/web/public/data/intelligence-feed.json \
             --source-status apps/web/public/data/source-status.json \
             --state /tmp/v2-shadow-state.json \
+            --handoff-state /tmp/v2-handoff-state.json \
             --output /tmp/v2-shadow-brief.json \
             --reset-baseline
 
@@ -71,6 +94,7 @@ jobs:
             --feed apps/web/public/data/intelligence-feed.json \
             --status apps/web/public/data/source-status.json \
             --state /tmp/v2-shadow-state.json \
+            --handoff-state /tmp/v2-handoff-state.json \
             --brief /tmp/v2-shadow-brief.json
           python -X utf8 -c 'import json; p="/tmp/v2-shadow-brief.json"; d=json.load(open(p, encoding="utf-8")); o=d["overview"]; assert o["current_change_count"] == 0; print("V2_SHADOW_BASELINE_OK archive={} legacy={}".format(o["archive_total"], o["legacy_home_candidate_count"]))'
 
@@ -79,28 +103,28 @@ jobs:
         run: |
           cp apps/web/public/data/intelligence-feed.json /tmp/v2-regression-feed.json
           cp state/v2-shadow-state.json /tmp/v2-regression-state.json
+          cp state/v2-handoff-state.json /tmp/v2-regression-handoff-state.json
           python -X utf8 -c 'import json; p="/tmp/v2-regression-feed.json"; d=json.load(open(p, encoding="utf-8")); assert len(d["items"]) >= 24; [(item.__setitem__("title", item["title"] + "（排程回歸測試）")) for item in d["items"][:24]]; json.dump(d, open(p, "w", encoding="utf-8"), ensure_ascii=False, indent=2)'
           python -X utf8 scripts/build-v2-shadow-brief.py \
             --input /tmp/v2-regression-feed.json \
             --source-status apps/web/public/data/source-status.json \
             --state /tmp/v2-regression-state.json \
+            --handoff-state /tmp/v2-regression-handoff-state.json \
             --output /tmp/v2-regression-brief.json
           cp /tmp/v2-regression-feed.json apps/web/public/data/intelligence-feed.json
           cp /tmp/v2-regression-brief.json apps/web/public/data/v2-daily-brief.json
-          npm --prefix apps/web test
+          pushd apps/web
+          GOVINTEL_SKIP_DIRTY_FIXTURE_RUNTIME=1 node --test --test-concurrency=1 tests/*.test.mjs
+          popd
           python -X utf8 -c 'import json; d=json.load(open("/tmp/v2-regression-brief.json", encoding="utf-8")); displayed=len(d["priority_items"])+len(d["tracking_items"])+len(d["other_changes"]); assert d["overview"]["current_change_count"] == 24; assert displayed == 23; print("V2_WEB_DISPLAY_CAP_OK changes=24 displayed=23")'
 
-      - name: Verify scheduled-failure summary quoting
+      - name: Verify publication outcome and safe summary rendering
         shell: bash
         run: |
-          python -X utf8 - <<'PY'
-          from pathlib import Path
+          python -X utf8 -m unittest discover -s tests -p "test_publication_outcome.py" -v
+          echo "PUBLICATION_OUTCOME_SUMMARY_OK"
 
-          workflow = Path(".github/workflows/pages.yml").read_text(encoding="utf-8")
-          expected = r'''printf 'Failure evidence is retained in artifact `%s`.\n' "$artifact_name"'''
-          assert expected in workflow, "pages workflow must keep Markdown backticks out of shell command substitution"
-          PY
-          artifact_name="failed-publication-morning-123"
-          rendered="$(printf 'Failure evidence is retained in artifact `%s`.\n' "$artifact_name")"
-          test "$rendered" = 'Failure evidence is retained in artifact `failed-publication-morning-123`.'
-          echo "SCHEDULED_FAILURE_SUMMARY_OK $rendered"
+      - name: Verify protected-main publication state lifecycle
+        run: |
+          python -X utf8 -m unittest discover -s tests -p "test_publication_state_branch.py" -v
+          echo "PUBLICATION_STATE_BRANCH_OK"

@@ -1,0 +1,381 @@
+{
+  "schema_version": 1,
+  "registry_version": 1,
+  "updated_at": "2026-09-17",
+  "entities": [
+    {
+      "entity_id": "agency:tc-police",
+      "kind": "agency",
+      "canonical_label": "臺中市政府警察局",
+      "aliases": ["臺中市警察局", "臺中市警局", "中市警"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "official-source-catalog:S-001"
+    },
+    {
+      "entity_id": "agency:tc-traffic",
+      "kind": "agency",
+      "canonical_label": "臺中市政府交通局",
+      "aliases": ["臺中市交通局", "中市交通局"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "official-source-catalog:S-032"
+    },
+    {
+      "entity_id": "agency:tc-fire",
+      "kind": "agency",
+      "canonical_label": "臺中市政府消防局",
+      "aliases": ["臺中市消防局", "中市消防局"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "official-source-catalog:S-031"
+    },
+    {
+      "entity_id": "agency:tc-council",
+      "kind": "agency",
+      "canonical_label": "臺中市議會",
+      "aliases": ["台中市議會", "中市議會"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "official-source-catalog:S-004"
+    },
+    {
+      "entity_id": "agency:tc-rdec",
+      "kind": "agency",
+      "canonical_label": "臺中市政府研究發展考核委員會",
+      "aliases": ["臺中市研考會", "中市研考會", "研考會"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "official-source-catalog:S-019"
+    },
+    {
+      "entity_id": "agency:tc-news",
+      "kind": "agency",
+      "canonical_label": "臺中市政府新聞局",
+      "aliases": ["臺中市新聞局", "中市新聞局"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "official-source-catalog:S-033"
+    },
+    {
+      "entity_id": "location:taichung-city",
+      "kind": "location",
+      "location_type": "city",
+      "canonical_label": "臺中市",
+      "aliases": ["台中市", "臺中", "台中"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "administrative-name"
+    },
+    {
+      "entity_id": "location:tc-central",
+      "kind": "location",
+      "location_type": "district",
+      "canonical_label": "中區",
+      "aliases": ["臺中市中區", "台中市中區"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "administrative-name"
+    },
+    {
+      "entity_id": "location:tc-east",
+      "kind": "location",
+      "location_type": "district",
+      "canonical_label": "東區",
+      "aliases": ["臺中市東區", "台中市東區"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "administrative-name"
+    },
+    {
+      "entity_id": "location:tc-south",
+      "kind": "location",
+      "location_type": "district",
+      "canonical_label": "南區",
+      "aliases": ["臺中市南區", "台中市南區"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "administrative-name"
+    },
+    {
+      "entity_id": "location:tc-west",
+      "kind": "location",
+      "location_type": "district",
+      "canonical_label": "西區",
+      "aliases": ["臺中市西區", "台中市西區"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "administrative-name"
+    },
+    {
+      "entity_id": "location:tc-north",
+      "kind": "location",
+      "location_type": "district",
+      "canonical_label": "北區",
+      "aliases": ["臺中市北區", "台中市北區"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "administrative-name"
+    },
+    {
+      "entity_id": "location:tc-xitun",
+      "kind": "location",
+      "location_type": "district",
+      "canonical_label": "西屯區",
+      "aliases": ["臺中市西屯區", "台中市西屯區", "西屯"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "administrative-name"
+    },
+    {
+      "entity_id": "location:tc-nantun",
+      "kind": "location",
+      "location_type": "district",
+      "canonical_label": "南屯區",
+      "aliases": ["臺中市南屯區", "台中市南屯區", "南屯"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "administrative-name"
+    },
+    {
+      "entity_id": "location:tc-beitun",
+      "kind": "location",
+      "location_type": "district",
+      "canonical_label": "北屯區",
+      "aliases": ["臺中市北屯區", "台中市北屯區", "北屯"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "administrative-name"
+    },
+    {
+      "entity_id": "location:tc-fengyuan",
+      "kind": "location",
+      "location_type": "district",
+      "canonical_label": "豐原區",
+      "aliases": ["臺中市豐原區", "台中市豐原區", "豐原"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "administrative-name"
+    },
+    {
+      "entity_id": "location:tc-dongshi",
+      "kind": "location",
+      "location_type": "district",
+      "canonical_label": "東勢區",
+      "aliases": ["臺中市東勢區", "台中市東勢區", "東勢"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "administrative-name"
+    },
+    {
+      "entity_id": "location:tc-dajia",
+      "kind": "location",
+      "location_type": "district",
+      "canonical_label": "大甲區",
+      "aliases": ["臺中市大甲區", "台中市大甲區", "大甲"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "administrative-name"
+    },
+    {
+      "entity_id": "location:tc-qingshui",
+      "kind": "location",
+      "location_type": "district",
+      "canonical_label": "清水區",
+      "aliases": ["臺中市清水區", "台中市清水區", "清水"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "administrative-name"
+    },
+    {
+      "entity_id": "location:tc-shalu",
+      "kind": "location",
+      "location_type": "district",
+      "canonical_label": "沙鹿區",
+      "aliases": ["臺中市沙鹿區", "台中市沙鹿區", "沙鹿"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "administrative-name"
+    },
+    {
+      "entity_id": "location:tc-wuqi",
+      "kind": "location",
+      "location_type": "district",
+      "canonical_label": "梧棲區",
+      "aliases": ["臺中市梧棲區", "台中市梧棲區", "梧棲"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "administrative-name"
+    },
+    {
+      "entity_id": "location:tc-houli",
+      "kind": "location",
+      "location_type": "district",
+      "canonical_label": "后里區",
+      "aliases": ["臺中市后里區", "台中市后里區", "后里"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "administrative-name"
+    },
+    {
+      "entity_id": "location:tc-shengang",
+      "kind": "location",
+      "location_type": "district",
+      "canonical_label": "神岡區",
+      "aliases": ["臺中市神岡區", "台中市神岡區", "神岡"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "administrative-name"
+    },
+    {
+      "entity_id": "location:tc-tanzi",
+      "kind": "location",
+      "location_type": "district",
+      "canonical_label": "潭子區",
+      "aliases": ["臺中市潭子區", "台中市潭子區", "潭子"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "administrative-name"
+    },
+    {
+      "entity_id": "location:tc-daya",
+      "kind": "location",
+      "location_type": "district",
+      "canonical_label": "大雅區",
+      "aliases": ["臺中市大雅區", "台中市大雅區", "大雅"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "administrative-name"
+    },
+    {
+      "entity_id": "location:tc-xinshe",
+      "kind": "location",
+      "location_type": "district",
+      "canonical_label": "新社區",
+      "aliases": ["臺中市新社區", "台中市新社區", "新社"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "administrative-name"
+    },
+    {
+      "entity_id": "location:tc-shigang",
+      "kind": "location",
+      "location_type": "district",
+      "canonical_label": "石岡區",
+      "aliases": ["臺中市石岡區", "台中市石岡區", "石岡"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "administrative-name"
+    },
+    {
+      "entity_id": "location:tc-waipu",
+      "kind": "location",
+      "location_type": "district",
+      "canonical_label": "外埔區",
+      "aliases": ["臺中市外埔區", "台中市外埔區", "外埔"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "administrative-name"
+    },
+    {
+      "entity_id": "location:tc-daan",
+      "kind": "location",
+      "location_type": "district",
+      "canonical_label": "大安區",
+      "aliases": ["臺中市大安區", "台中市大安區"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "administrative-name"
+    },
+    {
+      "entity_id": "location:tc-wuri",
+      "kind": "location",
+      "location_type": "district",
+      "canonical_label": "烏日區",
+      "aliases": ["臺中市烏日區", "台中市烏日區", "烏日"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "administrative-name"
+    },
+    {
+      "entity_id": "location:tc-dadu",
+      "kind": "location",
+      "location_type": "district",
+      "canonical_label": "大肚區",
+      "aliases": ["臺中市大肚區", "台中市大肚區", "大肚"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "administrative-name"
+    },
+    {
+      "entity_id": "location:tc-longjing",
+      "kind": "location",
+      "location_type": "district",
+      "canonical_label": "龍井區",
+      "aliases": ["臺中市龍井區", "台中市龍井區", "龍井"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "administrative-name"
+    },
+    {
+      "entity_id": "location:tc-wufeng",
+      "kind": "location",
+      "location_type": "district",
+      "canonical_label": "霧峰區",
+      "aliases": ["臺中市霧峰區", "台中市霧峰區", "霧峰"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "administrative-name"
+    },
+    {
+      "entity_id": "location:tc-taiping",
+      "kind": "location",
+      "location_type": "district",
+      "canonical_label": "太平區",
+      "aliases": ["臺中市太平區", "台中市太平區", "太平"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "administrative-name"
+    },
+    {
+      "entity_id": "location:tc-dali",
+      "kind": "location",
+      "location_type": "district",
+      "canonical_label": "大里區",
+      "aliases": ["臺中市大里區", "台中市大里區", "大里"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "administrative-name"
+    },
+    {
+      "entity_id": "location:tc-heping",
+      "kind": "location",
+      "location_type": "district",
+      "canonical_label": "和平區",
+      "aliases": ["臺中市和平區", "台中市和平區", "和平"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "administrative-name"
+    },
+    {
+      "entity_id": "location:tc-taiwan-blvd",
+      "kind": "location",
+      "location_type": "road",
+      "canonical_label": "臺灣大道",
+      "aliases": ["台灣大道"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "official-road-name"
+    },
+    {
+      "entity_id": "location:tc-route-74",
+      "kind": "location",
+      "location_type": "road",
+      "canonical_label": "台74線",
+      "aliases": ["臺74線", "74快速道路", "台74快速道路", "臺74快速道路"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "official-road-name"
+    }
+  ]
+}

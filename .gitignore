@@ -12,6 +12,8 @@ venv/
 .gstack/
 .playwright-cli/
 output/playwright/
+output/current-checkout-*/
+runtime-evidence/
 
 # Internal Chinese planning documents excluded from public submission
 daily-five-minute-homepage-sample-2026-08-13.md
@@ -20,6 +22,7 @@ hackathon-master-roadmap-v4.md
 source-catalog.md
 source-seven-day-audit-2026-08-14.md
 .runtime/
+state/live-meeting-session.json
 graphify-out/
 coverage/
 *.pre-sequential-fix-*.csv

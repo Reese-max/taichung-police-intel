@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import importlib.util
 import json
 import sys
 from pathlib import Path
@@ -8,7 +9,20 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "apps" / "web" / "public" / "data"
-EXPECTED_SOURCES = {"S-004", "S-006", "S-007", "S-009", "S-029"}
+SOURCE_POLICY = ROOT / "scripts" / "source-policy.py"
+
+
+def load_expected_sources() -> set[str]:
+    spec = importlib.util.spec_from_file_location("publication_source_policy", SOURCE_POLICY)
+    if spec is None or spec.loader is None:
+        raise ValueError("source policy module is unavailable")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    policy = module.compile_policy(module.load_catalog())
+    expected = set(policy["active_source_ids"])
+    if not expected:
+        raise ValueError("source policy has no active sources")
+    return expected
 
 
 def load_json(name: str) -> dict:
@@ -21,8 +35,23 @@ def load_json(name: str) -> dict:
         raise ValueError(f"invalid JSON: {path.relative_to(ROOT)}: {error}") from error
 
 
+def source_ids(sources: object) -> list[str]:
+    if not isinstance(sources, list) or any(not isinstance(source, dict) for source in sources):
+        raise ValueError("source-status sources must contain only objects")
+    ids = [source.get("source_id") for source in sources]
+    if any(not isinstance(source_id, str) or not source_id for source_id in ids):
+        raise ValueError("source-status source_id must be non-empty strings")
+    return ids
+
+
 def main() -> int:
     errors: list[str] = []
+
+    try:
+        expected_sources = load_expected_sources()
+    except (OSError, ValueError, json.JSONDecodeError) as error:
+        print(f"PUBLICATION_BUNDLE_FAIL {error}", file=sys.stderr)
+        return 1
 
     try:
         status = load_json("source-status.json")
@@ -59,23 +88,34 @@ def main() -> int:
         errors.append("intelligence-summary.json must use schema_version=1")
 
     status_sources = status.get("sources")
-    if not isinstance(status_sources, list):
-        errors.append("source-status.json sources must be an array")
+    try:
+        status_source_ids = source_ids(status_sources)
+    except ValueError as error:
+        errors.append(str(error))
         status_sources = []
-    status_source_ids = [item.get("source_id") for item in status_sources if isinstance(item, dict)]
-    if set(status_source_ids) != EXPECTED_SOURCES or len(status_source_ids) != len(EXPECTED_SOURCES):
+        status_source_ids = []
+    if set(status_source_ids) != expected_sources or len(status_source_ids) != len(expected_sources):
         errors.append(f"source-status source IDs invalid: {status_source_ids}")
 
     source_summary = feed.get("source_summary")
-    if not isinstance(source_summary, dict) or set(source_summary) != EXPECTED_SOURCES:
+    if not isinstance(source_summary, dict) or set(source_summary) != expected_sources:
         errors.append(
-            f"intelligence-feed source_summary must cover exactly {sorted(EXPECTED_SOURCES)}"
+            f"intelligence-feed source_summary must cover exactly {sorted(expected_sources)}"
         )
 
     items = feed.get("items")
     if not isinstance(items, list):
         errors.append("intelligence-feed.json items must be an array")
         items = []
+
+    feed_source_ids = {
+        item.get("source_id")
+        for item in items
+        if isinstance(item, dict) and isinstance(item.get("source_id"), str)
+    }
+    unknown_feed_sources = sorted(feed_source_ids - expected_sources)
+    if unknown_feed_sources:
+        errors.append(f"feed contains sources outside active policy: {unknown_feed_sources}")
 
     stable_ids = [item.get("stable_id") for item in items if isinstance(item, dict)]
     missing_stable_ids = sum(not stable_id for stable_id in stable_ids)

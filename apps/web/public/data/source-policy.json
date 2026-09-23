@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "catalog_schema_version": 2,
+  "catalog_updated_at": "2026-09-21",
+  "policy_version": 1,
+  "policy_hash": "1387c7e5a15c2fc0a07b6881b0ee40f70e789fcbe01862d9834bfe9b079464d5",
+  "catalog_hash": "886cd9c53e0431a09bb6573e6bcd328861c005ed410f95bdd226c1c2cc7c7356",
+  "active_source_ids": [
+    "S-004",
+    "S-006",
+    "S-007",
+    "S-009",
+    "S-029"
+  ]
+}

@@ -7,6 +7,7 @@ const briefUrl = new URL("../public/data/v2-daily-brief.json", import.meta.url);
 const feedUrl = new URL("../public/data/intelligence-feed.json", import.meta.url);
 const statusUrl = new URL("../public/data/source-status.json", import.meta.url);
 const componentUrl = new URL("../components/V2DailyDashboard.js", import.meta.url);
+const queryGatewayUrl = new URL("../components/QueryGatewayPanel.js", import.meta.url);
 const layoutUrl = new URL("../app/layout.js", import.meta.url);
 
 async function json(url) {
@@ -22,6 +23,10 @@ test("checked-in V2 brief uses the police-user publication schema", async () => 
   assert.ok(Array.isArray(brief.priority_items));
   assert.ok(Array.isArray(brief.tracking_items));
   assert.ok(Array.isArray(brief.other_changes));
+  assert.equal(brief.profile.profile_id, "general");
+  assert.equal(brief.profile.profile_version, 1);
+  assert.match(brief.profile.profile_hash, /^[0-9a-f]{64}$/);
+  assert.ok(Array.isArray(brief.profile_views) && brief.profile_views.length >= 3);
   assert.ok(brief.priority_items.length <= 3);
   assert.ok(brief.tracking_items.length <= 5);
 });
@@ -39,13 +44,13 @@ test("V2 brief and official-source bundle refer to one collection run", async ()
   );
   assert.equal(brief.generated_at, feed.generated_at);
   assert.equal(brief.source_status_generated_at, status.generated_at);
+  assert.ok(brief.overview.tracking_total >= brief.tracking_items.length);
 });
 
 test("generated brief separates current changes from the historical archive", async () => {
   const [brief, feed] = await Promise.all([json(briefUrl), json(feedUrl)]);
   const publishedChanges = [
     ...brief.priority_items,
-    ...brief.tracking_items,
     ...brief.other_changes,
   ];
 
@@ -84,7 +89,7 @@ test("formal layout renders V2 before the collapsed legacy interface", async () 
   assert.ok(dashboardIndex >= 0, "V2 dashboard must be rendered");
   assert.ok(legacyIndex > dashboardIndex, "legacy interface must follow V2");
   assert.ok(childrenIndex > legacyIndex, "legacy children must remain inside the collapsed section");
-  assert.match(source, /臺中警政每日情資/);
+  assert.match(source, /GovIntel AI/);
 });
 
 test("V2 dashboard is police-first, Top 3 capped, and evidence-bound", async () => {
@@ -94,10 +99,41 @@ test("V2 dashboard is police-first, Top 3 capped, and evidence-bound", async () 
   assert.match(source, /本期沒有需要處理的重要變更/);
   assert.match(source, /why_it_matters/);
   assert.match(source, /recommended_action/);
+  assert.match(source, /watch_status/);
+  assert.match(source, /data-testid="v2-tracking-list"/);
   assert.match(source, /affected_roles/);
+  assert.match(source, /role-profile-selector/);
+  assert.match(source, /profile_relevance/);
+  assert.match(source, /reason_codes/);
   assert.match(source, /開啟官方來源/);
+  assert.match(source, /加入追蹤/);
+  assert.match(source, /確認／更新交班版本/);
+  assert.match(source, /本機保存 · 不會寫入公開網站/);
+  assert.match(source, /標記已處理/);
+  assert.match(source, /匯出 Markdown/);
   assert.match(source, /DETERMINISTIC_PASS/);
   assert.doesNotMatch(source, /AUTO_PASS/);
+  assert.doesNotMatch(source, /\bitems\.slice\(0, 5\)/);
+});
+
+test("Ask GovIntel is a bounded shared-gateway entry rather than a fake chatbot", async () => {
+  const [dashboard, panel] = await Promise.all([
+    readFile(componentUrl, "utf8"),
+    readFile(queryGatewayUrl, "utf8"),
+  ]);
+  assert.match(dashboard, /QueryGatewayPanel/);
+  assert.match(panel, /search_evidence/);
+  assert.match(panel, /get_current_brief/);
+  assert.match(panel, /get_publication_receipt/);
+  assert.match(panel, /get_source_health/);
+  assert.match(panel, /publication metadata/);
+  assert.match(panel, /query_coverage/);
+  assert.match(panel, /覆蓋狀態/);
+  assert.match(panel, /targetType="QUERY"/);
+  assert.match(panel, /targetType="ANSWER"/);
+  assert.match(panel, /original_output_sha256/);
+  assert.match(panel, /Dashboard 仍可使用/);
+  assert.doesNotMatch(panel, /new Function|eval\(|arbitrary/);
 });
 
 test("V2 dashboard distinguishes fetch failure from a valid zero-change period", async () => {

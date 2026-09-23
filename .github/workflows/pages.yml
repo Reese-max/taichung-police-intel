@@ -10,6 +10,7 @@ on:
       - "apps/web/public/data/feed-export.csv"
       - "apps/web/public/data/v2-daily-brief.json"
       - "state/v2-shadow-state.json"
+      - "state/v2-handoff-state.json"
   schedule:
     - cron: "30 22 * * *"
     - cron: "30 10 * * *"
@@ -33,7 +34,37 @@ concurrency:
 
 jobs:
   build:
+    if: github.ref == 'refs/heads/main'
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/govintel_test
+    outputs:
+      restore: ${{ steps.restore_state.outcome }}
+      collect: ${{ steps.collect.outcome }}
+      v1: ${{ steps.v1.outcome }}
+      v2: ${{ steps.v2.outcome }}
+      v2_verify: ${{ steps.v2_verify.outcome }}
+      schema_drift: ${{ steps.schema_drift.outcome }}
+      verify: ${{ steps.verify.outcome }}
+      preserve: ${{ steps.preserve.outcome }}
+      state_commit: ${{ steps.preserve.outputs.state_commit }}
+      generation_id: ${{ steps.preserve.outputs.generation_id }}
+      pages_upload: ${{ steps.pages_upload.outcome }}
+      evidence: ${{ steps.evidence.outcome }}
+      evidence_url: ${{ steps.evidence.outputs.artifact-url }}
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: govintel_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d govintel_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -41,12 +72,13 @@ jobs:
           fetch-depth: 0
 
       - name: Select scheduled slot
-        if: github.event_name != 'push'
         id: slot
         shell: bash
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             echo "value=${{ inputs.slot }}" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.event_name }}" == "push" ]]; then
+            echo "value=code" >> "$GITHUB_OUTPUT"
           elif [[ "${{ github.event.schedule }}" == "30 22 * * *" ]]; then
             echo "value=morning" >> "$GITHUB_OUTPUT"
           else
@@ -62,8 +94,14 @@ jobs:
       - name: Install Python dependencies
         run: python -m pip install -r requirements.txt
 
+      # Code-only deploys also restore; checked-in JSON on main may be older.
+      - name: Restore last durable publication state
+        id: restore_state
+        run: python -X utf8 scripts/publication-state-branch.py restore --branch publication-state --allow-legacy-bootstrap
+
       - name: Refresh official-source publication bundle
-        if: github.event_name != 'push'
+        id: collect
+        if: github.event_name != 'push' && steps.restore_state.outputs.pending_recovery != 'true'
         run: |
           python online_collect.py \
             --slot "${{ steps.slot.outputs.value }}" \
@@ -71,30 +109,46 @@ jobs:
             --trigger "${{ github.event_name == 'schedule' && 'schedule' || 'manual' }}"
 
       - name: Verify generated V1 publication bundle
+        id: v1
         run: python -X utf8 scripts/verify-publication-bundle.py
 
       - name: Build persistent V2 daily intelligence
+        id: v2
         shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PENDING_RECOVERY: ${{ steps.restore_state.outputs.pending_recovery }}
         run: |
-          if [[ "${{ github.event_name }}" != "push" ]] \
-             || [[ ! -f state/v2-shadow-state.json ]] \
-             || [[ ! -f apps/web/public/data/v2-daily-brief.json ]]; then
+          if [[ "$PENDING_RECOVERY" == "true" ]]; then
+            echo "Replaying the exact pending V2 bundle; no recollection or diff advancement."
+          elif [[ "$EVENT_NAME" != "push" ]]; then
             python -X utf8 scripts/build-v2-shadow-brief.py \
               --input apps/web/public/data/intelligence-feed.json \
               --source-status apps/web/public/data/source-status.json \
               --state state/v2-shadow-state.json \
+              --handoff-state state/v2-handoff-state.json \
               --output apps/web/public/data/v2-daily-brief.json
           else
-            echo "Using the checked-in persistent V2 publication for this code-only push."
+            echo "Using the restored durable V2 publication for this code-only push."
           fi
 
       - name: Verify persistent V2 publication
+        id: v2_verify
         run: |
           python -X utf8 scripts/verify-v2-publication.py \
             --feed apps/web/public/data/intelligence-feed.json \
             --status apps/web/public/data/source-status.json \
             --state state/v2-shadow-state.json \
+            --handoff-state state/v2-handoff-state.json \
             --brief apps/web/public/data/v2-daily-brief.json
+
+      - name: Build source contract drift receipt
+        id: schema_drift
+        run: python -X utf8 scripts/schema_drift.py --live --state state/schema-drift-state.json --output apps/web/public/data/schema-drift.json
+
+      - name: Build machine-readable system health receipt
+        id: system_health
+        run: python -X utf8 scripts/system-health.py --output apps/web/public/data/system-health.json
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -111,6 +165,7 @@ jobs:
         uses: actions/configure-pages@v5
 
       - name: Run full verification gate and build static site
+        id: verify
         shell: bash
         run: |
           set -o pipefail
@@ -119,11 +174,25 @@ jobs:
           PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
           NEXT_PUBLIC_BASE_PATH: ${{ steps.pages.outputs.base_path }}
 
-      - name: Retain failed scheduled-publication evidence
-        if: failure() && github.event_name != 'push'
+      - name: Persist pending V1 and V2 state outside protected main
+        id: preserve
+        run: |
+          python -X utf8 scripts/publication-state-branch.py persist \
+            --branch publication-state \
+            --slot "${{ steps.slot.outputs.value }}"
+
+      - name: Upload Pages artifact
+        id: pages_upload
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/web/out
+
+      - name: Retain publication evidence, including downstream failures
+        if: always()
+        id: evidence
         uses: actions/upload-artifact@v4
         with:
-          name: failed-publication-${{ steps.slot.outputs.value }}-${{ github.run_id }}
+          name: publication-evidence-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             verification.log
             apps/web/public/data/source-status.json
@@ -131,42 +200,13 @@ jobs:
             apps/web/public/data/intelligence-summary.json
             apps/web/public/data/feed-export.csv
             apps/web/public/data/v2-daily-brief.json
+            apps/web/public/data/system-health.json
+            apps/web/public/data/schema-drift.json
             state/v2-shadow-state.json
-          if-no-files-found: warn
+            state/schema-drift-state.json
+            state/v2-handoff-state.json
+          if-no-files-found: error
           retention-days: 14
-
-      - name: Alert operators that the deployed publication is stale
-        if: failure() && github.event_name != 'push'
-        shell: bash
-        run: |
-          artifact_name="failed-publication-${{ steps.slot.outputs.value }}-${{ github.run_id }}"
-          {
-            echo "## Scheduled publication blocked"
-            echo "The generated ${{ steps.slot.outputs.value }} bundle did not pass the publication gate."
-            echo "GitHub Pages was not updated; the deployed publication remains stale."
-            printf 'Failure evidence is retained in artifact `%s`.\n' "$artifact_name"
-          } >> "$GITHUB_STEP_SUMMARY"
-          echo "::error title=Scheduled publication blocked::The generated ${{ steps.slot.outputs.value }} bundle failed verification. GitHub Pages was not updated; inspect the retained failure artifact."
-
-      - name: Preserve V1 and V2 publication evidence as one commit
-        shell: bash
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- \
-            apps/web/public/data/source-status.json \
-            apps/web/public/data/intelligence-feed.json \
-            apps/web/public/data/intelligence-summary.json \
-            apps/web/public/data/feed-export.csv \
-            apps/web/public/data/v2-daily-brief.json \
-            state/v2-shadow-state.json
-          git diff --cached --quiet || git commit -m "data: refresh V1 and V2 publication bundle [skip ci]"
-          git push
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: apps/web/out
 
   deploy:
     environment:
@@ -174,7 +214,63 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     needs: build
+    outputs:
+      public_verify: ${{ steps.acknowledge.outcome }}
     steps:
+      - name: Checkout reviewed code for public verification
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+      - name: Verify public data bytes and acknowledge exact checkpoint
+        id: acknowledge
+        run: python -X utf8 scripts/publication-state-branch.py acknowledge
+        env:
+          EXPECTED_STATE_COMMIT: ${{ needs.build.outputs.state_commit }}
+          EXPECTED_GENERATION: ${{ needs.build.outputs.generation_id }}
+          PUBLICATION_BASE_URL: ${{ steps.deployment.outputs.page_url }}
+
+  publication_outcome:
+    needs: [build, deploy]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout reporting code from the workflow commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Report actual build and deployment outcomes
+        env:
+          BUILD_RESULT: ${{ needs.build.result }}
+          DEPLOY_RESULT: ${{ needs.deploy.result }}
+          RESTORE: ${{ needs.build.outputs.restore }}
+          COLLECT: ${{ needs.build.outputs.collect }}
+          V1: ${{ needs.build.outputs.v1 }}
+          V2: ${{ needs.build.outputs.v2 }}
+          V2_VERIFY: ${{ needs.build.outputs.v2_verify }}
+          SCHEMA_DRIFT: ${{ needs.build.outputs.schema_drift }}
+          VERIFY: ${{ needs.build.outputs.verify }}
+          PRESERVE: ${{ needs.build.outputs.preserve }}
+          PAGES_UPLOAD: ${{ needs.build.outputs.pages_upload }}
+          EVIDENCE: ${{ needs.build.outputs.evidence }}
+          EVIDENCE_URL: ${{ needs.build.outputs.evidence_url }}
+          PUBLIC_VERIFY: ${{ needs.deploy.outputs.public_verify }}
+          GENERATION_ID: ${{ needs.build.outputs.generation_id }}
+          STATE_COMMIT: ${{ needs.build.outputs.state_commit }}
+        run: python scripts/publication-outcome.py --health-output runtime-evidence/publication-health.json
+
+      - name: Retain end-to-end runtime health receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: publication-health-${{ github.run_id }}-${{ github.run_attempt }}
+          path: runtime-evidence/publication-health.json
+          if-no-files-found: error
+          retention-days: 14

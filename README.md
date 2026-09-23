@@ -1,8 +1,25 @@
-# Taichung Police Public Intelligence
+# GovIntel AI｜跨機關公共事件整合、異動辨識與交班支援平台
+
+The former competition prototype name was **Taichung Police Public Intelligence**; this repository now documents the current GovIntel AI product.
 
 An evidence-first public-information monitor that helps police policy staff prepare for council questions in five minutes.
 
 The demo compresses official Taichung council and government sources into one workflow: identify a priority issue, inspect source health and intelligence gaps, then jump to the exact official video timestamp. Chinese is the end-user language; the homepage toggle provides the complete English judge path.
+
+## Current GovIntel state (2026-09-22)
+
+| Area | State | Evidence boundary |
+|---|---|---|
+| Five-source council publication baseline | `PRODUCTION_ACTIVE` in the repository path | Checked-in source/status contracts pass; current public deployment is not verified here |
+| Shared source policy, query coverage, official document replay, Dashboard discovery adapter | `IMPLEMENTED_NOT_PRODUCTION` | Local deterministic tests and receipts; no scheduled activation or public deployment claim |
+| S-001/S-019/S-031/S-032/S-033 source expansion | `CANDIDATE_CANARY` | List/live adapters and fixtures exist; live seven-day promotion evidence remains open under #14/#22 |
+| PublicEvent fusion and NPA source matrix | `IMPLEMENTED_NOT_PRODUCTION` | Conservative core and offline fixtures; no live collector/UI write path |
+| Bounded public live-meeting session and post-event reconciliation core | `IMPLEMENTED_NOT_PRODUCTION` | `python scripts/live-meeting.py self-check`; fixture-only state machine, no live provider transport or unattended ASR |
+| Twinkle/public API overlay and full cross-agency real-time coverage | `DESIGN_ONLY` | Strategy and candidate metadata only; no automatic promotion |
+| Scheduled publication merge, natural MORNING/EVENING proof, current anonymous hash check | `BLOCKED` | #20 still needs normal review/merge and real production evidence |
+| Human task evaluation, adoption, award, and official submission receipt | `NOT_RUN` / `UNVERIFIED` | No scores or institutional adoption claims are populated |
+
+The current judge entry is [docs/govintel/competition-2026/README.md](./docs/govintel/competition-2026/README.md). Historical Kiro/prototype receipts remain below and are labelled as historical.
 
 ## Judge path
 
@@ -12,15 +29,15 @@ The demo compresses official Taichung council and government sources into one wo
 4. Click a transcript segment or word to seek the official council video.
 5. Review `.kiro/` and [Kiro usage evidence](./docs/KIRO_USAGE.md).
 
-## Status
+## Historical prototype receipts (not current deployment evidence)
 
 | Deliverable | Current state |
 |---|---|
 | Working application | Local static production build passes |
-| Public demo | Deployed at [https://reese-max.github.io/taichung-police-intel](https://reese-max.github.io/taichung-police-intel) — verified HTTP 200 anonymously 2026-08-23 |
+| Public demo | [https://reese-max.github.io/taichung-police-intel](https://reese-max.github.io/taichung-police-intel) returned anonymous HTTP 200 on 2026-09-22; public [`data/source-status.json`](https://reese-max.github.io/taichung-police-intel/data/source-status.json) is still the older 2026-09-11 snapshot, not this checkout's candidate |
 | Demo video | [2:43 English-captioned MP4](https://reese-max.github.io/taichung-police-intel/demo-video.mp4) — verified anonymously in Chrome 2026-08-24 |
-| Twice-daily updates | GitHub Actions schedules 06:30 and 18:30 Asia/Taipei |
-| Source observability | Five live official-source adapters emit health, completeness, gaps, SHA-256, and last-known-good |
+| Twice-daily updates | GitHub Actions schedules 06:30 and 18:30 Asia/Taipei; a current successful schedule pair is not proven here |
+| Source observability | Five official-source adapters emit health, completeness, gaps, SHA-256, and last-known-good; the checked-in snapshot remains subject to its recorded freshness |
 | Evidence navigation | 86 transcript segments and 1,036 word timestamps seek the official HLS video |
 | English judge path | Complete homepage, source-monitor, evidence-drawer, control, limitation, and official-source translation path passes browser QA |
 | Kiro assets | Four Steering files, three Specs, and three executable Hooks are checked in |
@@ -68,13 +85,15 @@ GitHub Actions: 06:30 and 18:30 Asia/Taipei
 
 The repository also contains PostgreSQL migrations for the post-competition durable-history path. The public competition demo deliberately does not require that infrastructure.
 
+V2 可用 [role-profiles.v1.json](./docs/govintel/role-profiles.v1.json) 的版本化公開職能檔切換綜合、議會聯絡與交通／公共安全排序；profile 只產生可重播的 relevance projection，不改寫事件事實、官方證據或來源缺口。每日 brief 同時保存 profile hash 與 ranking policy version，首頁可用 `?profile=council-liaison` 或角色選單切換。
+
 ## Setup
 
 Requirements:
 
 - Node.js 20 or newer
 - Python 3.11 or newer
-- Git only for the scheduled evidence commit
+- Git for the scheduled publication-state checkpoint and local replay
 - Kiro CLI V3 only for reproducing the Kiro workflow
 
 Install dependencies:
@@ -106,20 +125,94 @@ python -m http.server 8000 --directory apps/web/out
 
 Open `http://localhost:8000`. The live refresh performs read-only requests to the listed official public sources.
 
+Read-only Query Gateway (publication slice; optional domain stores):
+
+```bash
+python scripts/query-gateway.py --port 8788 --allow-origin http://localhost:3000
+```
+
+若要讓 Gateway 使用保存的索引，先建立並以 `--query-store` 傳入；啟動時會
+重新核對它與 canonical feed、source status、brief 的 hash，不一致就拒絕服務：
+
+```bash
+python scripts/query-store.py build --output runtime/query-store.json
+python scripts/query-gateway.py --query-store runtime/query-store.json --port 8788 --allow-origin http://localhost:3000
+```
+
+For an MCP client using stdio, run `python scripts/query-gateway-stdio.py`; it
+reuses the same read-only JSON-RPC gateway. A reviewed located-facts bundle can
+be loaded with `--located-facts-bundle`; only hash-bound
+`CONFIRMED_OFFICIAL` facts enter the answer-evidence catalog.
+
+Set `NEXT_PUBLIC_QUERY_GATEWAY_URL=http://127.0.0.1:8788/query` when starting the Web app to enable **Ask GovIntel**. The default checked-in snapshot exposes five typed operations: `search_evidence`, `get_current_brief`, `get_publication_receipt`, `get_source_health`, and `validate_answer`. A validated PublicEvent store can additionally be supplied with `--public-events` for `search_events`, `get_event`, and `compare_event_versions`; a validated typed statistics store can be supplied with `--statistics` for `query_statistics`. Without those canonical stores, the domain operations stay explicitly `CAPABILITY_NOT_AVAILABLE` and are not advertised by MCP. All operations share the same read-only Gateway, reject arbitrary URL/SQL/path arguments, apply a process-local request cap, and report stale/partial/unknown states instead of converting them to zero events.
+
+Every query response also carries the catalog-derived `query_coverage` projection: policy version/hash, supported capability, required and covered sources, collection completeness, missing or stale sources, coverage limitations, and whether a bounded no-match statement is allowed. Optional domain-store queries additionally remain `freshness=UNKNOWN` and `domain_store_coverage_status=UNVERIFIED` until a source-health receipt is bound; a healthy index is not treated as complete coverage of the requested world.
+
+Current-checkout integration receipt:
+
+```bash
+npm ci
+npm run verify:current-checkout
+```
+
+This builds the static site, starts an ephemeral loopback server, records the actual code SHA, lockfile hash, publication generation/hash and source-policy binding, and verifies HTTP/static fallback, HTTP and STDIO MCP lifecycle/parity, browser interaction, mixed-generation rejection, and sabotage detection. It writes a machine-readable receipt under `runtime-evidence/current-checkout/`. `--mode core` omits the site/browser lane. It is a candidate-version receipt, not production deployment or public-reachability evidence.
+
+Rights/retention defaults are compiled from [retention-rights-policy.v1.json](./docs/govintel/retention-rights-policy.v1.json). Rights remain `UNKNOWN` until reviewed; outward Query Gateway data is metadata/link-only and never a legal permission or full-text archive. `scripts/retention-policy.py --plan ... --output ...` creates a read-only expiry receipt; it never deletes canonical audit linkage.
+
+Local-first handoff state:
+
+```bash
+python scripts/handoff-state.py watch --identity S-009:FEED-S-009-example
+python scripts/handoff-state.py confirm
+python scripts/handoff-state.py export --format markdown --output output/handoff.md
+python scripts/handoff-state.py self-check
+```
+
+The command uses the durable `state/v2-handoff-state.json`, makes repeated watch adds idempotent, preserves confirmed handoff versions, and reopens only affected watches as `NEEDS_REVIEW` when a source version changes. The static Web page remains canonical read-only: handoff drafts and Review Inbox actions are browser-local `localStorage` overlays only, while canonical state writes still use the local CLI and never store private notes or operational police fields.
+
+The saved [system-health.json](./apps/web/public/data/system-health.json) exposes the publication, query, and discovery lanes plus stage-level outcomes. `STALE` and `UNKNOWN` are intentional evidence states; they are not deployment or public-reachability claims.
+
+Because GitHub Pages is a static export, `/api/health.json` does not freeze a
+build-time `ok` result as current health; it returns `UNKNOWN` unless a caller
+provides a request-time clock. The browser dashboard performs the current
+snapshot-age check locally.
+
+Source contract drift is fail-closed. `scripts/schema_drift.py --live` observes the three HTML candidate lists, council JSON APIs, and data.gov.tw JSON/CSV resources; `--input` remains available for deterministic replay. A missing required field, changed type, failed HTML identity, missing pagination marker, or HTTP error becomes a drift receipt and preserves the last-known-good fingerprint; additive fields are recorded as compatible. The current receipt is reconciled into the system-health discovery lane and public Review Inbox projection; `scripts/review-inbox.py reconcile` persists local audit state. Running it without an observed input intentionally produces `UNKNOWN`, not a fabricated healthy result.
+
+Schema replay uses the small registry in `scripts/migration_replay.py` (`1→2→3`). `dry-run` emits affected/error counts and hashes; `apply` writes only after all objects pass and saves a migration receipt; `replay` reuses `intel_v2` semantics so deterministic IDs and `FIRST_SEEN` wording remain stable. Watch/handoff inputs are copied unchanged and hash-bound. Query Store remains rebuildable from a pinned canonical generation with `python scripts/query-store.py build --feed ... --status ... --brief ...`.
+
+Review Inbox uses `intel_v2/review.py` and `scripts/review-inbox.py` for deterministic fingerprints, deduplication, claim/decision audit, source-version reopening, and bounded homepage projection. `reconcile --input` also projects detail rechecks, discovery outcomes, PublicEvent conflict/candidate/split states, and stale/partial source rows into one local inbox without auto-promoting or auto-resolving them. Local audit state keeps reviewer/assignment details, while the public health receipt exposes only safe IDs and hashes. The Web overlay can mark an item for local follow-up, resolution, dismissal, or reopening and export that browser-local receipt; it never writes the canonical inbox. The first version is local-first and does not add RBAC or notifications.
+
+The bounded PublicEvent core is runnable with `python scripts/public-event-fusion.py --self-check`. It only fuses explicitly official normalized documents, optionally binds caller-provided labels through the versioned entity registry (`--entity-registry`) and carries its receipt, keeps document versions separate, carries forward partial/LKG events, and requires a confirmed event plus exact geography/period/source before adding `BACKGROUND_ONLY` context. The homepage now includes a clearly marked `FIXTURE_ONLY` read-only replay card for three sources, version differences, background context, and browser-local decision previews; it is not wired to live collectors or a write-capable public UI.
+
+The NPA source matrix is maintained in [npa-source-inventory.v1.json](./docs/govintel/npa-source-inventory.v1.json), with Batch 1 fixture adapters and explicit `PRIMARY_EVENT` / `PRIMARY_REFERENCE` / `ENRICHMENT` / `EXCLUDE_OR_AGGREGATE_ONLY` roles. Run `python scripts/npa-source-inventory.py --self-check` to verify the inventory. Candidate sources are not production or deployment evidence; personal case-level sources remain blocked from the public canonical feed. Details are in [issue-28-npa-source-matrix.md](./docs/govintel/issue-28-npa-source-matrix.md).
+
+Correction feedback is local-first and review-gated in [issue-37-feedback-loop.md](./docs/govintel/issue-37-feedback-loop.md). The V2 Review Inbox can create browser-local, version-bound feedback drafts for an event/entity; export remains explicit and does not write canonical state. `python scripts/feedback.py self-check` covers all nine feedback reasons, dedupe, trace hashes, privacy boundaries, accepted regression links, and the rule that feedback never directly changes production truth.
+
+The catalog-derived source policy has a cross-consumer receipt: `python scripts/verify-source-policy-integration.py --self-check` checks collector, publication, Query Store, Query Gateway, Health and Web bindings, approved candidate promotion, old replay, mixed-policy rejection, and bounded coverage gaps. It does not claim live source coverage or deployment.
+
+Official document conversion is bounded by `intel_v2/located_facts.py` and `scripts/located-facts.py`: approved catalog origin → immutable raw/text hashes → HTML text-range or JSON Pointer locator → `FACT_CANDIDATE` / `NEEDS_REVIEW` fact and evidence projections. A locator/hash mismatch fails closed; the adapter does not promote candidates to verified truth or infer missing dates.
+The live HTML/JSON replay receipt is [official-document-receipt.v1.json](./docs/govintel/official-document-receipt.v1.json); it records hashes and review status, not deployment or human approval.
+The read-only Taiwan Intel Dashboard discovery consumer is replayable with `python scripts/discovery-adapter.py self-check`; media remains unverified until a server-controlled official match, and it never writes canonical events.
+
 ## Public deployment
 
 `.github/workflows/pages.yml` uses GitHub Pages and GitHub Actions:
 
-- a push to `main` builds and deploys the checked-in snapshot;
+- a push to `main` restores the durable publication checkpoint, then builds and deploys the reviewed snapshot;
 - `30 22 * * *` UTC refreshes the morning slot at 06:30 Asia/Taipei;
 - `30 10 * * *` UTC refreshes the evening slot at 18:30 Asia/Taipei;
-- each scheduled run commits only `apps/web/public/data/source-status.json`, then deploys the static export;
+- the current candidate workflow persists the generated V1/V2 checkpoint to the dedicated `publication-state` branch, never directly to protected `main`, then deploys the same verified static artifact;
 - manual dispatch can refresh either slot.
+
+The `publication-state` workflow change is present in this checkout but remains
+unmerged; the remote `main` deployment is therefore not evidence that this
+candidate path is active.
 
 After the repository is public, enable Pages with **Source: GitHub Actions**. The deployed demo and repository URLs are recorded in [SUBMISSION.md](./SUBMISSION.md). A workflow file is not deployment evidence; acceptance requires an anonymous HTTPS check.
 
 Repository: `https://github.com/Reese-max/taichung-police-intel`
-Demo: `https://reese-max.github.io/taichung-police-intel` (verified HTTP 200 anonymously 2026-08-23; initial run 32631305048 conclusion=success)
+Demo: `https://reese-max.github.io/taichung-police-intel` (anonymous HTTP 200 rechecked 2026-09-22; public `data/source-status.json` `generated_at=2026-09-11T08:23:26+08:00`). The public bytes are reachable but stale relative to this checkout; the workflow configuration is not deployment evidence.
 
 ## Verification
 
@@ -135,6 +228,10 @@ npm test
 
 # Full gate including the production static build
 npm run check
+```
+
+```bash
+python scripts/schema_drift.py --self-check
 ```
 
 Expected final line:
@@ -163,8 +260,12 @@ Authenticated Kiro V3 sessions first reviewed all 16 Steering, Spec, and Hook ar
 - Every displayed source links to an HTTPS official page or endpoint.
 - Public aggregates are allowed; personal and operational police data are out of scope.
 - Missing post-meeting evidence remains an explicit gap, not an AI inference.
+- Answer drafts pass `apps/web/lib/answer-evidence-gate.js` before release: every factual claim needs exact official evidence (locator + document version), conflicting official sources surface as `CONFLICT` instead of a merged answer, stale sources cannot back current wording, and media-derived records never verify a claim. The shared gate emits one receipt with the publication hash and validator version for both Web Chat and MCP; the read-only `validate_answer` route binds that receipt to the server-controlled catalog and emits no free-text fallback.
 
-## Competition package
+## Historical Kiro competition package (2026-08)
+
+The following files describe the earlier Kiro competition submission path. They
+are preserved for provenance and are not the current GovIntel release status.
 
 - [Submission draft](./SUBMISSION.md)
 - [Three-minute demo script](./docs/DEMO_SCRIPT.md)
@@ -190,7 +291,7 @@ Official competition deadline: **2026-08-23 23:59 UTC**, which is **2026-08-24 0
 | jsDelivr `hls.js@1` | Apache-2.0 library delivered by jsDelivr | CDN availability applies only to the legacy standalone `asr-timestamp-demo.html` | Not used by the primary Next.js demo |
 | Official Taichung sources | Publisher-owned public pages, APIs, records, and HLS; linked, not claimed as project-owned | No guaranteed quota; five adapters run twice daily with one bounded retry | No credentials |
 
-Default verification performs no paid operation and no external write. Scheduled refresh writes only its generated status JSON back to the public repository.
+Default verification performs no paid operation and no external write. Scheduled refresh writes its generated status and durable publication checkpoint to the dedicated `publication-state` branch, then deploys the verified Pages artifact; it does not push generated data directly to protected `main`.
 
 The five scheduled inputs are `S-004` council agendas, `S-006` questioning-order tables, `S-007` meeting records, `S-009` proposals, and `S-029` city-government council project reports. The evidence path also uses `S-010`, the official Taichung City Council page, minutes, and HLS video. Exact official URLs remain visible in the checked-in status JSON and the UI.
 
@@ -201,11 +302,12 @@ The retained current-workspace Kiro records show Auto as `qdev::auto`: 10.254967
 - The competition UI demonstrates one complete council-evidence journey, not every police workflow.
 - Source freshness can be stale even when the endpoint is healthy; the UI shows both states.
 - Some official endpoints provide no usable publication date or only partial date-window coverage.
+- The migration registry covers the JSON durable-object/replay contract, and the PostgreSQL DDL migration has passed an isolated ephemeral database gate; persistent database recheck/backfill and production execution remain unverified.
 - Transcript quality is a historical baseline and has not received independent human sign-off.
 - The English path translates the product journey and source names; the official Chinese transcript remains Chinese and is explicitly labelled as navigation-only evidence.
 - The official `S-010` HLS CDN can fail in some Chrome sessions with `ERR_CONTENT_DECODING_FAILED`. A fatal media error or ten-second metadata timeout now preserves the transcript and provenance while showing a prominent link to the official council video. The local 2:43 product-demo MP4 is deliberately not substituted because it does not share the official evidence timeline.
 - The five source adapters passed local canaries and one GitHub-hosted scheduled EVENING run succeeded on 2026-08-23. A completed post-deployment MORNING plus EVENING pair has not yet been observed.
-- Public repository, public demo, and captioned video are live and verified anonymously; entrant details and form submission remain pending.
+- The public repository, demo, and captioned video have historical anonymous verification receipts; current deployment/version/hash status remains unverified in this checkout. Entrant details and form submission remain pending.
 
 ## License and data rights
 

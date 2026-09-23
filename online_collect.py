@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+from email.utils import parsedate_to_datetime
 import importlib.util
 import io
 import json
@@ -9,6 +10,7 @@ import os
 import re
 import time
 import urllib.parse
+import xml.etree.ElementTree as ET
 from collections import Counter
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -33,9 +35,16 @@ from collect import (
     scheduled_time,
     timestamp,
 )
+from intel_v2.detail_recheck import classify_observation
+from intel_v2.detail_recheck_http import recheck_detail
+from intel_v2.located_facts import validate_document_url
 
 
 USER_AGENT = "TaichungPoliceIntel/0.2 (+public-source-monitor)"
+DETAIL_RECHECK_INTERVAL_HOURS = 24
+DETAIL_RECHECK_MAX_PER_RUN = 1
+REDIRECT_STATUSES = {301, 302, 303, 307, 308}
+MAX_REDIRECTS = 3
 API_S007 = "https://yishi.tccc.gov.tw/api/ProceedingsBackWeb/FrontList"
 API_S009 = "https://yishi.tccc.gov.tw/api/Proposal/FrontList"
 PARSER_VERSION = "p0-live-1"
@@ -58,10 +67,37 @@ def http_session() -> requests.Session:
     return session
 
 
-def get(session: requests.Session, url: str, **kwargs) -> requests.Response:
-    response = session.get(url, timeout=kwargs.pop("timeout", 60), **kwargs)
-    response.raise_for_status()
-    return response
+def get(
+    session: requests.Session,
+    url: str,
+    *,
+    source_id: str | None = None,
+    **kwargs,
+) -> requests.Response:
+    """Fetch one catalog-bound URL without following an unapproved redirect."""
+    timeout = kwargs.pop("timeout", 60)
+    for _ in range(MAX_REDIRECTS + 1):
+        if source_id:
+            validate_document_url(source_id, url)
+        response = session.get(
+            url,
+            timeout=timeout,
+            allow_redirects=False,
+            **kwargs,
+        )
+        final_url = str(getattr(response, "url", url) or url)
+        if source_id:
+            validate_document_url(source_id, final_url)
+        if response.status_code in REDIRECT_STATUSES:
+            location = response.headers.get("location")
+            response.close()
+            if not location:
+                raise ValueError("redirect response has no location")
+            url = urllib.parse.urljoin(url, location)
+            continue
+        response.raise_for_status()
+        return response
+    raise ValueError("redirect budget exhausted")
 
 
 def snapshot(response: requests.Response, purpose: str) -> dict:
@@ -83,11 +119,34 @@ def canonical_bytes_sha256(body: bytes) -> str:
 
 
 def roc_date(value: str) -> date | None:
-    match = re.search(r"(\d{2,3})[./](\d{1,2})[./](\d{1,2})", value)
-    if not match:
+    # Parse Gregorian dates first; otherwise the ROC matcher can start at the
+    # second digit of a four-digit year (for example, 2026 -> 026).
+    gregorian = re.search(
+        r"(?<!\d)(\d{4})\s*[-/.年]\s*(\d{1,2})\s*[-/.月]\s*(\d{1,2})\s*日?(?!\d)",
+        value,
+    )
+    if gregorian:
+        year, month, day = map(int, gregorian.groups())
+        if not 1912 <= year <= 2200:
+            return None
+        try:
+            return date(year, month, day)
+        except ValueError:
+            return None
+
+    roc = re.search(
+        r"(?<!\d)(\d{2,3})\s*[-/.年]\s*(\d{1,2})\s*[-/.月]\s*(\d{1,2})\s*日?(?!\d)",
+        value,
+    )
+    if not roc:
         return None
-    year, month, day = map(int, match.groups())
-    return date(year + 1911, month, day)
+    year, month, day = map(int, roc.groups())
+    if not 1 <= year <= 289:
+        return None
+    try:
+        return date(year + 1911, month, day)
+    except ValueError:
+        return None
 
 
 def published_at(value: str | date | None) -> str | None:
@@ -128,14 +187,14 @@ def collect_download_list(
     end: date,
 ) -> dict:
     source_url = P0_SOURCES[source_id][1]
-    listing = get(session, source_url)
+    listing = get(session, source_url, source_id=source_id)
     responses = [snapshot(listing, "LIST")]
     entries = parse_download_entries(listing.content, listing.url)
     items = []
     for entry in entries:
         attachments = []
         for url in entry["attachment_urls"]:
-            response = get(session, url, timeout=120)
+            response = get(session, url, source_id=source_id, timeout=120)
             responses.append(snapshot(response, "ATTACHMENT"))
             attachments.append(
                 {
@@ -187,6 +246,7 @@ def paginated_api(
     url: str,
     params: dict,
     *,
+    source_id: str | None = None,
     page_size: int = 200,
 ) -> tuple[list[dict], list[dict]]:
     records = []
@@ -194,7 +254,12 @@ def paginated_api(
     page = 1
     total_pages = 1
     while page <= total_pages:
-        response = get(session, url, params={**params, "pageNumber": page, "pageSize": page_size})
+        response = get(
+            session,
+            url,
+            source_id=source_id,
+            params={**params, "pageNumber": page, "pageSize": page_size},
+        )
         responses.append(snapshot(response, "API"))
         payload = response.json()
         if payload.get("success") is not True or not isinstance(payload.get("data", {}).get("data"), list):
@@ -215,6 +280,7 @@ def collect_s007(session: requests.Session, start: date, end: date) -> dict:
         session,
         API_S007,
         {"keywordList": "警察局", "dateStart": start.isoformat(), "dateEnd": end.isoformat()},
+        source_id="S-007",
     )
     items = []
     for record in records:
@@ -236,7 +302,13 @@ def collect_s007(session: requests.Session, start: date, end: date) -> dict:
     # it's outside the current collection window.
     latest_date_str = None
     try:
-        probe_resp = get(session, API_S007, params={"keywordList": "警察局", "pageNumber": 1, "pageSize": 1}, timeout=30)
+        probe_resp = get(
+            session,
+            API_S007,
+            source_id="S-007",
+            params={"keywordList": "警察局", "pageNumber": 1, "pageSize": 1},
+            timeout=30,
+        )
         responses.append(snapshot(probe_resp, "PROBE_LATEST"))
         probe_data = probe_resp.json()
         if probe_data.get("success") and probe_data["data"]["data"]:
@@ -260,7 +332,9 @@ def collect_s007(session: requests.Session, start: date, end: date) -> dict:
 
 def collect_s009(session: requests.Session, start: date, end: date) -> dict:
     del start, end
-    records, responses = paginated_api(session, API_S009, {"keywordList": "警察局"})
+    records, responses = paginated_api(
+        session, API_S009, {"keywordList": "警察局"}, source_id="S-009"
+    )
     items = []
     for record in records:
         payload = {key: record.get(key) for key in sorted(record)}
@@ -305,7 +379,10 @@ def collect_s029(session: requests.Session, start: date, end: date) -> dict:
     urls = [(source["index"]["requested_url"], "LIST")]
     urls.extend((page["requested_url"], "LIST") for page in source["latest_session"]["list_pages"])
     urls.extend((item["url"], "ATTACHMENT") for item in source["police_attachments"])
-    responses = [snapshot(get(session, url, timeout=120), purpose) for url, purpose in urls]
+    responses = [
+        snapshot(get(session, url, source_id="S-029", timeout=120), purpose)
+        for url, purpose in urls
+    ]
     items = []
     for item in source["police_attachments"]:
         payload = {key: item[key] for key in sorted(item)}
@@ -329,19 +406,306 @@ def collect_s029(session: requests.Session, start: date, end: date) -> dict:
     }
 
 
+# Candidate official news lists use a list-first rule: only a new or changed
+# list row fetches its detail page. They stay outside P0 publication until the
+# catalog promotion gates have fresh live evidence.
+NEWS_LIST_SOURCES = {
+    "S-001": {
+        "name": "臺中市政府警察局警政新聞",
+        "list_url": "https://www.police.taichung.gov.tw/ch/home.jsp?id=1&parentpath=0&mcustomize=news_list.jsp",
+        "id_pattern": r"news_view\.jsp[^\"']*dataserno=(\d+)",
+    },
+    "S-019": {
+        "name": "臺中市政府市政會議紀錄與專案報告",
+        "list_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186",
+        "id_pattern": r"/(\d+)/post\b",
+    },
+    "S-032": {
+        "name": "臺中市政府交通局最新消息",
+        "list_url": "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,20",
+        "id_pattern": r"index-1\.asp\?Parser=9,4,20,,,,(\d+)",
+    },
+    "S-033": {
+        "name": "臺中市政府新聞局最新消息",
+        "list_url": "https://www.news.taichung.gov.tw/31034/564777/rss?nodeId=14813",
+        "format": "rss",
+    },
+    "S-031": {
+        "name": "臺中市政府消防局即時災情",
+        "list_url": "https://www.fire.taichung.gov.tw/caselist/index.asp?Parser=99,8,226",
+        "format": "fire_live",
+    },
+}
+
+
+def parse_news_list(html: bytes, base_url: str, id_pattern: str) -> list[dict]:
+    """Extract stable IDs, titles, detail URLs, and row dates from a list page."""
+    soup = BeautifulSoup(html, "html.parser")
+    pattern = re.compile(id_pattern)
+    seen: dict[str, dict] = {}
+    for anchor in soup.find_all("a", href=True):
+        match = pattern.search(anchor["href"])
+        if not match:
+            continue
+        stable_key = match.group(1)
+        row = anchor.find_parent(["li", "tr", "dd", "div"]) or anchor.parent or anchor
+        row_text = " ".join(row.stripped_strings)
+        if stable_key not in seen:
+            seen[stable_key] = {
+                "stable_key": stable_key,
+                "title": re.sub(r"\s+", " ", anchor.get_text(strip=True)),
+                "detail_url": urllib.parse.urljoin(base_url, anchor["href"]),
+                "published": roc_date(row_text),
+            }
+    entries = list(seen.values())
+    if not entries:
+        raise ValueError("news list has no parseable entries")
+    return entries
+
+
+def parse_news_rss(xml: bytes, base_url: str) -> list[dict]:
+    """Extract the official RSS list without treating a malformed item as zero."""
+    try:
+        root = ET.fromstring(xml)
+    except ET.ParseError as error:
+        raise ValueError("news RSS is not valid XML") from error
+    entries = []
+    for item in root.findall("./channel/item"):
+        stable_key = (item.get("iCuItem") or "").strip()
+        title = " ".join((item.findtext("title") or "").split())
+        detail_url = urllib.parse.urljoin(base_url, (item.findtext("link") or "").strip())
+        raw_date = (item.findtext("pubDate") or "").strip()
+        if not stable_key or not title or not detail_url or not raw_date:
+            raise ValueError("news RSS item is missing stable ID, title, link, or pubDate")
+        try:
+            published = parsedate_to_datetime(raw_date)
+        except (TypeError, ValueError) as error:
+            raise ValueError(f"news RSS item has invalid pubDate: {raw_date!r}") from error
+        if published.tzinfo is None:
+            published = published.replace(tzinfo=TZ)
+        entries.append({
+            "stable_key": stable_key,
+            "title": title,
+            "detail_url": detail_url,
+            "published": published.astimezone(TZ).date(),
+        })
+    if not entries:
+        raise ValueError("news RSS has no parseable entries")
+    return entries
+
+
+def _fire_datetime(value: str, label: str) -> datetime:
+    raw = " ".join(value.split())
+    for fmt in ("%Y/%m/%d %H:%M:%S", "%Y-%m-%d %H:%M:%S"):
+        try:
+            return datetime.strptime(raw, fmt).replace(tzinfo=TZ)
+        except ValueError:
+            pass
+    raise ValueError(f"fire live {label} has invalid timestamp: {raw!r}")
+
+
+def parse_fire_live(html: bytes) -> list[dict]:
+    """Parse only coarse, transient incident metadata from the official table."""
+    soup = BeautifulSoup(html, "html.parser")
+    update = soup.select_one(".update")
+    update_text = " ".join(update.stripped_strings) if update else ""
+    update_match = re.search(
+        r"最後異動時間\s*[：:]?\s*(\d{4}[-/]\d{2}[-/]\d{2}\s+\d{2}:\d{2}:\d{2})",
+        update_text,
+    )
+    if not update_match:
+        raise ValueError("fire live page has no last-update marker")
+    source_modified_at = _fire_datetime(update_match.group(1), "last-update marker")
+    table = soup.select_one("ul.list.rwd-table")
+    if not table:
+        raise ValueError("fire live page has no incident table")
+    rows = [row for row in table.find_all("li", recursive=False) if "list_head" not in row.get("class", [])]
+    if not rows:
+        raise ValueError("fire live page has no incident rows")
+
+    required = {"受理時間", "案類", "案別", "發生地點", "派遣分隊", "執行狀況"}
+    entries = []
+    for row in rows:
+        values = {}
+        for span in row.find_all("span", attrs={"data-th": True}, recursive=False):
+            label = re.sub(r"[：:]$", "", span["data-th"].strip())
+            direct_text = " ".join("".join(span.find_all(string=True, recursive=False)).split())
+            values[label] = direct_text
+        missing = required - set(values)
+        if missing:
+            raise ValueError(f"fire live row is missing fields: {sorted(missing)}")
+        received_at = _fire_datetime(values["受理時間"], "reception")
+        category = values["案類"].strip()
+        event_type = values["案別"].strip()
+        location = values["發生地點"].strip()
+        dispatch_unit = values["派遣分隊"].strip()
+        if not category or not event_type or not location or not dispatch_unit:
+            raise ValueError("fire live row has an empty required value")
+        districts = re.findall(r"[\u4e00-\u9fff]{1,3}區", location)
+        if not districts:
+            raise ValueError("fire live row has no district")
+        identity = {
+            "received_at": received_at.isoformat(),
+            "category": category,
+            "event_type": event_type,
+            "location": location,
+            "dispatch_unit": dispatch_unit,
+        }
+        entries.append({
+            "stable_key": f"S-031:{canonical_sha256(identity)[:24]}",
+            "category": category,
+            "event_type": event_type,
+            "district": districts[-1],
+            "observed_at": received_at.isoformat(),
+            "dispatch_unit": dispatch_unit,
+            "status": values["執行狀況"].strip() or "UNKNOWN",
+            "source_modified_at": source_modified_at.isoformat(),
+        })
+    return entries
+
+
+def collect_fire_live(session: requests.Session, start: date, end: date) -> dict:
+    """Collect one transient snapshot; it cannot prove a historical date window."""
+    del start, end
+    config = NEWS_LIST_SOURCES["S-031"]
+    listing = get(session, config["list_url"], source_id="S-031")
+    entries = parse_fire_live(listing.content)
+    items = []
+    for entry in entries:
+        payload = {key: value for key, value in entry.items() if key != "stable_key"}
+        items.append({
+            "stable_key": entry["stable_key"],
+            "source_url": listing.url,
+            "published_at": None,
+            "content_sha256": canonical_sha256(payload),
+            "payload": payload,
+        })
+    manifest = [
+        {key: item[key] for key in ("stable_key", "content_sha256", "published_at")}
+        for item in items
+    ]
+    return {
+        "source_health": "PASS",
+        "window_completeness": "PARTIAL",
+        "window_item_count": None,
+        "snapshot_item_count": len(items),
+        "items": items,
+        "snapshots": [snapshot(listing, "LIST")],
+        "manifest_sha256": canonical_sha256(manifest),
+    }
+
+
+def collect_news_list(
+    session: requests.Session,
+    source_id: str,
+    start: date,
+    end: date,
+    existing: dict[str, dict] | None = None,
+    max_details: int | None = None,
+) -> dict:
+    """Collect a candidate list with bounded detail-page requests."""
+    config = NEWS_LIST_SOURCES[source_id]
+    listing = get(session, config["list_url"], source_id=source_id)
+    responses = [snapshot(listing, "LIST")]
+    if config.get("format") == "rss":
+        entries = parse_news_rss(listing.content, listing.url)
+    else:
+        entries = parse_news_list(listing.content, listing.url, config["id_pattern"])
+    existing = existing or {}
+    details_fetched = 0
+    items = []
+    for entry in entries:
+        list_payload = {
+            "title": entry["title"],
+            "detail_url": entry["detail_url"],
+            "published_at": published_at(entry["published"]),
+        }
+        list_sha = canonical_sha256(list_payload)
+        if existing.get(entry["stable_key"], {}).get("content_sha256") == list_sha:
+            payload = {**list_payload, "detail": "unchanged-skipped"}
+        elif max_details is not None and details_fetched >= max_details:
+            payload = {**list_payload, "detail": "skipped-detail-cap"}
+        else:
+            details_fetched += 1
+            detail = get(session, entry["detail_url"], source_id=source_id, timeout=120)
+            responses.append(snapshot(detail, "DETAIL"))
+            payload = {
+                **list_payload,
+                "detail": "fetched",
+                "body_sha256": canonical_bytes_sha256(detail.content),
+                "attachments": [
+                    urllib.parse.urljoin(detail.url, anchor["href"])
+                    for anchor in BeautifulSoup(detail.content, "html.parser").find_all("a", href=True)
+                    if re.search(r"\.(pdf|docx?|xlsx?|odt|zip)(\?|$)", anchor["href"], re.I)
+                ],
+            }
+        items.append(
+            {
+                "stable_key": entry["stable_key"],
+                "source_url": entry["detail_url"],
+                "published_at": list_payload["published_at"],
+                "content_sha256": list_sha,
+                "payload": payload,
+            }
+        )
+
+    dated = [date.fromisoformat(item["published_at"][:10]) for item in items if item["published_at"]]
+    window_items = [
+        item for item in items
+        if item["published_at"] and start <= date.fromisoformat(item["published_at"][:10]) <= end
+    ]
+    reverse_chronological = all(left >= right for left, right in zip(dated, dated[1:]))
+    reaches_before_window = bool(dated) and min(dated) < start
+    if window_items and reverse_chronological and reaches_before_window:
+        completeness = "COMPLETE_WITH_ITEMS"
+    elif dated and reverse_chronological and max(dated) < start:
+        completeness = "COMPLETE_ZERO"
+    else:
+        completeness = "PARTIAL"
+    manifest = [{key: item[key] for key in ("stable_key", "content_sha256", "published_at")} for item in items]
+    return {
+        "source_health": "PASS",
+        "window_completeness": completeness,
+        "window_item_count": len(window_items),
+        "snapshot_item_count": len(items),
+        "items": items,
+        "snapshots": responses,
+        "manifest_sha256": canonical_sha256(manifest),
+    }
+
+
 COLLECTORS = {
     "S-004": collect_download_list,
     "S-006": collect_download_list,
     "S-007": collect_s007,
     "S-009": collect_s009,
     "S-029": collect_s029,
+    "S-001": collect_news_list,
+    "S-019": collect_news_list,
+    "S-032": collect_news_list,
+    "S-033": collect_news_list,
+    "S-031": collect_fire_live,
 }
 
 
-def collect_source(session: requests.Session, source_id: str, start: date, end: date) -> dict:
+def collect_source(
+    session: requests.Session,
+    source_id: str,
+    start: date,
+    end: date,
+    existing: dict[str, dict] | None = None,
+    *,
+    max_details: int | None = None,
+) -> dict:
     collector = COLLECTORS[source_id]
     if collector is collect_download_list:
         return collector(session, source_id, start, end)
+    if collector is collect_news_list:
+        return collector(session, source_id, start, end, existing, max_details=max_details)
+    if collector is collect_fire_live:
+        return collector(session, start, end)
+    if max_details is not None:
+        raise ValueError(f"max_details is only valid for list-news sources: {source_id}")
     return collector(session, start, end)
 
 
@@ -384,6 +748,280 @@ def current_items(connection, source_id: str) -> dict[str, dict]:
         (source_id,),
     ).fetchall()
     return {row["stable_key"]: row for row in rows}
+
+
+def _detail_previous(row: dict | None) -> dict | None:
+    if not row or not row.get("document_version_id"):
+        return None
+    previous = {
+        "document_version_id": row["document_version_id"],
+        "body_sha256": row["body_sha256"],
+        "normalized_text_sha256": row["normalized_text_sha256"],
+        "attachments": row.get("attachments") or [],
+    }
+    for field in ("last_checked_at", "expires_at", "etag", "last_modified"):
+        value = row.get(field)
+        if value is not None:
+            previous[field] = timestamp(value) if isinstance(value, datetime) else value
+    return previous
+
+
+def detail_next_check(
+    classification: dict,
+    observed_at: datetime,
+    *,
+    interval_hours: float = DETAIL_RECHECK_INTERVAL_HOURS,
+) -> datetime:
+    if not isinstance(interval_hours, (int, float)) or interval_hours <= 0:
+        raise ValueError("detail recheck interval must be positive")
+    if observed_at.tzinfo is None:
+        raise ValueError("detail recheck observed_at requires timezone")
+    retry = classification.get("retry_after_seconds")
+    if classification.get("status") == "DEFERRED" and isinstance(retry, int):
+        return observed_at + timedelta(seconds=min(max(retry, 0), 86400))
+    return observed_at + timedelta(hours=interval_hours)
+
+
+def register_detail_recheck(
+    connection,
+    source_id: str,
+    stable_key: str,
+    requested_url: str,
+    next_check_at: datetime,
+) -> None:
+    if not isinstance(stable_key, str) or not stable_key.strip():
+        raise ValueError("detail recheck stable_key is required")
+    if next_check_at.tzinfo is None:
+        raise ValueError("detail recheck next_check_at requires timezone")
+    validate_document_url(source_id, requested_url)
+    connection.execute(
+        """
+        INSERT INTO detail_recheck_state (source_id, stable_key, requested_url, next_check_at)
+        VALUES (%s, %s, %s, %s)
+        ON CONFLICT (source_id, stable_key) DO UPDATE SET
+            requested_url = EXCLUDED.requested_url,
+            next_check_at = LEAST(detail_recheck_state.next_check_at, EXCLUDED.next_check_at),
+            updated_at = now()
+        """,
+        (source_id, stable_key, requested_url, next_check_at),
+    )
+
+
+def _seed_detail_rechecks(connection, source_id: str, items: list[dict], completed_at: datetime) -> int:
+    seeded = 0
+    next_check_at = completed_at + timedelta(hours=DETAIL_RECHECK_INTERVAL_HOURS)
+    for item in items:
+        payload = item.get("payload") if isinstance(item, dict) else None
+        if not isinstance(payload, dict) or payload.get("detail") != "fetched":
+            continue
+        register_detail_recheck(
+            connection,
+            source_id,
+            str(item["stable_key"]),
+            str(item["source_url"]),
+            next_check_at,
+        )
+        seeded += 1
+    return seeded
+
+
+def _detail_unavailable(requested_url: str, previous: dict | None, observed_at: datetime, error: Exception) -> dict:
+    observation = {"status_code": 0, "available": False}
+    return {
+        "requested_url": requested_url,
+        "final_url": None,
+        "http_status": None,
+        "redirect_count": 0,
+        "request_headers": {},
+        "plan": None,
+        "observation": observation,
+        "classification": classify_observation(previous, observation, observed_at=timestamp(observed_at)),
+        "transport_error": {
+            "type": type(error).__name__,
+            "message": str(error).strip()[:256],
+        },
+    }
+
+
+def _detail_json(value: object) -> str:
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def _save_detail_snapshot(
+    connection,
+    source_run_id: str,
+    source_id: str,
+    stable_key: str,
+    result: dict,
+    fetched_at: datetime,
+) -> str | None:
+    body = result.get("response_body")
+    observation = result.get("observation") or {}
+    if not isinstance(body, (bytes, bytearray)) or not observation.get("body_sha256"):
+        return None
+    snapshot_id = f"DR-{source_run_id}-{canonical_sha256(f'detail:{stable_key}')[:16]}"
+    connection.execute(
+        """
+        INSERT INTO snapshot_blobs (content_sha256, content_type, byte_count, body, created_at)
+        VALUES (%s, %s, %s, %s, %s)
+        ON CONFLICT (content_sha256) DO NOTHING
+        """,
+        (
+            observation["body_sha256"],
+            observation.get("content_type") or "application/octet-stream",
+            len(body),
+            bytes(body),
+            fetched_at,
+        ),
+    )
+    connection.execute(
+        """
+        INSERT INTO source_snapshots (
+            snapshot_id, source_run_id, source_id, purpose, requested_url, final_url,
+            http_status, fetched_at, content_sha256
+        ) VALUES (%s, %s, %s, 'DETAIL', %s, %s, %s, %s, %s)
+        ON CONFLICT (snapshot_id) DO NOTHING
+        """,
+        (
+            snapshot_id,
+            source_run_id,
+            source_id,
+            result["requested_url"],
+            result.get("final_url") or result["requested_url"],
+            result["http_status"],
+            fetched_at,
+            observation["body_sha256"],
+        ),
+    )
+    return snapshot_id
+
+
+def run_detail_rechecks(
+    connection,
+    session: requests.Session,
+    source_run_ids: dict[str, str],
+    observed_at: datetime,
+    *,
+    limit: int = DETAIL_RECHECK_MAX_PER_RUN,
+    interval_hours: float = DETAIL_RECHECK_INTERVAL_HOURS,
+) -> list[dict]:
+    if not isinstance(limit, int) or limit < 0:
+        raise ValueError("detail recheck limit must be non-negative")
+    if not source_run_ids or limit == 0:
+        return []
+    source_ids = sorted(source_run_ids)
+    placeholders = ", ".join(["%s"] * len(source_ids))
+    # ponytail: one row lock spans one bounded request; split claim/worker
+    # phases only if recheck throughput becomes a measured bottleneck.
+    with connection.transaction():
+        rows = connection.execute(
+            f"""
+            SELECT source_id, stable_key, requested_url, last_checked_at, next_check_at,
+                   etag, last_modified, document_version_id, body_sha256,
+                   normalized_text_sha256, attachments
+            FROM detail_recheck_state
+            WHERE next_check_at <= %s AND source_id IN ({placeholders})
+            ORDER BY next_check_at, source_id, stable_key
+            LIMIT %s
+            FOR UPDATE SKIP LOCKED
+            """,
+            (observed_at, *source_ids, limit),
+        ).fetchall()
+        outcomes = []
+        for row in rows:
+            previous = _detail_previous(row)
+            try:
+                source = validate_document_url(row["source_id"], row["requested_url"])
+                host = urllib.parse.urlsplit(source["entrypoint"]).hostname
+                if not host:
+                    raise ValueError("approved source entrypoint has no hostname")
+                result = recheck_detail(
+                    session,
+                    row["requested_url"],
+                    previous,
+                    observed_at=timestamp(observed_at),
+                    allowed_hosts={host},
+                    interval_hours=interval_hours,
+                    include_body=True,
+                )
+            except (ValueError, TypeError, OSError, requests.RequestException) as error:
+                result = _detail_unavailable(row["requested_url"], previous, observed_at, error)
+
+            classification = result["classification"]
+            snapshot_id = _save_detail_snapshot(
+                connection,
+                source_run_ids[row["source_id"]],
+                row["source_id"],
+                row["stable_key"],
+                result,
+                observed_at,
+            )
+            after = classification.get("after") or {}
+            current = {
+                "document_version_id": after.get("document_version_id") or row.get("document_version_id"),
+                "body_sha256": after.get("body_sha256") or row.get("body_sha256"),
+                "normalized_text_sha256": after.get("normalized_text_sha256") or row.get("normalized_text_sha256"),
+                "attachments": after.get("attachments") if "attachments" in after else (row.get("attachments") or []),
+                "etag": after.get("etag") if "etag" in after else row.get("etag"),
+                "last_modified": after.get("last_modified") if "last_modified" in after else row.get("last_modified"),
+            }
+            checked_at = datetime.fromisoformat(classification["last_checked_at"])
+            next_check_at = detail_next_check(classification, checked_at, interval_hours=interval_hours)
+            public_result = {key: value for key, value in result.items() if key != "response_body"}
+            connection.execute(
+                """
+                UPDATE detail_recheck_state
+                SET last_checked_at = %s,
+                    next_check_at = %s,
+                    etag = %s,
+                    last_modified = %s,
+                    document_version_id = %s,
+                    body_sha256 = %s,
+                    normalized_text_sha256 = %s,
+                    attachments = %s::jsonb,
+                    status = %s,
+                    review_required = %s,
+                    preserve_last_known_good = %s,
+                    event_cancelled = %s,
+                    changed_fields = %s::jsonb,
+                    last_result = %s::jsonb,
+                    last_snapshot_id = COALESCE(%s, last_snapshot_id),
+                    updated_at = %s
+                WHERE source_id = %s AND stable_key = %s
+                """,
+                (
+                    checked_at,
+                    next_check_at,
+                    current["etag"],
+                    current["last_modified"],
+                    current["document_version_id"],
+                    current["body_sha256"],
+                    current["normalized_text_sha256"],
+                    _detail_json(current["attachments"]),
+                    classification["status"],
+                    classification["review_required"],
+                    classification["preserve_last_known_good"],
+                    classification["event_cancelled"],
+                    _detail_json(classification.get("changed_fields", [])),
+                    _detail_json(public_result),
+                    snapshot_id,
+                    observed_at,
+                    row["source_id"],
+                    row["stable_key"],
+                ),
+            )
+            outcomes.append(
+                {
+                    "source_id": row["source_id"],
+                    "stable_key": row["stable_key"],
+                    "requested_url": row["requested_url"],
+                    "status": classification["status"],
+                    "review_required": classification["review_required"],
+                    "classification": public_result["classification"],
+                    "snapshot_id": snapshot_id,
+                }
+            )
+    return outcomes
 
 
 def prior_success(connection, source_id: str) -> str | None:
@@ -500,6 +1138,10 @@ def save_success(
             ),
         )
 
+    # Only detail pages explicitly fetched by a list-first collector become
+    # recheck targets; unchanged rows are never expanded into a site-wide crawl.
+    _seed_detail_rechecks(connection, source_id, collected["items"], completed_at)
+
 
 def save_failure(
     connection,
@@ -597,6 +1239,20 @@ def run_database_slot(slot: str, slot_date: date, now: datetime | None = None) -
                             attempted_at, completed_at, window_start, window_end, error,
                         )
 
+            source_run_ids = {
+                row["source_id"]: row["source_run_id"]
+                for row in connection.execute(
+                    "SELECT source_id, source_run_id FROM source_runs WHERE collection_run_id = %s",
+                    (collection_run_id,),
+                ).fetchall()
+            }
+            detail_rechecks = run_detail_rechecks(
+                connection,
+                session,
+                source_run_ids,
+                datetime.now(TZ),
+            )
+
             results = connection.execute(
                 "SELECT result FROM source_runs WHERE collection_run_id = %s",
                 (collection_run_id,),
@@ -608,12 +1264,19 @@ def run_database_slot(slot: str, slot_date: date, now: datetime | None = None) -
                 "UPDATE collection_runs SET status = %s, finished_at = %s WHERE collection_run_id = %s",
                 (status, datetime.now(TZ), collection_run_id),
             )
-            return {"collection_run_id": collection_run_id, "status": status, "replayed": False}
+            return {
+                "collection_run_id": collection_run_id,
+                "status": status,
+                "replayed": False,
+                "detail_rechecks": detail_rechecks,
+            }
         finally:
             connection.execute("SELECT pg_advisory_unlock(hashtext(%s))", (lock_name,))
 
 
 def self_check() -> None:
+    missing_collectors = sorted(set(P0_SOURCES) - set(COLLECTORS))
+    assert not missing_collectors, f"active source policy has no collector: {missing_collectors}"
     sample = b"""
     <div id='Fdownload_list'><div class='text02_1'>\xe7\xac\xac\xe5\x9b\x9b\xe5\xb1\x86 \xe7\xac\xac8\xe6\xac\xa1\xe5\xae\x9a\xe6\x9c\x9f\xe6\x9c\x83 \xe8\xad\xb0\xe4\xba\x8b\xe6\x97\xa5\xe7\xa8\x8b\xe8\xa1\xa8(115.07.27\xe4\xbf\xae\xe6\xad\xa3)</div>
     <div class='text02_2'><a href='a.pdf'>PDF</a></div></div>
@@ -745,6 +1408,7 @@ def project_feed_item(
     return {
         "stable_id": stable_id,
         "source_id": source_id,
+        "source_name": source_name,
         "source_role": "PRIMARY_OFFICIAL",
         "title": title,
         "official_url": item.get("source_url") or source_url,

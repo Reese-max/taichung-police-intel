@@ -19,6 +19,9 @@ const required = [
   "requirements.txt",
   "collect.py",
   "online_collect.py",
+  "scripts/candidate-runtime-canary.py",
+  "scripts/verify-candidate-observation-window.py",
+  "scripts/verify-publication-bundle.py",
   ".github/workflows/pages.yml",
   "SUBMISSION.md",
   "docs/DEMO_SCRIPT.md",
@@ -26,10 +29,76 @@ const required = [
   "docs/KIRO_USAGE.md",
   "migrations/0001_ingestion_core.sql",
   "migrations/0002_source_snapshots.sql",
+  "migrations/0003_detail_recheck.sql",
   "apps/web/scripts/migrate.mjs",
   "apps/web/next.config.mjs",
   "apps/web/public/data/source-status.json",
+  "apps/web/public/data/system-health.json",
+  "apps/web/public/data/source-policy.json",
+  "apps/web/public/data/public-event-demo.json",
+  "apps/web/components/PublicEventFusionDemo.js",
+  "apps/web/scripts/sync-source-policy.mjs",
   "apps/web/public/data/intelligence-feed.json",
+  "intel_v2/handoff.py",
+  "intel_v2/review.py",
+  "intel_v2/located_facts.py",
+  "intel_v2/query_domain.py",
+  "intel_v2/detail_recheck.py",
+  "intel_v2/detail_recheck_http.py",
+  "intel_v2/discovery_adapter.py",
+  "intel_v2/role_profiles.py",
+  "scripts/handoff-state.py",
+  "scripts/review-inbox.py",
+  "scripts/located-facts.py",
+  "docs/govintel/official-document-rules.v1.json",
+  "docs/govintel/issue-48-official-document-replay.md",
+  "docs/govintel/role-profiles.v1.json",
+  "docs/govintel/official-document-receipt.v1.json",
+  "scripts/discovery-adapter.py",
+  "scripts/verify-v2-publication.py",
+  "state/v2-handoff-state.json",
+  "state/review-inbox.json",
+  "state/feedback.json",
+  "scripts/query-gateway.py",
+  "scripts/query-gateway-stdio.py",
+  "scripts/answer-gate-runner.mjs",
+  "scripts/verify-current-checkout.py",
+  "scripts/retention-policy.py",
+  "scripts/schema_drift.py",
+  "scripts/npa-source-inventory.py",
+  "scripts/feedback.py",
+  "scripts/verify-source-policy-integration.py",
+  "intel_v2/npa_source_adapters.py",
+  "intel_v2/feedback.py",
+  "docs/govintel/npa-source-inventory.v1.json",
+  "docs/govintel/issue-28-npa-source-matrix.md",
+  "docs/govintel/issue-37-feedback-loop.md",
+  "scripts/migration_replay.py",
+  "docs/govintel/retention-rights-policy.v1.json",
+  "tests/test_query_gateway.py",
+  "tests/test_query_domain.py",
+  "tests/test_query_gateway_domain.py",
+  "tests/test_query_gateway_stdio.py",
+  "tests/test_review_inbox.py",
+  "tests/test_located_facts.py",
+  "tests/test_detail_recheck.py",
+  "tests/test_detail_recheck_database.py",
+  "tests/test_discovery_adapter.py",
+  "tests/test_role_profiles.py",
+  "tests/test_v2_publication_contract.py",
+  "scripts/e2e-browser.mjs",
+  "tests/test_retention_policy.py",
+  "tests/test_schema_drift.py",
+  "tests/test_npa_source_inventory.py",
+  "tests/test_feedback.py",
+  "tests/test_source_policy_integration.py",
+  "tests/fixtures/npa/batch1.json",
+  "tests/test_migration_replay.py",
+  "apps/web/public/data/schema-drift.json",
+  "tests/fixtures/located-facts/official-news.html",
+  "tests/fixtures/located-facts/official-data.json",
+  "tests/fixtures/discovery/dashboard-feed.v1.json",
+  "tests/fixtures/discovery/official-matches.json",
   "apps/web/app/api/health.json/route.js",
   "apps/web/app/api/status.json/route.js",
   "evaluation/ingestion-record.schema.json",
@@ -89,10 +158,39 @@ if (!failures.length) {
   for (const token of ["30 22 * * *", "30 10 * * *", "actions/configure-pages@v5", "actions/deploy-pages@v4", "--demo-output apps/web/public/data/source-status.json"]) {
     if (!workflow.includes(token)) failures.push(`pages:missing-${token}`);
   }
+  for (const token of [
+    "scripts/publication-state-branch.py restore",
+    "scripts/publication-state-branch.py persist",
+    "scripts/publication-state-branch.py acknowledge",
+    "--branch publication-state",
+  ]) {
+    if (!workflow.includes(token)) failures.push(`pages:missing-protected-state-lifecycle-${token}`);
+  }
+  if (/\bgit\s+push\b[^\n]*(?:\bmain\b|refs\/heads\/main)/i.test(workflow)) {
+    failures.push("pages:direct-main-push-forbidden");
+  }
 
   const status = JSON.parse(await read("apps/web/public/data/source-status.json"));
+  const sourcePolicy = JSON.parse(await read("apps/web/public/data/source-policy.json"));
+  const systemHealth = JSON.parse(await read("apps/web/public/data/system-health.json"));
+  const schemaDrift = JSON.parse(await read("apps/web/public/data/schema-drift.json"));
+  if (systemHealth.schema_version !== 1 ||
+      !["HEALTHY", "DEGRADED", "STALE", "PARTIAL", "BLOCKED", "UNKNOWN"].includes(systemHealth.overall) ||
+      !systemHealth.lanes || typeof systemHealth.lanes !== "object" || !Array.isArray(systemHealth.stages)) {
+    failures.push("system-health:invalid-machine-readable-receipt");
+  }
+  if (schemaDrift.schema_version !== 1 ||
+      !["HEALTHY", "DEGRADED", "BLOCKED", "UNKNOWN"].includes(schemaDrift.overall) ||
+      !Array.isArray(schemaDrift.sources) || !Array.isArray(schemaDrift.review_inbox)) {
+    failures.push("schema-drift:invalid-machine-readable-receipt");
+  }
+  const activeSourceIds = new Set(sourcePolicy.active_source_ids || []);
+  const statusSourceIds = new Set((status.sources || []).map(source => source?.source_id));
   if (status.mode !== "COMPETITION_DEMO") failures.push("demo-status:invalid-mode");
-  if (status.sources?.length !== 5) failures.push("demo-status:expected-five-sources");
+  if (activeSourceIds.size === 0 || statusSourceIds.size !== activeSourceIds.size ||
+      [...activeSourceIds].some(sourceId => !statusSourceIds.has(sourceId))) {
+    failures.push("demo-status:source-coverage-does-not-match-policy");
+  }
   if (!(Date.parse(status.next_update_at) > Date.parse(status.generated_at))) failures.push("demo-status:next-update-not-future");
   for (const source of status.sources || []) {
     if (!/^https:\/\//.test(source.source_url || "")) failures.push(`demo-status:${source.source_id}:invalid-url`);
@@ -148,7 +246,7 @@ const ignoredKiro = spawnSync("git", ["check-ignore", "-q", ".kiro/steering/prod
 if (ignoredKiro.status === 0) failures.push(".kiro must not be ignored");
 else if (ignoredKiro.status !== 1) failures.push(`kiro-ignore-probe:exit=${ignoredKiro.status ?? "spawn-error"}`);
 
-const excludedDirs = new Set([".git", ".next", ".gstack", "node_modules", "__pycache__", "graphify-out"]);
+const excludedDirs = new Set([".git", ".next", ".gstack", "node_modules", "__pycache__", "graphify-out", ".pytest_cache", "out", "output", "runtime-evidence"]);
 const textExtensions = new Set([".css", ".env", ".html", ".js", ".json", ".md", ".mjs", ".py", ".sql", ".toml", ".txt", ".yaml", ".yml"]);
 const secretPatterns = [
   /-----BEGIN (?:RSA |OPENSSH |EC |DSA )?PRIVATE KEY-----/,
@@ -205,6 +303,44 @@ if (["quick", "full"].includes(mode) && !failures.length) {
     const checks = [
       ["contract-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "evaluation", "-p", "test_source_value_contract.py", "-v"]],
       ["ingestion-contract-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_source_ingestion.py", "-v"]],
+      ["system-health-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_system_health.py", "-v"]],
+      ["schema-drift-self-check", ["-X", "utf8", "scripts/schema_drift.py", "--self-check"]],
+      ["schema-drift-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_schema_drift.py", "-v"]],
+      ["npa-source-inventory-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_npa_source_inventory.py", "-v"]],
+      ["npa-source-inventory-self-check", ["-X", "utf8", "scripts/npa-source-inventory.py", "--self-check"]],
+      ["feedback-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_feedback.py", "-v"]],
+      ["feedback-self-check", ["-X", "utf8", "scripts/feedback.py", "self-check"]],
+      ["source-policy-integration-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_source_policy_integration.py", "-v"]],
+      ["source-policy-integration-self-check", ["-X", "utf8", "scripts/verify-source-policy-integration.py", "--self-check"]],
+      ["migration-replay-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_migration_replay.py", "-v"]],
+      ["migration-replay-self-check", ["-X", "utf8", "scripts/migration_replay.py", "self-check"]],
+      ["system-health-receipt", ["-X", "utf8", "scripts/system-health.py", "--output", "apps/web/public/data/system-health.json"]],
+      ["query-gateway-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_query_gateway.py", "-v"]],
+      ["query-domain-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_query_domain.py", "-v"]],
+      ["query-gateway-domain-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_query_gateway_domain.py", "-v"]],
+      ["query-gateway-stdio-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_query_gateway_stdio.py", "-v"]],
+      ["handoff-state-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_handoff_state.py", "-v"]],
+      ["handoff-state-self-check", ["-X", "utf8", "scripts/handoff-state.py", "self-check"]],
+      ["review-inbox-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_review_inbox.py", "-v"]],
+      ["review-inbox-self-check", ["-X", "utf8", "scripts/review-inbox.py", "self-check"]],
+      ["located-facts-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_located_facts.py", "-v"]],
+      ["located-facts-self-check", ["-X", "utf8", "scripts/located-facts.py", "self-check"]],
+      ["detail-recheck-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_detail_recheck.py", "-v"]],
+      ["detail-recheck-database-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_detail_recheck_database.py", "-v"]],
+      ["discovery-adapter-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_discovery_adapter.py", "-v"]],
+      ["discovery-adapter-self-check", ["-X", "utf8", "scripts/discovery-adapter.py", "self-check"]],
+      ["role-profile-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_role_profiles.py", "-v"]],
+      ["v2-publication-contract-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_v2_publication_contract.py", "-v"]],
+      ["current-checkout-tests", ["-X", "utf8", "scripts/verify-current-checkout.py", "--mode", "core"]],
+      ["retention-policy-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_retention_policy.py", "-v"]],
+      ["news-list-collector-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_news_list_collector.py", "-v"]],
+      ["live-canary-transport-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_live_canary_transport.py", "-v"]],
+      ["source-transport-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_source_transport.py", "-v"]],
+      ["candidate-canary-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_candidate_runtime_canary.py", "-v"]],
+      ["candidate-observation-window-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_candidate_observation_window.py", "-v"]],
+      ["publication-bundle-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_publication_bundle.py", "-v"]],
+      ["v2-publication-check", ["-X", "utf8", "scripts/verify-v2-publication.py"]],
+      ["publication-bundle-check", ["-X", "utf8", "scripts/verify-publication-bundle.py"]],
       ["audit-self-check", ["-X", "utf8", "build-seven-day-source-audit.py", "--self-check"]],
       ["canary-self-check", ["-X", "utf8", "canary-s026-s029.py", "--self-check"]],
       ["s028-165-self-check", ["-X", "utf8", "canary-s028-165.py", "--self-check"]],
@@ -212,6 +348,7 @@ if (["quick", "full"].includes(mode) && !failures.length) {
       ["asr-self-check", ["-X", "utf8", "groq-asr-canary.py", "--self-check"]],
       ["cer-self-check", ["-X", "utf8", "evaluation/evaluate-asr-cer.py", "--self-check"]],
       ["online-collector-self-check", ["-X", "utf8", "online_collect.py", "--self-check"]],
+      ["candidate-observation-window-self-check", ["-X", "utf8", "scripts/verify-candidate-observation-window.py", "--self-check"]],
     ];
     for (const [label, args] of checks) run(python.command, [...python.prefix, ...args], label);
   }
