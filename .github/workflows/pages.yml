@@ -175,6 +175,7 @@ jobs:
         env:
           PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
           NEXT_PUBLIC_BASE_PATH: ${{ steps.pages.outputs.base_path }}
+          NEXT_PUBLIC_QUERY_GATEWAY_URL: ${{ vars.QUERY_GATEWAY_URL }}
           GOVINTEL_PUBLICATION_WORKFLOW: "1"
 
       - name: Persist pending V1 and V2 state outside protected main

@@ -1,0 +1,31 @@
+name: Deploy GovIntel Query Gateway Worker
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "workers/query-gateway/**"
+      - "apps/web/lib/answer-evidence-gate.js"
+      - "apps/web/lib/council-prep.js"
+      - "docs/govintel/source-catalog.v2.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: govintel-query-gateway-worker
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Deploy Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          command: deploy --config workers/query-gateway/wrangler.jsonc
