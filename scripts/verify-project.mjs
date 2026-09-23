@@ -156,7 +156,7 @@ if (!failures.length) {
 
   const workflow = await read(".github/workflows/pages.yml");
   if ((workflow.match(/^\s*- cron:/gm) || []).length !== 2) failures.push("pages:expected-two-schedules");
-  for (const token of ["30 22 * * *", "30 10 * * *", "actions/configure-pages@v5", "actions/deploy-pages@v4", "--demo-output apps/web/public/data/source-status.json"]) {
+  for (const token of ["30 22 * * *", "30 10 * * *", "actions/configure-pages@v6", "actions/deploy-pages@v5", "--demo-output apps/web/public/data/source-status.json"]) {
     if (!workflow.includes(token)) failures.push(`pages:missing-${token}`);
   }
   for (const token of [

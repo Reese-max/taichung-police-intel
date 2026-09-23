@@ -67,7 +67,7 @@ jobs:
           --health-retries 5
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -86,7 +86,7 @@ jobs:
           fi
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
@@ -153,7 +153,7 @@ jobs:
         run: python -X utf8 scripts/system-health.py --output apps/web/public/data/system-health.json
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm
@@ -164,7 +164,7 @@ jobs:
 
       - name: Setup Pages
         id: pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
 
       - name: Run full verification gate and build static site
         id: verify
@@ -186,14 +186,14 @@ jobs:
 
       - name: Upload Pages artifact
         id: pages_upload
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: apps/web/out
 
       - name: Retain publication evidence, including downstream failures
         if: always()
         id: evidence
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: publication-evidence-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
@@ -221,13 +221,13 @@ jobs:
       public_verify: ${{ steps.acknowledge.outcome }}
     steps:
       - name: Checkout reviewed code for public verification
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
       - name: Verify public data bytes and acknowledge exact checkpoint
         id: acknowledge
         run: python -X utf8 scripts/publication-state-branch.py acknowledge
@@ -245,7 +245,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout reporting code from the workflow commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
@@ -271,7 +271,7 @@ jobs:
 
       - name: Retain end-to-end runtime health receipt
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: publication-health-${{ github.run_id }}-${{ github.run_attempt }}
           path: runtime-evidence/publication-health.json

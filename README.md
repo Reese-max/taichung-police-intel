@@ -205,14 +205,13 @@ The read-only Taiwan Intel Dashboard discovery consumer is replayable with `pyth
 - the current candidate workflow persists the generated V1/V2 checkpoint to the dedicated `publication-state` branch, never directly to protected `main`, then deploys the same verified static artifact;
 - manual dispatch can refresh either slot.
 
-The `publication-state` workflow change is present in this checkout but remains
-unmerged; the remote `main` deployment is therefore not evidence that this
-candidate path is active.
+The `publication-state` checkpoint lifecycle is now part of `main`; deployment
+still requires a successful Pages workflow and anonymous HTTPS readback.
 
 After the repository is public, enable Pages with **Source: GitHub Actions**. The deployed demo and repository URLs are recorded in [SUBMISSION.md](./SUBMISSION.md). A workflow file is not deployment evidence; acceptance requires an anonymous HTTPS check.
 
 Repository: `https://github.com/Reese-max/taichung-police-intel`
-Demo: `https://reese-max.github.io/taichung-police-intel` (anonymous HTTP 200 rechecked 2026-09-22; public `data/source-status.json` `generated_at=2026-09-11T08:23:26+08:00`). The public bytes are reachable but stale relative to this checkout; the workflow configuration is not deployment evidence.
+Demo: `https://reese-max.github.io/taichung-police-intel` (anonymous HTTPS readback is required after every publication). Inspect the public `data/source-status.json` for the current snapshot `generated_at`, each source's `last_checked_at`, and official `data_as_of`; a healthy source can remain `STALE` when its latest official record is old, and that state must not be read as proof that no current event exists.
 
 ## Verification
 
