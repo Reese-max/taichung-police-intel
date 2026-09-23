@@ -133,7 +133,7 @@
       "identity": "S-006:FEED-S-006-5ff390fd3563fcb9",
       "is_current": false,
       "last_seen_at": "2026-09-11T08:23:26+08:00",
-      "missing_streak": 9,
+      "missing_streak": 10,
       "normalized_sha256": "186310c9ca378b4efd26dfb68175d3c6d303f1e23e3390d7b1afade6203c579e",
       "official_url": "https://www.tccc.gov.tw/pic/DocCouncil/17875856282853(1).doc",
       "payload": {
@@ -233,7 +233,7 @@
       "identity": "S-006:FEED-S-006-c4e5b5777e317666",
       "is_current": false,
       "last_seen_at": "2026-09-11T08:23:26+08:00",
-      "missing_streak": 9,
+      "missing_streak": 10,
       "normalized_sha256": "77ee4c036e6bc2259df521ba3687d99f7319dd75f8be3f85ce648e1d2d16abce",
       "official_url": "https://www.tccc.gov.tw/pic/DocCouncil/17876726492859(1).doc",
       "payload": {

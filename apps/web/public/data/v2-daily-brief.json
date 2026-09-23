@@ -5,6 +5,29 @@
     "業管承辦",
     "分局主管"
   ],
+  "available_profiles": [
+    {
+      "label": "局本部綜合",
+      "profile_hash": "d84fd4976cb79c10e0e29c91350382009883111c659f7f2fcdb5a1ee91fec78e",
+      "profile_id": "general",
+      "profile_version": 1,
+      "ranking_policy_version": "role-ranking-v1"
+    },
+    {
+      "label": "議會聯絡",
+      "profile_hash": "a2c04b5daf3e93278e81593aaff0a26cb539b7eab92d211a22d4e544d07bd8aa",
+      "profile_id": "council-liaison",
+      "profile_version": 1,
+      "ranking_policy_version": "role-ranking-v1"
+    },
+    {
+      "label": "交通／公共安全業管",
+      "profile_hash": "57ed1af52410fb3ffad16c8f97188f0d3a4c7a4637bea9bd471d4719f7539805",
+      "profile_id": "traffic-policy",
+      "profile_version": 1,
+      "ranking_policy_version": "role-ranking-v1"
+    }
+  ],
   "baseline_established_at": "2026-08-27T12:13:22+08:00",
   "generated_at": "2026-09-11T08:23:26+08:00",
   "generator_version": 2,
@@ -16,9 +39,70 @@
     "legacy_home_candidate_count": 118,
     "other_change_count": 0,
     "priority_count": 0,
-    "tracking_count": 0
+    "tracking_count": 0,
+    "tracking_total": 0
   },
   "priority_items": [],
+  "profile": {
+    "label": "局本部綜合",
+    "profile_hash": "d84fd4976cb79c10e0e29c91350382009883111c659f7f2fcdb5a1ee91fec78e",
+    "profile_id": "general",
+    "profile_version": 1,
+    "ranking_policy_version": "role-ranking-v1"
+  },
+  "profile_views": [
+    {
+      "other_changes": [],
+      "overview": {
+        "other_change_count": 0,
+        "priority_count": 0,
+        "tracking_count": 0
+      },
+      "priority_items": [],
+      "profile": {
+        "label": "局本部綜合",
+        "profile_hash": "d84fd4976cb79c10e0e29c91350382009883111c659f7f2fcdb5a1ee91fec78e",
+        "profile_id": "general",
+        "profile_version": 1,
+        "ranking_policy_version": "role-ranking-v1"
+      },
+      "tracking_items": []
+    },
+    {
+      "other_changes": [],
+      "overview": {
+        "other_change_count": 0,
+        "priority_count": 0,
+        "tracking_count": 0
+      },
+      "priority_items": [],
+      "profile": {
+        "label": "議會聯絡",
+        "profile_hash": "a2c04b5daf3e93278e81593aaff0a26cb539b7eab92d211a22d4e544d07bd8aa",
+        "profile_id": "council-liaison",
+        "profile_version": 1,
+        "ranking_policy_version": "role-ranking-v1"
+      },
+      "tracking_items": []
+    },
+    {
+      "other_changes": [],
+      "overview": {
+        "other_change_count": 0,
+        "priority_count": 0,
+        "tracking_count": 0
+      },
+      "priority_items": [],
+      "profile": {
+        "label": "交通／公共安全業管",
+        "profile_hash": "57ed1af52410fb3ffad16c8f97188f0d3a4c7a4637bea9bd471d4719f7539805",
+        "profile_id": "traffic-policy",
+        "profile_version": 1,
+        "ranking_policy_version": "role-ranking-v1"
+      },
+      "tracking_items": []
+    }
+  ],
   "publication_status": "READY",
   "quality_issues": [
     {
