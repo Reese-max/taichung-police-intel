@@ -163,6 +163,8 @@ if (!failures.length) {
     "scripts/publication-state-branch.py persist",
     "scripts/publication-state-branch.py acknowledge",
     "--branch publication-state",
+    "LEGACY_BOOTSTRAP: ${{ steps.restore_state.outputs.legacy_bootstrap }}",
+    '|| "$LEGACY_BOOTSTRAP" == "true"',
   ]) {
     if (!workflow.includes(token)) failures.push(`pages:missing-protected-state-lifecycle-${token}`);
   }

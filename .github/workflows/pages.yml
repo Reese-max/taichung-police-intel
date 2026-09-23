@@ -118,10 +118,12 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           PENDING_RECOVERY: ${{ steps.restore_state.outputs.pending_recovery }}
+          LEGACY_BOOTSTRAP: ${{ steps.restore_state.outputs.legacy_bootstrap }}
         run: |
           if [[ "$PENDING_RECOVERY" == "true" ]]; then
             echo "Replaying the exact pending V2 bundle; no recollection or diff advancement."
-          elif [[ "$EVENT_NAME" != "push" ]]; then
+          # Legacy checkpoints predate profile metadata; rebuild the current V2 brief.
+          elif [[ "$EVENT_NAME" != "push" || "$LEGACY_BOOTSTRAP" == "true" ]]; then
             python -X utf8 scripts/build-v2-shadow-brief.py \
               --input apps/web/public/data/intelligence-feed.json \
               --source-status apps/web/public/data/source-status.json \
