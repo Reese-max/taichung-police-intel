@@ -8,6 +8,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const mode = process.argv[2] || "gate0";
 const modes = new Set(["gate0", "specs", "quick", "full"]);
 if (!modes.has(mode)) throw new Error(`Unknown verification mode: ${mode}`);
+const publicationWorkflow = process.env.GOVINTEL_PUBLICATION_WORKFLOW === "1";
 
 const failures = [];
 const required = [
@@ -165,6 +166,7 @@ if (!failures.length) {
     "--branch publication-state",
     "LEGACY_BOOTSTRAP: ${{ steps.restore_state.outputs.legacy_bootstrap }}",
     '|| "$LEGACY_BOOTSTRAP" == "true"',
+    'GOVINTEL_PUBLICATION_WORKFLOW: "1"',
   ]) {
     if (!workflow.includes(token)) failures.push(`pages:missing-protected-state-lifecycle-${token}`);
   }
@@ -300,6 +302,9 @@ function findPython() {
 if (["quick", "full"].includes(mode) && !failures.length) {
   const python = findPython();
   if (!python) failures.push("python:not-found");
+  if (publicationWorkflow) {
+    console.log("VERIFY_NOTE current-checkout runtime skipped for the generated Pages publication workspace");
+  }
   runNpm(["--prefix", "apps/web", "test"], "web-tests");
   if (python) {
     const checks = [
@@ -333,7 +338,7 @@ if (["quick", "full"].includes(mode) && !failures.length) {
       ["discovery-adapter-self-check", ["-X", "utf8", "scripts/discovery-adapter.py", "self-check"]],
       ["role-profile-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_role_profiles.py", "-v"]],
       ["v2-publication-contract-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_v2_publication_contract.py", "-v"]],
-      ["current-checkout-tests", ["-X", "utf8", "scripts/verify-current-checkout.py", "--mode", "core"]],
+      ...(publicationWorkflow ? [] : [["current-checkout-tests", ["-X", "utf8", "scripts/verify-current-checkout.py", "--mode", "core"]]]),
       ["retention-policy-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_retention_policy.py", "-v"]],
       ["news-list-collector-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_news_list_collector.py", "-v"]],
       ["live-canary-transport-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_live_canary_transport.py", "-v"]],
