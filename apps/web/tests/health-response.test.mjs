@@ -6,8 +6,13 @@ import { PUBLICATION_POLICY_BINDING } from "../lib/publication-freshness.mjs";
 
 const status = JSON.parse(await readFile(new URL("../public/data/source-status.json", import.meta.url)));
 const brief = JSON.parse(await readFile(new URL("../public/data/v2-daily-brief.json", import.meta.url)));
+const publicationWorkflow = process.env.GOVINTEL_PUBLICATION_WORKFLOW === "1";
 
-test("health endpoint does not call a stale checked-in snapshot ok", () => {
+test("health endpoint does not call a stale checked-in snapshot ok", {
+  skip: publicationWorkflow
+    ? "Pages publication uses generated source-status; publication validators cover its freshness"
+    : false,
+}, () => {
   const response = buildHealthResponse(status, brief, Date.parse("2026-09-21T12:00:00+08:00"));
   assert.equal(response.status, "stale");
   assert.equal(response.health, "STALE");

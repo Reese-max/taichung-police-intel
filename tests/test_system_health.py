@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -131,6 +132,8 @@ class SystemHealthTests(unittest.TestCase):
                 self.assertEqual(collection["outcome"], expected)
 
     def test_collection_keeps_last_known_success_when_current_sources_are_stale(self):
+        if os.getenv("GOVINTEL_PUBLICATION_WORKFLOW") == "1":
+            self.skipTest("Pages publication uses generated data, not the checked-in fixture snapshot")
         status = json.loads(health.DEFAULT_STATUS.read_text(encoding="utf-8"))
         brief = json.loads(health.DEFAULT_BRIEF.read_text(encoding="utf-8"))
         for source in status["sources"]:
