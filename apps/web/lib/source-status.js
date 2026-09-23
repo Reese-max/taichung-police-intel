@@ -1,4 +1,11 @@
 const TAIPEI_OFFSET_MS = 8 * 60 * 60 * 1000;
+const STALE_STATUSES = new Set(["STALE", "VERY_STALE"]);
+
+export function isHealthyStaleSource(source) {
+  return source?.source_health === "PASS"
+    && source?.result === "NO_NEW_ITEM"
+    && STALE_STATUSES.has(source?.freshness_status);
+}
 
 function iso(value) {
   return value ? new Date(value).toISOString() : null;

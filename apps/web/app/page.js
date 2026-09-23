@@ -15,6 +15,7 @@ import {
   requiresOfficialFallback,
 } from "../lib/homepage-data.js";
 import { buildHomepageResponse } from "../lib/homepage-eligibility.js";
+import { isHealthyStaleSource } from "../lib/source-status.js";
 
 // ── Relative time helper ──────────────────────────────────────────────────────
 function relativeTime(iso, lang) {
@@ -724,6 +725,13 @@ export default function Home() {
                     <small lang="zh-Hant">{t.source_official_name} {source.source_name}</small>
                   )}
                   <p>{source.result} · {source.freshness_status}</p>
+                  {isHealthyStaleSource(source) && (
+                    <small data-testid={`healthy-stale-note-${source.source_id}`}>
+                      {lang === "en"
+                        ? "Official source checked successfully; the latest record date is old. This does not mean there are no current events."
+                        : "已成功核對官方來源；最新資料日期較舊，不能解讀為目前沒有事件。"}
+                    </small>
+                  )}
                   <small>
                     {t.source_data_as_of}
                     {source.data_as_of

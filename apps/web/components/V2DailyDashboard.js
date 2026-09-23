@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { assessPublication } from "../lib/publication-freshness.mjs";
+import { isHealthyStaleSource } from "../lib/source-status.js";
 import {
   addLocalWatch,
   confirmLocalHandoff,
@@ -421,6 +422,11 @@ function SourceHealthSummary({ sourceStatus, canReassure }) {
               {source.source_health} · {source.freshness_status}
             </p>
             <small>最後檢查：{formatDateTime(source.last_checked_at)}</small>
+            {isHealthyStaleSource(source) && (
+              <small data-testid={`healthy-stale-note-${source.source_id}`}>
+                已成功核對官方來源；最新資料日期較舊，不能解讀為目前沒有事件。
+              </small>
+            )}
             {source.intelligence_gaps?.length > 0 && (
               <small>缺口：{source.intelligence_gaps.join("、")}</small>
             )}
