@@ -252,6 +252,15 @@ class SchemaDriftTests(unittest.TestCase):
             source_id="S-001",
         )
 
+    def test_s001_uses_same_origin_fallback_after_transient_connection_error(self):
+        response = SimpleNamespace(content=b"sample", status_code=200, headers={}, url="https://official.test/source")
+        with mock.patch("online_collect.get", side_effect=[ConnectionError("reset"), response]) as bounded_get:
+            result, resource_id = drift._fetch_live_source(object(), "S-001")
+        self.assertIs(result, response)
+        self.assertIsNone(resource_id)
+        self.assertEqual(bounded_get.call_count, 2)
+        self.assertEqual(bounded_get.call_args_list[1].args[1], online_collect.NEWS_LIST_SOURCES["S-001"]["fallback_list_url"])
+
     def test_receipt_rejects_duplicate_and_unknown_observation_ids(self):
         sample = {"source_id": "S-001", "body": b"<li><a href=\"news_view.jsp?dataserno=1\">news 115-09-10</a></li>"}
         with self.assertRaisesRegex(ValueError, "duplicate source_id"):
