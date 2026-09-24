@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "repository": "Reese-max/taichung-police-intel",
+  "validation_scope": "PINNED_COMPONENT_RUNTIME_AND_SYNTHETIC_INTEGRATION",
+  "production_verified": false,
+  "components": [
+    {"name":"publication","issue":20,"pr":26,"sha":"53d5bccbc501a0e8dccb956314f59a45070492a5","suites":["test_publication*.py"]},
+    {"name":"collector","issue":22,"pr":16,"sha":"acb67b3fc43ea1b6e7150a110e388885f77098aa","suites":["test_news_list_collector.py","test_candidate_runtime_canary.py"]},
+    {"name":"query","issue":30,"pr":40,"sha":"38530072e9329e3e14e4ef4c7c3351784ff470a3","suites":["test_query_store*.py"]},
+    {"name":"entity","issue":31,"pr":41,"sha":"b0ce37bd4d5be55959faa041e559f578e2ecaff0","suites":["test_entity_registry.py"]},
+    {"name":"evaluation","issue":33,"pr":42,"sha":"f0947feb41a3846a12b73906952495466b55ca7c","suites":["test_gold_evaluator.py"]},
+    {"name":"fusion","issue":24,"pr":43,"sha":"f76bcbd32260423ac29fa8ac36a1e81b0c932341","suites":["test_public_event_fusion.py"]},
+    {"name":"answer","issue":32,"pr":44,"sha":"633d4d4ab0ef9fdadc89b200933ca6fba2e00140","suites":["test_answer_evidence_gate.py"]},
+    {"name":"health","issue":35,"pr":45,"sha":"6017f1348e6213e89ebac741713e87bde977f866","suites":["test_system_health.py"]}
+  ]
+}
