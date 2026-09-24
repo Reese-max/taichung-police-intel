@@ -10,7 +10,7 @@ import sys
 from typing import Mapping
 from urllib.parse import urlsplit
 
-PHASES = ("RESTORE", "COLLECT", "V1", "V2", "V2_VERIFY", "SCHEMA_DRIFT", "VERIFY", "PRESERVE", "PAGES_UPLOAD", "EVIDENCE", "PUBLIC_VERIFY")
+PHASES = ("RESTORE", "COLLECT", "V1", "V2", "V2_VERIFY", "SCHEMA_DRIFT", "VERIFY", "PRESERVE", "PAGES_UPLOAD", "EVIDENCE", "PUBLIC_VERIFY", "QUERY_VERIFY")
 OUTCOMES = {"success", "failure", "cancelled", "skipped"}
 PHASE_TO_HEALTH = {
     "success": "SUCCESS",
@@ -22,7 +22,7 @@ PHASE_TO_HEALTH = {
 
 
 def phase_value(env: Mapping[str, str], key: str) -> str:
-    value = env.get(key, "")
+    value = env.get(key, "skipped" if key == "QUERY_VERIFY" else "")
     return value if value in OUTCOMES else "unknown"
 
 
@@ -66,6 +66,7 @@ def runtime_health(env: Mapping[str, str], *, observed_at: str | None = None) ->
 
     deploy = phase_value(env, "DEPLOY_RESULT")
     public_verify = phase_value(env, "PUBLIC_VERIFY")
+    query_verify = phase_value(env, "QUERY_VERIFY")
     stages = [
         stage("discovery", "source_contracts", schema, "SCHEMA_DRIFT_NOT_VERIFIED" if schema != "success" else None),
         stage("publication", "collection", collect, "COLLECTION_NOT_RUN" if collect == "skipped" else None),
@@ -73,7 +74,8 @@ def runtime_health(env: Mapping[str, str], *, observed_at: str | None = None) ->
         stage("publication", "deployment", deploy, "DEPLOYMENT_NOT_RUN" if deploy == "skipped" else None),
         stage("publication", "public_http_verification", public_verify,
               "PUBLIC_HTTP_NOT_VERIFIED" if public_verify != "success" else None),
-        stage("query", "mcp_web_query", "skipped", "NOT_IN_PUBLICATION_WORKFLOW"),
+        stage("query", "mcp_web_query", query_verify,
+              "QUERY_RUNTIME_NOT_VERIFIED" if query_verify != "success" else None),
     ]
     health = load_system_health().build_health(stages)
     health.update({
