@@ -12,6 +12,7 @@ import io
 import json
 import re
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -760,10 +761,21 @@ def live_observations(*, session=None, fetch_source=None) -> list[dict[str, Any]
     fetch_source = fetch_source or _fetch_live_source
     observations = []
     for source_id in CONTRACTS:
-        try:
-            response, resource_id = fetch_source(session, source_id)
-            observations.append(_response_observation(source_id, response, resource_id))
-        except Exception as error:
+        error = None
+        for attempt in range(2):
+            try:
+                response, resource_id = fetch_source(session, source_id)
+                observations.append(_response_observation(source_id, response, resource_id))
+                error = None
+                break
+            except Exception as caught:
+                error = caught
+                error_name = type(caught).__name__.upper()
+                if attempt == 0 and any(marker in error_name for marker in ("CONNECTION", "TIMEOUT", "PROXY")):
+                    time.sleep(1)
+                    continue
+                break
+        if error is not None:
             observations.append(_failed_observation(source_id, error))
     return observations
 

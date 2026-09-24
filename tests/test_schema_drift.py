@@ -217,6 +217,29 @@ class SchemaDriftTests(unittest.TestCase):
         self.assertEqual(failed["http_status"], 503)
         self.assertEqual(failed["error_reason"], "LIVE_FETCH_RUNTIMEERROR")
 
+    def test_live_observations_retries_transient_connection_once(self):
+        response = SimpleNamespace(
+            content=b"sample",
+            status_code=200,
+            headers={"content-type": "text/plain"},
+            url="https://official.test/source",
+            request=SimpleNamespace(url="https://official.test/source"),
+        )
+        calls = {"S-001": 0}
+
+        def fetch(_session, source_id):
+            if source_id == "S-001":
+                calls["S-001"] += 1
+                if calls["S-001"] == 1:
+                    raise ConnectionError("temporary network failure")
+            return response, None
+
+        with mock.patch.object(drift.time, "sleep") as sleep:
+            observations = drift.live_observations(session=object(), fetch_source=fetch)
+        self.assertEqual(calls["S-001"], 2)
+        self.assertEqual(next(item for item in observations if item["source_id"] == "S-001")["http_status"], 200)
+        sleep.assert_called_once_with(1)
+
     def test_live_catalog_sources_use_bound_collector_transport(self):
         response = SimpleNamespace(content=b"sample", status_code=200, headers={}, url="https://official.test/source")
         with mock.patch("online_collect.get", return_value=response) as bounded_get:
