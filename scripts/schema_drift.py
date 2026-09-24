@@ -673,7 +673,15 @@ def _fetch_live_source(session, source_id: str):
     from online_collect import API_S007, API_S009, NEWS_LIST_SOURCES, get as bounded_get
 
     if source_id in NEWS_LIST_SOURCES:
-        return bounded_get(session, NEWS_LIST_SOURCES[source_id]["list_url"], source_id=source_id), None
+        config = NEWS_LIST_SOURCES[source_id]
+        try:
+            return bounded_get(session, config["list_url"], source_id=source_id), None
+        except Exception as error:
+            error_name = type(error).__name__.upper()
+            fallback_url = config.get("fallback_list_url")
+            if not fallback_url or not any(marker in error_name for marker in ("CONNECTION", "TIMEOUT", "PROXY")):
+                raise
+            return bounded_get(session, fallback_url, source_id=source_id), None
     if source_id == "S-007":
         return bounded_get(
             session,

@@ -413,6 +413,7 @@ NEWS_LIST_SOURCES = {
     "S-001": {
         "name": "臺中市政府警察局警政新聞",
         "list_url": "https://www.police.taichung.gov.tw/ch/home.jsp?id=1&parentpath=0&mcustomize=news_list.jsp",
+        "fallback_list_url": "https://www.police.taichung.gov.tw/ch/home.jsp?id=1",
         "id_pattern": r"news_view\.jsp[^\"']*dataserno=(\d+)",
     },
     "S-019": {
