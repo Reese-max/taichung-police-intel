@@ -1,0 +1,45 @@
+name: GovIntel Figma workspace browser acceptance
+on:
+  push:
+    branches: [codex/govintel-figma-workspace-preview-20260917]
+  pull_request:
+    paths:
+      - 'apps/web/public/workspace-preview/**'
+      - 'apps/web/tests/workspace-preview.test.mjs'
+      - 'scripts/verify-workspace-ui.py'
+      - '.github/workflows/workspace-ui.yml'
+permissions:
+  contents: read
+concurrency:
+  group: workspace-ui-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate models and boundaries
+        run: node --test apps/web/tests/workspace-preview.test.mjs
+      - name: Install isolated browser verifier
+        run: |
+          python -m pip install playwright==1.57.0
+          python -m playwright install --with-deps chromium
+      - name: Exercise the actual current-checkout UI
+        run: python scripts/verify-workspace-ui.py
+      - name: Preserve screenshots, traces and actual outcomes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: govintel-workspace-ui-${{ github.run_id }}-${{ github.run_attempt }}
+          path: runtime-evidence/workspace-ui/
+          if-no-files-found: warn
+          retention-days: 14
