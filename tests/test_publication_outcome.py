@@ -83,6 +83,29 @@ class OutcomeTests(unittest.TestCase):
         self.assertEqual(stages[("query", "mcp_web_query")]["outcome"], "SUCCESS")
         self.assertEqual(receipt["lanes"]["query"], "HEALTHY")
 
+    def test_runtime_health_uses_schema_receipt_over_step_success(self):
+        env = {
+            "BUILD_RESULT": "success",
+            "DEPLOY_RESULT": "success",
+            "COLLECT": "skipped",
+            "SCHEMA_DRIFT": "success",
+            "SCHEMA_DRIFT_OVERALL": "BLOCKED",
+            "V1": "success",
+            "V2": "success",
+            "V2_VERIFY": "success",
+            "VERIFY": "success",
+            "PRESERVE": "success",
+            "PAGES_UPLOAD": "success",
+            "PUBLIC_VERIFY": "success",
+            "QUERY_VERIFY": "success",
+        }
+        receipt = module.runtime_health(env, observed_at="2026-09-24T04:00:00+00:00")
+        stages = {(row["lane"], row["stage"]): row for row in receipt["stages"]}
+        self.assertEqual(stages[("discovery", "source_contracts")]["outcome"], "FAILED")
+        self.assertEqual(stages[("discovery", "source_contracts")]["error_class"], "SOURCE_CONTRACT_DRIFT")
+        self.assertEqual(receipt["lanes"]["discovery"], "BLOCKED")
+        self.assertEqual(receipt["schema_drift_overall"], "BLOCKED")
+
     def test_cli_writes_machine_readable_runtime_health_receipt(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "health.json"
@@ -242,6 +265,8 @@ class OutcomeTests(unittest.TestCase):
         self.assertIn("GENERATION_ID: ${{ needs.build.outputs.generation_id }}", text)
         self.assertIn("STATE_COMMIT: ${{ needs.build.outputs.state_commit }}", text)
         self.assertIn("SCHEMA_DRIFT: ${{ needs.build.outputs.schema_drift }}", text)
+        self.assertIn("schema_drift_overall: ${{ steps.schema_drift_receipt.outputs.overall }}", text)
+        self.assertIn("SCHEMA_DRIFT_OVERALL: ${{ needs.build.outputs.schema_drift_overall }}", text)
         self.assertIn("verify-query-gateway-production.py", text)
         self.assertIn("QUERY_VERIFY: ${{ needs.deploy.outputs.query_verify }}", text)
 
