@@ -19,13 +19,16 @@ concurrency:
 
 jobs:
   deploy:
-    if: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
     runs-on: ubuntu-latest
+    env:
+      HAS_CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
     steps:
       - name: Checkout
+        if: ${{ env.HAS_CLOUDFLARE_API_TOKEN == 'true' }}
         uses: actions/checkout@v4
 
       - name: Deploy Worker
+        if: ${{ env.HAS_CLOUDFLARE_API_TOKEN == 'true' }}
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
