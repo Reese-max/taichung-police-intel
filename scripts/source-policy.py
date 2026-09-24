@@ -22,6 +22,15 @@ VALID_ROLES = {"PRIMARY_EVENT", "PRIMARY_REFERENCE", "ENRICHMENT", "DISCOVERY_ON
 COMPLETE = {"COMPLETE_ZERO", "COMPLETE_WITH_ITEMS"}
 FRESHNESS_RECENT = {"FRESH", "RECENT"}
 FRESHNESS_STALE = {"STALE", "VERY_STALE"}
+FRESHNESS_UNKNOWN = "UNKNOWN"
+
+
+def normalize_freshness(value: Any) -> str:
+    """Normalize source freshness values before policy or health projection."""
+    if value is None:
+        return FRESHNESS_UNKNOWN
+    normalized = str(value).strip().upper()
+    return normalized or FRESHNESS_UNKNOWN
 
 
 def canonical(value: Any) -> bytes:
@@ -288,8 +297,7 @@ def assess_query(policy: dict[str, Any], capability_id: str, source_states: dict
             continue
         if state.get("source_health") != "PASS" or state.get("window_completeness") not in COMPLETE:
             bad.append(source_id)
-        freshness = state.get("freshness", state.get("freshness_status"))
-        freshness = str(freshness).upper() if freshness is not None else "UNKNOWN"
+        freshness = normalize_freshness(state.get("freshness", state.get("freshness_status")))
         if freshness in FRESHNESS_STALE:
             stale.append(source_id)
         elif freshness not in FRESHNESS_RECENT:

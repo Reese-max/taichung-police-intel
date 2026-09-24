@@ -248,6 +248,7 @@ class ServerTests(unittest.TestCase):
     def test_health_endpoint_keeps_formal_deployment_unknown(self):
         status, health = http_json(self.base + "/api/health")
         self.assertEqual(status, 200)
+        self.assertFalse(health["production_verified"])
         stages = {(row["lane"], row["stage"]): row for row in health["stages"]}
         self.assertEqual(stages[("publication", "deployment")]["outcome"], "UNKNOWN")
         self.assertEqual(stages[("publication", "public_http_verification")]["outcome"], "UNKNOWN")
@@ -260,6 +261,7 @@ class ReceiptGuardTests(unittest.TestCase):
         ctx = vc.build_candidate_context(ROOT, modules)
         result = vc.build_health_receipt(ctx, [{"id": "loopback", "status": "PASS"}])
         stages = {(row["lane"], row["stage"]): row for row in result["stages"]}
+        self.assertFalse(result["production_verified"])
         self.assertEqual(stages[("publication", "deployment")]["outcome"], "UNKNOWN")
         self.assertEqual(stages[("publication", "public_http_verification")]["outcome"], "UNKNOWN")
         self.assertEqual(stages[("query", "query_index")]["outcome"], "UNKNOWN")
@@ -277,6 +279,18 @@ class ReceiptGuardTests(unittest.TestCase):
         self.assertEqual(stages[("query", "query_index")]["outcome"], "FAILED")
         self.assertEqual(stages[("query", "query_index")]["error_class"], "QUERY_CHECK_FAILED")
         self.assertEqual(result["lanes"]["query"], "BLOCKED")
+
+    def test_failed_unlisted_query_http_check_blocks_query_stage(self):
+        modules = vc.load_checkout_modules(ROOT)
+        ctx = vc.build_candidate_context(ROOT, modules)
+        result = vc.build_health_receipt(ctx, [
+            {"id": "http_query_contract_failed", "status": "FAIL"},
+            {"id": "http_read_only_mcp_publication_receipt", "status": "PASS"},
+            {"id": "stdio_read_only_mcp_lifecycle", "status": "PASS"},
+        ])
+        stages = {(row["lane"], row["stage"]): row for row in result["stages"]}
+        self.assertEqual(stages[("query", "query_index")]["outcome"], "FAILED")
+        self.assertEqual(stages[("query", "query_index")]["error_class"], "QUERY_CHECK_FAILED")
 
     def test_receipt_fails_with_any_failed_check(self):
         receipt = {"checks": [{"id": "a", "status": "PASS"}, {"id": "b", "status": "FAIL"}]}

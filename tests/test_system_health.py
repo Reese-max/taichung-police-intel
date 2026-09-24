@@ -131,6 +131,18 @@ class SystemHealthTests(unittest.TestCase):
                 )
                 self.assertEqual(collection["outcome"], expected)
 
+    def test_collection_uses_source_policy_freshness_normalization(self):
+        status = json.loads(health.DEFAULT_STATUS.read_text(encoding="utf-8"))
+        brief = json.loads(health.DEFAULT_BRIEF.read_text(encoding="utf-8"))
+        status["latest_collection_run"]["status"] = "SUCCEEDED"
+        for source in status["sources"]:
+            source["freshness_status"] = " stale "
+        collection = next(
+            row for row in health.current_publication_stages(status, brief)
+            if row["stage"] == "collection"
+        )
+        self.assertEqual(collection["outcome"], "STALE")
+
     def test_collection_keeps_last_known_success_when_current_sources_are_stale(self):
         if os.getenv("GOVINTEL_PUBLICATION_WORKFLOW") == "1":
             self.skipTest("Pages publication uses generated data, not the checked-in fixture snapshot")
@@ -169,6 +181,22 @@ class SystemHealthTests(unittest.TestCase):
         ])
         result = health.build_health(stages)
         self.assertEqual(result["lanes"]["publication"], "STALE")
+        self.assertNotEqual(result["overall"], "HEALTHY")
+
+    def test_no_data_source_cannot_become_healthy_with_complete_publication_receipt(self):
+        status = json.loads(health.DEFAULT_STATUS.read_text(encoding="utf-8"))
+        brief = json.loads(health.DEFAULT_BRIEF.read_text(encoding="utf-8"))
+        status["latest_collection_run"]["status"] = "SUCCEEDED"
+        for source in status["sources"]:
+            source["freshness_status"] = "NO_DATA"
+        stages = health.current_publication_stages(status, brief)
+        stages = [row for row in stages if row["stage"] not in {"deployment", "public_http_verification"}]
+        stages.extend([
+            stage("publication", "deployment", "SUCCESS"),
+            stage("publication", "public_http_verification", "SUCCESS"),
+        ])
+        result = health.build_health(stages)
+        self.assertEqual(result["lanes"]["publication"], "UNKNOWN")
         self.assertNotEqual(result["overall"], "HEALTHY")
 
     def test_checked_in_current_artifacts_produce_machine_readable_stage_breakdown(self):

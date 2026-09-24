@@ -28,6 +28,19 @@ class SourcePolicyTests(unittest.TestCase):
             for source_id in policy["active_source_ids"]
         }
 
+    def test_freshness_normalization_is_stable(self):
+        for raw, expected in {
+            " fresh ": "FRESH",
+            "recent": "RECENT",
+            " stale ": "STALE",
+            "VERY_STALE": "VERY_STALE",
+            "NO_DATA": "NO_DATA",
+            None: "UNKNOWN",
+            "": "UNKNOWN",
+        }.items():
+            with self.subTest(raw=raw):
+                self.assertEqual(sp.normalize_freshness(raw), expected)
+
     def test_active_set_is_derived_from_catalog_not_parallel_list(self):
         expected = sorted(row["source_id"] for row in self.catalog["sources"] if row["status"] == "PRODUCTION_ACTIVE")
         self.assertEqual(self.baseline["active_source_ids"], expected)
