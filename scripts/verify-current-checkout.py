@@ -76,6 +76,14 @@ QUERY_INDEX_CHECK_IDS = frozenset({
 })
 
 
+def is_query_index_check(check: dict[str, Any]) -> bool:
+    check_id = check.get("id")
+    return check_id in QUERY_INDEX_CHECK_IDS or (
+        isinstance(check_id, str)
+        and check_id.startswith(("http_query_", "negative_query_", "query_"))
+    )
+
+
 def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -328,7 +336,9 @@ def make_handler(ctx: dict[str, Any], serve_dir: Path):
                 "generation_id": generation,
                 "error_class": "QUERY_DOWN_INJECTED" if down else None,
             })
-            _json_response(self, health.build_health(stages))
+            result = health.build_health(stages)
+            result["production_verified"] = False
+            _json_response(self, result)
 
         def _api_capability(self, params: dict[str, list[str]]) -> None:
             capability_id = params.get("id", [None])[0]
@@ -837,7 +847,7 @@ def build_health_receipt(ctx: dict[str, Any], http_checks: list[dict[str, Any]] 
     )
     query_checks = [
         check for check in (http_checks or [])
-        if check.get("id") in QUERY_INDEX_CHECK_IDS
+        if is_query_index_check(check)
     ]
     if http_checks is None:
         query_outcome, query_error = "SKIPPED", "QUERY_RUNTIME_NOT_VERIFIED"
@@ -857,7 +867,9 @@ def build_health_receipt(ctx: dict[str, Any], http_checks: list[dict[str, Any]] 
         {"lane": "query", "stage": "mcp_web_query",
          "outcome": "SKIPPED", "error_class": "CAPABILITY_NOT_AVAILABLE"},
     ]
-    return health.build_health(stages)
+    result = health.build_health(stages)
+    result["production_verified"] = False
+    return result
 
 
 def parse_args(argv=None) -> argparse.Namespace:

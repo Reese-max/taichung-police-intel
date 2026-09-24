@@ -39,12 +39,17 @@ FRESH_SOURCE_STATES = {"FRESH", "RECENT"}
 STALE_SOURCE_STATES = {"STALE", "VERY_STALE"}
 
 
-def load_current_policy() -> dict[str, Any]:
+def load_source_policy() -> Any:
     spec = importlib.util.spec_from_file_location("system_health_source_policy", SOURCE_POLICY)
     if spec is None or spec.loader is None:
         raise ValueError("source policy module is unavailable")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    return module
+
+
+def load_current_policy() -> dict[str, Any]:
+    module = load_source_policy()
     return module.compile_policy(module.load_catalog())
 
 
@@ -301,16 +306,28 @@ def aggregate_last_success_at(sources: list[dict[str, Any]]) -> str | None:
     return values[parsed.index(min(parsed))]
 
 
+def normalize_source_freshness(value: Any, source_policy: Any | None = None) -> str:
+    if source_policy is not None:
+        return source_policy.normalize_freshness(value)
+    if value is None:
+        return "UNKNOWN"
+    normalized = str(value).strip().upper()
+    return normalized or "UNKNOWN"
+
+
 def current_publication_stages(
     status: dict[str, Any],
     brief: dict[str, Any],
     policy: dict[str, Any] | None = None,
     schema_drift: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
-    if policy is None:
-        try:
-            policy = load_current_policy()
-        except (OSError, ValueError, json.JSONDecodeError):
+    try:
+        source_policy = load_source_policy()
+        if policy is None:
+            policy = source_policy.compile_policy(source_policy.load_catalog())
+    except (OSError, ValueError, json.JSONDecodeError):
+        source_policy = None
+        if policy is None:
             policy = None
     required_source_ids = set(policy["active_source_ids"]) if policy else set()
     generated_at = status.get("generated_at")
@@ -319,7 +336,7 @@ def current_publication_stages(
     run_status = run.get("status")
     sources, exact_coverage = _source_coverage(status.get("sources"), required_source_ids)
     freshness_states = {
-        str(source.get("freshness_status", "UNKNOWN")).upper()
+        normalize_source_freshness(source.get("freshness_status"), source_policy)
         for source in sources
     }
     has_stale_source = bool(freshness_states & STALE_SOURCE_STATES)
