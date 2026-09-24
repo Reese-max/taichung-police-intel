@@ -44,6 +44,7 @@ jobs:
       v2: ${{ steps.v2.outcome }}
       v2_verify: ${{ steps.v2_verify.outcome }}
       schema_drift: ${{ steps.schema_drift.outcome }}
+      schema_drift_overall: ${{ steps.schema_drift_receipt.outputs.overall }}
       verify: ${{ steps.verify.outcome }}
       preserve: ${{ steps.preserve.outcome }}
       state_commit: ${{ steps.preserve.outputs.state_commit }}
@@ -147,6 +148,17 @@ jobs:
       - name: Build source contract drift receipt
         id: schema_drift
         run: python -X utf8 scripts/schema_drift.py --live --state state/schema-drift-state.json --output apps/web/public/data/schema-drift.json
+
+      - name: Export source contract outcome
+        if: always()
+        id: schema_drift_receipt
+        shell: bash
+        run: |
+          overall=UNKNOWN
+          if [[ -f apps/web/public/data/schema-drift.json ]]; then
+            overall="$(python -X utf8 -c 'import json; print(json.load(open("apps/web/public/data/schema-drift.json", encoding="utf-8"))["overall"])')"
+          fi
+          echo "overall=$overall" >> "$GITHUB_OUTPUT"
 
       - name: Build machine-readable system health receipt
         id: system_health
@@ -282,6 +294,7 @@ jobs:
           V2: ${{ needs.build.outputs.v2 }}
           V2_VERIFY: ${{ needs.build.outputs.v2_verify }}
           SCHEMA_DRIFT: ${{ needs.build.outputs.schema_drift }}
+          SCHEMA_DRIFT_OVERALL: ${{ needs.build.outputs.schema_drift_overall }}
           VERIFY: ${{ needs.build.outputs.verify }}
           PRESERVE: ${{ needs.build.outputs.preserve }}
           PAGES_UPLOAD: ${{ needs.build.outputs.pages_upload }}

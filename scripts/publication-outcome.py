@@ -54,6 +54,14 @@ def runtime_health(env: Mapping[str, str], *, observed_at: str | None = None) ->
 
     collect = phase_value(env, "COLLECT")
     schema = phase_value(env, "SCHEMA_DRIFT")
+    schema_overall = env.get("SCHEMA_DRIFT_OVERALL", "").strip().upper()
+    schema_error = None
+    if schema == "success" and schema_overall == "BLOCKED":
+        schema = "failure"
+        schema_error = "SOURCE_CONTRACT_DRIFT"
+    elif schema == "success" and schema_overall not in {"", "HEALTHY", "DEGRADED"}:
+        schema = "unknown"
+        schema_error = "SOURCE_CONTRACT_UNVERIFIED"
     validation = [phase_value(env, key) for key in ("V1", "V2", "V2_VERIFY", "VERIFY")]
     if all(value == "success" for value in validation):
         validation_outcome, validation_error = "success", None
@@ -68,7 +76,7 @@ def runtime_health(env: Mapping[str, str], *, observed_at: str | None = None) ->
     public_verify = phase_value(env, "PUBLIC_VERIFY")
     query_verify = phase_value(env, "QUERY_VERIFY")
     stages = [
-        stage("discovery", "source_contracts", schema, "SCHEMA_DRIFT_NOT_VERIFIED" if schema != "success" else None),
+        stage("discovery", "source_contracts", schema, schema_error or ("SCHEMA_DRIFT_NOT_VERIFIED" if schema != "success" else None)),
         stage("publication", "collection", collect, "COLLECTION_NOT_RUN" if collect == "skipped" else None),
         stage("publication", "canonical_validation", validation_outcome, validation_error),
         stage("publication", "deployment", deploy, "DEPLOYMENT_NOT_RUN" if deploy == "skipped" else None),
@@ -85,6 +93,7 @@ def runtime_health(env: Mapping[str, str], *, observed_at: str | None = None) ->
         "run_attempt": env.get("GITHUB_RUN_ATTEMPT") or None,
         "generation_id": generation_id,
         "state_commit": state_commit,
+        "schema_drift_overall": schema_overall or None,
         "public_data_verified": phase_value(env, "BUILD_RESULT") == "success" and deploy == "success" and public_verify == "success",
         "phase_results": {key: phase_value(env, key) for key in PHASES},
     })
