@@ -220,6 +220,7 @@ jobs:
     needs: build
     outputs:
       public_verify: ${{ steps.acknowledge.outcome }}
+      query_verify: ${{ steps.query_verify.outcome }}
     steps:
       - name: Checkout reviewed code for public verification
         uses: actions/checkout@v7
@@ -236,6 +237,27 @@ jobs:
           EXPECTED_STATE_COMMIT: ${{ needs.build.outputs.state_commit }}
           EXPECTED_GENERATION: ${{ needs.build.outputs.generation_id }}
           PUBLICATION_BASE_URL: ${{ steps.deployment.outputs.page_url }}
+
+      - name: Verify production Query Gateway and release binding
+        id: query_verify
+        if: ${{ success() }}
+        run: |
+          python -X utf8 scripts/verify-query-gateway-production.py \
+            --gateway-url "$QUERY_GATEWAY_URL" \
+            --public-base-url "$PUBLICATION_BASE_URL" \
+            --output runtime-evidence/query-gateway-receipt.json
+        env:
+          QUERY_GATEWAY_URL: ${{ vars.QUERY_GATEWAY_URL }}
+          PUBLICATION_BASE_URL: ${{ steps.deployment.outputs.page_url }}
+
+      - name: Retain production Query Gateway receipt
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: production-query-receipt-${{ github.run_id }}-${{ github.run_attempt }}
+          path: runtime-evidence/query-gateway-receipt.json
+          if-no-files-found: ignore
+          retention-days: 14
 
   publication_outcome:
     needs: [build, deploy]
@@ -266,6 +288,7 @@ jobs:
           EVIDENCE: ${{ needs.build.outputs.evidence }}
           EVIDENCE_URL: ${{ needs.build.outputs.evidence_url }}
           PUBLIC_VERIFY: ${{ needs.deploy.outputs.public_verify }}
+          QUERY_VERIFY: ${{ needs.deploy.outputs.query_verify }}
           GENERATION_ID: ${{ needs.build.outputs.generation_id }}
           STATE_COMMIT: ${{ needs.build.outputs.state_commit }}
         run: python scripts/publication-outcome.py --health-output runtime-evidence/publication-health.json
