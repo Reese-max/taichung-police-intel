@@ -7,6 +7,7 @@ on:
       - scripts/verify-backbone-runtime.py
       - tests/test_backbone_runtime.py
       - config/backbone-runtime.v1.json
+      - requirements.txt
       - docs/govintel/BACKBONE_RUNTIME.md
       - .github/workflows/backbone-runtime.yml
 permissions:
