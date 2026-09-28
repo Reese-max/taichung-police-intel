@@ -41,7 +41,7 @@ def load_policy_module():
 
 def load_current_policy() -> dict[str, Any]:
     module = load_policy_module()
-    return module.compile_policy(module.load_catalog())
+    return module.load_current_policy()
 
 
 def canonical_json(value: Any) -> bytes:
@@ -282,7 +282,7 @@ def assess_scope(store, source_id, now):
 
 def query_coverage(store, capability_id, *, requested_scope=None):
     policy_module = load_policy_module()
-    policy = policy_module.compile_policy(policy_module.load_catalog())
+    policy = policy_module.load_current_policy()
     states = {source["source_id"]: source for source in store["sources"]}
     coverage = policy_module.assess_query(policy, capability_id, states)
     required = set(coverage.get("required_sources", []))

@@ -42,7 +42,7 @@ def run_checks() -> dict[str, Any]:
     online = load_module("online_collect_integration", "online_collect.py")
 
     catalog = source_policy.load_catalog()
-    current = source_policy.compile_policy(catalog)
+    current = source_policy.load_current_policy()
     expected = binding(current)
     projections = {
         "query_store": binding(query_store.load_current_policy()),
