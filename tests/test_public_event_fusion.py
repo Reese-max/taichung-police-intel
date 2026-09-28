@@ -218,6 +218,13 @@ class PublicEventFusionTests(unittest.TestCase):
         self.assertEqual(before["public_event_id"], after["public_event_id"])
         self.assertNotEqual(before["linked_document_versions"], after["linked_document_versions"])
 
+    def test_input_order_preserves_event_identity_and_link_order(self):
+        documents = [document("CITY"), document("POLICE"), document("TRAFFIC")]
+        first = fusion.fuse_documents(documents)[0]
+        reversed_input = fusion.fuse_documents(list(reversed(documents)))[0]
+        self.assertEqual(first["public_event_id"], reversed_input["public_event_id"])
+        self.assertEqual(first["linked_document_versions"], reversed_input["linked_document_versions"])
+
     def test_missing_named_event_identity_never_auto_merges(self):
         events = fusion.fuse_documents([document("POLICE", named=None), document("TRAFFIC", named=None)])
         self.assertEqual(len(events), 2)
@@ -262,9 +269,18 @@ class PublicEventFusionTests(unittest.TestCase):
         self.assertEqual(enriched["background"][0]["role"], "BACKGROUND_ONLY")
         with self.assertRaisesRegex(ValueError, "geography"):
             fusion.attach_background(event, dict(record, district_id="location:tc-fengyuan"))
+        missing_url = dict(record)
+        missing_url.pop("source_url")
+        with self.assertRaisesRegex(ValueError, "source_url"):
+            fusion.attach_background(event, missing_url)
         candidate = fusion.fuse_documents([document("CITY")])[0]
         with self.assertRaisesRegex(ValueError, "CONFIRMED"):
             fusion.attach_background(candidate, record)
+        conflict = fusion.fuse_documents([
+            document("POLICE"), document("TRAFFIC", district="location:tc-fengyuan")
+        ])[0]
+        with self.assertRaisesRegex(ValueError, "CONFIRMED"):
+            fusion.attach_background(conflict, record)
 
     def test_manual_confirm_merge_and_split_keep_history(self):
         candidate = fusion.fuse_documents([document("CITY")])[0]
