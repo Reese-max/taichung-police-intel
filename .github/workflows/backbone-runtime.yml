@@ -31,6 +31,7 @@ jobs:
       - name: Verify historical replay invariants
         run: python -m unittest discover -s tests -p test_backbone_runtime.py -v
       - name: Execute pinned component suites and cross-component replay
+        if: ${{ success() || failure() }}
         run: python scripts/verify-backbone-runtime.py --prepare
         env:
           GIT_TERMINAL_PROMPT: '0'

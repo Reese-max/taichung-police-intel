@@ -2,12 +2,16 @@
 from __future__ import annotations
 
 import copy
+from contextlib import redirect_stdout
 import importlib.util
+import io
 import json
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -49,6 +53,25 @@ class PinnedReplayContractTests(unittest.TestCase):
         altered["production_verified"] = True
         with self.assertRaisesRegex(AssertionError, "production boundary"):
             module.validate_manifest(altered)
+
+    def test_rejected_manifest_still_writes_fail_report(self):
+        altered = copy.deepcopy(self.manifest)
+        altered["components"] = altered["components"][1:]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = root / "invalid-manifest.json"
+            manifest.write_text(json.dumps(altered), encoding="utf-8")
+            output = root / "evidence"
+            with patch.object(module, "MANIFEST", manifest), patch.object(
+                sys, "argv", [str(SCRIPT), "--output", str(output), "--components", str(root / "components")]
+            ), redirect_stdout(io.StringIO()):
+                self.assertEqual(module.main(), 1)
+            reports = list(output.glob("*/report.json"))
+            self.assertEqual(len(reports), 1)
+            report = json.loads(reports[0].read_text(encoding="utf-8"))
+            self.assertEqual(report["status"], "FAIL")
+            self.assertEqual(report["error_type"], "AssertionError")
+            self.assertFalse(report["production_verified"])
 
     def test_each_run_has_a_fresh_evidence_directory(self):
         with tempfile.TemporaryDirectory() as directory:
