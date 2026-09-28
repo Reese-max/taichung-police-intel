@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "workers/query-gateway/**"
+      - ".github/workflows/query-gateway-workers.yml"
       - "apps/web/lib/answer-evidence-gate.js"
       - "apps/web/lib/council-prep.js"
       - "docs/govintel/source-catalog.v2.json"
