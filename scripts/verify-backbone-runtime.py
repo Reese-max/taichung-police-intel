@@ -95,6 +95,13 @@ def new_run_directory(output_root, run_id):
     return output
 
 
+def verify_checkout(path, commit, name):
+    actual = execute(['git', 'rev-parse', 'HEAD'], path)
+    require(actual.returncode == 0 and actual.stdout.strip() == commit, 'checkout SHA mismatch: ' + name)
+    dirty = execute(['git', 'status', '--porcelain', '--untracked-files=all'], path)
+    require(dirty.returncode == 0 and not dirty.stdout.strip(), 'dirty or untracked checkout: ' + name)
+
+
 def prepare(manifest, components):
     validate_manifest(manifest)
     for component in manifest['components']:
@@ -105,10 +112,7 @@ def prepare(manifest, components):
             require(fetched.returncode == 0, 'failed pinned fetch: ' + name + '\n' + fetched.stderr)
             added = execute(['git', 'worktree', 'add', '--detach', str(path), commit], ROOT)
             require(added.returncode == 0, 'failed isolated worktree: ' + name + '\n' + added.stderr)
-        actual = execute(['git', 'rev-parse', 'HEAD'], path)
-        require(actual.returncode == 0 and actual.stdout.strip() == commit, 'checkout SHA mismatch: ' + name)
-        dirty = execute(['git', 'status', '--porcelain', '--untracked-files=no'], path)
-        require(dirty.returncode == 0 and not dirty.stdout.strip(), 'dirty tracked checkout: ' + name)
+        verify_checkout(path, commit, name)
 
 
 def component_suites(manifest, components, output):
@@ -308,8 +312,7 @@ def main():
         else:
             validate_manifest(manifest)
             for c in manifest['components']:
-                actual = execute(['git', 'rev-parse', 'HEAD'], components / c['name'])
-                require(actual.returncode == 0 and actual.stdout.strip() == c['sha'], 'pinned checkout required')
+                verify_checkout(components / c['name'], c['sha'], c['name'])
         report['components'] = component_suites(manifest, components, output)
         report['integration'] = integration(components, output)
         report['status'] = 'PASS'

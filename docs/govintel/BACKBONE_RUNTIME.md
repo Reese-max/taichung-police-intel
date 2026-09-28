@@ -13,7 +13,7 @@ Run from a checkout with read access to the same public repository. The manifest
 
 The optional workflow runs on relevant PR changes or manual dispatch. It has `contents: read`, no retained GitHub credentials, no deployment, no production state writes and no cron. Existing required CI remains unchanged. Its separate job preserves logs and machine-readable reports even on failure.
 
-The manifest must contain exactly the eight named components and their declared suite patterns. Missing components or suites fail before a PASS is possible. Each invocation writes to a fresh `runtime-evidence/backbone/<run-id>/` directory, so an earlier successful trace cannot be mixed with a later failed report. The workflow also runs `tests/test_backbone_runtime.py` for these invariants.
+The manifest must contain exactly the eight named components and their declared suite patterns. Missing components or suites fail before a PASS is possible. Reused pinned worktrees must match their SHA and have no tracked changes or untracked files before test discovery. Each invocation writes to a fresh `runtime-evidence/backbone/<run-id>/` directory, so an earlier successful trace cannot be mixed with a later failed report. The workflow also runs `tests/test_backbone_runtime.py` for these invariants.
 
 ## What is executed
 

@@ -5,6 +5,7 @@ import copy
 import importlib.util
 import json
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 
@@ -59,6 +60,29 @@ class PinnedReplayContractTests(unittest.TestCase):
             self.assertEqual((old / "synthetic-integration.json").read_text(encoding="utf-8"), "old")
             with self.assertRaises(FileExistsError):
                 module.new_run_directory(root, "run-two")
+
+    def test_reused_checkout_rejects_untracked_test(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+
+            def git(*args):
+                result = subprocess.run(
+                    ["git", *args], cwd=root, capture_output=True, text=True,
+                    timeout=15, check=False,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                return result.stdout.strip()
+
+            git("init")
+            (root / "tracked.txt").write_text("tracked\n", encoding="utf-8")
+            git("add", "tracked.txt")
+            git("-c", "user.name=fixture", "-c", "user.email=fixture@example.test", "commit", "-m", "fixture")
+            commit = git("rev-parse", "HEAD")
+            module.verify_checkout(root, commit, "fixture")
+            (root / "tests").mkdir()
+            (root / "tests" / "test_hijack.py").write_text("raise AssertionError('untracked')\n", encoding="utf-8")
+            with self.assertRaisesRegex(AssertionError, "dirty or untracked checkout"):
+                module.verify_checkout(root, commit, "fixture")
 
 
 if __name__ == "__main__":
