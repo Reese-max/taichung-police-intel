@@ -58,7 +58,7 @@ test("Worker search applies q and preserves official evidence and publication bi
     assert.equal(noMatch.result_count, 0);
     assert.deepEqual(noMatch.results, []);
     assert.ok(Array.isArray(noMatch.source_gaps));
-    assert.equal(noMatch.answerable_no_match, noMatch.source_gaps.length === 0);
+    assert.equal(noMatch.answerable_no_match, noMatch.freshness === "RECENT" && noMatch.source_gaps.length === 0);
     assert.equal(noMatch.query_generation_id, generation);
 
     const mismatch = await query("search_evidence", { q: item.stable_id, expected_generation: "wrong-generation" });
