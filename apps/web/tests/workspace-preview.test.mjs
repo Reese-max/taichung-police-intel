@@ -5,7 +5,7 @@ import * as m from '../public/workspace-preview/model.mjs';
 const clone = structuredClone;
 const fresh = '2026-09-17T08:00:00+08:00';
 function fixture() {
-  const sources=m.EXPECTED_SOURCES.map(id=>({source_id:id,source_name:id,source_health:'PASS',window_completeness:'COMPLETE_WITH_ITEMS',last_checked_at:fresh}));
+  const sources=m.EXPECTED_SOURCES.map(id=>({source_id:id,source_name:id,source_health:'PASS',window_completeness:'COMPLETE_WITH_ITEMS',result:'NO_NEW_ITEM',freshness_status:'FRESH',last_checked_at:fresh}));
   return [{schema_version:1,collection_run_id:'test',generated_at:fresh,items:[{stable_id:'one',title:'公告',source_id:'S-004',official_url:'https://www.tccc.gov.tw/'}]},
     {schema_version:1,generated_at:fresh,sources,latest_collection_run:{collection_run_id:'test',status:'SUCCEEDED'}},
     {schema_version:1,source_collection_run_id:'test',generated_at:fresh,source_status_generated_at:fresh,snapshot_complete:true,publication_status:'READY'}];
@@ -34,6 +34,7 @@ test('old snapshot reports stale',()=>assert.equal(m.inspectSnapshot(...fixture(
 test('partial data is not zero or complete',()=>{const b=fixture();b[1].sources[0].window_completeness='PARTIAL';assert.equal(m.inspectSnapshot(...b,now).status,'PARTIAL');});
 test('partial remains primary while stale is independently visible',()=>{const b=fixture();b[1].sources[0].window_completeness='PARTIAL';const s=m.inspectSnapshot(...b,now+86400000);assert.equal(s.status,'PARTIAL');assert.equal(s.completeness,'PARTIAL');assert.equal(s.freshness,'STALE');assert.equal(s.partial,true);assert.equal(s.stale,true);});
 test('failed source preserves partial state',()=>{const b=fixture();b[1].sources[0].source_health='FAILED';assert.equal(m.inspectSnapshot(...b,now).partial,true);});
+test('missing or unsupported source result and freshness remain partial',()=>{for(const field of ['result','freshness_status'])for(const value of [undefined,'UNKNOWN']){const b=fixture();if(value===undefined)delete b[1].sources[0][field];else b[1].sources[0][field]=value;const s=m.inspectSnapshot(...b,now);assert.equal(s.status,'PARTIAL',`${field}=${value}`);assert.equal(s.completeness,'PARTIAL',`${field}=${value}`);assert.equal(s.partial,true,`${field}=${value}`);}});
 test('future clock is unknown',()=>assert.equal(m.inspectSnapshot(...fixture(),now-86400000).status,'UNKNOWN'));
 test('unknown last-check time remains unknown',()=>{const b=fixture();b[1].sources[0].last_checked_at=null;assert.equal(m.inspectSnapshot(...b,now).status,'UNKNOWN');});
 test('mixed generations are rejected',()=>{const b=fixture();b[2].source_collection_run_id='other';assert.throws(()=>m.inspectSnapshot(...b,now),/GENERATION/);});

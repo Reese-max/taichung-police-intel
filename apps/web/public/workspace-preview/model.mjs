@@ -100,7 +100,11 @@ export function inspectSnapshot(feed, status, brief, now = Date.now()) {
   const ids = status.sources.map(s => s?.source_id);
   if (ids.length !== 5 || new Set(ids).size !== 5 || ids.some(id => !EXPECTED_SOURCES.includes(id))) throw new Error('SOURCE_COVERAGE_INVALID');
   if (feed.items.some(i => !i || typeof i.stable_id !== 'string' || typeof i.title !== 'string' || !ids.includes(i.source_id)) || new Set(feed.items.map(i => i.stable_id)).size !== feed.items.length) throw new Error('ROW_INVALID');
-  const sourceGap = status.sources.some(s => s.source_health !== 'PASS' || !['COMPLETE_ZERO', 'COMPLETE_WITH_ITEMS'].includes(s.window_completeness));
+  const sourceGap = status.sources.some(s =>
+    s.source_health !== 'PASS' ||
+    !['COMPLETE_ZERO', 'COMPLETE_WITH_ITEMS'].includes(s.window_completeness) ||
+    !['NEW_ITEMS', 'NO_NEW_ITEM'].includes(s.result) ||
+    !['FRESH', 'RECENT', 'STALE', 'VERY_STALE'].includes(s.freshness_status));
   const checks = [time(feed.generated_at), time(brief.generated_at), ...status.sources.map(s => time(s.last_checked_at))];
   const unknown = checks.some(t => !Number.isFinite(t) || t > now + 60000);
   const stale = !unknown && now - Math.min(...checks) > MAX_AGE_MS;
