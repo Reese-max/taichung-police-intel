@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   CLAIM_SCHEMA_VERSION,
@@ -270,6 +272,108 @@ const CURRENT_STATISTIC_NEW = {
   published_at: "2026-09-15T09:00:00+08:00",
   assertions: [{ subject: "交通違規舉發件數", value: "130" }],
 };
+
+const SCOPED_STATISTIC = {
+  ...CURRENT_STATISTIC_NEW,
+  evidence_id: "EV-S026-SCOPED-09",
+  assertions: [{
+    subject: "交通違規舉發件數",
+    value: { value: 130, period: "2026-09", geography: "臺中市", unit: "件" },
+  }],
+};
+
+function scopedStatClaim(value = SCOPED_STATISTIC.assertions[0].value) {
+  return {
+    claim_type: "STATISTIC",
+    text: "2026-09 臺中市交通違規舉發件數為 130 件",
+    temporal_scope: "CURRENT",
+    proposition: { subject: "交通違規舉發件數", value },
+  };
+}
+
+test("structured statistic requires the exact value, period, geography, and unit", () => {
+  const result = gateAnswer({ claims: [scopedStatClaim()], evidence: [SCOPED_STATISTIC] });
+  assert.equal(result.gate_status, "PASS");
+  assert.equal(result.receipt.claims[0].support_status, "SUPPORTED");
+  assert.deepEqual(result.receipt.evidence_ids, [SCOPED_STATISTIC.evidence_id]);
+  assert.deepEqual(result.receipt.claims[0].propositions[0].statistic, SCOPED_STATISTIC.assertions[0].value);
+  assert.equal(result.receipt.claims[0].propositions[0].value, "130 件（2026-09，臺中市）");
+});
+
+test("server gate runner renders a scoped statistic without releasing caller text", () => {
+  const claim = { ...scopedStatClaim(), text: "130 件，因豪雨增加" };
+  const run = spawnSync(process.execPath, [fileURLToPath(new URL("../../../scripts/answer-gate-runner.mjs", import.meta.url))], {
+    input: JSON.stringify({ claims: [claim], evidence: [SCOPED_STATISTIC], publication_hash: "a".repeat(64) }),
+    encoding: "utf8",
+  });
+  assert.equal(run.status, 0, run.stderr);
+  const result = JSON.parse(run.stdout);
+  assert.equal(result.gate_status, "PASS");
+  assert.deepEqual(result.answer, ["官方來源已核對：交通違規舉發件數=130 件（2026-09，臺中市）。"]);
+  assert.equal(result.receipt.publication_hash, "a".repeat(64));
+  assert.deepEqual(result.receipt.evidence_ids, [SCOPED_STATISTIC.evidence_id]);
+});
+
+test("other statistic scopes do not support or conflict with the requested scope", () => {
+  const base = SCOPED_STATISTIC.assertions[0].value;
+  for (const field of ["period", "geography", "unit"]) {
+    const mismatched = {
+      ...SCOPED_STATISTIC,
+      evidence_id: `${SCOPED_STATISTIC.evidence_id}-${field}`,
+      assertions: [{ subject: "交通違規舉發件數", value: { ...base, [field]: `other-${field}` } }],
+    };
+    const alone = gateAnswer({ claims: [scopedStatClaim()], evidence: [mismatched] });
+    assert.equal(alone.removed_claims[0].support_status, "UNSUPPORTED", field);
+    assert.equal(alone.removed_claims[0].reason_code, "NO_EVIDENCE", field);
+    const alongside = gateAnswer({ claims: [scopedStatClaim()], evidence: [mismatched, SCOPED_STATISTIC] });
+    assert.equal(alongside.gate_status, "PASS", field);
+    assert.deepEqual(alongside.receipt.evidence_ids, [SCOPED_STATISTIC.evidence_id], field);
+  }
+  const wrongValue = gateAnswer({
+    claims: [scopedStatClaim({ ...base, value: 129 })], evidence: [SCOPED_STATISTIC],
+  });
+  assert.equal(wrongValue.removed_claims[0].reason_code, "VALUE_MISMATCH");
+});
+
+test("stale evidence for the same statistic scope cannot support a current claim", () => {
+  const result = gateAnswer({
+    claims: [scopedStatClaim()], evidence: [{ ...SCOPED_STATISTIC, is_current: false }],
+  });
+  assert.equal(result.gate_status, "QUALIFIED");
+  assert.equal(result.receipt.claims[0].support_status, "STALE");
+});
+
+test("different current official values conflict only within the same statistic scope", () => {
+  const second = {
+    ...SCOPED_STATISTIC,
+    evidence_id: "EV-S014-SCOPED-09",
+    source_id: "S-014",
+    assertions: [{ subject: "交通違規舉發件數", value: { ...SCOPED_STATISTIC.assertions[0].value, value: 131 } }],
+  };
+  const result = gateAnswer({ claims: [scopedStatClaim()], evidence: [SCOPED_STATISTIC, second] });
+  assert.equal(result.gate_status, "QUALIFIED");
+  assert.equal(result.receipt.claims[0].support_status, "CONFLICT");
+  assert.deepEqual(result.receipt.claims[0].conflict_values.map((entry) => entry.value).sort(), [
+    "130 件（2026-09，臺中市）", "131 件（2026-09，臺中市）",
+  ]);
+});
+
+test("malformed statistic dimensions never verify a claim", () => {
+  const base = SCOPED_STATISTIC.assertions[0].value;
+  for (const value of [
+    { ...base, period: "" }, { ...base, geography: null }, { ...base, unit: " " },
+    { ...base, value: "130" }, { ...base, unexpected: "ignored" },
+    { "geography,period": "臺中市,2026-09", unit: "件", value: 130 },
+  ]) {
+    const claim = gateAnswer({ claims: [scopedStatClaim(value)], evidence: [SCOPED_STATISTIC] });
+    assert.equal(claim.removed_claims[0].reason_code, "INVALID_PROPOSITION");
+    const evidence = gateAnswer({
+      claims: [scopedStatClaim()],
+      evidence: [{ ...SCOPED_STATISTIC, assertions: [{ subject: "交通違規舉發件數", value }] }],
+    });
+    assert.equal(evidence.removed_claims[0].reason_code, "NO_EVIDENCE");
+  }
+});
 
 function currentStatClaim(overrides = {}) {
   return {

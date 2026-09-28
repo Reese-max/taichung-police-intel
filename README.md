@@ -260,6 +260,7 @@ Authenticated Kiro V3 sessions first reviewed all 16 Steering, Spec, and Hook ar
 - Public aggregates are allowed; personal and operational police data are out of scope.
 - Missing post-meeting evidence remains an explicit gap, not an AI inference.
 - Answer drafts pass `apps/web/lib/answer-evidence-gate.js` before release: every factual claim needs exact official evidence (locator + document version), conflicting official sources surface as `CONFLICT` instead of a merged answer, stale sources cannot back current wording, and media-derived records never verify a claim. The shared gate emits one receipt with the publication hash and validator version for both Web Chat and MCP; the read-only `validate_answer` route binds that receipt to the server-controlled catalog and emits no free-text fallback.
+- Structured `STATISTIC` propositions and trusted catalog assertions can use `value: { value: number, period: string, geography: string, unit: string }`. The gate compares all four fields within a subject; a different period, geography, or unit neither supports nor conflicts with the requested statistic. Older scalar statistic assertions remain supported for existing located facts, but do not carry these scope guarantees. The typed statistics query store is not yet promoted into the trusted answer catalog.
 
 ## Historical Kiro competition package (2026-08)
 
