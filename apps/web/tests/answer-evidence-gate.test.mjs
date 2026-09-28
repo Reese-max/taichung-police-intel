@@ -213,6 +213,21 @@ test("current phrasing in text is treated as a current assertion even if scope s
   assert.equal(result.final_claims[0].support_status, "STALE");
 });
 
+test("malformed temporal scopes cannot turn stale evidence into historical support", () => {
+  for (const temporal_scope of [null, 0, false, "", "historical"]) {
+    const claim = {
+      schema_version: CLAIM_SCHEMA_VERSION,
+      text: "2026-08 月交通違規舉發件數為 120 件",
+      claim_type: "STATISTIC",
+      temporal_scope,
+      proposition: { subject: "交通違規舉發件數", value: "120" },
+    };
+    const result = gateAnswer({ claims: [claim], evidence: [STALE_STATISTIC] });
+    assert.equal(result.gate_status, "QUALIFIED", String(temporal_scope));
+    assert.equal(result.final_claims[0].support_status, "STALE", String(temporal_scope));
+  }
+});
+
 test("stale evidence may support an explicitly HISTORICAL claim", () => {
   const historical = {
     schema_version: CLAIM_SCHEMA_VERSION,
