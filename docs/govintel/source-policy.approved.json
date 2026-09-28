@@ -1,0 +1,170 @@
+{
+  "active_source_ids": [
+    "S-004",
+    "S-006",
+    "S-007",
+    "S-009",
+    "S-029"
+  ],
+  "active_sources": [
+    {
+      "authority": "臺中市議會",
+      "cadence_class": "DAILY_EVENT",
+      "entrypoint": "https://www.tccc.gov.tw/wb_download13.asp?uno=&cno=49",
+      "name": "臺中市議會議事日程",
+      "role": "PRIMARY_EVENT",
+      "source_id": "S-004",
+      "status": "PRODUCTION_ACTIVE"
+    },
+    {
+      "authority": "臺中市議會",
+      "cadence_class": "DAILY_EVENT",
+      "entrypoint": "https://www.tccc.gov.tw/wb_download13.asp?uno=&cno=50",
+      "name": "臺中市議會質詢順序表",
+      "role": "PRIMARY_EVENT",
+      "source_id": "S-006",
+      "status": "PRODUCTION_ACTIVE"
+    },
+    {
+      "authority": "臺中市議會",
+      "cadence_class": "DAILY_EVENT",
+      "entrypoint": "https://yishi.tccc.gov.tw/api/ProceedingsBackWeb/FrontList",
+      "name": "臺中市議會議事資訊系統－議事錄",
+      "role": "PRIMARY_EVENT",
+      "source_id": "S-007",
+      "status": "PRODUCTION_ACTIVE"
+    },
+    {
+      "authority": "臺中市議會",
+      "cadence_class": "DAILY_EVENT",
+      "entrypoint": "https://yishi.tccc.gov.tw/api/Proposal/FrontList",
+      "name": "臺中市議會議事資訊系統－各項提案",
+      "role": "PRIMARY_EVENT",
+      "source_id": "S-009",
+      "status": "PRODUCTION_ACTIVE"
+    },
+    {
+      "authority": "臺中市政府研究發展考核委員會",
+      "cadence_class": "DAILY_EVENT",
+      "entrypoint": "https://www.rdec.taichung.gov.tw/12047/12142/12145",
+      "name": "臺中市政府議會專案報告",
+      "role": "PRIMARY_REFERENCE",
+      "source_id": "S-029",
+      "status": "PRODUCTION_ACTIVE"
+    }
+  ],
+  "capabilities": [
+    {
+      "candidate_or_optional_sources": [
+        "CTX-165",
+        "CTX-POP",
+        "S-001",
+        "S-010",
+        "S-011",
+        "S-019",
+        "S-026",
+        "S-028",
+        "S-031",
+        "S-032",
+        "S-033",
+        "S-034",
+        "S-035",
+        "S-036",
+        "S-037"
+      ],
+      "capability_id": "publication_metadata",
+      "coverage_limitation": "只代表 policy 中已啟用來源，不代表世界完整性。",
+      "label": "目前核准來源的 publication metadata",
+      "required_sources": [
+        "S-004",
+        "S-006",
+        "S-007",
+        "S-009",
+        "S-029"
+      ],
+      "supported": true
+    },
+    {
+      "candidate_or_optional_sources": [
+        "CTX-165",
+        "CTX-POP",
+        "S-001",
+        "S-010",
+        "S-011",
+        "S-019",
+        "S-026",
+        "S-028",
+        "S-031",
+        "S-032",
+        "S-033",
+        "S-034",
+        "S-035",
+        "S-036",
+        "S-037"
+      ],
+      "capability_id": "source_health",
+      "coverage_limitation": "健康來源不等於該問題領域具完整覆蓋。",
+      "label": "目前核准來源的來源健康狀態",
+      "required_sources": [
+        "S-004",
+        "S-006",
+        "S-007",
+        "S-009",
+        "S-029"
+      ],
+      "supported": true
+    },
+    {
+      "candidate_or_optional_sources": [
+        "S-010",
+        "S-011"
+      ],
+      "capability_id": "council_affairs",
+      "coverage_limitation": "只涵蓋 policy 中符合議會語意且已啟用的來源。",
+      "label": "議會／質詢相關公開資料",
+      "required_sources": [
+        "S-004",
+        "S-006",
+        "S-007",
+        "S-009",
+        "S-029"
+      ],
+      "supported": true
+    },
+    {
+      "candidate_or_optional_sources": [
+        "S-032"
+      ],
+      "capability_id": "traffic_events",
+      "coverage_limitation": "僅涵蓋已啟用且明確屬交通事件的來源；不代表所有臨時交通事件。",
+      "label": "交通事件公開資料",
+      "required_sources": [],
+      "supported": false
+    },
+    {
+      "candidate_or_optional_sources": [
+        "CTX-165"
+      ],
+      "capability_id": "fraud_reference",
+      "coverage_limitation": "僅作已啟用官方資料範圍內的反詐參考，不推論本地案件量。",
+      "label": "反詐公開參考資料",
+      "required_sources": [],
+      "supported": false
+    }
+  ],
+  "catalog_hash": "886cd9c53e0431a09bb6573e6bcd328861c005ed410f95bdd226c1c2cc7c7356",
+  "catalog_schema_version": 2,
+  "catalog_updated_at": "2026-09-21",
+  "policy_hash": "1387c7e5a15c2fc0a07b6881b0ee40f70e789fcbe01862d9834bfe9b079464d5",
+  "policy_version": 1,
+  "rules": {
+    "candidate_sources_are_verified": false,
+    "runtime_may_drop_failed_required_source": false,
+    "zero_result_scope": "BOUNDED_TO_REQUIRED_SOURCES_ONLY"
+  },
+  "schema_version": 1,
+  "transition": {
+    "promoted": [],
+    "retired": []
+  }
+}

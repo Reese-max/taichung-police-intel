@@ -50,7 +50,7 @@ def load_source_policy() -> Any:
 
 def load_current_policy() -> dict[str, Any]:
     module = load_source_policy()
-    return module.compile_policy(module.load_catalog())
+    return module.load_current_policy()
 
 
 def policy_binding(policy: dict[str, Any]) -> dict[str, Any]:
@@ -324,7 +324,7 @@ def current_publication_stages(
     try:
         source_policy = load_source_policy()
         if policy is None:
-            policy = source_policy.compile_policy(source_policy.load_catalog())
+            policy = source_policy.load_current_policy()
     except (OSError, ValueError, json.JSONDecodeError):
         source_policy = None
         if policy is None:
@@ -502,6 +502,17 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def write_if_changed(path: Path, text: str) -> bool:
+    try:
+        # Text mode normalizes CRLF from a Windows Git checkout to LF.
+        if path.read_text(encoding="utf-8") == text:
+            return False
+    except FileNotFoundError:
+        pass
+    path.write_text(text, encoding="utf-8")
+    return True
+
+
 def main() -> int:
     args = parse_args()
     if args.self_check:
@@ -515,7 +526,7 @@ def main() -> int:
     text = json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(text, encoding="utf-8")
+        write_if_changed(args.output, text)
     else:
         print(text, end="")
     return 0

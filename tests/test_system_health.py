@@ -32,6 +32,18 @@ def complete_publication(overrides=None):
 
 
 class SystemHealthTests(unittest.TestCase):
+    def test_unchanged_health_receipt_keeps_windows_checkout_timestamp(self):
+        text = '{\n  "overall": "UNKNOWN"\n}\n'
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "system-health.json"
+            windows_bytes = text.replace("\n", "\r\n").encode("utf-8")
+            path.write_bytes(windows_bytes)
+            os.utime(path, (946684800, 946684800))
+            before = path.stat().st_mtime_ns
+            self.assertFalse(health.write_if_changed(path, text))
+            self.assertEqual(path.read_bytes(), windows_bytes)
+            self.assertEqual(path.stat().st_mtime_ns, before)
+
     def test_query_failure_does_not_rewrite_publication_truth(self):
         stages = complete_publication() + [stage("query", "query_index", "FAILED", error_class="INDEX_BUILD")]
         result = health.build_health(stages)

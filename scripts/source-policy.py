@@ -10,12 +10,15 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
+import tempfile
 from typing import Any, Callable
 from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CATALOG = ROOT / "docs/govintel/source-catalog.v2.json"
+APPROVED_POLICY = ROOT / "docs/govintel/source-policy.approved.json"
 SCHEMA_VERSION = 1
 VALID_STATUSES = {"PRODUCTION_ACTIVE", "AUDITED_EXISTING", "VERIFIED_CANDIDATE", "REFERENCE_ONLY"}
 VALID_ROLES = {"PRIMARY_EVENT", "PRIMARY_REFERENCE", "ENRICHMENT", "DISCOVERY_ONLY"}
@@ -136,10 +139,13 @@ def compile_policy(
     catalog: dict[str, Any],
     *,
     previous: dict[str, Any] | None = None,
+    bootstrap: bool = False,
     promotions: list[dict[str, Any]] | None = None,
     retirements: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     validate_catalog(catalog)
+    if (previous is None) != bootstrap:
+        raise ValueError("initial policy bootstrap must be explicit; transitions require a previous policy")
     active_rows = [row for row in catalog["sources"] if row["status"] == "PRODUCTION_ACTIVE"]
     active_rows.sort(key=lambda row: row["source_id"])
     active_ids = [row["source_id"] for row in active_rows]
@@ -262,8 +268,32 @@ def validate_policy(policy: dict[str, Any]) -> None:
             or capability.get("supported") is not (bool(required))
         ):
             raise ValueError("invalid policy capability source binding")
-def assess_query(policy: dict[str, Any], capability_id: str, source_states: dict[str, dict[str, Any]] | None = None) -> dict[str, Any]:
+
+
+def validate_catalog_binding(policy: dict[str, Any], catalog: dict[str, Any]) -> None:
+    """Rebuild compiler-owned fields from a trusted catalog, not the policy's self-hash."""
     validate_policy(policy)
+    expected = compile_policy(catalog, bootstrap=True)
+    for key in expected.keys() - {"policy_version", "transition", "policy_hash"}:
+        if policy.get(key) != expected[key]:
+            raise ValueError(f"policy/catalog binding mismatch: {key}")
+    if set(policy) != set(expected):
+        raise ValueError("policy/catalog binding mismatch: fields")
+
+
+def load_current_policy(catalog_path: Path = DEFAULT_CATALOG,
+                        policy_path: Path = APPROVED_POLICY) -> dict[str, Any]:
+    """Load the reviewed snapshot and require it to match the canonical catalog."""
+    catalog = load_catalog(catalog_path)
+    policy = json.loads(policy_path.read_text(encoding="utf-8"))
+    validate_catalog_binding(policy, catalog)
+    return policy
+
+
+def assess_query(policy: dict[str, Any], capability_id: str, source_states: dict[str, dict[str, Any]] | None = None) -> dict[str, Any]:
+    # A recomputed self-hash is not authorization to change required sources.
+    if policy != load_current_policy():
+        raise ValueError("policy differs from the approved catalog-bound snapshot")
     capability = next((row for row in policy["capabilities"] if row["capability_id"] == capability_id), None)
     if capability is None or not capability["supported"]:
         return {
@@ -322,8 +352,7 @@ def assess_query(policy: dict[str, Any], capability_id: str, source_states: dict
 
 
 def self_check() -> None:
-    catalog = load_catalog()
-    policy = compile_policy(catalog)
+    policy = load_current_policy()
     assert policy["active_source_ids"] == sorted(policy["active_source_ids"])
     assert assess_query(policy, "traffic_events")["status"] == "CAPABILITY_NOT_AVAILABLE"
     states = {source_id: {"source_health": "PASS", "window_completeness": "COMPLETE_WITH_ITEMS", "freshness": "RECENT"} for source_id in policy["active_source_ids"]}
@@ -337,6 +366,8 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--catalog", type=Path, default=DEFAULT_CATALOG)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--promotions", type=Path, help="JSON array of exact promotion receipts")
+    parser.add_argument("--retirements", type=Path, help="JSON array of exact retirement receipts")
     parser.add_argument("--self-check", action="store_true")
     return parser.parse_args()
 
@@ -346,11 +377,35 @@ def main() -> int:
     if args.self_check:
         self_check()
         return 0
-    policy = compile_policy(load_catalog(args.catalog))
+    catalog = load_catalog(args.catalog)
+    previous = json.loads(APPROVED_POLICY.read_text(encoding="utf-8"))
+    validate_policy(previous)
+    promotions = json.loads(args.promotions.read_text(encoding="utf-8")) if args.promotions else None
+    retirements = json.loads(args.retirements.read_text(encoding="utf-8")) if args.retirements else None
+    if promotions is not None and not isinstance(promotions, list):
+        raise ValueError("promotions must be a JSON array")
+    if retirements is not None and not isinstance(retirements, list):
+        raise ValueError("retirements must be a JSON array")
+    if digest(catalog) == previous["catalog_hash"] and promotions is None and retirements is None:
+        validate_catalog_binding(previous, catalog)
+        policy = previous
+    else:
+        policy = compile_policy(catalog, previous=previous,
+                                promotions=promotions, retirements=retirements)
     text = json.dumps(policy, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(text, encoding="utf-8")
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", newline="\n",
+                                             dir=args.output.parent, prefix=f".{args.output.name}.",
+                                             suffix=".tmp", delete=False) as handle:
+                temporary = Path(handle.name)
+                handle.write(text)
+            os.replace(temporary, args.output)
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
     else:
         print(text, end="")
     return 0

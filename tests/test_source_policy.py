@@ -1,6 +1,10 @@
 import copy
 import importlib.util
+import json
 from pathlib import Path
+import subprocess
+import sys
+import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -15,7 +19,7 @@ class SourcePolicyTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.catalog = sp.load_catalog()
-        cls.baseline = sp.compile_policy(cls.catalog)
+        cls.baseline = sp.load_current_policy()
 
     def good_states(self, policy=None):
         policy = policy or self.baseline
@@ -60,9 +64,51 @@ class SourcePolicyTests(unittest.TestCase):
         self.assertEqual(self.baseline["catalog_hash"], sp.digest(self.catalog))
 
     def test_policy_build_is_deterministic(self):
-        second = sp.compile_policy(copy.deepcopy(self.catalog))
+        second = sp.compile_policy(copy.deepcopy(self.catalog), bootstrap=True)
         self.assertEqual(self.baseline, second)
         sp.validate_policy(second)
+
+    def test_bootstrap_requires_explicit_mode(self):
+        with self.assertRaisesRegex(ValueError, "bootstrap must be explicit"):
+            sp.compile_policy(self.catalog)
+
+    def test_approved_snapshot_rejects_catalog_drift_or_missing_anchor(self):
+        changed = copy.deepcopy(self.catalog)
+        next(row for row in changed["sources"] if row["source_id"] == "S-032")["status"] = "PRODUCTION_ACTIVE"
+        with tempfile.TemporaryDirectory() as directory:
+            catalog_path = Path(directory) / "changed-catalog.json"
+            catalog_path.write_text(json.dumps(changed), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "policy/catalog binding mismatch"):
+                sp.load_current_policy(catalog_path=catalog_path)
+            with self.assertRaises(FileNotFoundError):
+                sp.load_current_policy(policy_path=Path(directory) / "missing-policy.json")
+
+    def test_cli_requires_previous_policy_and_exact_transition_receipt(self):
+        promoted_catalog = copy.deepcopy(self.catalog)
+        next(row for row in promoted_catalog["sources"] if row["source_id"] == "S-032")["status"] = "PRODUCTION_ACTIVE"
+        with tempfile.TemporaryDirectory() as directory:
+            catalog_path = Path(directory) / "catalog.json"
+            receipts_path = Path(directory) / "receipts.json"
+            output_path = Path(directory) / "proposed-policy.json"
+            catalog_path.write_text(json.dumps(promoted_catalog), encoding="utf-8")
+            output_path.write_text("approved-old-snapshot\n", encoding="utf-8")
+            command = [sys.executable, "-X", "utf8", str(SCRIPT), "--catalog", str(catalog_path),
+                       "--output", str(output_path)]
+            denied = subprocess.run(command, cwd=ROOT, text=True, capture_output=True)
+            self.assertNotEqual(denied.returncode, 0)
+            self.assertIn("promotion receipts", denied.stderr)
+            self.assertEqual(output_path.read_text(encoding="utf-8"), "approved-old-snapshot\n")
+            receipts_path.write_text(json.dumps([{
+                "source_id": "S-032", "receipt_id": "review:22-canary",
+                "reason": "approved candidate promotion fixture",
+            }]), encoding="utf-8")
+            allowed = subprocess.run(command + ["--promotions", str(receipts_path)],
+                                     cwd=ROOT, text=True, capture_output=True)
+            self.assertEqual(allowed.returncode, 0, allowed.stderr)
+            policy = json.loads(output_path.read_text(encoding="utf-8"))
+            self.assertEqual(policy["policy_version"], self.baseline["policy_version"] + 1)
+            self.assertIn("S-032", policy["active_source_ids"])
+            self.assertEqual(policy["transition"]["promoted"][0]["source_id"], "S-032")
 
     def test_candidate_does_not_enter_verified_active_set(self):
         candidates = {row["source_id"] for row in self.catalog["sources"] if row["status"] != "PRODUCTION_ACTIVE"}
@@ -169,6 +215,27 @@ class SourcePolicyTests(unittest.TestCase):
         tampered["policy_hash"] = sp.digest({key: value for key, value in tampered.items() if key != "policy_hash"})
         with self.assertRaisesRegex(ValueError, "active_sources"):
             sp.validate_policy(tampered)
+
+    def test_recomputed_capability_and_candidate_forgery_fail_catalog_binding(self):
+        states = self.good_states()
+        for capability_id, required, optional in (
+            ("publication_metadata", self.baseline["active_source_ids"][:-1], []),
+            ("traffic_events", ["S-032"], []),
+        ):
+            with self.subTest(capability=capability_id):
+                tampered = copy.deepcopy(self.baseline)
+                if capability_id == "traffic_events":
+                    tampered["active_source_ids"].append("S-032")
+                    candidate = next(row for row in self.catalog["sources"] if row["source_id"] == "S-032")
+                    tampered["active_sources"].append(sp._project_source({**candidate, "status": "PRODUCTION_ACTIVE"}))
+                capability = next(row for row in tampered["capabilities"] if row["capability_id"] == capability_id)
+                capability["required_sources"] = required
+                capability["candidate_or_optional_sources"] = optional
+                capability["supported"] = True
+                tampered["policy_hash"] = sp.digest({key: value for key, value in tampered.items() if key != "policy_hash"})
+                sp.validate_policy(tampered)
+                with self.assertRaisesRegex(ValueError, "approved catalog-bound snapshot"):
+                    sp.assess_query(tampered, capability_id, states)
 
     def test_malformed_projection_types_fail_closed(self):
         cases = []
