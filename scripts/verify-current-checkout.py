@@ -798,11 +798,26 @@ def build_web_site(root: Path, log_dir: Path) -> dict[str, Any]:
     web = root / "apps" / "web"
     npm = "npm.cmd" if os.name == "nt" else "npm"
     log_dir.mkdir(parents=True, exist_ok=True)
+
+    def failed_command(error: Exception, name: str, log_name: str) -> dict[str, Any]:
+        stdout = getattr(error, "stdout", None) or ""
+        stderr = getattr(error, "stderr", None) or ""
+        if isinstance(stdout, bytes):
+            stdout = stdout.decode("utf-8", errors="replace")
+        if isinstance(stderr, bytes):
+            stderr = stderr.decode("utf-8", errors="replace")
+        (log_dir / log_name).write_text(f"{stdout}\n{stderr}\n{error}\n", encoding="utf-8")
+        return check_record("web_build", False, f"{name}: {type(error).__name__}",
+                            log=f"logs/{log_name}")
+
     # A pre-existing node_modules tree does not prove that either package-lock
     # produced the dependencies used by this candidate build/browser run.
     for name, directory in (("root", root), ("web", web)):
-        install = run([npm, "ci", "--no-audit", "--no-fund"], directory, timeout=600)
         log_name = f"npm-ci-{name}.log"
+        try:
+            install = run([npm, "ci", "--no-audit", "--no-fund"], directory, timeout=600)
+        except (subprocess.TimeoutExpired, OSError) as error:
+            return failed_command(error, f"{name} npm ci", log_name)
         (log_dir / log_name).write_text(install.stdout + "\n" + install.stderr, encoding="utf-8")
         if install.returncode != 0:
             return check_record("web_build", False, f"{name} npm ci exit={install.returncode}",
@@ -810,8 +825,11 @@ def build_web_site(root: Path, log_dir: Path) -> dict[str, Any]:
     env = dict(os.environ)
     env.pop("PAGES_BASE_PATH", None)
     env.pop("NEXT_PUBLIC_BASE_PATH", None)
-    build = subprocess.run([npm, "run", "build"], cwd=web, env=env,
-                           capture_output=True, text=True, encoding="utf-8", timeout=600)
+    try:
+        build = subprocess.run([npm, "run", "build"], cwd=web, env=env,
+                               capture_output=True, text=True, encoding="utf-8", timeout=600)
+    except (subprocess.TimeoutExpired, OSError) as error:
+        return failed_command(error, "next build", "next-build.log")
     (log_dir / "next-build.log").write_text(build.stdout + "\n" + build.stderr, encoding="utf-8")
     out = web / "out" / "index.html"
     return check_record("web_build", build.returncode == 0 and out.is_file(),

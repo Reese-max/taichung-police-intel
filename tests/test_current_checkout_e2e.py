@@ -107,6 +107,38 @@ class DependencyInstallTests(unittest.TestCase):
             self.assertIn("lock mismatch", (root / "logs" / "npm-ci-web.log").read_text(encoding="utf-8"))
             build.assert_not_called()
 
+    def test_timed_out_install_retains_partial_log_and_failed_check(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            timeout = subprocess.TimeoutExpired(["npm", "ci"], 600,
+                                                output=b"partial stdout", stderr=b"registry timeout")
+            with patch.object(vc, "run", side_effect=timeout), \
+                    patch.object(vc.subprocess, "run") as build:
+                result = vc.build_web_site(root, root / "logs")
+
+            self.assertEqual(result["status"], "FAIL", result)
+            self.assertEqual(result["log"], "logs/npm-ci-root.log")
+            log = (root / "logs" / "npm-ci-root.log").read_text(encoding="utf-8")
+            self.assertIn("partial stdout", log)
+            self.assertIn("registry timeout", log)
+            build.assert_not_called()
+
+    def test_timed_out_build_retains_log_and_failed_check(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            installed = subprocess.CompletedProcess(["npm", "ci"], 0, "installed", "")
+            timeout = subprocess.TimeoutExpired(["npm", "run", "build"], 600,
+                                                output=b"partial build", stderr=b"worker stalled")
+            with patch.object(vc, "run", return_value=installed), \
+                    patch.object(vc.subprocess, "run", side_effect=timeout):
+                result = vc.build_web_site(root, root / "logs")
+
+            self.assertEqual(result["status"], "FAIL", result)
+            self.assertEqual(result["log"], "logs/next-build.log")
+            log = (root / "logs" / "next-build.log").read_text(encoding="utf-8")
+            self.assertIn("partial build", log)
+            self.assertIn("worker stalled", log)
+
 
 class ModuleBindingTests(unittest.TestCase):
     def test_modules_load_from_this_checkout_only(self):
