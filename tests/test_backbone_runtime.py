@@ -73,6 +73,29 @@ class PinnedReplayContractTests(unittest.TestCase):
             self.assertEqual(report["error_type"], "AssertionError")
             self.assertFalse(report["production_verified"])
 
+    def test_malformed_or_missing_manifest_still_writes_fail_report(self):
+        for label, contents, error_type in (
+            ("malformed", "{bad json", "JSONDecodeError"),
+            ("missing", None, "FileNotFoundError"),
+        ):
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                manifest = root / "manifest.json"
+                if contents is not None:
+                    manifest.write_text(contents, encoding="utf-8")
+                output = root / "evidence"
+                with patch.object(module, "MANIFEST", manifest), patch.object(
+                    sys, "argv", [str(SCRIPT), "--output", str(output)]
+                ), redirect_stdout(io.StringIO()):
+                    self.assertEqual(module.main(), 1)
+                reports = list(output.glob("*/report.json"))
+                self.assertEqual(len(reports), 1)
+                report = json.loads(reports[0].read_text(encoding="utf-8"))
+                self.assertEqual(report["status"], "FAIL")
+                self.assertEqual(report["error_type"], error_type)
+                self.assertIsNone(report["manifest_sha256"])
+                self.assertFalse(report["production_verified"])
+
     def test_each_run_has_a_fresh_evidence_directory(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

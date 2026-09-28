@@ -300,13 +300,14 @@ def main():
     started = datetime.now(timezone.utc)
     run_id = started.strftime('%Y%m%dT%H%M%S%fZ') + '-' + uuid.uuid4().hex[:8]
     output = new_run_directory(args.output.resolve(), run_id)
-    manifest = json.loads(MANIFEST.read_text(encoding='utf-8'))
     report = {'schema_version': 1, 'started_at': started.isoformat(), 'evidence_run_id': run_id,
-              'manifest_sha256': sha(manifest),
+              'manifest_sha256': None,
               'validation_scope': 'PINNED_COMPONENT_RUNTIME_AND_SYNTHETIC_INTEGRATION',
               'production_verified': False, 'status': 'RUNNING'}
-    write_json(output / 'manifest.json', manifest)
     try:
+        manifest = json.loads(MANIFEST.read_text(encoding='utf-8'))
+        report['manifest_sha256'] = sha(manifest)
+        write_json(output / 'manifest.json', manifest)
         if args.prepare:
             prepare(manifest, components)
         else:
