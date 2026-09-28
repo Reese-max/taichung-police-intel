@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import csv
 import hashlib
+import importlib.util
 import json
 import os
 import tempfile
@@ -15,28 +16,27 @@ ROOT = Path(__file__).resolve().parent
 TZ = ZoneInfo("Asia/Taipei")
 STATUS_FIXTURE = "source-seven-day-status-2026-08-14.csv"
 S029_FIXTURE = "source-live-canary-s026-s029-2026-08-14.json"
-P0_SOURCES = {
-    "S-004": (
-        "臺中市議會議事日程",
-        "https://www.tccc.gov.tw/wb_download13.asp?uno=&cno=49",
-    ),
-    "S-006": (
-        "臺中市議會質詢順序表",
-        "https://www.tccc.gov.tw/wb_download13.asp?uno=&cno=50",
-    ),
-    "S-007": (
-        "臺中市議會議事資訊系統－議事錄",
-        "https://yishi.tccc.gov.tw/api/ProceedingsBackWeb/FrontList",
-    ),
-    "S-009": (
-        "臺中市議會議事資訊系統－各項提案",
-        "https://yishi.tccc.gov.tw/api/Proposal/FrontList",
-    ),
-    "S-029": (
-        "臺中市政府議會專案報告",
-        "https://www.rdec.taichung.gov.tw/12047/12142/12145",
-    ),
-}
+SOURCE_POLICY = ROOT / "scripts" / "source-policy.py"
+
+
+def load_production_sources() -> dict[str, tuple[str, str]]:
+    spec = importlib.util.spec_from_file_location("collect_source_policy", SOURCE_POLICY)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("source policy module is unavailable")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    active = [
+        row for row in module.load_catalog()["sources"]
+        if row["status"] == "PRODUCTION_ACTIVE"
+    ]
+    return {
+        row["source_id"]: (row["name"], row["entrypoint"])
+        for row in sorted(active, key=lambda row: row["source_id"])
+    }
+
+
+# Compatibility name retained for the fixture and collector callers.
+P0_SOURCES = load_production_sources()
 
 
 def canonical_sha256(value: object) -> str:
@@ -191,6 +191,9 @@ SOURCE_FRESHNESS_POLICY: dict[str, tuple[float, float]] = {
     "S-007": (24 * 90, 24 * 180),  # Meeting records: published after meeting periods
     "S-009": (24 * 14, 24 * 60),   # Proposals: session-based, API-confirmed
     "S-029": (24 * 45, 24 * 90),   # Project reports: updated per session cycle
+    "S-001": (13, 24),              # Police news: event/news cadence
+    "S-019": (36, 72),              # City meetings: daily publication cadence
+    "S-032": (13, 24),              # Traffic news: event/news cadence
 }
 
 

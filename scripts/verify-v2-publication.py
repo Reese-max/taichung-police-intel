@@ -2,13 +2,20 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from intel_v2.handoff import ACTIVE_WATCH_STATUSES, validate_state as validate_handoff_state
+
 DEFAULT_FEED = ROOT / "apps" / "web" / "public" / "data" / "intelligence-feed.json"
 DEFAULT_STATUS = ROOT / "apps" / "web" / "public" / "data" / "source-status.json"
 DEFAULT_STATE = ROOT / "state" / "v2-shadow-state.json"
+DEFAULT_HANDOFF_STATE = ROOT / "state" / "v2-handoff-state.json"
 DEFAULT_BRIEF = ROOT / "apps" / "web" / "public" / "data" / "v2-daily-brief.json"
 PUBLISHABLE_CHANGE_TYPES = {
     "NEW",
@@ -18,6 +25,31 @@ PUBLISHABLE_CHANGE_TYPES = {
     "REMOVED",
 }
 TEMPORAL_BASES = {"OFFICIAL_DATE", "FIRST_SEEN", "DETECTED_CHANGE"}
+CANONICAL_EVENT_FIELDS = (
+    "event_id",
+    "identity",
+    "watch_id",
+    "stable_key",
+    "source_id",
+    "source_name",
+    "change_type",
+    "headline",
+    "what_changed",
+    "why_it_matters",
+    "affected_roles",
+    "recommended_action",
+    "deadline",
+    "temporal_basis",
+    "date_status",
+    "detected_at",
+    "changed_fields",
+    "source_version",
+    "source_sha256",
+    "source_document_version",
+    "official_url",
+    "verification_status",
+    "evidence_status",
+)
 
 
 def load_json(path: Path) -> dict:
@@ -30,7 +62,38 @@ def fail(message: str) -> None:
     raise ValueError(f"V2_PUBLICATION_INVALID: {message}")
 
 
-def validate_action_item(item: dict, seen_event_ids: set[str], expected_tier: str) -> None:
+def validate_profile_metadata(profile: dict, *, label: str = "profile") -> None:
+    if not isinstance(profile, dict):
+        fail(f"{label} must be an object")
+    if not isinstance(profile.get("profile_id"), str) or not profile["profile_id"]:
+        fail(f"{label} is missing profile_id")
+    if not isinstance(profile.get("profile_version"), int) or profile["profile_version"] < 1:
+        fail(f"{label} has an invalid profile_version")
+    if not isinstance(profile.get("profile_hash"), str) or len(profile["profile_hash"]) != 64:
+        fail(f"{label} has an invalid profile_hash")
+    if not isinstance(profile.get("ranking_policy_version"), str) or not profile["ranking_policy_version"]:
+        fail(f"{label} is missing ranking_policy_version")
+    if not isinstance(profile.get("label"), str) or not profile["label"].strip():
+        fail(f"{label} is missing label")
+
+
+def validate_profile_relevance(item: dict, profile: dict, *, label: str) -> None:
+    relevance = item.get("profile_relevance")
+    if not isinstance(relevance, dict):
+        fail(f"{label} is missing profile_relevance")
+    for key in ("profile_id", "profile_version", "profile_hash", "ranking_policy_version"):
+        if relevance.get(key) != profile[key]:
+            fail(f"{label} profile metadata mismatch: {key}")
+    if not isinstance(relevance.get("reason_codes"), list) or not relevance["reason_codes"]:
+        fail(f"{label} must expose deterministic reason_codes")
+
+
+def validate_action_item(
+    item: dict,
+    seen_event_ids: set[str],
+    expected_tier: str,
+    expected_profile: dict | None = None,
+) -> None:
     event_id = item.get("event_id")
     if not event_id or event_id in seen_event_ids:
         fail("published event IDs must be present and unique")
@@ -55,18 +118,55 @@ def validate_action_item(item: dict, seen_event_ids: set[str], expected_tier: st
         fail(f"published item lacks official evidence binding: {event_id}")
     if item.get("publication_tier") != expected_tier:
         fail(f"published item tier mismatch: {event_id}")
+    if expected_profile:
+        validate_profile_relevance(item, expected_profile, label=f"published item {event_id}")
 
 
-def verify(*, feed_path: Path, status_path: Path, state_path: Path, brief_path: Path) -> dict:
+def validate_profile_view_consistency(profile_views: list[dict]) -> None:
+    """Profile views may reorder/select items, but cannot rewrite canonical truth."""
+    canonical_by_item: dict[tuple[str, str], str] = {}
+    for view in profile_views:
+        for key in ("priority_items", "other_changes", "tracking_items"):
+            for item in view[key]:
+                identity = item.get("identity") or item.get("event_id") or item.get("tracking_id")
+                if not identity:
+                    fail(f"profile view item lacks a stable identity: {key}")
+                item_key = (key, identity)
+                canonical = json.dumps(
+                    {field: item.get(field) for field in CANONICAL_EVENT_FIELDS},
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    allow_nan=False,
+                )
+                previous = canonical_by_item.get(item_key)
+                if previous is not None and previous != canonical:
+                    fail(f"canonical item differs across profile views: {identity}")
+                canonical_by_item[item_key] = canonical
+
+
+def verify(
+    *,
+    feed_path: Path,
+    status_path: Path,
+    state_path: Path,
+    handoff_state_path: Path,
+    brief_path: Path,
+) -> dict:
     feed = load_json(feed_path)
     status = load_json(status_path)
     state = load_json(state_path)
+    handoff_state = load_json(handoff_state_path)
     brief = load_json(brief_path)
 
     if feed.get("schema_version") != 1 or not isinstance(feed.get("items"), list):
         fail("legacy feed contract is invalid")
     if state.get("schema_version") != 1 or state.get("mode") != "V2_SHADOW":
         fail("state must use schema_version=1 and mode=V2_SHADOW")
+    try:
+        validate_handoff_state(handoff_state)
+    except ValueError as error:
+        fail(str(error))
     if not state.get("baseline_established_at"):
         fail("state is missing baseline_established_at")
     if not isinstance(state.get("items"), dict):
@@ -77,6 +177,45 @@ def verify(*, feed_path: Path, status_path: Path, state_path: Path, brief_path: 
         fail("brief must use police-user generator_version=2")
     if not isinstance(brief.get("audience"), list) or not brief["audience"]:
         fail("brief must declare its police-user audience")
+    profile = brief.get("profile")
+    validate_profile_metadata(profile)
+    profile_views = brief.get("profile_views")
+    if not isinstance(profile_views, list) or not profile_views:
+        fail("brief must include at least one profile view")
+    view_by_id = {}
+    for view in profile_views:
+        if not isinstance(view, dict):
+            fail("profile view must be an object")
+        view_profile = view.get("profile")
+        validate_profile_metadata(view_profile, label="profile view")
+        profile_id = view_profile["profile_id"]
+        if profile_id in view_by_id:
+            fail(f"duplicate profile view: {profile_id}")
+        view_by_id[profile_id] = view
+        view_priority = view.get("priority_items")
+        view_tracking = view.get("tracking_items")
+        view_other = view.get("other_changes")
+        if not isinstance(view_priority, list) or not isinstance(view_tracking, list) or not isinstance(view_other, list):
+            fail(f"profile view arrays are invalid: {profile_id}")
+        if len(view_priority) > 3 or len(view_tracking) > 5:
+            fail(f"profile view caps are invalid: {profile_id}")
+        seen_view_events: set[str] = set()
+        for item in view_priority:
+            validate_action_item(item, seen_view_events, "TOP", view_profile)
+        for item in view_other:
+            validate_action_item(item, seen_view_events, "OTHER", view_profile)
+        for item in view_tracking:
+            validate_profile_relevance(item, view_profile, label=f"profile tracking item {profile_id}")
+    validate_profile_view_consistency(profile_views)
+    if profile["profile_id"] not in view_by_id:
+        fail("selected profile is missing from profile_views")
+    selected_view = view_by_id[profile["profile_id"]]
+    if brief.get("priority_items") != selected_view["priority_items"]:
+        fail("brief priority_items do not match selected profile view")
+    if brief.get("tracking_items") != selected_view["tracking_items"]:
+        fail("brief tracking_items do not match selected profile view")
+    if brief.get("other_changes") != selected_view["other_changes"]:
+        fail("brief other_changes do not match selected profile view")
 
     run_id = feed.get("collection_run_id")
     status_run_id = (status.get("latest_collection_run") or {}).get("collection_run_id")
@@ -111,6 +250,16 @@ def verify(*, feed_path: Path, status_path: Path, state_path: Path, brief_path: 
         fail("priority_count does not match priority_items")
     if overview.get("tracking_count") != len(tracking_items):
         fail("tracking_count does not match tracking_items")
+    active_watch_ids = {
+        watch_id
+        for watch_id, watch in handoff_state["watch_items"].items()
+        if watch.get("status") in ACTIVE_WATCH_STATUSES
+    }
+    tracking_watch_ids = {item.get("watch_id") for item in tracking_items}
+    if None in tracking_watch_ids or not tracking_watch_ids <= active_watch_ids:
+        fail("tracking_items must project active persistent watch items")
+    if overview.get("tracking_total") != len(active_watch_ids):
+        fail("tracking_total does not match persistent active watch items")
     if overview.get("other_change_count") != len(other_changes):
         fail("other_change_count does not match other_changes")
     if len(priority_items) + len(other_changes) > current_change_count:
@@ -118,9 +267,11 @@ def verify(*, feed_path: Path, status_path: Path, state_path: Path, brief_path: 
 
     seen_event_ids: set[str] = set()
     for item in priority_items:
-        validate_action_item(item, seen_event_ids, "TOP")
+        validate_action_item(item, seen_event_ids, "TOP", profile)
     for item in other_changes:
-        validate_action_item(item, seen_event_ids, "OTHER")
+        validate_action_item(item, seen_event_ids, "OTHER", profile)
+    for item in tracking_items:
+        validate_profile_relevance(item, profile, label="tracking item")
 
     state_identities = set(state["items"])
     if len(state_identities) != len(state["items"]):
@@ -147,6 +298,8 @@ def verify(*, feed_path: Path, status_path: Path, state_path: Path, brief_path: 
         "state_total": len(state["items"]),
         "changes": current_change_count,
         "priority": len(priority_items),
+        "tracking": len(tracking_items),
+        "tracking_total": len(active_watch_ids),
         "other": len(other_changes),
         "publication_status": brief["publication_status"],
     }
@@ -157,6 +310,7 @@ def main() -> int:
     parser.add_argument("--feed", type=Path, default=DEFAULT_FEED)
     parser.add_argument("--status", type=Path, default=DEFAULT_STATUS)
     parser.add_argument("--state", type=Path, default=DEFAULT_STATE)
+    parser.add_argument("--handoff-state", type=Path, default=DEFAULT_HANDOFF_STATE)
     parser.add_argument("--brief", type=Path, default=DEFAULT_BRIEF)
     args = parser.parse_args()
 
@@ -164,13 +318,14 @@ def main() -> int:
         feed_path=args.feed,
         status_path=args.status,
         state_path=args.state,
+        handoff_state_path=args.handoff_state,
         brief_path=args.brief,
     )
     print(
         "V2_PUBLICATION_OK "
         f"run={result['run_id']} archive={result['archive_total']} "
         f"state={result['state_total']} changes={result['changes']} "
-        f"priority={result['priority']} other={result['other']} "
+        f"priority={result['priority']} tracking={result['tracking_total']} other={result['other']} "
         f"status={result['publication_status']}"
     )
     return 0

@@ -54,13 +54,7 @@ test("main production ruleset requires the GitHub Actions verify job", async () 
   ]);
 });
 
-test("only GitHub Actions can bypass for scheduled publication writes", async () => {
+test("main production ruleset has no bypass actors", async () => {
   const ruleset = await loadRuleset();
-  assert.deepEqual(ruleset.bypass_actors, [
-    {
-      actor_id: 15368,
-      actor_type: "Integration",
-      bypass_mode: "always",
-    },
-  ]);
+  assert.deepEqual(ruleset.bypass_actors, []);
 });

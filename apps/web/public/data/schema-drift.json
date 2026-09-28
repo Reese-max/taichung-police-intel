@@ -1,0 +1,193 @@
+{
+  "contract_version": "1.0",
+  "generated_at": "2026-09-20T23:35:53+00:00",
+  "overall": "UNKNOWN",
+  "review_inbox": [],
+  "schema_version": 1,
+  "sources": [
+    {
+      "contract_version": "1.0",
+      "final_url": null,
+      "history_count": 0,
+      "last_known_good": null,
+      "observed_at": "2026-09-20T23:35:53+00:00",
+      "observed_schema_fingerprint": null,
+      "parser_version": "online_collect:p0-live-1",
+      "reasons": [
+        "NO_CURRENT_OBSERVATION"
+      ],
+      "requested_url": null,
+      "resource_id": null,
+      "resource_id_changed": false,
+      "review_required": false,
+      "sample_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_health": "DEGRADED",
+      "source_id": "S-001",
+      "source_name": "臺中市政府警察局警政新聞",
+      "status": "CONTENT_SHAPE_UNKNOWN",
+      "transport": "HTML_LIST_DETAIL",
+      "window_completeness": "PARTIAL"
+    },
+    {
+      "contract_version": "1.0",
+      "final_url": null,
+      "history_count": 0,
+      "last_known_good": null,
+      "observed_at": "2026-09-20T23:35:53+00:00",
+      "observed_schema_fingerprint": null,
+      "parser_version": "online_collect:p0-live-1",
+      "reasons": [
+        "NO_CURRENT_OBSERVATION"
+      ],
+      "requested_url": null,
+      "resource_id": null,
+      "resource_id_changed": false,
+      "review_required": false,
+      "sample_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_health": "DEGRADED",
+      "source_id": "S-019",
+      "source_name": "臺中市政府市政會議紀錄與專案報告",
+      "status": "CONTENT_SHAPE_UNKNOWN",
+      "transport": "HTML_LIST_DETAIL",
+      "window_completeness": "PARTIAL"
+    },
+    {
+      "contract_version": "1.0",
+      "final_url": null,
+      "history_count": 0,
+      "last_known_good": null,
+      "observed_at": "2026-09-20T23:35:53+00:00",
+      "observed_schema_fingerprint": null,
+      "parser_version": "online_collect:p0-live-1",
+      "reasons": [
+        "NO_CURRENT_OBSERVATION"
+      ],
+      "requested_url": null,
+      "resource_id": null,
+      "resource_id_changed": false,
+      "review_required": false,
+      "sample_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_health": "DEGRADED",
+      "source_id": "S-032",
+      "source_name": "臺中市政府交通局最新消息",
+      "status": "CONTENT_SHAPE_UNKNOWN",
+      "transport": "HTML_LIST_DETAIL",
+      "window_completeness": "PARTIAL"
+    },
+    {
+      "contract_version": "1.0",
+      "final_url": null,
+      "history_count": 0,
+      "last_known_good": null,
+      "observed_at": "2026-09-20T23:35:53+00:00",
+      "observed_schema_fingerprint": null,
+      "parser_version": "online_collect:p0-live-1",
+      "reasons": [
+        "NO_CURRENT_OBSERVATION"
+      ],
+      "requested_url": null,
+      "resource_id": null,
+      "resource_id_changed": false,
+      "review_required": false,
+      "sample_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_health": "DEGRADED",
+      "source_id": "S-007",
+      "source_name": "臺中市議會議事資訊系統－議事錄",
+      "status": "CONTENT_SHAPE_UNKNOWN",
+      "transport": "JSON_API",
+      "window_completeness": "PARTIAL"
+    },
+    {
+      "contract_version": "1.0",
+      "final_url": null,
+      "history_count": 0,
+      "last_known_good": null,
+      "observed_at": "2026-09-20T23:35:53+00:00",
+      "observed_schema_fingerprint": null,
+      "parser_version": "online_collect:p0-live-1",
+      "reasons": [
+        "NO_CURRENT_OBSERVATION"
+      ],
+      "requested_url": null,
+      "resource_id": null,
+      "resource_id_changed": false,
+      "review_required": false,
+      "sample_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_health": "DEGRADED",
+      "source_id": "S-009",
+      "source_name": "臺中市議會議事資訊系統－各項提案",
+      "status": "CONTENT_SHAPE_UNKNOWN",
+      "transport": "JSON_API",
+      "window_completeness": "PARTIAL"
+    },
+    {
+      "contract_version": "1.0",
+      "final_url": null,
+      "history_count": 0,
+      "last_known_good": null,
+      "observed_at": "2026-09-20T23:35:53+00:00",
+      "observed_schema_fingerprint": null,
+      "parser_version": "canary-s028-165:1",
+      "reasons": [
+        "NO_CURRENT_OBSERVATION"
+      ],
+      "requested_url": null,
+      "resource_id": null,
+      "resource_id_changed": false,
+      "review_required": false,
+      "sample_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_health": "DEGRADED",
+      "source_id": "S-028",
+      "source_name": "臺中市受（處）理刑事案件－分局別",
+      "status": "CONTENT_SHAPE_UNKNOWN",
+      "transport": "DATA_GOV_JSON",
+      "window_completeness": "PARTIAL"
+    },
+    {
+      "contract_version": "1.0",
+      "final_url": null,
+      "history_count": 0,
+      "last_known_good": null,
+      "observed_at": "2026-09-20T23:35:53+00:00",
+      "observed_schema_fingerprint": null,
+      "parser_version": "canary-s028-165:1",
+      "reasons": [
+        "NO_CURRENT_OBSERVATION"
+      ],
+      "requested_url": null,
+      "resource_id": null,
+      "resource_id_changed": false,
+      "review_required": false,
+      "sample_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_health": "DEGRADED",
+      "source_id": "CTX-POP",
+      "source_name": "臺中市各區戶數、人口數按戶別及性別分",
+      "status": "CONTENT_SHAPE_UNKNOWN",
+      "transport": "DATA_GOV_JSON",
+      "window_completeness": "PARTIAL"
+    },
+    {
+      "contract_version": "1.0",
+      "final_url": null,
+      "history_count": 0,
+      "last_known_good": null,
+      "observed_at": "2026-09-20T23:35:53+00:00",
+      "observed_schema_fingerprint": null,
+      "parser_version": "canary-s028-165:1",
+      "reasons": [
+        "NO_CURRENT_OBSERVATION"
+      ],
+      "requested_url": null,
+      "resource_id": null,
+      "resource_id_changed": false,
+      "review_required": false,
+      "sample_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "source_health": "DEGRADED",
+      "source_id": "CTX-165",
+      "source_name": "165反詐騙諮詢專線－遭停止解析涉詐網站",
+      "status": "CONTENT_SHAPE_UNKNOWN",
+      "transport": "DATA_GOV_CSV",
+      "window_completeness": "PARTIAL"
+    }
+  ]
+}

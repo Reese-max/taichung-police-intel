@@ -4,6 +4,8 @@
 
 **Name:** Taichung Police Public Intelligence
 
+> Historical competition submission alias. The current product name is **GovIntel AI｜跨機關公共事件整合、異動辨識與交班支援平台**.
+
 **One sentence:** An evidence-first public-information monitor that helps police policy staff prepare for council questions in five minutes.
 
 **Category fit:** Public-sector productivity, situational awareness, and trustworthy AI-assisted information synthesis.

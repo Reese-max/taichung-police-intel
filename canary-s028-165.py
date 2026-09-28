@@ -14,7 +14,7 @@ from collections import Counter
 from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urljoin, urlparse
 from zoneinfo import ZoneInfo
 
 import requests
@@ -40,6 +40,8 @@ POPULATION_FIELDS = {
     "女_共同事業戶", "男_單獨生活戶", "女_單獨生活戶",
 }
 FRAUD_FIELDS = {"民國年月", "網域", "網站性質", "法律依據", "聲請單位"}
+REDIRECT_STATUSES = {301, 302, 303, 307, 308}
+MAX_REDIRECTS = 3
 
 
 def sha256(data: bytes) -> str:
@@ -51,19 +53,46 @@ def manifest_sha256(value: object) -> str:
     return sha256(body)
 
 
-def get(session: requests.Session, url: str, allowed_hosts: set[str], timeout: int = 60) -> requests.Response:
-    if urlparse(url).hostname not in allowed_hosts:
+def _approved_url(url: str, allowed_hosts: set[str]) -> None:
+    try:
+        parsed = urlparse(url)
+        port = parsed.port
+    except ValueError as error:
+        raise RuntimeError(f"網址格式無效：{url}") from error
+    if (
+        parsed.scheme.lower() != "https"
+        or parsed.hostname is None
+        or parsed.hostname.lower().rstrip(".") not in {host.lower().rstrip(".") for host in allowed_hosts}
+        or parsed.username
+        or parsed.password
+        or port not in (None, 443)
+    ):
         raise RuntimeError(f"非白名單來源：{url}")
+
+
+def get(session: requests.Session, url: str, allowed_hosts: set[str], timeout: int = 60) -> requests.Response:
+    _approved_url(url, allowed_hosts)
     last_error: requests.RequestException | None = None
     for attempt in range(3):
+        current_url = url
         try:
-            response = session.get(url, timeout=timeout, allow_redirects=True)
-            response.raise_for_status()
-            if urlparse(response.url).hostname not in allowed_hosts:
-                raise RuntimeError(f"官方來源導向非白名單網域：{response.url}")
-            if not response.content:
-                raise requests.RequestException("HTTP 成功但內容為空")
-            return response
+            for _ in range(MAX_REDIRECTS + 1):
+                _approved_url(current_url, allowed_hosts)
+                response = session.get(current_url, timeout=timeout, allow_redirects=False)
+                _approved_url(str(response.url or current_url), allowed_hosts)
+                if response.status_code in REDIRECT_STATUSES:
+                    location = response.headers.get("location")
+                    response.close()
+                    if not location:
+                        raise RuntimeError("redirect response 沒有 location")
+                    current_url = urljoin(current_url, location)
+                    continue
+                response.raise_for_status()
+                if not response.content:
+                    raise requests.RequestException("HTTP 成功但內容為空")
+                response._govintel_requested_url = url
+                return response
+            raise RuntimeError("redirect budget exhausted")
         except requests.RequestException as exc:
             last_error = exc
             status = exc.response.status_code if exc.response is not None else None
@@ -75,7 +104,7 @@ def get(session: requests.Session, url: str, allowed_hosts: set[str], timeout: i
 
 def response_evidence(response: requests.Response) -> dict:
     return {
-        "requested_url": response.request.url,
+        "requested_url": getattr(response, "_govintel_requested_url", response.request.url),
         "final_url": response.url,
         "fetched_at": datetime.now(TZ).isoformat(timespec="seconds"),
         "http_status": response.status_code,
@@ -223,7 +252,10 @@ def analyze_population(rows: list[dict]) -> dict:
 def roc_month_to_iso(value: str) -> str:
     if not re.fullmatch(r"\d{5}", value or ""):
         raise ValueError(f"無效民國年月：{value!r}")
-    year, month = int(value[:3]) + 1911, int(value[3:])
+    roc_year, month = int(value[:3]), int(value[3:])
+    if not 1 <= roc_year <= 289:
+        raise ValueError(f"無效民國年份：{value!r}")
+    year = roc_year + 1911
     if not 1 <= month <= 12:
         raise ValueError(f"無效月份：{value!r}")
     return f"{year:04d}-{month:02d}"
@@ -418,6 +450,12 @@ def self_check() -> None:
     assert resource_id("https://example.test/x?rid=abc") == "abc"
     assert resource_id("https://example.test/dataset/d/resource/r/download") == "r"
     assert roc_month_to_iso("11507") == "2026-07"
+    try:
+        roc_month_to_iso("00001")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("out-of-range ROC year must fail closed")
     assert rate_per_100k(1670, 2_868_465) == "58.22"
     crime_rows = [
         {"項目": CRIME_ITEM, "欄位名稱": f"{unit}_詐欺", "數值": "1", "資料時間日期": "2026-06-01T00:00:00", "資料週期": "月"}

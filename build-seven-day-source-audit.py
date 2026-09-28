@@ -23,6 +23,11 @@ from bs4 import BeautifulSoup
 TZ = ZoneInfo("Asia/Taipei")
 USER_AGENT = "Mozilla/5.0 (compatible; TaichungPoliceIntelAudit/0.1; public-data-audit)"
 HEADERS = {"User-Agent": USER_AGENT}
+REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
+MAX_REDIRECTS = 3
+POLICE_HOSTS = frozenset({"www.police.taichung.gov.tw"})
+DATA_GOV_HOSTS = frozenset({"data.gov.tw", "newdatacenter.taichung.gov.tw"})
+GAZETTE_HOSTS = frozenset({"gazette.nat.gov.tw"})
 
 SOURCES = {
     "S-001": "臺中市政府警察局警政新聞",
@@ -67,56 +72,132 @@ FIELDNAMES = (
 )
 
 
-def request(method: str, url: str, timeout: int = 90, **kwargs) -> requests.Response:
-    last_error: requests.RequestException | None = None
-    for attempt in range(3):
-        try:
-            response = requests.request(method, url, headers=HEADERS, timeout=timeout, **kwargs)
-            response.raise_for_status()
-            return response
-        except requests.RequestException as exc:
-            last_error = exc
-            status = exc.response.status_code if exc.response is not None else None
-            if attempt == 2 or (status is not None and status != 429 and status < 500):
-                raise
-            time.sleep(attempt + 1)
-    raise RuntimeError(f"取得失敗：{url}：{last_error}")
+def _normalized_hosts(url: str, allowed_hosts: set[str] | frozenset[str] | None) -> frozenset[str]:
+    if allowed_hosts is not None:
+        return frozenset(host.lower().rstrip(".") for host in allowed_hosts)
+    hostname = urllib.parse.urlsplit(url).hostname
+    return frozenset({hostname.lower().rstrip(".")}) if hostname else frozenset()
 
 
-def get(url: str, timeout: int = 90) -> requests.Response:
-    return request("GET", url, timeout)
+def _validate_transport_url(url: str, allowed_hosts: frozenset[str]) -> None:
+    parsed = urllib.parse.urlsplit(url)
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise ValueError(f"不合法的稽核來源 URL：{url}") from exc
+    host = (parsed.hostname or "").lower().rstrip(".")
+    if (
+        parsed.scheme != "https"
+        or not host
+        or host not in allowed_hosts
+        or parsed.username
+        or parsed.password
+        or port not in (None, 443)
+    ):
+        raise ValueError(f"不允許的稽核來源 URL：{url}")
 
 
-def post(url: str, data: dict[str, str], timeout: int = 90) -> requests.Response:
-    return request("POST", url, timeout, data=data)
+def request(
+    method: str,
+    url: str,
+    timeout: int = 90,
+    *,
+    allowed_hosts: set[str] | frozenset[str] | None = None,
+    **kwargs,
+) -> requests.Response:
+    hosts = _normalized_hosts(url, allowed_hosts)
+    kwargs.pop("allow_redirects", None)
+    current_url = url
+    for redirect_count in range(MAX_REDIRECTS + 1):
+        _validate_transport_url(current_url, hosts)
+        last_error: requests.RequestException | None = None
+        redirected = False
+        for attempt in range(3):
+            try:
+                response = requests.request(
+                    method,
+                    current_url,
+                    headers=HEADERS,
+                    timeout=timeout,
+                    allow_redirects=False,
+                    **kwargs,
+                )
+                final_url = str(getattr(response, "url", current_url) or current_url)
+                try:
+                    _validate_transport_url(final_url, hosts)
+                except ValueError:
+                    response.close()
+                    raise
+                if response.status_code in REDIRECT_STATUSES:
+                    if redirect_count == MAX_REDIRECTS:
+                        response.close()
+                        raise ValueError(f"稽核來源 redirect 超過上限：{url}")
+                    location = response.headers.get("Location") or response.headers.get("location")
+                    response.close()
+                    if not location:
+                        raise ValueError(f"稽核來源 redirect 缺少 Location：{current_url}")
+                    current_url = urllib.parse.urljoin(current_url, location)
+                    _validate_transport_url(current_url, hosts)
+                    redirected = True
+                    break
+                response.raise_for_status()
+                return response
+            except requests.RequestException as exc:
+                last_error = exc
+                status = exc.response.status_code if exc.response is not None else None
+                if attempt == 2 or (status is not None and status != 429 and status < 500):
+                    raise
+                time.sleep(attempt + 1)
+        if redirected:
+            continue
+        raise RuntimeError(f"取得失敗：{current_url}：{last_error}")
+    raise ValueError(f"稽核來源 redirect 超過上限：{url}")
+
+
+def get(
+    url: str,
+    timeout: int = 90,
+    *,
+    allowed_hosts: set[str] | frozenset[str] | None = None,
+) -> requests.Response:
+    return request("GET", url, timeout, allowed_hosts=allowed_hosts)
+
+
+def post(
+    url: str,
+    data: dict[str, str],
+    timeout: int = 90,
+    *,
+    allowed_hosts: set[str] | frozenset[str] | None = None,
+) -> requests.Response:
+    return request("POST", url, timeout, allowed_hosts=allowed_hosts, data=data)
 
 
 def sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def roc_slash_to_iso(value: str) -> str:
-    match = re.search(r"(\d{2,3})/(\d{1,2})/(\d{1,2})", value or "")
+def _roc_to_iso(pattern: str, value: str) -> str:
+    match = re.search(pattern, value or "")
     if not match:
         return ""
     year, month, day = map(int, match.groups())
-    return f"{year + 1911:04d}-{month:02d}-{day:02d}"
+    try:
+        return date(year + 1911, month, day).isoformat()
+    except ValueError:
+        return ""
+
+
+def roc_slash_to_iso(value: str) -> str:
+    return _roc_to_iso(r"(?<!\d)(\d{2,3})/(\d{1,2})/(\d{1,2})(?!\d)", value)
 
 
 def roc_dash_to_iso(value: str) -> str:
-    match = re.search(r"(\d{2,3})-(\d{1,2})-(\d{1,2})", value or "")
-    if not match:
-        return ""
-    year, month, day = map(int, match.groups())
-    return f"{year + 1911:04d}-{month:02d}-{day:02d}"
+    return _roc_to_iso(r"(?<!\d)(\d{2,3})-(\d{1,2})-(\d{1,2})(?!\d)", value)
 
 
 def roc_text_to_iso(value: str) -> str:
-    match = re.search(r"(?:中華民國)?(\d{2,3})年(\d{1,2})月(\d{1,2})日", value or "")
-    if not match:
-        return ""
-    year, month, day = map(int, match.groups())
-    return f"{year + 1911:04d}-{month:02d}-{day:02d}"
+    return _roc_to_iso(r"(?<!\d)(?:中華民國)?(\d{2,3})年(\d{1,2})月(\d{1,2})日(?!\d)", value)
 
 
 def in_window(value: str, start: date, end: date) -> bool:
@@ -155,7 +236,7 @@ def fetch_police_site_list(
         f"https://www.police.taichung.gov.tw/ch/home.jsp?id={section_id}&parentpath={parentpath}"
         f"&mcustomize={list_view}"
     )
-    first = get(url)
+    first = get(url, allowed_hosts=POLICE_HOSTS)
     first_soup = BeautifulSoup(first.text, "html.parser")
     all_option = first_soup.select_one('select[name="pagesize"] option')
     if all_option is None or not (all_option.get("value") or "").isdigit():
@@ -178,6 +259,7 @@ def fetch_police_site_list(
             "pagesize": str(expected),
         },
         120,
+        allowed_hosts=POLICE_HOSTS,
     )
     soup = BeautifulSoup(response.text, "html.parser")
     items: dict[str, dict[str, str]] = {}
@@ -206,8 +288,8 @@ def fetch_police_site_list(
     }
 
 
-def fetch_detail_with_attachments(url: str) -> dict:
-    response = get(url, 120)
+def fetch_detail_with_attachments(url: str, allowed_hosts: frozenset[str]) -> dict:
+    response = get(url, 120, allowed_hosts=allowed_hosts)
     soup = BeautifulSoup(response.text, "html.parser")
     attachments = []
     seen: set[str] = set()
@@ -216,7 +298,7 @@ def fetch_detail_with_attachments(url: str) -> dict:
         if attachment_url in seen:
             continue
         seen.add(attachment_url)
-        body = get(attachment_url, 180).content
+        body = get(attachment_url, 180, allowed_hosts=allowed_hosts).content
         attachments.append({
             "title": " ".join(anchor.stripped_strings),
             "url": attachment_url,
@@ -245,7 +327,7 @@ def fetch_s001(rows: list[dict[str, str]], start: date, end: date, fetched_at: s
     for item in items:
         if not in_window(item["date"], start, end):
             continue
-        detail = fetch_detail_with_attachments(item["url"])
+        detail = fetch_detail_with_attachments(item["url"], POLICE_HOSTS)
         body = detail.pop("detail_body")
         if not body:
             raise RuntimeError(f"S-001 詳細頁正文為空：{item['url']}")
@@ -276,7 +358,7 @@ def fetch_s001(rows: list[dict[str, str]], start: date, end: date, fetched_at: s
 
 def fetch_s021(rows: list[dict[str, str]], start: date, end: date, fetched_at: str, evidence: dict) -> None:
     plan_url = "https://data.gov.tw/dataset/178022"
-    plan_page = get(plan_url, 120)
+    plan_page = get(plan_url, 120, allowed_hosts=DATA_GOV_HOSTS)
     plan_soup = BeautifulSoup(plan_page.text, "html.parser")
     plan_anchor = next(
         (item.find("a", href=lambda value: value and "resource.download" in value)
@@ -287,7 +369,7 @@ def fetch_s021(rows: list[dict[str, str]], start: date, end: date, fetched_at: s
     if plan_anchor is None:
         raise RuntimeError("S-021 找不到 115 年度施政計畫下載連結")
     plan_resource_url = urllib.parse.urljoin(plan_url, plan_anchor["href"])
-    plan_resource = get(plan_resource_url, 180)
+    plan_resource = get(plan_resource_url, 180, allowed_hosts=DATA_GOV_HOSTS)
     plan_text = " ".join(plan_soup.stripped_strings)
     metadata_match = re.search(r"詮釋資料更新時間\s*(20\d{2}-\d{2}-\d{2})", plan_text)
     if not metadata_match:
@@ -304,13 +386,13 @@ def fetch_s021(rows: list[dict[str, str]], start: date, end: date, fetched_at: s
         if in_window(item["date"], start, end)
         or item["date"] in {latest_budget_date, latest_contract_date}
     }
-    details = {url: fetch_detail_with_attachments(url) for url in detail_items}
+    details = {url: fetch_detail_with_attachments(url, POLICE_HOSTS) for url in detail_items}
 
     schedule_url = (
         "https://www.police.taichung.gov.tw/ch/home.jsp?id=14&parentpath=0,1&"
         "mcustomize=multimessages_view.jsp&dataserno=202512150001&t=Multis&mserno=201710280030"
     )
-    schedule = fetch_detail_with_attachments(schedule_url)
+    schedule = fetch_detail_with_attachments(schedule_url, POLICE_HOSTS)
     schedule_match = re.search(r"其他\s+(\d{2,3}-\d{2}-\d{2})", schedule["text"])
     if not schedule_match:
         raise RuntimeError("S-021 採購預定時程缺少發布日期")
@@ -653,12 +735,14 @@ def fetch_s017(rows: list[dict[str, str]], start: date, end: date, fetched_at: s
         match = re.search(r"zipfile=(\d{3})-(\d{2})-(\d{2})\.zip", anchor.get("href", ""))
         if not match:
             continue
-        iso_date = f"{int(match.group(1)) + 1911:04d}-{match.group(2)}-{match.group(3)}"
+        iso_date = roc_dash_to_iso(f"{match.group(1)}-{match.group(2)}-{match.group(3)}")
+        if not iso_date:
+            continue
         if in_window(iso_date, start, end):
             links.append((iso_date, urllib.parse.urljoin(base, anchor["href"])))
     zip_evidence = []
     for zip_date, url in links:
-        body = get(url, 180).content
+        body = get(url, 180, allowed_hosts=GAZETTE_HOSTS).content
         archive = zipfile.ZipFile(io.BytesIO(body))
         xml_name = next(name for name in archive.namelist() if name.lower().endswith(".xml"))
         root = ET.fromstring(archive.read(xml_name))
@@ -740,6 +824,8 @@ def self_check() -> None:
     assert roc_slash_to_iso("115/08/10") == "2026-08-10"
     assert roc_dash_to_iso("115-08-10") == "2026-08-10"
     assert roc_text_to_iso("中華民國115年8月13日") == "2026-08-13"
+    assert roc_dash_to_iso("2026-08-10") == ""
+    assert roc_dash_to_iso("115-02-29") == ""
     assert in_window("2026-08-08", date(2026, 8, 8), date(2026, 8, 14))
     assert not in_window("2026-08-07", date(2026, 8, 8), date(2026, 8, 14))
     sample = BeautifulSoup('<tr><td><a href="v2_index.asp?ano=580"><b>第8次會議</b></a></td><td>2026-08-10</td></tr>', "html.parser")

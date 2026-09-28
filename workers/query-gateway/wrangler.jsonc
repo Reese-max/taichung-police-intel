@@ -1,0 +1,15 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "govintel-query-gateway",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-18",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    "PUBLIC_ORIGIN": "https://reese-max.github.io/taichung-police-intel",
+    "ALLOWED_ORIGINS": "https://reese-max.github.io,http://localhost:3000"
+  }
+}

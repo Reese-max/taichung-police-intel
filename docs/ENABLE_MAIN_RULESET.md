@@ -12,7 +12,7 @@
 - 禁止刪除 `main`。
 - 禁止 force push／non-fast-forward push。
 - Review conversation 必須先處理完畢。
-- GitHub Actions integration 保留 bypass，讓 06:30／18:30 的資料 publication bundle 可以直接寫入 `main`；一般使用者與開發 Agent 沒有 bypass。
+- GitHub Actions 不需要、也不應取得 bypass：06:30／18:30 workflow 將 durable publication checkpoint 寫入專用 `publication-state` 分支，再以同一份已驗證 artifact 部署 Pages，不直接寫入受保護的 `main`。
 
 ## 匯入步驟
 
@@ -58,14 +58,14 @@ Ruleset 仍然要求：
 - `main` 顯示為受保護／有 active ruleset。
 - 未通過 `verify` 的 PR 無法合併。
 - 直接由一般帳號 push `main` 會被拒絕。
-- 06:30／18:30 的 `github-actions[bot]` 資料更新仍可成功。
+- 06:30／18:30 workflow 能在不寫入 `main` 的情況下更新 `publication-state` 並完成 Pages artifact/deploy；候選 workflow 合併前，遠端舊 workflow 的失敗不算通過。
 - force push 與 branch deletion 被拒絕。
 
 ## 緊急回復
 
-如果匯入後資料排程無法 push：
+如果匯入後資料排程失敗：
 
-1. 先將 ruleset Enforcement 暫時改成 `Evaluate` 或 `Disabled`。
-2. 確認 bypass actor 是 GitHub Actions integration，ID `15368`。
-3. 不要移除 required `verify` check。
-4. 修正後重新設為 `Active`。
+1. 先查看 workflow 是否已使用 `.github/workflows/pages.yml` 的 `publication-state` checkpoint 路徑。
+2. 讀取 build、persist、Pages deploy 與匿名公開核對的實際 receipt；不要以 bypass 或關閉 ruleset 掩蓋失敗。
+3. 確認 `publication-state` 分支的受控寫入與 Pages artifact 權限已具備。
+4. 不要移除 required `verify` check，也不要讓資料 workflow 直接 push `main`。

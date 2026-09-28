@@ -15,6 +15,7 @@ import {
   requiresOfficialFallback,
 } from "../lib/homepage-data.js";
 import { buildHomepageResponse } from "../lib/homepage-eligibility.js";
+import { isHealthyStaleSource } from "../lib/source-status.js";
 
 // ── Relative time helper ──────────────────────────────────────────────────────
 function relativeTime(iso, lang) {
@@ -36,6 +37,9 @@ const SOURCE_NAMES_ZH = {
   "S-007": "臺中市議會議事資訊系統－議事錄",
   "S-009": "臺中市議會議事資訊系統－各項提案",
   "S-029": "臺中市政府議會專案報告",
+  "S-001": "臺中市政府警察局警政新聞",
+  "S-019": "臺中市政府市政會議紀錄與專案報告",
+  "S-032": "臺中市政府交通局最新消息",
 };
 
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
@@ -721,6 +725,13 @@ export default function Home() {
                     <small lang="zh-Hant">{t.source_official_name} {source.source_name}</small>
                   )}
                   <p>{source.result} · {source.freshness_status}</p>
+                  {isHealthyStaleSource(source) && (
+                    <small data-testid={`healthy-stale-note-${source.source_id}`}>
+                      {lang === "en"
+                        ? "Official source checked successfully; the latest record date is old. This does not mean there are no current events."
+                        : "已成功核對官方來源；最新資料日期較舊，不能解讀為目前沒有事件。"}
+                    </small>
+                  )}
                   <small>
                     {t.source_data_as_of}
                     {source.data_as_of

@@ -1,0 +1,79 @@
+{
+  "assembly": [
+    {
+      "record_id": "assembly-2026-09-25-01",
+      "title": "臺中市公共議題集會",
+      "event_start_at": "2026-09-25T09:00:00+08:00",
+      "event_end_at": "2026-09-25T12:00:00+08:00",
+      "event_category": "集會",
+      "route_or_venue": "臺中市西區公益路",
+      "authority": "臺中市政府警察局",
+      "district_id": "TAICHUNG-WEST",
+      "official_url": "https://data.gov.tw/dataset/11307"
+    }
+  ],
+  "traffic": {
+    "document_id": "S-032:traffic-2026-09-25-01",
+    "document_version_id": "S-032:traffic-2026-09-25-01:v1",
+    "source_id": "S-032",
+    "independent_source_id": "S-032",
+    "authority": "official",
+    "title": "臺中交通局集會周邊交通資訊",
+    "event_type": "assembly_or_protest",
+    "event_start_at": "2026-09-25T09:00:00+08:00",
+    "event_end_at": "2026-09-25T12:00:00+08:00",
+    "district_id": "TAICHUNG-WEST",
+    "agency_ids": ["臺中市政府交通局"],
+    "location_ids": ["臺中市西區公益路"],
+    "official_url": "https://www.traffic.taichung.gov.tw/",
+    "observed_at": "2026-09-21T09:00:00+08:00"
+  },
+  "statistics": [
+    {
+      "統計期別": "2026-08",
+      "表號": "治安-01",
+      "機關別值": 12,
+      "官方註記": "初步統計，正式數字以年度統計為準。",
+      "發布日": "2026-09-10"
+    }
+  ],
+  "fraud_effectiveness": [
+    {
+      "年度": "2026",
+      "月份": "08",
+      "查緝詐欺犯罪集團團數": 10,
+      "查緝人數": 40,
+      "查扣不法所得金額": 1000000,
+      "攔阻金額": 2000000
+    }
+  ],
+  "rumors": [
+    {
+      "record_id": "rumor-1",
+      "標題": "假冒公務機關簡訊",
+      "發布時間": "2026-09-20T10:00:00+08:00",
+      "發布內容": "官方澄清內容"
+    }
+  ],
+  "old_fraud_domains": [
+    {
+      "資料編號": "old-1",
+      "網域": "https://example-fraud.test",
+      "標題": "假投資網站"
+    }
+  ],
+  "current_fraud_domains": [
+    {
+      "資料編號": "current-1",
+      "網域": "https://example-fraud.test",
+      "網站性質": "假投資"
+    }
+  ],
+  "personal_record": {
+    "dataset_id": "14420",
+    "contains_personal_data": true,
+    "role": "EXCLUDE_OR_AGGREGATE_ONLY",
+    "name": "個案",
+    "photo": "redacted"
+  }
+}

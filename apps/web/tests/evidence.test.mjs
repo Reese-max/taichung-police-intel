@@ -5,7 +5,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { findActiveIndex, formatTime, groupWordsBySegment, validateEvidence } from "../lib/evidence.js";
-import { buildSourceStatus, nextUpdateAt } from "../lib/source-status.js";
+import { buildSourceStatus, isHealthyStaleSource, nextUpdateAt } from "../lib/source-status.js";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const canary = JSON.parse(await readFile(resolve(projectRoot, "groq-asr-canary-2026-08-14.json"), "utf8"));
@@ -40,4 +40,12 @@ test("線上來源狀態保留缺口、LKG 與下一次臺北排程", () => {
   assert.equal(status.last_known_good.source_run_id, "SR-OLD");
   assert.equal(status.next_update_at, "2026-08-22T18:30:00.000+08:00");
   assert.equal(nextUpdateAt("2026-08-22T11:00:00Z"), "2026-08-23T06:30:00.000+08:00");
+});
+
+test("健康但官方資料日期較舊的零變更來源保持 STALE 且明確可辨", async () => {
+  const status = JSON.parse(await readFile(resolve(projectRoot, "apps/web/public/data/source-status.json"), "utf8"));
+  assert.deepEqual(
+    status.sources.filter(isHealthyStaleSource).map((source) => source.source_id),
+    ["S-004", "S-007", "S-029"],
+  );
 });

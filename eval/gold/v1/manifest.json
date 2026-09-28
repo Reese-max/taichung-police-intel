@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "dataset_id": "govintel-gold-v1",
+  "dataset_type": "SYNTHETIC_REGRESSION_SEED",
+  "created_at": "2026-09-17",
+  "description": "Small deterministic starter set for engineering regressions. It is not a production accuracy claim and is not a substitute for the planned human-labelled holdout set.",
+  "case_file": "cases.jsonl",
+  "task_types": [
+    "event_pair",
+    "material_change",
+    "query_ids",
+    "claim_support"
+  ],
+  "label_policy": {
+    "model_generated_labels_are_gold": false,
+    "synthetic_cases_must_be_marked": true,
+    "human_review_required_for_historical_cases": true
+  }
+}

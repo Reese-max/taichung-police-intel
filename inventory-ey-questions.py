@@ -11,7 +11,7 @@ import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from urllib.parse import parse_qs, quote, urlencode
+from urllib.parse import parse_qs, quote, urlencode, urljoin, urlsplit
 
 import requests
 from bs4 import BeautifulSoup
@@ -24,6 +24,9 @@ LOCAL_KEYWORDS = ("臺中", "台中")
 CITY_UNIT_ID = "387000000"
 CHECKPOINT_VERSION = 1
 CHECKPOINT_MAX_AGE = timedelta(hours=24)
+QUERY_HOSTS = frozenset({"query.ey.gov.tw"})
+REDIRECT_STATUSES = frozenset({301, 302, 303, 307, 308})
+MAX_REDIRECTS = 3
 
 POLICE_DIRECT = (
     "警察", "警政", "警力", "警員", "員警", "警方", "警務", "警用", "警局", "派出所", "義警",
@@ -81,20 +84,61 @@ def title_matches_detail(title: str, detail: str) -> bool:
     return len(title_pairs & detail_pairs) >= required
 
 
+def _validate_transport_url(url: str) -> None:
+    parsed = urlsplit(url)
+    try:
+        port = parsed.port
+    except ValueError as exc:
+        raise ValueError(f"不合法的行政院議案 URL：{url}") from exc
+    if (
+        parsed.scheme != "https"
+        or (parsed.hostname or "").lower().rstrip(".") not in QUERY_HOSTS
+        or parsed.username
+        or parsed.password
+        or port not in (None, 443)
+    ):
+        raise ValueError(f"不允許的行政院議案 URL：{url}")
+
+
 def fetch(session: requests.Session, url: str) -> requests.Response:
-    last_error: Exception | None = None
-    for attempt in range(3):
-        try:
-            response = session.get(url, timeout=30)
-            response.raise_for_status()
-            if not response.content.strip():
-                raise requests.RequestException("HTTP 200 但內容為空")
-            response.encoding = response.apparent_encoding or "utf-8"
-            return response
-        except (requests.RequestException, UnicodeError) as exc:
-            last_error = exc
-            time.sleep(attempt + 1)
-    raise RuntimeError(f"取得失敗：{url}：{last_error}")
+    current_url = url
+    for redirect_count in range(MAX_REDIRECTS + 1):
+        _validate_transport_url(current_url)
+        last_error: Exception | None = None
+        redirected = False
+        for attempt in range(3):
+            try:
+                response = session.get(current_url, timeout=30, allow_redirects=False)
+                final_url = str(getattr(response, "url", current_url) or current_url)
+                try:
+                    _validate_transport_url(final_url)
+                except ValueError:
+                    response.close()
+                    raise
+                if response.status_code in REDIRECT_STATUSES:
+                    if redirect_count == MAX_REDIRECTS:
+                        response.close()
+                        raise ValueError(f"行政院議案 redirect 超過上限：{url}")
+                    location = response.headers.get("Location") or response.headers.get("location")
+                    response.close()
+                    if not location:
+                        raise ValueError(f"行政院議案 redirect 缺少 Location：{current_url}")
+                    current_url = urljoin(current_url, location)
+                    _validate_transport_url(current_url)
+                    redirected = True
+                    break
+                response.raise_for_status()
+                if not response.content.strip():
+                    raise requests.RequestException("HTTP 200 但內容為空")
+                response.encoding = response.apparent_encoding or "utf-8"
+                return response
+            except (requests.RequestException, UnicodeError) as exc:
+                last_error = exc
+                time.sleep(attempt + 1)
+        if redirected:
+            continue
+        raise RuntimeError(f"取得失敗：{current_url}：{last_error}")
+    raise ValueError(f"行政院議案 redirect 超過上限：{url}")
 
 
 def new_session() -> requests.Session:

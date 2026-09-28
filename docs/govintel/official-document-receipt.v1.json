@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "receipt_type": "OFFICIAL_DOCUMENT_REPLAY",
+  "status": "LIVE_HTML_AND_JSON_REPLAYED",
+  "source_id": "S-028",
+  "rights_status": "METADATA_LINK_ONLY",
+  "replays": [
+    {
+      "format": "HTML",
+      "requested_url": "https://data.gov.tw/dataset/88147",
+      "final_url": "https://data.gov.tw/dataset/88147",
+      "content_type": "text/html;charset=utf-8",
+      "retrieved_at": "2026-09-21T03:14:30+00:00",
+      "document_id": "DOC-7F90AFF69C23D37B22EF",
+      "document_version_id": "DOCV-A170E1AC139EC0585058",
+      "raw_bytes_sha256": "a170e1ac139ec05850589a8b9eaa19de092663e5ba16a0d000c5f89155c5cbbc",
+      "extracted_text_sha256": "b0123c8d80dc298d1120a2ab47ddecbb77df71e3c0c34c5ea683f94ae88388e7",
+      "bundle_sha256": "cf6f618d6e841daf839b15152f03ef09a92b585343c4e35f0d9a730b2a1f2c19",
+      "fact_count": 1,
+      "evidence_catalog_count": 1,
+      "public_event_input_count": 1,
+      "locator_types": ["HTML_TEXT_RANGE"],
+      "statuses": ["NEEDS_REVIEW"]
+    },
+    {
+      "format": "JSON",
+      "requested_url": "https://data.gov.tw/api/v2/rest/dataset/88147",
+      "final_url": "https://data.gov.tw/api/v2/rest/dataset/88147",
+      "content_type": "application/json",
+      "retrieved_at": "2026-09-21T03:14:00+00:00",
+      "document_id": "DOC-2897C55977D069E9923B",
+      "document_version_id": "DOCV-94D57674E75896E14B34",
+      "raw_bytes_sha256": "94d57674e75896e14b34288f6b333e0816d4295d4e20bbbbcf9526bef1102b71",
+      "extracted_text_sha256": "ecfa89989c1e66b6f5bb244e820818a7dd52e35a52e2bf1b2b82e408355b9bd9",
+      "bundle_sha256": "141f7f1ece3053710379a1df08a4aceb1cf77822cdcf50a115d6b6d9fbd07ea4",
+      "fact_count": 2,
+      "evidence_catalog_count": 2,
+      "public_event_input_count": 2,
+      "locator_types": ["JSON_POINTER"],
+      "statuses": ["FACT_CANDIDATE"]
+    }
+  ],
+  "document_hashes": {
+    "html_raw_bytes_sha256": "a170e1ac139ec05850589a8b9eaa19de092663e5ba16a0d000c5f89155c5cbbc",
+    "json_raw_bytes_sha256": "94d57674e75896e14b34288f6b333e0816d4295d4e20bbbbcf9526bef1102b71"
+  },
+  "evidence_catalog_count": 3,
+  "public_event_input_count": 3,
+  "parser_version": "located-facts-v1",
+  "retrieved_at": "2026-09-21T03:14:30+00:00",
+  "verification_boundary": "Live URL/hash was observed; deployment, publication, and human fact review remain separate gates."
+}

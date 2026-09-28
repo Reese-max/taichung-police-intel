@@ -6,10 +6,10 @@
   "scripts": {
     "predev": "node scripts/sync-evidence.mjs",
     "dev": "next dev",
-    "prebuild": "node scripts/sync-evidence.mjs",
+    "prebuild": "node scripts/sync-source-policy.mjs && node scripts/sync-evidence.mjs",
     "build": "next build",
     "start": "next start",
-    "test": "node --test tests/*.test.mjs",
+    "test": "node --test --test-concurrency=1 tests/*.test.mjs",
     "check": "npm test && npm run build"
   },
   "dependencies": {

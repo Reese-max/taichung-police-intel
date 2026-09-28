@@ -14,6 +14,13 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from intel_v2.handoff import (
+    load_state as load_handoff_state,
+    sync_with_publication,
+    tracking_projection,
+    watch_id_for,
+)
+from intel_v2.role_profiles import DEFAULT_PROFILE_ID, load_catalog, project_profile
 from intel_v2.semantics import ChangeEvent, compare_snapshot, feed_item_to_version, shadow_brief
 
 
@@ -22,7 +29,9 @@ GENERATOR_VERSION = 2
 DEFAULT_FEED = ROOT / "apps" / "web" / "public" / "data" / "intelligence-feed.json"
 DEFAULT_STATUS = ROOT / "apps" / "web" / "public" / "data" / "source-status.json"
 DEFAULT_STATE = ROOT / "state" / "v2-shadow-state.json"
+DEFAULT_HANDOFF_STATE = ROOT / "state" / "v2-handoff-state.json"
 DEFAULT_OUTPUT = ROOT / "apps" / "web" / "public" / "data" / "v2-daily-brief.json"
+DEFAULT_ROLE_PROFILES = ROOT / "docs" / "govintel" / "role-profiles.v1.json"
 
 SOURCE_CONTEXT = {
     "S-004": {
@@ -49,6 +58,21 @@ SOURCE_CONTEXT = {
         "source_name": "臺中市政府議會專案報告",
         "why_it_matters": "涉及市府專案說明、跨機關政策與警察局公開立場。",
         "affected_roles": ["局本部幕僚", "專案報告業管單位", "相關分局或大隊"],
+    },
+    "S-001": {
+        "source_name": "臺中市政府警察局警政新聞",
+        "why_it_matters": "提供警政措施、交通宣導與公開治安事件的官方異動線索。",
+        "affected_roles": ["局本部幕僚", "相關分局或大隊", "議會聯絡"],
+    },
+    "S-019": {
+        "source_name": "臺中市政府市政會議紀錄與專案報告",
+        "why_it_matters": "提供市政決策、跨機關專案與後續政策交辦的官方變更。",
+        "affected_roles": ["局本部幕僚", "跨機關業管單位", "議會聯絡"],
+    },
+    "S-032": {
+        "source_name": "臺中市政府交通局最新消息",
+        "why_it_matters": "提供交通管制、道路與公共運輸公告的官方異動。",
+        "affected_roles": ["交通業管", "相關分局或大隊", "局本部幕僚"],
     },
 }
 
@@ -136,7 +160,15 @@ def source_health_projection(source_status: dict | None) -> dict:
     }
 
 
-def event_projection(event: ChangeEvent, publication_tier: str) -> dict:
+def event_projection(
+    event: ChangeEvent,
+    publication_tier: str,
+    current_item: dict | None = None,
+) -> dict:
+    current_item = current_item or {}
+    source_version = current_item.get("version_no")
+    if not isinstance(source_version, int):
+        source_version = event.after_version
     context = SOURCE_CONTEXT.get(
         event.source_id,
         {
@@ -147,6 +179,9 @@ def event_projection(event: ChangeEvent, publication_tier: str) -> dict:
     )
     return {
         "event_id": event.event_id,
+        "identity": event.identity,
+        "watch_id": watch_id_for(event.identity),
+        "stable_key": event.stable_key,
         "source_id": event.source_id,
         "source_name": context["source_name"],
         "change_type": event.change_type,
@@ -163,6 +198,9 @@ def event_projection(event: ChangeEvent, publication_tier: str) -> dict:
         "date_status": event.date_status,
         "detected_at": event.detected_at,
         "changed_fields": list(event.changed_fields),
+        "source_version": source_version,
+        "source_sha256": current_item.get("normalized_sha256"),
+        "source_document_version": current_item.get("document_version_id"),
         "official_url": event.official_url,
         "verification_status": "DETERMINISTIC_PASS",
         "evidence_status": "OFFICIAL_URL_BOUND",
@@ -170,26 +208,62 @@ def event_projection(event: ChangeEvent, publication_tier: str) -> dict:
     }
 
 
-def enrich_for_police_users(brief: dict, events: list[ChangeEvent]) -> None:
+def enrich_for_police_users(
+    brief: dict,
+    events: list[ChangeEvent],
+    *,
+    handoff_state: dict,
+    current_items: dict,
+    source_status: dict | None,
+    profile_id: str = DEFAULT_PROFILE_ID,
+    profiles_path: Path = DEFAULT_ROLE_PROFILES,
+    observed_at: str | None = None,
+) -> None:
+    catalog = load_catalog(profiles_path)
+    if profile_id not in catalog["profiles"]:
+        raise ValueError(f"unknown role profile: {profile_id}")
+    if catalog["profiles"][profile_id]["status"] != "active":
+        raise ValueError(f"role profile is not active: {profile_id}")
     publishable = [event for event in events if event.publishable]
-    publishable.sort(
-        key=lambda event: (
-            CHANGE_PRIORITY.get(event.change_type, 99),
-            event.source_id,
-            event.identity,
-        )
-    )
-    priority_items = [event_projection(event, "TOP") for event in publishable[:3]]
-    other_changes = [event_projection(event, "OTHER") for event in publishable[3:23]]
+    event_items = [
+        event_projection(event, "OTHER", current_items.get(event.identity))
+        for event in publishable
+    ]
 
     brief["generator_version"] = GENERATOR_VERSION
     brief["audience"] = ["議會聯絡", "局本部幕僚", "業管承辦", "分局主管"]
-    brief["priority_items"] = priority_items
-    brief["tracking_items"] = []
-    brief["other_changes"] = other_changes
-    brief["overview"]["priority_count"] = len(priority_items)
-    brief["overview"]["tracking_count"] = 0
-    brief["overview"]["other_change_count"] = len(other_changes)
+    tracking_items, tracking_total = tracking_projection(
+        handoff_state,
+        current_items=current_items,
+        events=events,
+        source_status=source_status,
+        limit=5,
+    )
+    profile_views = [
+        project_profile(
+            event_items,
+            tracking_items,
+            profile,
+            ranking_policy_version=catalog["ranking_policy_version"],
+            observed_at=observed_at,
+        )
+        for profile in catalog["profiles"].values()
+        if profile["status"] == "active"
+    ]
+    selected_view = next(view for view in profile_views if view["profile"]["profile_id"] == profile_id)
+    brief["profile"] = selected_view["profile"]
+    brief["available_profiles"] = [view["profile"] for view in profile_views]
+    brief["profile_views"] = profile_views
+    brief["priority_items"] = selected_view["priority_items"]
+    brief["tracking_items"] = selected_view["tracking_items"]
+    brief["other_changes"] = selected_view["other_changes"]
+    brief["overview"]["priority_count"] = selected_view["overview"]["priority_count"]
+    brief["overview"]["tracking_count"] = selected_view["overview"]["tracking_count"]
+    brief["overview"]["tracking_total"] = tracking_total
+    brief["overview"]["other_change_count"] = selected_view["overview"]["other_change_count"]
+    if tracking_total:
+        suffix = f"另有 {tracking_total} 件跨日追蹤仍保留。"
+        brief["status_message"] = f"{brief['status_message']} {suffix}"
 
 
 def main() -> int:
@@ -199,7 +273,10 @@ def main() -> int:
     parser.add_argument("--input", type=Path, default=DEFAULT_FEED)
     parser.add_argument("--source-status", type=Path, default=DEFAULT_STATUS)
     parser.add_argument("--state", type=Path, default=DEFAULT_STATE)
+    parser.add_argument("--handoff-state", type=Path, default=DEFAULT_HANDOFF_STATE)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument("--profiles", type=Path, default=DEFAULT_ROLE_PROFILES)
+    parser.add_argument("--profile", default=DEFAULT_PROFILE_ID)
     parser.add_argument("--observed-at")
     parser.add_argument("--reset-baseline", action="store_true")
     parser.add_argument("--snapshot-partial", action="store_true")
@@ -233,19 +310,38 @@ def main() -> int:
         observed_at,
         snapshot_complete=snapshot_complete,
     )
+    handoff_state = load_handoff_state(args.handoff_state)
+    handoff_state = sync_with_publication(
+        handoff_state,
+        previous_items=(previous_state or {}).get("items", {}),
+        current_items={item.identity: item.to_state() for item in current_items},
+        events=events,
+        observed_at=observed_at,
+        collection_run_id=feed.get("collection_run_id"),
+    )
     brief = shadow_brief(
         feed=feed,
         state=state,
         events=events,
         generated_at=observed_at,
     )
-    enrich_for_police_users(brief, events)
+    enrich_for_police_users(
+        brief,
+        events,
+        handoff_state=handoff_state,
+        current_items=state["items"],
+        source_status=source_status,
+        profile_id=args.profile,
+        profiles_path=args.profiles,
+        observed_at=observed_at,
+    )
     brief["publication_status"] = "READY" if snapshot_complete else "PARTIAL"
     brief["snapshot_complete"] = snapshot_complete
     brief["source_health"] = source_health_projection(source_status)
     brief["source_status_generated_at"] = source_status.get("generated_at") if source_status else None
 
     save_json(args.state, state)
+    save_json(args.handoff_state, handoff_state)
     save_json(args.output, brief)
 
     print(
@@ -254,6 +350,7 @@ def main() -> int:
         f"archive={brief['overview']['archive_total']} "
         f"changes={brief['overview']['current_change_count']} "
         f"priority={brief['overview']['priority_count']} "
+        f"tracking={brief['overview']['tracking_total']} "
         f"complete={str(snapshot_complete).lower()} "
         f"quality_issues={len(brief['quality_issues'])} "
         f"state={args.state} output={args.output}"

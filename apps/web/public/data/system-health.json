@@ -1,0 +1,222 @@
+{
+  "lanes": {
+    "discovery": "UNKNOWN",
+    "publication": "STALE",
+    "query": "UNKNOWN"
+  },
+  "latency_metrics": {
+    "detect_to_verify_ms": null,
+    "publish_to_visible_ms": null,
+    "source_to_detect_ms": null,
+    "verify_to_publish_ms": null
+  },
+  "operator_summary": {
+    "attention_count": 6,
+    "message": "資料仍可讀取但已過期，請確認來源新鮮度。",
+    "primary_stage": {
+      "error_class": "SOURCE_FRESHNESS_STALE",
+      "lane": "publication",
+      "outcome": "STALE",
+      "stage": "collection"
+    },
+    "requires_attention": true,
+    "status": "STALE"
+  },
+  "overall": "STALE",
+  "policy": {
+    "active_source_ids": [
+      "S-004",
+      "S-006",
+      "S-007",
+      "S-009",
+      "S-029"
+    ],
+    "catalog_hash": "886cd9c53e0431a09bb6573e6bcd328861c005ed410f95bdd226c1c2cc7c7356",
+    "policy_hash": "1387c7e5a15c2fc0a07b6881b0ee40f70e789fcbe01862d9834bfe9b079464d5",
+    "policy_version": 1
+  },
+  "review_inbox": [
+    {
+      "created_at": "2026-09-11T08:23:26+08:00",
+      "entity_ids": {
+        "source_id": "S-007"
+      },
+      "evidence_sha256": "431954881465de5c1c2ba9a50af364fe32c7b690718944839a56bb56b2cc95a6",
+      "priority": 70,
+      "priority_reason": "STALE_SOURCE_REQUIRES_HUMAN_REVIEW",
+      "reason": "STALE_SOURCE",
+      "review_id": "REVIEW-0FA23A3E3F0B8D66EB3F",
+      "source_version": "SR-DEMO-20260911-MORNING-007",
+      "status": "OPEN",
+      "updated_at": "2026-09-11T08:23:26+08:00"
+    },
+    {
+      "created_at": "2026-09-11T08:23:26+08:00",
+      "entity_ids": {
+        "source_id": "S-029"
+      },
+      "evidence_sha256": "f0321b9ee40f031e32403422c6188c242d3105131c7d764a85c99aea67124680",
+      "priority": 70,
+      "priority_reason": "STALE_SOURCE_REQUIRES_HUMAN_REVIEW",
+      "reason": "STALE_SOURCE",
+      "review_id": "REVIEW-7CF46213C0EB433544C0",
+      "source_version": "SR-DEMO-20260911-MORNING-029",
+      "status": "OPEN",
+      "updated_at": "2026-09-11T08:23:26+08:00"
+    },
+    {
+      "created_at": "2026-09-11T08:23:26+08:00",
+      "entity_ids": {
+        "source_id": "S-004"
+      },
+      "evidence_sha256": "b08efeeb092d724e150fa903d21c70dffed2f82a431671abf9ff2852c68fb3e7",
+      "priority": 70,
+      "priority_reason": "STALE_SOURCE_REQUIRES_HUMAN_REVIEW",
+      "reason": "STALE_SOURCE",
+      "review_id": "REVIEW-ABB86811BA01B0DC87C8",
+      "source_version": "SR-DEMO-20260911-MORNING-004",
+      "status": "OPEN",
+      "updated_at": "2026-09-11T08:23:26+08:00"
+    }
+  ],
+  "review_inbox_total": 3,
+  "schema_drift": {
+    "overall": "UNKNOWN",
+    "source_count": 8
+  },
+  "schema_version": 1,
+  "stages": [
+    {
+      "contract_overall": "UNKNOWN",
+      "ended_at": "2026-09-20T23:35:53+00:00",
+      "error_class": "SOURCE_CONTRACT_UNVERIFIED",
+      "generation_id": null,
+      "lane": "discovery",
+      "last_success_at": null,
+      "outcome": "UNKNOWN",
+      "review_inbox_count": 0,
+      "stage": "source_contracts",
+      "started_at": null
+    },
+    {
+      "active_source_ids": [
+        "S-004",
+        "S-006",
+        "S-007",
+        "S-009",
+        "S-029"
+      ],
+      "catalog_hash": "886cd9c53e0431a09bb6573e6bcd328861c005ed410f95bdd226c1c2cc7c7356",
+      "ended_at": "2026-09-11T08:23:26+08:00",
+      "error_class": null,
+      "generation_id": "CR-DEMO-20260911-MORNING-SCHEDULE",
+      "lane": "publication",
+      "last_success_at": "2026-09-11T08:23:26+08:00",
+      "outcome": "SUCCESS",
+      "policy_hash": "1387c7e5a15c2fc0a07b6881b0ee40f70e789fcbe01862d9834bfe9b079464d5",
+      "policy_version": 1,
+      "stage": "canonical_validation",
+      "started_at": null
+    },
+    {
+      "active_source_ids": [
+        "S-004",
+        "S-006",
+        "S-007",
+        "S-009",
+        "S-029"
+      ],
+      "catalog_hash": "886cd9c53e0431a09bb6573e6bcd328861c005ed410f95bdd226c1c2cc7c7356",
+      "ended_at": "2026-09-11T08:23:26+08:00",
+      "error_class": "SOURCE_FRESHNESS_STALE",
+      "generation_id": "CR-DEMO-20260911-MORNING-SCHEDULE",
+      "lane": "publication",
+      "last_success_at": "2026-09-11T08:23:26+08:00",
+      "outcome": "STALE",
+      "policy_hash": "1387c7e5a15c2fc0a07b6881b0ee40f70e789fcbe01862d9834bfe9b079464d5",
+      "policy_version": 1,
+      "stage": "collection",
+      "started_at": null
+    },
+    {
+      "active_source_ids": [
+        "S-004",
+        "S-006",
+        "S-007",
+        "S-009",
+        "S-029"
+      ],
+      "catalog_hash": "886cd9c53e0431a09bb6573e6bcd328861c005ed410f95bdd226c1c2cc7c7356",
+      "ended_at": null,
+      "error_class": "NO_DEPLOYMENT_RECEIPT_IN_CANONICAL_ARTIFACT",
+      "generation_id": null,
+      "lane": "publication",
+      "last_success_at": null,
+      "outcome": "UNKNOWN",
+      "policy_hash": "1387c7e5a15c2fc0a07b6881b0ee40f70e789fcbe01862d9834bfe9b079464d5",
+      "policy_version": 1,
+      "stage": "deployment",
+      "started_at": null
+    },
+    {
+      "active_source_ids": [
+        "S-004",
+        "S-006",
+        "S-007",
+        "S-009",
+        "S-029"
+      ],
+      "catalog_hash": "886cd9c53e0431a09bb6573e6bcd328861c005ed410f95bdd226c1c2cc7c7356",
+      "ended_at": null,
+      "error_class": "NO_HTTP_HASH_RECEIPT_IN_CANONICAL_ARTIFACT",
+      "generation_id": null,
+      "lane": "publication",
+      "last_success_at": null,
+      "outcome": "UNKNOWN",
+      "policy_hash": "1387c7e5a15c2fc0a07b6881b0ee40f70e789fcbe01862d9834bfe9b079464d5",
+      "policy_version": 1,
+      "stage": "public_http_verification",
+      "started_at": null
+    },
+    {
+      "active_source_ids": [
+        "S-004",
+        "S-006",
+        "S-007",
+        "S-009",
+        "S-029"
+      ],
+      "catalog_hash": "886cd9c53e0431a09bb6573e6bcd328861c005ed410f95bdd226c1c2cc7c7356",
+      "ended_at": null,
+      "error_class": "QUERY_RUNTIME_NOT_YET_WIRED",
+      "generation_id": null,
+      "lane": "query",
+      "last_success_at": null,
+      "outcome": "UNKNOWN",
+      "policy_hash": "1387c7e5a15c2fc0a07b6881b0ee40f70e789fcbe01862d9834bfe9b079464d5",
+      "policy_version": 1,
+      "stage": "mcp_web_query",
+      "started_at": null
+    },
+    {
+      "active_source_ids": [
+        "S-004",
+        "S-006",
+        "S-007",
+        "S-009",
+        "S-029"
+      ],
+      "catalog_hash": "886cd9c53e0431a09bb6573e6bcd328861c005ed410f95bdd226c1c2cc7c7356",
+      "ended_at": null,
+      "error_class": "QUERY_INDEX_NOT_YET_WIRED",
+      "generation_id": null,
+      "lane": "query",
+      "last_success_at": null,
+      "outcome": "UNKNOWN",
+      "policy_hash": "1387c7e5a15c2fc0a07b6881b0ee40f70e789fcbe01862d9834bfe9b079464d5",
+      "policy_version": 1,
+      "stage": "query_index",
+      "started_at": null
+    }
+  ]
+}

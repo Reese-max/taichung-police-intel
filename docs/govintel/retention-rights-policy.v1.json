@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "policy_version": 1,
+  "updated_at": "2026-09-21",
+  "purpose": "Conservative public projection and retention defaults; not a legal rights determination.",
+  "retention_windows": {
+    "SOURCE_TERMS_REVIEW": {
+      "max_age_days": null,
+      "expired_action": "REVIEW_REQUIRED"
+    },
+    "SHORT_LIVED_SOURCE_TERMS_REVIEW": {
+      "max_age_days": 7,
+      "expired_action": "PURGE_RAW_KEEP_AUDIT"
+    },
+    "PROVENANCE_HISTORY": {
+      "max_age_days": null,
+      "expired_action": "KEEP_AUDIT_LINKAGE"
+    },
+    "PERIOD_AND_PROVENANCE_HISTORY": {
+      "max_age_days": null,
+      "expired_action": "KEEP_AUDIT_LINKAGE"
+    },
+    "DERIVATION_RECEIPT_ONLY": {
+      "max_age_days": null,
+      "expired_action": "KEEP_AUDIT_RECEIPT"
+    },
+    "DERIVATION_HISTORY": {
+      "max_age_days": null,
+      "expired_action": "KEEP_AUDIT_LINKAGE"
+    }
+  },
+  "classes": {
+    "OFFICIAL_METADATA_LINK": {
+      "rights_status": "UNKNOWN",
+      "public_projection": "METADATA_LINK_ONLY",
+      "public_fields": ["source_id", "source_name", "title", "official_url", "published_at", "data_as_of", "fetched_at", "freshness_status", "change_type", "evidence_count", "content_sha256"],
+      "full_text_allowed": false,
+      "excerpt_allowed": false,
+      "raw_retention_class": "SOURCE_TERMS_REVIEW",
+      "canonical_retention_class": "PROVENANCE_HISTORY",
+      "review_required": true,
+      "withdrawal_behavior": "KEEP_HASH_MARK_SOURCE_UNAVAILABLE"
+    },
+    "OFFICIAL_MEDIA_LINK": {
+      "rights_status": "UNKNOWN",
+      "public_projection": "LINK_ONLY",
+      "public_fields": ["source_id", "source_name", "title", "official_url", "published_at", "observed_at", "content_sha256"],
+      "full_text_allowed": false,
+      "excerpt_allowed": false,
+      "raw_retention_class": "SHORT_LIVED_SOURCE_TERMS_REVIEW",
+      "canonical_retention_class": "PROVENANCE_HISTORY",
+      "review_required": true,
+      "withdrawal_behavior": "KEEP_LOCATOR_MARK_SOURCE_UNAVAILABLE"
+    },
+    "OFFICIAL_TRANSIENT_METADATA": {
+      "rights_status": "UNKNOWN",
+      "public_projection": "METADATA_LINK_ONLY",
+      "public_fields": ["source_id", "source_name", "official_url", "observed_at", "data_as_of", "freshness_status", "change_type", "content_sha256"],
+      "full_text_allowed": false,
+      "excerpt_allowed": false,
+      "raw_retention_class": "SHORT_LIVED_SOURCE_TERMS_REVIEW",
+      "canonical_retention_class": "PROVENANCE_HISTORY",
+      "review_required": true,
+      "withdrawal_behavior": "KEEP_HASH_MARK_SOURCE_UNAVAILABLE"
+    },
+    "REFERENCE_METADATA": {
+      "rights_status": "UNKNOWN",
+      "public_projection": "METADATA_LINK_ONLY",
+      "public_fields": ["source_id", "source_name", "title", "official_url", "period", "dataset_id", "fetched_at", "content_sha256"],
+      "full_text_allowed": false,
+      "excerpt_allowed": false,
+      "raw_retention_class": "SOURCE_TERMS_REVIEW",
+      "canonical_retention_class": "PERIOD_AND_PROVENANCE_HISTORY",
+      "review_required": true,
+      "withdrawal_behavior": "KEEP_DATASET_ID_MARK_SOURCE_UNAVAILABLE"
+    },
+    "DERIVED_SUMMARY": {
+      "rights_status": "PROJECT_CONTROLLED",
+      "public_projection": "EVIDENCE_BOUND_SUMMARY_ONLY",
+      "public_fields": ["claim_id", "evidence_ids", "publication_hash", "generated_at"],
+      "full_text_allowed": false,
+      "excerpt_allowed": false,
+      "raw_retention_class": "DERIVATION_RECEIPT_ONLY",
+      "canonical_retention_class": "DERIVATION_HISTORY",
+      "review_required": true,
+      "withdrawal_behavior": "RETRACT_PROJECTION_KEEP_AUDIT_RECEIPT"
+    }
+  },
+  "source_classes": {
+    "S-001": "OFFICIAL_METADATA_LINK",
+    "S-004": "OFFICIAL_METADATA_LINK",
+    "S-006": "OFFICIAL_METADATA_LINK",
+    "S-007": "OFFICIAL_METADATA_LINK",
+    "S-009": "OFFICIAL_METADATA_LINK",
+    "S-010": "OFFICIAL_MEDIA_LINK",
+    "S-011": "OFFICIAL_MEDIA_LINK",
+    "S-019": "OFFICIAL_METADATA_LINK",
+    "S-026": "OFFICIAL_METADATA_LINK",
+    "S-028": "REFERENCE_METADATA",
+    "S-029": "OFFICIAL_METADATA_LINK",
+    "S-031": "OFFICIAL_TRANSIENT_METADATA",
+    "S-032": "OFFICIAL_METADATA_LINK",
+    "S-033": "OFFICIAL_METADATA_LINK",
+    "S-034": "REFERENCE_METADATA",
+    "S-035": "REFERENCE_METADATA",
+    "S-036": "OFFICIAL_METADATA_LINK",
+    "S-037": "REFERENCE_METADATA",
+    "CTX-POP": "REFERENCE_METADATA",
+    "CTX-165": "REFERENCE_METADATA"
+  },
+  "prohibited_public_fields": [
+    "raw_payload",
+    "raw_bytes",
+    "body",
+    "full_text",
+    "private_notes",
+    "personal_data",
+    "operational_fields",
+    "credentials"
+  ]
+}

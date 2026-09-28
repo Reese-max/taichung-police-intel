@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "status": "NOT_RUN",
+  "description": "Empty evaluation template; no scores, adoption or award claims.",
+  "code_commit": null,
+  "dataset_manifest_hash": null,
+  "information_cutoff": null,
+  "public_fixture_type": "SYNTHETIC_OR_LICENSED_PUBLIC_ONLY",
+  "split_by": "event_and_time",
+  "development_event_ids": [],
+  "heldout_event_ids": [],
+  "annotation": {"reviewer_count": null, "disagreements": null, "adjudication_reference": null},
+  "arms": {
+    "A": {"method": "manual_same_sources_same_cutoff", "results": null},
+    "B0": {"method": "frozen_previous_V2", "commit": null, "results": null},
+    "B": {"method": "same_new_workflow_without_semantic_AI", "results": null},
+    "C": {"method": "full_new_workflow", "model": null, "prompt_hash": null, "results": null},
+    "C_minus_D": {"method": "C_without_selected_background_dataset", "results": null}
+  },
+  "result_fields_required_per_arm": [
+    "task_count", "event_count", "true_positives", "false_positives", "false_negatives",
+    "false_merges", "missed_merges", "claims_checked", "unsupported_claims",
+    "abstentions", "task_completions", "median_total_task_seconds", "human_correction_seconds"
+  ],
+  "human_study": {"status": "NOT_RUN", "participant_count": null, "consent_record_private": null, "counterbalanced_order": null, "aggregate_results": null},
+  "runtime_evidence": {"ci_url": null, "browser_run": null, "deployment_receipt": null, "anonymous_version_hash_check": null},
+  "cost": {"currency": "TWD", "model": null, "compute_storage": null, "human_hours": null},
+  "safety": {"private_data_in_public_artifacts": null, "source_failure_as_zero": null},
+  "limitations": [],
+  "failed_cases": [],
+  "rules": [
+    "No future documents in historical replay.",
+    "Zero denominator is null, not 100 percent.",
+    "Targets are not observed results.",
+    "Same-origin mirrors are not independent evidence.",
+    "Do not publish raw participant data, consent forms, credentials or internal police information.",
+    "B0 vs C measures product changes; B vs C isolates semantic AI.",
+    "A successful unit test is not a human-study, provider or deployment result."
+  ]
+}

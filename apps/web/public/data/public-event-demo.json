@@ -1,0 +1,150 @@
+{
+  "schema_version": 1,
+  "kind": "GOVINTEL_PUBLIC_EVENT_DEMO",
+  "status": "FIXTURE_ONLY",
+  "production_verified": false,
+  "generated_at": "2026-09-22T09:00:00+08:00",
+  "generator": "scripts/public-event-fusion.py",
+  "current_event": {
+    "public_event_id": "PE-8afdf11371b3c9246fa0",
+    "canonical_title": "大型活動交通資訊",
+    "event_type": "large_event",
+    "fusion_status": "CONFLICT",
+    "event_date": "2026-09-20",
+    "start_at": null,
+    "end_at": null,
+    "district_id": "location:tc-xitun",
+    "location_candidates": ["location:tc-xitun"],
+    "independent_source_count": 3,
+    "independent_source_ids": ["S-001", "S-032", "S-033"],
+    "link_reasons": ["stable_named_event_id", "event_date"],
+    "conflict_fields": ["event_start_at"],
+    "source_state": "CURRENT",
+    "lkg": false,
+    "linked_document_versions": [
+      {
+        "document_id": "doc-S-001",
+        "document_version_id": "doc-S-001:v2",
+        "source_id": "S-001",
+        "independent_source_id": "S-001",
+        "official_url": "https://www.police.taichung.gov.tw/"
+      },
+      {
+        "document_id": "doc-S-032",
+        "document_version_id": "doc-S-032:v1",
+        "source_id": "S-032",
+        "independent_source_id": "S-032",
+        "official_url": "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,20"
+      },
+      {
+        "document_id": "doc-S-033",
+        "document_version_id": "doc-S-033:v1",
+        "source_id": "S-033",
+        "independent_source_id": "S-033",
+        "official_url": "https://www.news.taichung.gov.tw/"
+      }
+    ]
+  },
+  "previous_event": {
+    "public_event_id": "PE-8afdf11371b3c9246fa0",
+    "fusion_status": "CONFIRMED",
+    "start_at": "2026-09-20T18:00:00+08:00",
+    "end_at": "2026-09-20T22:00:00+08:00"
+  },
+  "documents": [
+    {
+      "source_id": "S-001",
+      "source_name": "臺中市政府警察局警政新聞",
+      "document_id": "doc-S-001",
+      "evidence_locator": "fixture:list-row:S-001:event-2026",
+      "official_url": "https://www.police.taichung.gov.tw/",
+      "previous": {
+        "document_version_id": "doc-S-001:v1",
+        "title": "大型活動交通疏導公告",
+        "event_start_at": "2026-09-20T18:00:00+08:00",
+        "event_end_at": "2026-09-20T22:00:00+08:00"
+      },
+      "current": {
+        "document_version_id": "doc-S-001:v2",
+        "title": "大型活動交通疏導公告（時間修正）",
+        "event_start_at": "2026-09-20T16:00:00+08:00",
+        "event_end_at": "2026-09-20T22:00:00+08:00"
+      }
+    },
+    {
+      "source_id": "S-032",
+      "source_name": "臺中市政府交通局最新消息",
+      "document_id": "doc-S-032",
+      "evidence_locator": "fixture:list-row:S-032:event-2026",
+      "official_url": "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,20",
+      "previous": {
+        "document_version_id": "doc-S-032:v1",
+        "title": "大型活動交通資訊",
+        "event_start_at": "2026-09-20T18:00:00+08:00",
+        "event_end_at": "2026-09-20T22:00:00+08:00"
+      },
+      "current": {
+        "document_version_id": "doc-S-032:v1",
+        "title": "大型活動交通資訊",
+        "event_start_at": "2026-09-20T18:00:00+08:00",
+        "event_end_at": "2026-09-20T22:00:00+08:00"
+      }
+    },
+    {
+      "source_id": "S-033",
+      "source_name": "臺中市政府新聞局市政新聞",
+      "document_id": "doc-S-033",
+      "evidence_locator": "fixture:list-row:S-033:event-2026",
+      "official_url": "https://www.news.taichung.gov.tw/",
+      "previous": {
+        "document_version_id": "doc-S-033:v1",
+        "title": "臺中大型活動市政公告",
+        "event_start_at": "2026-09-20T18:00:00+08:00",
+        "event_end_at": "2026-09-20T22:00:00+08:00"
+      },
+      "current": {
+        "document_version_id": "doc-S-033:v1",
+        "title": "臺中大型活動市政公告",
+        "event_start_at": "2026-09-20T18:00:00+08:00",
+        "event_end_at": "2026-09-20T22:00:00+08:00"
+      }
+    }
+  ],
+  "background_preview": {
+    "state": "PREVIOUS_CONFIRMED_EVENT_ONLY",
+    "dataset_id": "CTX-POP",
+    "dataset_name": "臺中市人口統計（示範）",
+    "period": "2026-08",
+    "value": 230000,
+    "unit": "人",
+    "district": "西屯區",
+    "source_url": "https://data.gov.tw/",
+    "note": "歷史統計，不代表即時人流或活動影響。"
+  },
+  "candidate_event": {
+    "public_event_id": "PE-23a24b65e2c027af9a8c",
+    "canonical_title": "待人工核對的活動公告",
+    "fusion_status": "CANDIDATE",
+    "event_date": "2026-09-20",
+    "start_at": "2026-09-20T18:00:00+08:00",
+    "end_at": "2026-09-20T22:00:00+08:00",
+    "source_id": "S-001",
+    "official_url": "https://www.police.taichung.gov.tw/",
+    "link_reason": "insufficient_identity_for_auto_merge"
+  },
+  "merge_preview": {
+    "public_event_id": "PE-8afdf11371b3c9246fa0",
+    "merged_from_public_event_ids": ["PE-8afdf11371b3c9246fa0", "PE-f2e0d1fc8362f2828fc9"],
+    "retired_public_event_ids": ["PE-f2e0d1fc8362f2828fc9"],
+    "independent_source_count": 4,
+    "fusion_status": "CANDIDATE"
+  },
+  "split_preview": {
+    "original_public_event_id": "PE-8afdf11371b3c9246fa0",
+    "original_status": "SPLIT_REQUIRED",
+    "children": [
+      {"public_event_id": "PE-split-s001-20260922", "fusion_status": "CANDIDATE", "sources": ["S-001"]},
+      {"public_event_id": "PE-split-s032-s033-20260922", "fusion_status": "CANDIDATE", "sources": ["S-032", "S-033"]}
+    ]
+  }
+}
