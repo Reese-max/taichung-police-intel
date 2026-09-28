@@ -798,11 +798,15 @@ def build_web_site(root: Path, log_dir: Path) -> dict[str, Any]:
     web = root / "apps" / "web"
     npm = "npm.cmd" if os.name == "nt" else "npm"
     log_dir.mkdir(parents=True, exist_ok=True)
-    if not (web / "node_modules").is_dir():
-        install = run([npm, "ci", "--no-audit", "--no-fund"], web, timeout=600)
-        (log_dir / "npm-ci.log").write_text(install.stdout + "\n" + install.stderr, encoding="utf-8")
+    # A pre-existing node_modules tree does not prove that either package-lock
+    # produced the dependencies used by this candidate build/browser run.
+    for name, directory in (("root", root), ("web", web)):
+        install = run([npm, "ci", "--no-audit", "--no-fund"], directory, timeout=600)
+        log_name = f"npm-ci-{name}.log"
+        (log_dir / log_name).write_text(install.stdout + "\n" + install.stderr, encoding="utf-8")
         if install.returncode != 0:
-            return check_record("web_build", False, f"npm ci exit={install.returncode}", log="logs/npm-ci.log")
+            return check_record("web_build", False, f"{name} npm ci exit={install.returncode}",
+                                log=f"logs/{log_name}")
     env = dict(os.environ)
     env.pop("PAGES_BASE_PATH", None)
     env.pop("NEXT_PUBLIC_BASE_PATH", None)
