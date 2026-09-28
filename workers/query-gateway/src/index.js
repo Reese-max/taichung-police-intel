@@ -274,7 +274,7 @@ function queryCoverage(snapshot, capabilityId, requestedScope = {}) {
   };
 }
 
-async function queryStore(snapshot, { text = null, source_id: sourceId = null, change_type: changeType = null, limit = 20, cursor = null, expected_generation: expectedGeneration = null } = {}) {
+async function queryStore(snapshot, { q: text = null, source_id: sourceId = null, change_type: changeType = null, limit = 20, cursor = null, expected_generation: expectedGeneration = null } = {}) {
   if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new GatewayError("INVALID_ARGUMENTS", "limit must be an integer between 1 and 100");
   for (const [name, value, max] of [["text", text, 512], ["source_id", sourceId, 64], ["change_type", changeType, 64]]) {
     if (value !== null && (typeof value !== "string" || value.length > max)) throw new GatewayError("INVALID_ARGUMENTS", `invalid ${name}`);
