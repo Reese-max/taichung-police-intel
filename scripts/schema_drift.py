@@ -769,6 +769,8 @@ def live_observations(*, session=None, fetch_source=None) -> list[dict[str, Any]
     fetch_source = fetch_source or _fetch_live_source
     observations = []
     for source_id in CONTRACTS:
+        started_at = time.monotonic()
+        print(f"SCHEMA_DRIFT_SOURCE_START source={source_id}", flush=True)
         error = None
         for attempt in range(2):
             try:
@@ -785,6 +787,12 @@ def live_observations(*, session=None, fetch_source=None) -> list[dict[str, Any]
                 break
         if error is not None:
             observations.append(_failed_observation(source_id, error))
+        print(
+            f"SCHEMA_DRIFT_SOURCE_END source={source_id} "
+            f"http_status={observations[-1]['http_status']} "
+            f"elapsed_seconds={time.monotonic() - started_at:.1f}",
+            flush=True,
+        )
     return observations
 
 

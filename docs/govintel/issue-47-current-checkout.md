@@ -5,9 +5,15 @@
 The current checkout now has one bounded candidate verifier:
 
 ```bash
-npm ci
 python -X utf8 scripts/verify-current-checkout.py
 ```
+
+Full verification runs `npm ci` for both the repository and `apps/web` before
+the build, even when either `node_modules` directory already exists. The
+receipt's dependency-lock hash therefore corresponds to freshly installed
+dependencies. A failed install fails the candidate; its log stays in the
+evidence directory. Use `--chrome-path` to select an installed Chromium-based
+browser when Playwright's default executable is unavailable.
 
 The verifier imports query store, source policy, health, and publication verifiers
 from this checkout, builds the static export, serves it over loopback, and writes

@@ -148,13 +148,14 @@ jobs:
       - name: Build source contract drift receipt
         id: schema_drift
         shell: bash
-        timeout-minutes: 10
+        timeout-minutes: 47
         run: |
           set -euo pipefail
           output=apps/web/public/data/schema-drift.json
           # Never export a receipt checked out from main as this run's result.
           rm -f "$output"
-          if timeout --signal=TERM --kill-after=5s 8m \
+          # The observed successful probe took 25 minutes; allow slow official sites.
+          if timeout --signal=TERM --kill-after=5s 45m \
             python -X utf8 scripts/schema_drift.py --live \
               --state state/schema-drift-state.json --output "$output"; then
             exit 0
