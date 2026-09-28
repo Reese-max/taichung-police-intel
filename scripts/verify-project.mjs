@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { dirname, extname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { failedSourceFeedFailures, sourceManifestFailures } from "./source-status-contract.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const mode = process.argv[2] || "gate0";
@@ -199,9 +200,8 @@ if (!failures.length) {
   if (!(Date.parse(status.next_update_at) > Date.parse(status.generated_at))) failures.push("demo-status:next-update-not-future");
   for (const source of status.sources || []) {
     if (!/^https:\/\//.test(source.source_url || "")) failures.push(`demo-status:${source.source_id}:invalid-url`);
-    if (!/^[0-9a-f]{64}$/.test(source.manifest_sha256 || "")) failures.push(`demo-status:${source.source_id}:invalid-manifest`);
+    failures.push(...sourceManifestFailures(source));
     if (!Array.isArray(source.intelligence_gaps)) failures.push(`demo-status:${source.source_id}:invalid-gaps`);
-    if (source.source_health === "PASS" && !source.last_known_good?.source_run_id) failures.push(`demo-status:${source.source_id}:missing-lkg`);
   }
 
   const feed = JSON.parse(await read("apps/web/public/data/intelligence-feed.json"));
@@ -224,6 +224,7 @@ if (!failures.length) {
     if (item.window_completeness === "PARTIAL" && item.eligibility === "HOME_CANDIDATE") {
       failures.push(`feed:${item.stable_id}:partial-marked-eligible`);
     }
+    failures.push(...failedSourceFeedFailures(item));
   }
 }
 
