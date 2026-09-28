@@ -167,7 +167,12 @@ root.addEventListener('change',ev=>{
 root.addEventListener('submit',ev=>{if(ev.target.id!=='search-form')return;ev.preventDefault(); query=new FormData(ev.target).get('q').slice(0,200);followup=false;render();document.querySelector('#query-input')?.focus();announce(`示例資料符合 ${searchDemo(query,category).length} 筆，並非真實事件搜尋。`);});
 root.addEventListener('keydown',ev=>{if(ev.target.getAttribute('role')!=='tab'||!['ArrowLeft','ArrowRight','Home','End'].includes(ev.key))return;ev.preventDefault();const values=['summary','compare','evidence'];const i=values.indexOf(tab);tab=values[ev.key==='Home'?0:ev.key==='End'?2:(i+(ev.key==='ArrowRight'?1:2))%3];render();document.querySelector(`#tab-${tab}`).focus();});
 dialog.addEventListener('change',ev=>{if(ev.target.id==='review-checkbox'){reviewed=ev.target.checked?demoGeneration(demo):null;document.querySelector('#save-confirmation').disabled=!canConfirm(demo,reviewed);}});
-dialog.addEventListener('close',()=>{reviewed=null;if(lastFocus)document.getElementById(lastFocus)?.focus();});
+dialog.addEventListener('close',()=>{
+  reviewed=null;
+  const active=document.activeElement;
+  if(lastFocus && (!active || active===document.body || active===document.documentElement || active===dialog || dialog.contains(active)))
+    document.getElementById(lastFocus)?.focus();
+});
 document.addEventListener('click',ev=>{
   if(ev.target.closest('.skip-link')){ev.preventDefault();document.querySelector('#main-content')?.focus();return;}
   const el=ev.target.closest('[data-action]');if(!el||el.disabled)return;const a=el.dataset.action;

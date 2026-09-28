@@ -85,6 +85,16 @@ class WorkspaceTests(unittest.TestCase):
         self.page.keyboard.press('Escape'); expect(self.page.locator('dialog')).not_to_be_visible()
         self.page.locator('.skip-link').focus(); self.page.keyboard.press('Enter')
         expect(self.page.locator('#main-content')).to_be_focused()
+        self.page.locator('[data-ref="demo-police:v2"]').click()
+        self.page.evaluate('''() => new Promise(resolve => {
+            const dialog = document.querySelector('dialog');
+            dialog.addEventListener('close', resolve, { once: true });
+            dialog.close();
+            const skip = document.querySelector('.skip-link');
+            skip.focus();
+            skip.click();
+        })''')
+        expect(self.page.locator('#main-content')).to_be_focused()
         self.assertIn('view=event',self.page.url)
     def test_04_review_persistence_and_export(self):
         self.go('handoff'); expect(self.page.locator('[data-action="confirm-open"]')).to_be_disabled()
