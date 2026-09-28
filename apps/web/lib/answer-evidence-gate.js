@@ -18,7 +18,7 @@ import { EVIDENCE_TYPES } from "./council-prep.js";
 export const CLAIM_SCHEMA_VERSION = 1;
 export const EVIDENCE_SCHEMA_VERSION = 1;
 export const RECEIPT_SCHEMA_VERSION = 1;
-export const VALIDATOR_VERSION = "answer-evidence-gate/1";
+export const VALIDATOR_VERSION = "answer-evidence-gate/3";
 
 export const CLAIM_TYPES = Object.freeze([
   "TIME",
@@ -71,10 +71,38 @@ function normalizeTerm(value) {
   return String(value).normalize("NFC").replace(/\s+/g, "").trim();
 }
 
-function normalizeAssertion(assertion) {
+function normalizeStatisticValue(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  if (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null) return null;
+  if (Object.keys(value).length !== 4 ||
+      !["value", "period", "geography", "unit"].every((field) => Object.hasOwn(value, field))) return null;
+  // JSON numbers lose their source spelling before this gate sees them. A
+  // decimal string preserves exact digits, including large or fractional ones.
+  if (typeof value.value !== "string" || value.value.length > 128 ||
+      !/^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$/.test(value.value)) return null;
+  if (![value.period, value.geography, value.unit].every((part) => typeof part === "string" && part.trim())) return null;
+  const statistic = {
+    value: value.value,
+    period: normalizeTerm(value.period),
+    geography: normalizeTerm(value.geography),
+    unit: normalizeTerm(value.unit),
+  };
+  return {
+    value: `${statistic.value} ${statistic.unit}（${statistic.period}，${statistic.geography}）`,
+    statistic,
+  };
+}
+
+function normalizeAssertion(assertion, allowStructured = false) {
   if (!assertion || typeof assertion !== "object") return null;
-  if (!isTerm(assertion.subject) || !isTerm(assertion.value)) return null;
-  return { subject: normalizeTerm(assertion.subject), value: normalizeTerm(assertion.value) };
+  if (!isTerm(assertion.subject)) return null;
+  const subject = normalizeTerm(assertion.subject);
+  if (allowStructured) {
+    const structured = normalizeStatisticValue(assertion.value);
+    if (structured) return { subject, ...structured };
+  }
+  if (!isTerm(assertion.value)) return null;
+  return { subject, value: normalizeTerm(assertion.value) };
 }
 
 function readEvidence(raw) {
@@ -82,7 +110,7 @@ function readEvidence(raw) {
   if ((raw.schema_version ?? EVIDENCE_SCHEMA_VERSION) !== EVIDENCE_SCHEMA_VERSION) return null;
   if (!raw.evidence_id || !EVIDENCE_TYPES.includes(raw.evidence_type) || !raw.source_id) return null;
   const assertions = Array.isArray(raw.assertions)
-    ? raw.assertions.map(normalizeAssertion).filter(Boolean)
+    ? raw.assertions.map((assertion) => normalizeAssertion(assertion, true)).filter(Boolean)
     : [];
   return {
     evidence_id: String(raw.evidence_id),
@@ -148,11 +176,7 @@ function readClaim(raw) {
     : raw.proposition === undefined || raw.proposition === null
       ? []
       : [raw.proposition];
-  const propositions = rawProps.map((prop) =>
-    prop && typeof prop === "object" && isTerm(prop.subject) && isTerm(prop.value)
-      ? { subject: normalizeTerm(prop.subject), value: normalizeTerm(prop.value) }
-      : null,
-  );
+  const propositions = rawProps.map((prop) => normalizeAssertion(prop, raw.claim_type === "STATISTIC"));
   if (factual && propositions.some((prop) => prop === null)) return { error: "INVALID_PROPOSITION" };
   if (factual && !propositions.length) return { error: "MISSING_PROPOSITION" };
   if (
@@ -178,29 +202,37 @@ function readClaim(raw) {
   };
 }
 
-function exactSupporters(records, subject, value) {
+function sameScope(assertion, prop) {
+  if (assertion.subject !== prop.subject) return false;
+  if (!prop.statistic) return !assertion.statistic;
+  return !!assertion.statistic && ["period", "geography", "unit"].every(
+    (field) => assertion.statistic[field] === prop.statistic[field],
+  );
+}
+
+function exactSupporters(records, prop) {
   return records.filter(
     (record) =>
       record.assertions.some(
-        (assertion) => assertion.subject === subject && assertion.value === value,
+        (assertion) => sameScope(assertion, prop) && assertion.value === prop.value,
       ) &&
       isTerm(record.locator) &&
       isTerm(record.document_version),
   );
 }
 
-function looseSupporters(records, subject, value) {
+function looseSupporters(records, prop) {
   return records.filter((record) =>
     record.assertions.some(
-      (assertion) => assertion.subject === subject && assertion.value === value,
+      (assertion) => sameScope(assertion, prop) && assertion.value === prop.value,
     ),
   );
 }
 
-function valuesForSubject(records, subject) {
+function valuesForSubject(records, prop) {
   return [...new Set(
     records.flatMap((record) =>
-      record.assertions.filter((a) => a.subject === subject).map((a) => a.value),
+      record.assertions.filter((a) => sameScope(a, prop)).map((a) => a.value),
     ),
   )];
 }
@@ -212,13 +244,13 @@ function evaluateProposition(prop, allRecords, pool, assertsCurrent) {
     (record) =>
       record.official &&
       record.is_current &&
-      record.assertions.some((assertion) => assertion.subject === prop.subject),
+      record.assertions.some((assertion) => sameScope(assertion, prop)),
   );
-  const conflictValues = valuesForSubject(conflictRecords, prop.subject);
+  const conflictValues = valuesForSubject(conflictRecords, prop);
   if (conflictValues.length >= 2) {
     const detail = conflictValues.map((value) => {
       const holder = conflictRecords.find((record) =>
-        record.assertions.some((a) => a.subject === prop.subject && a.value === value),
+        record.assertions.some((a) => sameScope(a, prop) && a.value === value),
       );
       return { value, source_id: holder.source_id, evidence_id: holder.evidence_id };
     });
@@ -226,24 +258,24 @@ function evaluateProposition(prop, allRecords, pool, assertsCurrent) {
   }
 
   const candidates = pool.filter((record) =>
-    record.assertions.some((assertion) => assertion.subject === prop.subject),
+    record.assertions.some((assertion) => sameScope(assertion, prop)),
   );
   const official = candidates.filter((record) => record.official);
   const current = official.filter((record) => record.is_current);
   const stale = official.filter((record) => !record.is_current);
 
-  const exactCurrent = exactSupporters(current, prop.subject, prop.value);
+  const exactCurrent = exactSupporters(current, prop);
   if (exactCurrent.length) {
     return { status: "SUPPORTED", supporting: exactCurrent };
   }
-  if (looseSupporters(current, prop.subject, prop.value).length) {
+  if (looseSupporters(current, prop).length) {
     return {
       status: "PARTIAL",
       reason_code: "MISSING_EXACT_LOCATOR",
-      supporting: looseSupporters(current, prop.subject, prop.value),
+      supporting: looseSupporters(current, prop),
     };
   }
-  const staleMatches = looseSupporters(stale, prop.subject, prop.value);
+  const staleMatches = looseSupporters(stale, prop);
   if (staleMatches.length) {
     if (assertsCurrent) {
       // A current official record asserting a different value for the same
@@ -252,7 +284,7 @@ function evaluateProposition(prop, allRecords, pool, assertsCurrent) {
       // exists.
       const superseding = conflictRecords.filter((record) =>
         record.assertions.some(
-          (assertion) => assertion.subject === prop.subject && assertion.value !== prop.value,
+          (assertion) => sameScope(assertion, prop) && assertion.value !== prop.value,
         ),
       );
       if (superseding.length) {
@@ -260,7 +292,7 @@ function evaluateProposition(prop, allRecords, pool, assertsCurrent) {
           status: "UNSUPPORTED",
           reason_code: "SUPERSEDED_BY_CURRENT",
           supporting: staleMatches,
-          official_values: valuesForSubject(superseding, prop.subject),
+          official_values: valuesForSubject(superseding, prop),
         };
       }
       // Reaching here means any current official record asserts the claim
@@ -273,7 +305,7 @@ function evaluateProposition(prop, allRecords, pool, assertsCurrent) {
         newer_confirmation: conflictRecords.length > 0,
       };
     }
-    const exactStale = exactSupporters(stale, prop.subject, prop.value);
+    const exactStale = exactSupporters(stale, prop);
     if (exactStale.length) return { status: "SUPPORTED", supporting: exactStale, historical: true };
     return {
       status: "PARTIAL",
@@ -285,7 +317,7 @@ function evaluateProposition(prop, allRecords, pool, assertsCurrent) {
     return {
       status: "UNSUPPORTED",
       reason_code: "VALUE_MISMATCH",
-      official_values: valuesForSubject(official, prop.subject),
+      official_values: valuesForSubject(official, prop),
     };
   }
   if (candidates.length) {
