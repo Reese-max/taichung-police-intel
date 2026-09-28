@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - scripts/verify-backbone-runtime.py
+      - tests/test_backbone_runtime.py
       - config/backbone-runtime.v1.json
       - docs/govintel/BACKBONE_RUNTIME.md
       - .github/workflows/backbone-runtime.yml
@@ -26,6 +27,8 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install -r requirements.txt
+      - name: Verify historical replay invariants
+        run: python -m unittest discover -s tests -p test_backbone_runtime.py -v
       - name: Execute pinned component suites and cross-component replay
         run: python scripts/verify-backbone-runtime.py --prepare
         env:

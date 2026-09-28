@@ -13,6 +13,8 @@ Run from a checkout with read access to the same public repository. The manifest
 
 The optional workflow runs on relevant PR changes or manual dispatch. It has `contents: read`, no retained GitHub credentials, no deployment, no production state writes and no cron. Existing required CI remains unchanged. Its separate job preserves logs and machine-readable reports even on failure.
 
+The manifest must contain exactly the eight named components and their declared suite patterns. Missing components or suites fail before a PASS is possible. Each invocation writes to a fresh `runtime-evidence/backbone/<run-id>/` directory, so an earlier successful trace cannot be mixed with a later failed report. The workflow also runs `tests/test_backbone_runtime.py` for these invariants.
+
 ## What is executed
 
 1. Actual Python test suites in eight exact implementation snapshots, rejecting zero-test runs and any failing exit code.
@@ -23,7 +25,7 @@ The optional workflow runs on relevant PR changes or manual dispatch. It has `co
 
 ## Outputs
 
-`runtime-evidence/backbone/` contains manifest, per-suite log/exit/count/hash, real-snapshot-query, synthetic integration documents/versions/receipts/predictions, health state and an overall runtime report.
+Each `runtime-evidence/backbone/<run-id>/` contains manifest, per-suite log/exit/count/hash, real-snapshot-query, synthetic integration documents/versions/receipts/predictions, health state and an overall runtime report.
 
 A PASS means only these pinned tests and synthetic interfaces executed successfully. It does not attest the code currently in main, a real data pipeline, a browser or MCP server, public deployment, or field usefulness. Free-form prose is not validated by the typed evidence gate.
 

@@ -17,9 +17,20 @@ import re
 import subprocess
 import sys
 import time
+import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / 'config/backbone-runtime.v1.json'
+EXPECTED_COMPONENT_SUITES = {
+    'publication': ('test_publication*.py',),
+    'collector': ('test_news_list_collector.py', 'test_candidate_runtime_canary.py'),
+    'query': ('test_query_store*.py',),
+    'entity': ('test_entity_registry.py',),
+    'evaluation': ('test_gold_evaluator.py',),
+    'fusion': ('test_public_event_fusion.py',),
+    'answer': ('test_answer_evidence_gate.py',),
+    'health': ('test_system_health.py',),
+}
 
 
 def sha(value):
@@ -58,13 +69,36 @@ def expect_error(operation, label):
     raise AssertionError(label)
 
 
-def prepare(manifest, components):
+def validate_manifest(manifest):
+    require(isinstance(manifest, dict), 'manifest must be an object')
     require(manifest.get('schema_version') == 1, 'manifest version')
     require(manifest.get('repository') == 'Reese-max/taichung-police-intel', 'repository allowlist')
-    require(len({c['name'] for c in manifest['components']}) == len(manifest['components']), 'duplicate component')
+    require(manifest.get('validation_scope') == 'PINNED_COMPONENT_RUNTIME_AND_SYNTHETIC_INTEGRATION', 'historical scope')
+    require(manifest.get('production_verified') is False, 'historical production boundary')
+    components = manifest.get('components')
+    require(isinstance(components, list) and len(components) == len(EXPECTED_COMPONENT_SUITES), 'complete component set')
+    require(all(isinstance(component, dict) for component in components), 'component objects')
+    names = [component.get('name') for component in components]
+    require(set(names) == set(EXPECTED_COMPONENT_SUITES), 'complete component set')
+    for component in components:
+        name, commit = component['name'], component.get('sha')
+        require(re.fullmatch('[a-z]+', name) and re.fullmatch('[0-9a-f]{40}', commit), 'invalid checkout identity')
+        require(tuple(component.get('suites') or ()) == EXPECTED_COMPONENT_SUITES[name], 'complete suite set: ' + name)
+        require(component.get('issue') and component.get('pr'), 'component issue/PR provenance: ' + name)
+
+
+def new_run_directory(output_root, run_id):
+    require(re.fullmatch(r'[A-Za-z0-9-]+', run_id), 'invalid evidence run ID')
+    output_root.mkdir(parents=True, exist_ok=True)
+    output = output_root / run_id
+    output.mkdir(exist_ok=False)
+    return output
+
+
+def prepare(manifest, components):
+    validate_manifest(manifest)
     for component in manifest['components']:
         name, commit = component['name'], component['sha']
-        require(re.fullmatch('[a-z]+', name) and re.fullmatch('[0-9a-f]{40}', commit), 'invalid checkout identity')
         path = components / name
         if not path.exists():
             fetched = execute(['git', 'fetch', '--no-tags', '--depth=1', 'origin', commit], ROOT)
@@ -258,17 +292,21 @@ def main():
     parser.add_argument('--output', type=Path, default=ROOT / 'runtime-evidence/backbone')
     parser.add_argument('--prepare', action='store_true')
     args = parser.parse_args()
-    components, output = args.components.resolve(), args.output.resolve()
-    output.mkdir(parents=True, exist_ok=True)
+    components = args.components.resolve()
+    started = datetime.now(timezone.utc)
+    run_id = started.strftime('%Y%m%dT%H%M%S%fZ') + '-' + uuid.uuid4().hex[:8]
+    output = new_run_directory(args.output.resolve(), run_id)
     manifest = json.loads(MANIFEST.read_text(encoding='utf-8'))
-    report = {'schema_version': 1, 'started_at': datetime.now(timezone.utc).isoformat(),
-              'manifest_sha256': sha(manifest), 'validation_scope': manifest['validation_scope'],
+    report = {'schema_version': 1, 'started_at': started.isoformat(), 'evidence_run_id': run_id,
+              'manifest_sha256': sha(manifest),
+              'validation_scope': 'PINNED_COMPONENT_RUNTIME_AND_SYNTHETIC_INTEGRATION',
               'production_verified': False, 'status': 'RUNNING'}
     write_json(output / 'manifest.json', manifest)
     try:
         if args.prepare:
             prepare(manifest, components)
         else:
+            validate_manifest(manifest)
             for c in manifest['components']:
                 actual = execute(['git', 'rev-parse', 'HEAD'], components / c['name'])
                 require(actual.returncode == 0 and actual.stdout.strip() == c['sha'], 'pinned checkout required')
