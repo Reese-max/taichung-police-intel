@@ -32,7 +32,8 @@ test("current-checkout runtime contract passes", {
     timeout: 300000,
   });
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-  assert.match(result.stderr, /Ran 30 tests/);
+  const count = result.stderr.match(/\bRan (\d+) tests?\b/);
+  assert.ok(count && Number(count[1]) >= 30, result.stderr);
   assert.match(result.stderr, /OK/);
 });
 

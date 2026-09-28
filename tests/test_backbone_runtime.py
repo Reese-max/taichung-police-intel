@@ -107,7 +107,7 @@ class PinnedReplayContractTests(unittest.TestCase):
             with self.assertRaises(FileExistsError):
                 module.new_run_directory(root, "run-two")
 
-    def test_reused_checkout_rejects_untracked_test(self):
+    def test_reused_checkout_rejects_untracked_and_ignored_tests(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
 
@@ -121,13 +121,21 @@ class PinnedReplayContractTests(unittest.TestCase):
 
             git("init")
             (root / "tracked.txt").write_text("tracked\n", encoding="utf-8")
-            git("add", "tracked.txt")
+            (root / ".gitignore").write_text("tests/test_publication_hijack.py\n", encoding="utf-8")
+            git("add", "tracked.txt", ".gitignore")
             git("-c", "user.name=fixture", "-c", "user.email=fixture@example.test", "commit", "-m", "fixture")
             commit = git("rev-parse", "HEAD")
             module.verify_checkout(root, commit, "fixture")
             (root / "tests").mkdir()
-            (root / "tests" / "test_hijack.py").write_text("raise AssertionError('untracked')\n", encoding="utf-8")
-            with self.assertRaisesRegex(AssertionError, "dirty or untracked checkout"):
+            untracked = root / "tests" / "test_hijack.py"
+            untracked.write_text("raise AssertionError('untracked')\n", encoding="utf-8")
+            with self.assertRaisesRegex(AssertionError, "dirty, untracked, or ignored checkout"):
+                module.verify_checkout(root, commit, "fixture")
+            untracked.unlink()
+            ignored = root / "tests" / "test_publication_hijack.py"
+            ignored.write_text("raise AssertionError('ignored')\n", encoding="utf-8")
+            self.assertFalse(git("status", "--porcelain", "--untracked-files=all"))
+            with self.assertRaisesRegex(AssertionError, "dirty, untracked, or ignored checkout"):
                 module.verify_checkout(root, commit, "fixture")
 
 

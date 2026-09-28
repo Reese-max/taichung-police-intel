@@ -9,6 +9,7 @@ import time
 import unittest
 import urllib.error
 import urllib.request
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "verify-current-checkout.py"
@@ -61,6 +62,82 @@ class IdentityTests(unittest.TestCase):
             first = vc.hash_lockfiles([copied])
             copied.write_text(copied.read_text(encoding="utf-8") + "extra==1.0.0\n", encoding="utf-8")
             self.assertNotEqual(first, vc.hash_lockfiles([copied]))
+
+
+class DependencyInstallTests(unittest.TestCase):
+    def test_full_build_reinstalls_both_locks_with_existing_modules(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            web = root / "apps" / "web"
+            (root / "node_modules").mkdir()
+            (web / "node_modules").mkdir(parents=True)
+            (web / "out").mkdir()
+            (web / "out" / "index.html").write_text("ok", encoding="utf-8")
+            install_dirs = []
+
+            def install(args, cwd, timeout):
+                self.assertEqual(args[1:], ["ci", "--no-audit", "--no-fund"])
+                install_dirs.append(cwd)
+                return subprocess.CompletedProcess(args, 0, "installed", "")
+
+            build = subprocess.CompletedProcess(["npm", "run", "build"], 0, "built", "")
+            with patch.object(vc, "run", side_effect=install), patch.object(vc.subprocess, "run", return_value=build):
+                result = vc.build_web_site(root, root / "logs")
+
+            self.assertEqual(result["status"], "PASS", result)
+            self.assertEqual(install_dirs, [root, web])
+            self.assertTrue((root / "logs" / "npm-ci-root.log").is_file())
+            self.assertTrue((root / "logs" / "npm-ci-web.log").is_file())
+
+    def test_failed_web_install_blocks_build(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            web = root / "apps" / "web"
+            (web / "node_modules").mkdir(parents=True)
+            installs = iter((
+                subprocess.CompletedProcess(["npm", "ci"], 0, "installed", ""),
+                subprocess.CompletedProcess(["npm", "ci"], 1, "", "lock mismatch"),
+            ))
+            with patch.object(vc, "run", side_effect=lambda *args, **kwargs: next(installs)), \
+                    patch.object(vc.subprocess, "run") as build:
+                result = vc.build_web_site(root, root / "logs")
+
+            self.assertEqual(result["status"], "FAIL", result)
+            self.assertEqual(result["log"], "logs/npm-ci-web.log")
+            self.assertIn("lock mismatch", (root / "logs" / "npm-ci-web.log").read_text(encoding="utf-8"))
+            build.assert_not_called()
+
+    def test_timed_out_install_retains_partial_log_and_failed_check(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            timeout = subprocess.TimeoutExpired(["npm", "ci"], 600,
+                                                output=b"partial stdout", stderr=b"registry timeout")
+            with patch.object(vc, "run", side_effect=timeout), \
+                    patch.object(vc.subprocess, "run") as build:
+                result = vc.build_web_site(root, root / "logs")
+
+            self.assertEqual(result["status"], "FAIL", result)
+            self.assertEqual(result["log"], "logs/npm-ci-root.log")
+            log = (root / "logs" / "npm-ci-root.log").read_text(encoding="utf-8")
+            self.assertIn("partial stdout", log)
+            self.assertIn("registry timeout", log)
+            build.assert_not_called()
+
+    def test_timed_out_build_retains_log_and_failed_check(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            installed = subprocess.CompletedProcess(["npm", "ci"], 0, "installed", "")
+            timeout = subprocess.TimeoutExpired(["npm", "run", "build"], 600,
+                                                output=b"partial build", stderr=b"worker stalled")
+            with patch.object(vc, "run", return_value=installed), \
+                    patch.object(vc.subprocess, "run", side_effect=timeout):
+                result = vc.build_web_site(root, root / "logs")
+
+            self.assertEqual(result["status"], "FAIL", result)
+            self.assertEqual(result["log"], "logs/next-build.log")
+            log = (root / "logs" / "next-build.log").read_text(encoding="utf-8")
+            self.assertIn("partial build", log)
+            self.assertIn("worker stalled", log)
 
 
 class ModuleBindingTests(unittest.TestCase):

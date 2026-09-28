@@ -98,8 +98,8 @@ def new_run_directory(output_root, run_id):
 def verify_checkout(path, commit, name):
     actual = execute(['git', 'rev-parse', 'HEAD'], path)
     require(actual.returncode == 0 and actual.stdout.strip() == commit, 'checkout SHA mismatch: ' + name)
-    dirty = execute(['git', 'status', '--porcelain', '--untracked-files=all'], path)
-    require(dirty.returncode == 0 and not dirty.stdout.strip(), 'dirty or untracked checkout: ' + name)
+    dirty = execute(['git', 'status', '--porcelain', '--untracked-files=all', '--ignored'], path)
+    require(dirty.returncode == 0 and not dirty.stdout.strip(), 'dirty, untracked, or ignored checkout: ' + name)
 
 
 def prepare(manifest, components):
