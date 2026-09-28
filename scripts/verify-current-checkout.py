@@ -154,7 +154,7 @@ def build_candidate_context(root: Path, modules: dict[str, Any]) -> dict[str, An
     if rebuilt != store:
         raise ValueError("query store rebuild is not deterministic")
     catalog = sp.load_catalog(root / "docs" / "govintel" / "source-catalog.v2.json")
-    policy = sp.compile_policy(catalog)
+    policy = sp.load_current_policy()
     current_policy = qs.load_current_policy()
     if policy["active_source_ids"] != current_policy["active_source_ids"]:
         raise ValueError("source policy active set does not match the pinned P0 query scope")
