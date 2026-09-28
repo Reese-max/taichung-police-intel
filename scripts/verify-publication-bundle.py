@@ -18,7 +18,7 @@ def load_expected_sources() -> set[str]:
         raise ValueError("source policy module is unavailable")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    policy = module.compile_policy(module.load_catalog())
+    policy = module.load_current_policy()
     expected = set(policy["active_source_ids"])
     if not expected:
         raise ValueError("source policy has no active sources")

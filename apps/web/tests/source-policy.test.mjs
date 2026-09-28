@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import os from 'node:os';
 import test from 'node:test';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -46,4 +47,26 @@ test('web policy projection preserves the compiled policy binding', async () => 
   assert.match(projection.policy_hash, /^[0-9a-f]{64}$/);
   assert.equal(projection.policy_hash, policy.policy_hash);
   assert.equal(projection.catalog_hash, policy.catalog_hash);
+});
+
+test('sync preserves an unchanged policy projection without touching its timestamp', async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'govintel-policy-sync-'));
+  const output = path.join(directory, 'source-policy.json');
+  const script = path.join(repo, 'apps/web/scripts/sync-source-policy.mjs');
+  try {
+    const first = spawnSync(process.execPath, [script, '--output', output], { cwd: repo, encoding: 'utf8' });
+    assert.equal(first.status, 0, `${first.stdout}\n${first.stderr}`);
+    const windowsBytes = Buffer.from((await readFile(output, 'utf8')).replace(/\n/g, '\r\n'));
+    await writeFile(output, windowsBytes);
+    const old = new Date('2001-01-01T00:00:00Z');
+    await utimes(output, old, old);
+    const before = await stat(output);
+    const second = spawnSync(process.execPath, [script, '--output', output], { cwd: repo, encoding: 'utf8' });
+    assert.equal(second.status, 0, `${second.stdout}\n${second.stderr}`);
+    assert.match(second.stdout, /changed=false/);
+    assert.deepEqual(await readFile(output), windowsBytes);
+    assert.equal((await stat(output)).mtimeMs, before.mtimeMs);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });

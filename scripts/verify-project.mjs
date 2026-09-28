@@ -52,6 +52,7 @@ const required = [
   "scripts/review-inbox.py",
   "scripts/located-facts.py",
   "docs/govintel/official-document-rules.v1.json",
+  "docs/govintel/source-policy.approved.json",
   "docs/govintel/issue-48-official-document-replay.md",
   "docs/govintel/role-profiles.v1.json",
   "docs/govintel/official-document-receipt.v1.json",

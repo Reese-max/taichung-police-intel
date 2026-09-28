@@ -5,7 +5,11 @@ import { fileURLToPath } from "node:url";
 
 const webRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const catalogPath = resolve(webRoot, "../../docs/govintel/source-catalog.v2.json");
-const outputPath = resolve(webRoot, "public/data/source-policy.json");
+const defaultOutputPath = resolve(webRoot, "public/data/source-policy.json");
+if (process.argv.length > 2 && (process.argv.length !== 4 || process.argv[2] !== "--output")) {
+  throw new Error("usage: sync-source-policy.mjs [--output <path>]");
+}
+const outputPath = process.argv[2] === "--output" ? resolve(process.argv[3]) : defaultOutputPath;
 const catalog = JSON.parse(await readFile(catalogPath, "utf8"));
 if (catalog.schema_version !== 2 || !Array.isArray(catalog.sources)) {
   throw new Error("invalid source catalog");
@@ -41,5 +45,17 @@ const projection = {
   catalog_hash: policy.catalog_hash,
   active_source_ids: activeSourceIds,
 };
-await writeFile(outputPath, `${JSON.stringify(projection, null, 2)}\n`, "utf8");
-console.log(`SOURCE_POLICY_SYNC_OK active=${activeSourceIds.length} output=${outputPath}`);
+const rendered = `${JSON.stringify(projection, null, 2)}\n`;
+let current;
+try {
+  current = await readFile(outputPath);
+} catch (error) {
+  if (error.code !== "ENOENT") throw error;
+}
+// Git may check out this tracked JSON with CRLF on Windows. Equal policy bytes
+// after newline normalization must not rewrite the file during a build.
+const unchanged = current?.toString("utf8").replace(/\r\n/g, "\n") === rendered;
+if (!unchanged) {
+  await writeFile(outputPath, rendered, "utf8");
+}
+console.log(`SOURCE_POLICY_SYNC_OK active=${activeSourceIds.length} output=${outputPath} changed=${!unchanged}`);
