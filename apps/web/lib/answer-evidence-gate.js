@@ -18,7 +18,7 @@ import { EVIDENCE_TYPES } from "./council-prep.js";
 export const CLAIM_SCHEMA_VERSION = 1;
 export const EVIDENCE_SCHEMA_VERSION = 1;
 export const RECEIPT_SCHEMA_VERSION = 1;
-export const VALIDATOR_VERSION = "answer-evidence-gate/2";
+export const VALIDATOR_VERSION = "answer-evidence-gate/3";
 
 export const CLAIM_TYPES = Object.freeze([
   "TIME",
@@ -76,11 +76,13 @@ function normalizeStatisticValue(value) {
   if (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null) return null;
   if (Object.keys(value).length !== 4 ||
       !["value", "period", "geography", "unit"].every((field) => Object.hasOwn(value, field))) return null;
-  if (typeof value.value !== "number" || !Number.isFinite(value.value) ||
-      (Number.isInteger(value.value) && !Number.isSafeInteger(value.value))) return null;
+  // JSON numbers lose their source spelling before this gate sees them. A
+  // decimal string preserves exact digits, including large or fractional ones.
+  if (typeof value.value !== "string" || value.value.length > 128 ||
+      !/^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?$/.test(value.value)) return null;
   if (![value.period, value.geography, value.unit].every((part) => typeof part === "string" && part.trim())) return null;
   const statistic = {
-    value: Object.is(value.value, -0) ? 0 : value.value,
+    value: value.value,
     period: normalizeTerm(value.period),
     geography: normalizeTerm(value.geography),
     unit: normalizeTerm(value.unit),

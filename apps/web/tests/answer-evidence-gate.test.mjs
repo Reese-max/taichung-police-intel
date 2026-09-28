@@ -278,7 +278,7 @@ const SCOPED_STATISTIC = {
   evidence_id: "EV-S026-SCOPED-09",
   assertions: [{
     subject: "交通違規舉發件數",
-    value: { value: 130, period: "2026-09", geography: "臺中市", unit: "件" },
+    value: { value: "130", period: "2026-09", geography: "臺中市", unit: "件" },
   }],
 };
 
@@ -330,7 +330,7 @@ test("other statistic scopes do not support or conflict with the requested scope
     assert.deepEqual(alongside.receipt.evidence_ids, [SCOPED_STATISTIC.evidence_id], field);
   }
   const wrongValue = gateAnswer({
-    claims: [scopedStatClaim({ ...base, value: 129 })], evidence: [SCOPED_STATISTIC],
+    claims: [scopedStatClaim({ ...base, value: "129" })], evidence: [SCOPED_STATISTIC],
   });
   assert.equal(wrongValue.removed_claims[0].reason_code, "VALUE_MISMATCH");
 });
@@ -348,7 +348,7 @@ test("different current official values conflict only within the same statistic 
     ...SCOPED_STATISTIC,
     evidence_id: "EV-S014-SCOPED-09",
     source_id: "S-014",
-    assertions: [{ subject: "交通違規舉發件數", value: { ...SCOPED_STATISTIC.assertions[0].value, value: 131 } }],
+    assertions: [{ subject: "交通違規舉發件數", value: { ...SCOPED_STATISTIC.assertions[0].value, value: "131" } }],
   };
   const result = gateAnswer({ claims: [scopedStatClaim()], evidence: [SCOPED_STATISTIC, second] });
   assert.equal(result.gate_status, "QUALIFIED");
@@ -362,7 +362,8 @@ test("malformed statistic dimensions never verify a claim", () => {
   const base = SCOPED_STATISTIC.assertions[0].value;
   for (const value of [
     { ...base, period: "" }, { ...base, geography: null }, { ...base, unit: " " },
-    { ...base, value: "130" }, { ...base, unexpected: "ignored" },
+    { ...base, value: 130 }, { ...base, value: "0130" }, { ...base, value: "1e2" },
+    { ...base, unexpected: "ignored" },
     { "geography,period": "臺中市,2026-09", unit: "件", value: 130 },
   ]) {
     const claim = gateAnswer({ claims: [scopedStatClaim(value)], evidence: [SCOPED_STATISTIC] });
@@ -375,25 +376,50 @@ test("malformed statistic dimensions never verify a claim", () => {
   }
 });
 
-test("JSON-rounded unsafe statistic integers cannot produce false support", () => {
-  const claimValue = { ...SCOPED_STATISTIC.assertions[0].value, value: 9007199254740992 };
-  const evidenceValue = { ...claimValue, value: JSON.parse("9007199254740993") };
-  assert.equal(evidenceValue.value, claimValue.value); // distinct JSON integers have collided in JS
-  const result = gateAnswer({
-    claims: [scopedStatClaim(claimValue)],
-    evidence: [{
-      ...SCOPED_STATISTIC,
-      assertions: [{ subject: "交通違規舉發件數", value: evidenceValue }],
-    }],
+test("different decimal literals stay distinct and rounded JSON numbers fail closed", () => {
+  const base = SCOPED_STATISTIC.assertions[0].value;
+  for (const [claimText, evidenceText] of [
+    ["9007199254740992", "9007199254740993"],
+    ["1", "1.0000000000000001"],
+  ]) {
+    assert.equal(JSON.parse(claimText), JSON.parse(evidenceText)); // JSON number collision
+    const claimValue = { ...base, value: claimText };
+    const evidenceValue = { ...base, value: evidenceText };
+    const exact = gateAnswer({
+      claims: [scopedStatClaim(claimValue)],
+      evidence: [{ ...SCOPED_STATISTIC, assertions: [{ subject: "交通違規舉發件數", value: evidenceValue }] }],
+    });
+    assert.equal(exact.removed_claims[0].reason_code, "VALUE_MISMATCH", evidenceText);
+    const numeric = gateAnswer({
+      claims: [scopedStatClaim({ ...claimValue, value: JSON.parse(claimText) })],
+      evidence: [{
+        ...SCOPED_STATISTIC,
+        assertions: [{ subject: "交通違規舉發件數", value: { ...evidenceValue, value: JSON.parse(evidenceText) } }],
+      }],
+    });
+    assert.equal(numeric.removed_claims[0].reason_code, "INVALID_PROPOSITION", evidenceText);
+    assert.deepEqual(numeric.receipt.evidence_ids, [], evidenceText);
+  }
+});
+
+test("JSON runner rejects rounded statistic numbers before release", () => {
+  const base = SCOPED_STATISTIC.assertions[0].value;
+  const claim = scopedStatClaim({ ...base, value: "__CLAIM__" });
+  const evidence = {
+    ...SCOPED_STATISTIC,
+    assertions: [{ subject: "交通違規舉發件數", value: { ...base, value: "__EVIDENCE__" } }],
+  };
+  const input = JSON.stringify({ claims: [claim], evidence: [evidence] })
+    .replace('"__CLAIM__"', "1")
+    .replace('"__EVIDENCE__"', "1.0000000000000001");
+  const run = spawnSync(process.execPath, [fileURLToPath(new URL("../../../scripts/answer-gate-runner.mjs", import.meta.url))], {
+    input, encoding: "utf8",
   });
+  assert.equal(run.status, 0, run.stderr);
+  const result = JSON.parse(run.stdout);
   assert.equal(result.gate_status, "QUALIFIED");
-  assert.equal(result.removed_claims[0].reason_code, "INVALID_PROPOSITION");
-  assert.deepEqual(result.receipt.evidence_ids, []);
-  const safeClaim = gateAnswer({
-    claims: [scopedStatClaim()],
-    evidence: [{ ...SCOPED_STATISTIC, assertions: [{ subject: "交通違規舉發件數", value: evidenceValue }] }],
-  });
-  assert.equal(safeClaim.removed_claims[0].reason_code, "NO_EVIDENCE");
+  assert.deepEqual(result.answer, []);
+  assert.equal(result.receipt.claims[0].reason_code, "INVALID_PROPOSITION");
 });
 
 function currentStatClaim(overrides = {}) {
