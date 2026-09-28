@@ -23,8 +23,10 @@ export function sourceManifestFailures(source) {
   return failures;
 }
 
-export function failedSourceFeedFailures(item) {
-  if (item.source_health !== "FAILED" ||
-      (item.change_type === "LKG" && item.eligibility === "INELIGIBLE_SOURCE_FAILED")) return [];
+export function failedSourceFeedFailures(item, failedSourceIds) {
+  const statusFailed = failedSourceIds.has(item.source_id);
+  if (!statusFailed && item.source_health !== "FAILED") return [];
+  if (statusFailed && item.source_health === "FAILED" &&
+      item.change_type === "LKG" && item.eligibility === "INELIGIBLE_SOURCE_FAILED") return [];
   return [`feed:${item.stable_id || "unknown"}:failed-source-not-lkg`];
 }

@@ -192,6 +192,9 @@ if (!failures.length) {
   }
   const activeSourceIds = new Set(sourcePolicy.active_source_ids || []);
   const statusSourceIds = new Set((status.sources || []).map(source => source?.source_id));
+  const failedSourceIds = new Set((status.sources || [])
+    .filter(source => source?.source_health === "FAILED")
+    .map(source => source.source_id));
   if (status.mode !== "COMPETITION_DEMO") failures.push("demo-status:invalid-mode");
   if (activeSourceIds.size === 0 || statusSourceIds.size !== activeSourceIds.size ||
       [...activeSourceIds].some(sourceId => !statusSourceIds.has(sourceId))) {
@@ -224,7 +227,7 @@ if (!failures.length) {
     if (item.window_completeness === "PARTIAL" && item.eligibility === "HOME_CANDIDATE") {
       failures.push(`feed:${item.stable_id}:partial-marked-eligible`);
     }
-    failures.push(...failedSourceFeedFailures(item));
+    failures.push(...failedSourceFeedFailures(item, failedSourceIds));
   }
 }
 

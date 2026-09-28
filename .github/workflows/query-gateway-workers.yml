@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "workers/query-gateway/**"
+      - ".github/workflows/query-gateway-workers.yml"
       - "apps/web/lib/answer-evidence-gate.js"
       - "apps/web/lib/council-prep.js"
       - "docs/govintel/source-catalog.v2.json"
@@ -23,6 +24,12 @@ jobs:
     env:
       HAS_CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
     steps:
+      - name: Require Cloudflare deployment credential
+        if: ${{ env.HAS_CLOUDFLARE_API_TOKEN != 'true' }}
+        run: |
+          echo '::error::CLOUDFLARE_API_TOKEN is unavailable; the Worker was not deployed.'
+          exit 1
+
       - name: Checkout
         if: ${{ env.HAS_CLOUDFLARE_API_TOKEN == 'true' }}
         uses: actions/checkout@v4

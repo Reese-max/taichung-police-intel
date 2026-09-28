@@ -26,10 +26,11 @@ test("failed S-029 fetch retains LKG without inventing a current manifest", () =
   assert.deepEqual(sourceManifestFailures(failedSource()), []);
   assert.deepEqual(failedSourceFeedFailures({
     stable_id: "S-029-item",
+    source_id: "S-029",
     source_health: "FAILED",
     change_type: "LKG",
     eligibility: "INELIGIBLE_SOURCE_FAILED",
-  }), []);
+  }, new Set(["S-029"])), []);
 });
 
 test("failed source without a verified baseline remains blocked", () => {
@@ -61,8 +62,29 @@ test("successful source requires a valid current manifest and LKG", () => {
 test("failed-source feed item cannot be promoted as a new home candidate", () => {
   assert.deepEqual(failedSourceFeedFailures({
     stable_id: "S-029-item",
+    source_id: "S-029",
     source_health: "FAILED",
     change_type: "NEW",
     eligibility: "HOME_CANDIDATE",
-  }), ["feed:S-029-item:failed-source-not-lkg"]);
+  }, new Set(["S-029"])), ["feed:S-029-item:failed-source-not-lkg"]);
+});
+
+test("status-failed source cannot be promoted by a feed row claiming PASS", () => {
+  assert.deepEqual(failedSourceFeedFailures({
+    stable_id: "S-029-item",
+    source_id: "S-029",
+    source_health: "PASS",
+    change_type: "NEW",
+    eligibility: "HOME_CANDIDATE",
+  }, new Set(["S-029"])), ["feed:S-029-item:failed-source-not-lkg"]);
+});
+
+test("feed failure must agree with source status", () => {
+  assert.deepEqual(failedSourceFeedFailures({
+    stable_id: "S-029-item",
+    source_id: "S-029",
+    source_health: "FAILED",
+    change_type: "LKG",
+    eligibility: "INELIGIBLE_SOURCE_FAILED",
+  }, new Set()), ["feed:S-029-item:failed-source-not-lkg"]);
 });
