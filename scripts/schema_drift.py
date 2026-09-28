@@ -769,6 +769,8 @@ def live_observations(*, session=None, fetch_source=None) -> list[dict[str, Any]
     fetch_source = fetch_source or _fetch_live_source
     observations = []
     for source_id in CONTRACTS:
+        started_at = time.monotonic()
+        print(f"SCHEMA_DRIFT_SOURCE_START source={source_id}", flush=True)
         error = None
         for attempt in range(2):
             try:
@@ -785,6 +787,22 @@ def live_observations(*, session=None, fetch_source=None) -> list[dict[str, Any]
                 break
         if error is not None:
             observations.append(_failed_observation(source_id, error))
+        print(
+            f"SCHEMA_DRIFT_SOURCE_END source={source_id} "
+            f"http_status={observations[-1]['http_status']} "
+            f"elapsed_seconds={time.monotonic() - started_at:.1f}",
+            flush=True,
+        )
+    return observations
+
+
+def interrupted_live_observations() -> list[dict[str, Any]]:
+    """Fail closed when the live probe is stopped before it can write a receipt."""
+    observations = []
+    for source_id in CONTRACTS:
+        observation = _failed_observation(source_id, TimeoutError("live collection interrupted"))
+        observation["error_reason"] = "LIVE_COLLECTION_INTERRUPTED"
+        observations.append(observation)
     return observations
 
 
@@ -849,8 +867,10 @@ def self_check() -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", type=Path)
-    parser.add_argument("--live", action="store_true")
+    source = parser.add_mutually_exclusive_group()
+    source.add_argument("--input", type=Path)
+    source.add_argument("--live", action="store_true")
+    source.add_argument("--live-interrupted-receipt", action="store_true")
     parser.add_argument("--state", type=Path, default=DEFAULT_STATE)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--self-check", action="store_true")
@@ -858,10 +878,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.self_check:
         self_check()
         return 0
-    if args.live and args.input:
-        parser.error("--live and --input are mutually exclusive")
     state = json.loads(args.state.read_text(encoding="utf-8")) if args.state.exists() else empty_state()
-    observations = live_observations() if args.live else _load_observations(args.input) if args.input else []
+    observations = (
+        live_observations() if args.live
+        else interrupted_live_observations() if args.live_interrupted_receipt
+        else _load_observations(args.input) if args.input
+        else []
+    )
     receipt, next_state = build_receipt(observations, state=state)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(receipt, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")

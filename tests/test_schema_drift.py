@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import copy
 import json
+import tempfile
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
@@ -239,6 +241,33 @@ class SchemaDriftTests(unittest.TestCase):
         self.assertEqual(calls["S-001"], 2)
         self.assertEqual(next(item for item in observations if item["source_id"] == "S-001")["http_status"], 200)
         sleep.assert_called_once_with(1)
+
+    def test_interrupted_live_receipt_blocks_every_source_and_preserves_lkg(self):
+        good = drift.observe(
+            drift.CONTRACTS["S-001"],
+            '<li><a href="news_view.jsp?dataserno=1">news 115-09-10</a></li>',
+            content_type="text/html",
+        )
+        state = drift.update_state(drift.empty_state(), good)
+        with tempfile.TemporaryDirectory() as directory:
+            state_path = Path(directory) / "state.json"
+            output_path = Path(directory) / "receipt.json"
+            state_path.write_text(json.dumps(state), encoding="utf-8")
+            output_path.write_text('{"overall":"HEALTHY"}', encoding="utf-8")
+            with mock.patch.object(drift, "live_observations", side_effect=AssertionError("network called")):
+                self.assertEqual(drift.main([
+                    "--live-interrupted-receipt", "--state", str(state_path), "--output", str(output_path)
+                ]), 0)
+            receipt = json.loads(output_path.read_text(encoding="utf-8"))
+            self.assertEqual(receipt["overall"], "BLOCKED")
+            self.assertEqual(len(receipt["sources"]), len(drift.CONTRACTS))
+            for source in receipt["sources"]:
+                self.assertEqual(source["status"], "SOURCE_UNAVAILABLE")
+                self.assertEqual(source["reasons"], ["LIVE_COLLECTION_INTERRUPTED"])
+                self.assertTrue(source["review_required"])
+            s001 = next(source for source in receipt["sources"] if source["source_id"] == "S-001")
+            self.assertEqual(s001["last_known_good"]["observed_schema_fingerprint"], good["observed_schema_fingerprint"])
+            self.assertEqual(json.loads(state_path.read_text(encoding="utf-8")), state)
 
     def test_live_catalog_sources_use_bound_collector_transport(self):
         response = SimpleNamespace(content=b"sample", status_code=200, headers={}, url="https://official.test/source")
