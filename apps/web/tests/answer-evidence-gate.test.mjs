@@ -375,6 +375,27 @@ test("malformed statistic dimensions never verify a claim", () => {
   }
 });
 
+test("JSON-rounded unsafe statistic integers cannot produce false support", () => {
+  const claimValue = { ...SCOPED_STATISTIC.assertions[0].value, value: 9007199254740992 };
+  const evidenceValue = { ...claimValue, value: JSON.parse("9007199254740993") };
+  assert.equal(evidenceValue.value, claimValue.value); // distinct JSON integers have collided in JS
+  const result = gateAnswer({
+    claims: [scopedStatClaim(claimValue)],
+    evidence: [{
+      ...SCOPED_STATISTIC,
+      assertions: [{ subject: "交通違規舉發件數", value: evidenceValue }],
+    }],
+  });
+  assert.equal(result.gate_status, "QUALIFIED");
+  assert.equal(result.removed_claims[0].reason_code, "INVALID_PROPOSITION");
+  assert.deepEqual(result.receipt.evidence_ids, []);
+  const safeClaim = gateAnswer({
+    claims: [scopedStatClaim()],
+    evidence: [{ ...SCOPED_STATISTIC, assertions: [{ subject: "交通違規舉發件數", value: evidenceValue }] }],
+  });
+  assert.equal(safeClaim.removed_claims[0].reason_code, "NO_EVIDENCE");
+});
+
 function currentStatClaim(overrides = {}) {
   return {
     schema_version: CLAIM_SCHEMA_VERSION,

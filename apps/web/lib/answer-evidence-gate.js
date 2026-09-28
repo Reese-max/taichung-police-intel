@@ -76,7 +76,8 @@ function normalizeStatisticValue(value) {
   if (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null) return null;
   if (Object.keys(value).length !== 4 ||
       !["value", "period", "geography", "unit"].every((field) => Object.hasOwn(value, field))) return null;
-  if (typeof value.value !== "number" || !Number.isFinite(value.value)) return null;
+  if (typeof value.value !== "number" || !Number.isFinite(value.value) ||
+      (Number.isInteger(value.value) && !Number.isSafeInteger(value.value))) return null;
   if (![value.period, value.geography, value.unit].every((part) => typeof part === "string" && part.trim())) return null;
   const statistic = {
     value: Object.is(value.value, -0) ? 0 : value.value,
