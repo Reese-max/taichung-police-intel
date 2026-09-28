@@ -366,7 +366,20 @@ class QueryGatewayTests(unittest.TestCase):
         receipt = query["answer_evidence_receipt"]
         self.assertEqual(receipt["publication_hash"], query["publication_hash"])
         self.assertRegex(receipt["evidence_catalog_hash"], r"^[0-9a-f]{64}$")
-        self.assertIn(f"PUB-{item['canonical_id']}", receipt["evidence_ids"])
+        evidence_id = f"PUB-{item['canonical_id']}"
+        self.assertIn(evidence_id, receipt["evidence_ids"])
+        catalog = self.gateway._trusted_evidence_catalog(self.gateway.store, self.gateway.clock())
+        self.assertEqual(receipt["evidence_catalog_hash"], gateway_module._json_hash(catalog))
+        catalog_item = next(row for row in catalog if row["evidence_id"] == evidence_id)
+        self.assertEqual(catalog_item["content_sha256"], item["content_sha256"])
+        supporter = receipt["claims"][0]["supporting_evidence"][0]
+        self.assertEqual(supporter["evidence_id"], evidence_id)
+        self.assertEqual(supporter["source_id"], item["source_id"])
+        self.assertEqual(supporter["document_version"], item["content_sha256"])
+        self.assertEqual(supporter["locator"], f"{item['official_url']}#publication:{item['canonical_id']}")
+        mcp_receipt = mcp["result"]["structuredContent"]["answer_evidence_receipt"]
+        self.assertEqual(mcp_receipt["evidence_catalog_hash"], receipt["evidence_catalog_hash"])
+        self.assertEqual(mcp_receipt["claims"][0]["supporting_evidence"], receipt["claims"][0]["supporting_evidence"])
 
         stale_gateway = gateway_module.QueryGateway(
             clock=lambda: datetime(2026, 9, 21, 9, 0, tzinfo=timezone.utc),
