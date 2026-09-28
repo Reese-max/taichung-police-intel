@@ -8,10 +8,12 @@ human-labelled accuracy evidence. All outputs state this distinction explicitly.
 from __future__ import annotations
 import argparse
 import copy
+from contextlib import contextmanager
 from datetime import datetime, timezone
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -44,6 +46,23 @@ def write_json(path, obj):
 
 def execute(args, cwd, timeout=120):
     return subprocess.run(args, cwd=cwd, capture_output=True, text=True, encoding='utf-8', timeout=timeout)
+
+
+@contextmanager
+def no_bytecode():
+    """Keep both in-process imports and child Python tests from dirtying pinned trees."""
+    previous_flag = sys.dont_write_bytecode
+    previous_env = os.environ.get('PYTHONDONTWRITEBYTECODE')
+    sys.dont_write_bytecode = True
+    os.environ['PYTHONDONTWRITEBYTECODE'] = '1'
+    try:
+        yield
+    finally:
+        sys.dont_write_bytecode = previous_flag
+        if previous_env is None:
+            os.environ.pop('PYTHONDONTWRITEBYTECODE', None)
+        else:
+            os.environ['PYTHONDONTWRITEBYTECODE'] = previous_env
 
 
 def load_module(name, path):
@@ -314,8 +333,11 @@ def main():
             validate_manifest(manifest)
             for c in manifest['components']:
                 verify_checkout(components / c['name'], c['sha'], c['name'])
-        report['components'] = component_suites(manifest, components, output)
-        report['integration'] = integration(components, output)
+        with no_bytecode():
+            report['components'] = component_suites(manifest, components, output)
+            report['integration'] = integration(components, output)
+        for component in manifest['components']:
+            verify_checkout(components / component['name'], component['sha'], component['name'])
         report['status'] = 'PASS'
     except Exception as error:
         report['status'] = 'FAIL'

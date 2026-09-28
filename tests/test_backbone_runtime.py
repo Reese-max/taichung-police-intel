@@ -6,6 +6,7 @@ from contextlib import redirect_stdout
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -95,6 +96,22 @@ class PinnedReplayContractTests(unittest.TestCase):
                 self.assertEqual(report["error_type"], error_type)
                 self.assertIsNone(report["manifest_sha256"])
                 self.assertFalse(report["production_verified"])
+
+    def test_replay_imports_do_not_create_ignored_bytecode(self):
+        previous_flag = sys.dont_write_bytecode
+        previous_env = os.environ.get("PYTHONDONTWRITEBYTECODE")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "probe.py"
+            source.write_text("VALUE = 1\n", encoding="utf-8")
+            with module.no_bytecode():
+                self.assertEqual(module.load_module("probe", source).VALUE, 1)
+                result = module.execute([sys.executable, "-c", "import probe"], root)
+                self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse((root / "__pycache__").exists())
+        sys.modules.pop("backbone_probe", None)
+        self.assertEqual(sys.dont_write_bytecode, previous_flag)
+        self.assertEqual(os.environ.get("PYTHONDONTWRITEBYTECODE"), previous_env)
 
     def test_each_run_has_a_fresh_evidence_directory(self):
         with tempfile.TemporaryDirectory() as directory:
