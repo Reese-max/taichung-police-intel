@@ -81,6 +81,9 @@ def bind_document_entities(document: dict[str, Any], registry: dict[str, Any]) -
         jurisdiction = named_jurisdiction or result.get("jurisdiction")
         if not isinstance(jurisdiction, str) or not jurisdiction.strip() or not isinstance(named_date, str):
             raise ValueError("named_event_label requires explicit jurisdiction and event_date")
+        observed_date = _iso_date(result.get("event_start_at"))
+        if observed_date is not None and observed_date != named_date:
+            raise ValueError("named_event_date conflicts with document event_start_at")
         match = module.resolve(registry, "named_event", named_label, jurisdiction, named_date)
         if match["status"] != "RESOLVED":
             raise ValueError(f"unresolved named_event label: {named_label}")

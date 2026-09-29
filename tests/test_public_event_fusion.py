@@ -196,6 +196,8 @@ class PublicEventFusionTests(unittest.TestCase):
             fusion.bind_document_entities(dict(before, named_event_date=None), registry)
         with self.assertRaisesRegex(ValueError, "conflicts"):
             fusion.bind_document_entities(dict(before, named_event_id="named_event:forum-0921"), registry)
+        with self.assertRaisesRegex(ValueError, "conflicts with document event_start_at"):
+            fusion.bind_document_entities(dict(before, named_event_date="2026-09-21"), registry)
 
     def test_same_identity_with_district_conflict_stays_conflict(self):
         event = fusion.fuse_documents([document("POLICE"), document("TRAFFIC", district="location:tc-fengyuan")])[0]
