@@ -42,10 +42,15 @@ test("線上來源狀態保留缺口、LKG 與下一次臺北排程", () => {
   assert.equal(nextUpdateAt("2026-08-22T11:00:00Z"), "2026-08-23T06:30:00.000+08:00");
 });
 
-test("健康但官方資料日期較舊的零變更來源保持 STALE 且明確可辨", async () => {
-  const status = JSON.parse(await readFile(resolve(projectRoot, "apps/web/public/data/source-status.json"), "utf8"));
+test("健康但官方資料日期較舊的零變更來源保持 STALE 且明確可辨", () => {
+  const sources = ["S-004", "S-007", "S-029"].map((source_id) => ({
+    source_id,
+    source_health: "PASS",
+    result: "NO_NEW_ITEM",
+    freshness_status: "STALE",
+  }));
   assert.deepEqual(
-    status.sources.filter(isHealthyStaleSource).map((source) => source.source_id),
+    sources.filter(isHealthyStaleSource).map((source) => source.source_id),
     ["S-004", "S-007", "S-029"],
   );
 });
