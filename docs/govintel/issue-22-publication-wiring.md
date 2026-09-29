@@ -7,6 +7,8 @@
 - V2 daily brief、首頁中英文來源名稱與 V2 dashboard source-health 已補上第一批 promotion candidates 的 context。
 - `tests/test_candidate_publication_wiring.py` 以升格後的 S-032 合成觀測驗證 status → feed → V2 locator 鏈；它不改動正式 catalog，也不冒充 live canary。
 
+新聞 HTML 列表現在沿官方「下一頁」連結最多讀四頁；S-001 的 `javascript:list(page,intpage)` 只轉為同來源的唯讀 GET 查詢參數。只有沒有待讀下一頁、每個解析列都有日期、跨頁日期為新到舊，且觀察到窗口前邊界時，才可宣稱 `COMPLETE_WITH_ITEMS`（所有日期均早於窗口時為 `COMPLETE_ZERO`）。不認得的下一頁控制、重複頁面、超出四頁上限或任何無法解析日期都維持 `PARTIAL`。有長歷史分頁的來源可能持續 `PARTIAL`；此安全狀態不能當成 promotion 的完整覆蓋證據。
+
 2026-09-21 11:35:12 Asia/Taipei 的 bounded live canary 修正並驗證了 S-032 的來源路徑：`https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,20`，HTTP 200、9 筆列表、窗口內 4 筆、1 篇 detail、`NO_DRIFT`，manifest `d24d5b467f510b019e1f08627faa1ab715f4e081e7e627375740578e6dde0014`。原設定誤指向長者專區，已改為最新消息項目的 `index-1.asp` 連結；本觀測仍明確標記 `CANDIDATE`，不是 promotion receipt。
 
 2026-09-21 15:34:50 Asia/Taipei 的第二次 bounded live canary（`candidate-runtime-canary.py`，`failed_count=0`）觀察到三個候選來源均 HTTP 200、`NO_DRIFT`、`COMPLETE_WITH_ITEMS`：S-001 15 筆列表／窗口 3 筆／2 snapshots，S-019 63 筆／窗口 1 筆／2 snapshots，S-032 10 筆／窗口 5 筆／2 snapshots。三者仍為 `integration_status=CANDIDATE`、`promotion_eligible=false`、`coverage_independently_verified=false`；manifest 分別為 `ecaa4864fc03677128e5f34c66abf72cebe4fa32e094380dc3e6d79d7ec85181`、`bcdbe2e2225b0ce88c8d33153c83d24fe2518747a1df2d3a5f978ff6419cd557`、`ff3690b99c1617173299002675588abf10e3157710b270c59eae6edefe4f505d`。這是單次觀測，不是七日 promotion 或正式發布證據。

@@ -6,7 +6,7 @@ import online_collect as oc
 
 
 def _page(body: str) -> bytes:
-    return f"<html><body><ul>{body}</ul></body></html>".encode("utf-8")
+    return f"<html><head><meta charset='utf-8'></head><body><ul>{body}</ul></body></html>".encode("utf-8")
 
 
 POLICE_LIST = _page(
@@ -204,6 +204,75 @@ class ListFirstGatingTests(unittest.TestCase):
         result, _ = _collect("S-001", POLICE_LIST)
         self.assertEqual(result["window_completeness"], "COMPLETE_WITH_ITEMS")
         self.assertEqual(result["window_item_count"], 2)
+
+    def test_two_page_list_needs_second_page_before_claiming_complete(self):
+        first = _page(
+            '<li><a href="index-1.asp?Parser=9,4,20,,,,21750">新訊 2026-09-10</a></li>'
+            '<li><a href="index-1.asp?Parser=9,4,20,,,,21749">舊訊 2026-09-01</a></li>'
+            '<a rel="next" href="/news/index.asp?Parser=9,4,20,,,,,,,,2">下一頁</a>'
+        )
+        second = _page('<li><a href="index-1.asp?Parser=9,4,20,,,,21748">更早 2026-08-30</a></li>')
+        second_url = "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,20,,,,,,,,2"
+        with mock.patch.object(oc, "MAX_NEWS_LIST_PAGES", 1):
+            first_only, session = _collect("S-032", first, max_details=0)
+        self.assertEqual(first_only["window_completeness"], "PARTIAL")
+        self.assertEqual(session.fetched, [oc.NEWS_LIST_SOURCES["S-032"]["list_url"]])
+
+        complete, session = _collect("S-032", first, max_details=0, **{second_url: second})
+        self.assertEqual(complete["window_completeness"], "COMPLETE_WITH_ITEMS")
+        self.assertEqual(complete["window_item_count"], 1)
+        self.assertEqual(complete["snapshot_item_count"], 3)
+        self.assertEqual(session.fetched, [oc.NEWS_LIST_SOURCES["S-032"]["list_url"], second_url])
+        self.assertEqual([row["purpose"] for row in complete["snapshots"]], ["LIST", "LIST"])
+
+    def test_police_javascript_pager_uses_bounded_read_only_get(self):
+        first = _page(
+            '<li><a href="home.jsp?mcustomize=news_view.jsp&dataserno=1">115-09-10 新訊</a></li>'
+            '<li><a href="home.jsp?mcustomize=news_view.jsp&dataserno=2">115-09-01 舊訊</a></li>'
+            '<a href="javascript:list(2,1)">下一頁</a>'
+        )
+        second = _page('<li><a href="home.jsp?mcustomize=news_view.jsp&dataserno=3">115-08-30 更早</a></li>')
+        second_url = oc.NEWS_LIST_SOURCES["S-001"]["list_url"] + "&page=2&intpage=1"
+        result, session = _collect("S-001", first, max_details=0, **{second_url: second})
+        self.assertEqual(result["window_completeness"], "COMPLETE_WITH_ITEMS")
+        self.assertEqual(session.fetched[-1], second_url)
+
+    def test_unknown_date_and_unreadable_next_page_fail_closed(self):
+        undated = _page(
+            '<li><a href="index-1.asp?Parser=9,4,20,,,,21750">新訊 2026-09-10</a></li>'
+            '<li><a href="index-1.asp?Parser=9,4,20,,,,21749">日期不明</a></li>'
+            '<li><a href="index-1.asp?Parser=9,4,20,,,,21748">舊訊 2026-09-01</a></li>'
+        )
+        self.assertEqual(_collect("S-032", undated, max_details=0)[0]["window_completeness"], "PARTIAL")
+        otherwise_complete = _page(
+            '<li><a href="index-1.asp?Parser=9,4,20,,,,21750">新訊 2026-09-10</a></li>'
+            '<li><a href="index-1.asp?Parser=9,4,20,,,,21749">舊訊 2026-09-01</a></li>'
+        )
+        unsupported = otherwise_complete.replace(b"</ul>", b'<a href="javascript:loadMore()">Next</a></ul>')
+        self.assertEqual(_collect("S-032", unsupported, max_details=0)[0]["window_completeness"], "PARTIAL")
+
+    def test_repeated_page_and_cross_page_date_reversal_are_partial(self):
+        first = _page(
+            '<li><a href="index-1.asp?Parser=9,4,20,,,,21750">新訊 2026-09-10</a></li>'
+            '<li><a href="index-1.asp?Parser=9,4,20,,,,21749">舊訊 2026-09-01</a></li>'
+            '<a rel="next" href="/news/index.asp?Parser=9,4,20,,,,,,,,2">Next</a>'
+        )
+        second_url = "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,20,,,,,,,,2"
+        loop = _page(
+            '<li><a href="index-1.asp?Parser=9,4,20,,,,21748">更早 2026-08-30</a></li>'
+            '<a rel="next" href="/news/index.asp?Parser=9,4,20,,,,,,,,2">Next</a>'
+        )
+        reversal = _page('<li><a href="index-1.asp?Parser=9,4,20,,,,21748">亂序 2026-09-11</a></li>')
+        self.assertEqual(_collect("S-032", first, max_details=0, **{second_url: loop})[0]["window_completeness"], "PARTIAL")
+        self.assertEqual(_collect("S-032", first, max_details=0, **{second_url: reversal})[0]["window_completeness"], "PARTIAL")
+
+    def test_unapproved_next_page_is_rejected_before_fetch(self):
+        page = _page(
+            '<li><a href="index-1.asp?Parser=9,4,20,,,,21750">新訊 2026-09-10</a></li>'
+            '<a href="https://example.invalid/page2" rel="next">下一頁</a>'
+        )
+        with self.assertRaisesRegex(ValueError, "outside the approved source origin"):
+            _collect("S-032", page, max_details=0)
 
     def test_recent_only_and_non_monotonic_lists_are_partial(self):
         recent_only = _page(
