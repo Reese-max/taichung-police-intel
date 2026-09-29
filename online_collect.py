@@ -45,6 +45,7 @@ DETAIL_RECHECK_INTERVAL_HOURS = 24
 DETAIL_RECHECK_MAX_PER_RUN = 1
 REDIRECT_STATUSES = {301, 302, 303, 307, 308}
 MAX_REDIRECTS = 3
+MAX_NEWS_LIST_PAGES = 4
 API_S007 = "https://yishi.tccc.gov.tw/api/ProceedingsBackWeb/FrontList"
 API_S009 = "https://yishi.tccc.gov.tw/api/Proposal/FrontList"
 PARSER_VERSION = "p0-live-1"
@@ -464,6 +465,46 @@ def parse_news_list(html: bytes, base_url: str, id_pattern: str) -> list[dict]:
     return entries
 
 
+def next_news_list_page(html: bytes, base_url: str, source_id: str) -> tuple[str | None, bool]:
+    """Return a next-page URL and whether a next-page control exists.
+
+    The police list renders its pager as a JavaScript form submission, but its
+    page and intpage parameters also work with a read-only GET. Other sources
+    expose ordinary links. Unknown pager shapes must not imply a final page.
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    pager_hint = False
+    for anchor in soup.find_all(["a", "link"], href=True):
+        label = " ".join(anchor.stripped_strings).strip().lower()
+        title = str(anchor.get("title") or "").strip().lower()
+        aria_label = str(anchor.get("aria-label") or "").strip().lower()
+        rel = {str(value).lower() for value in anchor.get("rel", [])}
+        href = anchor["href"].strip()
+        if not ({label, title, aria_label} & {"下一頁", "下一页", "下頁", "下页", "next", "next page"} or "next" in rel):
+            if (
+                re.fullmatch(r"(?:第\s*)?\d{1,4}\s*(?:頁|页)?", label or title)
+                and (re.search(r"[?&]page=\d+", href, re.I) or re.search(r"javascript:\s*list\(", href, re.I))
+            ):
+                pager_hint = True
+            continue
+        if href.lower().startswith("javascript:"):
+            match = re.fullmatch(r"javascript:\s*list\((\d{1,4}),\s*(\d{1,4})\)\s*;?", href, re.I)
+            if source_id != "S-001" or not match or int(match.group(1)) < 1:
+                return None, True
+            parts = urllib.parse.urlsplit(base_url)
+            query = [
+                (key, value)
+                for key, value in urllib.parse.parse_qsl(parts.query, keep_blank_values=True)
+                if key.lower() not in {"page", "intpage"}
+            ]
+            query.extend((("page", match.group(1)), ("intpage", match.group(2))))
+            return urllib.parse.urlunsplit(parts._replace(query=urllib.parse.urlencode(query))), True
+        if not href or href.startswith("#"):
+            return None, True
+        return urllib.parse.urljoin(base_url, href), True
+    return None, pager_hint
+
+
 def parse_news_rss(xml: bytes, base_url: str) -> list[dict]:
     """Extract the official RSS list without treating a malformed item as zero."""
     try:
@@ -604,14 +645,43 @@ def collect_news_list(
     existing: dict[str, dict] | None = None,
     max_details: int | None = None,
 ) -> dict:
-    """Collect a candidate list with bounded detail-page requests."""
+    """Collect a candidate list with bounded list and detail-page requests."""
     config = NEWS_LIST_SOURCES[source_id]
-    listing = get(session, config["list_url"], source_id=source_id)
-    responses = [snapshot(listing, "LIST")]
+    responses = []
+    all_pages_seen = True
     if config.get("format") == "rss":
+        listing = get(session, config["list_url"], source_id=source_id)
+        responses.append(snapshot(listing, "LIST"))
         entries = parse_news_rss(listing.content, listing.url)
+        observed_entries = entries
     else:
-        entries = parse_news_list(listing.content, listing.url, config["id_pattern"])
+        entries = []
+        observed_entries = []
+        seen_keys = set()
+        seen_pages = set()
+        page_url = config["list_url"]
+        for _ in range(MAX_NEWS_LIST_PAGES):
+            if page_url in seen_pages:
+                all_pages_seen = False
+                break
+            seen_pages.add(page_url)
+            listing = get(session, page_url, source_id=source_id)
+            responses.append(snapshot(listing, "LIST"))
+            page_entries = parse_news_list(listing.content, listing.url, config["id_pattern"])
+            observed_entries.extend(page_entries)
+            for entry in page_entries:
+                if entry["stable_key"] not in seen_keys:
+                    entries.append(entry)
+                    seen_keys.add(entry["stable_key"])
+            next_url, has_next = next_news_list_page(listing.content, listing.url, source_id)
+            if not has_next:
+                break
+            if not next_url or next_url in seen_pages:
+                all_pages_seen = False
+                break
+            page_url = next_url
+        else:
+            all_pages_seen = False
     existing = existing or {}
     details_fetched = 0
     items = []
@@ -650,16 +720,17 @@ def collect_news_list(
             }
         )
 
-    dated = [date.fromisoformat(item["published_at"][:10]) for item in items if item["published_at"]]
+    dated = [entry["published"] for entry in observed_entries if entry["published"]]
     window_items = [
         item for item in items
         if item["published_at"] and start <= date.fromisoformat(item["published_at"][:10]) <= end
     ]
     reverse_chronological = all(left >= right for left, right in zip(dated, dated[1:]))
+    complete_list = all_pages_seen and len(dated) == len(observed_entries) and reverse_chronological
     reaches_before_window = bool(dated) and min(dated) < start
-    if window_items and reverse_chronological and reaches_before_window:
+    if window_items and complete_list and reaches_before_window:
         completeness = "COMPLETE_WITH_ITEMS"
-    elif dated and reverse_chronological and max(dated) < start:
+    elif dated and complete_list and max(dated) < start:
         completeness = "COMPLETE_ZERO"
     else:
         completeness = "PARTIAL"
