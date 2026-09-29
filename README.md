@@ -20,12 +20,12 @@
 
 Police policy and council-liaison staff must monitor scattered official pages, proposals, reports, meeting records, and videos. Finding what changed can take one to two hours, and a summary without a source locator is difficult to trust under questioning.
 
-This competition version focuses on one real task: preparing for a council question. It uses public information only and excludes internal duty data, emergency dispatch, 110 calls, case-level criminal data, personal data, and operational command functions.
+The deployed council prototype focuses on preparing for a council question. The 2026 GovIntel extension targets cross-agency public-event handoff, with the implementation and publication boundaries listed above. Both use public information only and exclude internal duty data, emergency dispatch, 110 calls, case-level criminal data, personal data, and operational command functions.
 
 ## What works
 
 - A focused council-preparation brief for a police policy user.
-- Five live official-source adapters with isolated failure handling.
+- Five official-source adapters with isolated failure handling; recent scheduled publication remains under [#20](https://github.com/Reese-max/taichung-police-intel/issues/20).
 - Source health kept separate from date-window completeness.
 - Intelligence-gap reasons instead of silently turning collection failure into zero results.
 - Last-known-good retained when a later source fetch fails.
