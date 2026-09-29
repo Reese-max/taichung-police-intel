@@ -5,6 +5,7 @@
 - required path/field、型別、pagination marker、resource ID、HTML selector/identity 與 CSV header 變更會產生 fingerprint 與 bounded receipt。
 - `CONTENT_SHAPE_UNKNOWN` 不再被當成可忽略狀態；空 resource、HTTP 200 錯誤 content type、無法解析 JSON/CSV 都需要人工覆核。
 - `BREAKING_DRIFT`、`SOURCE_UNAVAILABLE` 與 `CONTENT_SHAPE_UNKNOWN` 不會產生完整窗口成功；`update_state` 保留 last-known-good 與 fingerprint history。
+- 完成的 `--live` 與 `--input` 執行會一併持久化 receipt 和下一版 state；`--live-interrupted-receipt` 僅產生 fail-closed receipt，不覆寫 state。
 - receipt 的 `review_inbox` 由既有 `intel_v2.review` 投影到 system health，不自動改 parser 或 production canonical data。
 
 驗證：

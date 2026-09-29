@@ -192,6 +192,53 @@ class SchemaDriftTests(unittest.TestCase):
         self.assertEqual(saved["current"]["status"], "BREAKING_DRIFT")
         self.assertEqual(saved["history"][0]["observed_schema_fingerprint"], good["observed_schema_fingerprint"])
 
+    def test_successive_live_runs_persist_and_preserve_lkg_history(self):
+        good = {
+            "source_id": "S-007",
+            "body": json.dumps(API),
+            "content_type": "application/json",
+        }
+        unavailable = drift._failed_observation("S-007", ConnectionError("fixture unavailable"))
+
+        with tempfile.TemporaryDirectory() as directory:
+            state_path = Path(directory) / "state.json"
+            output_path = Path(directory) / "receipt.json"
+            # Scope this persistence regression to one representative contract so the first receipt is clean.
+            with mock.patch.dict(drift.CONTRACTS, {"S-007": drift.CONTRACTS["S-007"]}, clear=True):
+                with mock.patch.object(drift, "live_observations", side_effect=[[good], [unavailable]]):
+                    self.assertEqual(drift.main([
+                        "--live", "--state", str(state_path), "--output", str(output_path)
+                    ]), 0)
+                    first_state = json.loads(state_path.read_text(encoding="utf-8"))
+                    first_receipt = json.loads(output_path.read_text(encoding="utf-8"))
+                    self.assertEqual(drift.main([
+                        "--live", "--state", str(state_path), "--output", str(output_path)
+                    ]), 0)
+
+            saved_state = json.loads(state_path.read_text(encoding="utf-8"))
+            receipt = json.loads(output_path.read_text(encoding="utf-8"))
+            first_s007 = first_state["sources"]["S-007"]
+            saved_s007 = saved_state["sources"]["S-007"]
+            receipt_s007 = next(source for source in receipt["sources"] if source["source_id"] == "S-007")
+            first_receipt_s007 = next(source for source in first_receipt["sources"] if source["source_id"] == "S-007")
+            good_fingerprint = first_s007["current"]["observed_schema_fingerprint"]
+            self.assertEqual(first_s007["current"]["status"], "NO_DRIFT")
+            self.assertEqual(first_receipt_s007["status"], "NO_DRIFT")
+            self.assertEqual(first_receipt["overall"], "HEALTHY")
+            self.assertEqual(first_s007["history"], [])
+            self.assertEqual(first_s007["last_known_good"]["observed_schema_fingerprint"], good_fingerprint)
+            self.assertEqual(saved_s007["current"]["status"], "SOURCE_UNAVAILABLE")
+            self.assertEqual(
+                saved_s007["last_known_good"]["observed_schema_fingerprint"],
+                good_fingerprint,
+            )
+            self.assertEqual(
+                saved_s007["history"][0]["observed_schema_fingerprint"],
+                good_fingerprint,
+            )
+            self.assertEqual(receipt_s007["status"], "SOURCE_UNAVAILABLE")
+            self.assertEqual(receipt["overall"], "BLOCKED")
+
     def test_source_unavailable_is_not_an_empty_success(self):
         result = drift.observe(
             drift.CONTRACTS["S-009"], b"", http_status=503, content_type="application/json"
