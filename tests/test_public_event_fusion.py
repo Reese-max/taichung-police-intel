@@ -1,4 +1,5 @@
 import importlib.util
+import json
 from pathlib import Path
 import unittest
 
@@ -180,6 +181,21 @@ class PublicEventFusionTests(unittest.TestCase):
             fusion.fuse_documents([dict(source, agency_labels=["不存在機關"])], entity_registry=registry)
         with self.assertRaisesRegex(ValueError, "explicit registry binding"):
             fusion.fuse_documents([dict(source, entity_registry={"registry_version": 99, "registry_hash": "fake"})])
+
+    def test_named_event_label_requires_date_and_never_fuses_separate_occurrences(self):
+        registry = json.loads((ROOT / "tests/fixtures/entity-registry/false-positives.v1.json").read_text(encoding="utf-8"))
+        before = document("POLICE", day="2026-09-20", named=None)
+        after = document("TRAFFIC", day="2026-09-21", named=None)
+        for row, day in ((before, "2026-09-20"), (after, "2026-09-21")):
+            row.update(agency_ids=[], location_ids=[], jurisdiction="臺中市", named_event_label="市政論壇", named_event_date=day)
+        events = fusion.fuse_documents([before, after], entity_registry=registry)
+        self.assertEqual(len(events), 2)
+        self.assertEqual({event["named_event_id"] for event in events}, {"named_event:forum-0920", "named_event:forum-0921"})
+        self.assertEqual({event["entity_registry"]["registry_hash"] for event in events}, {fusion._load_entity_registry_module().registry_hash(registry)})
+        with self.assertRaisesRegex(ValueError, "event_date"):
+            fusion.bind_document_entities(dict(before, named_event_date=None), registry)
+        with self.assertRaisesRegex(ValueError, "conflicts"):
+            fusion.bind_document_entities(dict(before, named_event_id="named_event:forum-0921"), registry)
 
     def test_same_identity_with_district_conflict_stays_conflict(self):
         event = fusion.fuse_documents([document("POLICE"), document("TRAFFIC", district="location:tc-fengyuan")])[0]

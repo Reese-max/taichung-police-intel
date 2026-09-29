@@ -74,6 +74,31 @@ def bind_document_entities(document: dict[str, Any], registry: dict[str, Any]) -
                 raise ValueError(f"unresolved {kind} label: {label}")
             resolved.append(match["entity_id"])
         result[id_field] = sorted(set(existing + resolved))
+    named_label = result.pop("named_event_label", None)
+    named_date = result.pop("named_event_date", None)
+    named_jurisdiction = result.pop("named_event_jurisdiction", None)
+    if named_label is not None:
+        jurisdiction = named_jurisdiction or result.get("jurisdiction")
+        if not isinstance(jurisdiction, str) or not jurisdiction.strip() or not isinstance(named_date, str):
+            raise ValueError("named_event_label requires explicit jurisdiction and event_date")
+        match = module.resolve(registry, "named_event", named_label, jurisdiction, named_date)
+        if match["status"] != "RESOLVED":
+            raise ValueError(f"unresolved named_event label: {named_label}")
+        if result.get("named_event_id") and result["named_event_id"] != match["entity_id"]:
+            raise ValueError("named_event label conflicts with supplied entity ID")
+        result["named_event_id"] = match["entity_id"]
+    elif named_date is not None or named_jurisdiction is not None:
+        raise ValueError("named_event date/jurisdiction requires a label")
+    named_id = result.get("named_event_id")
+    if isinstance(named_id, str) and named_id.startswith("named_event:"):
+        active = {entity["entity_id"] for entity in registry["entities"] if entity["kind"] == "named_event"}
+        if named_id not in active:
+            raise ValueError("unknown named_event entity ID")
+    district_id = result.get("district_id")
+    if isinstance(district_id, str) and district_id.startswith("location:"):
+        active_locations = {entity["entity_id"] for entity in registry["entities"] if entity["kind"] == "location"}
+        if district_id not in active_locations:
+            raise ValueError("unknown district entity ID")
     result["entity_registry"] = module.registry_receipt(registry)
     return result
 

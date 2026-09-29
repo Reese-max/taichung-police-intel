@@ -13,6 +13,8 @@ import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from intel_v2.entity_binding import registry_runtime
+
 
 SCHEMA_VERSION = 1
 FEED_ID = "taiwan-intel-dashboard:govintel-discovery"
@@ -169,13 +171,50 @@ def _hash_fields(item: dict[str, Any], fields: tuple[str, ...]) -> str:
     return _digest({field: item.get(field) for field in fields})
 
 
-def candidate_from_item(feed: dict[str, Any], item: dict[str, Any], ttl_hours: int = 72) -> dict[str, Any]:
+def _candidate_entities(item: dict[str, Any], registry: dict[str, Any]) -> dict[str, Any]:
+    """Annotate radar hints only; these IDs never participate in official matching."""
+    module = registry_runtime()
+    receipt = module.registry_receipt(registry)
+    region = item.get("region")
+    jurisdiction = region if isinstance(region, str) and region.strip() else None
+    hints = item.get("entities")
+    if hints is not None and (not isinstance(hints, list) or len(hints) > 100
+                              or any(not isinstance(value, str) or not value.strip() or len(value) > 256 for value in hints)):
+        raise DiscoveryFeedError("entities hints must be a bounded string array or null")
+    agency_ids: set[str] = set()
+    location_ids: set[str] = set()
+    unresolved: list[str] = []
+    ambiguous: list[str] = []
+    names = list(hints or [])
+    if item["authority"] == "official" and isinstance(item.get("publisher_name"), str) and item["publisher_name"].strip():
+        names.append(item["publisher_name"])
+    for name in names:
+        matches = [module.resolve(registry, kind, name, jurisdiction) for kind in ("agency", "location")]
+        agency_ids.update(match["entity_id"] for match in matches if match["status"] == "RESOLVED" and match["kind"] == "agency")
+        location_ids.update(match["entity_id"] for match in matches if match["status"] == "RESOLVED" and match["kind"] == "location")
+        if any(match["status"] == "AMBIGUOUS" for match in matches):
+            ambiguous.append(name)
+        elif all(match["status"] == "NO_MATCH" for match in matches):
+            unresolved.append(name)
+    return {
+        **receipt,
+        "status": "CANDIDATE_ONLY",
+        "agency_ids": sorted(agency_ids),
+        "location_ids": sorted(location_ids),
+        "unresolved_hints": sorted(set(unresolved)),
+        "ambiguous_hints": sorted(set(ambiguous)),
+    }
+
+
+def candidate_from_item(feed: dict[str, Any], item: dict[str, Any], ttl_hours: int = 72,
+                        *, entity_registry: dict[str, Any] | None = None) -> dict[str, Any]:
     validated = validate_feed(feed)
     if not _is_int(ttl_hours) or ttl_hours < 1:
         raise ValueError("ttl_hours must be a positive integer")
     relevant, relevance_reason = _relevance(item)
     observed = _timestamp(item.get("observed_at"), "observed_at") or _timestamp(validated["generated_at"], "generated_at")
     status = "DISCOVERY_UNVERIFIED" if item["authority"] == "media" else "OFFICIAL_CANDIDATE"
+    registry = entity_registry if entity_registry is not None else registry_runtime().load_registry()
     return {
         "candidate_id": item["discovery_id"],
         "discovery_source": FEED_ID,
@@ -193,6 +232,7 @@ def candidate_from_item(feed: dict[str, Any], item: dict[str, Any], ttl_hours: i
         "original_source_identity": item.get("original_source_identity"),
         "rights_status": item["rights_status"],
         "candidate_hints": {"summary": item.get("summary"), "risk_level": item.get("risk_level"), "entities": item.get("entities"), "topic": item.get("topic")},
+        "candidate_entities": _candidate_entities(item, registry),
         "upstream_generation_id": generation_id(validated),
         "upstream_content_hash": validated["source_snapshot_hash"],
         "upstream_operating_state": validated["operating_state"],
@@ -295,10 +335,15 @@ def ingest_feed(
     ttl_hours: int = 72,
     max_candidates: int = 50,
     historical_replay: bool = False,
+    entity_registry: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Apply one full feed snapshot idempotently and return receipt plus state."""
 
     validated = validate_feed(feed)
+    module = registry_runtime()
+    registry = entity_registry if entity_registry is not None else module.load_registry()
+    module.validate_registry(registry)
+    registry_receipt = module.registry_receipt(registry)
     previous = _previous_state(previous_state)
     documents = official_documents or []
     _validate_official_documents(documents)
@@ -313,11 +358,12 @@ def ingest_feed(
         last_receipt = previous.get("last_receipt")
         if not isinstance(last_receipt, dict):
             raise DiscoveryFeedError("same generation has no replay receipt")
-        replay_receipt = dict(last_receipt)
-        replay_receipt["replayed"] = True
-        return {"state": previous, "candidates": list(previous.get("active_candidates", [])), "receipt": replay_receipt, "replayed": True}
+        if last_receipt.get("entity_registry") == registry_receipt:
+            replay_receipt = dict(last_receipt)
+            replay_receipt["replayed"] = True
+            return {"state": previous, "candidates": list(previous.get("active_candidates", [])), "receipt": replay_receipt, "replayed": True}
 
-    projected = [candidate_from_item(validated, item, ttl_hours) for item in validated["items"]]
+    projected = [candidate_from_item(validated, item, ttl_hours, entity_registry=registry) for item in validated["items"]]
     projected = [candidate for candidate in projected if candidate["relevant"]]
     projected.sort(key=lambda candidate: (candidate.get("event_time") is not None, candidate.get("event_time") or "", candidate["candidate_id"]), reverse=True)
     truncated = len(projected) > max_candidates
@@ -327,10 +373,14 @@ def ingest_feed(
     added: list[str] = []
     updated: list[str] = []
     presentation_only: list[str] = []
+    registry_rebound: list[str] = []
     verification_calls: list[str] = []
     for candidate in projected:
         old = previous_candidates.get(candidate["candidate_id"])
         change = classify_change(old, candidate)
+        if (old is not None and old.get("candidate_entities", {}).get("registry_hash")
+                != candidate["candidate_entities"]["registry_hash"]):
+            registry_rebound.append(candidate["candidate_id"])
         candidate["change_class"] = change
         if old is not None and change != "MATERIAL_DISCOVERY_CHANGE":
             candidate["verification_status"] = old.get("verification_status", candidate["verification_status"])
@@ -356,7 +406,8 @@ def ingest_feed(
     status = "PENDING_PUBLICATION" if new_events else "VERIFIED" if verified else "INGESTED"
     receipt = {
         "schema_version": 1,
-        "consumer_run_id": f"govintel-discovery:{current_generation}",
+        "entity_registry": registry_receipt,
+        "consumer_run_id": f"govintel-discovery:{current_generation}:{registry_receipt['registry_hash'][:16]}",
         "upstream_feed_id": FEED_ID,
         "upstream_generation_id": current_generation,
         "upstream_content_hash": validated["source_snapshot_hash"],
@@ -364,6 +415,7 @@ def ingest_feed(
         "candidate_added": added,
         "candidate_updated": updated,
         "presentation_only_updated": presentation_only,
+        "registry_rebound": registry_rebound,
         "candidate_retracted": [],
         "verification_calls": verification_calls,
         "relevant_count": len(candidates),

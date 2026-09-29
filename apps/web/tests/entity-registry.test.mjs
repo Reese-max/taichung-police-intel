@@ -26,7 +26,8 @@ function runPython(args) {
 test("entity registry runtime suite passes", () => {
   const result = runPython(["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_entity_registry.py", "-v"]);
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-  assert.match(result.stderr, /Ran 17 tests/);
+  const count = result.stderr.match(/\bRan (\d+) tests?\b/);
+  assert.ok(count && Number(count[1]) >= 17, result.stderr);
   assert.match(result.stderr, /OK/);
 });
 

@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from intel_v2.discovery_adapter import DiscoveryFeedError, classify_change, ingest_feed, load_feed, summarize_canary
+from intel_v2.entity_binding import registry_runtime
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -70,6 +71,33 @@ class DiscoveryAdapterTests(unittest.TestCase):
         older["generated_at"] = "2026-09-20T00:00:00Z"
         with self.assertRaisesRegex(DiscoveryFeedError, "out-of-order"):
             ingest_feed(older, previous_state=first["state"], now=NOW)
+
+    def test_candidate_entity_ids_are_scoped_and_never_become_official_evidence(self):
+        registry = json.loads((ROOT / "tests/fixtures/entity-registry/false-positives.v1.json").read_text(encoding="utf-8"))
+        feed = copy.deepcopy(self.feed)
+        feed["items"][0]["entities"] = ["中正路", "中市警"]
+        first = ingest_feed(feed, official_documents=[], now=NOW, entity_registry=registry)
+        media = next(row for row in first["candidates"] if row["authority"] == "media")
+        self.assertEqual(media["candidate_entities"]["location_ids"], ["location:tc-zhongzheng"])
+        self.assertEqual(media["candidate_entities"]["agency_ids"], ["agency:tc-police-fixture"])
+        self.assertEqual(media["candidate_entities"]["status"], "CANDIDATE_ONLY")
+        self.assertEqual(media["verification_status"], "NO_OFFICIAL_MATCH")
+        self.assertFalse(media["canonical_write"])
+        self.assertEqual(first["receipt"]["entity_registry"], registry_runtime().registry_receipt(registry))
+        second_registry = copy.deepcopy(registry)
+        second_registry["registry_version"] += 1
+        rebound = ingest_feed(feed, previous_state=first["state"], official_documents=[], now=NOW, entity_registry=second_registry)
+        self.assertFalse(rebound["replayed"])
+        self.assertNotEqual(first["receipt"]["consumer_run_id"], rebound["receipt"]["consumer_run_id"])
+        self.assertEqual(rebound["receipt"]["verification_calls"], [])
+        self.assertEqual(set(rebound["receipt"]["registry_rebound"]), {row["candidate_id"] for row in rebound["candidates"]})
+        unscoped = copy.deepcopy(feed)
+        unscoped["items"][0]["region"] = None
+        ambiguous = ingest_feed(unscoped, official_documents=[], now=NOW, entity_registry=registry)
+        media = next(row for row in ambiguous["candidates"] if row["authority"] == "media")
+        self.assertEqual(media["candidate_entities"]["agency_ids"], [])
+        self.assertEqual(media["candidate_entities"]["location_ids"], [])
+        self.assertEqual(media["candidate_entities"]["ambiguous_hints"], ["中市警", "中正路"])
 
     def test_schema_mismatch_and_upstream_gap_fail_closed(self):
         broken = copy.deepcopy(self.feed)
