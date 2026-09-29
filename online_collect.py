@@ -473,13 +473,20 @@ def next_news_list_page(html: bytes, base_url: str, source_id: str) -> tuple[str
     expose ordinary links. Unknown pager shapes must not imply a final page.
     """
     soup = BeautifulSoup(html, "html.parser")
-    for anchor in soup.find_all("a", href=True):
+    pager_hint = False
+    for anchor in soup.find_all(["a", "link"], href=True):
         label = " ".join(anchor.stripped_strings).strip().lower()
-        title = str(anchor.get("title") or anchor.get("aria-label") or "").strip().lower()
+        title = str(anchor.get("title") or "").strip().lower()
+        aria_label = str(anchor.get("aria-label") or "").strip().lower()
         rel = {str(value).lower() for value in anchor.get("rel", [])}
-        if not ({label, title} & {"下一頁", "下一页", "下頁", "下页", "next", "next page"} or "next" in rel):
-            continue
         href = anchor["href"].strip()
+        if not ({label, title, aria_label} & {"下一頁", "下一页", "下頁", "下页", "next", "next page"} or "next" in rel):
+            if (
+                re.fullmatch(r"(?:第\s*)?\d{1,4}\s*(?:頁|页)?", label or title)
+                and (re.search(r"[?&]page=\d+", href, re.I) or re.search(r"javascript:\s*list\(", href, re.I))
+            ):
+                pager_hint = True
+            continue
         if href.lower().startswith("javascript:"):
             match = re.fullmatch(r"javascript:\s*list\((\d{1,4}),\s*(\d{1,4})\)\s*;?", href, re.I)
             if source_id != "S-001" or not match or int(match.group(1)) < 1:
@@ -495,7 +502,7 @@ def next_news_list_page(html: bytes, base_url: str, source_id: str) -> tuple[str
         if not href or href.startswith("#"):
             return None, True
         return urllib.parse.urljoin(base_url, href), True
-    return None, False
+    return None, pager_hint
 
 
 def parse_news_rss(xml: bytes, base_url: str) -> list[dict]:

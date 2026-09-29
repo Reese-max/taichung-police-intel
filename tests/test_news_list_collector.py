@@ -250,6 +250,8 @@ class ListFirstGatingTests(unittest.TestCase):
         )
         unsupported = otherwise_complete.replace(b"</ul>", b'<a href="javascript:loadMore()">Next</a></ul>')
         self.assertEqual(_collect("S-032", unsupported, max_details=0)[0]["window_completeness"], "PARTIAL")
+        numbered_only = otherwise_complete.replace(b"</ul>", b'<a href="?Page=2">2</a></ul>')
+        self.assertEqual(_collect("S-032", numbered_only, max_details=0)[0]["window_completeness"], "PARTIAL")
 
     def test_repeated_page_and_cross_page_date_reversal_are_partial(self):
         first = _page(
