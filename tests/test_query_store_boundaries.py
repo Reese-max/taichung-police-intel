@@ -21,7 +21,18 @@ class QueryBoundaryTests(unittest.TestCase):
         self.feed, fh = qs.load_json(qs.DEFAULT_FEED)
         self.status, sh = qs.load_json(qs.DEFAULT_STATUS)
         self.brief, bh = qs.load_json(qs.DEFAULT_BRIEF)
+        run_id = self.status["latest_collection_run"]["collection_run_id"]
+        self.status["latest_collection_run"]["status"] = "SUCCEEDED"
+        self.feed["collection_run_id"] = run_id
+        self.feed["generated_at"] = self.status["generated_at"]
+        self.brief["source_collection_run_id"] = run_id
+        self.brief["source_status_generated_at"] = self.status["generated_at"]
+        self.brief["publication_status"] = "READY"
+        self.brief["snapshot_complete"] = True
         for source in self.status["sources"]:
+            source["source_health"] = "PASS"
+            source["window_completeness"] = "COMPLETE_ZERO"
+            source["result"] = "NO_NEW_ITEM"
             source["freshness_status"] = "FRESH"
         self.hashes = {'feed': fh, 'status': sh, 'brief': bh}
         self.now = max(qs.instant(d['generated_at']) for d in (self.feed, self.status, self.brief)) + timedelta(minutes=1)

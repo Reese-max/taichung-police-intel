@@ -31,6 +31,25 @@ def complete_publication(overrides=None):
     return rows
 
 
+def controlled_publication_inputs():
+    """Keep state-machine tests independent of the scheduled live collection."""
+    status = json.loads(health.DEFAULT_STATUS.read_text(encoding="utf-8"))
+    brief = json.loads(health.DEFAULT_BRIEF.read_text(encoding="utf-8"))
+    run = status["latest_collection_run"]
+    run["collection_run_id"] = "TEST-COLLECTION-RUN"
+    run["status"] = "SUCCEEDED"
+    for source in status["sources"]:
+        source["source_health"] = "PASS"
+        source["window_completeness"] = "COMPLETE_ZERO"
+        source["freshness_status"] = "FRESH"
+        source["last_success_at"] = "2026-09-11T08:23:26+08:00"
+    brief["publication_status"] = "READY"
+    brief["snapshot_complete"] = True
+    brief["source_collection_run_id"] = run["collection_run_id"]
+    brief["source_status_generated_at"] = status["generated_at"]
+    return status, brief
+
+
 class SystemHealthTests(unittest.TestCase):
     def test_unchanged_health_receipt_keeps_windows_checkout_timestamp(self):
         text = '{\n  "overall": "UNKNOWN"\n}\n'
@@ -101,8 +120,7 @@ class SystemHealthTests(unittest.TestCase):
             health.build_health([stage("publication", "collection", "SUCCESS", ended_at="not-a-time")])
 
     def test_succeeded_run_with_empty_sources_is_partial_not_success(self):
-        status = json.loads(health.DEFAULT_STATUS.read_text(encoding="utf-8"))
-        brief = json.loads(health.DEFAULT_BRIEF.read_text(encoding="utf-8"))
+        status, brief = controlled_publication_inputs()
         status["latest_collection_run"]["status"] = "SUCCEEDED"
         status["sources"] = []
         stages = health.current_publication_stages(status, brief)
@@ -111,8 +129,7 @@ class SystemHealthTests(unittest.TestCase):
         self.assertEqual(collection["error_class"], "SOURCE_COVERAGE_OR_COLLECTION_GAP")
 
     def test_stale_brief_from_another_run_is_not_validation_success(self):
-        status = json.loads(health.DEFAULT_STATUS.read_text(encoding="utf-8"))
-        brief = json.loads(health.DEFAULT_BRIEF.read_text(encoding="utf-8"))
+        status, brief = controlled_publication_inputs()
         status["latest_collection_run"]["status"] = "SUCCEEDED"
         brief["publication_status"] = "READY"
         brief["snapshot_complete"] = True
@@ -132,8 +149,7 @@ class SystemHealthTests(unittest.TestCase):
             "UNKNOWN": "UNKNOWN",
         }.items():
             with self.subTest(freshness=freshness):
-                status = json.loads(health.DEFAULT_STATUS.read_text(encoding="utf-8"))
-                brief = json.loads(health.DEFAULT_BRIEF.read_text(encoding="utf-8"))
+                status, brief = controlled_publication_inputs()
                 status["latest_collection_run"]["status"] = "SUCCEEDED"
                 for source in status["sources"]:
                     source["freshness_status"] = freshness
@@ -144,8 +160,7 @@ class SystemHealthTests(unittest.TestCase):
                 self.assertEqual(collection["outcome"], expected)
 
     def test_collection_uses_source_policy_freshness_normalization(self):
-        status = json.loads(health.DEFAULT_STATUS.read_text(encoding="utf-8"))
-        brief = json.loads(health.DEFAULT_BRIEF.read_text(encoding="utf-8"))
+        status, brief = controlled_publication_inputs()
         status["latest_collection_run"]["status"] = "SUCCEEDED"
         for source in status["sources"]:
             source["freshness_status"] = " stale "
@@ -156,10 +171,7 @@ class SystemHealthTests(unittest.TestCase):
         self.assertEqual(collection["outcome"], "STALE")
 
     def test_collection_keeps_last_known_success_when_current_sources_are_stale(self):
-        if os.getenv("GOVINTEL_PUBLICATION_WORKFLOW") == "1":
-            self.skipTest("Pages publication uses generated data, not the checked-in fixture snapshot")
-        status = json.loads(health.DEFAULT_STATUS.read_text(encoding="utf-8"))
-        brief = json.loads(health.DEFAULT_BRIEF.read_text(encoding="utf-8"))
+        status, brief = controlled_publication_inputs()
         for source in status["sources"]:
             source["freshness_status"] = "STALE"
         collection = next(
@@ -167,11 +179,11 @@ class SystemHealthTests(unittest.TestCase):
             if row["stage"] == "collection"
         )
         self.assertEqual(collection["outcome"], "STALE")
-        self.assertEqual(collection["last_success_at"], "2026-09-11T08:23:26+08:00")
+        self.assertEqual(collection["last_success_at"], health.aggregate_last_success_at(status["sources"]))
 
     def test_collection_last_success_stays_unknown_when_any_source_lacks_it(self):
-        status = json.loads(health.DEFAULT_STATUS.read_text(encoding="utf-8"))
-        brief = json.loads(health.DEFAULT_BRIEF.read_text(encoding="utf-8"))
+        status, brief = controlled_publication_inputs()
+        status["latest_collection_run"]["status"] = "PARTIAL"
         status["sources"][0].pop("last_success_at", None)
         collection = next(
             row for row in health.current_publication_stages(status, brief)
@@ -180,8 +192,7 @@ class SystemHealthTests(unittest.TestCase):
         self.assertIsNone(collection["last_success_at"])
 
     def test_stale_source_cannot_become_healthy_with_complete_publication_receipt(self):
-        status = json.loads(health.DEFAULT_STATUS.read_text(encoding="utf-8"))
-        brief = json.loads(health.DEFAULT_BRIEF.read_text(encoding="utf-8"))
+        status, brief = controlled_publication_inputs()
         status["latest_collection_run"]["status"] = "SUCCEEDED"
         for source in status["sources"]:
             source["freshness_status"] = "STALE"
@@ -196,8 +207,7 @@ class SystemHealthTests(unittest.TestCase):
         self.assertNotEqual(result["overall"], "HEALTHY")
 
     def test_no_data_source_cannot_become_healthy_with_complete_publication_receipt(self):
-        status = json.loads(health.DEFAULT_STATUS.read_text(encoding="utf-8"))
-        brief = json.loads(health.DEFAULT_BRIEF.read_text(encoding="utf-8"))
+        status, brief = controlled_publication_inputs()
         status["latest_collection_run"]["status"] = "SUCCEEDED"
         for source in status["sources"]:
             source["freshness_status"] = "NO_DATA"
@@ -212,6 +222,8 @@ class SystemHealthTests(unittest.TestCase):
         self.assertNotEqual(result["overall"], "HEALTHY")
 
     def test_checked_in_current_artifacts_produce_machine_readable_stage_breakdown(self):
+        if os.getenv("GOVINTEL_PUBLICATION_WORKFLOW") == "1":
+            self.skipTest("Pages publication tests use generated artifacts, not the checked-in snapshot")
         result = health.load_current()
         self.assertEqual(result["schema_version"], 1)
         names = {(row["lane"], row["stage"]) for row in result["stages"]}
