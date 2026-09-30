@@ -1,0 +1,27 @@
+{
+  "anonymous_http_verified_at": null,
+  "artifact_hashes": {
+    "brief": "3df565c29622ae729f0f053712f513eddacf6e014aeec227ddd664dd00b38448",
+    "feed": "f88408f49f444de0dd3a16fc864d96d9318eefc0c78f69e5d2923a9872f35121",
+    "source_policy": "fbabf0752ec0fea4d915030562980e2374ee2f436aa63b4d73e03cd3d9592fea",
+    "status": "1876845d854d4387fccee398fefcdebb395a36d0343d7bd2690226dc7020c51b"
+  },
+  "built_at": "2026-09-30T00:00:00Z",
+  "code_sha": "639697c815fe6fa48fca5022a0d410662d9a59c7",
+  "deployed_at": null,
+  "evidence_catalog_hash": "36ee8121f66175ac745ca979ac154a5e3970a22b9a51dd856fc8f1fb2f85d5f0",
+  "kind": "GOVINTEL_RELEASE_MANIFEST",
+  "pages_deployment": {
+    "deployment_id": "base-fixture",
+    "provider": "github-pages",
+    "status": "PENDING",
+    "url": "https://reese-max.github.io/taichung-police-intel"
+  },
+  "publication_generation": "CR-DEMO-20260911-MORNING-SCHEDULE",
+  "publication_hash": "3df565c29622ae729f0f053712f513eddacf6e014aeec227ddd664dd00b38448",
+  "query_generation": "b34349542bb4f756d5838e3b5b4927082704d989db0f7b33767eee3a5beb980f",
+  "release_id": "6ae5a7c112275ba130618f517c5cf97e5720d141a0bd2f67fa5b9bce0121d692",
+  "schema_version": 1,
+  "source_policy_hash": "1387c7e5a15c2fc0a07b6881b0ee40f70e789fcbe01862d9834bfe9b079464d5",
+  "worker_version": "query-gateway-v1-workers"
+}

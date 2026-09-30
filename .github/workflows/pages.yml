@@ -198,6 +198,13 @@ jobs:
         id: pages
         uses: actions/configure-pages@v6
 
+      - name: Build release manifest
+        run: |
+          python -X utf8 scripts/release-manifest.py build \
+            --code-sha "${GITHUB_SHA}" \
+            --pages-url "https://reese-max.github.io/taichung-police-intel" \
+            --deployment-id "${GITHUB_RUN_ID}"
+
       - name: Run full verification gate and build static site
         id: verify
         shell: bash
@@ -238,6 +245,7 @@ jobs:
             apps/web/public/data/v2-daily-brief.json
             apps/web/public/data/system-health.json
             apps/web/public/data/schema-drift.json
+            apps/web/public/data/release.json
             state/v2-shadow-state.json
             state/schema-drift-state.json
             state/v2-handoff-state.json

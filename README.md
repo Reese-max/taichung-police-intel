@@ -14,6 +14,7 @@ The demo compresses official Taichung council and government sources into one wo
 | Shared source policy, query coverage, official document replay, Dashboard discovery adapter | `IMPLEMENTED_NOT_PRODUCTION` | Local deterministic tests and receipts; no scheduled activation or public deployment claim |
 | S-001/S-019/S-031/S-032/S-033 source expansion | `CANDIDATE_CANARY` | List/live adapters and fixtures exist; live seven-day promotion evidence remains open under #14/#22 |
 | PublicEvent fusion and NPA source matrix | `IMPLEMENTED_NOT_PRODUCTION` | Conservative core and offline fixtures; no live collector/UI write path |
+| Pages/Worker release manifest binding | `IMPLEMENTED_NOT_PRODUCTION` | `data/release.json` binds artifact, policy, query, evidence, and code hashes; live deployment fields remain receipt-driven |
 | Bounded public live-meeting session and post-event reconciliation core | `IMPLEMENTED_NOT_PRODUCTION` | `python scripts/live-meeting.py self-check`; fixture-only state machine, no live provider transport or unattended ASR |
 | Twinkle/public API overlay and full cross-agency real-time coverage | `DESIGN_ONLY` | Strategy and candidate metadata only; no automatic promotion |
 | Scheduled publication merge, natural MORNING/EVENING proof, current anonymous hash check | `BLOCKED` | #20 still needs normal review/merge and real production evidence |
@@ -172,6 +173,8 @@ The command uses the durable `state/v2-handoff-state.json`, makes repeated watch
 
 The saved [system-health.json](./apps/web/public/data/system-health.json) exposes the publication, query, and discovery lanes plus stage-level outcomes. `STALE` and `UNKNOWN` are intentional evidence states; they are not deployment or public-reachability claims.
 
+The [release manifest](./apps/web/public/data/release.json) is the machine-readable Pages/Worker binding. It is rebuilt by the Pages workflow from the generated publication bytes; a checked-in `PENDING` manifest is only a deterministic fixture. See [Issue #62 production closure](./docs/govintel/issue-62-production-closure.md) for the evidence boundary and the live receipts still required.
+
 Because GitHub Pages is a static export, `/api/health.json` does not freeze a
 build-time `ok` result as current health; it returns `UNKNOWN` unless a caller
 provides a request-time clock. The browser dashboard performs the current
@@ -208,6 +211,12 @@ The read-only Taiwan Intel Dashboard discovery consumer is replayable with `pyth
 The `publication-state` checkpoint lifecycle is now part of `main`; deployment
 still requires a successful Pages workflow and anonymous HTTPS readback.
 
+The Pages workflow emits `data/release.json` before the static build. The
+Worker rejects mixed artifact, policy, query-generation, evidence-catalog, or
+Worker-version bindings before exposing its read-only query surface. This
+contract makes a release mismatch visible as an unavailable query service;
+it does not claim that an actual deployment or anonymous smoke has run.
+
 After the repository is public, enable Pages with **Source: GitHub Actions**. The deployed demo and repository URLs are recorded in [SUBMISSION.md](./SUBMISSION.md). A workflow file is not deployment evidence; acceptance requires an anonymous HTTPS check.
 
 Repository: `https://github.com/Reese-max/taichung-police-intel`
@@ -231,6 +240,7 @@ npm run check
 
 ```bash
 python scripts/schema_drift.py --self-check
+python3 scripts/release-manifest.py verify apps/web/public/data/release.json
 ```
 
 Expected final line:

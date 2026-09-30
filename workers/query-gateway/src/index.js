@@ -16,6 +16,7 @@ const RETENTION_POLICY = {
 const MAX_RATE = 60;
 const rateWindows = new Map();
 let snapshotCache = null;
+const RELEASE_MANIFEST_NAME = "release.json";
 
 const CAPABILITY_DEFINITIONS = [
   ["publication_metadata", "只代表 policy 中已啟用來源，不代表世界完整性。", () => true],
@@ -143,6 +144,33 @@ function validatePolicy(policy) {
   assertHash(policy.catalog_hash, "catalog_hash");
 }
 
+async function validateReleaseManifest(release) {
+  if (!release || release.schema_version !== 1 || release.kind !== "GOVINTEL_RELEASE_MANIFEST") throw new Error("invalid release manifest");
+  for (const field of ["release_id", "publication_hash", "source_policy_hash", "query_generation", "evidence_catalog_hash"]) assertHash(release[field], `release.${field}`);
+  if (typeof release.code_sha !== "string" || !/^[a-f0-9]{40}$/.test(release.code_sha)) throw new Error("release.code_sha is invalid");
+  if (typeof release.publication_generation !== "string" || !release.publication_generation) throw new Error("release.publication_generation is missing");
+  if (typeof release.worker_version !== "string" || !release.worker_version) throw new Error("release.worker_version is missing");
+  if (!release.pages_deployment || typeof release.pages_deployment !== "object" || typeof release.pages_deployment.status !== "string") throw new Error("release.pages_deployment is invalid");
+  if (typeof release.built_at !== "string" || !Number.isFinite(parseInstant(release.built_at))) throw new Error("release.built_at is invalid");
+  for (const field of ["deployed_at", "anonymous_http_verified_at"]) {
+    if (release[field] !== null && (typeof release[field] !== "string" || !Number.isFinite(parseInstant(release[field])))) throw new Error(`release.${field} is invalid`);
+  }
+  const artifactHashes = release.artifact_hashes;
+  if (!artifactHashes || typeof artifactHashes !== "object") throw new Error("release.artifact_hashes is missing");
+  for (const field of ["feed", "status", "brief", "source_policy"]) assertHash(artifactHashes[field], `release.artifact_hashes.${field}`);
+  const identity = {
+    code_sha: release.code_sha,
+    publication_generation: release.publication_generation,
+    publication_hash: release.publication_hash,
+    source_policy_hash: release.source_policy_hash,
+    query_generation: release.query_generation,
+    evidence_catalog_hash: release.evidence_catalog_hash,
+    worker_version: release.worker_version,
+  };
+  if (release.release_id !== await sha256(canonicalJson(identity))) throw new Error("release_id does not match the release identity");
+  return release;
+}
+
 async function fetchJson(origin, name) {
   const url = `${origin.replace(/\/$/, "")}/data/${name}`;
   const response = await fetch(url, { cf: { cacheTtl: 30, cacheEverything: true } });
@@ -155,16 +183,18 @@ async function fetchJson(origin, name) {
 async function buildSnapshot(env) {
   const origin = env.PUBLIC_ORIGIN;
   if (!origin) throw new Error("PUBLIC_ORIGIN is not configured");
-  const [feedDoc, statusDoc, briefDoc, policyDoc] = await Promise.all([
+  const [feedDoc, statusDoc, briefDoc, policyDoc, releaseDoc] = await Promise.all([
     fetchJson(origin, "intelligence-feed.json"),
     fetchJson(origin, "source-status.json"),
     fetchJson(origin, "v2-daily-brief.json"),
     fetchJson(origin, "source-policy.json"),
+    fetchJson(origin, RELEASE_MANIFEST_NAME),
   ]);
   const feed = feedDoc.value;
   const status = statusDoc.value;
   const brief = briefDoc.value;
   const policy = policyDoc.value;
+  const release = await validateReleaseManifest(releaseDoc.value);
   if (![feed, status, brief].every((value) => value?.schema_version === 1)) throw new Error("unsupported publication schema");
   validatePolicy(policy);
   const run = feed.collection_run_id;
@@ -204,7 +234,17 @@ async function buildSnapshot(env) {
     publication_status: brief.publication_status,
     snapshot_complete: brief.snapshot_complete,
   };
-  return { feed, status, brief, policy, policyBinding, capabilityDefinitions: makeCapabilities(policy), items, sources, generatedFrom, generationId };
+  const value = { feed, status, brief, policy, policyBinding, capabilityDefinitions: makeCapabilities(policy), items, sources, generatedFrom, generationId, releaseManifest: release };
+  const stableEvidenceCatalog = trustedEvidence(value).map(({ is_current: _isCurrent, ...entry }) => entry);
+  const stableEvidenceCatalogHash = await sha256(canonicalJson(stableEvidenceCatalog));
+  if (release.artifact_hashes.feed !== feedDoc.hash || release.artifact_hashes.status !== statusDoc.hash ||
+      release.artifact_hashes.brief !== briefDoc.hash || release.artifact_hashes.source_policy !== policyDoc.hash ||
+      release.publication_generation !== run || release.publication_hash !== briefDoc.hash ||
+      release.source_policy_hash !== policy.policy_hash || release.query_generation !== generationId ||
+      release.evidence_catalog_hash !== stableEvidenceCatalogHash || release.worker_version !== SERVER_VERSION) {
+    throw new Error("release manifest binding mismatch");
+  }
+  return value;
 }
 
 async function getSnapshot(env) {
@@ -378,7 +418,8 @@ function envelope(snapshot, tool, args, scope, payload, resultCount = 0, truncat
     queried_at: isoNow(), freshness: freshness(scope.dataStatus), verification_summary: verificationSummary(scope.dataStatus),
     event_ids: [], evidence_ids: [], source_gaps: scope.gaps, query_coverage: scope.coverage,
     discovery_unverified_count: 0, truncated, policy: snapshot.policyBinding, retention: RETENTION_POLICY, result_type: resultType,
-    receipt: { schema_version: 1, tool_name: tool, arguments_sha256: null, publication_hash: snapshot.generatedFrom.brief_sha256, query_generation_id: snapshot.generationId, result_count: resultCount, truncated, server_version: SERVER_VERSION, issued_at: isoNow() },
+    release_id: snapshot.releaseManifest.release_id,
+    receipt: { schema_version: 1, tool_name: tool, arguments_sha256: null, publication_hash: snapshot.generatedFrom.brief_sha256, query_generation_id: snapshot.generationId, release_id: snapshot.releaseManifest.release_id, result_count: resultCount, truncated, server_version: SERVER_VERSION, issued_at: isoNow() },
     ...payload,
   };
 }
@@ -409,7 +450,7 @@ async function execute(snapshot, tool, rawArgs = {}) {
   }
   if (tool === "get_publication_receipt") {
     const publication = snapshot.generatedFrom;
-    const publicationReceipt = { schema_version: 1, receipt_type: "PUBLICATION_PROJECTION", publication_id: publication.collection_run_id, publication_hash: publication.brief_sha256, generation_id: snapshot.generationId, artifact_hashes: { feed: publication.feed_sha256, status: publication.status_sha256, brief: publication.brief_sha256 }, generated_at: publication.brief_generated_at, collection_status: publication.collection_status, publication_status: publication.publication_status, snapshot_complete: publication.snapshot_complete, freshness: freshness(scope.dataStatus), current_as_of_server_clock: scope.dataStatus === "SNAPSHOT_RECENT", source_gaps: scope.gaps, policy_hash: snapshot.policyBinding.policy_hash };
+    const publicationReceipt = { schema_version: 1, receipt_type: "PUBLICATION_PROJECTION", release_id: snapshot.releaseManifest.release_id, code_sha: snapshot.releaseManifest.code_sha, publication_id: publication.collection_run_id, publication_hash: publication.brief_sha256, generation_id: snapshot.generationId, artifact_hashes: { feed: publication.feed_sha256, status: publication.status_sha256, brief: publication.brief_sha256 }, generated_at: publication.brief_generated_at, collection_status: publication.collection_status, publication_status: publication.publication_status, snapshot_complete: publication.snapshot_complete, freshness: freshness(scope.dataStatus), current_as_of_server_clock: scope.dataStatus === "SNAPSHOT_RECENT", source_gaps: scope.gaps, policy_hash: snapshot.policyBinding.policy_hash };
     return { ...envelope(snapshot, tool, args, scope, { publication_receipt: publicationReceipt }, 1, false, "publication_receipt"), receipt: { ...envelope(snapshot, tool, args, scope, {}, 1).receipt, arguments_sha256: argumentsHash } };
   }
   if (tool === "get_source_health") {
@@ -489,9 +530,9 @@ export default {
       const snapshot = await getSnapshot(env);
       if (request.method === "GET" && url.pathname === "/health") {
         const scope = assessScope(snapshot);
-        return responseJson({ schema_version: 1, service: "govintel-query-gateway", server_version: SERVER_VERSION, status: "ok", publication_freshness: freshness(scope.dataStatus), publication_id: snapshot.generatedFrom.collection_run_id, publication_hash: snapshot.generatedFrom.brief_sha256, query_coverage: queryCoverage(snapshot, "publication_metadata"), policy: snapshot.policyBinding, retention: RETENTION_POLICY, source_gaps: scope.gaps, read_only: true }, 200, request, env);
+        return responseJson({ schema_version: 1, service: "govintel-query-gateway", server_version: SERVER_VERSION, status: "ok", release_id: snapshot.releaseManifest.release_id, code_sha: snapshot.releaseManifest.code_sha, publication_freshness: freshness(scope.dataStatus), publication_id: snapshot.generatedFrom.collection_run_id, publication_hash: snapshot.generatedFrom.brief_sha256, query_generation: snapshot.generationId, query_coverage: queryCoverage(snapshot, "publication_metadata"), policy: snapshot.policyBinding, retention: RETENTION_POLICY, source_gaps: scope.gaps, read_only: true }, 200, request, env);
       }
-      if (request.method === "GET" && url.pathname === "/capabilities") return responseJson({ schema_version: 1, server_version: SERVER_VERSION, read_only: true, capabilities: ["search_evidence", "get_current_brief", "get_publication_receipt", "get_source_health", "validate_answer"], unavailable_capabilities: DOMAIN_CAPABILITIES, policy: snapshot.policyBinding, retention: RETENTION_POLICY }, 200, request, env);
+      if (request.method === "GET" && url.pathname === "/capabilities") return responseJson({ schema_version: 1, server_version: SERVER_VERSION, release_id: snapshot.releaseManifest.release_id, read_only: true, capabilities: ["search_evidence", "get_current_brief", "get_publication_receipt", "get_source_health", "validate_answer"], unavailable_capabilities: DOMAIN_CAPABILITIES, policy: snapshot.policyBinding, retention: RETENTION_POLICY }, 200, request, env);
       if (request.method !== "POST" || !["/query", "/mcp"].includes(url.pathname)) return responseJson(jsonError("NOT_FOUND", "route not found"), 404, request, env);
       const bytes = await request.arrayBuffer();
       if (bytes.byteLength > MAX_REQUEST_BYTES) return responseJson(jsonError("REQUEST_TOO_LARGE", "request exceeds byte budget"), 413, request, env);

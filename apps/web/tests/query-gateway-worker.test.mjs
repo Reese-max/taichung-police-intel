@@ -12,7 +12,7 @@ const env = { PUBLIC_ORIGIN: origin, ALLOWED_ORIGINS: "https://reese-max.github.
 test("Worker search applies q and preserves official evidence and publication binding", async () => {
   const originalFetch = globalThis.fetch;
   const bytes = Object.fromEntries(await Promise.all(
-    ["intelligence-feed.json", "source-status.json", "v2-daily-brief.json", "source-policy.json"]
+    ["intelligence-feed.json", "source-status.json", "v2-daily-brief.json", "source-policy.json", "release.json"]
       .map(async name => [name, await readFile(new URL(name, base))]),
   ));
   globalThis.fetch = async url => {
@@ -64,6 +64,31 @@ test("Worker search applies q and preserves official evidence and publication bi
     const mismatch = await query("search_evidence", { q: item.stable_id, expected_generation: "wrong-generation" });
     assert.equal(mismatch.status, 400);
     assert.equal(mismatch.body.error.code, "INVALID_ARGUMENTS");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Worker refuses a release manifest with a mixed publication generation", async () => {
+  const originalFetch = globalThis.fetch;
+  const bytes = Object.fromEntries(await Promise.all(
+    ["intelligence-feed.json", "source-status.json", "v2-daily-brief.json", "source-policy.json", "release.json"]
+      .map(async name => [name, await readFile(new URL(name, base))]),
+  ));
+  const release = JSON.parse(bytes["release.json"].toString("utf8"));
+  release.publication_generation = "mixed-generation";
+  bytes["release.json"] = Buffer.from(JSON.stringify(release));
+  globalThis.fetch = async url => {
+    const name = new URL(url).pathname.split("/").at(-1);
+    return new Response(bytes[name], { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+  try {
+    const isolatedWorker = (await import("../../../workers/query-gateway/src/index.js?mixed-release" + Date.now())).default;
+    const response = await isolatedWorker.fetch(new Request("https://govintel-query-gateway.example/health"), env);
+    const payload = await response.json();
+    assert.equal(response.status, 503);
+    assert.equal(payload.error.code, "UPSTREAM_UNAVAILABLE");
+    assert.match(payload.error.message, /release_id does not match/);
   } finally {
     globalThis.fetch = originalFetch;
   }
