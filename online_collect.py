@@ -1337,13 +1337,17 @@ def project_feed_item(
     data_as_of: str | None,
     fetched_at: str,
     previous_sha256s: set[str],
+    *,
+    baseline_only: bool = False,
 ) -> dict:
     """Project a raw collector item into a safe feed item for the homepage."""
     stable_key_hash = canonical_sha256(f"{source_id}:{item['stable_key']}")[:16]
     stable_id = f"FEED-{source_id}-{stable_key_hash}"
 
     # Determine change type
-    if item["content_sha256"] in previous_sha256s:
+    if baseline_only:
+        change_type = "CONFIRMED"
+    elif item["content_sha256"] in previous_sha256s:
         # Item content is identical to prior feed. However, if the source is
         # confirmed FRESH and healthy, mark as CONFIRMED (still active/valid)
         # rather than UNCHANGED (implies stale repetition).
@@ -1375,7 +1379,9 @@ def project_feed_item(
         title = title[:197] + "…"
 
     # Eligibility rules — order matters: most restrictive first
-    if change_type == "UNCHANGED":
+    if baseline_only:
+        eligibility = "INELIGIBLE_BASELINE"
+    elif change_type == "UNCHANGED":
         eligibility = "INELIGIBLE_UNCHANGED"
     elif source_health == "FAILED":
         eligibility = "INELIGIBLE_SOURCE_FAILED"
@@ -1398,6 +1404,8 @@ def project_feed_item(
         reason_codes.append("POLICY_CHANGE")
     elif source_id in ("S-029",):
         reason_codes.append("CROSS_SOURCE")
+    if baseline_only:
+        reason_codes.append("FIRST_OBSERVATION_BASELINE")
     if not reason_codes:
         reason_codes.append("HIGH_VALUE")
 
@@ -1661,6 +1669,7 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
         source_run_id = f"SR-DEMO-{slot_date:%Y%m%d}-{slot}-{source_id[2:]}"
         previous = prior_sources.get(source_id, {})
         previous_lkg = previous.get("last_known_good")
+        baseline_only = previous_lkg is None
         collected_items = []
         try:
             collected = collect_source(session, source_id, window_start.date(), window_end.date())
@@ -1682,7 +1691,7 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
                 else:
                     data_as_of = previous.get("data_as_of")
             manifest_changed = collected["manifest_sha256"] != previous.get("manifest_sha256")
-            change_count = collected["window_item_count"] if manifest_changed else 0
+            change_count = collected["window_item_count"] if manifest_changed and not baseline_only else 0
             result = result_for(collected["window_completeness"], change_count)
             lkg = {
                 "source_run_id": source_run_id,
@@ -1751,6 +1760,7 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
                     data_as_of=record["data_as_of"],
                     fetched_at=fetched_at,
                     previous_sha256s=prior_feed_sha256s,
+                    baseline_only=baseline_only,
                 )
                 feed_items.append(feed_item)
         elif record["source_health"] == "FAILED" and prior_feed and isinstance(prior_feed.get("items"), list):
