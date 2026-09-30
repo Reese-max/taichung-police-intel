@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 import time
@@ -21,7 +22,10 @@ REQUIRED_CAPABILITIES = {
     "get_source_health",
     "validate_answer",
 }
-ARTIFACTS = ("intelligence-feed.json", "source-status.json", "v2-daily-brief.json")
+ARTIFACTS = ("intelligence-feed.json", "source-status.json", "v2-daily-brief.json", "source-policy.json", "release.json")
+_release_spec = importlib.util.spec_from_file_location("release_manifest", Path(__file__).with_name("release-manifest.py"))
+release_manifest = importlib.util.module_from_spec(_release_spec)
+_release_spec.loader.exec_module(release_manifest)
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -96,6 +100,17 @@ def verify(gateway_url: str, public_url: str, client: JsonClient | None = None) 
         public_hashes[name.removesuffix(".json")] = sha256(raw)
         public_docs[name] = document
 
+    release = release_manifest.validate_manifest(public_docs["release.json"])
+    if release.get("artifact_hashes", {}).get("feed") != public_hashes["intelligence-feed"] or \
+        release.get("artifact_hashes", {}).get("status") != public_hashes["source-status"] or \
+        release.get("artifact_hashes", {}).get("brief") != public_hashes["v2-daily-brief"] or \
+        release.get("artifact_hashes", {}).get("source_policy") != public_hashes["source-policy"]:
+        raise RuntimeError("Pages release manifest artifact hashes do not match served bytes")
+    if release.get("publication_hash") != public_hashes["v2-daily-brief"]:
+        raise RuntimeError("Pages release manifest publication hash is not bound to the brief")
+    if release.get("source_policy_hash") != public_docs["source-policy.json"].get("policy_hash"):
+        raise RuntimeError("Pages release manifest source policy hash is stale")
+
     _, publication_query, _ = client.request(
         f"{gateway_url}/query",
         method="POST",
@@ -113,14 +128,31 @@ def verify(gateway_url: str, public_url: str, client: JsonClient | None = None) 
         raise RuntimeError("Worker and public publication hashes do not match")
     if receipt.get("publication_id") != health.get("publication_id"):
         raise RuntimeError("Worker health and publication receipt use different publication IDs")
+    if release.get("publication_generation") != receipt.get("publication_id"):
+        raise RuntimeError("Pages release manifest publication generation is not bound to Worker")
+    if release.get("query_generation") != receipt.get("generation_id") or release.get("query_generation") != health.get("query_generation"):
+        raise RuntimeError("Pages release manifest query generation is not bound to Worker")
+    if release.get("release_id") != health.get("release_id") or release.get("release_id") != receipt.get("release_id"):
+        raise RuntimeError("Pages and Worker release IDs do not match")
+    if release["release_id"] != capabilities.get("release_id"):
+        raise RuntimeError("Worker capabilities use a different release")
+    if release["code_sha"] != health.get("code_sha") or release["code_sha"] != receipt.get("code_sha"):
+        raise RuntimeError("Pages and Worker publication code SHAs do not match")
+    if release.get("worker_version") != health.get("server_version"):
+        raise RuntimeError("Pages release manifest worker version is stale")
 
     _, search, _ = client.request(
         f"{gateway_url}/query",
         method="POST",
-        payload={"tool": "search_evidence", "arguments": {"q": "", "limit": 1}},
+        payload={"tool": "search_evidence", "arguments": {"q": "", "limit": 1, "expected_generation": release["query_generation"]}},
     )
     if search.get("tool_name") != "search_evidence" or not isinstance(search.get("receipt"), dict):
         raise RuntimeError("Worker search_evidence smoke did not return a receipt")
+    for result in (search, search["receipt"]):
+        if (result.get("release_id") != release["release_id"] or
+                result.get("query_generation_id") != release["query_generation"] or
+                result.get("publication_hash") != release["publication_hash"]):
+            raise RuntimeError("Worker search receipt uses a different release binding")
 
     _, initialize, _ = client.request(
         f"{gateway_url}/mcp",
@@ -145,6 +177,8 @@ def verify(gateway_url: str, public_url: str, client: JsonClient | None = None) 
         "gateway_url": gateway_url,
         "public_url": public_url,
         "worker_version": health.get("server_version"),
+        "release_id": release.get("release_id"),
+        "code_sha": release.get("code_sha"),
         "publication_id": receipt.get("publication_id"),
         "publication_hash": receipt.get("publication_hash"),
         "artifact_hashes": expected_hashes,
@@ -153,6 +187,16 @@ def verify(gateway_url: str, public_url: str, client: JsonClient | None = None) 
         "capabilities": sorted(actual_capabilities),
         "checks": {"health": "SUCCESS", "capabilities": "SUCCESS", "hash_binding": "SUCCESS", "query": "SUCCESS", "mcp": "SUCCESS"},
         "public_generation": public_docs["v2-daily-brief.json"].get("source_collection_run_id"),
+        "release_manifest": {
+            "release_id": release.get("release_id"),
+            "publication_generation": release.get("publication_generation"),
+            "query_generation": release.get("query_generation"),
+            "evidence_catalog_hash": release.get("evidence_catalog_hash"),
+            "pages_deployment": release.get("pages_deployment"),
+            "built_at": release.get("built_at"),
+            "deployed_at": release.get("deployed_at"),
+            "anonymous_http_verified_at": release.get("anonymous_http_verified_at"),
+        },
     }
 
 

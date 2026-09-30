@@ -1,0 +1,44 @@
+{
+  "pr": 87,
+  "head": "78c922c0cdd487c55ad439a377190445db0c104e",
+  "findings": [
+    {
+      "severity": "high",
+      "file": "apps/web/public/data/release.json",
+      "line": 3,
+      "issue": "The checked-in manifest hashes LF bytes, but core.autocrlf=true checks out all four bound artifacts as CRLF. A clean Windows checkout returns Worker 503 and the existing Worker test fails. Pin the bound artifact checkout bytes and exercise both Git newline modes."
+    },
+    {
+      "severity": "med",
+      "file": "scripts/release-manifest.py",
+      "line": 105,
+      "issue": "Python's stable evidence projection differs from the Worker: missing item freshness falls back to UNKNOWN instead of source freshness, and evidence IDs use code-point ordering instead of localeCompare. Valid publications built by this CLI can therefore be rejected with a release binding mismatch."
+    },
+    {
+      "severity": "high",
+      "file": "scripts/verify-query-gateway-production.py",
+      "line": 99,
+      "issue": "The production verifier never validates release identity/schema fields and only binds health/publication receipts. Tampered code_sha, evidence_catalog_hash or built_at and a different capabilities/search release are all accepted as hash_binding SUCCESS."
+    },
+    {
+      "severity": "med",
+      "file": "scripts/release-manifest.py",
+      "line": 258,
+      "issue": "The verify command validates only internal schema/identity, so changing any served artifact bytes leaves RELEASE_MANIFEST_OK. Reuse the builder and validate_binding against the manifest's sibling publication files."
+    },
+    {
+      "severity": "high",
+      "file": ".github/workflows/pages.yml",
+      "line": 201,
+      "issue": "The manifest is built before source-policy prebuild synchronization, while the CI display-cap regression rewrites feed/brief without rebuilding it. Both lifecycle paths leave stale raw-byte bindings and fail the Worker regression or shipped query surface."
+    },
+    {
+      "severity": "med",
+      "file": "workers/query-gateway/src/index.js",
+      "line": 244,
+      "issue": "needs-human: code_sha is copied from Pages and worker_version is a fixed protocol label, so this binding cannot attest the code actually deployed to Cloudflare. Confirm whether issue #62 requires independent Worker deployment identity and define that contract before changing the API/deployment flow."
+    }
+  ],
+  "fixed": true,
+  "summary": "Fixed five release-binding defects with failing-then-passing regressions: checkout bytes, evidence projection parity, production verification, local artifact verification, and workflow ordering. Git Bash npm run check passed (576 tests passed, 0 failed, 1 PostgreSQL test skipped), including the production build; an isolated CI display-cap replay also returned Worker HTTP 200. needs-human: define independent Worker deployment attestation; no live deployment, canary or human-evaluation acceptance is claimed."
+}

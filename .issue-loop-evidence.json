@@ -1,0 +1,27 @@
+{
+  "repo": "Reese-max/taichung-police-intel",
+  "issue": 87,
+  "base_sha": "78c922c0cdd487c55ad439a377190445db0c104e",
+  "red_proof": [
+    {
+      "command": "python -X utf8 -B -m unittest discover -s tests -p test_release_manifest.py -v",
+      "exit": 1,
+      "output": "Ran 7 tests; FAILED (failures=12, errors=1). Tampered manifest and mixed search/capabilities were accepted; changed artifact verify returned RELEASE_MANIFEST_OK; core.autocrlf=true caused publication_hash mismatch; both workflow order assertions failed."
+    },
+    {
+      "command": "node --test --test-concurrency=1 --test-name-pattern='Python manifests' apps/web/tests/query-gateway-worker.test.mjs",
+      "exit": 1,
+      "output": "freshness-default and id-order: HTTP 503 instead of 200; UPSTREAM_UNAVAILABLE: release manifest binding mismatch. tests=3 pass=0 fail=3 (including parent)."
+    }
+  ],
+  "test_command": "npm run check",
+  "test_exit": 0,
+  "tests_passed": 576,
+  "tests_failed": 0,
+  "summary": "Five review defects fixed in local commit 65274274d1fda725a16165e4bab3dafaa285838e. Git Bash npm run check exited 0 on that clean commit: 308 Node passes plus 268 Python passes, 1 PostgreSQL test skipped, CURRENT_CHECKOUT_RC status=PASS checks=5/5, and VERIFY_OK mode=full required=115 specs=4 secrets=0. The Next.js production build passed; isolated CI display-cap replay passed with changes=24, displayed=23, Worker=200.",
+  "not_done": [
+    "needs-human: define Worker deployment-code attestation contract; Pages code_sha and the static server_version are not independent deployment proof.",
+    "PostgreSQL migration integration test skipped because TEST_DATABASE_URL is not set.",
+    "No push, live deployment, anonymous production smoke, seven-day canary, or human evaluation performed."
+  ]
+}

@@ -1,0 +1,5 @@
+# Release hashes bind exact publication bytes across Windows and Linux checkouts.
+apps/web/public/data/intelligence-feed.json text eol=lf
+apps/web/public/data/source-status.json text eol=lf
+apps/web/public/data/v2-daily-brief.json text eol=lf
+apps/web/public/data/source-policy.json text eol=lf

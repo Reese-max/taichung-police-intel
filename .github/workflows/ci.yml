@@ -113,6 +113,7 @@ jobs:
             --output /tmp/v2-regression-brief.json
           cp /tmp/v2-regression-feed.json apps/web/public/data/intelligence-feed.json
           cp /tmp/v2-regression-brief.json apps/web/public/data/v2-daily-brief.json
+          python -X utf8 scripts/release-manifest.py build --code-sha "$GITHUB_SHA"
           pushd apps/web
           GOVINTEL_SKIP_DIRTY_FIXTURE_RUNTIME=1 node --test --test-concurrency=1 tests/*.test.mjs
           popd
