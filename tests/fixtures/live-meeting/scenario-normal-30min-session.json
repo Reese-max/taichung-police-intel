@@ -1,0 +1,30 @@
+{
+  "scenario": "normal-30min-session",
+  "covers": "A normal bounded 30-minute opt-in session stays provisional end to end and reconciles cleanly.",
+  "session": {
+    "source_id": "S-010",
+    "official_source_url": "https://www.tccc.gov.tw/",
+    "stream_url": "https://vod.tccc.gov.tw/live/session-30m.m3u8",
+    "started_at": "2026-09-21T10:00:00+08:00",
+    "meeting_id": "MEETING-30M",
+    "agenda_id": "AGENDA-30M",
+    "max_duration_seconds": 1800,
+    "transport_enabled": true,
+    "provider_authorized": true,
+    "budget_seconds": 1800,
+    "session_id": "LM-FX-NORMAL"
+  },
+  "ops": [
+    {"op": "append_segment", "sequence": 0, "start_seconds": 0, "end_seconds": 300, "text": "交通治安報告開始", "at": "2026-09-21T10:00:05+08:00", "finalized": true, "profile_id": "traffic-policy"},
+    {"op": "append_segment", "sequence": 1, "start_seconds": 300, "end_seconds": 900, "text": "預算審查進行中", "at": "2026-09-21T10:15:00+08:00", "finalized": true},
+    {"op": "append_segment", "sequence": 2, "start_seconds": 900, "end_seconds": 1500, "text": "交通事故統計說明", "at": "2026-09-21T10:25:00+08:00", "finalized": true, "profile_id": "traffic-policy"},
+    {"op": "timeline", "expect": {"timeline_kinds": ["SEGMENT", "SEGMENT", "SEGMENT"], "timeline_all_visible": true, "timeline_all_provisional": true}},
+    {"op": "search", "query": "交通", "expect": {"match_count": 2, "all_provisional": true}},
+    {"op": "bookmark", "segment_ids": ["$seg:2"], "reason_code": "TOPIC_MATCH", "note": "交通統計回看", "at": "2026-09-21T10:26:00+08:00"},
+    {"op": "stop_session", "at": "2026-09-21T10:30:00+08:00", "expect": {"status": "ENDED"}},
+    {"op": "reconcile", "at": "2026-09-22T09:00:00+08:00", "candidates": [
+      {"candidate_id": "$bookmark:0", "outcome": "CONFIRMED_BY_OFFICIAL_MEDIA", "official_source_id": "S-010", "official_url": "https://vod.tccc.gov.tw/wb_news02.asp?url=100", "official_locator": "timestamp:900-1500", "official_document_version": "VOD-20260921", "official_text_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+    ], "expect": {"status": "RECONCILED", "formal_count": 1, "formal_verification_statuses": ["OFFICIAL_RECONCILED"]}}
+  ],
+  "expect": {"status": "RECONCILED", "segment_count": 3, "gap_count": 0, "bookmark_count": 1, "receipt_count": 1}
+}

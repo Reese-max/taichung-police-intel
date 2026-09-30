@@ -1,0 +1,21 @@
+{
+  "scenario": "speaker-label-drift",
+  "covers": "Speaker labels stay unverified tokens; drift is preserved and real names are rejected.",
+  "session": {
+    "source_id": "S-010",
+    "official_source_url": "https://www.tccc.gov.tw/",
+    "stream_url": "https://vod.tccc.gov.tw/live/speaker.m3u8",
+    "started_at": "2026-09-21T10:00:00+08:00",
+    "max_duration_seconds": 1800,
+    "transport_enabled": true,
+    "provider_authorized": true,
+    "budget_seconds": 1800,
+    "session_id": "LM-FX-SPEAKER"
+  },
+  "ops": [
+    {"op": "append_segment", "sequence": 0, "start_seconds": 0, "end_seconds": 5, "text": "第一人發言", "at": "2026-09-21T10:00:05+08:00", "finalized": true, "speaker_label": "SPEAKER_1"},
+    {"op": "append_segment", "sequence": 1, "start_seconds": 5, "end_seconds": 10, "text": "同一發言者標籤漂移", "at": "2026-09-21T10:00:10+08:00", "finalized": true, "speaker_label": "SPEAKER_2"},
+    {"op": "append_segment", "sequence": 2, "start_seconds": 10, "end_seconds": 15, "text": "不允許真名", "at": "2026-09-21T10:00:15+08:00", "speaker_label": "局長王小明", "expect_error": "unverified speaker"}
+  ],
+  "expect": {"status": "LIVE", "segment_count": 2}
+}

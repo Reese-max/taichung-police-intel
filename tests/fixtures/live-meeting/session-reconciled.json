@@ -1,0 +1,104 @@
+{
+  "agenda_id": null,
+  "asr_contract": {
+    "language": "zh",
+    "model": "provisional",
+    "provider": "fixture",
+    "version": "v1"
+  },
+  "bookmarks": [
+    {
+      "bookmark_id": "BM-BFAA94C3D88234C805CF",
+      "bookmarked_at": "2026-09-21T10:01:30+08:00",
+      "end_seconds": 60.0,
+      "note": null,
+      "profile_relevance": null,
+      "reason_code": "REVIEW",
+      "segment_ids": [
+        "SEG-LM-FX-RECON-000000"
+      ],
+      "session_revision": 2,
+      "start_seconds": 0.0,
+      "stream_content_hash": "9c5042bc5d46b48b660b8abd453eb6b620b63f930cc9d246fca21367e46f90af"
+    }
+  ],
+  "budget_seconds": 1800,
+  "content_hash": "a1497f7e8e47cf5bf16e51fc0eda0e8f6c33ebeb2efa7d39ce8db06cf65d9b80",
+  "created_at": "2026-09-21T10:00:00+08:00",
+  "current_reconciliations": {
+    "BM-BFAA94C3D88234C805CF": "RC-58F7177E29E0F08C4354"
+  },
+  "ended_at": "2026-09-21T10:30:00+08:00",
+  "gap_intervals": [],
+  "max_duration_seconds": 1800,
+  "meeting_id": null,
+  "official_source_url": "https://www.tccc.gov.tw/",
+  "reconciliation_receipts": [
+    {
+      "asr_contract": {
+        "language": "zh",
+        "model": "provisional",
+        "provider": "fixture",
+        "version": "v1"
+      },
+      "candidate_id": "BM-BFAA94C3D88234C805CF",
+      "official": {
+        "document_version": "VOD-1",
+        "locator": "timestamp:0-60",
+        "official_url": "https://vod.tccc.gov.tw/wb_news02.asp?url=200",
+        "source_id": "S-010",
+        "text_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "outcome": "CONFIRMED_BY_OFFICIAL_MEDIA",
+      "provisional_text_sha256": "19bfd0600ab8428999b77affeab5bfd6b9c1ab6a2b9356d70efcb66dd2cf48d4",
+      "receipt_id": "RC-58F7177E29E0F08C4354",
+      "reconciled_at": "2026-09-22T09:00:00+08:00",
+      "reconciler": {
+        "name": "intel_v2.live_meeting",
+        "schema_version": 1
+      },
+      "segment_ids": [
+        "SEG-LM-FX-RECON-000000"
+      ],
+      "session_id": "LM-FX-RECON",
+      "session_revision": 4
+    }
+  ],
+  "schema_version": 1,
+  "seek": null,
+  "segments": [
+    {
+      "asr_contract": {
+        "language": "zh",
+        "model": "provisional",
+        "provider": "fixture",
+        "version": "v1"
+      },
+      "confidence": null,
+      "content_sha256": "76ad81b59545202d37c3c2eb0c8f62a02d9b0591256b1e70357f8aa2684222f2",
+      "end_seconds": 60.0,
+      "finalized": true,
+      "language": "zh",
+      "partial": false,
+      "profile_relevance": null,
+      "received_at": "2026-09-21T10:01:00+08:00",
+      "revision": 1,
+      "revision_history": [],
+      "segment_id": "SEG-LM-FX-RECON-000000",
+      "sequence": 0,
+      "speaker_label": null,
+      "start_seconds": 0.0,
+      "text": "已確認的官方內容"
+    }
+  ],
+  "session_id": "LM-FX-RECON",
+  "session_revision": 5,
+  "source_id": "S-010",
+  "started_at": "2026-09-21T10:00:00+08:00",
+  "status": "RECONCILED",
+  "stream_content_hash": "9c5042bc5d46b48b660b8abd453eb6b620b63f930cc9d246fca21367e46f90af",
+  "stream_url": "https://vod.tccc.gov.tw/live/recon.m3u8",
+  "termination_reason": "USER_STOP",
+  "transport_status": "STOPPED",
+  "updated_at": "2026-09-22T09:00:00+08:00"
+}

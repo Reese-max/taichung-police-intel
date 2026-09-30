@@ -1,0 +1,23 @@
+{
+  "scenario": "asr-reconnect",
+  "covers": "After an ASR outage gap, resume accepts new segments only after the gap end; overlap is rejected.",
+  "session": {
+    "source_id": "S-010",
+    "official_source_url": "https://www.tccc.gov.tw/",
+    "stream_url": "https://vod.tccc.gov.tw/live/reconnect.m3u8",
+    "started_at": "2026-09-21T10:00:00+08:00",
+    "max_duration_seconds": 1800,
+    "transport_enabled": true,
+    "provider_authorized": true,
+    "budget_seconds": 1800,
+    "session_id": "LM-FX-RECONNECT"
+  },
+  "ops": [
+    {"op": "append_segment", "sequence": 0, "start_seconds": 0, "end_seconds": 60, "text": "正常片段", "at": "2026-09-21T10:01:00+08:00", "finalized": true},
+    {"op": "record_gap", "start_seconds": 60, "end_seconds": 120, "reason": "ASR_OUTAGE", "at": "2026-09-21T10:02:00+08:00"},
+    {"op": "resume_session", "at": "2026-09-21T10:02:05+08:00", "expect": {"status": "LIVE"}},
+    {"op": "append_segment", "sequence": 1, "start_seconds": 120, "end_seconds": 180, "text": "重連後片段", "at": "2026-09-21T10:03:00+08:00", "finalized": true},
+    {"op": "timeline", "expect": {"timeline_kinds": ["SEGMENT", "GAP", "SEGMENT"], "timeline_all_visible": true}}
+  ],
+  "expect": {"status": "LIVE", "segment_count": 2, "gap_count": 1}
+}

@@ -31,6 +31,7 @@ inclusion: always
 - Do not add vector search, an agent platform, or a workflow orchestrator for the hackathon path.
 - Fixed snapshot mode must work without API keys or paid services.
 - Live ASR uses Groq `whisper-large-v3` only when explicitly invoked with a configured key.
+- Live-meeting sessions are explicit opt-in only, bounded by `max_duration_seconds`/provider budget, restricted to allowlisted official streams, and produce only provisional (`LIVE_ASR_PROVISIONAL`) navigation text until post-event reconciliation.
 - Generator and verifier runs must have separate run IDs; deterministic checks take precedence over model agreement.
 
 ## Required commands
