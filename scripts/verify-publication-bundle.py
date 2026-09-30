@@ -25,6 +25,18 @@ def load_expected_sources() -> set[str]:
     return expected
 
 
+def load_catalog_source_metadata() -> dict[str, dict[str, str]]:
+    spec = importlib.util.spec_from_file_location("publication_source_catalog", SOURCE_POLICY)
+    if spec is None or spec.loader is None:
+        raise ValueError("source policy module is unavailable")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return {
+        row["source_id"]: {"role": row["role"], "status": row["status"]}
+        for row in module.load_catalog()["sources"]
+    }
+
+
 def load_json(name: str) -> dict:
     path = DATA_DIR / name
     try:
@@ -49,6 +61,7 @@ def main() -> int:
 
     try:
         expected_sources = load_expected_sources()
+        catalog_metadata = load_catalog_source_metadata()
     except (OSError, ValueError, json.JSONDecodeError) as error:
         print(f"PUBLICATION_BUNDLE_FAIL {error}", file=sys.stderr)
         return 1
@@ -96,6 +109,23 @@ def main() -> int:
         status_source_ids = []
     if set(status_source_ids) != expected_sources or len(status_source_ids) != len(expected_sources):
         errors.append(f"source-status source IDs invalid: {status_source_ids}")
+
+    for source in status_sources:
+        source_id = source.get("source_id")
+        expected = catalog_metadata.get(source_id)
+        if expected is None:
+            errors.append(f"{source_id}: source is missing from the catalog")
+            continue
+        if source.get("source_role") != expected["role"]:
+            errors.append(
+                f"{source_id}: source_role={source.get('source_role')!r} "
+                f"does not match catalog role={expected['role']!r}"
+            )
+        if source.get("integration_status") != expected["status"]:
+            errors.append(
+                f"{source_id}: integration_status={source.get('integration_status')!r} "
+                f"does not match catalog status={expected['status']!r}"
+            )
 
     source_summary = feed.get("source_summary")
     if not isinstance(source_summary, dict) or set(source_summary) != expected_sources:

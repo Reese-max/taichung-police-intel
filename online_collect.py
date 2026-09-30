@@ -30,6 +30,7 @@ from collect import (
     canonical_sha256,
     freshness_status,
     gap_reasons,
+    load_source_catalog,
     next_update,
     save_state,
     scheduled_time,
@@ -51,6 +52,10 @@ PARSER_VERSION = "p0-live-1"
 SOURCE_ROWS = {
     source_id: (name, "PRIMARY_OFFICIAL", "PREP_CORE", "ACTIVE")
     for source_id, (name, _) in P0_SOURCES.items()
+}
+SOURCE_CATALOG_METADATA = {
+    row["source_id"]: {"role": row["role"], "status": row["status"]}
+    for row in load_source_catalog()["sources"]
 }
 
 
@@ -1729,6 +1734,11 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
                 "last_known_good": previous_lkg,
                 "error_code": type(error).__name__.upper()[:64],
             }
+        metadata = SOURCE_CATALOG_METADATA.get(source_id)
+        if metadata is None:
+            raise ValueError(f"source catalog metadata missing for {source_id}")
+        record["source_role"] = metadata["role"]
+        record["integration_status"] = metadata["status"]
         freshness = freshness_status(record["data_as_of"], now, *SOURCE_FRESHNESS_POLICY.get(source_id, (13, 24)))
         record["freshness_status"] = freshness
         record["intelligence_gaps"] = gap_reasons(record, record["last_known_good"], freshness)
