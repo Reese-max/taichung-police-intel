@@ -90,13 +90,23 @@ def bind_document_entities(document: dict[str, Any], registry: dict[str, Any]) -
         if result.get("named_event_id") and result["named_event_id"] != match["entity_id"]:
             raise ValueError("named_event label conflicts with supplied entity ID")
         result["named_event_id"] = match["entity_id"]
-    elif named_date is not None or named_jurisdiction is not None:
+    elif named_date is not None or (
+        named_jurisdiction is not None
+        and not (
+            isinstance(result.get("named_event_id"), str)
+            and result["named_event_id"].startswith("named_event:")
+        )
+    ):
         raise ValueError("named_event date/jurisdiction requires a label")
     named_id = result.get("named_event_id")
     if isinstance(named_id, str) and named_id.startswith("named_event:"):
-        active = {entity["entity_id"] for entity in registry["entities"] if entity["kind"] == "named_event"}
-        if named_id not in active:
-            raise ValueError("unknown named_event entity ID")
+        jurisdiction = named_jurisdiction or result.get("jurisdiction")
+        observed_date = _iso_date(result.get("event_start_at"))
+        if not isinstance(jurisdiction, str) or not jurisdiction.strip() or observed_date is None:
+            raise ValueError("named_event_id requires document jurisdiction and observed event_start_at")
+        match = module.resolve(registry, "named_event", named_id, jurisdiction, observed_date)
+        if match.get("status") != "RESOLVED":
+            raise ValueError("named_event_id conflicts with document jurisdiction or observed event_start_at")
     district_id = result.get("district_id")
     if isinstance(district_id, str) and district_id.startswith("location:"):
         active_locations = {entity["entity_id"] for entity in registry["entities"] if entity["kind"] == "location"}
@@ -496,6 +506,34 @@ def _apply_official_reschedule(
     return result
 
 
+def _rebind_partial_event_registry(
+    event: dict[str, Any], registry: dict[str, Any], receipt: dict[str, Any]
+) -> None:
+    """Rebind a partial-snapshot event only while each canonical ID remains active and typed."""
+    module = _load_entity_registry_module()
+    module.validate_registry(registry)
+    active = {entity["entity_id"]: entity for entity in registry["entities"]}
+    for field, kind in (("agency_ids", "agency"), ("location_ids", "location")):
+        values = event.get(field, [])
+        if not isinstance(values, list) or any(not isinstance(value, str) or not value for value in values):
+            raise ValueError(f"partial PublicEvent cannot be rebound: invalid {field}")
+        if any(active.get(value, {}).get("kind") != kind for value in values):
+            raise ValueError(f"partial PublicEvent cannot be rebound: inactive or wrong-kind ID in {field}")
+
+    district_id = event.get("district_id")
+    if district_id is not None and (
+        not isinstance(district_id, str) or active.get(district_id, {}).get("kind") != "location"
+    ):
+        raise ValueError("partial PublicEvent cannot be rebound: inactive or wrong-kind district_id")
+
+    named_event_id = event.get("named_event_id")
+    if isinstance(named_event_id, str) and named_event_id.startswith("named_event:"):
+        if active.get(named_event_id, {}).get("kind") != "named_event":
+            raise ValueError("partial PublicEvent cannot be rebound: inactive or wrong-kind named_event_id")
+
+    event["entity_registry"] = copy.deepcopy(receipt)
+
+
 def reconcile_public_events(
     previous_events: list[dict[str, Any]],
     documents: list[dict[str, Any]],
@@ -593,6 +631,9 @@ def reconcile_public_events(
         event["previous_fusion_status"] = previous.get("fusion_status")
         if previous.get("fusion_status") == "CONFIRMED" and event.get("fusion_status") != "CONFLICT":
             event["fusion_status"] = "CONFIRMED"
+    if entity_registry is not None:
+        for event in by_id.values():
+            _rebind_partial_event_registry(event, entity_registry, registry_receipt)
     return sorted(by_id.values(), key=lambda event: event["public_event_id"])
 
 
