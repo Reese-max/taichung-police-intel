@@ -16,17 +16,25 @@ ROOT = Path(__file__).resolve().parents[1]
 CANDIDATE_STATUSES = {"AUDITED_EXISTING", "VERIFIED_CANDIDATE"}
 
 
-def candidate_source_ids(collector) -> tuple[str, ...]:
-    """Derive the bounded list from the canonical source catalog."""
+def _load_policy_module():
     policy_path = ROOT / "scripts/source-policy.py"
     spec = importlib.util.spec_from_file_location("govintel_source_policy", policy_path)
     if spec is None or spec.loader is None:
         raise RuntimeError("cannot load source policy")
     policy = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(policy)
+    return policy
+
+
+def catalog_source_rows() -> dict[str, dict]:
+    return {row["source_id"]: row for row in _load_policy_module().load_catalog()["sources"]}
+
+
+def candidate_source_ids(collector) -> tuple[str, ...]:
+    """Derive the bounded list from the canonical source catalog."""
     catalog_ids = {
         row["source_id"]
-        for row in policy.load_catalog()["sources"]
+        for row in _load_policy_module().load_catalog()["sources"]
         if row["status"] in CANDIDATE_STATUSES
     }
     return tuple(sorted(catalog_ids & set(collector.NEWS_LIST_SOURCES)))
@@ -100,13 +108,16 @@ class BoundedSession:
         self.transport.close()
 
 
-def run_canary(collector, sources, now, *, session_factory=BoundedSession):
+def run_canary(collector, sources, now, *, session_factory=BoundedSession, existing_items=None):
     allowed = set(candidate_source_ids(collector))
     if not sources or len(sources) != len(set(sources)) or any(source not in allowed for source in sources):
         raise ValueError("select a nonempty unique subset of catalog-approved candidate IDs")
     if now.tzinfo is None:
         raise ValueError("canary clock must be timezone-aware")
 
+    catalog = catalog_source_rows()
+    existing_items = existing_items or {}
+    item_state: dict[str, dict[str, str]] = {}
     records = []
     drift = None
     try:
@@ -121,20 +132,29 @@ def run_canary(collector, sources, now, *, session_factory=BoundedSession):
         url = collector.NEWS_LIST_SOURCES[source_id]["list_url"]
         session = session_factory(url)
         started = time.monotonic()
+        catalog_row = catalog.get(source_id, {})
         record = {
             "source_id": source_id,
             "source_url": url,
+            "source_role": catalog_row.get("role"),
             "integration_status": "CANDIDATE",
+            "catalog_status": catalog_row.get("status"),
             "promotion_eligible": False,
             "observed_at": now.isoformat(),
         }
+        for field in ("public_usage_notice", "retention_class"):
+            if catalog_row.get(field):
+                record[field] = catalog_row[field]
         try:
+            # Unchanged list rows are diffed against the previous observation so
+            # only new/changed stable IDs cost a detail-page request.
+            existing = dict(existing_items.get(source_id) or {})
             result = collector.collect_source(
                 session,
                 source_id,
                 now.date() - timedelta(days=6),
                 now.date(),
-                {},
+                existing,
                 max_details=1,
             )
             manifest = result.get("manifest_sha256", "")
@@ -155,9 +175,20 @@ def run_canary(collector, sources, now, *, session_factory=BoundedSession):
                 "detail_fetch_count": sum(
                     snapshot["purpose"] == "DETAIL" for snapshot in result["snapshots"]
                 ),
+                "unchanged_detail_skips": sum(
+                    1
+                    for item in result.get("items", [])
+                    if isinstance(item.get("payload"), dict)
+                    and item["payload"].get("detail") == "unchanged-skipped"
+                ),
                 "manifest_sha256": manifest,
                 "coverage_independently_verified": False,
             })
+            item_state[source_id] = {
+                item["stable_key"]: item["content_sha256"]
+                for item in result.get("items", [])
+                if item.get("stable_key") and item.get("content_sha256")
+            }
             first_snapshot = next((item for item in result["snapshots"] if item.get("purpose") == "LIST"), None)
             if drift is not None and first_snapshot and "body" in first_snapshot:
                 contract = drift.CONTRACTS[source_id]
@@ -217,13 +248,39 @@ def run_canary(collector, sources, now, *, session_factory=BoundedSession):
         "failed_count": failed,
         "status": "FAILED" if failed else "OBSERVED",
         "sources": records,
+        "item_state": item_state,
     }
+
+
+def load_existing_items(path: Path | None) -> dict:
+    """Read a prior observation report into the collector's existing-item map."""
+    if path is None or not path.exists():
+        return {}
+    document = json.loads(path.read_text(encoding="utf-8"))
+    state = document.get("item_state") if isinstance(document, dict) else None
+    if not isinstance(state, dict):
+        return {}
+    existing = {}
+    for source_id, items in state.items():
+        if not isinstance(items, dict):
+            continue
+        existing[source_id] = {
+            str(stable_key): {"content_sha256": content_sha256}
+            for stable_key, content_sha256 in items.items()
+            if isinstance(content_sha256, str)
+        }
+    return existing
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--source", action="append")
     parser.add_argument("--output", required=True)
+    parser.add_argument(
+        "--existing",
+        type=Path,
+        help="Previous observation report whose item_state seeds the incremental diff.",
+    )
     args = parser.parse_args(argv)
     sys.path.insert(0, str(ROOT))
     import online_collect as collector
@@ -232,6 +289,7 @@ def main(argv=None):
         collector,
         args.source or list(candidate_source_ids(collector)),
         datetime.now(collector.TZ),
+        existing_items=load_existing_items(args.existing),
     )
     path = Path(args.output)
     path.parent.mkdir(parents=True, exist_ok=True)

@@ -72,6 +72,8 @@ class CandidatePublicationWiringTests(unittest.TestCase):
             "S-032",
             "臺中市政府交通局最新消息",
             "https://www.traffic.taichung.gov.tw/",
+            "PRIMARY_EVENT",
+            "VERIFIED_CANDIDATE",
             "FRESH",
             "PASS",
             "COMPLETE_WITH_ITEMS",
@@ -81,6 +83,8 @@ class CandidatePublicationWiringTests(unittest.TestCase):
         )
         self.assertEqual(projected["source_id"], "S-032")
         self.assertEqual(projected["source_name"], "臺中市政府交通局最新消息")
+        self.assertEqual(projected["source_role"], "PRIMARY_EVENT")
+        self.assertEqual(projected["integration_status"], "VERIFIED_CANDIDATE")
         self.assertEqual(projected["official_url"], item["source_url"])
 
     def test_v2_context_names_all_first_promotion_candidates(self):

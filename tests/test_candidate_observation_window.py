@@ -12,10 +12,10 @@ assert spec and spec.loader
 spec.loader.exec_module(module)
 
 
-def report(day: date, *, source_ids=("S-001", "S-031"), failed_count=0):
+def report(day: date, *, source_ids=("S-001", "S-031"), failed_count=0, notice=True):
     rows = []
     for source_id in source_ids:
-        rows.append({
+        row = {
             "source_id": source_id,
             "integration_status": "CANDIDATE",
             "promotion_eligible": False,
@@ -24,7 +24,11 @@ def report(day: date, *, source_ids=("S-001", "S-031"), failed_count=0):
             "collector_window_claim": "PARTIAL" if source_id == "S-031" else "COMPLETE_WITH_ITEMS",
             "manifest_sha256": "a" * 64,
             "schema_contract": {"status": "NO_DRIFT", "review_required": False},
-        })
+        }
+        if source_id == "S-031" and notice:
+            row["public_usage_notice"] = "僅供公共態勢感知，不作派遣或勤務指揮依據。"
+            row["retention_class"] = "OFFICIAL_TRANSIENT_METADATA"
+        rows.append(row)
     return {
         "observed_at": f"{day.isoformat()}T10:00:00+08:00",
         "status": "FAILED" if failed_count else "OBSERVED",
@@ -90,6 +94,16 @@ class CandidateObservationWindowTests(unittest.TestCase):
         ], required_days=1)
         self.assertEqual(result["status"], "BLOCKED")
         self.assertFalse(result["sources"]["S-032"]["window_complete"])
+
+    def test_fire_rows_without_usage_notice_block(self):
+        start = date(2026, 9, 15)
+        result = module.validate_reports([
+            (f"{day}.json", report(day, source_ids=("S-031",), notice=False))
+            for day in (start + timedelta(days=offset) for offset in range(7))
+        ])
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertFalse(result["sources"]["S-031"]["window_complete"])
+        self.assertTrue(any("usage notice" in reason for reason in result["reasons"]))
 
     def test_source_inventory_change_blocks(self):
         start = date(2026, 9, 15)
