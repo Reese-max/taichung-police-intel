@@ -24,6 +24,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from intel_v2 import query_domain
+from intel_v2.entity_binding import registry_runtime
 from intel_v2.located_facts import validate_document_url
 
 QUERY_STORE_PATH = ROOT / "scripts" / "query-store.py"
@@ -801,6 +802,7 @@ class QueryGateway:
                 "truncated": truncated,
                 "server_version": SERVER_VERSION,
                 "issued_at": queried_at,
+                **({"entity_registry": payload["entity_registry"]} if "entity_registry" in payload else {}),
             },
             **payload,
         }
@@ -865,6 +867,51 @@ class QueryGateway:
             raise GatewayError("INVALID_ARGUMENTS", f"{name} must be a bounded non-empty string")
         return value.strip()
 
+    @staticmethod
+    def _event_registry(store: dict[str, Any]) -> dict[str, Any] | None:
+        pinned = store.get("entity_registry")
+        if pinned is None:
+            return None
+        module = registry_runtime()
+        registry = module.load_registry()
+        if module.registry_receipt(registry) != pinned:
+            raise GatewayError("ENTITY_REGISTRY_STALE", "event store registry receipt differs from the current registry", 503)
+        active = {
+            kind: {entity["entity_id"] for entity in registry["entities"] if entity["kind"] == kind}
+            for kind in ("agency", "location", "named_event")
+        }
+        for event in store["public_events"]:
+            if (any(entity_id not in active["agency"] for entity_id in event.get("agency_ids") or [])
+                    or any(entity_id not in active["location"] for entity_id in event.get("location_ids") or [])
+                    or (str(event.get("district_id") or "").startswith("location:")
+                        and event["district_id"] not in active["location"])
+                    or (str(event.get("named_event_id") or "").startswith("named_event:")
+                        and event["named_event_id"] not in active["named_event"])):
+                raise GatewayError("ENTITY_REGISTRY_INVALID_STORE", "event store references inactive registry entity IDs", 503)
+        return registry
+
+    @staticmethod
+    def _resolve_event_entity_filters(arguments: dict[str, Any], registry: dict[str, Any] | None) -> tuple[dict[str, Any], dict[str, Any]]:
+        resolved = dict(arguments)
+        decisions: dict[str, Any] = {}
+        module = registry_runtime() if registry is not None else None
+        for field, kind in (("agency", "agency"), ("region", "location"), ("district", "location")):
+            value = arguments.get(field)
+            if value is None:
+                continue
+            if kind == "agency" and value.startswith("S-"):
+                continue  # Existing source-ID filter is independent of entity aliases.
+            if registry is None:
+                if not value.startswith(f"{kind}:"):
+                    raise GatewayError("ENTITY_REGISTRY_UNBOUND", f"{field} alias requires a registry-bound event store", 422)
+                continue  # Legacy ID-only stores remain readable.
+            match = module.resolve(registry, kind, value)
+            if match["status"] != "RESOLVED":
+                raise GatewayError("ENTITY_NOT_RESOLVED", f"{field} is not a unique confirmed {kind} entity", 422)
+            resolved[field] = match["entity_id"]
+            decisions[field] = {"entity_id": match["entity_id"], "match_method": match["match_method"]}
+        return resolved, decisions
+
     def _execute_domain(self, tool: str, args: dict[str, Any], now: datetime) -> dict[str, Any]:
         store = self.event_store if tool in {"search_events", "get_event", "compare_event_versions"} else self.statistics_store
         if store is None:
@@ -873,6 +920,8 @@ class QueryGateway:
                 f"{tool} requires a validated canonical domain store; no such store is configured",
                 422,
             )
+        registry = self._event_registry(store) if store is self.event_store else None
+        entity_receipt = store.get("entity_registry") if store is self.event_store else None
         if tool == "search_events":
             for name in ("q", "region", "district", "agency", "category", "time_from", "time_to", "verification_status", "event_status", "public_event_id"):
                 args[name] = self._require_string(args, name)
@@ -883,6 +932,7 @@ class QueryGateway:
                     raise GatewayError("INVALID_ARGUMENTS", f"{name} must be boolean")
             try:
                 query_args, time_resolution = _resolve_event_time_bounds(args, now)
+                query_args, entity_resolution = self._resolve_event_entity_filters(query_args, registry)
                 result = query_domain.query_events(store, query_args)
             except ValueError as error:
                 raise GatewayError("INVALID_ARGUMENTS", str(error)) from error
@@ -892,6 +942,7 @@ class QueryGateway:
                 "event_ids": event_ids, "events": result["results"],
                 **{key: value for key, value in result.items() if key != "results"},
                 "domain_query_generation_id": result["query_generation_id"],
+                **({"entity_registry": entity_receipt, "entity_resolution": entity_resolution} if entity_receipt else {}),
             }
             if time_resolution is not None:
                 payload["time_resolution"] = time_resolution
@@ -909,7 +960,8 @@ class QueryGateway:
                 return self._envelope(
                     tool, args, scope,
                     {"event_ids": [event_id], "evidence_ids": evidence_ids, "event": event,
-                     "domain_query_generation_id": store["generation_id"]},
+                     "domain_query_generation_id": store["generation_id"],
+                     **({"entity_registry": entity_receipt} if entity_receipt else {})},
                     result_count=1, result_type="public_event",
                 )
             for name in ("before_version", "after_version"):
@@ -926,7 +978,8 @@ class QueryGateway:
         scope = self._domain_scope(store, now)
         return self._envelope(
             tool, args, scope,
-            {"event_ids": [event_id], "comparison": comparison, "domain_query_generation_id": store["generation_id"]},
+            {"event_ids": [event_id], "comparison": comparison, "domain_query_generation_id": store["generation_id"],
+             **({"entity_registry": entity_receipt} if entity_receipt else {})},
             result_count=1, result_type="event_comparison",
         )
 

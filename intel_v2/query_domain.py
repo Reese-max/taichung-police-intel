@@ -19,6 +19,15 @@ STATISTICS_STORE_SCHEMA_VERSION = 1
 EVENT_STATUSES = frozenset({"CONFIRMED", "CANDIDATE", "CONFLICT", "SPLIT_REQUIRED", "PARTIAL_LKG"})
 
 
+def _entity_registry_receipt(value: Any) -> dict[str, Any]:
+    if (not isinstance(value, dict) or set(value) != {"registry_version", "registry_hash"}
+            or type(value["registry_version"]) is not int or value["registry_version"] < 1
+            or not isinstance(value["registry_hash"], str) or len(value["registry_hash"]) != 64
+            or any(char not in "0123456789abcdef" for char in value["registry_hash"])):
+        raise ValueError("invalid entity registry receipt")
+    return value
+
+
 def canonical(value: Any) -> bytes:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf-8")
 
@@ -120,6 +129,8 @@ def validate_event(event: Any) -> dict[str, Any]:
     if not isinstance(event, dict) or event.get("schema_version") != 1:
         raise ValueError("PublicEvent must use schema_version=1")
     event_id = _text(event.get("public_event_id"), name="public_event_id", max_length=256)
+    if "entity_registry" in event:
+        _entity_registry_receipt(event["entity_registry"])
     _text(event.get("canonical_title"), name="canonical_title", max_length=2000)
     status = _text(event.get("fusion_status"), name="fusion_status", max_length=64)
     if status not in EVENT_STATUSES:
@@ -207,6 +218,7 @@ def _event_material(store: dict[str, Any]) -> dict[str, Any]:
         "source_ids": store["source_ids"],
         "features": store["features"],
         "public_events": store["public_events"],
+        **({"entity_registry": store["entity_registry"]} if "entity_registry" in store else {}),
     }
 
 
@@ -217,6 +229,10 @@ def build_event_store(events: list[dict[str, Any]], *, generated_at: str | None 
     rows.sort(key=lambda event: event["public_event_id"])
     if len({event["public_event_id"] for event in rows}) != len(rows):
         raise ValueError("duplicate PublicEvent IDs")
+    receipts = [event.get("entity_registry") for event in rows]
+    if any(receipt is not None for receipt in receipts) and (any(receipt is None for receipt in receipts)
+                                                        or any(receipt != receipts[0] for receipt in receipts)):
+        raise ValueError("PublicEvent registry receipts must be uniform")
     if generated_at is not None:
         _instant(generated_at, name="generated_at")
     source_ids = sorted({
@@ -231,6 +247,7 @@ def build_event_store(events: list[dict[str, Any]], *, generated_at: str | None 
         "source_ids": source_ids,
         "features": _event_features(rows),
         "public_events": rows,
+        **({"entity_registry": receipts[0]} if receipts and receipts[0] is not None else {}),
     }
     store["store_sha256"] = digest(_event_material(store))
     store["generation_id"] = digest({"store_sha256": store["store_sha256"], "source_ids": source_ids})
@@ -246,6 +263,8 @@ def validate_event_store(store: Any) -> dict[str, Any]:
     for event in rows:
         validate_event(event)
     expected = build_event_store(rows, generated_at=store.get("generated_at"))
+    if store.get("entity_registry") != expected.get("entity_registry"):
+        raise ValueError("PublicEvent query store registry metadata mismatch")
     if store.get("source_ids") != expected["source_ids"] or store.get("features") != expected["features"]:
         raise ValueError("PublicEvent query store metadata mismatch")
     if store.get("store_sha256") != expected["store_sha256"] or store.get("generation_id") != expected["generation_id"]:
@@ -451,6 +470,7 @@ def project_event(event: dict[str, Any]) -> dict[str, Any]:
         "district_id", "location_candidates", "location_ids", "agency_ids", "independent_source_ids",
         "independent_source_count", "fusion_status", "verification_status", "event_status", "source_state", "lkg",
         "tracked", "tracking_id", "changed", "changed_fields", "conflict_fields", "uncertain_fields", "created_at", "updated_at",
+        "entity_registry",
     )
     result = {key: event.get(key) for key in allowed if key in event}
     result["documents"] = [_project_document(event["public_event_id"], link) for link in event["linked_document_versions"]]

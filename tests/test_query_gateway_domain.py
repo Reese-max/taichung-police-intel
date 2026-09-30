@@ -3,6 +3,8 @@ import importlib.util
 from pathlib import Path
 import unittest
 
+from intel_v2.entity_binding import registry_runtime
+
 
 ROOT = Path(__file__).resolve().parents[1]
 gateway_spec = importlib.util.spec_from_file_location("query_gateway_domain_test", ROOT / "scripts" / "query-gateway.py")
@@ -88,6 +90,48 @@ class QueryGatewayDomainTests(unittest.TestCase):
         self.assertEqual(query["query_coverage"]["domain_store_coverage_status"], "UNVERIFIED")
         self.assertFalse(query["query_coverage"]["can_state_bounded_no_match"])
         self.assertIn("DOMAIN_STORE_SOURCE_HEALTH_UNBOUND", {gap["reason"] for gap in query["source_gaps"]})
+
+    def test_registry_bound_aliases_share_ids_and_receipt_in_web_and_mcp(self):
+        module = registry_runtime()
+        registry = module.load_registry()
+        receipt = module.registry_receipt(registry)
+        row = event()
+        row.update(district_id="location:tc-xitun", location_candidates=[], location_ids=["location:tc-xitun"],
+                   agency_ids=["agency:tc-police"], entity_registry=receipt)
+        snapshot = gateway_module.load_snapshot()
+        snapshot["event_store"] = gateway_module.query_domain.build_event_store([row])
+        gateway = gateway_module.QueryGateway(snapshot=snapshot, clock=self.gateway.clock)
+        arguments = {"district": "台中市西屯區", "agency": "中市警"}
+        web = gateway.execute("search_events", arguments)
+        mcp = gateway_module.dispatch_mcp(gateway, {
+            "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+            "params": {"name": "search_events", "arguments": arguments},
+        })["result"]["structuredContent"]
+        self.assertEqual(web["event_ids"], ["PE-DOMAIN-1"])
+        self.assertEqual(web["event_ids"], mcp["event_ids"])
+        self.assertEqual(web["receipt"]["entity_registry"], mcp["receipt"]["entity_registry"])
+        self.assertEqual(web["receipt"]["entity_registry"], receipt)
+        self.assertEqual(web["entity_resolution"]["agency"]["entity_id"], "agency:tc-police")
+        self.assertEqual(web["entity_resolution"]["district"]["entity_id"], "location:tc-xitun")
+        with self.assertRaisesRegex(gateway_module.GatewayError, "unique confirmed"):
+            gateway.execute("search_events", {"district": "不存在的路"})
+
+    def test_alias_on_unbound_store_and_stale_binding_fail_closed(self):
+        with self.assertRaisesRegex(gateway_module.GatewayError, "registry-bound"):
+            self.gateway.execute("search_events", {"agency": "中市警"})
+        row = event()
+        row["entity_registry"] = {"registry_version": 999, "registry_hash": "a" * 64}
+        snapshot = gateway_module.load_snapshot()
+        snapshot["event_store"] = gateway_module.query_domain.build_event_store([row])
+        stale = gateway_module.QueryGateway(snapshot=snapshot, clock=self.gateway.clock)
+        with self.assertRaisesRegex(gateway_module.GatewayError, "differs"):
+            stale.execute("search_events", {"agency": "中市警"})
+        module = registry_runtime()
+        row["entity_registry"] = module.registry_receipt(module.load_registry())
+        snapshot["event_store"] = gateway_module.query_domain.build_event_store([row])
+        invalid = gateway_module.QueryGateway(snapshot=snapshot, clock=self.gateway.clock)
+        with self.assertRaisesRegex(gateway_module.GatewayError, "inactive registry entity IDs"):
+            invalid.execute("search_events", {"agency": "中市警"})
 
     def test_get_event_and_statistics_keep_receipts_and_typed_fields(self):
         event_result = self.gateway.execute("get_event", {"event_id": "PE-DOMAIN-1"})

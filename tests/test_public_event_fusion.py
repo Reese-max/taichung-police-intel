@@ -1,4 +1,5 @@
 import importlib.util
+import json
 from pathlib import Path
 import unittest
 
@@ -9,6 +10,10 @@ spec = importlib.util.spec_from_file_location("public_event_fusion", SCRIPT)
 fusion = importlib.util.module_from_spec(spec)
 assert spec and spec.loader
 spec.loader.exec_module(fusion)
+DOMAIN_SPEC = importlib.util.spec_from_file_location("query_domain", ROOT / "intel_v2" / "query_domain.py")
+query_domain = importlib.util.module_from_spec(DOMAIN_SPEC)
+assert DOMAIN_SPEC and DOMAIN_SPEC.loader
+DOMAIN_SPEC.loader.exec_module(query_domain)
 
 
 def document(
@@ -181,6 +186,55 @@ class PublicEventFusionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "explicit registry binding"):
             fusion.fuse_documents([dict(source, entity_registry={"registry_version": 99, "registry_hash": "fake"})])
 
+    def test_named_event_label_requires_date_and_never_fuses_separate_occurrences(self):
+        registry = json.loads((ROOT / "tests/fixtures/entity-registry/false-positives.v1.json").read_text(encoding="utf-8"))
+        before = document("POLICE", day="2026-09-20", named=None)
+        after = document("TRAFFIC", day="2026-09-21", named=None)
+        for row, day in ((before, "2026-09-20"), (after, "2026-09-21")):
+            row.update(agency_ids=[], location_ids=[], jurisdiction="臺中市", named_event_label="市政論壇", named_event_date=day)
+        events = fusion.fuse_documents([before, after], entity_registry=registry)
+        self.assertEqual(len(events), 2)
+        self.assertEqual({event["named_event_id"] for event in events}, {"named_event:forum-0920", "named_event:forum-0921"})
+        self.assertEqual({event["entity_registry"]["registry_hash"] for event in events}, {fusion._load_entity_registry_module().registry_hash(registry)})
+        with self.assertRaisesRegex(ValueError, "event_date"):
+            fusion.bind_document_entities(dict(before, named_event_date=None), registry)
+        with self.assertRaisesRegex(ValueError, "conflicts"):
+            fusion.bind_document_entities(dict(before, named_event_id="named_event:forum-0921"), registry)
+        with self.assertRaisesRegex(ValueError, "conflicts with document event_start_at"):
+            fusion.bind_document_entities(dict(before, named_event_date="2026-09-21"), registry)
+
+    def test_direct_named_event_id_must_match_document_jurisdiction_and_observed_date(self):
+        registry = json.loads((ROOT / "tests/fixtures/entity-registry/false-positives.v1.json").read_text(encoding="utf-8"))
+        direct = document("POLICE", named="named_event:forum-0920")
+        direct.update(jurisdiction="臺中市", agency_ids=[], location_ids=[], district_id=None)
+        bound = fusion.bind_document_entities(direct, registry)
+        self.assertEqual(bound["named_event_id"], "named_event:forum-0920")
+
+        named_scope_only = dict(direct)
+        named_scope_only.pop("jurisdiction")
+        named_scope_only["named_event_jurisdiction"] = "臺中市"
+        self.assertEqual(
+            fusion.bind_document_entities(named_scope_only, registry)["named_event_id"],
+            "named_event:forum-0920",
+        )
+
+        wrong_jurisdiction = dict(direct, jurisdiction="臺北市")
+        with self.assertRaisesRegex(ValueError, "conflicts with document jurisdiction"):
+            fusion.bind_document_entities(wrong_jurisdiction, registry)
+
+        wrong_date = dict(direct, event_start_at="2026-09-21T18:00:00+08:00")
+        with self.assertRaisesRegex(ValueError, "conflicts with document jurisdiction"):
+            fusion.bind_document_entities(wrong_date, registry)
+
+        missing_jurisdiction = dict(direct)
+        missing_jurisdiction.pop("jurisdiction")
+        with self.assertRaisesRegex(ValueError, "requires document jurisdiction"):
+            fusion.bind_document_entities(missing_jurisdiction, registry)
+
+        missing_observed_date = dict(direct, event_start_at=None)
+        with self.assertRaisesRegex(ValueError, "requires document jurisdiction"):
+            fusion.bind_document_entities(missing_observed_date, registry)
+
     def test_same_identity_with_district_conflict_stays_conflict(self):
         event = fusion.fuse_documents([document("POLICE"), document("TRAFFIC", district="location:tc-fengyuan")])[0]
         self.assertEqual(event["fusion_status"], "CONFLICT")
@@ -254,6 +308,62 @@ class PublicEventFusionTests(unittest.TestCase):
         self.assertTrue(current[0]["lkg"])
         self.assertEqual(current[0]["source_state"], "PARTIAL_LKG")
         self.assertEqual(len(current[0]["linked_document_versions"]), 3)
+
+    def test_partial_lkg_event_rebinds_to_changed_registry_receipt(self):
+        registry = fusion.load_entity_registry()
+        city = document("CITY")
+        city.update(agency_ids=["agency:tc-police"], location_ids=["location:tc-xitun"])
+        police = document("POLICE")
+        police.update(agency_ids=["agency:tc-traffic"], location_ids=["location:tc-xitun"])
+        previous = fusion.fuse_documents([city, police], entity_registry=registry)
+        previous_receipt = dict(previous[0]["entity_registry"])
+
+        changed_registry = json.loads(json.dumps(registry))
+        changed_registry["registry_version"] += 1
+        changed_registry["entities"].append({
+            "entity_id": "agency:tc-new",
+            "kind": "agency",
+            "canonical_label": "臺中市新機關",
+            "aliases": [],
+            "jurisdiction": "臺中市",
+            "status": "CONFIRMED",
+        })
+        current_receipt = fusion._load_entity_registry_module().registry_receipt(changed_registry)
+
+        current_document = document("FIRE", day="2026-09-21", named="event:current")
+        current_document.update(agency_ids=["agency:tc-fire"], location_ids=["location:tc-xitun"])
+        current = fusion.reconcile_public_events(
+            previous, [current_document], snapshot_complete=False, entity_registry=changed_registry
+        )
+        self.assertEqual(len(current), 2)
+        lkg_event = next(event for event in current if event["public_event_id"] == previous[0]["public_event_id"])
+        self.assertTrue(lkg_event["lkg"])
+        self.assertEqual(lkg_event["entity_registry"], current_receipt)
+        self.assertNotEqual(lkg_event["entity_registry"], previous_receipt)
+        self.assertEqual(previous[0]["entity_registry"], previous_receipt)
+
+        store = query_domain.build_event_store(current)
+        self.assertEqual(query_domain.validate_event_store(store)["entity_registry"], current_receipt)
+
+    def test_partial_lkg_event_fails_before_return_when_registry_id_is_retired(self):
+        registry = fusion.load_entity_registry()
+        city = document("CITY")
+        city.update(agency_ids=["agency:tc-police"], location_ids=["location:tc-xitun"])
+        previous = fusion.fuse_documents([city], entity_registry=registry)
+        previous_receipt = dict(previous[0]["entity_registry"])
+
+        changed_registry = json.loads(json.dumps(registry))
+        changed_registry["registry_version"] += 1
+        changed_registry["entities"] = [
+            entity for entity in changed_registry["entities"] if entity["entity_id"] != "agency:tc-police"
+        ]
+        changed_registry.setdefault("redirects", {})["agency:tc-police"] = ["agency:tc-traffic"]
+
+        with self.assertRaisesRegex(ValueError, "inactive or wrong-kind ID in agency_ids"):
+            fusion.reconcile_public_events(
+                previous, [], snapshot_complete=False, entity_registry=changed_registry
+            )
+        self.assertEqual(previous[0]["entity_registry"], previous_receipt)
 
     def test_background_requires_confirmed_exact_geography_and_period(self):
         event = fusion.fuse_documents([document("CITY"), document("POLICE")])[0]

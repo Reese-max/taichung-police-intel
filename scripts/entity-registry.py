@@ -475,6 +475,18 @@ def resolve(
     jurisdiction_norm = normalize(jurisdiction or "")
     index = build_index(registry)
 
+    # A canonical ID is authoritative only while active and within any explicit
+    # scope. Historical redirects are exposed by resolve_entity_id, never
+    # silently followed as a new canonical match.
+    for entity in registry["entities"]:
+        if entity["entity_id"] != text.strip():
+            continue
+        if entity["kind"] != kind or (jurisdiction is not None and normalize(entity.get("jurisdiction") or "") != jurisdiction_norm):
+            return no_match(registry, kind, text, jurisdiction)
+        if event_date is not None and entity.get("event_date") != event_date:
+            return no_match(registry, kind, text, jurisdiction)
+        return _resolved(entity, registry, match_method="EXACT_ID")
+
     if jurisdiction is not None and not (kind == "named_event" and event_date is None):
         entity = index.get((kind, jurisdiction_norm, event_date or "", query))
         if entity:
@@ -500,7 +512,7 @@ def resolve(
     return no_match(registry, kind, text, jurisdiction)
 
 
-def _resolved(entity: dict[str, Any], registry: dict[str, Any]) -> dict[str, Any]:
+def _resolved(entity: dict[str, Any], registry: dict[str, Any], *, match_method: str | None = None) -> dict[str, Any]:
     return {
         "status": "RESOLVED",
         "entity_id": entity["entity_id"],
@@ -509,7 +521,7 @@ def _resolved(entity: dict[str, Any], registry: dict[str, Any]) -> dict[str, Any
         "jurisdiction": entity.get("jurisdiction"),
         **({"event_date": entity["event_date"]} if entity.get("event_date") else {}),
         **registry_receipt(registry),
-        "match_method": "EXACT_NORMALIZED_ALIAS_AND_DATE" if entity.get("event_date") else "EXACT_NORMALIZED_ALIAS",
+        "match_method": match_method or ("EXACT_NORMALIZED_ALIAS_AND_DATE" if entity.get("event_date") else "EXACT_NORMALIZED_ALIAS"),
     }
 
 

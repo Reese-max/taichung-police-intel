@@ -90,6 +90,22 @@ class QueryDomainTests(unittest.TestCase):
         self.assertEqual(first["results"][0]["public_event_id"], "PE-1")
         self.assertEqual(first["results"][0]["documents"][0]["official_url"], "https://police.example/event")
 
+    def test_event_store_pins_one_registry_receipt_and_rejects_mixed_versions(self):
+        receipt = {"registry_version": 7, "registry_hash": "a" * 64}
+        first = {**event("PE-1"), "entity_registry": receipt}
+        second = {**event("PE-2"), "entity_registry": receipt}
+        store = domain.build_event_store([second, first])
+        self.assertEqual(store["entity_registry"], receipt)
+        self.assertEqual(domain.get_event(store, "PE-1")["entity_registry"], receipt)
+        tampered = copy.deepcopy(store)
+        tampered["entity_registry"] = {"registry_version": 7, "registry_hash": "b" * 64}
+        with self.assertRaisesRegex(ValueError, "registry metadata mismatch"):
+            domain.validate_event_store(tampered)
+        with self.assertRaisesRegex(ValueError, "must be uniform"):
+            domain.build_event_store([first, event("PE-3")])
+        with self.assertRaisesRegex(ValueError, "must be uniform"):
+            domain.build_event_store([first, {**second, "entity_registry": {"registry_version": 8, "registry_hash": "c" * 64}}])
+
     def test_event_get_and_compare_keep_safe_version_projection(self):
         store = domain.build_event_store([event()])
         result = domain.get_event(store, "PE-1")

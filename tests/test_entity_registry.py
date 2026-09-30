@@ -1,4 +1,5 @@
 import importlib.util
+import json
 from pathlib import Path
 import unittest
 
@@ -37,6 +38,16 @@ class EntityRegistryTests(unittest.TestCase):
             for name in ("臺中市政府警察局", "臺中市警局", "中市警")
         }
         self.assertEqual(ids, {"agency:tc-police"})
+
+    def test_exact_id_precedes_alias_but_respects_kind_scope_and_date(self):
+        registry = json.loads((ROOT / "tests/fixtures/entity-registry/false-positives.v1.json").read_text(encoding="utf-8"))
+        exact = er.resolve(registry, "agency", "agency:tc-police-fixture", "台中市")
+        self.assertEqual((exact["entity_id"], exact["match_method"]), ("agency:tc-police-fixture", "EXACT_ID"))
+        self.assertEqual(er.resolve(registry, "agency", "agency:tc-police-fixture", "高雄市")["status"], "NO_MATCH")
+        self.assertEqual(er.resolve(registry, "location", "agency:tc-police-fixture")["status"], "NO_MATCH")
+        self.assertEqual(er.resolve(registry, "named_event", "named_event:forum-0920", "臺中市", "2026-09-21")["status"], "NO_MATCH")
+        self.assertEqual(er.resolve(registry, "agency", "中市警")["status"], "AMBIGUOUS")
+        self.assertEqual(er.resolve(registry, "agency", "中市警", "台中市")["entity_id"], "agency:tc-police-fixture")
 
     def test_tai_and_taiwan_normalization_is_deterministic(self):
         road = er.resolve(self.registry, "location", "台灣大道", "台中市")
