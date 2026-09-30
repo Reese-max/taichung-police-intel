@@ -35,6 +35,7 @@ Every publishable fact must retain, when applicable:
 - `WRITTEN_OFFICIAL`: a written response whose publisher and addressee are identifiable.
 - `RESOLUTION`: a council review opinion or resolution, not an agency response.
 - `GROQ_ASR`: derived navigation text; formal citation returns to official media.
+- `LIVE_ASR_PROVISIONAL`: opt-in live-session ASR text; navigation/bookmark only, never a formal fact until a post-event reconciliation receipt confirms it against official sources.
 - `UNVERIFIED_AFTER_MEETING`: no systematic official post-meeting implementation evidence exists.
 
 ## External actions
