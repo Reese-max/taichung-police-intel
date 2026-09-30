@@ -51,8 +51,45 @@ class CandidateObservationWindowTests(unittest.TestCase):
         reports[0] = (reports[0][0], report(days[0], failed_count=1))
         result = module.validate_reports(reports)
         self.assertEqual(result["status"], "BLOCKED")
-        self.assertTrue(any("not an all-source observation" in reason for reason in result["reasons"]))
+        self.assertTrue(any("not a successful observation" in reason for reason in result["reasons"]))
         self.assertTrue(any("missing observation days" in reason for reason in result["reasons"]))
+
+    def test_independent_source_reports_for_each_day_pass(self):
+        start = date(2026, 9, 15)
+        reports = [
+            (f"{day}-{source_id}.json", report(day, source_ids=(source_id,)))
+            for day in (start + timedelta(days=offset) for offset in range(7))
+            for source_id in ("S-001", "S-031")
+        ]
+        result = module.validate_reports(reports)
+        self.assertEqual(result["status"], "PASS")
+        self.assertEqual(result["source_ids"], ["S-001", "S-031"])
+        self.assertTrue(all(row["window_complete"] for row in result["sources"].values()))
+
+    def test_failed_source_does_not_hide_healthy_source(self):
+        start = date(2026, 9, 15)
+        reports = [
+            (
+                f"{day}-{source_id}.json",
+                report(day, source_ids=(source_id,), failed_count=int(offset == 3 and source_id == "S-001")),
+            )
+            for offset in range(7)
+            for day in (start + timedelta(days=offset),)
+            for source_id in ("S-001", "S-031")
+        ]
+        result = module.validate_reports(reports)
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertFalse(result["sources"]["S-001"]["window_complete"])
+        self.assertTrue(result["sources"]["S-031"]["window_complete"])
+
+    def test_duplicate_source_day_blocks(self):
+        day = date(2026, 9, 15)
+        result = module.validate_reports([
+            ("first.json", report(day, source_ids=("S-032",))),
+            ("repeat.json", report(day, source_ids=("S-032",))),
+        ], required_days=1)
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertFalse(result["sources"]["S-032"]["window_complete"])
 
     def test_source_inventory_change_blocks(self):
         start = date(2026, 9, 15)

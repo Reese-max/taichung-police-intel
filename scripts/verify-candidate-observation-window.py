@@ -47,9 +47,10 @@ def validate_reports(
         raise ValueError("required_days must be positive")
 
     reasons: list[str] = []
-    expected_ids: tuple[str, ...] | None = None
     source_observations: dict[str, list[dict[str, Any]]] = {}
-    seen_report_times: set[str] = set()
+    day_sources: dict[str, list[str]] = {}
+    seen_source_days: set[tuple[str, str]] = set()
+    duplicate_sources: set[str] = set()
     report_summaries: list[dict[str, Any]] = []
 
     for path, report in reports:
@@ -59,11 +60,6 @@ def validate_reports(
         except ValueError as exc:
             reasons.append(f"{path}: {exc}")
             local_day = None
-        if not isinstance(observed_at, str) or observed_at in seen_report_times:
-            reasons.append(f"{path}: duplicate or missing observed_at")
-        if isinstance(observed_at, str):
-            seen_report_times.add(observed_at)
-
         rows = report["sources"]
         raw_ids = [row.get("source_id") for row in rows if isinstance(row, dict)]
         ids = tuple(sorted(source_id for source_id in raw_ids if isinstance(source_id, str)))
@@ -71,44 +67,52 @@ def validate_reports(
             reasons.append(f"{path}: invalid source inventory")
         if len(ids) != len(set(ids)):
             reasons.append(f"{path}: duplicate source_id")
-        if expected_ids is None:
-            expected_ids = ids
-        elif ids != expected_ids:
-            reasons.append(f"{path}: source inventory changed")
+        if local_day:
+            day_sources.setdefault(local_day.isoformat(), []).extend(ids)
 
         failed_count = report.get("failed_count")
-        if report.get("status") != "OBSERVED" or failed_count != 0:
-            reasons.append(f"{path}: report is not an all-source observation")
+        report_valid = report.get("status") == "OBSERVED" and failed_count == 0
+        if not report_valid:
+            reasons.append(f"{path}: report is not a successful observation")
 
         for row in rows:
             if not isinstance(row, dict):
                 reasons.append(f"{path}: source row is not an object")
                 continue
             source_id = row.get("source_id")
-            if not isinstance(source_id, str):
+            if not isinstance(source_id, str) or not re.fullmatch(r"S-\d{3,4}", source_id):
                 continue
             schema = row.get("schema_contract") or {}
+            row_reasons: list[str] = []
             if not isinstance(schema, dict):
-                reasons.append(f"{path}:{source_id}: invalid schema contract")
+                row_reasons.append("invalid schema contract")
                 schema = {}
             manifest = row.get("manifest_sha256")
             if row.get("integration_status") != "CANDIDATE":
-                reasons.append(f"{path}:{source_id}: not a candidate observation")
+                row_reasons.append("not a candidate observation")
             if row.get("promotion_eligible") is not False:
-                reasons.append(f"{path}:{source_id}: promotion flag is not false")
+                row_reasons.append("promotion flag is not false")
             if row.get("coverage_independently_verified") is not False:
-                reasons.append(f"{path}:{source_id}: coverage verification flag is unsafe")
+                row_reasons.append("coverage verification flag is unsafe")
             if row.get("source_health") not in GOOD_HEALTH_STATUSES:
-                reasons.append(f"{path}:{source_id}: source health is not usable")
+                row_reasons.append("source health is not usable")
             if row.get("collector_window_claim") not in GOOD_WINDOW_CLAIMS:
-                reasons.append(f"{path}:{source_id}: invalid window claim")
+                row_reasons.append("invalid window claim")
             if not isinstance(manifest, str) or not re.fullmatch(r"[0-9a-f]{64}", manifest):
-                reasons.append(f"{path}:{source_id}: invalid manifest")
+                row_reasons.append("invalid manifest")
             if schema.get("status") not in GOOD_SCHEMA_STATUSES or schema.get("review_required"):
-                reasons.append(f"{path}:{source_id}: schema requires review")
+                row_reasons.append("schema requires review")
+            reasons.extend(f"{path}:{source_id}: {reason}" for reason in row_reasons)
+            day_key = (local_day.isoformat(), source_id) if local_day else None
+            if day_key and day_key in seen_source_days:
+                reasons.append(f"{path}:{source_id}: duplicate observation day")
+                duplicate_sources.add(source_id)
+            if day_key:
+                seen_source_days.add(day_key)
             source_observations.setdefault(source_id, []).append({
                 "observed_at": observed_at,
                 "local_date": local_day.isoformat() if local_day else None,
+                "valid": report_valid and not row_reasons and local_day is not None,
                 "source_health": row.get("source_health"),
                 "window_completeness": row.get("collector_window_claim"),
                 "schema_status": schema.get("status"),
@@ -122,32 +126,42 @@ def validate_reports(
             "failed_count": failed_count,
         })
 
+    expected_ids: tuple[str, ...] | None = None
+    for day, ids in sorted(day_sources.items()):
+        daily_ids = tuple(sorted(set(ids)))
+        if expected_ids is None:
+            expected_ids = daily_ids
+        elif daily_ids != expected_ids:
+            reasons.append(f"{day}: source inventory changed")
+
     sources: dict[str, dict[str, Any]] = {}
-    for source_id in expected_ids or ():
+    for source_id in sorted(source_observations):
         observations = sorted(
             source_observations.get(source_id, []),
             key=lambda item: item["observed_at"] or "",
         )
         days = sorted({item["local_date"] for item in observations if item["local_date"]})
-        if len(days) < required_days:
-            reasons.append(f"{source_id}: only {len(days)} observed days; need {required_days}")
+        valid_days = sorted({item["local_date"] for item in observations if item["valid"]})
+        if len(valid_days) < required_days:
+            reasons.append(f"{source_id}: only {len(valid_days)} valid observed days; need {required_days}")
         missing_days: list[str] = []
-        if days:
-            first = date.fromisoformat(days[0])
-            last = date.fromisoformat(days[-1])
+        if valid_days:
+            first = date.fromisoformat(valid_days[0])
+            last = date.fromisoformat(valid_days[-1])
             expected = {(
                 first + timedelta(days=offset)
             ).isoformat() for offset in range((last - first).days + 1)}
-            missing_days = sorted(expected - set(days))
+            missing_days = sorted(expected - set(valid_days))
             if missing_days:
                 reasons.append(f"{source_id}: missing observation days {','.join(missing_days)}")
         sources[source_id] = {
             "observation_count": len(observations),
             "observed_days": days,
+            "valid_observed_days": valid_days,
             "missing_days": missing_days,
             "first_observed_at": observations[0]["observed_at"] if observations else None,
             "last_observed_at": observations[-1]["observed_at"] if observations else None,
-            "window_complete": len(days) >= required_days and not missing_days,
+            "window_complete": len(valid_days) >= required_days and not missing_days and source_id not in duplicate_sources,
             "promotion_eligible": False,
         }
 
@@ -155,7 +169,7 @@ def validate_reports(
         "schema_version": 1,
         "validation_scope": "CANDIDATE_OBSERVATION_WINDOW_NOT_PROMOTION",
         "required_observation_days": required_days,
-        "source_ids": list(expected_ids or ()),
+        "source_ids": sorted(source_observations),
         "report_count": len(reports),
         "status": "PASS" if not reasons else "BLOCKED",
         "promotion_eligible": False,
