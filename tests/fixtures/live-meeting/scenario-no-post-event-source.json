@@ -1,0 +1,24 @@
+{
+  "scenario": "no-post-event-source",
+  "covers": "With no official post-event source, candidates stay UNRESOLVED and never enter formal publication.",
+  "session": {
+    "source_id": "S-010",
+    "official_source_url": "https://www.tccc.gov.tw/",
+    "stream_url": "https://vod.tccc.gov.tw/live/no-source.m3u8",
+    "started_at": "2026-09-21T10:00:00+08:00",
+    "max_duration_seconds": 1800,
+    "transport_enabled": true,
+    "provider_authorized": true,
+    "budget_seconds": 1800,
+    "session_id": "LM-FX-NOSOURCE"
+  },
+  "ops": [
+    {"op": "append_segment", "sequence": 0, "start_seconds": 0, "end_seconds": 60, "text": "沒有官方紀錄的片段", "at": "2026-09-21T10:01:00+08:00", "finalized": true},
+    {"op": "bookmark", "segment_ids": ["$seg:0"], "reason_code": "REVIEW", "at": "2026-09-21T10:01:30+08:00"},
+    {"op": "stop_session", "at": "2026-09-21T10:30:00+08:00"},
+    {"op": "reconcile", "at": "2026-09-30T09:00:00+08:00", "candidates": [
+      {"candidate_id": "$bookmark:0", "outcome": "UNRESOLVED"}
+    ], "expect": {"status": "RECONCILING", "formal_count": 0}}
+  ],
+  "expect": {"status": "RECONCILING", "receipt_count": 1, "formal_count": 0}
+}

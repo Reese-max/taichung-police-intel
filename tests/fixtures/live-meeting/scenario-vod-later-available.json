@@ -1,0 +1,27 @@
+{
+  "scenario": "vod-later-available",
+  "covers": "A pending official source stays SOURCE_NOT_YET_AVAILABLE until the VOD arrives, then confirms via a new receipt.",
+  "session": {
+    "source_id": "S-010",
+    "official_source_url": "https://www.tccc.gov.tw/",
+    "stream_url": "https://vod.tccc.gov.tw/live/late-vod.m3u8",
+    "started_at": "2026-09-21T10:00:00+08:00",
+    "max_duration_seconds": 1800,
+    "transport_enabled": true,
+    "provider_authorized": true,
+    "budget_seconds": 1800,
+    "session_id": "LM-FX-LATEVOD"
+  },
+  "ops": [
+    {"op": "append_segment", "sequence": 0, "start_seconds": 0, "end_seconds": 60, "text": "待核對片段", "at": "2026-09-21T10:01:00+08:00", "finalized": true},
+    {"op": "bookmark", "segment_ids": ["$seg:0"], "reason_code": "REVIEW", "at": "2026-09-21T10:01:30+08:00"},
+    {"op": "stop_session", "at": "2026-09-21T10:30:00+08:00", "expect": {"status": "ENDED"}},
+    {"op": "reconcile", "at": "2026-09-21T12:00:00+08:00", "candidates": [
+      {"candidate_id": "$bookmark:0", "outcome": "SOURCE_NOT_YET_AVAILABLE"}
+    ], "expect": {"status": "RECONCILING", "receipt_count": 1, "formal_count": 0}},
+    {"op": "reconcile", "at": "2026-09-23T09:00:00+08:00", "candidates": [
+      {"candidate_id": "$bookmark:0", "outcome": "CONFIRMED_BY_OFFICIAL_MEDIA", "official_source_id": "S-010", "official_url": "https://vod.tccc.gov.tw/wb_news02.asp?url=101", "official_locator": "timestamp:0-60", "official_document_version": "VOD-20260923", "official_text_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}
+    ], "expect": {"status": "RECONCILED", "receipt_count": 2, "superseded_count": 1, "formal_count": 1}}
+  ],
+  "expect": {"status": "RECONCILED", "receipt_count": 2, "superseded_count": 1}
+}
