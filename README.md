@@ -1,12 +1,30 @@
 # GovIntel AI｜跨機關公共事件整合、異動辨識與交班支援平台
 
+## Current GovIntel snapshot and 2026 judge entry (checked 2026-09-30)
+
+**承辦任務：**找出跨機關公開公告的實質版本／時間變更，回查官方原文，再判斷舊交班稿是否需要重核。現行公開產品仍是臺中議會／市政五來源備詢簡報與證據導覽；新跨機關事件與交班流程尚未成為正式發布能力。
+
+**評審路徑：**[3–5 分鐘固定版本重播、來源矩陣、功能差異與評測限制](./docs/govintel/competition-2026/JUDGE_PATH.md)。可開[公開展示](https://reese-max.github.io/taichung-police-intel/)或依路徑執行本地 fixture；展示網址可用不代表最新資料已通過 hash／部署驗收。
+
+| 固定狀態 | 目前主張與證據 |
+|---|---|
+| `PRODUCTION_ACTIVE` | 五來源 council 靜態展示與官方影音導覽在公開 Pages 提供；[公開 source status](https://reese-max.github.io/taichung-police-intel/data/source-status.json) 的最新可讀內容為 `2026-09-30T09:26:28+08:00`，整批狀態 `PARTIAL`，不表示五個來源都新鮮。 |
+| `IMPLEMENTED_NOT_PRODUCTION` | [Query Gateway](./docs/govintel/issue-30-runtime-boundaries.md)、[官方文件 locator](./docs/govintel/issue-48-official-document-replay.md)、[PublicEvent fixture](./docs/govintel/issue-24-public-event-fusion.md)與[本地交班流程](./docs/govintel/issue-23-handoff-flow.md)可重播；正式跨機關服務與真人驗收未完成。 |
+| `CANDIDATE_CANARY` | S-001／019／031／032／033 仍是候選擴源；[PR #16](https://github.com/Reese-max/taichung-police-intel/pull/16)仍開啟，沒有 promotion／正式發布收據。 |
+| `DESIGN_ONLY` | [Twinkle＋官方直連策略](./docs/govintel/TWINKLE_HYBRID_SOURCES.md)與[正文複查計畫](./docs/govintel/issue-21-detail-recheck.md)不代表 live client 或完整跨機關覆蓋。 |
+| `BLOCKED` | [Issue #20](https://github.com/Reese-max/taichung-police-intel/issues/20)：最新自然排程 [36655070187](https://github.com/Reese-max/taichung-police-intel/actions/runs/36655070187)完成建置、artifact upload 與 Pages deploy，但公開資料驗證因 `data/source-status.json` hash/status mismatch 失敗，Query Gateway 驗證跳過，沒有新的已驗證發布收據。 |
+
+**資料與驗證時間：**目前 `main@639697c815fe6fa48fca5022a0d410662d9a59c7` 的主幹 verify [36537639155](https://github.com/Reese-max/taichung-police-intel/actions/runs/36537639155) 成功；這是程式 CI，不是晨晚排程或匿名資料 hash 驗收。2026-09-30 查核時，公開首頁與 source-status URL 均回 HTTP 200；該 JSON 記錄 MORNING `PARTIAL`，S-006／S-009 為 `FRESH`，S-004／S-007 為 `STALE`，S-029 為 `FAILED`／`STALE`。真人 A/B/C 成效、正式資格與報名回執仍 `NOT_RUN`／`UNVERIFIED`。
+
+README 下方 2026-09-22 產品快照與 2026-08 Kiro 參賽資料均保留為歷史背景；本段與[現行評審路徑](./docs/govintel/competition-2026/JUDGE_PATH.md)才是本次查核狀態。
+
 The former competition prototype name was **Taichung Police Public Intelligence**; this repository now documents the current GovIntel AI product.
 
 An evidence-first public-information monitor that helps police policy staff prepare for council questions in five minutes.
 
 The demo compresses official Taichung council and government sources into one workflow: identify a priority issue, inspect source health and intelligence gaps, then jump to the exact official video timestamp. Chinese is the end-user language; the homepage toggle provides the complete English judge path.
 
-## Current GovIntel state (2026-09-22)
+## Historical GovIntel state snapshot (2026-09-22)
 
 | Area | State | Evidence boundary |
 |---|---|---|
