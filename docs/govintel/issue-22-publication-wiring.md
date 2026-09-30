@@ -24,3 +24,5 @@
 - S-001／S-019／S-031／S-032／S-033 的連續觀察窗口與 promotion receipt；
 - S-001 穩定 live 取得與完整分頁證據；
 - #20 protected-main-safe workflow 的合併、實際排程、Pages deploy 與匿名 HTTP/hash 驗證。
+
+2026-09-30 的新一輪候選觀察：S-032 取得 10 筆列表／7 日窗口 8 筆，S-031 取得 10 筆即時快照（窗口仍為 `PARTIAL`）。S-033 改接臺中市政府官方市政新聞 RSS，取得 500 筆列表／7 日窗口 69 筆，`NO_DRIFT`；來源轉載不算獨立佐證。S-001 的主入口與同站備援入口在本機均逾時。新增每日逐來源 GitHub Actions 觀察與各自的 21 日 artifact；這些仍是單日候選證據，不能取代七日窗口、正式 promotion receipt 或公開發布驗收。

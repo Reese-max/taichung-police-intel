@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-09-21",
+  "updated_at": "2026-09-30",
   "purpose": "GovIntel AI prioritized public-source catalog for event detection, evidence, policy/reference data, and enrichment.",
   "status_semantics": {
     "PRODUCTION_ACTIVE": "Already used by the current production collector path.",
@@ -205,18 +205,18 @@
     },
     {
       "source_id": "S-033",
-      "name": "臺中市政府新聞局市政新聞與最新消息",
-      "authority": "臺中市政府新聞局",
+      "name": "臺中市政府市政新聞",
+      "authority": "臺中市政府",
       "role": "PRIMARY_EVENT",
       "priority": 1,
       "status": "VERIFIED_CANDIDATE",
-      "entrypoint": "https://www.news.taichung.gov.tw/",
+      "entrypoint": "https://www.taichung.gov.tw/",
       "transport": "Official RSS feed + HTML detail",
-      "list_endpoint": "https://www.news.taichung.gov.tw/31034/564777/rss?nodeId=14813",
+      "list_endpoint": "https://www.taichung.gov.tw/10179/564770/rss?nodeId=9962",
       "cadence_class": "FAST_EVENT",
       "recommended_interval_minutes": 30,
-      "collection_rule": "Use as cross-agency discovery and second official confirmation; preserve publishing agency and date.",
-      "evidence_rule": "Official city-news detail page can confirm statements attributed to the city government.",
+      "collection_rule": "Use the official citywide RSS for cross-agency discovery; preserve its publication date and detail link. Do not treat syndicated agency posts as independent corroboration.",
+      "evidence_rule": "The linked city-government detail page is the primary official evidence for that post.",
       "promotion_order": 4
     },
     {
