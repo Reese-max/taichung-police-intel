@@ -1,60 +1,31 @@
 # GovIntel AI｜跨機關公共事件整合、異動辨識與交班支援平台
 
-The former competition prototype name was **Taichung Police Public Intelligence**; this repository now documents the current GovIntel AI product.
+**承辦任務：**從公開的跨機關公告找出同一事件的版本與時間異動，核對官方原文，再判斷哪份交班稿需要重核。現行公開服務仍以五個臺中議會／市政來源的備詢簡報與證據導覽為主；新增事件融合與交班流程尚未成為正式發布能力。
 
-An evidence-first public-information monitor that helps police policy staff prepare for council questions in five minutes.
+**2026 評審入口：**[3–5 分鐘可重播路徑、來源矩陣、版本差異與評測邊界](./docs/govintel/competition-2026/JUDGE_PATH.md)。先看下表，再選[公開網站](https://reese-max.github.io/taichung-police-intel/)或固定版本的本地 fixture；公開頁面不能代替新能力的正式部署證明。
 
-The demo compresses official Taichung council and government sources into one workflow: identify a priority issue, inspect source health and intelligence gaps, then jump to the exact official video timestamp. Chinese is the end-user language; the homepage toggle provides the complete English judge path.
-
-## Current GovIntel state (2026-09-22)
-
-| Area | State | Evidence boundary |
-|---|---|---|
-| Five-source council publication baseline | `PRODUCTION_ACTIVE` in the repository path | Checked-in source/status contracts pass; current public deployment is not verified here |
-| Shared source policy, query coverage, official document replay, Dashboard discovery adapter | `IMPLEMENTED_NOT_PRODUCTION` | Local deterministic tests and receipts; no scheduled activation or public deployment claim |
-| S-001/S-019/S-031/S-032/S-033 source expansion | `CANDIDATE_CANARY` | List/live adapters and fixtures exist; live seven-day promotion evidence remains open under #14/#22 |
-| PublicEvent fusion and NPA source matrix | `IMPLEMENTED_NOT_PRODUCTION` | Conservative core and offline fixtures; no live collector/UI write path |
-| Bounded public live-meeting session and post-event reconciliation core | `IMPLEMENTED_NOT_PRODUCTION` | `python scripts/live-meeting.py self-check`; fixture-only state machine, no live provider transport or unattended ASR |
-| Twinkle/public API overlay and full cross-agency real-time coverage | `DESIGN_ONLY` | Strategy and candidate metadata only; no automatic promotion |
-| Scheduled publication merge, natural MORNING/EVENING proof, current anonymous hash check | `BLOCKED` | #20 still needs normal review/merge and real production evidence |
-| Human task evaluation, adoption, award, and official submission receipt | `NOT_RUN` / `UNVERIFIED` | No scores or institutional adoption claims are populated |
-
-The current judge entry is [docs/govintel/competition-2026/README.md](./docs/govintel/competition-2026/README.md). Historical Kiro/prototype receipts remain below and are labelled as historical.
-
-## Judge path
-
-1. Read the priority brief on the homepage.
-2. Check the five official sources for health, freshness, gaps, and last-known-good.
-3. Open the evidence drawer.
-4. Click a transcript segment or word to seek the official council video.
-5. Review `.kiro/` and [Kiro usage evidence](./docs/KIRO_USAGE.md).
-
-## Historical prototype receipts (not current deployment evidence)
-
-| Deliverable | Current state |
+| 狀態（2026-09-29 查核） | 能力與證據 |
 |---|---|
-| Working application | Local static production build passes |
-| Public demo | [https://reese-max.github.io/taichung-police-intel](https://reese-max.github.io/taichung-police-intel) returned anonymous HTTP 200 on 2026-09-22; public [`data/source-status.json`](https://reese-max.github.io/taichung-police-intel/data/source-status.json) is still the older 2026-09-11 snapshot, not this checkout's candidate |
-| Demo video | [2:43 English-captioned MP4](https://reese-max.github.io/taichung-police-intel/demo-video.mp4) — verified anonymously in Chrome 2026-08-24 |
-| Twice-daily updates | GitHub Actions schedules 06:30 and 18:30 Asia/Taipei; a current successful schedule pair is not proven here |
-| Source observability | Five official-source adapters emit health, completeness, gaps, SHA-256, and last-known-good; the checked-in snapshot remains subject to its recorded freshness |
-| Evidence navigation | 86 transcript segments and 1,036 word timestamps seek the official HLS video |
-| English judge path | Complete homepage, source-monitor, evidence-drawer, control, limitation, and official-source translation path passes browser QA |
-| Kiro assets | Four Steering files, three Specs, and three executable Hooks are checked in |
-| Kiro live-session proof | Authenticated V3 Spec sessions reviewed the architecture and implemented the English homepage path with executable acceptance tests |
-| Kiro model and usage | The three retained current-workspace sessions used Auto (`qdev::auto` in local records) and consumed 13.006002 credits; Auto did not disclose its routed base model |
-| Submission package | English README, script, checklist, submission draft, and captioned video are present; entrant details and form receipt remain pending |
+| `PRODUCTION_ACTIVE` | [source catalog](./docs/govintel/source-catalog.v2.json) 與 [source policy](./apps/web/public/data/source-policy.json) 指定 S-004／006／007／009／029 為正式五來源。匿名[公開 source status](https://reese-max.github.io/taichung-police-intel/data/source-status.json) 於本次查核為 HTTP 200，但 `generated_at=2026-09-24T23:18:12+08:00`；這是已發布舊資料，不是今日蒐集成功。 |
+| `IMPLEMENTED_NOT_PRODUCTION` | [Query Gateway](./docs/govintel/issue-30-runtime-boundaries.md)、[官方文件 locator](./docs/govintel/issue-48-official-document-replay.md)、[PublicEvent fixture](./docs/govintel/issue-24-public-event-fusion.md)、[本地交班版本](./docs/govintel/issue-23-handoff-flow.md) 有程式與重播測試；正式多來源事件／交班上線及真人驗收仍缺。 |
+| `CANDIDATE_CANARY` | S-001／019／031／032／033 有[限量觀測紀錄](./docs/govintel/issue-22-publication-wiring.md)；[PR #16](https://github.com/Reese-max/taichung-police-intel/pull/16) 仍開啟，來源未升格。 |
+| `DESIGN_ONLY` | [Twinkle＋官方直連策略](./docs/govintel/TWINKLE_HYBRID_SOURCES.md)與[最新資訊複查規劃](./docs/govintel/issue-21-detail-recheck.md)不等於 live client、完整正文覆蓋或正式服務。 |
+| `BLOCKED` | [#20 排程發布驗收](https://github.com/Reese-max/taichung-police-intel/issues/20)仍開啟。受保護 main 的直推缺陷已於 [PR #26](https://github.com/Reese-max/taichung-police-intel/pull/26) 合併修復；但本版最新[自然排程 36511458406](https://github.com/Reese-max/taichung-police-intel/actions/runs/36511458406)驗證失敗、跳過部署。仍缺成功 EVENING、新晨晚收據及 artifact-upload 失敗演練。 |
+
+**版本／資料時間：**本表核對 `main@bd9adc647a2a91b54487d96869bd2d56eacea26e`；該 commit 的[主幹 verify](https://github.com/Reese-max/taichung-police-intel/actions/runs/36487310563)成功且執行 22 步，與失敗的自然排程是不同驗證。倉庫內的 [source-status snapshot](./apps/web/public/data/source-status.json) 是 `2026-09-11T08:23:26+08:00`，與公開服務所回傳的 9 月 24 日版本不同。後續發佈可能改變公開資料；評審應重新讀取其 `generated_at`、來源健康、缺口及 [#20](https://github.com/Reese-max/taichung-police-intel/issues/20) 的最新執行結果。真人績效、正式報名與機關採用均未驗證。
+
+舊名 **Taichung Police Public Intelligence** 的 2026 年 8 月 Kiro 參賽作品、影片、使用紀錄與當時截止日期保留在下方的「Historical Kiro competition package」；它們是歷史佐證，並非本次 GovIntel 參賽規則或新功能成果。
 
 ## Problem and users
 
 Police policy and council-liaison staff must monitor scattered official pages, proposals, reports, meeting records, and videos. Finding what changed can take one to two hours, and a summary without a source locator is difficult to trust under questioning.
 
-This competition version focuses on one real task: preparing for a council question. It uses public information only and excludes internal duty data, emergency dispatch, 110 calls, case-level criminal data, personal data, and operational command functions.
+The deployed council prototype focuses on preparing for a council question. The 2026 GovIntel extension targets cross-agency public-event handoff, with the implementation and publication boundaries listed above. Both use public information only and exclude internal duty data, emergency dispatch, 110 calls, case-level criminal data, personal data, and operational command functions.
 
 ## What works
 
 - A focused council-preparation brief for a police policy user.
-- Five live official-source adapters with isolated failure handling.
+- Five official-source adapters with isolated failure handling; recent scheduled publication remains under [#20](https://github.com/Reese-max/taichung-police-intel/issues/20).
 - Source health kept separate from date-window completeness.
 - Intelligence-gap reasons instead of silently turning collection failure into zero results.
 - Last-known-good retained when a later source fetch fails.
@@ -202,13 +173,13 @@ The read-only Taiwan Intel Dashboard discovery consumer is replayable with `pyth
 - a push to `main` restores the durable publication checkpoint, then builds and deploys the reviewed snapshot;
 - `30 22 * * *` UTC refreshes the morning slot at 06:30 Asia/Taipei;
 - `30 10 * * *` UTC refreshes the evening slot at 18:30 Asia/Taipei;
-- the current candidate workflow persists the generated V1/V2 checkpoint to the dedicated `publication-state` branch, never directly to protected `main`, then deploys the same verified static artifact;
+- the merged workflow persists the generated V1/V2 checkpoint to the dedicated `publication-state` branch, never directly to protected `main`, then deploys the same verified static artifact when all gates pass;
 - manual dispatch can refresh either slot.
 
 The `publication-state` checkpoint lifecycle is now part of `main`; deployment
 still requires a successful Pages workflow and anonymous HTTPS readback.
 
-After the repository is public, enable Pages with **Source: GitHub Actions**. The deployed demo and repository URLs are recorded in [SUBMISSION.md](./SUBMISSION.md). A workflow file is not deployment evidence; acceptance requires an anonymous HTTPS check.
+Pages is public with **Source: GitHub Actions**. The historical submission draft is in [SUBMISSION.md](./SUBMISSION.md). A workflow file or successful push-triggered deployment is not a fresh scheduled-publication receipt; acceptance requires anonymous HTTPS version and hash checks.
 
 Repository: `https://github.com/Reese-max/taichung-police-intel`
 Demo: `https://reese-max.github.io/taichung-police-intel` (anonymous HTTPS readback is required after every publication). Inspect the public `data/source-status.json` for the current snapshot `generated_at`, each source's `last_checked_at`, and official `data_as_of`; a healthy source can remain `STALE` when its latest official record is old, and that state must not be read as proof that no current event exists.

@@ -1,12 +1,12 @@
 # GovIntel AI｜內政黑客松交付與驗證入口
 
-更新：2026-09-22。本文是參賽準備與交付計畫，不是獲獎保證、報名回執或正式採用證明。
+本頁保存 2026-09-22 的參賽準備／評測計畫。**請先讀[2026-09-29 現行評審入口](JUDGE_PATH.md)**，取得最新主幹、公開資料時間、固定狀態、官方來源矩陣、可重播四分鐘展示與舊／新功能差異。下方按當時工作狀態書寫，不是現行部署或送件回執。
 
 **價值主張：讓承辦人知道跨機關公告改了什麼、哪份舊交班稿需要重核，並能回到原文確認。**
 
 沿用 [GovIntel 主計畫](../GOVINTEL_PLAN.md)。README 既有 Kiro 競賽證據屬歷史原型；不得把其八月截止日期、舊影片或舊試用當成本次比賽的規則與成果。當屆資格、報名期間、評分比重、既有作品認定及格式須取得官方原件確認，本頁不重複未重新驗證的數字。
 
-## 0. Current judge path（3–5 分鐘）
+## 0. 歷史規劃時的 judge path（由現行入口取代）
 
 1. 先看本頁的 current status 與 limitation，再看根目錄 README 的 evidence links。
 2. 在 checkout 重播三個核心 receipt：
@@ -21,7 +21,7 @@
 
 目前公開 Pages 的版本/hash 尚未在本 checkout 重新核對；本地 receipts、HTTP 200 或 CI 成功都不替代 deployment/public reachability/user validation。
 
-## 0.1 Current status snapshot
+## 0.1 2026-09-22 規劃狀態快照（非現況）
 
 | 能力 | 固定狀態 | 可重播證據 |
 |---|---|---|
@@ -36,7 +36,7 @@
 | 排程發布、晨晚自然 run、匿名版本/hash | `BLOCKED` | #20；需正常 review/merge 與正式環境證據 |
 | 真人成效／機關採用／得獎 | `NOT_RUN` / `UNVERIFIED` | `evaluation-manifest.template.json` 保持 null |
 
-## 1. 這輪真的交付什麼
+## 1. 2026-09-22 當輪交付說明（歷史）
 
 本分支目前包含前端快照年齡判斷、發布階段留證、bounded detail-recheck／handoff／事件融合核心、受限 Query Gateway 與測試，並包含 #20 的
 `publication-state` 分支修復候選，**尚未合併／部署**。因此不能把候選流程
