@@ -1,0 +1,12 @@
+{
+  "repo": "Reese-max/taichung-police-intel",
+  "issue": 62,
+  "base_sha": "639697c815fe6fa48fca5022a0d410662d9a59c7",
+  "red_proof": "Before implementation: node --test apps/web/tests/release-manifest.test.mjs exited 1, tests 6 / pass 0 / fail 6; TypeError: gateway.buildSnapshot is not a function; MODULE_NOT_FOUND scripts/build-release-manifest.mjs. python -X utf8 -B -m unittest discover -s tests -p test_release_verification.py -v exited 1: test_each_worker_surface_must_match_the_pages_release (route='health', field='code_sha') ... FAIL; Ran 6 tests; FAILED (failures=49, errors=1). UI client test also failed with ERR_MODULE_NOT_FOUND before implementation; explicit loopback regression failed because /data/release.json was fetched instead of http://127.0.0.1:8788/query before its fix.",
+  "test_command": "node --test apps/web/tests/release-manifest.test.mjs apps/web/tests/query-release-client.test.mjs apps/web/tests/query-gateway-worker.test.mjs && python -X utf8 -B -m unittest discover -s tests -p test_release_verification.py -v",
+  "test_exit": 0,
+  "tests_passed": 34,
+  "tests_failed": 0,
+  "summary": "Implemented the local P0-1 release contract by reusing the existing Worker snapshot builder to bind code SHA, publication generation/hashes, source policy, query generation and evidence catalog in a build-only release manifest. Worker and UI queries fail closed on mixed releases, while the production verifier checks Pages, all four Worker surfaces and an official evidence locator, separating local/build receipts from deployment-backed anonymous HTTP evidence. Updated workflow wiring and documented every acceptance group and all nine closure gates without claiming the meta issue is closed.",
+  "not_done": "Issue #62 is not fully closed: no push, PR, deployment, production HTTP/UI/browser verification, rollout/rollback drill, external PR supersession inventory or closures, 7/30-day live canary, complete freshness-policy/date-provenance repair, human holdout or task evaluation, operator source-specific next actions, or broad README/archive reorganization. The driver owns all external actions; local tests and Wrangler dry-run do not establish production readiness."
+}
