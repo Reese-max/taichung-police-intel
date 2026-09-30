@@ -880,7 +880,7 @@ def main(argv: list[str] | None = None) -> int:
     receipt, next_state = build_receipt(observations, state=state)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(receipt, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    if args.input:
+    if args.input or args.live:
         args.state.parent.mkdir(parents=True, exist_ok=True)
         args.state.write_text(json.dumps(next_state, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(f"SCHEMA_DRIFT_RECEIPT_OK overall={receipt['overall']} sources={len(receipt['sources'])} output={args.output}")
