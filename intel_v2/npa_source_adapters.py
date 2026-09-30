@@ -14,6 +14,8 @@ from typing import Any
 
 
 NPA_11307_URL = "https://data.gov.tw/dataset/11307"
+NPA_172159_URL = "https://data.gov.tw/dataset/172159"
+NPA_172159_SCHEMA_VERSION = "npa-172159.v1"
 NPA_165_DATASETS = {"38262", "160055", "176455"}
 PERSONAL_DATASET_IDS = {"14420", "STOLEN-VEHICLES", "LOST-PROPERTY"}
 
@@ -153,7 +155,12 @@ def parse_important_statistics_rows(
 
 
 def parse_fraud_effectiveness_rows(rows: list[dict[str, Any]], *, observed_at: str) -> list[dict[str, Any]]:
-    """Normalize dataset 172159 as period-bound policy reference data."""
+    """Normalize verified dataset 172159 CSV rows as period-bound reference data.
+
+    This deliberately accepts the official CSV labels only. Dataset 172159 uses
+    ROC years and monthly periods; its metadata update frequency is irregular.
+    The observed CSV encodes non-negative integers with optional comma grouping.
+    """
     if not isinstance(rows, list):
         raise ValueError("fraud effectiveness rows must be an array")
     observed = _timestamp(observed_at, "observed_at")
@@ -161,21 +168,51 @@ def parse_fraud_effectiveness_rows(rows: list[dict[str, Any]], *, observed_at: s
     for row in rows:
         if not isinstance(row, dict):
             raise ValueError("fraud effectiveness row must be an object")
-        year = _required_text(row, "year", "年度")
-        month = _text(row, "month", "月份")
+        roc_year = _required_text(row, "年度")
+        if not re.fullmatch(r"\d{3}", roc_year) or int(roc_year) == 0:
+            raise ValueError("年度 must be a three-digit ROC year")
+        month_text = _required_text(row, "月")
+        if not re.fullmatch(r"\d{1,2}", month_text):
+            raise ValueError("月 must be a numeric month")
+        month = int(month_text)
+        if not 1 <= month <= 12:
+            raise ValueError("月 must be between 1 and 12")
+
+        def metric(field: str) -> int:
+            value = row.get(field)
+            if isinstance(value, bool):
+                raise ValueError(f"{field} must be a non-negative integer")
+            if isinstance(value, int):
+                parsed = value
+            elif isinstance(value, str):
+                value = value.strip()
+                if not re.fullmatch(r"(?:\d+|[1-9]\d{0,2}(?:,\d{3})+)", value):
+                    raise ValueError(f"{field} must be a non-negative integer")
+                parsed = int(value.replace(",", ""))
+            else:
+                raise ValueError(f"{field} must be a non-negative integer")
+            if parsed < 0:
+                raise ValueError(f"{field} must be a non-negative integer")
+            return parsed
+
         metrics = {
-            "groups": row.get("groups", row.get("查緝詐欺犯罪集團團數")),
-            "people": row.get("people", row.get("查緝人數")),
-            "seized_amount": row.get("seized_amount", row.get("查扣不法所得金額")),
-            "prevented_amount": row.get("prevented_amount", row.get("攔阻金額")),
+            "groups": metric("查緝不法犯罪集團團數"),
+            "people": metric("查緝不法犯罪集團人數"),
+            "seized_amount": metric("查扣不法所得金額"),
+            "prevented_amount": metric("攔阻金額"),
         }
-        if any(value in (None, "") for value in metrics.values()):
-            raise ValueError("fraud effectiveness row missing metric")
+        source_period = f"{roc_year}-{month:02d}"
+        gregorian_year = int(roc_year) + 1911
         result.append(
             {
                 "record_type": "FRAUD_EFFECTIVENESS_REFERENCE",
                 "source_id": "NPA-172159",
-                "period": f"{year}-{month}" if month else year,
+                "dataset_id": "172159",
+                "source_url": NPA_172159_URL,
+                "source_schema_version": NPA_172159_SCHEMA_VERSION,
+                "source_calendar": "ROC",
+                "source_period": source_period,
+                "period": f"{gregorian_year}-{month:02d}",
                 "metrics": metrics,
                 "observed_at": observed,
                 "realtime_allowed": False,
