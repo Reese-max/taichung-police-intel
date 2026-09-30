@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 import time
@@ -22,6 +23,9 @@ REQUIRED_CAPABILITIES = {
     "validate_answer",
 }
 ARTIFACTS = ("intelligence-feed.json", "source-status.json", "v2-daily-brief.json", "source-policy.json", "release.json")
+_release_spec = importlib.util.spec_from_file_location("release_manifest", Path(__file__).with_name("release-manifest.py"))
+release_manifest = importlib.util.module_from_spec(_release_spec)
+_release_spec.loader.exec_module(release_manifest)
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -96,9 +100,7 @@ def verify(gateway_url: str, public_url: str, client: JsonClient | None = None) 
         public_hashes[name.removesuffix(".json")] = sha256(raw)
         public_docs[name] = document
 
-    release = public_docs["release.json"]
-    if release.get("schema_version") != 1 or release.get("kind") != "GOVINTEL_RELEASE_MANIFEST":
-        raise RuntimeError("Pages release manifest is missing or invalid")
+    release = release_manifest.validate_manifest(public_docs["release.json"])
     if release.get("artifact_hashes", {}).get("feed") != public_hashes["intelligence-feed"] or \
         release.get("artifact_hashes", {}).get("status") != public_hashes["source-status"] or \
         release.get("artifact_hashes", {}).get("brief") != public_hashes["v2-daily-brief"] or \
@@ -132,16 +134,25 @@ def verify(gateway_url: str, public_url: str, client: JsonClient | None = None) 
         raise RuntimeError("Pages release manifest query generation is not bound to Worker")
     if release.get("release_id") != health.get("release_id") or release.get("release_id") != receipt.get("release_id"):
         raise RuntimeError("Pages and Worker release IDs do not match")
+    if release["release_id"] != capabilities.get("release_id"):
+        raise RuntimeError("Worker capabilities use a different release")
+    if release["code_sha"] != health.get("code_sha") or release["code_sha"] != receipt.get("code_sha"):
+        raise RuntimeError("Pages and Worker publication code SHAs do not match")
     if release.get("worker_version") != health.get("server_version"):
         raise RuntimeError("Pages release manifest worker version is stale")
 
     _, search, _ = client.request(
         f"{gateway_url}/query",
         method="POST",
-        payload={"tool": "search_evidence", "arguments": {"q": "", "limit": 1}},
+        payload={"tool": "search_evidence", "arguments": {"q": "", "limit": 1, "expected_generation": release["query_generation"]}},
     )
     if search.get("tool_name") != "search_evidence" or not isinstance(search.get("receipt"), dict):
         raise RuntimeError("Worker search_evidence smoke did not return a receipt")
+    for result in (search, search["receipt"]):
+        if (result.get("release_id") != release["release_id"] or
+                result.get("query_generation_id") != release["query_generation"] or
+                result.get("publication_hash") != release["publication_hash"]):
+            raise RuntimeError("Worker search receipt uses a different release binding")
 
     _, initialize, _ = client.request(
         f"{gateway_url}/mcp",

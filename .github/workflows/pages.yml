@@ -200,6 +200,7 @@ jobs:
 
       - name: Build release manifest
         run: |
+          node apps/web/scripts/sync-source-policy.mjs
           python -X utf8 scripts/release-manifest.py build \
             --code-sha "${GITHUB_SHA}" \
             --pages-url "https://reese-max.github.io/taichung-police-intel" \

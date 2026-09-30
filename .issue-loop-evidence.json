@@ -1,0 +1,27 @@
+{
+  "repo": "Reese-max/taichung-police-intel",
+  "issue": 87,
+  "base_sha": "78c922c0cdd487c55ad439a377190445db0c104e",
+  "red_proof": [
+    {
+      "command": "python -X utf8 -B -m unittest discover -s tests -p test_release_manifest.py -v",
+      "exit": 1,
+      "output": "Ran 7 tests; FAILED (failures=12, errors=1). Tampered manifest and mixed search/capabilities were accepted; changed artifact verify returned RELEASE_MANIFEST_OK; core.autocrlf=true caused publication_hash mismatch; both workflow order assertions failed."
+    },
+    {
+      "command": "node --test --test-concurrency=1 --test-name-pattern='Python manifests' apps/web/tests/query-gateway-worker.test.mjs",
+      "exit": 1,
+      "output": "freshness-default and id-order: HTTP 503 instead of 200; UPSTREAM_UNAVAILABLE: release manifest binding mismatch. tests=3 pass=0 fail=3 (including parent)."
+    }
+  ],
+  "test_command": "python -X utf8 -B -m unittest discover -s tests -p test_release_manifest.py -v && node --test --test-concurrency=1 apps/web/tests/query-gateway-worker.test.mjs",
+  "test_exit": 0,
+  "tests_passed": 12,
+  "tests_failed": 0,
+  "summary": "Fixed five review defects; the recorded Git Bash command passes 7 Python and 5 Node tests. Next.js static production build also passed. Full npm run check requires a post-commit rerun because current-checkout verification intentionally rejects a dirty worktree.",
+  "not_done": [
+    "Full npm run check post-commit rerun is pending; the pre-commit run failed only the clean-worktree acceptance checks.",
+    "needs-human: Worker deployment-code attestation contract (Pages code_sha and static server_version are not deployment proof).",
+    "No push, live deployment, anonymous production smoke, seven-day canary, or human evaluation performed."
+  ]
+}

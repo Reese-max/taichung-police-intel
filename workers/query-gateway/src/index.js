@@ -235,7 +235,8 @@ async function buildSnapshot(env) {
     snapshot_complete: brief.snapshot_complete,
   };
   const value = { feed, status, brief, policy, policyBinding, capabilityDefinitions: makeCapabilities(policy), items, sources, generatedFrom, generationId, releaseManifest: release };
-  const stableEvidenceCatalog = trustedEvidence(value).map(({ is_current: _isCurrent, ...entry }) => entry);
+  const stableEvidenceCatalog = trustedEvidence(value).map(({ is_current: _isCurrent, ...entry }) => entry)
+    .sort((a, b) => a.evidence_id < b.evidence_id ? -1 : a.evidence_id > b.evidence_id ? 1 : 0);
   const stableEvidenceCatalogHash = await sha256(canonicalJson(stableEvidenceCatalog));
   if (release.artifact_hashes.feed !== feedDoc.hash || release.artifact_hashes.status !== statusDoc.hash ||
       release.artifact_hashes.brief !== briefDoc.hash || release.artifact_hashes.source_policy !== policyDoc.hash ||

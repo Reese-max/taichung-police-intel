@@ -92,8 +92,9 @@ def _publication(data_dir: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     }, raw_by_name
 
 
-def _stable_evidence_catalog(feed: dict[str, Any], feed_hash: str) -> list[dict[str, Any]]:
+def _stable_evidence_catalog(feed: dict[str, Any], status: dict[str, Any]) -> list[dict[str, Any]]:
     catalog = []
+    source_freshness = {row["source_id"]: row.get("freshness_status") for row in status.get("sources", [])}
     for item in feed.get("items", []):
         official_url = item.get("official_url")
         stable_id = item.get("stable_id")
@@ -102,7 +103,7 @@ def _stable_evidence_catalog(feed: dict[str, Any], feed_hash: str) -> list[dict[
         content_hash = item.get("content_sha256")
         if not isinstance(content_hash, str) or not HEX64.fullmatch(content_hash):
             raise ValueError(f"invalid content_sha256 for {stable_id}")
-        freshness = str(item.get("freshness_status") or "UNKNOWN").upper()
+        freshness = str(item.get("freshness_status") or source_freshness.get(item.get("source_id")) or "UNKNOWN").upper()
         catalog.append({
             "schema_version": 1,
             "evidence_id": f"PUB-{stable_id}",
@@ -120,7 +121,7 @@ def _stable_evidence_catalog(feed: dict[str, Any], feed_hash: str) -> list[dict[
                 {"subject": f"publication:{stable_id}:source_id", "value": item.get("source_id")},
             ],
         })
-    return sorted(catalog, key=lambda row: row["evidence_id"])
+    return sorted(catalog, key=lambda row: row["evidence_id"].encode("utf-16-be"))
 
 
 def _binding_material(publication: dict[str, Any], evidence_catalog_hash: str, worker_version: str) -> tuple[dict[str, Any], str, str]:
@@ -158,7 +159,7 @@ def build_manifest(
     if not worker_version:
         raise ValueError("worker_version is required")
     publication, _ = _publication(Path(data_dir))
-    catalog = _stable_evidence_catalog(publication["feed"], publication["hashes"]["feed"])
+    catalog = _stable_evidence_catalog(publication["feed"], publication["status"])
     evidence_catalog_hash = sha256_json(catalog)
     material, _, _ = _binding_material(publication, evidence_catalog_hash, worker_version)
     query_generation = sha256_json(material)
@@ -255,7 +256,12 @@ def main() -> int:
     verify.add_argument("manifest", type=Path, default=DEFAULT_OUTPUT, nargs="?")
     args = parser.parse_args()
     if args.command == "verify":
-        validate_manifest(json.loads(args.manifest.read_text(encoding="utf-8")))
+        manifest = validate_manifest(json.loads(args.manifest.read_text(encoding="utf-8")))
+        expected = build_manifest(
+            args.manifest.parent, code_sha=manifest["code_sha"], worker_version=manifest["worker_version"],
+            pages_deployment=manifest["pages_deployment"], built_at=manifest["built_at"],
+        )
+        validate_binding(manifest, expected)
         print(f"RELEASE_MANIFEST_OK path={args.manifest}")
         return 0
     built_at = args.built_at or datetime.now(timezone.utc).isoformat()
