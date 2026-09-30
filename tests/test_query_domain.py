@@ -102,6 +102,26 @@ class QueryDomainTests(unittest.TestCase):
         explicit_before = domain.compare_event_versions(store, "PE-1", before_version="doc-police:v1")
         self.assertEqual(explicit_before["after"]["document_version_id"], "doc-police:v2")
 
+    def test_event_projection_preserves_explicit_trust_tiers(self):
+        explicit_stale = event("PE-EXPLICIT-STALE")
+        explicit_stale["verification_status"] = "STALE"
+        store = domain.build_event_store([
+            event("PE-CONFLICT", status="CONFLICT"),
+            event("PE-CANDIDATE", status="CANDIDATE"),
+            event("PE-STALE", status="PARTIAL_LKG"),
+            event("PE-VERIFIED", status="CONFIRMED"),
+            explicit_stale,
+        ])
+        result = domain.query_events(store, {"limit": 10})
+        tiers = {row["public_event_id"]: row["trust_tier"] for row in result["results"]}
+        self.assertEqual(tiers, {
+            "PE-CANDIDATE": "DISCOVERY_UNVERIFIED",
+            "PE-CONFLICT": "CONFLICT",
+            "PE-EXPLICIT-STALE": "STALE",
+            "PE-STALE": "STALE",
+            "PE-VERIFIED": "VERIFIED",
+        })
+
     def test_statistics_store_is_typed_and_period_bound(self):
         store = domain.build_statistics_store([statistic("STAT-2", "2026-09"), statistic("STAT-1", "2026-08", provisional=True)])
         result = domain.query_statistics(store, {"dataset_id": "NPA-STAT-1", "period_from": "2026-08", "period_to": "2026-08", "limit": 10})
