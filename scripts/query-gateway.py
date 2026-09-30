@@ -73,6 +73,7 @@ MCP_TOOLS = [
             "additionalProperties": False,
             "properties": {
                 "q": {"type": "string", "maxLength": 512},
+                "canonical_id": {"type": "string", "maxLength": 256},
                 "source_id": {"type": "string", "maxLength": 64},
                 "change_type": {"type": "string", "maxLength": 64},
                 "limit": {"type": "integer", "minimum": 1, "maximum": 100},
@@ -812,7 +813,7 @@ class QueryGateway:
         if not isinstance(arguments, dict):
             raise GatewayError("INVALID_ARGUMENTS", "arguments must be an object")
         allowed = {
-            "search_evidence": {"q", "source_id", "change_type", "limit", "cursor", "expected_generation"},
+            "search_evidence": {"q", "canonical_id", "source_id", "change_type", "limit", "cursor", "expected_generation"},
             "get_current_brief": set(),
             "get_publication_receipt": set(),
             "get_source_health": {"source_id"},
@@ -890,6 +891,9 @@ class QueryGateway:
             event_ids = [row["public_event_id"] for row in result["results"]]
             payload = {
                 "event_ids": event_ids, "events": result["results"],
+                "discovery_unverified_count": sum(
+                    row.get("trust_tier") == "DISCOVERY_UNVERIFIED" for row in result["results"]
+                ),
                 **{key: value for key, value in result.items() if key != "results"},
                 "domain_query_generation_id": result["query_generation_id"],
             }
@@ -909,6 +913,7 @@ class QueryGateway:
                 return self._envelope(
                     tool, args, scope,
                     {"event_ids": [event_id], "evidence_ids": evidence_ids, "event": event,
+                     "discovery_unverified_count": int(event.get("trust_tier") == "DISCOVERY_UNVERIFIED"),
                      "domain_query_generation_id": store["generation_id"]},
                     result_count=1, result_type="public_event",
                 )
@@ -926,7 +931,9 @@ class QueryGateway:
         scope = self._domain_scope(store, now)
         return self._envelope(
             tool, args, scope,
-            {"event_ids": [event_id], "comparison": comparison, "domain_query_generation_id": store["generation_id"]},
+            {"event_ids": [event_id], "comparison": comparison,
+             "discovery_unverified_count": int(comparison.get("trust_tier") == "DISCOVERY_UNVERIFIED"),
+             "domain_query_generation_id": store["generation_id"]},
             result_count=1, result_type="event_comparison",
         )
 

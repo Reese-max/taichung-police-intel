@@ -87,6 +87,7 @@ function projectFeedItem(item, feedHash) {
   for (const key of ["published_at", "data_as_of", "fetched_at"]) {
     if (item[key] !== null && item[key] !== undefined && !Number.isFinite(parseInstant(item[key]))) throw new Error(`invalid ${key}`);
   }
+  const freshness = String(item.freshness_status || "").toUpperCase();
   return {
     record_type: "publication_item",
     canonical_id: item.stable_id,
@@ -105,7 +106,12 @@ function projectFeedItem(item, feedHash) {
     evidence_count: Number.isInteger(item.evidence_count) && item.evidence_count >= 0 ? item.evidence_count : 0,
     content_sha256: item.content_sha256,
     trust_tier: "CANONICAL_PUBLICATION",
-    canonical_ref: { artifact: "intelligence-feed.json", artifact_sha256: feedHash, stable_id: item.stable_id },
+    verification_status: ["FRESH", "RECENT"].includes(freshness) ? "VERIFIED" : "STALE",
+    canonical_ref: {
+      artifact: "intelligence-feed.json", artifact_sha256: feedHash, stable_id: item.stable_id,
+      document_version_id: `DOCV-${item.content_sha256.slice(0, 20).toUpperCase()}`,
+      evidence_id: `PUB-${item.stable_id}`,
+    },
   };
 }
 
@@ -274,16 +280,17 @@ function queryCoverage(snapshot, capabilityId, requestedScope = {}) {
   };
 }
 
-async function queryStore(snapshot, { q: text = null, source_id: sourceId = null, change_type: changeType = null, limit = 20, cursor = null, expected_generation: expectedGeneration = null } = {}) {
+async function queryStore(snapshot, { q: text = null, canonical_id: canonicalId = null, source_id: sourceId = null, change_type: changeType = null, limit = 20, cursor = null, expected_generation: expectedGeneration = null } = {}) {
   if (!Number.isInteger(limit) || limit < 1 || limit > 100) throw new GatewayError("INVALID_ARGUMENTS", "limit must be an integer between 1 and 100");
-  for (const [name, value, max] of [["text", text, 512], ["source_id", sourceId, 64], ["change_type", changeType, 64]]) {
+  for (const [name, value, max] of [["text", text, 512], ["canonical_id", canonicalId, 256], ["source_id", sourceId, 64], ["change_type", changeType, 64]]) {
     if (value !== null && (typeof value !== "string" || value.length > max)) throw new GatewayError("INVALID_ARGUMENTS", `invalid ${name}`);
   }
+  if (canonicalId !== null && !canonicalId.trim()) throw new GatewayError("INVALID_ARGUMENTS", "invalid canonical_id");
   const changes = new Set(["NEW", "REVISED", "STATUS_CHANGED", "DEADLINE_CHANGED", "CONFIRMED", "UNCHANGED", "LKG", "REMOVED"]);
   if (changeType && !changes.has(changeType)) throw new GatewayError("INVALID_ARGUMENTS", "unknown change_type");
   if (expectedGeneration !== null && expectedGeneration !== snapshot.generationId) throw new GatewayError("INVALID_ARGUMENTS", "query generation mismatch; retry against the requested snapshot");
   const needle = text ? text.toLocaleLowerCase().trim() : null;
-  const filterHash = await sha256(canonicalJson([needle, sourceId, changeType]));
+  const filterHash = await sha256(canonicalJson([needle, canonicalId, sourceId, changeType]));
   let offset = 0;
   if (cursor !== null) {
     try {
@@ -293,7 +300,7 @@ async function queryStore(snapshot, { q: text = null, source_id: sourceId = null
       offset = token.offset;
     } catch { throw new GatewayError("INVALID_ARGUMENTS", "invalid cursor: generation/filter/offset mismatch"); }
   }
-  const selected = snapshot.items.filter((row) => (!sourceId || row.source_id === sourceId) && (!changeType || row.change_type === changeType) &&
+  const selected = snapshot.items.filter((row) => (!canonicalId || row.canonical_id === canonicalId) && (!sourceId || row.source_id === sourceId) && (!changeType || row.change_type === changeType) &&
     (!needle || [row.title, row.committee, row.source_id, row.canonical_id].map((value) => String(value || "")).join(" ").toLocaleLowerCase().includes(needle)));
   selected.sort((a, b) => (parseInstant(b.published_at) || -Infinity) - (parseInstant(a.published_at) || -Infinity) || a.canonical_id.localeCompare(b.canonical_id));
   const result = selected.slice(offset, offset + limit);
@@ -305,7 +312,7 @@ async function queryStore(snapshot, { q: text = null, source_id: sourceId = null
     schema_version: 2, query_generation_id: snapshot.generationId,
     canonical_artifact_hashes: { feed: snapshot.generatedFrom.feed_sha256, status: snapshot.generatedFrom.status_sha256, brief: snapshot.generatedFrom.brief_sha256 },
     publication_deployment_verified: false, policy: snapshot.policyBinding,
-    query_coverage: queryCoverage(snapshot, "publication_metadata", { text, source_id: sourceId, change_type: changeType }),
+    query_coverage: queryCoverage(snapshot, "publication_metadata", { text, canonical_id: canonicalId, source_id: sourceId, change_type: changeType }),
     data_status: scope.dataStatus, source_gaps: scope.gaps,
     source_status: snapshot.sources.filter((source) => !sourceId || source.source_id === sourceId),
     answerable_no_match: selected.length === 0 && scope.gaps.length === 0,
@@ -386,7 +393,7 @@ function envelope(snapshot, tool, args, scope, payload, resultCount = 0, truncat
 async function execute(snapshot, tool, rawArgs = {}) {
   if (!rawArgs || typeof rawArgs !== "object" || Array.isArray(rawArgs)) throw new GatewayError("INVALID_ARGUMENTS", "arguments must be an object");
   const allowed = {
-    search_evidence: ["q", "source_id", "change_type", "limit", "cursor", "expected_generation"],
+    search_evidence: ["q", "canonical_id", "source_id", "change_type", "limit", "cursor", "expected_generation"],
     get_current_brief: [], get_publication_receipt: [], get_source_health: ["source_id"], validate_answer: ["claims", "expected_generation"],
   }[tool];
   if (!allowed) throw new GatewayError("CAPABILITY_NOT_AVAILABLE", `${tool} is not implemented; available capabilities: search_evidence, get_current_brief, get_publication_receipt, get_source_health, validate_answer`, 422);
@@ -429,7 +436,7 @@ class GatewayError extends Error {
 function mcpTools() {
   const readonly = { readOnlyHint: true, openWorldHint: false, destructiveHint: false };
   return [
-    { name: "search_evidence", description: "Search approved publication metadata; this is not full-text or PublicEvent search.", inputSchema: { type: "object", additionalProperties: false, properties: { q: { type: "string", maxLength: 512 }, source_id: { type: "string", maxLength: 64 }, change_type: { type: "string", maxLength: 64 }, limit: { type: "integer", minimum: 1, maximum: 100 }, cursor: { type: "string", maxLength: 1024 }, expected_generation: { type: "string", maxLength: 128 } } }, annotations: readonly },
+    { name: "search_evidence", description: "Search approved publication metadata; this is not full-text or PublicEvent search.", inputSchema: { type: "object", additionalProperties: false, properties: { q: { type: "string", maxLength: 512 }, canonical_id: { type: "string", maxLength: 256 }, source_id: { type: "string", maxLength: 64 }, change_type: { type: "string", maxLength: 64 }, limit: { type: "integer", minimum: 1, maximum: 100 }, cursor: { type: "string", maxLength: 1024 }, expected_generation: { type: "string", maxLength: 128 } } }, annotations: readonly },
     { name: "get_current_brief", description: "Read the checked-in canonical brief with its freshness and publication receipt.", inputSchema: { type: "object", additionalProperties: false, properties: {} }, annotations: readonly },
     { name: "get_publication_receipt", description: "Read the current publication and canonical artifact hashes without exposing raw content.", inputSchema: { type: "object", additionalProperties: false, properties: {} }, annotations: readonly },
     { name: "get_source_health", description: "Read approved source health, freshness, completeness, and gaps.", inputSchema: { type: "object", additionalProperties: false, properties: { source_id: { type: "string", maxLength: 64 } } }, annotations: readonly },

@@ -100,6 +100,21 @@ class QueryGatewayDomainTests(unittest.TestCase):
         self.assertFalse(stats["statistics"][0]["provisional"])
         self.assertEqual(stats["result_type"], "statistics")
 
+    def test_discovery_event_is_counted_and_not_promoted_to_verified(self):
+        candidate = event()
+        candidate["public_event_id"] = "PE-DOMAIN-CANDIDATE"
+        candidate["fusion_status"] = "CANDIDATE"
+        snapshot = gateway_module.load_snapshot()
+        snapshot["event_store"] = gateway_module.query_domain.build_event_store([event(), candidate])
+        gateway = gateway_module.QueryGateway(
+            snapshot=snapshot,
+            clock=lambda: datetime(2026, 9, 21, 9, 0, tzinfo=timezone.utc),
+        )
+        result = gateway.execute("search_events", {"limit": 10})
+        tiers = {row["public_event_id"]: row["trust_tier"] for row in result["events"]}
+        self.assertEqual(tiers["PE-DOMAIN-CANDIDATE"], "DISCOVERY_UNVERIFIED")
+        self.assertEqual(result["discovery_unverified_count"], 1)
+
     def test_date_only_event_bounds_resolve_in_requested_timezone(self):
         query = self.gateway.execute("search_events", {
             "time_from": "2026-09-20",

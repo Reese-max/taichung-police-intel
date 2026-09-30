@@ -53,6 +53,14 @@ test("Worker search applies q and preserves official evidence and publication bi
     assert.equal(matching.query_generation_id, generation);
     assert.equal(matching.receipt.query_generation_id, generation);
 
+    const exact = (await query("search_evidence", { canonical_id: item.stable_id, limit: 8, expected_generation: generation })).body;
+    assert.equal(exact.total_matches, 1);
+    assert.equal(exact.result_count, 1);
+    assert.equal(exact.query_coverage.requested_scope.canonical_id, item.stable_id);
+    assert.equal(exact.results[0].canonical_id, item.stable_id);
+    assert.equal(exact.results[0].canonical_ref.evidence_id, `PUB-${item.stable_id}`);
+    assert.match(exact.results[0].canonical_ref.document_version_id, /^DOCV-[A-F0-9]{20}$/);
+
     const noMatch = (await query("search_evidence", { q: noMatchTerm, limit: 8, expected_generation: generation })).body;
     assert.equal(noMatch.total_matches, 0);
     assert.equal(noMatch.result_count, 0);

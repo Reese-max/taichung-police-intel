@@ -29,6 +29,12 @@ class QueryStoreTests(unittest.TestCase):
             self.assertEqual(row["canonical_ref"]["artifact"], "intelligence-feed.json")
             self.assertEqual(row["canonical_ref"]["stable_id"], row["canonical_id"])
             self.assertEqual(len(row["canonical_ref"]["artifact_sha256"]), 64)
+            self.assertEqual(row["canonical_ref"]["evidence_id"], f"PUB-{row['canonical_id']}")
+            self.assertEqual(
+                row["canonical_ref"]["document_version_id"],
+                f"DOCV-{row['content_sha256'][:20].upper()}",
+            )
+            self.assertIn(row["verification_status"], {"VERIFIED", "STALE"})
             self.assertNotIn("payload", row)
             self.assertNotIn("raw", row)
 
@@ -49,6 +55,17 @@ class QueryStoreTests(unittest.TestCase):
         self.assertLessEqual(result["result_count"], 1)
         self.assertTrue(all(row["source_id"] == "S-004" for row in result["results"]))
         self.assertEqual(result["truncated"], result["total_matches"] > result["result_count"])
+
+    def test_exact_canonical_id_lookup_is_strict(self):
+        store = qs.build_from_paths(qs.DEFAULT_FEED, qs.DEFAULT_STATUS, qs.DEFAULT_BRIEF)
+        canonical_id = store["items"][0]["canonical_id"]
+        result = qs.query_store(store, canonical_id=canonical_id, limit=10)
+        self.assertEqual([row["canonical_id"] for row in result["results"]], [canonical_id])
+        self.assertEqual(result["total_matches"], 1)
+
+        missing = qs.query_store(store, canonical_id="does-not-exist", limit=10)
+        self.assertEqual(missing["results"], [])
+        self.assertEqual(missing["total_matches"], 0)
 
     def test_query_store_is_bound_to_current_source_policy(self):
         store = qs.build_from_paths(qs.DEFAULT_FEED, qs.DEFAULT_STATUS, qs.DEFAULT_BRIEF)
