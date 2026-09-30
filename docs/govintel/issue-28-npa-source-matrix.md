@@ -14,6 +14,14 @@
 - self-check 會輸出離線 fixture 的資料量、更新頻率類別、解析失敗、schema drift、實際事件數與交班數；它不是成功下載或 live receipt。
 - `--live-metadata` 會對 inventory 中有 `dataset_id` 的來源讀取 data.gov.tw metadata，保存 raw hash、dataset identity、resource URL／format／欄位數與逐來源 PASS/PARTIAL/FAILED；不下載 resource bytes。
 
+## 172159 已核實的窄切片
+
+本切片只核實並修正 `NPA-172159`（打詐執行成效）的 inventory 與離線 parser contract，不代表完成 issue #28。官方 [資料集 metadata](https://data.gov.tw/dataset/172159) 和 [data.gov.tw API v2 metadata](https://data.gov.tw/api/v2/rest/dataset/172159) 列出 UTF-8 CSV 欄位 `年度`、`月`、`查緝不法犯罪集團團數`、`查緝不法犯罪集團人數`、`查扣不法所得金額`、`攔阻金額`；描述為每月統計，但 metadata 更新頻率為不定期，授權標示 OGDL v1。抽樣核對官方 CSV 後確認 `年度` 使用民國年、月份為數字，數值可有千分位逗號；金額單位不由 parser 推定。
+
+`npa-172159.v1` 僅接受上述官方欄位、3 位數民國年、1–12 月與非負整數／千分位格式，轉換為 Gregorian `period` 同時保留 `source_period` 和來源 provenance。fixture 是合成數值；inventory 仍標成 `FIXTURE_ONLY`，沒有接入正式下載、儲存、catalog promotion 或公開輸出。
+
+此 PR 不完成 issue #28 的其他 Batch 1/2/3 來源、彙總／個資隔離全鏈路、production collector/persistence、UI、部署或真實使用者驗收；這些 AC 仍需分別驗證。
+
 驗證：
 
 ```bash
