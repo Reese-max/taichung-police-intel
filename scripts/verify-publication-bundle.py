@@ -5,6 +5,7 @@ import importlib.util
 import json
 import sys
 from pathlib import Path
+from urllib.parse import urlsplit
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -12,17 +13,26 @@ DATA_DIR = ROOT / "apps" / "web" / "public" / "data"
 SOURCE_POLICY = ROOT / "scripts" / "source-policy.py"
 
 
-def load_expected_sources() -> set[str]:
+def load_policy_module():
     spec = importlib.util.spec_from_file_location("publication_source_policy", SOURCE_POLICY)
     if spec is None or spec.loader is None:
         raise ValueError("source policy module is unavailable")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    policy = module.load_current_policy()
+    return module
+
+
+def load_expected_sources() -> set[str]:
+    policy = load_policy_module().load_current_policy()
     expected = set(policy["active_source_ids"])
     if not expected:
         raise ValueError("source policy has no active sources")
     return expected
+
+
+def load_catalog() -> dict:
+    """Return the canonical catalog truth each published label must match."""
+    return load_policy_module().load_catalog()
 
 
 def load_json(name: str) -> dict:
@@ -44,22 +54,33 @@ def source_ids(sources: object) -> list[str]:
     return ids
 
 
-def main() -> int:
+def _credentialed_url(value: object) -> bool:
+    if not isinstance(value, str):
+        return True
+    parsed = urlsplit(value)
+    return parsed.scheme != "https" or parsed.username is not None or parsed.password is not None
+
+
+def bundle_errors(
+    status: dict,
+    feed: dict,
+    summary: dict,
+    csv_rows: list[dict],
+    catalog: dict,
+    expected_sources: set[str],
+) -> list[str]:
     errors: list[str] = []
-
-    try:
-        expected_sources = load_expected_sources()
-    except (OSError, ValueError, json.JSONDecodeError) as error:
-        print(f"PUBLICATION_BUNDLE_FAIL {error}", file=sys.stderr)
-        return 1
-
-    try:
-        status = load_json("source-status.json")
-        feed = load_json("intelligence-feed.json")
-        summary = load_json("intelligence-summary.json")
-    except ValueError as error:
-        print(f"PUBLICATION_BUNDLE_FAIL {error}", file=sys.stderr)
-        return 1
+    if not isinstance(status, dict):
+        return ["source-status.json must be an object"]
+    if not isinstance(feed, dict):
+        return ["intelligence-feed.json must be an object"]
+    if not isinstance(summary, dict):
+        return ["intelligence-summary.json must be an object"]
+    catalog_rows = {
+        row["source_id"]: row
+        for row in catalog.get("sources", [])
+        if isinstance(row, dict) and row.get("source_id")
+    }
 
     status_run = status.get("latest_collection_run") or {}
     run_ids = {
@@ -96,6 +117,78 @@ def main() -> int:
         status_source_ids = []
     if set(status_source_ids) != expected_sources or len(status_source_ids) != len(expected_sources):
         errors.append(f"source-status source IDs invalid: {status_source_ids}")
+
+    for source in status_sources:
+        if not isinstance(source, dict):
+            continue
+        source_id = source.get("source_id") or "unknown"
+        catalog_row = catalog_rows.get(source_id)
+        if catalog_row is None:
+            errors.append(f"{source_id}: source is not in the source catalog")
+            continue
+        if source.get("source_role") != catalog_row.get("role"):
+            errors.append(
+                f"{source_id}: source_role {source.get('source_role')!r} "
+                f"does not match catalog role {catalog_row.get('role')!r}"
+            )
+        if source.get("integration_status") != catalog_row.get("status"):
+            errors.append(
+                f"{source_id}: integration_status {source.get('integration_status')!r} "
+                f"does not match catalog status {catalog_row.get('status')!r}"
+            )
+        if catalog_row.get("status") != "PRODUCTION_ACTIVE":
+            errors.append(f"{source_id}: non-production catalog source cannot appear as a production source")
+        if _credentialed_url(source.get("source_url")):
+            errors.append(f"{source_id}: source_url must be a credential-free HTTPS URL")
+
+    candidate_sources = status.get("candidate_sources")
+    if not isinstance(candidate_sources, list):
+        errors.append("source-status.json must carry a candidate_sources array")
+        candidate_sources = []
+    expected_candidates = {
+        source_id
+        for source_id in (catalog.get("promotion_plan") or [])
+        if catalog_rows.get(source_id, {}).get("status") != "PRODUCTION_ACTIVE"
+    }
+    published_candidates = {
+        candidate["source_id"]
+        for candidate in candidate_sources
+        if isinstance(candidate, dict) and isinstance(candidate.get("source_id"), str)
+    }
+    if published_candidates != expected_candidates:
+        errors.append(
+            f"candidate_sources must cover exactly the promotion plan {sorted(expected_candidates)}"
+        )
+    for candidate in candidate_sources:
+        if not isinstance(candidate, dict):
+            errors.append("candidate_sources entries must be objects")
+            continue
+        candidate_id = candidate.get("source_id") or "unknown"
+        catalog_row = catalog_rows.get(candidate_id)
+        if catalog_row is None:
+            errors.append(f"{candidate_id}: candidate is not in the source catalog")
+            continue
+        if candidate_id in expected_sources:
+            errors.append(f"{candidate_id}: production source must not appear as a candidate")
+        if candidate.get("source_role") != catalog_row.get("role"):
+            errors.append(
+                f"{candidate_id}: candidate source_role {candidate.get('source_role')!r} "
+                f"does not match catalog role {catalog_row.get('role')!r}"
+            )
+        if candidate.get("integration_status") != catalog_row.get("status"):
+            errors.append(
+                f"{candidate_id}: candidate integration_status {candidate.get('integration_status')!r} "
+                f"does not match catalog status {catalog_row.get('status')!r}"
+            )
+        if catalog_row.get("status") == "PRODUCTION_ACTIVE" or candidate.get("integration_status") == "PRODUCTION_ACTIVE":
+            errors.append(f"{candidate_id}: a source that has not passed canary cannot be labelled production")
+        if candidate.get("promotion_eligible") is not False:
+            errors.append(f"{candidate_id}: candidate promotion_eligible must be false until the window verifier passes")
+        for field in ("public_usage_notice", "retention_class"):
+            if catalog_row.get(field) and candidate.get(field) != catalog_row[field]:
+                errors.append(f"{candidate_id}: candidate must carry the catalog {field}")
+        if _credentialed_url(candidate.get("source_url")):
+            errors.append(f"{candidate_id}: candidate source_url must be a credential-free HTTPS URL")
 
     source_summary = feed.get("source_summary")
     if not isinstance(source_summary, dict) or set(source_summary) != expected_sources:
@@ -134,10 +227,24 @@ def main() -> int:
         stable_id = item.get("stable_id") or "unknown"
         if not str(item.get("official_url") or "").startswith("https://"):
             errors.append(f"{stable_id}: official_url must be HTTPS")
+        elif _credentialed_url(item.get("official_url")):
+            errors.append(f"{stable_id}: official_url must not carry credentials")
         if not item.get("content_sha256"):
             errors.append(f"{stable_id}: missing content_sha256")
         if not isinstance(item.get("reason_codes"), list):
             errors.append(f"{stable_id}: reason_codes must be an array")
+        item_catalog_row = catalog_rows.get(item.get("source_id"))
+        if item_catalog_row is not None:
+            if item.get("source_role") != item_catalog_row.get("role"):
+                errors.append(
+                    f"{stable_id}: item source_role {item.get('source_role')!r} "
+                    f"does not match catalog role {item_catalog_row.get('role')!r}"
+                )
+            if item.get("integration_status") != item_catalog_row.get("status"):
+                errors.append(
+                    f"{stable_id}: item integration_status {item.get('integration_status')!r} "
+                    f"does not match catalog status {item_catalog_row.get('status')!r}"
+                )
 
     eligible_count = sum(
         isinstance(item, dict) and item.get("eligibility") == "HOME_CANDIDATE"
@@ -167,25 +274,51 @@ def main() -> int:
     else:
         errors.append("summary source_breakdown must be an array")
 
-    csv_path = DATA_DIR / "feed-export.csv"
-    try:
-        with csv_path.open(encoding="utf-8-sig", newline="") as handle:
-            csv_rows = list(csv.DictReader(handle))
-    except FileNotFoundError:
-        errors.append("missing file: apps/web/public/data/feed-export.csv")
-        csv_rows = []
-
     if len(csv_rows) != len(items):
         errors.append(f"CSV rows={len(csv_rows)} does not match feed items={len(items)}")
     csv_ids = [row.get("stable_id") for row in csv_rows]
     if set(csv_ids) != set(stable_ids):
         errors.append("CSV stable_id set does not match intelligence-feed.json")
 
+    return errors
+
+
+def main() -> int:
+    try:
+        expected_sources = load_expected_sources()
+        catalog = load_catalog()
+    except (OSError, ValueError, json.JSONDecodeError) as error:
+        print(f"PUBLICATION_BUNDLE_FAIL {error}", file=sys.stderr)
+        return 1
+
+    try:
+        status = load_json("source-status.json")
+        feed = load_json("intelligence-feed.json")
+        summary = load_json("intelligence-summary.json")
+    except ValueError as error:
+        print(f"PUBLICATION_BUNDLE_FAIL {error}", file=sys.stderr)
+        return 1
+
+    csv_path = DATA_DIR / "feed-export.csv"
+    try:
+        with csv_path.open(encoding="utf-8-sig", newline="") as handle:
+            csv_rows = list(csv.DictReader(handle))
+    except FileNotFoundError:
+        print("PUBLICATION_BUNDLE_FAIL missing file: apps/web/public/data/feed-export.csv", file=sys.stderr)
+        return 1
+
+    errors = bundle_errors(status, feed, summary, csv_rows, catalog, expected_sources)
     if errors:
         for error in errors:
             print(f"PUBLICATION_BUNDLE_FAIL {error}", file=sys.stderr)
         return 1
 
+    items = feed.get("items") or []
+    status_sources = status.get("sources") or []
+    eligible_count = sum(
+        isinstance(item, dict) and item.get("eligibility") == "HOME_CANDIDATE"
+        for item in items
+    )
     ratio = eligible_count / len(items) if items else 0.0
     if len(items) >= 20 and ratio >= 0.80:
         print(
@@ -193,7 +326,7 @@ def main() -> int:
             f"high_eligibility_ratio={ratio:.3f} eligible={eligible_count} total={len(items)}"
         )
 
-    run_id = next(iter(present_run_ids))
+    run_id = (status.get("latest_collection_run") or {}).get("collection_run_id")
     print(
         "PUBLICATION_BUNDLE_OK "
         f"run_id={run_id} items={len(items)} eligible={eligible_count} sources={len(status_sources)}"
