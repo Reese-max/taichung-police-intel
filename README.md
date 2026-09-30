@@ -16,10 +16,12 @@ The demo compresses official Taichung council and government sources into one wo
 | PublicEvent fusion and NPA source matrix | `IMPLEMENTED_NOT_PRODUCTION` | Conservative core and offline fixtures; no live collector/UI write path |
 | Bounded public live-meeting session and post-event reconciliation core | `IMPLEMENTED_NOT_PRODUCTION` | `python scripts/live-meeting.py self-check`; fixture-only state machine, no live provider transport or unattended ASR |
 | Twinkle/public API overlay and full cross-agency real-time coverage | `DESIGN_ONLY` | Strategy and candidate metadata only; no automatic promotion |
-| Scheduled publication merge, natural MORNING/EVENING proof, current anonymous hash check | `BLOCKED` | #20 still needs normal review/merge and real production evidence |
+| 排程發布 checkpoint、自然 MORNING/EVENING 與匿名 hash 驗證 | `UNVERIFIED` | `publication-state` 路徑已存在；本 checkout 尚未驗證正式排程、部署與公開 receipts |
 | Human task evaluation, adoption, award, and official submission receipt | `NOT_RUN` / `UNVERIFIED` | No scores or institutional adoption claims are populated |
 
 The current judge entry is [docs/govintel/competition-2026/README.md](./docs/govintel/competition-2026/README.md). Historical Kiro/prototype receipts remain below and are labelled as historical.
+
+Release manifest、Pages／Worker／Query 版本核對與 #62 完整驗收狀態見 [Production Closure runbook](./docs/govintel/issue-62-release-closure.md)。本地 `BUILD_ONLY` manifest 與測試 receipts 不代表正式部署；七日 canary、supersession audit 與真人評測仍待完成。
 
 ## Judge path
 
@@ -202,7 +204,7 @@ The read-only Taiwan Intel Dashboard discovery consumer is replayable with `pyth
 - a push to `main` restores the durable publication checkpoint, then builds and deploys the reviewed snapshot;
 - `30 22 * * *` UTC refreshes the morning slot at 06:30 Asia/Taipei;
 - `30 10 * * *` UTC refreshes the evening slot at 18:30 Asia/Taipei;
-- the current candidate workflow persists the generated V1/V2 checkpoint to the dedicated `publication-state` branch, never directly to protected `main`, then deploys the same verified static artifact;
+- the existing workflow persists the generated V1/V2 checkpoint to the dedicated `publication-state` branch, never directly to protected `main`, then deploys the same verified static artifact;
 - manual dispatch can refresh either slot.
 
 The `publication-state` checkpoint lifecycle is now part of `main`; deployment
