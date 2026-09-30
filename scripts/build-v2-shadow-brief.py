@@ -74,6 +74,16 @@ SOURCE_CONTEXT = {
         "why_it_matters": "提供交通管制、道路與公共運輸公告的官方異動。",
         "affected_roles": ["交通業管", "相關分局或大隊", "局本部幕僚"],
     },
+    "S-033": {
+        "source_name": "臺中市政府市政新聞",
+        "why_it_matters": "提供跨局處公開事件線索；轉載不能算作獨立佐證。",
+        "affected_roles": ["跨機關業管單位", "局本部幕僚"],
+    },
+    "S-031": {
+        "source_name": "臺中市政府消防局即時災情",
+        "why_it_matters": "提供短生命週期的公開災情線索，不可作為派遣依據。",
+        "affected_roles": ["局本部幕僚", "相關業管單位"],
+    },
 }
 
 CHANGE_ACTIONS = {
@@ -303,12 +313,18 @@ def main() -> int:
             raise ValueError("unsupported V2 shadow state")
 
     current_items = [feed_item_to_version(item, observed_at) for item in feed["items"]]
+    baseline_identities = {
+        item.identity
+        for raw, item in zip(feed["items"], current_items)
+        if raw.get("eligibility") == "INELIGIBLE_BASELINE"
+    }
     snapshot_complete = collection_is_complete(source_status) and not args.snapshot_partial
     state, events = compare_snapshot(
         previous_state,
         current_items,
         observed_at,
         snapshot_complete=snapshot_complete,
+        baseline_identities=baseline_identities,
     )
     handoff_state = load_handoff_state(args.handoff_state)
     handoff_state = sync_with_publication(

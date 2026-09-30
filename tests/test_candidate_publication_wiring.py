@@ -58,6 +58,9 @@ class CandidatePublicationWiringTests(unittest.TestCase):
             self.assertEqual(candidate_status["source_name"], "臺中市政府交通局最新消息")
             self.assertEqual(candidate_item["source_name"], "臺中市政府交通局最新消息")
             self.assertEqual(candidate_item["official_url"], "https://www.traffic.taichung.gov.tw/item")
+            self.assertEqual(candidate_status["result"], "NO_NEW_ITEM")
+            self.assertEqual(candidate_item["change_type"], "CONFIRMED")
+            self.assertEqual(candidate_item["eligibility"], "INELIGIBLE_BASELINE")
 
     def test_promoted_news_candidate_keeps_source_identity_in_feed_projection(self):
         item = {
@@ -88,6 +91,8 @@ class CandidatePublicationWiringTests(unittest.TestCase):
             "S-001": "臺中市政府警察局警政新聞",
             "S-019": "臺中市政府市政會議紀錄與專案報告",
             "S-032": "臺中市政府交通局最新消息",
+            "S-033": "臺中市政府市政新聞",
+            "S-031": "臺中市政府消防局即時災情",
         }
         self.assertEqual(
             {source_id: v2.SOURCE_CONTEXT[source_id]["source_name"] for source_id in expected},
@@ -119,6 +124,42 @@ class CandidatePublicationWiringTests(unittest.TestCase):
         self.assertEqual(projected["identity"], event.identity)
         self.assertEqual(projected["source_version"], 1)
         self.assertTrue(projected["watch_id"].startswith("WATCH-"))
+
+    def test_v2_builder_does_not_publish_a_promoted_source_baseline(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            observed = "2026-09-11T10:00:00+08:00"
+            existing = {
+                "stable_id": "FEED-S-009-existing", "source_id": "S-009",
+                "title": "既有提案", "official_url": "https://yishi.tccc.gov.tw/existing",
+                "content_sha256": "a" * 64, "eligibility": "HOME_CANDIDATE",
+            }
+            promoted = {
+                "stable_id": "FEED-S-032-historical", "source_id": "S-032",
+                "title": "歷史交通公告", "official_url": "https://www.traffic.taichung.gov.tw/historical",
+                "content_sha256": "b" * 64, "eligibility": "INELIGIBLE_BASELINE",
+            }
+            state, _ = v2.compare_snapshot(None, [v2.feed_item_to_version(existing, observed)], observed)
+            (root / "state.json").write_text(json.dumps(state), encoding="utf-8")
+            (root / "feed.json").write_text(json.dumps({
+                "schema_version": 1, "generated_at": observed,
+                "collection_run_id": "CR-BASELINE", "items": [existing, promoted],
+            }), encoding="utf-8")
+            (root / "status.json").write_text(json.dumps({
+                "schema_version": 1, "generated_at": observed,
+                "latest_collection_run": {"collection_run_id": "CR-BASELINE"},
+                "sources": [{"source_id": sid, "source_health": "PASS", "window_completeness": "COMPLETE_WITH_ITEMS"}
+                            for sid in ("S-009", "S-032")],
+            }), encoding="utf-8")
+            with mock.patch("sys.argv", ["build-v2-shadow-brief.py",
+                                         "--input", str(root / "feed.json"),
+                                         "--source-status", str(root / "status.json"),
+                                         "--state", str(root / "state.json"),
+                                         "--handoff-state", str(root / "handoff.json"),
+                                         "--output", str(root / "brief.json")]):
+                self.assertEqual(v2.main(), 0)
+            brief = json.loads((root / "brief.json").read_text(encoding="utf-8"))
+            self.assertEqual(brief["overview"]["current_change_count"], 0)
 
 
 if __name__ == "__main__":
