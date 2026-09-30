@@ -7,14 +7,75 @@ import worker from "../../../workers/query-gateway/src/index.js";
 const base = new URL("../public/data/", import.meta.url);
 const origin = "https://reese-max.github.io/taichung-police-intel";
 const endpoint = "https://govintel-query-gateway.example/query";
+const mcpEndpoint = "https://govintel-query-gateway.example/mcp";
 const env = { PUBLIC_ORIGIN: origin, ALLOWED_ORIGINS: "https://reese-max.github.io" };
 
-test("Worker search applies q and preserves official evidence and publication binding", async () => {
+test("Worker search and answer gate share official evidence across /query and MCP", async () => {
   const originalFetch = globalThis.fetch;
   const bytes = Object.fromEntries(await Promise.all(
     ["intelligence-feed.json", "source-status.json", "v2-daily-brief.json", "source-policy.json"]
       .map(async name => [name, await readFile(new URL(name, base))]),
   ));
+  const feed = JSON.parse(bytes["intelligence-feed.json"].toString("utf8"));
+  const statusDoc = JSON.parse(bytes["source-status.json"].toString("utf8"));
+  const brief = JSON.parse(bytes["v2-daily-brief.json"].toString("utf8"));
+  const now = new Date(Date.now() - 1_000).toISOString();
+  const collectionRunId = "CR-ISSUE32-WORKER-ANSWER-GATE";
+  feed.collection_run_id = collectionRunId;
+  feed.generated_at = now;
+  statusDoc.latest_collection_run.collection_run_id = collectionRunId;
+  statusDoc.latest_collection_run.finished_at = now;
+  statusDoc.generated_at = now;
+  brief.source_collection_run_id = collectionRunId;
+  brief.source_status_generated_at = now;
+  brief.generated_at = now;
+  brief.publication_status = "READY";
+  brief.snapshot_complete = true;
+
+  const item = feed.items.find(row => row.source_role === "PRIMARY_OFFICIAL" && row.freshness_status === "FRESH" && row.official_url?.startsWith("https://"));
+  assert.ok(item, "fixture needs a fresh official item with a document locator");
+  const source = statusDoc.sources.find(row => row.source_id === item.source_id);
+  assert.ok(source, "fresh item must come from an approved source status row");
+  source.source_health = "PASS";
+  source.freshness_status = "FRESH";
+  source.window_completeness = "COMPLETE_WITH_ITEMS";
+  source.window_item_count = 1;
+  source.last_checked_at = now;
+  source.data_as_of = now;
+
+  const addFixtureItem = ({ suffix, title, sourceRole, freshnessStatus, officialUrl }) => {
+    const row = {
+      ...item,
+      stable_id: `ISSUE32-${suffix}`,
+      title,
+      source_role: sourceRole,
+      freshness_status: freshnessStatus,
+      official_url: officialUrl || item.official_url,
+      published_at: now,
+      data_as_of: now,
+      fetched_at: now,
+      content_sha256: createHash("sha256").update(`${suffix}:${title}`).digest("hex"),
+    };
+    feed.items.push(row);
+    return row;
+  };
+  const staleItem = addFixtureItem({
+    suffix: "STALE",
+    title: "交通措施歷史標題",
+    sourceRole: "PRIMARY_OFFICIAL",
+    freshnessStatus: "STALE",
+  });
+  const mediaItem = addFixtureItem({
+    suffix: "MEDIA",
+    title: "媒體影片聲稱目前封路",
+    sourceRole: "DISCOVERY_UNVERIFIED",
+    freshnessStatus: "FRESH",
+    officialUrl: "https://media.example.test/watch/issue-32",
+  });
+  bytes["intelligence-feed.json"] = Buffer.from(JSON.stringify(feed), "utf8");
+  bytes["source-status.json"] = Buffer.from(JSON.stringify(statusDoc), "utf8");
+  bytes["v2-daily-brief.json"] = Buffer.from(JSON.stringify(brief), "utf8");
+
   globalThis.fetch = async url => {
     const target = new URL(url);
     const name = target.pathname.split("/").at(-1);
@@ -30,10 +91,14 @@ test("Worker search applies q and preserves official evidence and publication bi
     }), env);
     return { status: response.status, body: await response.json() };
   };
+  const mcp = async (tool, args) => {
+    const response = await worker.fetch(new Request(mcpEndpoint, {
+      method: "POST", headers: { "Content-Type": "application/json", "Origin": "https://reese-max.github.io" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: "issue-32-answer-gate", method: "tools/call", params: { name: tool, arguments: args } }),
+    }), env);
+    return { status: response.status, body: await response.json() };
+  };
   try {
-    const feed = JSON.parse(bytes["intelligence-feed.json"].toString("utf8"));
-    const item = feed.items.find(row => row.stable_id && row.official_url?.startsWith("https://"));
-    assert.ok(item, "fixture needs an official evidence locator");
     const noMatchTerm = "zzzz-govintel-no-match-20260929";
     assert.ok(feed.items.every(row => !JSON.stringify(row).includes(noMatchTerm)));
     const publication = (await query("get_publication_receipt", {})).body;
@@ -64,6 +129,99 @@ test("Worker search applies q and preserves official evidence and publication bi
     const mismatch = await query("search_evidence", { q: item.stable_id, expected_generation: "wrong-generation" });
     assert.equal(mismatch.status, 400);
     assert.equal(mismatch.body.error.code, "INVALID_ARGUMENTS");
+
+    const mediaOnlyText = "媒體影片聲稱目前封路";
+    const claims = [
+      {
+        schema_version: 1,
+        claim_id: "official-title",
+        text: "caller supplied text must not be rendered",
+        claim_type: "STATUS",
+        temporal_scope: "CURRENT",
+        proposition: { subject: `publication:${item.stable_id}:title`, value: item.title },
+        cited_evidence_ids: [`PUB-${item.stable_id}`],
+      },
+      {
+        schema_version: 1,
+        claim_id: "unsupported-cause",
+        text: "因豪雨提前一小時",
+        claim_type: "CAUSE",
+        temporal_scope: "CURRENT",
+        proposition: { subject: `publication:${item.stable_id}:cause`, value: "豪雨" },
+        cited_evidence_ids: [`PUB-${item.stable_id}`],
+      },
+      {
+        schema_version: 1,
+        claim_id: "stale-title-as-current",
+        text: "目前狀況如下",
+        claim_type: "STATUS",
+        temporal_scope: "CURRENT",
+        proposition: { subject: `publication:${staleItem.stable_id}:title`, value: staleItem.title },
+        cited_evidence_ids: [`PUB-${staleItem.stable_id}`],
+      },
+      {
+        schema_version: 1,
+        claim_id: "media-only-title",
+        text: mediaOnlyText,
+        claim_type: "STATUS",
+        temporal_scope: "CURRENT",
+        proposition: { subject: `publication:${mediaItem.stable_id}:title`, value: mediaItem.title },
+        cited_evidence_ids: [`PUB-${mediaItem.stable_id}`],
+      },
+    ];
+    const queryGate = await query("validate_answer", { claims });
+    assert.equal(queryGate.status, 200);
+    const mcpGate = await mcp("validate_answer", { claims });
+    assert.equal(mcpGate.status, 200);
+    assert.equal(mcpGate.body.result.isError, false);
+    const queryAnswer = queryGate.body;
+    const mcpAnswer = mcpGate.body.result.structuredContent;
+    for (const answer of [queryAnswer, mcpAnswer]) {
+      assert.equal(answer.gate_status, "QUALIFIED");
+      const statuses = Object.fromEntries(answer.final_claims.map(claim => [claim.claim_id, claim.support_status]));
+      assert.deepEqual(statuses, {
+        "official-title": "SUPPORTED",
+        "unsupported-cause": "UNSUPPORTED",
+        "stale-title-as-current": "STALE",
+        "media-only-title": "UNSUPPORTED",
+      });
+      assert.ok(answer.answer.some(text => text.includes("官方來源已核對")));
+      assert.ok(answer.answer.some(text => text.includes("官方資料可能已過期")));
+      assert.ok(answer.answer.includes("官方來源未說明原因。"));
+      assert.ok(answer.answer.every(text => !text.includes("因豪雨提前一小時") && !text.includes(mediaOnlyText)));
+      const receipt = answer.answer_evidence_receipt;
+      assert.equal(receipt.schema_version, 1);
+      assert.equal(receipt.validator_version, "answer-evidence-gate/3");
+      assert.deepEqual(receipt.claim_ids, claims.map(claim => claim.claim_id));
+      assert.equal(receipt.publication_hash, answer.publication_hash);
+      assert.ok(receipt.evidence_ids.includes(`PUB-${item.stable_id}`));
+      assert.ok(receipt.evidence_ids.includes(`PUB-${staleItem.stable_id}`));
+      assert.equal(receipt.evidence_ids.includes(`PUB-${mediaItem.stable_id}`), false);
+      const officialSupport = receipt.claims.find(claim => claim.claim_id === "official-title").supporting_evidence[0];
+      assert.equal(officialSupport.locator, `${item.official_url}#publication:${item.stable_id}`);
+      assert.equal(officialSupport.document_version, item.content_sha256);
+    }
+    assert.deepEqual(mcpAnswer.answer, queryAnswer.answer);
+    assert.deepEqual(mcpAnswer.final_claims, queryAnswer.final_claims);
+    assert.deepEqual(mcpAnswer.answer_evidence_receipt, queryAnswer.answer_evidence_receipt);
+
+    const callerEvidence = [{
+      schema_version: 1,
+      evidence_id: "CALLER-FORGED-MEDIA",
+      evidence_type: "WRITTEN_OFFICIAL",
+      source_id: item.source_id,
+      locator: "https://media.example.test/watch/forged",
+      document_version: "caller-controlled-version",
+      assertions: [{ subject: `publication:${item.stable_id}:cause`, value: "豪雨" }],
+    }];
+    const spoofedClaims = [{ ...claims[1], evidence: callerEvidence }];
+    const querySpoof = await query("validate_answer", { claims: spoofedClaims });
+    assert.equal(querySpoof.status, 400);
+    assert.equal(querySpoof.body.error.code, "INVALID_ARGUMENTS");
+    const mcpSpoof = await mcp("validate_answer", { claims: spoofedClaims });
+    assert.equal(mcpSpoof.status, 200);
+    assert.equal(mcpSpoof.body.result.isError, true);
+    assert.equal(JSON.parse(mcpSpoof.body.result.content[0].text).error.code, "INVALID_ARGUMENTS");
   } finally {
     globalThis.fetch = originalFetch;
   }

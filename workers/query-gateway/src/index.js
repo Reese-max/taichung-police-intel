@@ -92,6 +92,7 @@ function projectFeedItem(item, feedHash) {
     canonical_id: item.stable_id,
     title: item.title,
     source_id: item.source_id,
+    source_role: typeof item.source_role === "string" ? item.source_role : null,
     official_url: item.official_url ?? null,
     published_at: item.published_at ?? null,
     data_as_of: item.data_as_of ?? null,
@@ -323,7 +324,14 @@ function publicSource(row) {
 
 function trustedEvidence(snapshot) {
   const sourceStatus = Object.fromEntries(snapshot.sources.map((source) => [source.source_id, assessScope(snapshot, source.source_id).dataStatus]));
-  return snapshot.items.filter((item) => typeof item.official_url === "string" && item.official_url.startsWith("https://")).map((item) => {
+  // A locator alone does not establish authority. The current feed only marks
+  // PRIMARY_OFFICIAL rows as answer evidence; discovery and unclassified rows stay out.
+  const eligible = snapshot.items.filter((item) =>
+    item.source_role === "PRIMARY_OFFICIAL" &&
+    typeof item.official_url === "string" &&
+    item.official_url.startsWith("https://"),
+  );
+  return eligible.map((item) => {
     const source = snapshot.sources.find((row) => row.source_id === item.source_id) || {};
     const freshnessValue = String(item.freshness_status || source.freshness_status || "UNKNOWN").toUpperCase();
     const current = sourceStatus[item.source_id] === "SNAPSHOT_RECENT" && source.source_health === "PASS" &&
@@ -367,6 +375,7 @@ function controlledText(entry) {
     }
     if (entry.support_status === "STALE") return "官方資料可能已過期，未作為目前情況回答。";
     if (entry.support_status === "PARTIAL") return "官方來源僅部分支持，未核對部分不納入回答。";
+    if (entry.support_status === "UNSUPPORTED" && entry.claim_type === "CAUSE") return "官方來源未說明原因。";
     if (entry.support_status === "UNSUPPORTED") return "未找到可驗證的官方證據，此項說法已移除。";
     return `官方來源已核對：${facts.join("；")}。`;
 }
