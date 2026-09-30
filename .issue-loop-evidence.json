@@ -14,14 +14,14 @@
       "output": "freshness-default and id-order: HTTP 503 instead of 200; UPSTREAM_UNAVAILABLE: release manifest binding mismatch. tests=3 pass=0 fail=3 (including parent)."
     }
   ],
-  "test_command": "python -X utf8 -B -m unittest discover -s tests -p test_release_manifest.py -v && node --test --test-concurrency=1 apps/web/tests/query-gateway-worker.test.mjs",
+  "test_command": "npm run check",
   "test_exit": 0,
-  "tests_passed": 12,
+  "tests_passed": 576,
   "tests_failed": 0,
-  "summary": "Fixed five review defects; the recorded Git Bash command passes 7 Python and 5 Node tests. Next.js static production build also passed. Full npm run check requires a post-commit rerun because current-checkout verification intentionally rejects a dirty worktree.",
+  "summary": "Five review defects fixed in local commit 65274274d1fda725a16165e4bab3dafaa285838e. Git Bash npm run check exited 0 on that clean commit: 308 Node passes plus 268 Python passes, 1 PostgreSQL test skipped, CURRENT_CHECKOUT_RC status=PASS checks=5/5, and VERIFY_OK mode=full required=115 specs=4 secrets=0. The Next.js production build passed; isolated CI display-cap replay passed with changes=24, displayed=23, Worker=200.",
   "not_done": [
-    "Full npm run check post-commit rerun is pending; the pre-commit run failed only the clean-worktree acceptance checks.",
-    "needs-human: Worker deployment-code attestation contract (Pages code_sha and static server_version are not deployment proof).",
+    "needs-human: define Worker deployment-code attestation contract; Pages code_sha and the static server_version are not independent deployment proof.",
+    "PostgreSQL migration integration test skipped because TEST_DATABASE_URL is not set.",
     "No push, live deployment, anonymous production smoke, seven-day canary, or human evaluation performed."
   ]
 }

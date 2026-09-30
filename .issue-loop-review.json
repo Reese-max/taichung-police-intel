@@ -40,5 +40,5 @@
     }
   ],
   "fixed": true,
-  "summary": "Fixed five release-binding defects with failing-then-passing regressions: checkout bytes, evidence projection parity, production verification, local artifact verification, and workflow ordering. Focused tests pass (12); the production build passed, and the full gate will be rerun after committing because current-checkout verification requires a clean worktree. needs-human: define independent Worker deployment attestation; live deployment, canary and human-evaluation acceptance remain outstanding."
+  "summary": "Fixed five release-binding defects with failing-then-passing regressions: checkout bytes, evidence projection parity, production verification, local artifact verification, and workflow ordering. Git Bash npm run check passed (576 tests passed, 0 failed, 1 PostgreSQL test skipped), including the production build; an isolated CI display-cap replay also returned Worker HTTP 200. needs-human: define independent Worker deployment attestation; no live deployment, canary or human-evaluation acceptance is claimed."
 }
