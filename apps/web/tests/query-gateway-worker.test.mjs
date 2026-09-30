@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import worker from "../../../workers/query-gateway/src/index.js";
+import worker, { buildSnapshot, createReleaseManifest } from "../../../workers/query-gateway/src/index.js";
 
 const base = new URL("../public/data/", import.meta.url);
 const origin = "https://reese-max.github.io/taichung-police-intel";
 const endpoint = "https://govintel-query-gateway.example/query";
-const env = { PUBLIC_ORIGIN: origin, ALLOWED_ORIGINS: "https://reese-max.github.io" };
+const env = { PUBLIC_ORIGIN: origin, ALLOWED_ORIGINS: "https://reese-max.github.io", CF_VERSION_METADATA: { id: "test-worker", tag: "a".repeat(40) } };
 
 test("Worker search applies q and preserves official evidence and publication binding", async () => {
   const originalFetch = globalThis.fetch;
@@ -15,6 +15,10 @@ test("Worker search applies q and preserves official evidence and publication bi
     ["intelligence-feed.json", "source-status.json", "v2-daily-brief.json", "source-policy.json"]
       .map(async name => [name, await readFile(new URL(name, base))]),
   ));
+  const snapshot = await buildSnapshot(env, async name => ({
+    value: JSON.parse(bytes[name]), hash: createHash("sha256").update(bytes[name]).digest("hex"),
+  }));
+  bytes["release.json"] = JSON.stringify(await createReleaseManifest(snapshot, env.CF_VERSION_METADATA.tag));
   globalThis.fetch = async url => {
     const target = new URL(url);
     const name = target.pathname.split("/").at(-1);
