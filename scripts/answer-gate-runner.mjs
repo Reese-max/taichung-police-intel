@@ -34,6 +34,7 @@ function controlledText(entry) {
   }
   if (entry.support_status === "STALE") return "官方資料可能已過期，未作為目前情況回答。";
   if (entry.support_status === "PARTIAL") return "官方來源僅部分支持，未核對部分不納入回答。";
+  if (entry.support_status === "UNSUPPORTED" && entry.claim_type === "CAUSE") return "官方來源未說明原因。";
   if (entry.support_status === "UNSUPPORTED") return "未找到可驗證的官方證據，此項說法已移除。";
   return `官方來源已核對：${facts.join("；")}。`;
 }
