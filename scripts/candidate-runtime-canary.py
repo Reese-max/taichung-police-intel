@@ -32,6 +32,19 @@ def candidate_source_ids(collector) -> tuple[str, ...]:
     return tuple(sorted(catalog_ids & set(collector.NEWS_LIST_SOURCES)))
 
 
+def catalog_source_metadata() -> dict[str, dict[str, str]]:
+    policy_path = ROOT / "scripts/source-policy.py"
+    spec = importlib.util.spec_from_file_location("govintel_source_metadata", policy_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("cannot load source policy")
+    policy = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(policy)
+    return {
+        row["source_id"]: {"role": row["role"], "status": row["status"]}
+        for row in policy.load_catalog()["sources"]
+    }
+
+
 class BoundedSession:
     """Allow only same-host HTTPS requests with small call and body budgets."""
 
@@ -102,6 +115,7 @@ class BoundedSession:
 
 def run_canary(collector, sources, now, *, session_factory=BoundedSession):
     allowed = set(candidate_source_ids(collector))
+    metadata = catalog_source_metadata()
     if not sources or len(sources) != len(set(sources)) or any(source not in allowed for source in sources):
         raise ValueError("select a nonempty unique subset of catalog-approved candidate IDs")
     if now.tzinfo is None:
@@ -124,6 +138,7 @@ def run_canary(collector, sources, now, *, session_factory=BoundedSession):
         record = {
             "source_id": source_id,
             "source_url": url,
+            "source_role": metadata[source_id]["role"],
             "integration_status": "CANDIDATE",
             "promotion_eligible": False,
             "observed_at": now.isoformat(),

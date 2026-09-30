@@ -35,6 +35,14 @@ class PublicationBundleTests(unittest.TestCase):
     def test_checked_in_bundle_passes(self):
         self.assertEqual(module.main(), 0)
 
+    def test_checked_in_sources_expose_catalog_role_and_integration_status(self):
+        status = module.load_json("source-status.json")
+        metadata = module.load_catalog_source_metadata()
+        for source in status["sources"]:
+            source_id = source["source_id"]
+            self.assertEqual(source["source_role"], metadata[source_id]["role"])
+            self.assertEqual(source["integration_status"], metadata[source_id]["status"])
+
 
 if __name__ == "__main__":
     unittest.main()

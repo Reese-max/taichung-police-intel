@@ -258,6 +258,10 @@ Authenticated Kiro V3 sessions first reviewed all 16 Steering, Spec, and Hook ar
 - `FAILED` and `NOT_RUN` cannot overwrite last-known-good.
 - Every displayed source links to an HTTPS official page or endpoint.
 - Public aggregates are allowed; personal and operational police data are out of scope.
+- Each published `source-status.json` row carries catalog-derived `source_role`
+  and `integration_status`. S-001, S-019, S-031, S-032, and S-033 remain
+  candidates until bounded canary and promotion evidence is complete; the
+  publication validator rejects missing or mismatched metadata.
 - Missing post-meeting evidence remains an explicit gap, not an AI inference.
 - Answer drafts pass `apps/web/lib/answer-evidence-gate.js` before release: every factual claim needs exact official evidence (locator + document version), conflicting official sources surface as `CONFLICT` instead of a merged answer, stale sources cannot back current wording, and media-derived records never verify a claim. The shared gate emits one receipt with the publication hash and validator version for both Web Chat and MCP; the read-only `validate_answer` route binds that receipt to the server-controlled catalog and emits no free-text fallback.
 - Structured `STATISTIC` propositions and trusted catalog assertions can use `value: { value: decimal string, period: string, geography: string, unit: string }` (for example, `value: "130"`). A decimal string keeps the source digits exact; JSON numeric values are rejected because parsing can round them. The gate compares all four fields within a subject; a different period, geography, or unit neither supports nor conflicts with the requested statistic. Older scalar statistic assertions remain supported for existing located facts, but do not carry these scope or exact numeric-token guarantees. The typed statistics query store is not yet promoted into the trusted answer catalog; its original decimal tokens must be preserved before future promotion.

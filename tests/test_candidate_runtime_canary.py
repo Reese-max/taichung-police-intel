@@ -53,6 +53,7 @@ class CanaryContractTests(unittest.TestCase):
             self.assertFalse(item["promotion_eligible"])
             self.assertFalse(item["coverage_independently_verified"])
             self.assertEqual(item["integration_status"], "CANDIDATE")
+            self.assertEqual(item["source_role"], "PRIMARY_EVENT")
             self.assertNotIn("body", str(item))
 
     def test_one_source_failure_preserves_other_observations_and_null_counts(self):
