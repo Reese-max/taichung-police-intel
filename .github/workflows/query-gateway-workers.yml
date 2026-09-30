@@ -3,12 +3,6 @@ name: Deploy GovIntel Query Gateway Worker
 on:
   push:
     branches: [main]
-    paths:
-      - "workers/query-gateway/**"
-      - ".github/workflows/query-gateway-workers.yml"
-      - "apps/web/lib/answer-evidence-gate.js"
-      - "apps/web/lib/council-prep.js"
-      - "docs/govintel/source-catalog.v2.json"
   workflow_dispatch:
 
 permissions:
@@ -20,6 +14,7 @@ concurrency:
 
 jobs:
   deploy:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     env:
       HAS_CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
@@ -39,4 +34,4 @@ jobs:
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          command: deploy --config workers/query-gateway/wrangler.jsonc
+          command: deploy --config workers/query-gateway/wrangler.jsonc --tag ${{ github.sha }}

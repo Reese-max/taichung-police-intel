@@ -152,14 +152,14 @@ async function fetchJson(origin, name) {
   return { value: JSON.parse(new TextDecoder().decode(bytes)), hash: await sha256(bytes) };
 }
 
-async function buildSnapshot(env) {
+export async function buildSnapshot(env, readArtifact = (name) => fetchJson(env.PUBLIC_ORIGIN, name)) {
   const origin = env.PUBLIC_ORIGIN;
   if (!origin) throw new Error("PUBLIC_ORIGIN is not configured");
   const [feedDoc, statusDoc, briefDoc, policyDoc] = await Promise.all([
-    fetchJson(origin, "intelligence-feed.json"),
-    fetchJson(origin, "source-status.json"),
-    fetchJson(origin, "v2-daily-brief.json"),
-    fetchJson(origin, "source-policy.json"),
+    readArtifact("intelligence-feed.json"),
+    readArtifact("source-status.json"),
+    readArtifact("v2-daily-brief.json"),
+    readArtifact("source-policy.json"),
   ]);
   const feed = feedDoc.value;
   const status = statusDoc.value;
@@ -204,14 +204,52 @@ async function buildSnapshot(env) {
     publication_status: brief.publication_status,
     snapshot_complete: brief.snapshot_complete,
   };
-  return { feed, status, brief, policy, policyBinding, capabilityDefinitions: makeCapabilities(policy), items, sources, generatedFrom, generationId };
+  const snapshot = { feed, status, brief, policy, policyBinding, capabilityDefinitions: makeCapabilities(policy), items, sources, generatedFrom, generationId };
+  // Bind the published catalog at publication time; live freshness still uses the server clock.
+  snapshot.evidenceCatalogHash = await sha256(canonicalJson(trustedEvidence(snapshot, parseInstant(brief.generated_at))));
+  return snapshot;
+}
+
+export async function createReleaseManifest(snapshot, codeSha, builtAt = isoNow()) {
+  if (typeof codeSha !== "string" || !/^[a-f0-9]{40}$/.test(codeSha)) throw new Error("release code SHA must be a full Git SHA");
+  if (!Number.isFinite(parseInstant(builtAt))) throw new Error("release built_at must include a timezone");
+  const publication = snapshot.generatedFrom;
+  const binding = {
+    code_sha: codeSha,
+    publication_generation: publication.collection_run_id,
+    publication_hash: publication.brief_sha256,
+    artifact_hashes: { feed: publication.feed_sha256, status: publication.status_sha256, brief: publication.brief_sha256 },
+    source_policy_hash: snapshot.policyBinding.policy_hash,
+    query_generation: snapshot.generationId,
+    evidence_catalog_hash: snapshot.evidenceCatalogHash,
+  };
+  return {
+    schema_version: 1, release_id: await sha256(canonicalJson(binding)), ...binding, built_at: builtAt,
+    worker_version: null, pages_deployment: null, deployed_at: null, anonymous_http_verified_at: null,
+    evidence_level: "BUILD_ONLY", production_verified: false,
+  };
 }
 
 async function getSnapshot(env) {
   const now = Date.now();
-  if (snapshotCache && snapshotCache.expiresAt > now) return snapshotCache.value;
-  const value = buildSnapshot(env);
-  snapshotCache = { value, expiresAt: now + 30_000 };
+  const version = env.CF_VERSION_METADATA;
+  const key = JSON.stringify([env.PUBLIC_ORIGIN, version?.tag, version?.id]);
+  if (snapshotCache?.key === key && snapshotCache.expiresAt > now) return snapshotCache.value;
+  const value = (async () => {
+    try {
+      if (!version?.id) throw new Error("Worker version metadata is missing");
+      const [snapshot, manifest] = await Promise.all([buildSnapshot(env), fetchJson(env.PUBLIC_ORIGIN, "release.json")]);
+      const expected = await createReleaseManifest(snapshot, version.tag, manifest.value?.built_at);
+      for (const [field, expectedValue] of Object.entries(expected)) {
+        if (canonicalJson(manifest.value?.[field]) !== canonicalJson(expectedValue)) throw new Error(`release ${field} mismatch`);
+      }
+      snapshot.release = { ...expected, worker_version: version.id, evidence_level: "RUNTIME_BOUND" };
+      return snapshot;
+    } catch (error) {
+      throw new GatewayError("QUERY_TEMPORARILY_UNAVAILABLE", `Release binding unavailable: ${error.message}`, 503);
+    }
+  })();
+  snapshotCache = { key, value, expiresAt: now + 30_000 };
   try { return await value; } catch (error) { snapshotCache = null; throw error; }
 }
 
@@ -321,8 +359,8 @@ function publicSource(row) {
   return Object.fromEntries(fields.filter((key) => key in row).map((key) => [key, row[key]]));
 }
 
-function trustedEvidence(snapshot) {
-  const sourceStatus = Object.fromEntries(snapshot.sources.map((source) => [source.source_id, assessScope(snapshot, source.source_id).dataStatus]));
+function trustedEvidence(snapshot, now = Date.now()) {
+  const sourceStatus = Object.fromEntries(snapshot.sources.map((source) => [source.source_id, assessScope(snapshot, source.source_id, now).dataStatus]));
   return snapshot.items.filter((item) => typeof item.official_url === "string" && item.official_url.startsWith("https://")).map((item) => {
     const source = snapshot.sources.find((row) => row.source_id === item.source_id) || {};
     const freshnessValue = String(item.freshness_status || source.freshness_status || "UNKNOWN").toUpperCase();
@@ -373,6 +411,7 @@ function controlledText(entry) {
 
 function envelope(snapshot, tool, args, scope, payload, resultCount = 0, truncated = false, resultType = "publication_metadata") {
   return {
+    release: snapshot.release,
     schema_version: 1, query_id: crypto.randomUUID(), tool_name: tool, publication_id: snapshot.generatedFrom.collection_run_id,
     publication_hash: snapshot.generatedFrom.brief_sha256, query_generation_id: snapshot.generationId, generated_at: snapshot.brief.generated_at,
     queried_at: isoNow(), freshness: freshness(scope.dataStatus), verification_summary: verificationSummary(scope.dataStatus),
@@ -439,8 +478,8 @@ function mcpTools() {
 
 async function dispatchMcp(snapshot, request) {
   if (request?.jsonrpc !== "2.0" || !("id" in (request || {}))) throw new GatewayError("INVALID_JSON_RPC", "request must be JSON-RPC 2.0 with an id");
-  if (request.method === "initialize") return { jsonrpc: "2.0", id: request.id, result: { protocolVersion: MCP_PROTOCOL_VERSION, capabilities: { tools: { listChanged: false } }, serverInfo: { name: "govintel-query-gateway", version: SERVER_VERSION } } };
-  if (request.method === "tools/list") return { jsonrpc: "2.0", id: request.id, result: { tools: mcpTools() } };
+  if (request.method === "initialize") return { jsonrpc: "2.0", id: request.id, result: { protocolVersion: MCP_PROTOCOL_VERSION, capabilities: { tools: { listChanged: false } }, serverInfo: { name: "govintel-query-gateway", version: SERVER_VERSION }, release: snapshot.release } };
+  if (request.method === "tools/list") return { jsonrpc: "2.0", id: request.id, result: { tools: mcpTools(), release: snapshot.release } };
   if (request.method !== "tools/call" || !request.params || typeof request.params.name !== "string") throw new GatewayError("METHOD_NOT_FOUND", `unsupported MCP method: ${request.method}`, 404);
   try {
     const payload = await execute(snapshot, request.params.name, request.params.arguments);
@@ -489,13 +528,14 @@ export default {
       const snapshot = await getSnapshot(env);
       if (request.method === "GET" && url.pathname === "/health") {
         const scope = assessScope(snapshot);
-        return responseJson({ schema_version: 1, service: "govintel-query-gateway", server_version: SERVER_VERSION, status: "ok", publication_freshness: freshness(scope.dataStatus), publication_id: snapshot.generatedFrom.collection_run_id, publication_hash: snapshot.generatedFrom.brief_sha256, query_coverage: queryCoverage(snapshot, "publication_metadata"), policy: snapshot.policyBinding, retention: RETENTION_POLICY, source_gaps: scope.gaps, read_only: true }, 200, request, env);
+        return responseJson({ schema_version: 1, service: "govintel-query-gateway", server_version: SERVER_VERSION, status: "ok", release: snapshot.release, publication_freshness: freshness(scope.dataStatus), publication_id: snapshot.generatedFrom.collection_run_id, publication_hash: snapshot.generatedFrom.brief_sha256, query_coverage: queryCoverage(snapshot, "publication_metadata"), policy: snapshot.policyBinding, retention: RETENTION_POLICY, source_gaps: scope.gaps, read_only: true }, 200, request, env);
       }
-      if (request.method === "GET" && url.pathname === "/capabilities") return responseJson({ schema_version: 1, server_version: SERVER_VERSION, read_only: true, capabilities: ["search_evidence", "get_current_brief", "get_publication_receipt", "get_source_health", "validate_answer"], unavailable_capabilities: DOMAIN_CAPABILITIES, policy: snapshot.policyBinding, retention: RETENTION_POLICY }, 200, request, env);
+      if (request.method === "GET" && url.pathname === "/capabilities") return responseJson({ schema_version: 1, server_version: SERVER_VERSION, read_only: true, release: snapshot.release, capabilities: ["search_evidence", "get_current_brief", "get_publication_receipt", "get_source_health", "validate_answer"], unavailable_capabilities: DOMAIN_CAPABILITIES, policy: snapshot.policyBinding, retention: RETENTION_POLICY }, 200, request, env);
       if (request.method !== "POST" || !["/query", "/mcp"].includes(url.pathname)) return responseJson(jsonError("NOT_FOUND", "route not found"), 404, request, env);
       const bytes = await request.arrayBuffer();
       if (bytes.byteLength > MAX_REQUEST_BYTES) return responseJson(jsonError("REQUEST_TOO_LARGE", "request exceeds byte budget"), 413, request, env);
       const input = JSON.parse(new TextDecoder().decode(bytes));
+      if (input?.release_id !== undefined && input.release_id !== snapshot.release.release_id) throw new GatewayError("QUERY_TEMPORARILY_UNAVAILABLE", "Pages and Worker release mismatch; reload the publication", 503);
       if (url.pathname === "/query") return responseJson(await execute(snapshot, input?.tool, input?.arguments), 200, request, env);
       return responseJson(await dispatchMcp(snapshot, input), 200, request, env);
     } catch (error) {
