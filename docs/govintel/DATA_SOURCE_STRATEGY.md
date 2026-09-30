@@ -40,7 +40,7 @@
 | S-001 | 臺中市政府警察局警政新聞 | PRIMARY_EVENT | 30 分鐘 | 既有稽核，曾 DEGRADED | 治安、交通、重大活動、宣導與警政措施 |
 | S-031 | 臺中市政府消防局「即時災情」 | PRIMARY_EVENT | 10 分鐘 | 新候選，官方頁已查核 | 公開救災／救護事件感知；僅供公共資訊，不作派遣依據 |
 | S-032 | 臺中市政府交通局最新消息 | PRIMARY_EVENT | 30 分鐘 | 新候選，官方頁已查核 | 交通管制、公車／YouBike 異動、重大交通事件 |
-| S-033 | 臺中市政府新聞局市政新聞／最新消息 | PRIMARY_EVENT | 30 分鐘 | 新候選，官方頁已查核 | 跨局處事件發現與官方交叉驗證 |
+| S-033 | 臺中市政府市政新聞 | PRIMARY_EVENT | 30 分鐘 | 候選，官方市府 RSS 已查核 | 跨局處事件發現；轉載不得算獨立佐證 |
 
 ### B. 政策、議會與制度異動
 
@@ -73,7 +73,7 @@
 - 臺中市政府警察局警政新聞：`https://www.police.taichung.gov.tw/ch/home.jsp?id=1&parentpath=0&mcustomize=news_list.jsp`
 - 臺中市政府消防局：`https://www.fire.taichung.gov.tw/`（首頁含公開「即時災情」）
 - 臺中市政府交通局最新消息：`https://www.traffic.taichung.gov.tw/`
-- 臺中市政府新聞局：`https://www.news.taichung.gov.tw/`
+- 臺中市政府市政新聞 RSS：`https://www.taichung.gov.tw/10179/564770/rss?nodeId=9962`
 - 臺中市政府市政會議紀錄：`https://www.rdec.taichung.gov.tw/12047/12142/12186`
 - 臺中市政府主管法規共用系統：`https://law.taichung.gov.tw/DraftForum.aspx`
 - 臺中市政府議會專案報告：`https://www.rdec.taichung.gov.tw/12047/12142/12145`
@@ -151,7 +151,7 @@ SourceScore =
 1. **S-019 市政會議**：已有稽核、結構穩定，最容易快速升級成正式 collector。
 2. **S-001 警察局警政新聞**：已有完整清單與詳細頁解析，但需解決高頻全量抓取造成的連線重設；改成列表差異後才抓新／變更詳細頁。
 3. **S-032 交通局最新消息**：對大型活動、交通管制、疏運情境價值高。
-4. **S-033 新聞局市政新聞**：作跨局處事件發現與第二官方來源。
+4. **S-033 市府市政新聞**：作跨局處事件發現；轉載內容不能重複計為獨立佐證。
 
 S-031 消防即時災情已接線為候選 adapter；它是高頻、短生命週期資料，仍須完成 retention、隱私遮蔽與「不是派遣資料」提示的 live／七日驗收。
 

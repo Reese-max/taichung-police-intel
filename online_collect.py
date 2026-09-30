@@ -427,8 +427,8 @@ NEWS_LIST_SOURCES = {
         "id_pattern": r"index-1\.asp\?Parser=9,4,20,,,,(\d+)",
     },
     "S-033": {
-        "name": "臺中市政府新聞局最新消息",
-        "list_url": "https://www.news.taichung.gov.tw/31034/564777/rss?nodeId=14813",
+        "name": "臺中市政府市政新聞",
+        "list_url": "https://www.taichung.gov.tw/10179/564770/rss?nodeId=9962",
         "format": "rss",
     },
     "S-031": {
@@ -437,6 +437,17 @@ NEWS_LIST_SOURCES = {
         "format": "fire_live",
     },
 }
+
+
+def get_news_listing(session: requests.Session, source_id: str) -> requests.Response:
+    config = NEWS_LIST_SOURCES[source_id]
+    try:
+        return get(session, config["list_url"], source_id=source_id)
+    except (ConnectionError, requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+        fallback_url = config.get("fallback_list_url")
+        if not fallback_url:
+            raise
+        return get(session, fallback_url, source_id=source_id)
 
 
 def parse_news_list(html: bytes, base_url: str, id_pattern: str) -> list[dict]:
@@ -606,7 +617,7 @@ def collect_news_list(
 ) -> dict:
     """Collect a candidate list with bounded detail-page requests."""
     config = NEWS_LIST_SOURCES[source_id]
-    listing = get(session, config["list_url"], source_id=source_id)
+    listing = get_news_listing(session, source_id)
     responses = [snapshot(listing, "LIST")]
     if config.get("format") == "rss":
         entries = parse_news_rss(listing.content, listing.url)

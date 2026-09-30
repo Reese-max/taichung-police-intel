@@ -94,15 +94,15 @@ class ParseNewsListTests(unittest.TestCase):
                 self.assertEqual(entries[0]["published"], date(2026, 9, 10) if source_id != "S-032" else date(2026, 9, 11))
 
     def test_rss_parser_extracts_stable_ids_and_rfc822_dates(self):
-        entries = oc.parse_news_rss(RSS_LIST, "https://www.news.taichung.gov.tw/feed")
+        entries = oc.parse_news_rss(RSS_LIST, "https://www.taichung.gov.tw/feed")
         self.assertEqual([entry["stable_key"] for entry in entries], ["3375296", "3372712"])
         self.assertEqual(entries[0]["published"], date(2026, 9, 21))
-        self.assertEqual(entries[0]["detail_url"], "https://www.news.taichung.gov.tw/3375296/post")
+        self.assertEqual(entries[0]["detail_url"], "https://www.taichung.gov.tw/3375296/post")
 
     def test_rss_parser_fails_closed_on_missing_date(self):
         broken = RSS_LIST.replace(b"<pubDate>Thu, 17 Sep 2026 01:40:58 GMT</pubDate>", b"")
         with self.assertRaises(ValueError):
-            oc.parse_news_rss(broken, "https://www.news.taichung.gov.tw/feed")
+            oc.parse_news_rss(broken, "https://www.taichung.gov.tw/feed")
 
     def test_unparseable_list_raises_not_zero(self):
         with self.assertRaises(ValueError):
@@ -148,6 +148,15 @@ class ParseNewsListTests(unittest.TestCase):
 
 
 class ListFirstGatingTests(unittest.TestCase):
+    def test_police_collector_uses_same_origin_fallback_after_connection_error(self):
+        fallback = oc.NEWS_LIST_SOURCES["S-001"]["fallback_list_url"]
+        with mock.patch.object(oc, "get", side_effect=[ConnectionError("reset"), FakeResponse(POLICE_LIST, fallback)]) as fetch:
+            result = oc.collect_news_list(
+                FakeSession({}), "S-001", date(2026, 9, 4), date(2026, 9, 11), max_details=0
+            )
+        self.assertEqual(result["snapshot_item_count"], 3)
+        self.assertEqual(fetch.call_args_list[1].args[1], fallback)
+
     def test_unchanged_items_skip_detail_fetch(self):
         detail_url = "https://www.police.taichung.gov.tw/home.jsp?id=1&mcustomize=news_view.jsp&dataserno=202609100003"
         first, session = _collect("S-001", POLICE_LIST, **{detail_url: DETAIL})

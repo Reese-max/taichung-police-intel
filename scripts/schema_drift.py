@@ -102,7 +102,7 @@ CONTRACTS: dict[str, dict[str, Any]] = {
         "臺中市政府交通局最新消息",
         r"index-1\.asp\?Parser=9,4,20,,,,(\d+)",
     ),
-    "S-033": _rss_news("S-033", "臺中市政府新聞局最新消息"),
+    "S-033": _rss_news("S-033", "臺中市政府市政新聞"),
     "S-031": _fire_live("S-031", "臺中市政府消防局即時災情"),
     "S-007": {
         "source_id": "S-007",
@@ -670,18 +670,10 @@ def _load_s028_module():
 def _fetch_live_source(session, source_id: str):
     if str(ROOT) not in sys.path:
         sys.path.insert(0, str(ROOT))
-    from online_collect import API_S007, API_S009, NEWS_LIST_SOURCES, get as bounded_get
+    from online_collect import API_S007, API_S009, NEWS_LIST_SOURCES, get as bounded_get, get_news_listing
 
     if source_id in NEWS_LIST_SOURCES:
-        config = NEWS_LIST_SOURCES[source_id]
-        try:
-            return bounded_get(session, config["list_url"], source_id=source_id), None
-        except Exception as error:
-            error_name = type(error).__name__.upper()
-            fallback_url = config.get("fallback_list_url")
-            if not fallback_url or not any(marker in error_name for marker in ("CONNECTION", "TIMEOUT", "PROXY")):
-                raise
-            return bounded_get(session, fallback_url, source_id=source_id), None
+        return get_news_listing(session, source_id), None
     if source_id == "S-007":
         return bounded_get(
             session,
