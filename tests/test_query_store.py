@@ -56,6 +56,33 @@ class QueryStoreTests(unittest.TestCase):
         self.assertTrue(all(row["source_id"] == "S-004" for row in result["results"]))
         self.assertEqual(result["truncated"], result["total_matches"] > result["result_count"])
 
+    def test_item_without_own_freshness_inherits_the_source_row(self):
+        item = {
+            "stable_id": "PE-FRESHNESS-FALLBACK",
+            "title": "無自有時效的公告項目",
+            "source_id": "S-004",
+            "official_url": "https://www.police.taichung.gov.tw/news/1",
+            "evidence_count": 1,
+            "content_sha256": "c" * 64,
+        }
+        # The projected status and the evidence catalog resolve freshness the same
+        # way, so an item row can never be labelled STALE while its source-backed
+        # evidence row is treated as current.
+        self.assertEqual(qs.project_feed_item(item, "a" * 64)["verification_status"], "STALE")
+        self.assertEqual(
+            qs.project_feed_item(item, "a" * 64, source_freshness="FRESH")["verification_status"], "VERIFIED"
+        )
+        self.assertEqual(
+            qs.project_feed_item(item, "a" * 64, source_freshness="RECENT")["verification_status"], "VERIFIED"
+        )
+        self.assertEqual(
+            qs.project_feed_item(item, "a" * 64, source_freshness="STALE")["verification_status"], "STALE"
+        )
+        explicit = dict(item, freshness_status="STALE")
+        self.assertEqual(
+            qs.project_feed_item(explicit, "a" * 64, source_freshness="FRESH")["verification_status"], "STALE"
+        )
+
     def test_store_saved_by_a_superseded_projection_is_refused(self):
         store = qs.build_from_paths(qs.DEFAULT_FEED, qs.DEFAULT_STATUS, qs.DEFAULT_BRIEF)
         self.assertEqual(store["projection_version"], qs.PROJECTION_VERSION)

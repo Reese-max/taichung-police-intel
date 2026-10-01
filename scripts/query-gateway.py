@@ -658,6 +658,9 @@ class QueryGateway:
                 source.get("source_health") == "PASS"
                 and source.get("window_completeness") in {"COMPLETE_ZERO", "COMPLETE_WITH_ITEMS"}
                 and freshness in {"FRESH", "RECENT"}
+                # The projected status already resolved the item/source freshness
+                # fallback, so the label on the row and this decision cannot drift.
+                and item["verification_status"] == "VERIFIED"
             )
             canonical_id = item["canonical_id"]
             official_url = item.get("official_url")

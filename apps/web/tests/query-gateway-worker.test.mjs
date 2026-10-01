@@ -162,7 +162,9 @@ test("Worker serves the last good snapshot when a rebuild fails", async () => {
   };
   try {
     const healthy = (await import("../../../workers/query-gateway/src/index.js?snapshot-fallback")).default;
+    let upstreamCalls = 0;
     globalThis.fetch = async url => {
+      upstreamCalls += 1;
       const name = new URL(url).pathname.split("/").at(-1);
       return new Response(freshBytes[name], { status: 200, headers: { "Content-Type": "application/json" } });
     };
@@ -176,7 +178,7 @@ test("Worker serves the last good snapshot when a rebuild fails", async () => {
     assert.equal(first.body.answerable_no_match, true);
     assert.equal(first.body.query_coverage.can_state_bounded_no_match, true);
 
-    globalThis.fetch = async () => new Response("upstream", { status: 503 });
+    globalThis.fetch = async () => { upstreamCalls += 1; return new Response("upstream", { status: 503 }); };
     Date.now = () => originalNow() + 31_000;
     const degraded = await query(healthy, { q: noMatchTerm, limit: 1 });
     assert.equal(degraded.status, 200);
@@ -191,7 +193,15 @@ test("Worker serves the last good snapshot when a rebuild fails", async () => {
     assert.ok(gap, JSON.stringify(degraded.body.source_gaps));
     assert.ok(Date.parse(gap.since) > 0);
 
+    const failures = upstreamCalls;
+    Date.now = () => originalNow() + 32_000;
+    const held = await query(healthy, { q: noMatchTerm, limit: 1 });
+    assert.equal(held.body.source_gaps.find((row) => row.reason === "INDEX_REBUILD_FAILED").since, gap.since);
+    assert.equal(upstreamCalls, failures, "a degraded index must not refetch every artifact per request");
+
+    Date.now = () => originalNow() + 61_000;
     const again = await query(healthy, { q: noMatchTerm, limit: 1 });
+    assert.ok(upstreamCalls > failures, "the rebuild must be retried after the backoff");
     assert.equal(again.body.source_gaps.find((row) => row.reason === "INDEX_REBUILD_FAILED").since, gap.since);
 
     const health = await healthy.fetch(new Request("https://govintel-query-gateway.example/health"), env);
@@ -247,6 +257,52 @@ test("Worker fails closed instead of serving a superseded generation", async () 
   } finally {
     globalThis.fetch = originalFetch;
     Date.now = originalNow;
+  }
+});
+
+test("Worker inherits the source freshness for an item without its own", async () => {
+  const originalFetch = globalThis.fetch;
+  const bytes = Object.fromEntries(await Promise.all(
+    artifactNames.map(async name => [name, await readFile(new URL(name, base))]),
+  ));
+  const fresh = refreshedPublicationArtifacts(bytes);
+  const feed = JSON.parse(fresh["intelligence-feed.json"].toString("utf8"));
+  const item = feed.items.find(row => row.stable_id);
+  assert.ok(item, "fixture needs a feed item");
+  delete item.freshness_status;
+  const staleStatus = JSON.parse(fresh["source-status.json"].toString("utf8"));
+  const serve = table => async url => {
+    const name = new URL(url).pathname.split("/").at(-1);
+    return new Response(table[name], { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+  const query = async (instance, args) => {
+    const response = await instance.fetch(new Request(endpoint, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tool: "search_evidence", arguments: args }),
+    }), env);
+    return { status: response.status, body: await response.json() };
+  };
+  try {
+    globalThis.fetch = serve({ ...fresh, "intelligence-feed.json": Buffer.from(JSON.stringify(feed), "utf8") });
+    const inherited = (await query(
+      (await import("../../../workers/query-gateway/src/index.js?fresh-source")).default,
+      { canonical_id: item.stable_id, limit: 1 },
+    )).body;
+    assert.equal(inherited.results[0].verification_status, "VERIFIED");
+
+    for (const source of staleStatus.sources) source.freshness_status = "STALE";
+    globalThis.fetch = serve({
+      ...fresh,
+      "intelligence-feed.json": Buffer.from(JSON.stringify(feed), "utf8"),
+      "source-status.json": Buffer.from(JSON.stringify(staleStatus), "utf8"),
+    });
+    const fromStaleSource = (await query(
+      (await import("../../../workers/query-gateway/src/index.js?stale-source")).default,
+      { canonical_id: item.stable_id, limit: 1 },
+    )).body;
+    assert.equal(fromStaleSource.results[0].verification_status, "STALE");
+  } finally {
+    globalThis.fetch = originalFetch;
   }
 });
 

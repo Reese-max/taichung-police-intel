@@ -14,6 +14,7 @@ const RETENTION_POLICY = {
   full_text_allowed: false,
 };
 const MAX_RATE = 60;
+const DEGRADED_RETRY_MS = 5_000;
 const rateWindows = new Map();
 let snapshotCache = null;
 let snapshotBuild = null;
@@ -77,7 +78,7 @@ function assertHash(value, name) {
   if (typeof value !== "string" || !/^[a-f0-9]{64}$/.test(value)) throw new Error(`${name} must be a SHA-256 hex digest`);
 }
 
-function projectFeedItem(item, feedHash) {
+function projectFeedItem(item, feedHash, sourceFreshness = null) {
   if (!item || typeof item !== "object" || typeof item.stable_id !== "string" || typeof item.title !== "string" || typeof item.source_id !== "string") {
     throw new Error("invalid feed row");
   }
@@ -89,7 +90,9 @@ function projectFeedItem(item, feedHash) {
   for (const key of ["published_at", "data_as_of", "fetched_at"]) {
     if (item[key] !== null && item[key] !== undefined && !Number.isFinite(parseInstant(item[key]))) throw new Error(`invalid ${key}`);
   }
-  const freshness = String(item.freshness_status || "").toUpperCase();
+  // An item without its own freshness inherits the source row's, which is the same
+  // effective freshness the evidence catalog and answer gate use.
+  const freshness = String(item.freshness_status || sourceFreshness || "UNKNOWN").toUpperCase();
   return {
     record_type: "publication_item",
     canonical_id: item.stable_id,
@@ -195,7 +198,8 @@ async function buildSnapshotFromArtifacts({ feedDoc, statusDoc, briefDoc, policy
     if (!Number.isFinite(parseInstant(value))) throw new Error("publication timestamp is invalid");
   }
   if (!Array.isArray(feed.items) || feed.items.length > 10000 || !Array.isArray(status.sources)) throw new Error("publication arrays are invalid");
-  const items = feed.items.map((item) => projectFeedItem(item, feedDoc.hash)).sort((a, b) => a.canonical_id.localeCompare(b.canonical_id));
+  const sourceFreshness = new Map(status.sources.map((source) => [source.source_id, String(source.freshness_status || "UNKNOWN").toUpperCase()]));
+  const items = feed.items.map((item) => projectFeedItem(item, feedDoc.hash, sourceFreshness.get(item.source_id) || null)).sort((a, b) => a.canonical_id.localeCompare(b.canonical_id));
   if (new Set(items.map((item) => item.canonical_id)).size !== items.length) throw new Error("duplicate canonical_id");
   const sources = status.sources.map((source) => projectSource(source, statusDoc.hash)).sort((a, b) => a.source_id.localeCompare(b.source_id));
   const active = [...policy.active_source_ids].sort();
@@ -228,7 +232,7 @@ async function buildSnapshotFromArtifacts({ feedDoc, statusDoc, briefDoc, policy
 
 async function getSnapshot(env) {
   const now = Date.now();
-  if (snapshotCache && snapshotCache.expiresAt > now) return snapshotCache.value;
+  if (snapshotCache && snapshotCache.expiresAt > now) return snapshotCache.degraded || snapshotCache.value;
   // Concurrent requests share one in-flight rebuild, so a failure degrades every
   // waiter to the same last usable snapshot instead of racing the cache write.
   if (!snapshotBuild) snapshotBuild = buildSnapshot(env).finally(() => { snapshotBuild = null; });
@@ -245,7 +249,11 @@ async function getSnapshot(env) {
     // response has to say so instead of reading as a successful fresh rebuild.
     console.warn("query-gateway: index rebuild failed; serving last usable snapshot", String(error?.message || error));
     degradedSince = degradedSince || new Date().toISOString();
-    return { ...snapshotCache.value, degradedSince };
+    const degraded = { ...snapshotCache.value, degradedSince };
+    // Hold the degraded projection briefly instead of re-fetching every artifact
+    // on every request while the origin is down.
+    snapshotCache = { value: snapshotCache.value, degraded, expiresAt: Date.now() + DEGRADED_RETRY_MS };
+    return degraded;
   }
 }
 
@@ -375,7 +383,10 @@ function trustedEvidence(snapshot) {
     const source = snapshot.sources.find((row) => row.source_id === item.source_id) || {};
     const freshnessValue = String(item.freshness_status || source.freshness_status || "UNKNOWN").toUpperCase();
     const current = sourceStatus[item.source_id] === "SNAPSHOT_RECENT" && source.source_health === "PASS" &&
-      ["COMPLETE_ZERO", "COMPLETE_WITH_ITEMS"].includes(source.window_completeness) && ["FRESH", "RECENT"].includes(freshnessValue);
+      ["COMPLETE_ZERO", "COMPLETE_WITH_ITEMS"].includes(source.window_completeness) && ["FRESH", "RECENT"].includes(freshnessValue) &&
+      // The projected status already resolved the item/source freshness fallback,
+      // so the label on the row and this decision cannot drift.
+      item.verification_status === "VERIFIED";
     return {
       schema_version: 1, evidence_id: `PUB-${item.canonical_id}`, evidence_type: "WRITTEN_OFFICIAL", source_id: item.source_id,
       locator: `${item.official_url}#publication:${item.canonical_id}`, document_version: item.content_sha256, content_sha256: item.content_sha256,
