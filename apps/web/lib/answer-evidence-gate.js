@@ -526,6 +526,9 @@ function blockedReceipt(reason, error) {
       ...(error !== undefined
         ? { error_detail: String(error?.message ?? error).slice(0, 200) }
         : {}),
+      // Rows this validator refused to index were never checked against any
+      // claim, so a refused gate reports no evidence coverage at all.
+      indexed_evidence_count: 0,
       claim_ids: [],
       evidence_ids: [],
       source_document_versions: {},
@@ -593,6 +596,12 @@ export function gateAnswer({ claims, evidence, generated_at } = {}) {
         validator_version: VALIDATOR_VERSION,
         gate_status: gateStatus,
         publication_hash: publicationHash(index),
+        // readEvidence() rejects rows it cannot index (foreign schema_version,
+        // missing id/source, unknown evidence_type) and the gate drops them.
+        // A dropped row silently changes a verdict, so report the indexed row
+        // count and let the gate host fail closed on a partial catalog instead
+        // of releasing a receipt that reads as a full-publication check.
+        indexed_evidence_count: index.length,
         ...(generated_at ? { generated_at } : {}),
         claim_ids: evaluated.map((entry) => entry.claim_id),
         evidence_ids: evidenceIds,
