@@ -317,7 +317,8 @@ function queryCoverage(snapshot, capabilityId, requestedScope = {}) {
   for (const sourceId of required) {
     const source = sourceMap.get(sourceId);
     if (!source) { missing.push(sourceId); continue; }
-    if (source.source_health !== "PASS" || !["COMPLETE_ZERO", "COMPLETE_WITH_ITEMS"].includes(source.window_completeness)) missing.push(sourceId);
+    if (source.source_health !== "PASS" || !["COMPLETE_ZERO", "COMPLETE_WITH_ITEMS"].includes(source.window_completeness) ||
+        !["NEW_ITEMS", "NO_NEW_ITEM"].includes(source.result)) missing.push(sourceId);
     const state = String(source.freshness_status || "UNKNOWN").toUpperCase();
     if (["STALE", "VERY_STALE"].includes(state)) stale.push(sourceId);
     else if (!["FRESH", "RECENT"].includes(state)) missing.push(sourceId);

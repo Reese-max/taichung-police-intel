@@ -915,7 +915,7 @@ class QueryGateway:
                 return self._envelope(
                     tool, args, scope,
                     {"event_ids": [event_id], "evidence_ids": evidence_ids, "event": event,
-                     "discovery_unverified_count": int(event.get("trust_tier") == "DISCOVERY_UNVERIFIED"),
+                     **query_domain.trust_tier_counts([event]),
                      "domain_query_generation_id": store["generation_id"]},
                     result_count=1, result_type="public_event",
                 )
@@ -934,7 +934,7 @@ class QueryGateway:
         return self._envelope(
             tool, args, scope,
             {"event_ids": [event_id], "comparison": comparison,
-             "discovery_unverified_count": int(comparison.get("trust_tier") == "DISCOVERY_UNVERIFIED"),
+             **query_domain.trust_tier_counts([comparison]),
              "domain_query_generation_id": store["generation_id"]},
             result_count=1, result_type="event_comparison",
         )

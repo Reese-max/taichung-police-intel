@@ -516,14 +516,21 @@ def query_events(store: dict[str, Any], arguments: dict[str, Any]) -> dict[str, 
     # discovery count alone must not read as "every match is verified".
     return {
         "query_generation_id": store["generation_id"],
+        **trust_tier_counts(matches),
+        **page,
+    }
+
+
+def trust_tier_counts(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Aggregate trust tiers over a result set, never over the returned page."""
+    return {
         "trust_tier_counts": {
-            tier: sum(1 for row in matches if row["trust_tier"] == tier)
+            tier: sum(1 for row in rows if row["trust_tier"] == tier)
             for tier in sorted(TRUST_TIERS)
         },
-        "discovery_unverified_count": sum(1 for row in matches if row["trust_tier"] == "DISCOVERY_UNVERIFIED"),
-        "conflict_count": sum(1 for row in matches if row["trust_tier"] == "CONFLICT"),
-        "stale_count": sum(1 for row in matches if row["trust_tier"] == "STALE"),
-        **page,
+        "discovery_unverified_count": sum(1 for row in rows if row["trust_tier"] == "DISCOVERY_UNVERIFIED"),
+        "conflict_count": sum(1 for row in rows if row["trust_tier"] == "CONFLICT"),
+        "stale_count": sum(1 for row in rows if row["trust_tier"] == "STALE"),
     }
 
 

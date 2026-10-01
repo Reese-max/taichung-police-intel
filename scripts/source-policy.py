@@ -325,7 +325,8 @@ def assess_query(policy: dict[str, Any], capability_id: str, source_states: dict
         state = source_states.get(source_id)
         if state is None:
             continue
-        if state.get("source_health") != "PASS" or state.get("window_completeness") not in COMPLETE:
+        if (state.get("source_health") != "PASS" or state.get("window_completeness") not in COMPLETE
+                or state.get("result") not in ("NEW_ITEMS", "NO_NEW_ITEM")):
             bad.append(source_id)
         freshness = normalize_freshness(state.get("freshness", state.get("freshness_status")))
         if freshness in FRESHNESS_STALE:

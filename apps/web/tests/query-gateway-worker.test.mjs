@@ -325,6 +325,8 @@ test("Worker treats a partially collected source as incomplete scope", async () 
     assert.ok(body.source_gaps.some((gap) => gap.reason === "SOURCE_INCOMPLETE"), JSON.stringify(body.source_gaps));
     assert.notEqual(body.freshness, "RECENT");
     assert.equal(body.answerable_no_match, false);
+    assert.equal(body.query_coverage.can_state_bounded_no_match, false);
+    assert.equal(body.query_coverage.status, "PARTIAL");
   } finally {
     globalThis.fetch = originalFetch;
   }
