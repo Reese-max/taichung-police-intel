@@ -356,7 +356,7 @@ def self_check() -> None:
     policy = load_current_policy()
     assert policy["active_source_ids"] == sorted(policy["active_source_ids"])
     assert assess_query(policy, "traffic_events")["status"] == "CAPABILITY_NOT_AVAILABLE"
-    states = {source_id: {"source_health": "PASS", "window_completeness": "COMPLETE_WITH_ITEMS", "freshness": "RECENT"} for source_id in policy["active_source_ids"]}
+    states = {source_id: {"source_health": "PASS", "window_completeness": "COMPLETE_WITH_ITEMS", "result": "NEW_ITEMS", "freshness": "RECENT"} for source_id in policy["active_source_ids"]}
     result = assess_query(policy, "publication_metadata", states)
     assert result["status"] == "COVERED_BOUNDED_SCOPE"
     assert result["can_state_bounded_no_match"] is True
