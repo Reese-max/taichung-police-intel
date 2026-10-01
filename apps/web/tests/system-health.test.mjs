@@ -4,6 +4,14 @@ import test from "node:test";
 
 const healthUrl = new URL("../public/data/system-health.json", import.meta.url);
 const componentUrl = new URL("../components/V2DailyDashboard.js", import.meta.url);
+const healthRouteUrl = new URL("../app/api/system-health.json/route.js", import.meta.url);
+import {
+  formatSloMetric,
+  sloMetricEntries,
+  stageModelEntries,
+  upstreamOperatingStateLabel,
+} from "../lib/system-health-view.mjs";
+const measured = metric => metric && metric.measured === true && typeof metric.value === "number";
 
 test("system health receipt exposes lane and stage evidence", async () => {
   const health = JSON.parse(await readFile(healthUrl, "utf8"));
@@ -15,6 +23,119 @@ test("system health receipt exposes lane and stage evidence", async () => {
   assert.equal(typeof health.operator_summary?.message, "string");
   assert.ok(health.stages.every((stage) => Object.hasOwn(stage, "last_success_at")));
   assert.ok(Array.isArray(health.review_inbox));
+});
+
+test("receipt publishes a versioned stage model covering the end-to-end chain", async () => {
+  const health = JSON.parse(await readFile(healthUrl, "utf8"));
+  assert.equal(health.stage_model?.version, "govintel-e2e-stages.v1");
+  assert.ok(Array.isArray(health.stage_model?.stages) && health.stage_model.stages.length >= 10);
+  for (const stageId of [
+    "collection",
+    "parsing",
+    "fusion_verification",
+    "canonical_validation",
+    "publication_build",
+    "deployment",
+    "public_http_verification",
+    "query_index",
+    "read_only_mcp",
+    "mcp_web_query",
+    "upstream_operating_state",
+  ]) {
+    assert.ok(health.stage_model.stage_ids.includes(stageId), `missing stage ${stageId}`);
+  }
+  const reported = new Set(health.stages.map(stage => stage.stage));
+  for (const stageId of health.stage_model.stage_ids) {
+    assert.ok(reported.has(stageId), `stage model advertises unreported stage ${stageId}`);
+  }
+  assert.deepEqual(
+    health.stage_model.required_publication_stages.sort(),
+    ["canonical_validation", "collection", "deployment", "public_http_verification"],
+  );
+  // An all-null error_stage would mean failures are not attributed to a link.
+  const attributed = health.stages.filter(stage => stage.outcome !== "SUCCESS");
+  assert.ok(attributed.length > 0, "checked-in receipt should carry at least one non-SUCCESS stage");
+  for (const stage of attributed) {
+    assert.equal(stage.error_stage, stage.stage, stage.stage);
+  }
+  for (const stage of health.stages) {
+    assert.ok(Object.hasOwn(stage, "last_success_at"));
+  }
+});
+
+test("unmeasured SLO metrics render as UNKNOWN, never as zero", () => {
+  assert.deepEqual(
+    formatSloMetric({ measured: false, value: null, unit: "ratio", reason: "NO_SOURCE_RECEIPTS" }),
+    { value: "UNKNOWN", note: "NO_SOURCE_RECEIPTS" },
+  );
+  // A faked measurement must still render as UNKNOWN, not as the number.
+  assert.equal(formatSloMetric({ measured: false, value: 0, unit: "count" }).value, "UNKNOWN");
+  assert.equal(formatSloMetric({ measured: true, value: null }).value, "UNKNOWN");
+  assert.equal(formatSloMetric(null).value, "UNKNOWN");
+  assert.equal(formatSloMetric(undefined).note, "尚未量測");
+  assert.equal(formatSloMetric({ measured: true, value: 0, unit: "count" }).value, "0 次");
+  assert.equal(formatSloMetric({ measured: true, value: 0.25, unit: "ratio" }).value, "0.25");
+  assert.equal(formatSloMetric({ measured: true, value: 60000, unit: "milliseconds" }).value, "60000 ms");
+});
+
+test("an older receipt without the #35 sections degrades instead of throwing", () => {
+  const legacy = { schema_version: 1, overall: "STALE", lanes: {}, stages: [] };
+  assert.deepEqual(stageModelEntries(legacy), []);
+  assert.deepEqual(stageModelEntries({ stage_model: {} }), []);
+  assert.deepEqual(stageModelEntries({ stage_model: { stage_ids: null } }), []);
+  assert.deepEqual(sloMetricEntries(legacy), []);
+  assert.deepEqual(sloMetricEntries({ slo: { metrics: null } }), []);
+  assert.equal(upstreamOperatingStateLabel(legacy), "UNKNOWN");
+  assert.equal(upstreamOperatingStateLabel({ upstream: {} }), "UNKNOWN");
+  assert.equal(upstreamOperatingStateLabel({ upstream: { upstream_operating_state: "PAUSED" } }), "PAUSED");
+});
+
+test("receipt publishes measurement-only SLO fields that stay unknown when unproven", async () => {
+  const health = JSON.parse(await readFile(healthUrl, "utf8"));
+  assert.equal(health.slo?.status, "MEASUREMENT_ONLY");
+  assert.equal(health.slo.thresholds, null);
+  const metrics = health.slo.metrics;
+  assert.ok(metrics && Object.keys(metrics).length >= 9);
+  for (const [name, metric] of Object.entries(metrics)) {
+    assert.ok(Object.hasOwn(metric, "unit"), name);
+    assert.equal(typeof metric.measured, "boolean", name);
+    if (!metric.measured) {
+      assert.equal(metric.value, null, name);
+      assert.ok(metric.reason, name);
+    }
+  }
+  assert.ok(measured(metrics.stale_source_ratio));
+  assert.ok(measured(metrics.collection_success_ratio));
+  // No production HTTP receipt is checked in, so publish→public-visible must stay unknown.
+  assert.equal(metrics.publish_to_public_visible_ms.measured, false);
+  assert.equal(health.latency_metrics.publish_to_visible_ms, null);
+});
+
+test("upstream operating state is reported without overriding GovIntel health", async () => {
+  const health = JSON.parse(await readFile(healthUrl, "utf8"));
+  assert.ok(["ACTIVE", "DEGRADED", "RESTORING", "PAUSED", "UNKNOWN"].includes(health.upstream?.upstream_operating_state));
+  assert.equal(health.upstream.overrides_govintel_health, false);
+  assert.notEqual(health.lanes.publication, "BLOCKED");
+});
+
+test("machine-readable system-health route serves the saved receipt", async () => {
+  const route = await readFile(healthRouteUrl, "utf8");
+  assert.match(route, /system-health\.json/);
+  assert.match(route, /force-static/);
+  assert.match(route, /Response\.json/);
+});
+
+test("dashboard renders the stage model, SLO metrics and upstream state", async () => {
+  const source = await readFile(componentUrl, "utf8");
+  assert.match(source, /v2-stage-model/);
+  assert.match(source, /v2-slo-metrics/);
+  assert.match(source, /v2-upstream-operating-state/);
+  assert.match(source, /不覆蓋 GovIntel 自身健康/);
+  // The unknown-safe rendering must come from the tested helper, not a local copy.
+  assert.match(source, /from "\.\.\/lib\/system-health-view\.mjs"/);
+  assert.match(source, /stageModelEntries\(health\)/);
+  assert.match(source, /sloMetricEntries\(health\)/);
+  assert.match(source, /upstreamOperatingStateLabel\(health\)/);
 });
 
 test("dashboard renders the saved health receipt without treating UNKNOWN as success", async () => {
