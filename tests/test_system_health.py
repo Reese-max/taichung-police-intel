@@ -31,6 +31,22 @@ def complete_publication(overrides=None):
     return rows
 
 
+def healthy_chain():
+    """A fully green end-to-end chain: every stage in the versioned model."""
+    return [stage(row["lane"], row["stage"], "SUCCESS") for row in health.stage_model()["stages"]]
+
+
+def chain_with_failure(error_class):
+    """Same healthy chain, with exactly one stage forced into the given failure."""
+    receipt = health.failure_stage_receipt(error_class)
+    rows = healthy_chain()
+    for row in rows:
+        if (row["lane"], row["stage"]) == (receipt["lane"], receipt["stage"]):
+            row["outcome"] = receipt["outcome"]
+            row["error_class"] = receipt["error_class"]
+    return rows
+
+
 def controlled_publication_inputs():
     """Keep state-machine tests independent of the scheduled live collection."""
     status = json.loads(health.DEFAULT_STATUS.read_text(encoding="utf-8"))
@@ -265,6 +281,247 @@ class SystemHealthTests(unittest.TestCase):
         self.assertEqual(rows[0]["reason"], "PARTIAL_SOURCE")
         self.assertNotIn("evidence", rows[0])
         self.assertNotIn("audit", rows[0])
+
+    # ------------------------------------------------------------------
+    # Issue #35 — end-to-end observability / SLO measurement fields.
+    # ------------------------------------------------------------------
+
+    def test_stage_model_is_versioned_and_covers_the_end_to_end_chain(self):
+        self.assertEqual(health.STAGE_MODEL_VERSION, "govintel-e2e-stages.v1")
+        model = health.stage_model()
+        self.assertEqual(model["version"], "govintel-e2e-stages.v1")
+        self.assertTrue(model["stage_ids"])
+        for expected in (
+            "source_contracts",
+            "upstream_operating_state",
+            "collection",
+            "parsing",
+            "fusion_verification",
+            "canonical_validation",
+            "publication_build",
+            "deployment",
+            "public_http_verification",
+            "query_index",
+            "mcp_web_query",
+        ):
+            self.assertIn(expected, model["stage_ids"])
+        orders = [row["order"] for row in model["stages"]]
+        self.assertEqual(orders, sorted(orders))
+        self.assertEqual(len(orders), len(set(orders)))
+        for row in model["stages"]:
+            self.assertIn(row["lane"], health.VALID_LANES)
+            self.assertTrue(row["description"])
+            self.assertEqual(health.stage_model_entry(row["stage"])["lane"], row["lane"])
+        self.assertIsNone(health.stage_model_entry("not-a-stage"))
+
+    def test_every_stage_carries_last_success_and_generation_hash_linkage(self):
+        result = health.build_health(healthy_chain())
+        self.assertEqual(len(result["stages"]), len(health.stage_model()["stage_ids"]))
+        for row in result["stages"]:
+            for field in (
+                "lane",
+                "stage",
+                "outcome",
+                "started_at",
+                "ended_at",
+                "last_success_at",
+                "generation_id",
+                "upstream_hash",
+                "downstream_hash",
+                "item_count",
+                "gap_count",
+                "error_stage",
+                "error_class",
+                "receipt_ref",
+            ):
+                self.assertIn(field, row, f"{row['stage']} missing {field}")
+            self.assertIsNone(row["error_stage"])
+        failed = health.build_health(chain_with_failure("DEPLOY_ACTION_FAILED"))
+        deployment = next(row for row in failed["stages"] if row["stage"] == "deployment")
+        self.assertEqual(deployment["error_stage"], "deployment")
+        self.assertIsNone(next(row for row in failed["stages"] if row["stage"] == "collection")["error_stage"])
+
+    def test_failed_stage_reports_the_error_stage_that_owns_it(self):
+        result = health.build_health(chain_with_failure("DEPLOY_ACTION_FAILED"))
+        deployment = next(row for row in result["stages"] if row["stage"] == "deployment")
+        self.assertEqual(deployment["error_stage"], "deployment")
+        collection = next(row for row in result["stages"] if row["stage"] == "collection")
+        self.assertIsNone(collection["error_stage"])
+
+    # Every simulated critical failure must land in exactly one stage, so an
+    # operator can answer "which link of the chain broke" without guessing.
+    FAILURE_MATRIX = {
+        "COLLECTOR_TRANSPORT_ERROR": ("publication", "collection", "FAILED", "BLOCKED", "BLOCKED"),
+        "PARSER_OUTPUT_PARTIAL": ("publication", "parsing", "PARTIAL", "PARTIAL", "PARTIAL"),
+        "FUSION_VERIFICATION_FAILED": ("publication", "fusion_verification", "FAILED", "BLOCKED", "BLOCKED"),
+        "PROTECTED_BRANCH_PUSH_REJECTED": ("publication", "deployment", "FAILED", "BLOCKED", "BLOCKED"),
+        "DEPLOY_ACTION_FAILED": ("publication", "deployment", "FAILED", "BLOCKED", "BLOCKED"),
+        "PUBLIC_HTTP_HASH_MISMATCH": ("publication", "public_http_verification", "FAILED", "BLOCKED", "BLOCKED"),
+        "QUERY_INDEX_BUILD_FAILED": ("query", "query_index", "FAILED", "BLOCKED", "DEGRADED"),
+        "MCP_RUNTIME_UNAVAILABLE": ("query", "mcp_web_query", "FAILED", "BLOCKED", "DEGRADED"),
+        "SOURCE_CONTRACT_DRIFT": ("discovery", "source_contracts", "FAILED", "BLOCKED", "DEGRADED"),
+    }
+
+    def test_each_failure_mode_lands_in_exactly_one_stage(self):
+        for error_class, (lane, name, outcome, lane_health, overall) in self.FAILURE_MATRIX.items():
+            with self.subTest(error_class=error_class):
+                receipt = health.failure_stage_receipt(error_class)
+                self.assertEqual((receipt["lane"], receipt["stage"]), (lane, name))
+                self.assertEqual(receipt["outcome"], outcome)
+                self.assertEqual(receipt["error_class"], error_class)
+                self.assertEqual(receipt["error_stage"], name)
+                owners = [
+                    row["stage"]
+                    for row in health.stage_model()["stages"]
+                    if error_class in health.error_classes_for_stage(row["stage"])
+                ]
+                self.assertEqual(owners, [name])
+                result = health.build_health(chain_with_failure(error_class))
+                self.assertEqual(result["lanes"][lane], lane_health)
+                self.assertEqual(result["overall"], overall)
+                self.assertEqual(result["operator_summary"]["primary_stage"]["stage"], name)
+                attributed = next(
+                    row for row in result["stages"]
+                    if (row["lane"], row["stage"]) == (lane, name)
+                )
+                self.assertEqual(attributed["error_class"], error_class)
+
+    def test_publish_failure_never_reports_a_collection_failure(self):
+        result = health.build_health(chain_with_failure("PROTECTED_BRANCH_PUSH_REJECTED"))
+        collection = next(row for row in result["stages"] if row["stage"] == "collection")
+        self.assertEqual(collection["outcome"], "SUCCESS")
+        self.assertIsNone(collection["error_class"])
+        self.assertEqual(result["operator_summary"]["primary_stage"]["stage"], "deployment")
+        self.assertEqual(result["operator_summary"]["primary_stage"]["error_class"], "PROTECTED_BRANCH_PUSH_REJECTED")
+
+    def test_unknown_error_class_fails_closed(self):
+        with self.assertRaisesRegex(ValueError, "unclassified error class"):
+            health.failure_stage_receipt("SOMETHING_WE_NEVER_DEFINED")
+
+    def test_upstream_operating_state_is_reflected_without_overriding_govintel_health(self):
+        for state, outcome in {
+            "ACTIVE": "SUCCESS",
+            "DEGRADED": "PARTIAL",
+            "RESTORING": "PARTIAL",
+            "PAUSED": "STALE",
+        }.items():
+            with self.subTest(operating_state=state):
+                stage = health.upstream_operating_state_stage(
+                    {
+                        "upstream_operating_state": state,
+                        "upstream_current": state == "ACTIVE",
+                        "last_seen_generation_id": "gdf-abc",
+                        "last_seen_generated_at": "2026-09-11T08:23:26+08:00",
+                        "last_seen_content_hash": "a" * 64,
+                    }
+                )
+                self.assertEqual((stage["lane"], stage["stage"]), ("discovery", "upstream_operating_state"))
+                self.assertEqual(stage["outcome"], outcome)
+                self.assertEqual(stage["generation_id"], "gdf-abc")
+                self.assertEqual(stage["upstream_hash"], "a" * 64)
+                self.assertEqual(stage["last_success_at"], "2026-09-11T08:23:26+08:00" if state == "ACTIVE" else None)
+                result = health.build_health(
+                    [row for row in healthy_chain() if row["stage"] != "upstream_operating_state"],
+                    context={
+                        "upstream_receipt": {
+                            "upstream_operating_state": state,
+                            "upstream_current": state == "ACTIVE",
+                            "last_seen_generation_id": "gdf-abc",
+                            "last_seen_generated_at": "2026-09-11T08:23:26+08:00",
+                        }
+                    },
+                )
+                self.assertEqual(result["lanes"]["publication"], "HEALTHY")
+                self.assertEqual(result["upstream"]["upstream_operating_state"], state)
+                self.assertFalse(result["upstream"]["overrides_govintel_health"])
+                self.assertEqual(result["overall"], "HEALTHY" if state == "ACTIVE" else "DEGRADED")
+
+    def test_missing_upstream_operating_state_receipt_is_unknown_not_success(self):
+        result = health.build_health(complete_publication())
+        self.assertEqual(result["upstream"]["upstream_operating_state"], "UNKNOWN")
+        self.assertEqual(result["upstream"]["overrides_govintel_health"], False)
+        stage = next(row for row in result["stages"] if row["stage"] == "upstream_operating_state")
+        self.assertEqual(stage["outcome"], "UNKNOWN")
+        self.assertEqual(stage["error_class"], "NO_UPSTREAM_OPERATING_STATE_RECEIPT")
+        self.assertEqual(result["overall"], "DEGRADED")
+
+    def test_slo_metrics_stay_unknown_without_reliable_evidence(self):
+        slo = health.slo_metrics([], {}, None, None)
+        self.assertEqual(slo["status"], "MEASUREMENT_ONLY")
+        self.assertIsNone(slo["thresholds"])
+        self.assertEqual(sorted(slo["metrics"]), sorted(name for name, _ in health.SLO_METRIC_FIELDS))
+        for name, metric in slo["metrics"].items():
+            with self.subTest(metric=name):
+                self.assertIsNone(metric["value"])
+                self.assertFalse(metric["measured"])
+                self.assertTrue(metric["reason"])
+
+    def test_slo_metrics_measure_collection_source_and_publication_ratios(self):
+        sources = [
+            {"source_health": "PASS", "window_completeness": "COMPLETE_WITH_ITEMS", "freshness_status": "FRESH",
+             "last_success_at": "2026-09-11T08:00:00+08:00"},
+            {"source_health": "PASS", "window_completeness": "COMPLETE_ZERO", "freshness_status": "FRESH",
+             "last_success_at": "2026-09-11T08:10:00+08:00"},
+            {"source_health": "PASS", "window_completeness": "COMPLETE_WITH_ITEMS", "freshness_status": "STALE",
+             "last_success_at": "2026-09-11T08:20:00+08:00"},
+            {"source_health": "FAILED", "window_completeness": "PARTIAL_WINDOW", "freshness_status": "NO_DATA",
+             "last_success_at": "2026-09-11T08:21:00+08:00"},
+        ]
+        metrics = health.slo_metrics(sources, {}, None, "2026-09-11T09:00:00+08:00")["metrics"]
+        self.assertEqual(metrics["collection_success_ratio"]["value"], 0.75)
+        self.assertEqual(metrics["stale_source_ratio"]["value"], 0.25)
+        self.assertEqual(metrics["partial_source_ratio"]["value"], 0.25)
+        self.assertEqual(metrics["publication_mismatch_count"]["value"], 1)
+        self.assertEqual(metrics["source_freshness_age_ms"]["value"], 3600000)
+        for name in ("collection_success_ratio", "stale_source_ratio", "partial_source_ratio",
+                     "publication_mismatch_count", "source_freshness_age_ms"):
+            self.assertTrue(metrics[name]["measured"], name)
+
+    def test_slo_query_metrics_need_a_query_receipt(self):
+        without = health.slo_metrics([], {}, None, "2026-09-11T09:00:00+08:00")["metrics"]
+        self.assertFalse(without["query_index_lag_ms"]["measured"])
+        self.assertFalse(without["query_error_rate"]["measured"])
+        with_receipt = health.slo_metrics([], {}, {
+            "indexed_at": "2026-09-11T08:50:00+08:00",
+            "published_at": "2026-09-11T08:40:00+08:00",
+            "query_total": 200,
+            "query_errors": 5,
+        }, "2026-09-11T09:00:00+08:00")["metrics"]
+        self.assertEqual(with_receipt["query_index_lag_ms"]["value"], 600000)
+        self.assertEqual(with_receipt["query_error_rate"]["value"], 0.025)
+
+    def test_latency_chain_is_derived_from_stage_timestamps_without_fabricating_source_time(self):
+        stages = [
+            stage("publication", "collection", "SUCCESS", ended_at="2026-09-11T08:00:00+08:00"),
+            stage("publication", "parsing", "SUCCESS", ended_at="2026-09-11T08:01:00+08:00"),
+            stage("publication", "canonical_validation", "SUCCESS", ended_at="2026-09-11T08:05:00+08:00"),
+            stage("publication", "publication_build", "SUCCESS", ended_at="2026-09-11T08:10:00+08:00"),
+            stage("publication", "deployment", "SUCCESS", ended_at="2026-09-11T08:12:00+08:00"),
+            stage("publication", "public_http_verification", "SUCCESS", ended_at="2026-09-11T08:13:00+08:00"),
+        ]
+        result = health.build_health(stages)
+        metrics = result["latency_metrics"]
+        self.assertIsNone(metrics["source_to_detect_ms"])
+        self.assertEqual(metrics["detect_to_verify_ms"], 300000)
+        self.assertEqual(metrics["verify_to_publish_ms"], 420000)
+        self.assertEqual(metrics["publish_to_visible_ms"], 60000)
+
+    def test_checked_in_receipt_carries_versioned_model_and_unknown_safe_slo(self):
+        if os.getenv("GOVINTEL_PUBLICATION_WORKFLOW") == "1":
+            self.skipTest("Pages publication tests use generated artifacts, not the checked-in snapshot")
+        first = health.load_current()
+        second = health.load_current()
+        self.assertEqual(first, second)
+        self.assertEqual(first["stage_model"]["version"], health.STAGE_MODEL_VERSION)
+        self.assertEqual(first["slo"]["status"], "MEASUREMENT_ONLY")
+        self.assertIsNone(first["slo"]["thresholds"])
+        self.assertTrue(first["slo"]["metrics"]["publish_to_public_visible_ms"]["measured"] is False)
+        self.assertFalse(first["upstream"]["overrides_govintel_health"])
+        self.assertIsNotNone(health.parse_time(first["generated_at"]))
+        self.assertEqual(first["latency_metrics"]["publish_to_visible_ms"], None)
+        names = {row["stage"] for row in first["stages"]}
+        for expected in health.stage_model()["stage_ids"]:
+            self.assertIn(expected, names)
 
     def test_source_health_candidates_reach_public_review_projection(self):
         status = {

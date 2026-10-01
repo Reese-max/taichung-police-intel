@@ -272,8 +272,26 @@ function ReviewInboxPanel({ health, localReview, onDecision, onFeedback, onExpor
   );
 }
 
+const SLO_UNIT_SUFFIX = {
+  ratio: "",
+  count: " 次",
+  milliseconds: " ms",
+};
+
+function formatSloMetric(metric) {
+  // Unmeasured fields render as UNKNOWN with their reason; never as zero.
+  if (!metric || !metric.measured || typeof metric.value !== "number") {
+    return { value: "UNKNOWN", note: metric?.reason || "尚未量測" };
+  }
+  const suffix = SLO_UNIT_SUFFIX[metric.unit] ?? ` ${metric.unit}`;
+  return { value: `${metric.value}${suffix}`, note: "" };
+}
+
 function SystemHealthSummary({ health, localReview, onDecision, onFeedback, onExport, notice, error }) {
   if (!health || !health.lanes || !Array.isArray(health.stages)) return null;
+  const sloMetrics = health.slo?.metrics && typeof health.slo.metrics === "object"
+    ? Object.entries(health.slo.metrics)
+    : [];
   return (
     <details className="v2-system-health" data-testid="v2-system-health">
       <summary>端到端系統健康：{health.overall}</summary>
@@ -286,6 +304,19 @@ function SystemHealthSummary({ health, localReview, onDecision, onFeedback, onEx
             </div>
           ))}
         </div>
+        {health.stage_model && (
+          <p className="v2-health-note" data-testid="v2-stage-model">
+            階段模型：{health.stage_model.version} · {health.stage_model.stage_ids.length} 個階段
+            {health.generated_at && ` · 產生於 ${formatDateTime(health.generated_at)}`}
+          </p>
+        )}
+        {health.upstream && (
+          <p className="v2-health-note" data-testid="v2-upstream-operating-state">
+            上游 Dashboard 狀態：{health.upstream.upstream_operating_state}
+            {health.upstream.generation_id && ` · ${health.upstream.generation_id}`}
+            {` · 只反映上游事實，不覆蓋 GovIntel 自身健康`}
+          </p>
+        )}
         {health.operator_summary && (
           <p className="v2-health-note" data-testid="v2-operator-summary">
             操作提示：{health.operator_summary.message}
@@ -298,10 +329,34 @@ function SystemHealthSummary({ health, localReview, onDecision, onFeedback, onEx
             <li key={`${stage.lane}-${stage.stage}`}>
               <span>{stage.lane} / {stage.stage}</span>
               <strong>{stage.outcome}</strong>
-              <small>{stage.error_class || `最後觀測：${formatDateTime(stage.ended_at || stage.last_success_at)}`}</small>
+              <small>
+                {stage.error_class
+                  ? `${stage.error_class}${stage.error_stage ? ` @ ${stage.error_stage}` : ""}`
+                  : `最後觀測：${formatDateTime(stage.ended_at || stage.last_success_at)}`}
+                {stage.generation_id && ` · generation ${stage.generation_id}`}
+              </small>
             </li>
           ))}
         </ul>
+        {sloMetrics.length > 0 && (
+          <>
+            <p className="v2-health-note" data-testid="v2-slo-status">
+              量測欄位（{health.slo.status}）：第一版只量測欄位，不承諾未驗證的 SLA 門檻。
+            </p>
+            <ul className="v2-health-stage-list" data-testid="v2-slo-metrics">
+              {sloMetrics.map(([name, metric]) => {
+                const shown = formatSloMetric(metric);
+                return (
+                  <li key={name}>
+                    <span>{name}</span>
+                    <strong>{shown.value}</strong>
+                    {shown.note && <small>{shown.note}</small>}
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        )}
         <ReviewInboxPanel
           health={health}
           localReview={localReview}
