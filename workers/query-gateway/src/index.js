@@ -355,13 +355,19 @@ function trustedEvidence(snapshot) {
   }).sort((a, b) => a.evidence_id.localeCompare(b.evidence_id));
 }
 
-async function validateAnswer(snapshot, claims) {
+export async function validateAnswer(snapshot, claims, gate = gateAnswer) {
   const evidence = trustedEvidence(snapshot);
   const publicationHash = snapshot.generatedFrom.brief_sha256;
   const evidenceCatalogHash = await sha256(canonicalJson(evidence));
-  const result = gateAnswer({ claims, evidence, generated_at: snapshot.brief.generated_at });
-  const receipt = result.receipt;
+  const result = gate({ claims, evidence, generated_at: snapshot.brief.generated_at });
+  const receipt = result?.receipt;
+  if (result?.gate_status === "BLOCKED") {
+    throw new GatewayError("GATE_FAILED", `answer evidence gate refused the draft: ${receipt?.failure_reason ?? "unknown"}`, 503);
+  }
   if (!receipt || typeof receipt !== "object") throw new GatewayError("GATE_FAILED", "answer evidence receipt is missing", 503);
+  if (receipt.indexed_evidence_count !== evidence.length) {
+    throw new GatewayError("GATE_FAILED", "answer evidence gate did not index the full evidence catalog", 503);
+  }
   if (receipt.validator_version !== ANSWER_VALIDATOR_VERSION) throw new GatewayError("GATE_FAILED", "answer evidence validator version is not recognized", 503);
   const { error_detail: _errorDetail, ...publicReceipt } = receipt;
   const answer = (receipt.claims || []).map(controlledText).filter(Boolean);
