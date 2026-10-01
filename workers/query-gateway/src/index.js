@@ -5,6 +5,7 @@ const MAX_REQUEST_BYTES = 64 * 1024;
 const MAX_RESPONSE_BYTES = 256 * 1024;
 const MAX_SNAPSHOT_AGE_MS = 16 * 60 * 60 * 1000;
 const SERVER_VERSION = "query-gateway-v1-workers";
+const ANSWER_VALIDATOR_VERSION = "answer-evidence-gate/3";
 const MCP_PROTOCOL_VERSION = "2025-06-18";
 const PUBLIC_PROJECTION = "METADATA_LINK_ONLY";
 const RETENTION_POLICY = {
@@ -92,6 +93,7 @@ function projectFeedItem(item, feedHash) {
     canonical_id: item.stable_id,
     title: item.title,
     source_id: item.source_id,
+    source_role: typeof item.source_role === "string" ? item.source_role : null,
     official_url: item.official_url ?? null,
     published_at: item.published_at ?? null,
     data_as_of: item.data_as_of ?? null,
@@ -321,9 +323,21 @@ function publicSource(row) {
   return Object.fromEntries(fields.filter((key) => key in row).map((key) => [key, row[key]]));
 }
 
+const OFFICIAL_EVIDENCE_SOURCE_IDS = new Set(
+  sourceCatalog.sources
+    .filter((row) => ["PRIMARY_EVENT", "PRIMARY_REFERENCE"].includes(row.role)
+      && ["PRODUCTION_ACTIVE", "AUDITED_EXISTING"].includes(row.status))
+    .map((row) => row.source_id),
+);
+
 function trustedEvidence(snapshot) {
   const sourceStatus = Object.fromEntries(snapshot.sources.map((source) => [source.source_id, assessScope(snapshot, source.source_id).dataStatus]));
-  return snapshot.items.filter((item) => typeof item.official_url === "string" && item.official_url.startsWith("https://")).map((item) => {
+  return snapshot.items.filter((item) =>
+    item.source_role === "PRIMARY_OFFICIAL" &&
+    OFFICIAL_EVIDENCE_SOURCE_IDS.has(item.source_id) &&
+    typeof item.official_url === "string" &&
+    item.official_url.startsWith("https://"),
+  ).map((item) => {
     const source = snapshot.sources.find((row) => row.source_id === item.source_id) || {};
     const freshnessValue = String(item.freshness_status || source.freshness_status || "UNKNOWN").toUpperCase();
     const current = sourceStatus[item.source_id] === "SNAPSHOT_RECENT" && source.source_health === "PASS" &&
@@ -348,12 +362,14 @@ async function validateAnswer(snapshot, claims) {
   const result = gateAnswer({ claims, evidence, generated_at: snapshot.brief.generated_at });
   const receipt = result.receipt;
   if (!receipt || typeof receipt !== "object") throw new GatewayError("GATE_FAILED", "answer evidence receipt is missing", 503);
+  if (receipt.validator_version !== ANSWER_VALIDATOR_VERSION) throw new GatewayError("GATE_FAILED", "answer evidence validator version is not recognized", 503);
+  const { error_detail: _errorDetail, ...publicReceipt } = receipt;
   const answer = (receipt.claims || []).map(controlledText).filter(Boolean);
   return {
     ...result,
     answer,
     final_claims: (receipt.claims || []).map((entry) => ({ claim_id: entry.claim_id, claim_type: entry.claim_type, support_status: entry.support_status, text: controlledText(entry) })),
-    receipt: { ...receipt, publication_hash: publicationHash, evidence_catalog_hash: evidenceCatalogHash, renderer_version: "controlled-answer-renderer/1", answer_sha256: await sha256(JSON.stringify(answer)) },
+    receipt: { ...publicReceipt, publication_hash: publicationHash, evidence_catalog_hash: evidenceCatalogHash, renderer_version: "controlled-answer-renderer/1", answer_sha256: await sha256(JSON.stringify(answer)) },
   };
 }
 
@@ -367,6 +383,7 @@ function controlledText(entry) {
     }
     if (entry.support_status === "STALE") return "官方資料可能已過期，未作為目前情況回答。";
     if (entry.support_status === "PARTIAL") return "官方來源僅部分支持，未核對部分不納入回答。";
+    if (entry.support_status === "UNSUPPORTED" && entry.claim_type === "CAUSE") return "官方來源未說明原因。";
     if (entry.support_status === "UNSUPPORTED") return "未找到可驗證的官方證據，此項說法已移除。";
     return `官方來源已核對：${facts.join("；")}。`;
 }
@@ -446,7 +463,8 @@ async function dispatchMcp(snapshot, request) {
     const payload = await execute(snapshot, request.params.name, request.params.arguments);
     return { jsonrpc: "2.0", id: request.id, result: { isError: false, content: [{ type: "text", text: JSON.stringify(payload) }], structuredContent: payload } };
   } catch (error) {
-    const gatewayError = error instanceof GatewayError ? error : new GatewayError("INVALID_ARGUMENTS", String(error?.message || error));
+    if (!(error instanceof GatewayError)) console.error("mcp dispatch failed");
+    const gatewayError = error instanceof GatewayError ? error : new GatewayError("INVALID_ARGUMENTS", "request could not be processed");
     return { jsonrpc: "2.0", id: request.id, result: { isError: true, content: [{ type: "text", text: JSON.stringify(jsonError(gatewayError.code, gatewayError.message)) }] } };
   }
 }
@@ -499,7 +517,8 @@ export default {
       if (url.pathname === "/query") return responseJson(await execute(snapshot, input?.tool, input?.arguments), 200, request, env);
       return responseJson(await dispatchMcp(snapshot, input), 200, request, env);
     } catch (error) {
-      const gatewayError = error instanceof GatewayError ? error : new GatewayError("UPSTREAM_UNAVAILABLE", String(error?.message || error), 503);
+      if (!(error instanceof GatewayError)) console.error("gateway request failed");
+      const gatewayError = error instanceof GatewayError ? error : new GatewayError("UPSTREAM_UNAVAILABLE", "upstream publication is unavailable", 503);
       return responseJson(jsonError(gatewayError.code, gatewayError.message), gatewayError.status, request, env);
     }
   },
