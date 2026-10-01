@@ -19,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        source: [S-001, S-032, S-033, S-031]
+        source: [S-019, S-001, S-032, S-033, S-031]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7

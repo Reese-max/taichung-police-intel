@@ -12,9 +12,28 @@ from zoneinfo import ZoneInfo
 
 
 TZ = ZoneInfo("Asia/Taipei")
+ROOT = Path(__file__).resolve().parents[1]
+CATALOG = ROOT / "docs" / "govintel" / "source-catalog.v2.json"
 GOOD_SCHEMA_STATUSES = {"NO_DRIFT", "ADDITIVE_COMPATIBLE"}
 GOOD_HEALTH_STATUSES = {"PASS", "DEGRADED"}
 GOOD_WINDOW_CLAIMS = {"COMPLETE_ZERO", "COMPLETE_WITH_ITEMS", "PARTIAL"}
+
+
+def promotion_source_ids() -> tuple[str, ...]:
+    """Return the catalog promotion plan; every listed source needs a window."""
+    catalog = json.loads(CATALOG.read_text(encoding="utf-8"))
+    known = {
+        row.get("source_id")
+        for row in catalog.get("sources", [])
+        if isinstance(row, dict)
+    }
+    plan = catalog.get("promotion_plan")
+    if not isinstance(plan, list) or not plan or any(not isinstance(item, str) or not item for item in plan):
+        raise ValueError("catalog promotion_plan must be a nonempty array of source IDs")
+    unknown = sorted(set(plan) - known)
+    if unknown:
+        raise ValueError(f"catalog promotion_plan references unknown sources: {unknown}")
+    return tuple(plan)
 
 
 def load_report(path: Path) -> dict[str, Any]:
@@ -40,11 +59,15 @@ def validate_reports(
     reports: list[tuple[str, dict[str, Any]]],
     *,
     required_days: int = 7,
+    required_source_ids: tuple[str, ...] | None = None,
 ) -> dict[str, Any]:
     if not reports:
         raise ValueError("at least one canary report is required")
     if required_days < 1:
         raise ValueError("required_days must be positive")
+    required = (
+        promotion_source_ids() if required_source_ids is None else tuple(required_source_ids)
+    )
 
     reasons: list[str] = []
     source_observations: dict[str, list[dict[str, Any]]] = {}
@@ -134,6 +157,11 @@ def validate_reports(
         elif daily_ids != expected_ids:
             reasons.append(f"{day}: source inventory changed")
 
+    # A promotion candidate that never appears in the receipts has zero valid
+    # days — the window is incomplete and must block rather than pass silently.
+    for source_id in required:
+        source_observations.setdefault(source_id, [])
+
     sources: dict[str, dict[str, Any]] = {}
     for source_id in sorted(source_observations):
         observations = sorted(
@@ -180,12 +208,13 @@ def validate_reports(
 
 
 def self_check() -> None:
+    required = promotion_source_ids()
     reports = []
     for offset in range(7):
         day = date(2026, 9, 15) + timedelta(days=offset)
         observed_at = f"{day.isoformat()}T10:00:00+08:00"
         rows = []
-        for source_id in ("S-001", "S-031"):
+        for source_id in required:
             rows.append({
                 "source_id": source_id,
                 "integration_status": "CANDIDATE",
@@ -205,7 +234,13 @@ def self_check() -> None:
     result = validate_reports(reports)
     assert result["status"] == "PASS"
     assert not result["promotion_eligible"]
-    print("CANDIDATE_OBSERVATION_WINDOW_SELF_CHECK_OK days=7 promotion=false")
+    assert all(
+        result["sources"][source_id]["window_complete"] for source_id in required
+    )
+    print(
+        "CANDIDATE_OBSERVATION_WINDOW_SELF_CHECK_OK "
+        f"days=7 sources={len(required)} promotion=false"
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
