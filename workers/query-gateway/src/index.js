@@ -17,6 +17,7 @@ const MAX_RATE = 60;
 const rateWindows = new Map();
 let snapshotCache = null;
 let snapshotBuild = null;
+let degradedSince = null;
 
 const CAPABILITY_DEFINITIONS = [
   ["publication_metadata", "只代表 policy 中已啟用來源，不代表世界完整性。", () => true],
@@ -234,6 +235,7 @@ async function getSnapshot(env) {
   try {
     const value = await snapshotBuild;
     snapshotCache = { value, expiresAt: Date.now() + 30_000 };
+    degradedSince = null;
     return value;
   } catch (error) {
     // Inconsistent artifacts are an integrity failure: serving the previous
@@ -242,7 +244,8 @@ async function getSnapshot(env) {
     // An unreachable upstream must not drop the last usable projection, but the
     // response has to say so instead of reading as a successful fresh rebuild.
     console.warn("query-gateway: index rebuild failed; serving last usable snapshot", String(error?.message || error));
-    return { ...snapshotCache.value, degradedSince: snapshotCache.value.degradedSince || new Date().toISOString() };
+    degradedSince = degradedSince || new Date().toISOString();
+    return { ...snapshotCache.value, degradedSince };
   }
 }
 
@@ -298,11 +301,17 @@ function queryCoverage(snapshot, capabilityId, requestedScope = {}) {
   }
   const uniqueMissing = [...new Set(missing)].sort();
   const uniqueStale = [...new Set(stale)].sort();
-  const status = uniqueMissing.length ? "PARTIAL" : uniqueStale.length ? "STALE" : "COVERED_BOUNDED_SCOPE";
+  // A projection served after a failed rebuild cannot license a bounded
+  // no-match statement, even while its sources still look current.
+  const degraded = Boolean(snapshot.degradedSince);
+  const status = uniqueMissing.length || degraded ? "PARTIAL" : uniqueStale.length ? "STALE" : "COVERED_BOUNDED_SCOPE";
   return {
     status, policy_version: snapshot.policyBinding.policy_version, policy_hash: snapshot.policyBinding.policy_hash, capability_id: capabilityId,
     required_sources: required, missing_required_sources: uniqueMissing, stale_required_sources: uniqueStale,
-    can_state_bounded_no_match: status === "COVERED_BOUNDED_SCOPE", coverage_limitations: [definition.coverage_limitation],
+    can_state_bounded_no_match: status === "COVERED_BOUNDED_SCOPE",
+    coverage_limitations: degraded
+      ? [definition.coverage_limitation, "查詢索引上一次重建失敗，本次回應使用上一個可用 generation，不能據此回答目前沒有相關事件。"]
+      : [definition.coverage_limitation],
     supported_capabilities: supportedCapabilities, covered_sources: required.filter((sourceId) => !uniqueMissing.includes(sourceId) && !uniqueStale.includes(sourceId)),
     collection_completeness: Object.fromEntries(required.map((sourceId) => [sourceId, sourceMap.get(sourceId)?.window_completeness]).filter(([, value]) => value !== undefined)),
     requested_scope: requestedScope,

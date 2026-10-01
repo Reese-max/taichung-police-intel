@@ -8,6 +8,39 @@ const base = new URL("../public/data/", import.meta.url);
 const origin = "https://reese-max.github.io/taichung-police-intel";
 const endpoint = "https://govintel-query-gateway.example/query";
 const env = { PUBLIC_ORIGIN: origin, ALLOWED_ORIGINS: "https://reese-max.github.io" };
+const artifactNames = ["intelligence-feed.json", "source-status.json", "v2-daily-brief.json", "source-policy.json"];
+
+// The checked-in publication is an archived snapshot, so freshness assertions
+// need an equivalent snapshot whose own timestamps are current. Only the
+// clock-derived fields move; collection run, policy binding and item rows are
+// the canonical ones.
+function refreshedPublicationArtifacts(bytes) {
+  const stamp = new Date().toISOString();
+  const read = name => JSON.parse(bytes[name].toString("utf8"));
+  const encode = value => Buffer.from(JSON.stringify(value), "utf8");
+  const feed = read("intelligence-feed.json");
+  const status = read("source-status.json");
+  const brief = read("v2-daily-brief.json");
+  feed.generated_at = stamp;
+  status.generated_at = stamp;
+  status.latest_collection_run.finished_at = stamp;
+  brief.generated_at = stamp;
+  brief.source_status_generated_at = stamp;
+  status.sources = status.sources.map(source => ({
+    ...source,
+    source_health: "PASS",
+    window_completeness: "COMPLETE_WITH_ITEMS",
+    freshness_status: "FRESH",
+    last_checked_at: stamp,
+    last_success_at: stamp,
+  }));
+  return {
+    "intelligence-feed.json": encode(feed),
+    "source-status.json": encode(status),
+    "v2-daily-brief.json": encode(brief),
+    "source-policy.json": bytes["source-policy.json"],
+  };
+}
 
 test("Worker search applies q and preserves official evidence and publication binding", async () => {
   const originalFetch = globalThis.fetch;
@@ -119,6 +152,7 @@ test("Worker serves the last good snapshot when a rebuild fails", async () => {
     ["intelligence-feed.json", "source-status.json", "v2-daily-brief.json", "source-policy.json"]
       .map(async name => [name, await readFile(new URL(name, base))]),
   ));
+  const freshBytes = refreshedPublicationArtifacts(bytes);
   const query = async (instance, args) => {
     const response = await instance.fetch(new Request(endpoint, {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -130,22 +164,35 @@ test("Worker serves the last good snapshot when a rebuild fails", async () => {
     const healthy = (await import("../../../workers/query-gateway/src/index.js?snapshot-fallback")).default;
     globalThis.fetch = async url => {
       const name = new URL(url).pathname.split("/").at(-1);
-      return new Response(bytes[name], { status: 200, headers: { "Content-Type": "application/json" } });
+      return new Response(freshBytes[name], { status: 200, headers: { "Content-Type": "application/json" } });
     };
-    const first = await query(healthy, { limit: 1 });
+    const noMatchTerm = "zzzz-govintel-no-match-20261001";
+    const first = await query(healthy, { q: noMatchTerm, limit: 1 });
     assert.equal(first.status, 200);
+    // Baseline: the same snapshot is fresh and may answer a bounded no-match,
+    // so every degraded assertion below has a RECENT state to contradict.
+    assert.equal(first.body.freshness, "RECENT");
+    assert.deepEqual(first.body.source_gaps, []);
+    assert.equal(first.body.answerable_no_match, true);
+    assert.equal(first.body.query_coverage.can_state_bounded_no_match, true);
 
     globalThis.fetch = async () => new Response("upstream", { status: 503 });
     Date.now = () => originalNow() + 31_000;
-    const degraded = await query(healthy, { limit: 1 });
+    const degraded = await query(healthy, { q: noMatchTerm, limit: 1 });
     assert.equal(degraded.status, 200);
     assert.equal(degraded.body.query_generation_id, first.body.query_generation_id);
     // Serving the last usable index must stay visibly degraded: an unlabelled
-    // stale projection would let a zero-match query read as a current answer.
-    assert.notEqual(degraded.body.data_status, "SNAPSHOT_RECENT");
+    // projection would let a zero-match query read as a current answer.
     assert.equal(degraded.body.freshness, "STALE");
     assert.equal(degraded.body.answerable_no_match, false);
-    assert.ok(degraded.body.source_gaps.some((gap) => gap.reason === "INDEX_REBUILD_FAILED"), JSON.stringify(degraded.body.source_gaps));
+    assert.equal(degraded.body.query_coverage.can_state_bounded_no_match, false);
+    assert.equal(degraded.body.query_coverage.status, "PARTIAL");
+    const gap = degraded.body.source_gaps.find((row) => row.reason === "INDEX_REBUILD_FAILED");
+    assert.ok(gap, JSON.stringify(degraded.body.source_gaps));
+    assert.ok(Date.parse(gap.since) > 0);
+
+    const again = await query(healthy, { q: noMatchTerm, limit: 1 });
+    assert.equal(again.body.source_gaps.find((row) => row.reason === "INDEX_REBUILD_FAILED").since, gap.since);
 
     const health = await healthy.fetch(new Request("https://govintel-query-gateway.example/health"), env);
     const healthBody = await health.json();
