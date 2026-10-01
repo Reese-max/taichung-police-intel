@@ -72,6 +72,12 @@ test("Worker search and answer gate share official evidence across /query and MC
     freshnessStatus: "FRESH",
     officialUrl: "https://media.example.test/watch/issue-32",
   });
+  const unmarkedItem = addFixtureItem({
+    suffix: "UNMARKED",
+    title: "缺少來源角色標記的資料",
+    sourceRole: undefined,
+    freshnessStatus: "FRESH",
+  });
   bytes["intelligence-feed.json"] = Buffer.from(JSON.stringify(feed), "utf8");
   bytes["source-status.json"] = Buffer.from(JSON.stringify(statusDoc), "utf8");
   bytes["v2-daily-brief.json"] = Buffer.from(JSON.stringify(brief), "utf8");
@@ -167,6 +173,15 @@ test("Worker search and answer gate share official evidence across /query and MC
         proposition: { subject: `publication:${mediaItem.stable_id}:title`, value: mediaItem.title },
         cited_evidence_ids: [`PUB-${mediaItem.stable_id}`],
       },
+      {
+        schema_version: 1,
+        claim_id: "unmarked-title",
+        text: "缺少來源角色標記的資料",
+        claim_type: "STATUS",
+        temporal_scope: "CURRENT",
+        proposition: { subject: `publication:${unmarkedItem.stable_id}:title`, value: unmarkedItem.title },
+        cited_evidence_ids: [`PUB-${unmarkedItem.stable_id}`],
+      },
     ];
     const queryGate = await query("validate_answer", { claims });
     assert.equal(queryGate.status, 200);
@@ -183,11 +198,12 @@ test("Worker search and answer gate share official evidence across /query and MC
         "unsupported-cause": "UNSUPPORTED",
         "stale-title-as-current": "STALE",
         "media-only-title": "UNSUPPORTED",
+        "unmarked-title": "UNSUPPORTED",
       });
       assert.ok(answer.answer.some(text => text.includes("官方來源已核對")));
       assert.ok(answer.answer.some(text => text.includes("官方資料可能已過期")));
       assert.ok(answer.answer.includes("官方來源未說明原因。"));
-      assert.ok(answer.answer.every(text => !text.includes("因豪雨提前一小時") && !text.includes(mediaOnlyText)));
+      assert.ok(answer.answer.every(text => !text.includes("因豪雨提前一小時") && !text.includes(mediaOnlyText) && !text.includes(unmarkedItem.title)));
       const receipt = answer.answer_evidence_receipt;
       assert.equal(receipt.schema_version, 1);
       assert.equal(receipt.validator_version, "answer-evidence-gate/3");
@@ -196,6 +212,7 @@ test("Worker search and answer gate share official evidence across /query and MC
       assert.ok(receipt.evidence_ids.includes(`PUB-${item.stable_id}`));
       assert.ok(receipt.evidence_ids.includes(`PUB-${staleItem.stable_id}`));
       assert.equal(receipt.evidence_ids.includes(`PUB-${mediaItem.stable_id}`), false);
+      assert.equal(receipt.evidence_ids.includes(`PUB-${unmarkedItem.stable_id}`), false);
       const officialSupport = receipt.claims.find(claim => claim.claim_id === "official-title").supporting_evidence[0];
       assert.equal(officialSupport.locator, `${item.official_url}#publication:${item.stable_id}`);
       assert.equal(officialSupport.document_version, item.content_sha256);

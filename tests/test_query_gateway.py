@@ -416,7 +416,13 @@ class QueryGatewayTests(unittest.TestCase):
             source_role="DISCOVERY_UNVERIFIED",
             official_url="https://media.example.test/watch/issue-32",
         )
-        snapshot["store"]["items"] = [official, discovery]
+        unmarked = dict(
+            official,
+            canonical_id="ISSUE32-UNMARKED",
+            title="缺少來源角色標記的資料",
+        )
+        unmarked.pop("source_role")
+        snapshot["store"]["items"] = [official, discovery, unmarked]
         gateway = gateway_module.QueryGateway(
             snapshot=snapshot,
             clock=lambda: datetime(2026, 9, 11, 9, 0, tzinfo=timezone.utc),
@@ -597,6 +603,24 @@ class QueryGatewayTests(unittest.TestCase):
         snapshot["located_facts"] = bundle
         with self.assertRaisesRegex(ValueError, "evidence must link exactly"):
             gateway_module.QueryGateway(snapshot=snapshot)
+
+    def test_confirmed_evidence_with_unknown_fact_fails_closed(self):
+        snapshot = gateway_module.load_snapshot()
+        snapshot["located_facts"] = self.located_bundle()
+        gateway = gateway_module.QueryGateway(
+            snapshot=snapshot,
+            clock=lambda: datetime(2026, 9, 21, 9, 0, tzinfo=timezone.utc),
+        )
+        rogue = dict(
+            gateway.located_facts["evidence_catalog"][0],
+            evidence_id="EVID-ORPHAN",
+            fact_id="FACT-NOT-IN-BUNDLE",
+        )
+        gateway.located_facts["evidence_catalog"].append(rogue)
+        with self.assertRaises(gateway_module.GatewayError) as caught:
+            gateway.execute("validate_answer", {"claims": [{"claim_type": "OTHER", "text": "觸發閘門"}]})
+        self.assertEqual(caught.exception.code, "GATE_FAILED")
+        self.assertEqual(caught.exception.status, 503)
 
 
 if __name__ == "__main__":

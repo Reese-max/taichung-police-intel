@@ -698,7 +698,9 @@ class QueryGateway:
             for row in self.located_facts["evidence_catalog"]:
                 if row.get("verification_status") != "CONFIRMED_OFFICIAL":
                     continue
-                fact = facts[row["fact_id"]]
+                fact = facts.get(row["fact_id"])
+                if fact is None:
+                    raise GatewayError("GATE_FAILED", "confirmed evidence references an unknown fact", 503)
                 locator = quote(json.dumps(row["locator"], ensure_ascii=False, sort_keys=True, separators=(",", ":")))
                 value = fact.get("normalized_value")
                 if value is None:
