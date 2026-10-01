@@ -70,6 +70,15 @@ const result = gateAnswer({
   generated_at: input.generated_at,
 });
 const receiptClaims = Array.isArray(result.receipt?.claims) ? result.receipt.claims : [];
+// Fail closed before any host binding is written onto the receipt.
+if (result.gate_status === "BLOCKED") {
+  throw new Error(`answer evidence gate refused the draft: ${result.receipt?.failure_reason ?? "unknown"}`);
+}
+if (result.receipt?.indexed_evidence_count !== input.evidence.length) {
+  throw new Error(
+    `answer evidence gate indexed ${result.receipt?.indexed_evidence_count ?? 0} of ${input.evidence.length} evidence records`,
+  );
+}
 const finalClaims = receiptClaims.map((entry) => ({
   claim_id: entry.claim_id,
   claim_type: entry.claim_type,
