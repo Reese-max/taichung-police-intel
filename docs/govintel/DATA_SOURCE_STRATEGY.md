@@ -198,4 +198,6 @@ S-031 消防即時災情已接線為候選 adapter；它是高頻、短生命週
 - 回查連結可匿名開啟。
 - 對外展示不含內部勤務、110 案件、個資或未公開資料。
 
+`promotion_plan` 中每個來源都必須在觀測窗口內逐日累積有效 canary receipt；`scripts/verify-candidate-observation-window.py` 會把「來源完全沒有出現在任何 receipt」視為未完成窗口（BLOCKED），而不是略過。每日觀測 workflow（`.github/workflows/candidate-source-observation.yml`）的 matrix 必須涵蓋 `promotion_plan` 全部來源（S-019、S-001、S-032、S-033、S-031），缺漏來源無法累積七日收據。
+
 機器可讀清冊：`docs/govintel/source-catalog.v2.json`。
