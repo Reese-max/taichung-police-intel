@@ -3,7 +3,9 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { CLAIM_SCHEMA_VERSION, EVIDENCE_SCHEMA_VERSION } from "../lib/answer-evidence-gate.js";
+import { createHash } from "node:crypto";
+
+import { CLAIM_SCHEMA_VERSION, EVIDENCE_SCHEMA_VERSION, canonicalize } from "../lib/answer-evidence-gate.js";
 
 // The gate host (answer-gate-runner.mjs) is the only thing that binds a gate
 // verdict to a publication. Both hosts below used to stamp the caller's own
@@ -14,7 +16,6 @@ import { CLAIM_SCHEMA_VERSION, EVIDENCE_SCHEMA_VERSION } from "../lib/answer-evi
 
 const RUNNER = fileURLToPath(new URL("../../../scripts/answer-gate-runner.mjs", import.meta.url));
 const PUBLICATION_HASH = "a".repeat(64);
-const EVIDENCE_CATALOG_HASH = "b".repeat(64);
 
 const CLAIM = {
   schema_version: CLAIM_SCHEMA_VERSION,
@@ -37,6 +38,8 @@ function evidence(overrides = {}) {
     ...overrides,
   };
 }
+
+const EVIDENCE_CATALOG_HASH = createHash("sha256").update(canonicalize([evidence()]), "utf8").digest("hex");
 
 function run(payload) {
   return spawnSync(process.execPath, [RUNNER], {
