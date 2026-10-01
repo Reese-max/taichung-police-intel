@@ -99,9 +99,9 @@ def project_feed_item(item: dict[str, Any], feed_hash: str) -> dict[str, Any]:
             instant(item[key])
     return {
         "record_type": "publication_item", "canonical_id": stable_id, "title": title,
-        "source_id": source_id, "official_url": official_url,
+        "source_id": source_id, "source_role": _string(item.get("source_role")), "official_url": official_url,
         **{key: item.get(key) for key in ("published_at", "data_as_of", "fetched_at", "change_type",
-                                        "freshness_status", "source_health", "window_completeness")},
+                                          "freshness_status", "source_health", "window_completeness")},
         "committee": str(item.get("committee") or ""),
         "next_milestone": item.get("next_milestone"),
         "evidence_count": count, "content_sha256": content_hash,

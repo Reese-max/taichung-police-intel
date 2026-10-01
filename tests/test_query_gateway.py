@@ -406,6 +406,24 @@ class QueryGatewayTests(unittest.TestCase):
         self.assertEqual(bad_status, 400)
         self.assertEqual(bad["error"]["code"], "INVALID_ARGUMENTS")
 
+    def test_discovery_rows_never_enter_the_local_answer_catalog(self):
+        snapshot = gateway_module.load_snapshot()
+        official = dict(snapshot["store"]["items"][0], source_role="PRIMARY_OFFICIAL")
+        discovery = dict(
+            official,
+            canonical_id="ISSUE32-DISCOVERY",
+            title="媒體影片聲稱目前封路",
+            source_role="DISCOVERY_UNVERIFIED",
+            official_url="https://media.example.test/watch/issue-32",
+        )
+        snapshot["store"]["items"] = [official, discovery]
+        gateway = gateway_module.QueryGateway(
+            snapshot=snapshot,
+            clock=lambda: datetime(2026, 9, 11, 9, 0, tzinfo=timezone.utc),
+        )
+        catalog = gateway._trusted_evidence_catalog(gateway.store, gateway.clock())
+        self.assertEqual([row["evidence_id"] for row in catalog], [f"PUB-{official['canonical_id']}"])
+
     def test_located_facts_enter_gate_only_after_server_side_confirmation(self):
         snapshot = gateway_module.load_snapshot()
         confirmed_bundle = self.located_bundle()

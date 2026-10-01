@@ -649,6 +649,11 @@ class QueryGateway:
         } if now is not None else {}
         catalog = []
         for item in store["items"]:
+            # A URL is only a locator. Discovery/enrichment rows may link to
+            # media or other context, but only explicitly classified official
+            # rows can become answer evidence.
+            if item.get("source_role") != "PRIMARY_OFFICIAL":
+                continue
             source = sources.get(item["source_id"], {})
             freshness = str(item.get("freshness_status") or source.get("freshness_status") or "UNKNOWN").upper()
             current = (
