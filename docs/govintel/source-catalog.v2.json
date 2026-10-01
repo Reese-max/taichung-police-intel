@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-09-30",
+  "updated_at": "2026-10-01",
   "purpose": "GovIntel AI prioritized public-source catalog for event detection, evidence, policy/reference data, and enrichment.",
   "status_semantics": {
     "PRODUCTION_ACTIVE": "Already used by the current production collector path.",
@@ -186,6 +186,8 @@
       "recommended_interval_minutes": 10,
       "collection_rule": "One lightweight read per run; retain short-lived snapshots and redact unnecessary detail. Never use as dispatch/control data.",
       "evidence_rule": "Use as public situational awareness only; preserve observed_at because rows are transient.",
+      "public_usage_notice": "公開即時災情僅供公共態勢感知，不作派遣或勤務指揮依據；僅保留短期快照並遮蔽非必要地址細節。",
+      "retention_class": "OFFICIAL_TRANSIENT_METADATA",
       "promotion_order": 5
     },
     {

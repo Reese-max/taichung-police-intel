@@ -28,8 +28,10 @@ from collect import (
     SOURCE_FRESHNESS_POLICY,
     TZ,
     canonical_sha256,
+    catalog_rows,
     freshness_status,
     gap_reasons,
+    load_source_catalog,
     next_update,
     save_state,
     scheduled_time,
@@ -1235,7 +1237,12 @@ def run_database_slot(slot: str, slot_date: date, now: datetime | None = None) -
                 attempted_at = datetime.now(TZ)
                 started = time.monotonic()
                 try:
-                    collected = collect_source(session, source_id, window_start.date(), window_end.date())
+                    # List-first collectors diff against durable current items so
+                    # unchanged list rows never refetch their detail pages.
+                    existing = current_items(connection, source_id)
+                    collected = collect_source(
+                        session, source_id, window_start.date(), window_end.date(), existing
+                    )
                     completed_at = datetime.now(TZ)
                     with connection.transaction():
                         save_success(
@@ -1331,6 +1338,8 @@ def project_feed_item(
     source_id: str,
     source_name: str,
     source_url: str,
+    source_role: str,
+    integration_status: str,
     freshness: str,
     source_health: str,
     window_completeness: str,
@@ -1421,7 +1430,8 @@ def project_feed_item(
         "stable_id": stable_id,
         "source_id": source_id,
         "source_name": source_name,
-        "source_role": "PRIMARY_OFFICIAL",
+        "source_role": source_role,
+        "integration_status": integration_status,
         "title": title,
         "official_url": item.get("source_url") or source_url,
         "published_at": item.get("published_at"),
@@ -1649,6 +1659,7 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
         prior_feed_sha256s = {item["content_sha256"] for item in prior_feed["items"] if item.get("content_sha256")}
 
     session = http_session()
+    catalog = catalog_rows()
     window_end = scheduled_time(slot_date, slot)
     window_start = window_end - timedelta(days=7)
     next_at = next_update(slot_date, slot)
@@ -1729,6 +1740,9 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
                 "last_known_good": previous_lkg,
                 "error_code": type(error).__name__.upper()[:64],
             }
+        catalog_row = catalog.get(source_id, {})
+        record["source_role"] = catalog_row.get("role")
+        record["integration_status"] = catalog_row.get("status")
         freshness = freshness_status(record["data_as_of"], now, *SOURCE_FRESHNESS_POLICY.get(source_id, (13, 24)))
         record["freshness_status"] = freshness
         record["intelligence_gaps"] = gap_reasons(record, record["last_known_good"], freshness)
@@ -1745,6 +1759,8 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
                     source_id=source_id,
                     source_name=source_name,
                     source_url=source_url,
+                    source_role=record["source_role"],
+                    integration_status=record["integration_status"],
                     freshness=freshness,
                     source_health=record["source_health"],
                     window_completeness=record["window_completeness"],
@@ -1760,6 +1776,8 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
                     lkg_item = {**prior_item}
                     lkg_item["change_type"] = "LKG"
                     lkg_item["source_health"] = "FAILED"
+                    lkg_item["source_role"] = record["source_role"]
+                    lkg_item["integration_status"] = record["integration_status"]
                     lkg_item["eligibility"] = "INELIGIBLE_SOURCE_FAILED"
                     lkg_item["freshness_status"] = freshness if freshness != "FRESH" else "VERY_STALE"
                     lkg_item["fetched_at"] = fetched_at
@@ -1772,6 +1790,25 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
             "item_count": len(collected_items),
         }
 
+    candidate_sources = []
+    for source_id in load_source_catalog().get("promotion_plan", []):
+        row = catalog.get(source_id)
+        if not row or row["status"] == "PRODUCTION_ACTIVE" or source_id not in NEWS_LIST_SOURCES:
+            continue
+        entry = {
+            "source_id": source_id,
+            "source_name": row["name"],
+            "source_url": row["entrypoint"],
+            "source_role": row["role"],
+            "integration_status": row["status"],
+            "cadence_class": row.get("cadence_class"),
+            "promotion_eligible": False,
+        }
+        for field in ("public_usage_notice", "retention_class"):
+            if row.get(field):
+                entry[field] = row[field]
+        candidate_sources.append(entry)
+
     failed = sum(item["result"] == "FAILED" for item in source_status)
     partial = sum(item["result"] == "PARTIAL" for item in source_status)
     status = "FAILED" if failed == len(source_status) else "PARTIAL" if failed or partial else "SUCCEEDED"
@@ -1781,6 +1818,7 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
         "mode": "COMPETITION_DEMO",
         "generated_at": timestamp(now),
         "next_update_at": next_at,
+        "candidate_sources": candidate_sources,
         "latest_collection_run": {
             "collection_run_id": collection_run_id,
             "slot_date": slot_date.isoformat(),

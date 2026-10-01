@@ -56,7 +56,11 @@ class CandidatePublicationWiringTests(unittest.TestCase):
             candidate_status = next(row for row in status["sources"] if row["source_id"] == "S-032")
             candidate_item = next(row for row in feed["items"] if row["source_id"] == "S-032")
             self.assertEqual(candidate_status["source_name"], "臺中市政府交通局最新消息")
+            self.assertEqual(candidate_status["source_role"], "PRIMARY_EVENT")
+            self.assertEqual(candidate_status["integration_status"], "VERIFIED_CANDIDATE")
             self.assertEqual(candidate_item["source_name"], "臺中市政府交通局最新消息")
+            self.assertEqual(candidate_item["source_role"], "PRIMARY_EVENT")
+            self.assertEqual(candidate_item["integration_status"], "VERIFIED_CANDIDATE")
             self.assertEqual(candidate_item["official_url"], "https://www.traffic.taichung.gov.tw/item")
 
     def test_promoted_news_candidate_keeps_source_identity_in_feed_projection(self):
@@ -72,6 +76,8 @@ class CandidatePublicationWiringTests(unittest.TestCase):
             "S-032",
             "臺中市政府交通局最新消息",
             "https://www.traffic.taichung.gov.tw/",
+            "PRIMARY_EVENT",
+            "VERIFIED_CANDIDATE",
             "FRESH",
             "PASS",
             "COMPLETE_WITH_ITEMS",
@@ -81,6 +87,8 @@ class CandidatePublicationWiringTests(unittest.TestCase):
         )
         self.assertEqual(projected["source_id"], "S-032")
         self.assertEqual(projected["source_name"], "臺中市政府交通局最新消息")
+        self.assertEqual(projected["source_role"], "PRIMARY_EVENT")
+        self.assertEqual(projected["integration_status"], "VERIFIED_CANDIDATE")
         self.assertEqual(projected["official_url"], item["source_url"])
 
     def test_v2_context_names_all_first_promotion_candidates(self):

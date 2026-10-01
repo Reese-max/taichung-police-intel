@@ -1,5 +1,7 @@
+import os
 import unittest
-from datetime import date
+from contextlib import nullcontext
+from datetime import date, datetime
 from unittest import mock
 
 import online_collect as oc
@@ -231,6 +233,77 @@ class ListFirstGatingTests(unittest.TestCase):
         self.assertEqual(_collect("S-001", recent_only)[0]["window_completeness"], "PARTIAL")
         self.assertEqual(_collect("S-001", unordered)[0]["window_completeness"], "PARTIAL")
 
+
+class _SlotResult:
+    def __init__(self, rows=(), one=None):
+        self.rows = list(rows)
+        self.one = one
+
+    def fetchall(self):
+        return self.rows
+
+    def fetchone(self):
+        return self.one
+
+
+class _SlotConnection:
+    def __init__(self, current_rows):
+        self.current_rows = current_rows
+        self.statements = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        return False
+
+    def transaction(self):
+        return nullcontext()
+
+    def execute(self, statement, params=()):
+        self.statements.append(statement)
+        if "pg_try_advisory_lock" in statement:
+            return _SlotResult(one={"locked": True})
+        if "FROM raw_items" in statement:
+            return _SlotResult(rows=self.current_rows.get(params[0], ()))
+        if "SELECT result FROM source_runs" in statement:
+            return _SlotResult(rows=[{"result": "NO_NEW_ITEM"} for _ in oc.P0_SOURCES])
+        return _SlotResult()
+
+
+class IncrementalSlotWiringTests(unittest.TestCase):
+    def test_database_slot_passes_current_items_to_collectors(self):
+        stored = {
+            "raw_item_id": "RI-004-x",
+            "stable_key": "seed-row",
+            "version_no": 3,
+            "content_sha256": "a" * 64,
+        }
+        connection = _SlotConnection({"S-004": [stored]})
+        captured = {}
+
+        def fake_collect(session, source_id, start, end, existing=None, *, max_details=None):
+            captured[source_id] = existing
+            return {
+                "source_health": "PASS",
+                "window_completeness": "COMPLETE_ZERO",
+                "window_item_count": 0,
+                "snapshot_item_count": 0,
+                "items": [],
+                "snapshots": [],
+                "manifest_sha256": "b" * 64,
+            }
+
+        with mock.patch.dict(os.environ, {"DATABASE_URL": "postgres://example.invalid/db"}), \
+             mock.patch.object(oc.psycopg, "connect", return_value=connection), \
+             mock.patch.object(oc, "collect_source", side_effect=fake_collect):
+            oc.run_database_slot(
+                "MORNING", date(2026, 9, 20), now=datetime(2026, 9, 20, 7, 0, tzinfo=oc.TZ)
+            )
+
+        self.assertEqual(set(captured), set(oc.P0_SOURCES))
+        self.assertEqual(captured["S-004"], {"seed-row": stored})
+        self.assertEqual(captured["S-029"], {})
 
 class RocDateTests(unittest.TestCase):
     def test_roc_formats(self):

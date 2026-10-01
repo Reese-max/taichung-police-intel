@@ -152,10 +152,10 @@
       "supported": false
     }
   ],
-  "catalog_hash": "95ae82270eaab6f6270d9c00c8122e9bcfafbaf0dd216dc575a5f0b99544c51a",
+  "catalog_hash": "f5c997ea65c3de0b252f5f08d3304114f58682619df22f1406e81a98eb1190ea",
   "catalog_schema_version": 2,
-  "catalog_updated_at": "2026-09-30",
-  "policy_hash": "3404809ff40f7647c44203329d4476b12b62e9ee64df24cd1f1f46cbda59caf4",
+  "catalog_updated_at": "2026-10-01",
+  "policy_hash": "d8a6884bdccfd1f172f589721318d28fe3fb9c401a4ad517beeb75d3104c3603",
   "policy_version": 1,
   "rules": {
     "candidate_sources_are_verified": false,
