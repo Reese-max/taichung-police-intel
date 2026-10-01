@@ -26,6 +26,7 @@ class QueryStoreTests(unittest.TestCase):
         store = qs.build_from_paths(qs.DEFAULT_FEED, qs.DEFAULT_STATUS, qs.DEFAULT_BRIEF)
         for row in store["items"]:
             self.assertEqual(row["trust_tier"], "CANONICAL_PUBLICATION")
+            self.assertEqual(row["source_role"], "PRIMARY_OFFICIAL")
             self.assertEqual(row["canonical_ref"]["artifact"], "intelligence-feed.json")
             self.assertEqual(row["canonical_ref"]["stable_id"], row["canonical_id"])
             self.assertEqual(len(row["canonical_ref"]["artifact_sha256"]), 64)

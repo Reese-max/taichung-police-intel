@@ -1,9 +1,12 @@
 import importlib.util
 import json
 import os
+import shutil
+import subprocess
 from datetime import datetime, timezone
 from threading import Thread
 import tempfile
+from unittest import mock
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 import unittest
@@ -21,15 +24,16 @@ spec.loader.exec_module(gateway_module)
 
 class QueryGatewayTests(unittest.TestCase):
     @staticmethod
-    def located_bundle(status="CONFIRMED_OFFICIAL"):
+    def located_bundle(status="CONFIRMED_OFFICIAL", source_id="S-028",
+                       source_url="https://data.gov.tw/api/v2/rest/dataset/88147"):
         document = {
             "schema_version": 1,
             "document_id": "DOC-LOCATED-1",
             "document_version_id": "DOCV-AAAAAAAAAAAAAAAAAAAA",
-            "source_id": "S-028",
-            "original_source_identity": "S-028:dataset-88147",
-            "requested_url": "https://data.gov.tw/api/v2/rest/dataset/88147",
-            "final_url": "https://data.gov.tw/api/v2/rest/dataset/88147",
+            "source_id": source_id,
+            "original_source_identity": f"{source_id}:dataset-88147",
+            "requested_url": source_url,
+            "final_url": source_url,
             "fetched_at": "2026-09-21T00:00:00+00:00",
             "content_type": "application/json",
             "raw_bytes_sha256": "a" * 64,
@@ -406,6 +410,224 @@ class QueryGatewayTests(unittest.TestCase):
         self.assertEqual(bad_status, 400)
         self.assertEqual(bad["error"]["code"], "INVALID_ARGUMENTS")
 
+    def test_discovery_rows_never_enter_the_local_answer_catalog(self):
+        snapshot = gateway_module.load_snapshot()
+        official = dict(snapshot["store"]["items"][0], source_role="PRIMARY_OFFICIAL")
+        discovery = dict(
+            official,
+            canonical_id="ISSUE32-DISCOVERY",
+            title="媒體影片聲稱目前封路",
+            source_role="DISCOVERY_UNVERIFIED",
+            official_url="https://media.example.test/watch/issue-32",
+        )
+        unmarked = dict(
+            official,
+            canonical_id="ISSUE32-UNMARKED",
+            title="缺少來源角色標記的資料",
+        )
+        unmarked.pop("source_role")
+        snapshot["store"]["items"] = [official, discovery, unmarked]
+        gateway = gateway_module.QueryGateway(
+            snapshot=snapshot,
+            clock=lambda: datetime(2026, 9, 11, 9, 0, tzinfo=timezone.utc),
+        )
+        catalog = gateway._trusted_evidence_catalog(gateway.store, gateway.clock())
+        self.assertEqual([row["evidence_id"] for row in catalog], [f"PUB-{official['canonical_id']}"])
+
+    def test_item_level_role_label_cannot_promote_a_non_official_source(self):
+        snapshot = gateway_module.load_snapshot()
+        official = dict(snapshot["store"]["items"][0], source_role="PRIMARY_OFFICIAL")
+        # CTX-POP is an ENRICHMENT row in the checked-in source catalog. An
+        # item-level PRIMARY_OFFICIAL label cannot override the server-side
+        # catalog classification.
+        forged = dict(
+            official,
+            canonical_id="ISSUE32-FORGED-ROLE",
+            title="背景資料來源偽稱官方證據",
+            source_id="CTX-POP",
+            source_role="PRIMARY_OFFICIAL",
+        )
+        snapshot["store"]["items"] = [official, forged]
+        gateway = gateway_module.QueryGateway(
+            snapshot=snapshot,
+            clock=lambda: datetime(2026, 9, 11, 9, 0, tzinfo=timezone.utc),
+        )
+        catalog = gateway._trusted_evidence_catalog(gateway.store, gateway.clock())
+        self.assertEqual([row["evidence_id"] for row in catalog], [f"PUB-{official['canonical_id']}"])
+
+    def test_answer_gate_runner_computes_catalog_hash_from_supplied_evidence(self):
+        node = shutil.which("node")
+        if node is None:
+            self.skipTest("node runtime is unavailable")
+        runner = ROOT / "scripts" / "answer-gate-runner.mjs"
+        claims = [{
+            "schema_version": 1,
+            "claim_id": "runner-hash-check",
+            "text": "候選主張",
+            "claim_type": "STATUS",
+            "temporal_scope": "CURRENT",
+            "proposition": {"subject": "publication:X:title", "value": "標題"},
+        }]
+        payload = {
+            "claims": claims,
+            "evidence": [],
+            "generated_at": "2026-09-11T09:00:00+00:00",
+            "publication_hash": "f" * 64,
+        }
+
+        def invoke(extra):
+            body = {**payload, **extra}
+            return subprocess.run(
+                [node, str(runner)],
+                input=json.dumps(body, ensure_ascii=False),
+                capture_output=True,
+                text=True,
+                timeout=20,
+                check=False,
+            )
+
+        forged = invoke({"evidence_catalog_hash": "0" * 64})
+        self.assertNotEqual(forged.returncode, 0)
+        honest = invoke({})
+        self.assertEqual(honest.returncode, 0, honest.stderr)
+        output = json.loads(honest.stdout)
+        expected = gateway_module._json_hash(payload["evidence"])
+        self.assertEqual(output["receipt"]["evidence_catalog_hash"], expected)
+        self.assertEqual(output["receipt"]["publication_hash"], payload["publication_hash"])
+
+    def test_gate_subprocess_failure_does_not_leak_stderr_to_callers(self):
+        marker = "INTERNAL-RUNNER-DETAIL-NOT-FOR-CLIENTS"
+        failed = subprocess.CompletedProcess(
+            args=["node"], returncode=1, stdout="", stderr=marker,
+        )
+        gateway = gateway_module.QueryGateway(
+            clock=lambda: datetime(2026, 9, 11, 9, 0, tzinfo=timezone.utc),
+        )
+        with mock.patch.object(gateway_module.subprocess, "run", return_value=failed):
+            with self.assertRaises(gateway_module.GatewayError) as caught:
+                gateway.execute("validate_answer", {"claims": [{
+                    "claim_type": "STATUS",
+                    "text": "觸發閘門",
+                    "proposition": {"subject": "s", "value": "v"},
+                }]})
+        self.assertEqual(caught.exception.code, "GATE_FAILED")
+        self.assertEqual(caught.exception.status, 503)
+        self.assertNotIn(marker, str(caught.exception))
+
+    def test_malformed_source_catalog_fails_closed(self):
+        snapshot = gateway_module.load_snapshot()
+        gateway = gateway_module.QueryGateway(
+            snapshot=snapshot,
+            clock=lambda: datetime(2026, 9, 11, 9, 0, tzinfo=timezone.utc),
+        )
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+            handle.write("[]")
+            bad_catalog = handle.name
+        try:
+            with mock.patch.object(gateway_module, "SOURCE_CATALOG", Path(bad_catalog)):
+                with self.assertRaises(gateway_module.GatewayError) as caught:
+                    gateway._trusted_evidence_catalog(gateway.store, gateway.clock())
+                with self.assertRaises(ValueError):
+                    gateway_module.approved_source_origins()
+        finally:
+            os.unlink(bad_catalog)
+        self.assertEqual(caught.exception.code, "GATE_FAILED")
+        self.assertEqual(caught.exception.status, 503)
+
+    def test_enrichment_source_cannot_publish_located_facts_evidence(self):
+        snapshot = gateway_module.load_snapshot()
+        # CTX-POP is an approved AUDITED_EXISTING origin on data.gov.tw but its
+        # catalog role is ENRICHMENT, so a confirmed bundle bound to it must be
+        # rejected before any of its facts reach the answer gate. The document
+        # URL itself passes origin validation; only the role check can reject.
+        gateway_module.validate_document_url("CTX-POP", "https://data.gov.tw/dataset/103703")
+        snapshot["located_facts"] = self.located_bundle(
+            source_id="CTX-POP",
+            source_url="https://data.gov.tw/dataset/103703",
+        )
+        with self.assertRaisesRegex(ValueError, "not approved and HTTPS"):
+            gateway_module.QueryGateway(snapshot=snapshot)
+
+    def test_located_facts_from_demoted_source_stop_feeding_the_gate(self):
+        snapshot = gateway_module.load_snapshot()
+        bundle = self.located_bundle()
+        snapshot["located_facts"] = bundle
+        gateway = gateway_module.QueryGateway(
+            snapshot=snapshot,
+            clock=lambda: datetime(2026, 9, 21, 9, 0, tzinfo=timezone.utc),
+        )
+        evidence_id = bundle["evidence_catalog"][0]["evidence_id"]
+        claim = {
+            "claim_type": "STATUS",
+            "text": "確認事實",
+            "temporal_scope": "HISTORICAL",
+            "proposition": {
+                "subject": f"{bundle['facts'][0]['subject_id']}:{bundle['facts'][0]['predicate']}",
+                "value": bundle["facts"][0]["normalized_value"],
+            },
+            "cited_evidence_ids": [evidence_id],
+        }
+        supported = gateway.execute("validate_answer", {"claims": [claim]})
+        self.assertEqual(supported["final_claims"][0]["support_status"], "SUPPORTED")
+        self.assertIn(evidence_id, supported["answer_evidence_receipt"]["evidence_ids"])
+
+        # If the source catalog is updated to demote the bundle's source, its
+        # facts must stop feeding the gate even though the bundle passed
+        # admission at construction time.
+        demoted = gateway_module.official_evidence_source_ids() - {"S-028"}
+        with mock.patch.object(
+            gateway_module, "official_evidence_source_ids", return_value=demoted
+        ):
+            result = gateway.execute("validate_answer", {"claims": [claim]})
+        self.assertEqual(result["final_claims"][0]["support_status"], "UNSUPPORTED")
+        self.assertNotIn(evidence_id, result["answer_evidence_receipt"]["evidence_ids"])
+
+    def test_gate_receipt_rejects_unrecognized_validator_version(self):
+        gateway = gateway_module.QueryGateway(
+            clock=lambda: datetime(2026, 9, 11, 9, 0, tzinfo=timezone.utc),
+        )
+        catalog = gateway._trusted_evidence_catalog(gateway.store, gateway.clock())
+        receipt = {
+            "schema_version": 1,
+            "validator_version": "answer-evidence-gate/0",
+            "publication_hash": gateway.store["generated_from"]["brief_sha256"],
+            "evidence_catalog_hash": gateway_module._json_hash(catalog),
+        }
+        forged = subprocess.CompletedProcess(
+            args=["node"],
+            returncode=0,
+            stdout=json.dumps({
+                "schema_version": 1,
+                "gate_status": "PASS",
+                "final_claims": [],
+                "answer": [],
+                "receipt": receipt,
+            }),
+            stderr="",
+        )
+        with mock.patch.object(gateway_module.subprocess, "run", return_value=forged):
+            with self.assertRaises(gateway_module.GatewayError) as caught:
+                gateway.execute("validate_answer", {"claims": [{
+                    "claim_type": "STATUS",
+                    "text": "觸發閘門",
+                    "proposition": {"subject": "s", "value": "v"},
+                }]})
+        self.assertEqual(caught.exception.code, "GATE_FAILED")
+        self.assertIn("validator version", caught.exception.message)
+
+    def test_non_portable_evidence_scalar_fails_closed(self):
+        snapshot = gateway_module.load_snapshot()
+        snapshot["located_facts"] = self.located_bundle()
+        gateway = gateway_module.QueryGateway(
+            snapshot=snapshot,
+            clock=lambda: datetime(2026, 9, 21, 9, 0, tzinfo=timezone.utc),
+        )
+        gateway.located_facts["facts"][0]["normalized_value"] = 1.5
+        with self.assertRaises(gateway_module.GatewayError) as caught:
+            gateway.execute("validate_answer", {"claims": [{"claim_type": "OTHER", "text": "觸發閘門"}]})
+        self.assertEqual(caught.exception.code, "GATE_FAILED")
+        self.assertIn("non-portable", caught.exception.message)
+
     def test_located_facts_enter_gate_only_after_server_side_confirmation(self):
         snapshot = gateway_module.load_snapshot()
         confirmed_bundle = self.located_bundle()
@@ -579,6 +801,24 @@ class QueryGatewayTests(unittest.TestCase):
         snapshot["located_facts"] = bundle
         with self.assertRaisesRegex(ValueError, "evidence must link exactly"):
             gateway_module.QueryGateway(snapshot=snapshot)
+
+    def test_confirmed_evidence_with_unknown_fact_fails_closed(self):
+        snapshot = gateway_module.load_snapshot()
+        snapshot["located_facts"] = self.located_bundle()
+        gateway = gateway_module.QueryGateway(
+            snapshot=snapshot,
+            clock=lambda: datetime(2026, 9, 21, 9, 0, tzinfo=timezone.utc),
+        )
+        rogue = dict(
+            gateway.located_facts["evidence_catalog"][0],
+            evidence_id="EVID-ORPHAN",
+            fact_id="FACT-NOT-IN-BUNDLE",
+        )
+        gateway.located_facts["evidence_catalog"].append(rogue)
+        with self.assertRaises(gateway_module.GatewayError) as caught:
+            gateway.execute("validate_answer", {"claims": [{"claim_type": "OTHER", "text": "觸發閘門"}]})
+        self.assertEqual(caught.exception.code, "GATE_FAILED")
+        self.assertEqual(caught.exception.status, 503)
 
 
 if __name__ == "__main__":

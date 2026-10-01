@@ -37,6 +37,8 @@ DEFAULT_RATE_LIMIT = 60
 DEFAULT_QUERY_TIMEZONE = "Asia/Taipei"
 SOURCE_CATALOG = ROOT / "docs" / "govintel" / "source-catalog.v2.json"
 PUBLIC_EVIDENCE_SOURCE_STATUSES = frozenset({"PRODUCTION_ACTIVE", "AUDITED_EXISTING"})
+OFFICIAL_EVIDENCE_SOURCE_ROLES = frozenset({"PRIMARY_EVENT", "PRIMARY_REFERENCE"})
+ANSWER_VALIDATOR_VERSION = "answer-evidence-gate/3"
 
 _query_store_spec = importlib.util.spec_from_file_location("govintel_query_store", QUERY_STORE_PATH)
 if _query_store_spec is None or _query_store_spec.loader is None:
@@ -350,6 +352,8 @@ def _valid_fact_review(review: Any) -> bool:
 
 def approved_source_origins() -> dict[str, str]:
     catalog = json.loads(SOURCE_CATALOG.read_text(encoding="utf-8"))
+    if not isinstance(catalog, dict):
+        raise ValueError("approved source catalog shape is invalid")
     return {
         str(row["source_id"]): str(urlsplit(row["entrypoint"]).hostname)
         for row in catalog.get("sources", [])
@@ -360,6 +364,29 @@ def approved_source_origins() -> dict[str, str]:
             and row.get("status") in PUBLIC_EVIDENCE_SOURCE_STATUSES
         )
     }
+
+
+def official_evidence_source_ids() -> set[str]:
+    catalog = json.loads(SOURCE_CATALOG.read_text(encoding="utf-8"))
+    if not isinstance(catalog, dict):
+        raise ValueError("official source catalog shape is invalid")
+    return {
+        str(row["source_id"])
+        for row in catalog.get("sources", [])
+        if (
+            isinstance(row, dict)
+            and row.get("source_id")
+            and row.get("role") in OFFICIAL_EVIDENCE_SOURCE_ROLES
+            and row.get("status") in PUBLIC_EVIDENCE_SOURCE_STATUSES
+        )
+    }
+
+
+def approved_evidence_source_ids() -> set[str]:
+    # An approved origin that is only enrichment/discovery in the source
+    # catalog can still host navigation links, but it can never publish
+    # answer evidence — located facts bound to it must be rejected too.
+    return set(approved_source_origins()) & official_evidence_source_ids()
 
 
 def validate_located_facts_bundle(bundle: Any, approved_source_ids: set[str]) -> dict[str, Any]:
@@ -546,7 +573,7 @@ def load_snapshot(
     snapshot = {"store": store, "status": status, "brief": brief}
     if located_facts_path is not None:
         bundle = json.loads(located_facts_path.read_text(encoding="utf-8"))
-        snapshot["located_facts"] = validate_located_facts_bundle(bundle, set(approved_source_origins()))
+        snapshot["located_facts"] = validate_located_facts_bundle(bundle, approved_evidence_source_ids())
     if public_events_path is not None:
         snapshot["event_store"] = query_domain.load_event_store(public_events_path)
     if statistics_path is not None:
@@ -556,6 +583,25 @@ def load_snapshot(
 
 def _json_hash(value: Any) -> str:
     return hashlib.sha256(qs.canonical_json(value)).hexdigest()
+
+
+def _json_portable(value: Any) -> bool:
+    # The answer gate runs in Node: its canonicalization must reproduce
+    # canonical_json byte-for-byte. Floats and integers beyond 2^53 do not
+    # survive a JSON round trip with their Python spelling intact, so they
+    # are rejected before the receipt hash is ever computed.
+    if value is None or isinstance(value, (str, bool)):
+        return True
+    if isinstance(value, int):
+        return -(2**53) < value < 2**53
+    if isinstance(value, list):
+        return all(_json_portable(item) for item in value)
+    if isinstance(value, dict):
+        return all(
+            isinstance(key, str) and _json_portable(key) and _json_portable(item)
+            for key, item in value.items()
+        )
+    return False
 
 
 def _json_bytes(value: Any) -> bytes:
@@ -607,7 +653,7 @@ class QueryGateway:
         self.brief = self.snapshot["brief"]
         self.located_facts = (
             validate_located_facts_bundle(
-                self.snapshot["located_facts"], set(approved_source_origins())
+                self.snapshot["located_facts"], approved_evidence_source_ids()
             )
             if self.snapshot.get("located_facts") is not None else None
         )
@@ -648,7 +694,19 @@ class QueryGateway:
             for source_id in sources
         } if now is not None else {}
         catalog = []
+        try:
+            official_sources = official_evidence_source_ids()
+        except (OSError, ValueError) as error:
+            raise GatewayError("GATE_FAILED", "official source catalog is unavailable", 503) from error
         for item in store["items"]:
+            # A URL is only a locator, and the row's own role label is only a
+            # producer claim. Evidence admission requires both the row's
+            # PRIMARY_OFFICIAL marker and a catalog-official source_id;
+            # discovery/enrichment rows can never satisfy the second check.
+            if item.get("source_role") != "PRIMARY_OFFICIAL":
+                continue
+            if item.get("source_id") not in official_sources:
+                continue
             source = sources.get(item["source_id"], {})
             freshness = str(item.get("freshness_status") or source.get("freshness_status") or "UNKNOWN").upper()
             current = (
@@ -688,12 +746,23 @@ class QueryGateway:
             raise GatewayError("GATE_UNAVAILABLE", "answer evidence gate runtime is unavailable", 503)
         evidence = self._trusted_evidence_catalog(self.store, self.clock())
         if self.located_facts is not None:
+            # Bundle admission happens once at load; the live catalog stays
+            # authoritative, so a source demoted after admission stops feeding
+            # the gate exactly like a feed row would.
+            try:
+                located_official = official_evidence_source_ids()
+            except (OSError, ValueError) as error:
+                raise GatewayError("GATE_FAILED", "official source catalog is unavailable", 503) from error
             document = self.located_facts["document_version"]
             facts = {fact["fact_id"]: fact for fact in self.located_facts["facts"]}
             for row in self.located_facts["evidence_catalog"]:
                 if row.get("verification_status") != "CONFIRMED_OFFICIAL":
                     continue
-                fact = facts[row["fact_id"]]
+                if row["source_id"] not in located_official:
+                    continue
+                fact = facts.get(row["fact_id"])
+                if fact is None:
+                    raise GatewayError("GATE_FAILED", "confirmed evidence references an unknown fact", 503)
                 locator = quote(json.dumps(row["locator"], ensure_ascii=False, sort_keys=True, separators=(",", ":")))
                 value = fact.get("normalized_value")
                 if value is None:
@@ -719,6 +788,8 @@ class QueryGateway:
         evidence_ids = [row["evidence_id"] for row in evidence]
         if len(evidence_ids) != len(set(evidence_ids)):
             raise GatewayError("GATE_FAILED", "evidence catalog contains duplicate IDs", 503)
+        if not _json_portable(evidence):
+            raise GatewayError("GATE_FAILED", "evidence catalog contains non-portable JSON scalars", 503)
         catalog_hash = _json_hash(evidence)
         payload = {
             "claims": claims,
@@ -741,8 +812,10 @@ class QueryGateway:
         except (OSError, subprocess.TimeoutExpired) as error:
             raise GatewayError("GATE_UNAVAILABLE", "answer evidence gate did not complete", 503) from error
         if result.returncode != 0:
-            detail = (result.stderr or "answer evidence gate failed").strip()[:256]
-            raise GatewayError("GATE_FAILED", detail, 503)
+            detail = (result.stderr or "").strip()[:256]
+            if detail:
+                sys.stderr.write(f"answer evidence gate failed: {detail}\n")
+            raise GatewayError("GATE_FAILED", "answer evidence gate failed", 503)
         try:
             output = json.loads(result.stdout)
         except json.JSONDecodeError as error:
@@ -750,6 +823,8 @@ class QueryGateway:
         receipt = output.get("receipt") if isinstance(output, dict) else None
         if not isinstance(receipt, dict) or receipt.get("publication_hash") != payload["publication_hash"] or receipt.get("evidence_catalog_hash") != catalog_hash:
             raise GatewayError("GATE_FAILED", "answer evidence receipt is not bound to this publication", 503)
+        if receipt.get("validator_version") != ANSWER_VALIDATOR_VERSION:
+            raise GatewayError("GATE_FAILED", "answer evidence validator version is not recognized", 503)
         return output
 
     def _envelope(
