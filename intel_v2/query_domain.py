@@ -18,6 +18,9 @@ EVENT_STORE_SCHEMA_VERSION = 1
 STATISTICS_STORE_SCHEMA_VERSION = 1
 EVENT_STATUSES = frozenset({"CONFIRMED", "CANDIDATE", "CONFLICT", "SPLIT_REQUIRED", "PARTIAL_LKG"})
 TRUST_TIERS = frozenset({"VERIFIED", "DISCOVERY_UNVERIFIED", "CONFLICT", "STALE"})
+VERIFIED_STATUSES = frozenset({
+    "VERIFIED", "VERIFIED_OFFICIAL", "OFFICIAL_RECONCILED", "DETERMINISTIC_PASS", "CONFIRMED_OFFICIAL",
+})
 
 
 def canonical(value: Any) -> bytes:
@@ -34,19 +37,24 @@ def event_trust_tier(event: dict[str, Any]) -> str:
     Query projections must not collapse candidate, conflict, or last-known-good
     events into the verified result set.  The fusion status is authoritative;
     an explicit verification/freshness state is used for compatible older
-    PublicEvent payloads that do not have a fusion-specific status.
+    PublicEvent payloads that do not have a fusion-specific status.  The mapping
+    fails closed: a non-empty verification_status that is not in the known
+    verified set projects as DISCOVERY_UNVERIFIED, never VERIFIED.
     """
     fusion_status = event.get("fusion_status")
-    if fusion_status == "CONFLICT" or event.get("verification_status") in {"CONFLICT", "CONFLICTING"}:
+    verification_status = event.get("verification_status")
+    if fusion_status == "CONFLICT" or verification_status in {"CONFLICT", "CONFLICTING"}:
         return "CONFLICT"
     if (fusion_status == "PARTIAL_LKG"
             or event.get("lkg") is True
             or event.get("freshness_status") in {"STALE", "VERY_STALE"}
-            or event.get("verification_status") in {"STALE", "VERY_STALE"}):
+            or verification_status in {"STALE", "VERY_STALE"}):
         return "STALE"
-    if fusion_status in {"CANDIDATE", "SPLIT_REQUIRED"} or event.get("verification_status") in {
-        "DISCOVERY_UNVERIFIED", "UNVERIFIED", "CANDIDATE"
+    if fusion_status in {"CANDIDATE", "SPLIT_REQUIRED"} or verification_status in {
+        "DISCOVERY_UNVERIFIED", "UNVERIFIED", "CANDIDATE", "OFFICIAL_CANDIDATE", "NO_OFFICIAL_MATCH"
     }:
+        return "DISCOVERY_UNVERIFIED"
+    if verification_status is not None and verification_status not in VERIFIED_STATUSES:
         return "DISCOVERY_UNVERIFIED"
     return "VERIFIED"
 

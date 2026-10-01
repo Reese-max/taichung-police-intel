@@ -140,6 +140,32 @@ class QueryDomainTests(unittest.TestCase):
         self.assertEqual(result["total_matches"], 3)
         self.assertEqual(result["discovery_unverified_count"], 2)
 
+    def test_unrecognized_verification_status_never_projects_verified(self):
+        cases = {
+            "PE-OFFICIAL-CANDIDATE": "OFFICIAL_CANDIDATE",
+            "PE-NO-MATCH": "NO_OFFICIAL_MATCH",
+            "PE-EXPIRED": "EXPIRED",
+            "PE-NEEDS-REVIEW": "NEEDS_REVIEW",
+            "PE-UNKNOWN-FUTURE": "SOMETHING_NOT_YET_DEFINED",
+        }
+        verified = event("PE-VERIFIED-OFFICIAL", status="CONFIRMED")
+        verified["verification_status"] = "VERIFIED_OFFICIAL"
+        confirmed = event("PE-CONFIRMED-OFFICIAL", status="CONFIRMED")
+        confirmed["verification_status"] = "CONFIRMED_OFFICIAL"
+        store = domain.build_event_store(
+            [verified, confirmed] + [
+                {**event(event_id), "verification_status": status}
+                for event_id, status in cases.items()
+            ]
+        )
+        result = domain.query_events(store, {"limit": 10})
+        tiers = {row["public_event_id"]: row["trust_tier"] for row in result["results"]}
+        for event_id in cases:
+            self.assertEqual(tiers[event_id], "DISCOVERY_UNVERIFIED", event_id)
+        self.assertEqual(tiers["PE-VERIFIED-OFFICIAL"], "VERIFIED")
+        self.assertEqual(tiers["PE-CONFIRMED-OFFICIAL"], "VERIFIED")
+        self.assertEqual(result["discovery_unverified_count"], len(cases))
+
     def test_statistics_store_is_typed_and_period_bound(self):
         store = domain.build_statistics_store([statistic("STAT-2", "2026-09"), statistic("STAT-1", "2026-08", provisional=True)])
         result = domain.query_statistics(store, {"dataset_id": "NPA-STAT-1", "period_from": "2026-08", "period_to": "2026-08", "limit": 10})
