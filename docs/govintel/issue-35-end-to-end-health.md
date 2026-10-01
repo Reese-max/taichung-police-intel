@@ -7,8 +7,11 @@ red light. The receipt is `apps/web/public/data/system-health.json`, produced by
 ## Versioned stage model
 
 `STAGE_MODEL_VERSION = "govintel-e2e-stages.v1"` — every published receipt carries the
-registry under `stage_model`, and `stage_model.stage_ids` is exactly the set of stages
-reported in `stages`.
+registry under `stage_model`. The canonical artifact reports every advertised
+`stage_ids` entry; a workflow receipt (`scripts/publication-outcome.py`) may report a
+subset of them, and `stage_model.required_publication_stages` names the stages whose
+absence alone forces the publication lane to UNKNOWN, so a consumer never has to guess
+what gates a HEALTHY verdict.
 
 | lane | stage | what it proves |
 |---|---|---|
@@ -22,6 +25,7 @@ reported in `stages`.
 | publication | `deployment` | protected state push and Pages deployment |
 | publication | `public_http_verification` | the deployed bytes are readable and hash-matched publicly |
 | query | `query_index` | Query Store index generation is bound to the publication |
+| query | `read_only_mcp` | read-only MCP stdio lifecycle bound to the publication |
 | query | `mcp_web_query` | Web Chat / MCP query runtime |
 
 Every stage row always carries `started_at`, `ended_at`, `last_success_at`,
@@ -33,7 +37,10 @@ fabricated.
 
 `FAILURE_STAGE_CLASSIFICATION` maps every known `error_class` to exactly one stage, and
 `failure_stage_receipt()` fails closed on an unclassified class rather than dumping it
-into a catch-all. The regression matrix in `tests/test_system_health.py` walks:
+into a catch-all. `tests/test_system_health.py` asserts that every class the pipeline
+actually emits — from `current_publication_stages()` and from
+`publication-outcome.runtime_health()` across the phase combinations the workflow emits —
+is a key of the registry. The regression matrix walks:
 
 | simulated failure | stage | lane | overall |
 |---|---|---|---|
@@ -67,7 +74,7 @@ the fields, not an SLA that has not been validated.
 | `source_freshness_age_ms` | milliseconds | oldest `last_success_at` against the receipt `generated_at` |
 | `stale_source_ratio` | ratio | sources whose freshness is `STALE` / `VERY_STALE` |
 | `partial_source_ratio` | ratio | sources outside the complete-window set |
-| `publication_mismatch_count` | count | sources the publication cannot faithfully represent |
+| `publication_mismatch_count` | count | publication-lane receipts whose error class is an artifact mismatch (`PUBLICATION_GENERATION_MISMATCH`, `PUBLIC_HTTP_HASH_MISMATCH`) — independent of the collection ratios |
 | `source_to_detect_ms` | milliseconds | chain latency |
 | `detect_to_verify_ms` | milliseconds | chain latency |
 | `verify_to_publish_ms` | milliseconds | chain latency |
@@ -85,7 +92,9 @@ for example the checked-in snapshot has no deployment or public HTTP receipt, so
 `chain_timestamps()` derives the chain from real stage `ended_at` values only.
 `source_published_at` has no stage behind it, so source→detect latency stays UNKNOWN
 unless a source publishes a real timestamp — a missing upstream timestamp is never
-invented.
+invented. Two endpoints carrying the *same* instant are equally unknowable (a reused
+generation timestamp is indistinguishable from a zero-length hop), so a zero delta
+reports UNKNOWN rather than `0 ms`.
 
 ## Non-goals
 

@@ -47,6 +47,14 @@ def chain_with_failure(error_class):
     return rows
 
 
+def load_module(name, path):
+    module_spec = importlib.util.spec_from_file_location(name, path)
+    assert module_spec and module_spec.loader
+    module = importlib.util.module_from_spec(module_spec)
+    module_spec.loader.exec_module(module)
+    return module
+
+
 def controlled_publication_inputs():
     """Keep state-machine tests independent of the scheduled live collection."""
     status = json.loads(health.DEFAULT_STATUS.read_text(encoding="utf-8"))
@@ -80,14 +88,14 @@ class SystemHealthTests(unittest.TestCase):
             self.assertEqual(path.stat().st_mtime_ns, before)
 
     def test_query_failure_does_not_rewrite_publication_truth(self):
-        stages = complete_publication() + [stage("query", "query_index", "FAILED", error_class="INDEX_BUILD")]
+        stages = complete_publication() + [stage("query", "query_index", "FAILED", error_class="QUERY_INDEX_BUILD_FAILED")]
         result = health.build_health(stages)
         self.assertEqual(result["lanes"]["publication"], "HEALTHY")
         self.assertEqual(result["lanes"]["query"], "BLOCKED")
         self.assertEqual(result["overall"], "DEGRADED")
         self.assertTrue(result["operator_summary"]["requires_attention"])
         self.assertEqual(result["operator_summary"]["primary_stage"]["stage"], "query_index")
-        self.assertEqual(result["operator_summary"]["primary_stage"]["error_class"], "INDEX_BUILD")
+        self.assertEqual(result["operator_summary"]["primary_stage"]["error_class"], "QUERY_INDEX_BUILD_FAILED")
         self.assertTrue(all("last_success_at" in row for row in result["stages"]))
 
     def test_publish_or_deploy_failure_blocks_publication_lane(self):
@@ -301,8 +309,10 @@ class SystemHealthTests(unittest.TestCase):
             "publication_build",
             "deployment",
             "public_http_verification",
-            "query_index",
+"query_index",
+            "read_only_mcp",
             "mcp_web_query",
+            "upstream_operating_state",
         ):
             self.assertIn(expected, model["stage_ids"])
         orders = [row["order"] for row in model["stages"]]
@@ -398,6 +408,88 @@ class SystemHealthTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unclassified error class"):
             health.failure_stage_receipt("SOMETHING_WE_NEVER_DEFINED")
 
+    def test_every_error_class_this_repo_emits_is_classified(self):
+        """No emitted error class may be invisible to the attribution registry."""
+        seen = set()
+
+        def collect(stages):
+            for row in stages:
+                if row.get("error_class"):
+                    seen.add(row["error_class"])
+
+        status, brief = controlled_publication_inputs()
+        collect(health.current_publication_stages(status, brief))
+        collect(health.current_publication_stages(status, brief, None, None))
+        status["latest_collection_run"]["status"] = "FAILED"
+        collect(health.current_publication_stages(status, brief))
+        collect([health.upstream_operating_state_stage(
+            {"upstream_operating_state": "PAUSED", "upstream_current": False})])
+
+        outcome = load_module("publication_outcome", ROOT / "scripts" / "publication-outcome.py")
+        for env in (
+            {},
+            {"COLLECT": "skipped", "DEPLOY_RESULT": "success", "PUBLIC_VERIFY": "success"},
+            {"COLLECT": "success", "DEPLOY_RESULT": "failure", "PUBLIC_VERIFY": "failure"},
+            {"COLLECT": "success", "DEPLOY_RESULT": "success", "PUBLIC_VERIFY": "success",
+             "QUERY_VERIFY": "failure"},
+            {"COLLECT": "success", "SCHEMA_DRIFT": "success", "SCHEMA_DRIFT_OVERALL": "BLOCKED",
+             "DEPLOY_RESULT": "success", "PUBLIC_VERIFY": "success"},
+        ):
+            receipt = outcome.runtime_health(env, observed_at="2026-09-11T08:00:00+00:00")
+            collect(receipt["stages"])
+
+        checkout = load_module("verify_current_checkout", ROOT / "scripts" / "verify-current-checkout.py")
+        collect(health.current_publication_stages(status, brief))
+        collect([{
+            "lane": "query",
+            "stage": row["stage"],
+            "outcome": row["outcome"],
+            "error_class": row.get("error_class"),
+        } for row in [
+            {"lane": "query", "stage": "query_index", "outcome": "FAILED", "error_class": "QUERY_CHECK_FAILED"},
+            {"lane": "query", "stage": "read_only_mcp", "outcome": "FAILED", "error_class": "MCP_RUNTIME_NOT_VERIFIED"},
+            {"lane": "query", "stage": "mcp_web_query", "outcome": "SKIPPED", "error_class": "CAPABILITY_NOT_AVAILABLE"},
+        ]])
+        self.assertIsNotNone(checkout)
+        self.assertTrue(seen)
+        unclassified = sorted(seen - set(health.FAILURE_STAGE_CLASSIFICATION))
+        self.assertEqual(unclassified, [], f"unclassified error classes emitted: {unclassified}")
+        for stage in health.stage_model()["stage_ids"]:
+            self.assertEqual(
+                [owner for owner in health.stage_model()["stages"] if owner["stage"] == stage],
+                [health.stage_model_entry(stage)],
+            )
+
+    def test_same_instant_latency_stays_unknown_instead_of_zero(self):
+        shared = "2026-09-11T08:00:00+08:00"
+        result = health.build_health([
+            stage("publication", "collection", "SUCCESS", ended_at=shared),
+            stage("publication", "canonical_validation", "SUCCESS", ended_at=shared),
+            stage("publication", "deployment", "SUCCESS", ended_at=shared),
+            stage("publication", "public_http_verification", "SUCCESS", ended_at=shared),
+        ])
+        self.assertIsNone(result["latency_metrics"]["detect_to_verify_ms"])
+        self.assertIsNone(result["latency_metrics"]["verify_to_publish_ms"])
+        self.assertIsNone(result["latency_metrics"]["publish_to_visible_ms"])
+        self.assertIsNone(result["slo"]["metrics"]["detect_to_verify_ms"]["value"])
+        self.assertFalse(result["slo"]["metrics"]["detect_to_verify_ms"]["measured"])
+        self.assertIsNone(health.latency_ms(shared, shared))
+        self.assertIsNone(health.latency_ms(shared, "2026-09-11T08:00:00"))
+
+    def test_stage_model_declares_the_stages_that_gate_a_healthy_verdict(self):
+        model = health.stage_model()
+        self.assertEqual(model["required_publication_stages"], sorted(health.REQUIRED_PUBLICATION_STAGES))
+        # HEALTHY stays unreachable while a required publication stage is absent.
+        self.assertEqual(
+            health.build_health([stage("publication", "collection", "SUCCESS")])["overall"],
+            "UNKNOWN",
+        )
+        result = health.load_current()
+        self.assertEqual(
+            result["stage_model"]["required_publication_stages"],
+            sorted(health.REQUIRED_PUBLICATION_STAGES),
+        )
+
     def test_upstream_operating_state_is_reflected_without_overriding_govintel_health(self):
         for state, outcome in {
             "ACTIVE": "SUCCESS",
@@ -467,7 +559,8 @@ class SystemHealthTests(unittest.TestCase):
             {"source_health": "FAILED", "window_completeness": "PARTIAL_WINDOW", "freshness_status": "NO_DATA",
              "last_success_at": "2026-09-11T08:21:00+08:00"},
         ]
-        metrics = health.slo_metrics(sources, {}, None, "2026-09-11T09:00:00+08:00")["metrics"]
+        metrics = health.slo_metrics(sources, {}, None, "2026-09-11T09:00:00+08:00",
+                                 chain_with_failure("PUBLIC_HTTP_HASH_MISMATCH"))["metrics"]
         self.assertEqual(metrics["collection_success_ratio"]["value"], 0.75)
         self.assertEqual(metrics["stale_source_ratio"]["value"], 0.25)
         self.assertEqual(metrics["partial_source_ratio"]["value"], 0.25)
@@ -476,6 +569,12 @@ class SystemHealthTests(unittest.TestCase):
         for name in ("collection_success_ratio", "stale_source_ratio", "partial_source_ratio",
                      "publication_mismatch_count", "source_freshness_age_ms"):
             self.assertTrue(metrics[name]["measured"], name)
+        # A publication mismatch count must be independent of the collection ratios.
+        healthy = health.slo_metrics(sources, {}, None, "2026-09-11T09:00:00+08:00", healthy_chain())["metrics"]
+        self.assertEqual(healthy["publication_mismatch_count"]["value"], 0)
+        self.assertEqual(healthy["collection_success_ratio"]["value"], 0.75)
+        no_receipts = health.slo_metrics(sources, {}, None, "2026-09-11T09:00:00+08:00")["metrics"]
+        self.assertFalse(no_receipts["publication_mismatch_count"]["measured"])
 
     def test_slo_query_metrics_need_a_query_receipt(self):
         without = health.slo_metrics([], {}, None, "2026-09-11T09:00:00+08:00")["metrics"]
@@ -522,6 +621,28 @@ class SystemHealthTests(unittest.TestCase):
         names = {row["stage"] for row in first["stages"]}
         for expected in health.stage_model()["stage_ids"]:
             self.assertIn(expected, names)
+
+    def test_committed_receipt_is_reproducible_from_the_committed_inputs(self):
+        """A stale or non-deterministic checked-in receipt must fail the suite.
+
+        CI and `npm test` regenerate the artifact in place; if that output ever
+        differs from what is committed, the receipt the site serves is stale.
+        """
+        if os.getenv("GOVINTEL_PUBLICATION_WORKFLOW") == "1":
+            self.skipTest("Pages publication tests use generated artifacts, not the checked-in snapshot")
+        if health.load_upstream_receipt() is not None or health.load_query_receipt() is not None:
+            self.skipTest("local runtime receipts exist, so the receipt is not the checked-in one")
+        committed = (health.ROOT / "apps/web/public/data/system-health.json").read_text(encoding="utf-8")
+        result = health.load_current()
+        self.assertEqual(
+            json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            committed,
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "system-health.json"
+            self.assertTrue(health.write_if_changed(target, committed))
+            self.assertFalse(health.write_if_changed(target, committed))
+            self.assertEqual(target.read_text(encoding="utf-8"), committed)
 
     def test_source_health_candidates_reach_public_review_projection(self):
         status = {

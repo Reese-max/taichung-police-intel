@@ -41,6 +41,12 @@ REQUIRED_PUBLICATION_STAGES = {
 FRESH_SOURCE_STATES = {"FRESH", "RECENT"}
 STALE_SOURCE_STATES = {"STALE", "VERY_STALE"}
 COMPLETE_SOURCE_WINDOWS = {"COMPLETE_ZERO", "COMPLETE_WITH_ITEMS"}
+# Publication-lane failure classes that mean the published artifact disagrees
+# with the source snapshot, as opposed to a collection or runtime failure.
+MISMATCH_ERROR_CLASSES = {
+    "PUBLICATION_GENERATION_MISMATCH",
+    "PUBLIC_HTTP_HASH_MISMATCH",
+}
 
 # End-to-end chain, ordered from upstream source publication to the served
 # query runtime. Every stage receipt is attributed against this registry so an
@@ -118,6 +124,13 @@ STAGE_MODEL: tuple[dict[str, Any], ...] = (
     },
     {
         "lane": "query",
+        "stage": "read_only_mcp",
+        "order": 105,
+        "description": "唯讀 MCP stdio 生命週期與發布綁定",
+        "measures": [],
+    },
+    {
+        "lane": "query",
         "stage": "mcp_web_query",
         "order": 110,
         "description": "Web Chat / MCP 查詢服務",
@@ -155,6 +168,8 @@ UPSTREAM_STATE_OUTCOMES = {
 # fail closed instead of being dumped into a catch-all stage.
 FAILURE_STAGE_CLASSIFICATION: dict[str, tuple[str, str, str]] = {
     "COLLECTOR_TRANSPORT_ERROR": ("publication", "collection", "FAILED"),
+    "COLLECTION_NOT_RUN": ("publication", "collection", "FAILED"),
+    "SOURCE_POLICY_UNAVAILABLE": ("publication", "collection", "FAILED"),
     "COLLECTION_RUN_FAILED": ("publication", "collection", "FAILED"),
     "COLLECTION_RECEIPT_INCOMPLETE": ("publication", "collection", "FAILED"),
     "SOURCE_COVERAGE_OR_COLLECTION_GAP": ("publication", "collection", "FAILED"),
@@ -190,7 +205,8 @@ FAILURE_STAGE_CLASSIFICATION: dict[str, tuple[str, str, str]] = {
     "QUERY_DOWN_INJECTED": ("query", "query_index", "FAILED"),
     "QUERY_INDEX_NOT_YET_WIRED": ("query", "query_index", "FAILED"),
     "MCP_RUNTIME_UNAVAILABLE": ("query", "mcp_web_query", "FAILED"),
-    "MCP_RUNTIME_NOT_VERIFIED": ("query", "mcp_web_query", "FAILED"),
+    "MCP_RUNTIME_NOT_VERIFIED": ("query", "read_only_mcp", "FAILED"),
+    "READ_ONLY_MCP_NOT_YET_WIRED": ("query", "read_only_mcp", "FAILED"),
     "QUERY_RUNTIME_NOT_VERIFIED": ("query", "mcp_web_query", "FAILED"),
     "QUERY_RUNTIME_NOT_YET_WIRED": ("query", "mcp_web_query", "FAILED"),
     "CAPABILITY_NOT_AVAILABLE": ("query", "mcp_web_query", "FAILED"),
@@ -245,10 +261,16 @@ def policy_binding(policy: dict[str, Any]) -> dict[str, Any]:
 
 
 def stage_model() -> dict[str, Any]:
-    """The versioned end-to-end stage contract shipped with this receipt."""
+    """The versioned end-to-end stage contract shipped with this receipt.
+
+    `required_publication_stages` names the stages whose absence alone forces the
+    publication lane to UNKNOWN, so a consumer never has to guess what gates a
+    HEALTHY verdict.
+    """
     return {
         "version": STAGE_MODEL_VERSION,
         "stage_ids": [row["stage"] for row in STAGE_MODEL],
+        "required_publication_stages": sorted(REQUIRED_PUBLICATION_STAGES),
         "stages": [dict(row) for row in STAGE_MODEL],
     }
 
@@ -543,7 +565,9 @@ def latency_ms(start: Any, end: Any) -> int | None:
     if left is None or right is None or left.tzinfo is None or right.tzinfo is None:
         return None
     delta = int((right - left).total_seconds() * 1000)
-    return delta if delta >= 0 else None
+    # Two endpoints carrying the same instant are indistinguishable from a
+    # reused generation timestamp, so the latency stays UNKNOWN rather than 0.
+    return delta if delta > 0 else None
 
 
 CHAIN_TIMESTAMP_SOURCES = {
@@ -614,6 +638,8 @@ def slo_metrics(
     latency: dict[str, Any] | None = None,
     query_receipt: Any = None,
     generated_at: Any = None,
+    stages: list[dict[str, Any]] | None = None,
+    source_policy: Any = None,
 ) -> dict[str, Any]:
     """Measure the first-release SLO fields; unknown stays unknown."""
     latency = latency if isinstance(latency, dict) else {}
@@ -621,15 +647,29 @@ def slo_metrics(
     rows = [row for row in sources if isinstance(row, dict)] if isinstance(sources, list) else []
     total = len(rows)
     complete = [
-        row for row in rows
+        index for index, row in enumerate(rows)
         if row.get("source_health") == "PASS"
         and row.get("window_completeness") in COMPLETE_SOURCE_WINDOWS
     ]
-    stale = [row for row in rows if str(row.get("freshness_status") or "").strip().upper() in STALE_SOURCE_STATES]
-    partial = [row for row in rows if row.get("window_completeness") not in COMPLETE_SOURCE_WINDOWS]
-    complete_ids = {id(row) for row in complete}
-    mismatched = [row for row in rows if id(row) not in complete_ids]
+    stale = [
+        index for index, row in enumerate(rows)
+        if normalize_source_freshness(row.get("freshness_status"), source_policy) in STALE_SOURCE_STATES
+    ]
+    partial = [
+        index for index, row in enumerate(rows)
+        if row.get("window_completeness") not in COMPLETE_SOURCE_WINDOWS
+    ]
     no_sources = "NO_SOURCE_RECEIPTS"
+
+    # Publication mismatch is an artifact disagreement, not a collection gap, so
+    # it is counted from the publication-lane receipts the chain produced.
+    publication_stages = [
+        row for row in (stages or [])
+        if isinstance(row, dict) and row.get("lane") == "publication"
+    ]
+    mismatched = [
+        row for row in publication_stages if row.get("error_class") in MISMATCH_ERROR_CLASSES
+    ]
 
     reference = parse_time(generated_at)
     ages: int | None = None
@@ -658,7 +698,10 @@ def slo_metrics(
         "source_freshness_age_ms": (ages, "NO_RELIABLE_FRESHNESS_TIMESTAMPS"),
         "stale_source_ratio": (len(stale) / total if total else None, no_sources),
         "partial_source_ratio": (len(partial) / total if total else None, no_sources),
-        "publication_mismatch_count": (len(mismatched) if total else None, no_sources),
+        "publication_mismatch_count": (
+            len(mismatched) if publication_stages else None,
+            "NO_PUBLICATION_STAGE_RECEIPTS",
+        ),
         "source_to_detect_ms": (latency.get("source_to_detect_ms"), "NO_RELIABLE_STAGE_TIMESTAMPS"),
         "detect_to_verify_ms": (latency.get("detect_to_verify_ms"), "NO_RELIABLE_STAGE_TIMESTAMPS"),
         "verify_to_publish_ms": (latency.get("verify_to_publish_ms"), "NO_RELIABLE_STAGE_TIMESTAMPS"),
@@ -723,7 +766,8 @@ def build_health(
         "latency_metrics": metrics,
         "upstream": upstream,
         "slo": slo_metrics(extra.get("sources"), metrics, extra.get("query_receipt"),
-                           extra.get("generated_at") or max_stage_time(normalized_stages)),
+                           extra.get("generated_at") or max_stage_time(normalized_stages),
+                           normalized_stages, extra.get("source_policy")),
         "operator_summary": operator_summary(overall, normalized_stages),
     }
 
@@ -915,6 +959,13 @@ def current_publication_stages(
         },
         {
             "lane": "query",
+            "stage": "read_only_mcp",
+            "outcome": "UNKNOWN",
+            "error_class": "READ_ONLY_MCP_NOT_YET_WIRED",
+            **binding,
+        },
+        {
+            "lane": "query",
             "stage": "mcp_web_query",
             "outcome": "UNKNOWN",
             "error_class": "QUERY_RUNTIME_NOT_YET_WIRED",
@@ -935,12 +986,17 @@ def load_current(status_path: Path = DEFAULT_STATUS, brief_path: Path = DEFAULT_
     review_items = load_review_inbox(DEFAULT_REVIEW_STATE, schema_drift, status)
     upstream_receipt = load_upstream_receipt()
     query_receipt = load_query_receipt()
+    try:
+        source_policy = load_source_policy()
+    except (OSError, ValueError, json.JSONDecodeError):
+        source_policy = None
     result = build_health(
         current_publication_stages(status, brief, policy, schema_drift, upstream_receipt, query_receipt),
         context={
             "sources": status.get("sources"),
             "upstream_receipt": upstream_receipt,
             "query_receipt": query_receipt,
+            "source_policy": source_policy,
         },
     )
     result["policy"] = policy_binding(policy) if policy else {"policy_status": "UNKNOWN"}
@@ -960,7 +1016,7 @@ def self_check() -> None:
         {"lane": "publication", "stage": "deployment", "outcome": "SUCCESS"},
         {"lane": "publication", "stage": "public_http_verification", "outcome": "SUCCESS"},
     ]
-    query_failed = [{"lane": "query", "stage": "query_index", "outcome": "FAILED", "error_class": "INDEX_BUILD"}]
+    query_failed = [{"lane": "query", "stage": "query_index", "outcome": "FAILED", "error_class": "QUERY_INDEX_BUILD_FAILED"}]
     result = build_health(healthy_publication + query_failed)
     assert result["lanes"]["publication"] == "HEALTHY"
     assert result["lanes"]["query"] == "BLOCKED"

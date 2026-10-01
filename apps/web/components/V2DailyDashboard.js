@@ -2,6 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { assessPublication } from "../lib/publication-freshness.mjs";
+import {
+  formatSloMetric,
+  sloMetricEntries,
+  stageModelEntries,
+  upstreamOperatingStateLabel,
+} from "../lib/system-health-view.mjs";
 import { isHealthyStaleSource } from "../lib/source-status.js";
 import {
   addLocalWatch,
@@ -272,26 +278,10 @@ function ReviewInboxPanel({ health, localReview, onDecision, onFeedback, onExpor
   );
 }
 
-const SLO_UNIT_SUFFIX = {
-  ratio: "",
-  count: " 次",
-  milliseconds: " ms",
-};
-
-function formatSloMetric(metric) {
-  // Unmeasured fields render as UNKNOWN with their reason; never as zero.
-  if (!metric || !metric.measured || typeof metric.value !== "number") {
-    return { value: "UNKNOWN", note: metric?.reason || "尚未量測" };
-  }
-  const suffix = SLO_UNIT_SUFFIX[metric.unit] ?? ` ${metric.unit}`;
-  return { value: `${metric.value}${suffix}`, note: "" };
-}
-
 function SystemHealthSummary({ health, localReview, onDecision, onFeedback, onExport, notice, error }) {
   if (!health || !health.lanes || !Array.isArray(health.stages)) return null;
-  const sloMetrics = health.slo?.metrics && typeof health.slo.metrics === "object"
-    ? Object.entries(health.slo.metrics)
-    : [];
+  const stageIds = stageModelEntries(health);
+  const sloMetrics = sloMetricEntries(health);
   return (
     <details className="v2-system-health" data-testid="v2-system-health">
       <summary>端到端系統健康：{health.overall}</summary>
@@ -304,15 +294,15 @@ function SystemHealthSummary({ health, localReview, onDecision, onFeedback, onEx
             </div>
           ))}
         </div>
-        {health.stage_model && (
+        {stageIds.length > 0 && (
           <p className="v2-health-note" data-testid="v2-stage-model">
-            階段模型：{health.stage_model.version} · {health.stage_model.stage_ids.length} 個階段
+            階段模型：{health.stage_model.version} · {stageIds.length} 個階段
             {health.generated_at && ` · 產生於 ${formatDateTime(health.generated_at)}`}
           </p>
         )}
         {health.upstream && (
           <p className="v2-health-note" data-testid="v2-upstream-operating-state">
-            上游 Dashboard 狀態：{health.upstream.upstream_operating_state}
+            上游 Dashboard 狀態：{upstreamOperatingStateLabel(health)}
             {health.upstream.generation_id && ` · ${health.upstream.generation_id}`}
             {` · 只反映上游事實，不覆蓋 GovIntel 自身健康`}
           </p>

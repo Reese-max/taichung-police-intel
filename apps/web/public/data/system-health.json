@@ -6,13 +6,13 @@
     "query": "UNKNOWN"
   },
   "latency_metrics": {
-    "detect_to_verify_ms": 0,
+    "detect_to_verify_ms": null,
     "publish_to_visible_ms": null,
     "source_to_detect_ms": null,
     "verify_to_publish_ms": null
   },
   "operator_summary": {
-    "attention_count": 10,
+    "attention_count": 11,
     "message": "資料仍可讀取但已過期，請確認來源新鮮度。",
     "primary_stage": {
       "error_class": "SOURCE_FRESHNESS_STALE",
@@ -95,10 +95,10 @@
         "value": 1.0
       },
       "detect_to_verify_ms": {
-        "measured": true,
-        "reason": null,
+        "measured": false,
+        "reason": "NO_RELIABLE_STAGE_TIMESTAMPS",
         "unit": "milliseconds",
-        "value": 0
+        "value": null
       },
       "partial_source_ratio": {
         "measured": true,
@@ -160,6 +160,12 @@
     "thresholds": null
   },
   "stage_model": {
+    "required_publication_stages": [
+      "canonical_validation",
+      "collection",
+      "deployment",
+      "public_http_verification"
+    ],
     "stage_ids": [
       "source_contracts",
       "upstream_operating_state",
@@ -171,6 +177,7 @@
       "deployment",
       "public_http_verification",
       "query_index",
+      "read_only_mcp",
       "mcp_web_query"
     ],
     "stages": [
@@ -262,6 +269,13 @@
         ],
         "order": 100,
         "stage": "query_index"
+      },
+      {
+        "description": "唯讀 MCP stdio 生命週期與發布綁定",
+        "lane": "query",
+        "measures": [],
+        "order": 105,
+        "stage": "read_only_mcp"
       },
       {
         "description": "Web Chat / MCP 查詢服務",
@@ -541,6 +555,32 @@
       "policy_version": 1,
       "receipt_ref": null,
       "stage": "query_index",
+      "started_at": null,
+      "upstream_hash": null
+    },
+    {
+      "active_source_ids": [
+        "S-004",
+        "S-006",
+        "S-007",
+        "S-009",
+        "S-029"
+      ],
+      "catalog_hash": "95ae82270eaab6f6270d9c00c8122e9bcfafbaf0dd216dc575a5f0b99544c51a",
+      "downstream_hash": null,
+      "ended_at": null,
+      "error_class": "READ_ONLY_MCP_NOT_YET_WIRED",
+      "error_stage": "read_only_mcp",
+      "gap_count": null,
+      "generation_id": null,
+      "item_count": null,
+      "lane": "query",
+      "last_success_at": null,
+      "outcome": "UNKNOWN",
+      "policy_hash": "3404809ff40f7647c44203329d4476b12b62e9ee64df24cd1f1f46cbda59caf4",
+      "policy_version": 1,
+      "receipt_ref": null,
+      "stage": "read_only_mcp",
       "started_at": null,
       "upstream_hash": null
     }

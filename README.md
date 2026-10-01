@@ -220,9 +220,11 @@ Demo: `https://reese-max.github.io/taichung-police-intel` (anonymous HTTPS readb
 apps/web/public/data/system-health.json` and served machine-readably at
 `/api/system-health.json`. It names the broken link instead of showing one red light:
 
-- `stage_model` lists the eleven stages from upstream operating state through the served
-  query runtime, and `stages` reports the same set with `last_success_at`,
-  `generation_id`, hash linkage, item/gap counts and `error_stage`;
+- `stage_model` lists the twelve stages from source contracts and upstream operating state
+  through the served query runtime, and `stages` reports the same set with
+  `last_success_at`, `generation_id`, hash linkage, item/gap counts and `error_stage`.
+  `stage_model.required_publication_stages` names the stages whose absence alone forces
+  the publication lane to UNKNOWN;
 - `operator_summary.primary_stage` names the lane/stage and error class an operator should
   act on;
 - `slo` carries measurement-only fields (collection success ratio, source freshness age,
