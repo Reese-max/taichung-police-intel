@@ -1,9 +1,12 @@
 import importlib.util
 import json
 import os
+import shutil
+import subprocess
 from datetime import datetime, timezone
 from threading import Thread
 import tempfile
+from unittest import mock
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 import unittest
@@ -21,15 +24,16 @@ spec.loader.exec_module(gateway_module)
 
 class QueryGatewayTests(unittest.TestCase):
     @staticmethod
-    def located_bundle(status="CONFIRMED_OFFICIAL"):
+    def located_bundle(status="CONFIRMED_OFFICIAL", source_id="S-028",
+                       source_url="https://data.gov.tw/api/v2/rest/dataset/88147"):
         document = {
             "schema_version": 1,
             "document_id": "DOC-LOCATED-1",
             "document_version_id": "DOCV-AAAAAAAAAAAAAAAAAAAA",
-            "source_id": "S-028",
-            "original_source_identity": "S-028:dataset-88147",
-            "requested_url": "https://data.gov.tw/api/v2/rest/dataset/88147",
-            "final_url": "https://data.gov.tw/api/v2/rest/dataset/88147",
+            "source_id": source_id,
+            "original_source_identity": f"{source_id}:dataset-88147",
+            "requested_url": source_url,
+            "final_url": source_url,
             "fetched_at": "2026-09-21T00:00:00+00:00",
             "content_type": "application/json",
             "raw_bytes_sha256": "a" * 64,
@@ -405,6 +409,209 @@ class QueryGatewayTests(unittest.TestCase):
         )
         self.assertEqual(bad_status, 400)
         self.assertEqual(bad["error"]["code"], "INVALID_ARGUMENTS")
+
+    def test_discovery_rows_never_enter_the_local_answer_catalog(self):
+        snapshot = gateway_module.load_snapshot()
+        original = dict(snapshot["store"]["items"][0])
+        official = {**original, "source_role": "PRIMARY_OFFICIAL"}
+        discovery = {
+            **original,
+            "canonical_id": "ISSUE32-DISCOVERY",
+            "title": "媒體影片聲稱目前封路",
+            "source_role": "DISCOVERY_UNVERIFIED",
+            "official_url": "https://media.example.test/watch/issue-32",
+        }
+        snapshot["store"]["items"] = [official, discovery]
+        gateway = gateway_module.QueryGateway(
+            snapshot=snapshot,
+            clock=lambda: datetime(2026, 9, 11, 9, 0, tzinfo=timezone.utc),
+        )
+        catalog = gateway._trusted_evidence_catalog(gateway.store, gateway.clock())
+        self.assertEqual([row["evidence_id"] for row in catalog], [f"PUB-{official['canonical_id']}"])
+
+    def test_item_level_role_cannot_promote_a_non_official_source(self):
+        snapshot = gateway_module.load_snapshot()
+        official = dict(snapshot["store"]["items"][0], source_role="PRIMARY_OFFICIAL")
+        forged = {
+            **official,
+            "canonical_id": "ISSUE32-FORGED-ROLE",
+            "title": "背景資料來源偽稱官方證據",
+            "source_id": "CTX-POP",
+            "source_role": "PRIMARY_OFFICIAL",
+        }
+        snapshot["store"]["items"] = [official, forged]
+        gateway = gateway_module.QueryGateway(
+            snapshot=snapshot,
+            clock=lambda: datetime(2026, 9, 11, 9, 0, tzinfo=timezone.utc),
+        )
+        catalog = gateway._trusted_evidence_catalog(gateway.store, gateway.clock())
+        self.assertEqual([row["evidence_id"] for row in catalog], [f"PUB-{official['canonical_id']}"])
+
+    def test_answer_gate_runner_computes_catalog_hash_from_supplied_evidence(self):
+        node = shutil.which("node")
+        if node is None:
+            self.skipTest("node runtime is unavailable")
+        runner = gateway_module.ROOT / "scripts" / "answer-gate-runner.mjs"
+        payload = {
+            "claims": [{
+                "schema_version": 1,
+                "claim_id": "runner-hash-check",
+                "text": "候選主張",
+                "claim_type": "STATUS",
+                "temporal_scope": "CURRENT",
+                "proposition": {"subject": "publication:X:title", "value": "標題"},
+            }],
+            "evidence": [],
+            "generated_at": "2026-09-11T09:00:00+00:00",
+            "publication_hash": "f" * 64,
+        }
+
+        def invoke(extra):
+            return subprocess.run(
+                [node, str(runner)],
+                input=json.dumps({**payload, **extra}, ensure_ascii=False),
+                capture_output=True,
+                text=True,
+                timeout=20,
+                check=False,
+            )
+
+        forged = invoke({"evidence_catalog_hash": "0" * 64})
+        self.assertNotEqual(forged.returncode, 0)
+        honest = invoke({})
+        self.assertEqual(honest.returncode, 0, honest.stderr)
+        output = json.loads(honest.stdout)
+        self.assertEqual(output["receipt"]["evidence_catalog_hash"], gateway_module._json_hash(payload["evidence"]))
+
+    def test_gate_subprocess_failure_does_not_leak_stderr_to_callers(self):
+        marker = "INTERNAL-RUNNER-DETAIL-NOT-FOR-CLIENTS"
+        failed = subprocess.CompletedProcess(args=["node"], returncode=1, stdout="", stderr=marker)
+        gateway = gateway_module.QueryGateway(
+            clock=lambda: datetime(2026, 9, 11, 9, 0, tzinfo=timezone.utc),
+        )
+        with mock.patch.object(gateway_module.subprocess, "run", return_value=failed):
+            with self.assertRaises(gateway_module.GatewayError) as caught:
+                gateway.execute("validate_answer", {"claims": [{
+                    "claim_type": "STATUS",
+                    "text": "觸發閘門",
+                    "proposition": {"subject": "s", "value": "v"},
+                }]})
+        self.assertEqual(caught.exception.code, "GATE_FAILED")
+        self.assertNotIn(marker, str(caught.exception))
+
+    def test_malformed_source_catalog_fails_closed(self):
+        snapshot = gateway_module.load_snapshot()
+        gateway = gateway_module.QueryGateway(
+            snapshot=snapshot,
+            clock=lambda: datetime(2026, 9, 11, 9, 0, tzinfo=timezone.utc),
+        )
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+            handle.write("[]")
+            bad_catalog = handle.name
+        try:
+            with mock.patch.object(gateway_module, "SOURCE_CATALOG", Path(bad_catalog)):
+                with self.assertRaises(gateway_module.GatewayError) as caught:
+                    gateway._trusted_evidence_catalog(gateway.store, gateway.clock())
+                with self.assertRaises(ValueError):
+                    gateway_module.approved_source_origins()
+        finally:
+            os.unlink(bad_catalog)
+        self.assertEqual(caught.exception.code, "GATE_FAILED")
+        self.assertEqual(caught.exception.status, 503)
+
+    def test_enrichment_source_cannot_publish_located_facts_evidence(self):
+        snapshot = gateway_module.load_snapshot()
+        gateway_module.validate_document_url("CTX-POP", "https://data.gov.tw/dataset/103703")
+        snapshot["located_facts"] = self.located_bundle(
+            source_id="CTX-POP",
+            source_url="https://data.gov.tw/dataset/103703",
+        )
+        with self.assertRaisesRegex(ValueError, "not approved and HTTPS"):
+            gateway_module.QueryGateway(snapshot=snapshot)
+
+    def test_gate_receipt_rejects_unrecognized_validator_version(self):
+        gateway = gateway_module.QueryGateway(
+            clock=lambda: datetime(2026, 9, 11, 9, 0, tzinfo=timezone.utc),
+        )
+        catalog = gateway._trusted_evidence_catalog(gateway.store, gateway.clock())
+        forged = subprocess.CompletedProcess(
+            args=["node"],
+            returncode=0,
+            stdout=json.dumps({
+                "schema_version": 1,
+                "gate_status": "PASS",
+                "final_claims": [],
+                "answer": [],
+                "receipt": {
+                    "schema_version": 1,
+                    "validator_version": "answer-evidence-gate/0",
+                    "publication_hash": gateway.store["generated_from"]["brief_sha256"],
+                    "evidence_catalog_hash": gateway_module._json_hash(catalog),
+                },
+            }),
+            stderr="",
+        )
+        with mock.patch.object(gateway_module.subprocess, "run", return_value=forged):
+            with self.assertRaises(gateway_module.GatewayError) as caught:
+                gateway.execute("validate_answer", {"claims": [{
+                    "claim_type": "STATUS",
+                    "text": "觸發閘門",
+                    "proposition": {"subject": "s", "value": "v"},
+                }]})
+        self.assertEqual(caught.exception.code, "GATE_FAILED")
+        self.assertIn("validator version", caught.exception.message)
+
+    def test_non_portable_claim_scalar_fails_closed(self):
+        gateway = gateway_module.QueryGateway(
+            clock=lambda: datetime(2026, 9, 11, 9, 0, tzinfo=timezone.utc),
+        )
+        with self.assertRaisesRegex(gateway_module.GatewayError, "non-portable"):
+            gateway.execute("validate_answer", {"claims": [{
+                "claim_type": "STATUS",
+                "text": "不可精確表示的主張",
+                "proposition": {"subject": "s", "value": 2**53},
+            }]})
+
+    def test_typed_statistics_use_exact_scope_and_cannot_back_current_wording(self):
+        snapshot = gateway_module.load_snapshot()
+        snapshot["statistics_store"] = gateway_module.query_domain.build_statistics_store([{
+            "statistic_id": "STAT-ISSUE32-1",
+            "dataset_id": "NPA-STAT-1",
+            "source_id": "S-028",
+            "metric": "fraud_reports",
+            "period": "2026-08",
+            "value": 120,
+            "value_text": "120",
+            "unit": "件",
+            "geography": "臺中市",
+            "provisional": False,
+            "updated_at": "2026-09-21T00:00:00+08:00",
+            "official_url": "https://data.gov.tw/dataset/88147",
+            "evidence_locator": "json:/result/records/0/value",
+        }])
+        gateway = gateway_module.QueryGateway(
+            snapshot=snapshot,
+            clock=lambda: datetime(2026, 9, 21, 9, 0, tzinfo=timezone.utc),
+        )
+        proposition = {
+            "subject": "statistic:NPA-STAT-1:fraud_reports",
+            "value": {"value": "120", "period": "2026-08", "geography": "臺中市", "unit": "件"},
+        }
+        historical = gateway.execute("validate_answer", {"claims": [{
+            "claim_type": "STATISTIC",
+            "text": "2026-08 臺中市詐騙通報為 120 件",
+            "temporal_scope": "HISTORICAL",
+            "proposition": proposition,
+        }]})
+        self.assertEqual(historical["gate_status"], "PASS")
+        self.assertEqual(historical["answer_evidence_receipt"]["evidence_ids"], ["STAT-STAT-ISSUE32-1"])
+        current = gateway.execute("validate_answer", {"claims": [{
+            "claim_type": "STATISTIC",
+            "text": "本月臺中市詐騙通報為 120 件",
+            "temporal_scope": "CURRENT",
+            "proposition": proposition,
+        }]})
+        self.assertEqual(current["final_claims"][0]["support_status"], "STALE")
 
     def test_located_facts_enter_gate_only_after_server_side_confirmation(self):
         snapshot = gateway_module.load_snapshot()
