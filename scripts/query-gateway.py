@@ -365,6 +365,8 @@ def approved_source_origins() -> dict[str, str]:
 
 def official_evidence_source_ids() -> set[str]:
     catalog = json.loads(SOURCE_CATALOG.read_text(encoding="utf-8"))
+    if not isinstance(catalog, dict):
+        raise ValueError("official source catalog shape is invalid")
     return {
         str(row["source_id"])
         for row in catalog.get("sources", [])
@@ -375,6 +377,13 @@ def official_evidence_source_ids() -> set[str]:
             and row.get("status") in PUBLIC_EVIDENCE_SOURCE_STATUSES
         )
     }
+
+
+def approved_evidence_source_ids() -> set[str]:
+    # An approved origin that is only enrichment/discovery in the source
+    # catalog can still host navigation links, but it can never publish
+    # answer evidence — located facts bound to it must be rejected too.
+    return set(approved_source_origins()) & official_evidence_source_ids()
 
 
 def validate_located_facts_bundle(bundle: Any, approved_source_ids: set[str]) -> dict[str, Any]:
@@ -561,7 +570,7 @@ def load_snapshot(
     snapshot = {"store": store, "status": status, "brief": brief}
     if located_facts_path is not None:
         bundle = json.loads(located_facts_path.read_text(encoding="utf-8"))
-        snapshot["located_facts"] = validate_located_facts_bundle(bundle, set(approved_source_origins()))
+        snapshot["located_facts"] = validate_located_facts_bundle(bundle, approved_evidence_source_ids())
     if public_events_path is not None:
         snapshot["event_store"] = query_domain.load_event_store(public_events_path)
     if statistics_path is not None:
@@ -571,6 +580,25 @@ def load_snapshot(
 
 def _json_hash(value: Any) -> str:
     return hashlib.sha256(qs.canonical_json(value)).hexdigest()
+
+
+def _json_portable(value: Any) -> bool:
+    # The answer gate runs in Node: its canonicalization must reproduce
+    # canonical_json byte-for-byte. Floats and integers beyond 2^53 do not
+    # survive a JSON round trip with their Python spelling intact, so they
+    # are rejected before the receipt hash is ever computed.
+    if value is None or isinstance(value, (str, bool)):
+        return True
+    if isinstance(value, int):
+        return -(2**53) < value < 2**53
+    if isinstance(value, list):
+        return all(_json_portable(item) for item in value)
+    if isinstance(value, dict):
+        return all(
+            isinstance(key, str) and _json_portable(key) and _json_portable(item)
+            for key, item in value.items()
+        )
+    return False
 
 
 def _json_bytes(value: Any) -> bytes:
@@ -622,7 +650,7 @@ class QueryGateway:
         self.brief = self.snapshot["brief"]
         self.located_facts = (
             validate_located_facts_bundle(
-                self.snapshot["located_facts"], set(approved_source_origins())
+                self.snapshot["located_facts"], approved_evidence_source_ids()
             )
             if self.snapshot.get("located_facts") is not None else None
         )
@@ -748,6 +776,8 @@ class QueryGateway:
         evidence_ids = [row["evidence_id"] for row in evidence]
         if len(evidence_ids) != len(set(evidence_ids)):
             raise GatewayError("GATE_FAILED", "evidence catalog contains duplicate IDs", 503)
+        if not _json_portable(evidence):
+            raise GatewayError("GATE_FAILED", "evidence catalog contains non-portable JSON scalars", 503)
         catalog_hash = _json_hash(evidence)
         payload = {
             "claims": claims,

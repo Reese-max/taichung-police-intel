@@ -24,15 +24,16 @@ spec.loader.exec_module(gateway_module)
 
 class QueryGatewayTests(unittest.TestCase):
     @staticmethod
-    def located_bundle(status="CONFIRMED_OFFICIAL"):
+    def located_bundle(status="CONFIRMED_OFFICIAL", source_id="S-028",
+                       source_url="https://data.gov.tw/api/v2/rest/dataset/88147"):
         document = {
             "schema_version": 1,
             "document_id": "DOC-LOCATED-1",
             "document_version_id": "DOCV-AAAAAAAAAAAAAAAAAAAA",
-            "source_id": "S-028",
-            "original_source_identity": "S-028:dataset-88147",
-            "requested_url": "https://data.gov.tw/api/v2/rest/dataset/88147",
-            "final_url": "https://data.gov.tw/api/v2/rest/dataset/88147",
+            "source_id": source_id,
+            "original_source_identity": f"{source_id}:dataset-88147",
+            "requested_url": source_url,
+            "final_url": source_url,
             "fetched_at": "2026-09-21T00:00:00+00:00",
             "content_type": "application/json",
             "raw_bytes_sha256": "a" * 64,
@@ -512,6 +513,49 @@ class QueryGatewayTests(unittest.TestCase):
         self.assertEqual(caught.exception.code, "GATE_FAILED")
         self.assertEqual(caught.exception.status, 503)
         self.assertNotIn(marker, str(caught.exception))
+
+    def test_malformed_source_catalog_fails_closed(self):
+        snapshot = gateway_module.load_snapshot()
+        gateway = gateway_module.QueryGateway(
+            snapshot=snapshot,
+            clock=lambda: datetime(2026, 9, 11, 9, 0, tzinfo=timezone.utc),
+        )
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+            handle.write("[]")
+            bad_catalog = handle.name
+        try:
+            with mock.patch.object(gateway_module, "SOURCE_CATALOG", Path(bad_catalog)):
+                with self.assertRaises(gateway_module.GatewayError) as caught:
+                    gateway._trusted_evidence_catalog(gateway.store, gateway.clock())
+        finally:
+            os.unlink(bad_catalog)
+        self.assertEqual(caught.exception.code, "GATE_FAILED")
+        self.assertEqual(caught.exception.status, 503)
+
+    def test_enrichment_source_cannot_publish_located_facts_evidence(self):
+        snapshot = gateway_module.load_snapshot()
+        # CTX-POP is an approved AUDITED_EXISTING origin on data.gov.tw but its
+        # catalog role is ENRICHMENT, so a confirmed bundle bound to it must be
+        # rejected before any of its facts reach the answer gate.
+        snapshot["located_facts"] = self.located_bundle(
+            source_id="CTX-POP",
+            source_url="https://data.gov.tw/dataset/103703",
+        )
+        with self.assertRaises(ValueError):
+            gateway_module.QueryGateway(snapshot=snapshot)
+
+    def test_non_portable_evidence_scalar_fails_closed(self):
+        snapshot = gateway_module.load_snapshot()
+        snapshot["located_facts"] = self.located_bundle()
+        gateway = gateway_module.QueryGateway(
+            snapshot=snapshot,
+            clock=lambda: datetime(2026, 9, 21, 9, 0, tzinfo=timezone.utc),
+        )
+        gateway.located_facts["facts"][0]["normalized_value"] = 1.5
+        with self.assertRaises(gateway_module.GatewayError) as caught:
+            gateway.execute("validate_answer", {"claims": [{"claim_type": "OTHER", "text": "觸發閘門"}]})
+        self.assertEqual(caught.exception.code, "GATE_FAILED")
+        self.assertIn("non-portable", caught.exception.message)
 
     def test_located_facts_enter_gate_only_after_server_side_confirmation(self):
         snapshot = gateway_module.load_snapshot()
