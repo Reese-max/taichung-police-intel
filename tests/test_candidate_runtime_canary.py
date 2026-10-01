@@ -2,6 +2,7 @@ import importlib.util
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
+import re
 import sys
 import unittest
 
@@ -23,10 +24,12 @@ class FakeSession:
         pass
 
 
-def collector(fail=None):
+def collector(fail=None, sources=SOURCES, existing_log=None):
     def collect(session, source_id, start, end, existing, *, max_details):
         assert max_details == 1
         session.calls = 2
+        if existing_log is not None:
+            existing_log[source_id] = existing
         if source_id == fail:
             raise ValueError("fixture unavailable")
         return {
@@ -36,10 +39,17 @@ def collector(fail=None):
             "window_item_count": 2,
             "snapshot_item_count": 3,
             "snapshots": [{"purpose": "LIST"}, {"purpose": "DETAIL"}],
+            "items": [
+                {
+                    "stable_key": f"{source_id}-item-1",
+                    "content_sha256": "b" * 64,
+                    "payload": {"detail": "unchanged-skipped" if existing else "fetched"},
+                }
+            ],
         }
 
     return SimpleNamespace(
-        NEWS_LIST_SOURCES={source: {"list_url": "https://official.example.test/"} for source in SOURCES},
+        NEWS_LIST_SOURCES={source: {"list_url": "https://official.example.test/"} for source in sources},
         collect_source=collect,
     )
 
@@ -131,6 +141,50 @@ class CanaryContractTests(unittest.TestCase):
         self.assertIs(online_collect.COLLECTORS["S-033"], online_collect.collect_news_list)
         self.assertIn("S-031", module.candidate_source_ids(online_collect))
         self.assertIs(online_collect.COLLECTORS["S-031"], online_collect.collect_fire_live)
+
+    def test_observation_workflow_matrix_covers_every_candidate(self):
+        import online_collect
+
+        workflow = (SCRIPT.parent.parent / ".github/workflows/candidate-source-observation.yml").read_text(
+            encoding="utf-8"
+        )
+        matrix_match = re.search(r"source:\s*\[([^\]]+)\]", workflow)
+        self.assertIsNotNone(matrix_match, "workflow must keep a source matrix")
+        matrix = {item.strip() for item in matrix_match.group(1).split(",")}
+        expected = set(module.candidate_source_ids(online_collect))
+        self.assertEqual(expected, {"S-001", "S-019", "S-031", "S-032", "S-033"})
+        self.assertEqual(matrix, expected)
+
+    def test_existing_items_are_threaded_into_collect_source(self):
+        log = {}
+        prior = {"S-001": {"S-001-item-1": {"content_sha256": "b" * 64}}}
+        report = module.run_canary(
+            collector(existing_log=log),
+            ["S-001"],
+            NOW,
+            session_factory=FakeSession,
+            existing_items=prior,
+        )
+        self.assertEqual(log["S-001"], prior["S-001"])
+        record = report["sources"][0]
+        self.assertEqual(record["unchanged_detail_skips"], 1)
+
+    def test_report_carries_incremental_item_state(self):
+        report = module.run_canary(collector(), ["S-001"], NOW, session_factory=FakeSession)
+        self.assertEqual(
+            report["item_state"],
+            {"S-001": {"S-001-item-1": "b" * 64}},
+        )
+
+    def test_fire_candidate_record_carries_usage_notice_and_catalog_truth(self):
+        report = module.run_canary(
+            collector(sources=("S-031",)), ["S-031"], NOW, session_factory=FakeSession
+        )
+        record = report["sources"][0]
+        self.assertEqual(record["catalog_status"], "VERIFIED_CANDIDATE")
+        self.assertEqual(record["source_role"], "PRIMARY_EVENT")
+        self.assertIn("派遣", record["public_usage_notice"])
+        self.assertEqual(record["retention_class"], "OFFICIAL_TRANSIENT_METADATA")
 
 
 if __name__ == "__main__":

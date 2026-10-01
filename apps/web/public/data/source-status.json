@@ -1,4 +1,53 @@
 {
+  "candidate_sources": [
+    {
+      "cadence_class": "DAILY_EVENT",
+      "integration_status": "AUDITED_EXISTING",
+      "promotion_eligible": false,
+      "source_id": "S-019",
+      "source_name": "臺中市政府市政會議紀錄與專案報告",
+      "source_role": "PRIMARY_EVENT",
+      "source_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186"
+    },
+    {
+      "cadence_class": "FAST_EVENT",
+      "integration_status": "AUDITED_EXISTING",
+      "promotion_eligible": false,
+      "source_id": "S-001",
+      "source_name": "臺中市政府警察局警政新聞",
+      "source_role": "PRIMARY_EVENT",
+      "source_url": "https://www.police.taichung.gov.tw/ch/home.jsp?id=1&parentpath=0&mcustomize=news_list.jsp"
+    },
+    {
+      "cadence_class": "FAST_EVENT",
+      "integration_status": "VERIFIED_CANDIDATE",
+      "promotion_eligible": false,
+      "source_id": "S-032",
+      "source_name": "臺中市政府交通局最新消息",
+      "source_role": "PRIMARY_EVENT",
+      "source_url": "https://www.traffic.taichung.gov.tw/"
+    },
+    {
+      "cadence_class": "FAST_EVENT",
+      "integration_status": "VERIFIED_CANDIDATE",
+      "promotion_eligible": false,
+      "source_id": "S-033",
+      "source_name": "臺中市政府市政新聞",
+      "source_role": "PRIMARY_EVENT",
+      "source_url": "https://www.taichung.gov.tw/"
+    },
+    {
+      "cadence_class": "FAST_EVENT",
+      "integration_status": "VERIFIED_CANDIDATE",
+      "promotion_eligible": false,
+      "public_usage_notice": "公開即時災情僅供公共態勢感知，不作派遣或勤務指揮依據；僅保留短期快照並遮蔽非必要地址細節。",
+      "retention_class": "OFFICIAL_TRANSIENT_METADATA",
+      "source_id": "S-031",
+      "source_name": "臺中市政府消防局即時災情",
+      "source_role": "PRIMARY_EVENT",
+      "source_url": "https://www.fire.taichung.gov.tw/"
+    }
+  ],
   "generated_at": "2026-09-11T08:23:26+08:00",
   "latest_collection_run": {
     "collection_run_id": "CR-DEMO-20260911-MORNING-SCHEDULE",
@@ -17,6 +66,7 @@
       "current_source_run_id": "SR-DEMO-20260911-MORNING-004",
       "data_as_of": "2026-07-27T00:00:00+08:00",
       "freshness_status": "STALE",
+      "integration_status": "PRODUCTION_ACTIVE",
       "intelligence_gaps": [
         "STALE_DATA"
       ],
@@ -37,6 +87,7 @@
       "source_health": "PASS",
       "source_id": "S-004",
       "source_name": "臺中市議會議事日程",
+      "source_role": "PRIMARY_EVENT",
       "source_url": "https://www.tccc.gov.tw/wb_download13.asp?uno=&cno=49",
       "window_completeness": "COMPLETE_ZERO",
       "window_item_count": 0
@@ -45,6 +96,7 @@
       "current_source_run_id": "SR-DEMO-20260911-MORNING-006",
       "data_as_of": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "intelligence_gaps": [],
       "last_checked_at": "2026-09-11T08:23:26+08:00",
       "last_known_good": {
@@ -63,6 +115,7 @@
       "source_health": "PASS",
       "source_id": "S-006",
       "source_name": "臺中市議會質詢順序表",
+      "source_role": "PRIMARY_EVENT",
       "source_url": "https://www.tccc.gov.tw/wb_download13.asp?uno=&cno=50",
       "window_completeness": "COMPLETE_ZERO",
       "window_item_count": 0
@@ -71,6 +124,7 @@
       "current_source_run_id": "SR-DEMO-20260911-MORNING-007",
       "data_as_of": "2026-05-27T01:12:00+08:00",
       "freshness_status": "STALE",
+      "integration_status": "PRODUCTION_ACTIVE",
       "intelligence_gaps": [
         "STALE_DATA"
       ],
@@ -91,6 +145,7 @@
       "source_health": "PASS",
       "source_id": "S-007",
       "source_name": "臺中市議會議事資訊系統－議事錄",
+      "source_role": "PRIMARY_EVENT",
       "source_url": "https://yishi.tccc.gov.tw/api/ProceedingsBackWeb/FrontList",
       "window_completeness": "COMPLETE_ZERO",
       "window_item_count": 0
@@ -99,6 +154,7 @@
       "current_source_run_id": "SR-DEMO-20260911-MORNING-009",
       "data_as_of": "2026-09-11T08:23:49+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "intelligence_gaps": [],
       "last_checked_at": "2026-09-11T08:23:26+08:00",
       "last_known_good": {
@@ -117,6 +173,7 @@
       "source_health": "PASS",
       "source_id": "S-009",
       "source_name": "臺中市議會議事資訊系統－各項提案",
+      "source_role": "PRIMARY_EVENT",
       "source_url": "https://yishi.tccc.gov.tw/api/Proposal/FrontList",
       "window_completeness": "COMPLETE_ZERO",
       "window_item_count": 0
@@ -125,6 +182,7 @@
       "current_source_run_id": "SR-DEMO-20260911-MORNING-029",
       "data_as_of": "2026-07-24T00:00:00+08:00",
       "freshness_status": "STALE",
+      "integration_status": "PRODUCTION_ACTIVE",
       "intelligence_gaps": [
         "STALE_DATA"
       ],
@@ -145,6 +203,7 @@
       "source_health": "PASS",
       "source_id": "S-029",
       "source_name": "臺中市政府議會專案報告",
+      "source_role": "PRIMARY_REFERENCE",
       "source_url": "https://www.rdec.taichung.gov.tw/12047/12142/12145",
       "window_completeness": "COMPLETE_ZERO",
       "window_item_count": 0
