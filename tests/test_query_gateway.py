@@ -547,6 +547,7 @@ class QueryGatewayTests(unittest.TestCase):
                     "validator_version": "answer-evidence-gate/0",
                     "publication_hash": gateway.store["generated_from"]["brief_sha256"],
                     "evidence_catalog_hash": gateway_module._json_hash(catalog),
+                    "indexed_evidence_count": len(catalog),
                 },
             }),
             stderr="",
