@@ -70,17 +70,17 @@ class QueryStoreTests(unittest.TestCase):
         # evidence row is treated as current.
         self.assertEqual(qs.project_feed_item(item, "a" * 64)["verification_status"], "STALE")
         self.assertEqual(
-            qs.project_feed_item(item, "a" * 64, source_freshness="FRESH")["verification_status"], "VERIFIED"
+            qs.project_feed_item(item, "a" * 64, source_freshness={"S-004": "FRESH"})["verification_status"], "VERIFIED"
         )
         self.assertEqual(
-            qs.project_feed_item(item, "a" * 64, source_freshness="RECENT")["verification_status"], "VERIFIED"
+            qs.project_feed_item(item, "a" * 64, source_freshness={"S-004": "RECENT"})["verification_status"], "VERIFIED"
         )
         self.assertEqual(
-            qs.project_feed_item(item, "a" * 64, source_freshness="STALE")["verification_status"], "STALE"
+            qs.project_feed_item(item, "a" * 64, source_freshness={"S-004": "STALE"})["verification_status"], "STALE"
         )
         explicit = dict(item, freshness_status="STALE")
         self.assertEqual(
-            qs.project_feed_item(explicit, "a" * 64, source_freshness="FRESH")["verification_status"], "STALE"
+            qs.project_feed_item(explicit, "a" * 64, source_freshness={"S-004": "FRESH"})["verification_status"], "STALE"
         )
 
     def test_store_saved_by_a_superseded_projection_is_refused(self):

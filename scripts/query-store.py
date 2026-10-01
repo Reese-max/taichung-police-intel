@@ -75,7 +75,7 @@ def instant(value):
     return stamp.astimezone(timezone.utc)
 
 
-def project_feed_item(item: dict[str, Any], feed_hash: str, *, source_freshness: str | None = None) -> dict[str, Any]:
+def project_feed_item(item: dict[str, Any], feed_hash: str, *, source_freshness: dict[str, str] | None = None) -> dict[str, Any]:
     if not isinstance(item, dict):
         raise ValueError("invalid feed row; refusing silent omission")
     stable_id, title, source_id = (_string(item.get(k)) for k in ("stable_id", "title", "source_id"))
@@ -99,7 +99,7 @@ def project_feed_item(item: dict[str, Any], feed_hash: str, *, source_freshness:
             instant(item[key])
     # An item without its own freshness inherits the source row's, which is the same
     # effective freshness the evidence catalog and answer gate use.
-    freshness = str(item.get("freshness_status") or source_freshness or "UNKNOWN").upper()
+    freshness = str(item.get("freshness_status") or (source_freshness or {}).get(source_id) or "UNKNOWN").upper()
     return {
         "record_type": "publication_item", "canonical_id": stable_id, "title": title,
         "source_id": source_id, "official_url": official_url,
@@ -159,11 +159,13 @@ def build_store(feed: dict[str, Any], status: dict[str, Any], brief: dict[str, A
     rows, sources = feed.get("items"), status.get("sources")
     if not isinstance(rows, list) or not isinstance(sources, list) or len(rows) > MAX_ROWS:
         raise ValueError("invalid or unbounded canonical arrays")
+    # Only object rows contribute a freshness fallback; malformed rows are still
+    # rejected by the projection below instead of being skipped here.
     source_freshness = {
         _string(source.get("source_id")): str(source.get("freshness_status") or "UNKNOWN").upper()
-        for source in sources
+        for source in sources if isinstance(source, dict)
     }
-    projected = [project_feed_item(item, hashes["feed"], source_freshness=source_freshness.get(_string(item.get("source_id")))) for item in rows]
+    projected = [project_feed_item(item, hashes["feed"], source_freshness=source_freshness) for item in rows]
     projected.sort(key=lambda r: r["canonical_id"])
     if len({r["canonical_id"] for r in projected}) != len(projected):
         raise ValueError("duplicate canonical_id in publication projection")

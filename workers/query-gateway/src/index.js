@@ -198,7 +198,9 @@ async function buildSnapshotFromArtifacts({ feedDoc, statusDoc, briefDoc, policy
     if (!Number.isFinite(parseInstant(value))) throw new Error("publication timestamp is invalid");
   }
   if (!Array.isArray(feed.items) || feed.items.length > 10000 || !Array.isArray(status.sources)) throw new Error("publication arrays are invalid");
-  const sourceFreshness = new Map(status.sources.map((source) => [source.source_id, String(source.freshness_status || "UNKNOWN").toUpperCase()]));
+  // Only object rows contribute a freshness fallback; malformed rows are still rejected below.
+  const sourceFreshness = new Map(status.sources.filter((source) => source && typeof source === "object")
+    .map((source) => [source.source_id, String(source.freshness_status || "UNKNOWN").toUpperCase()]));
   const items = feed.items.map((item) => projectFeedItem(item, feedDoc.hash, sourceFreshness.get(item.source_id) || null)).sort((a, b) => a.canonical_id.localeCompare(b.canonical_id));
   if (new Set(items.map((item) => item.canonical_id)).size !== items.length) throw new Error("duplicate canonical_id");
   const sources = status.sources.map((source) => projectSource(source, statusDoc.hash)).sort((a, b) => a.source_id.localeCompare(b.source_id));
