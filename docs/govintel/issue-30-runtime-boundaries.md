@@ -35,7 +35,7 @@ Implemented in the existing PR #40, not a second query service. No production wi
 
 ## Actual local execution
 
-The bounded query-store suite currently passes **33 tests** with `python -m unittest discover -s tests -p 'test_query_store*.py' -v`. The portable Node bridge and the real CLI self-check passed too; bridge runs are not counted as independent validation.
+The bounded query-store suite currently passes **36 tests** with `python -m unittest discover -s tests -p 'test_query_store*.py' -v`. The portable Node bridge and the real CLI self-check passed too; bridge runs are not counted as independent validation.
 
 ```sh
 python scripts/query-store.py build --output /tmp/query-store.json

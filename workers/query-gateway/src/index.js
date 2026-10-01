@@ -154,35 +154,45 @@ function validatePolicy(policy) {
   assertHash(policy.catalog_hash, "catalog_hash");
 }
 
-async function fetchJson(origin, name) {
+async function fetchArtifact(origin, name) {
   const url = `${origin.replace(/\/$/, "")}/data/${name}`;
   const response = await fetch(url, { cf: { cacheTtl: 30, cacheEverything: true } });
   if (!response.ok) throw new Error(`publication artifact ${name} returned HTTP ${response.status}`);
   const bytes = await response.arrayBuffer();
-  if (bytes.byteLength > 32 * 1024 * 1024) throw new Error(`publication artifact ${name} exceeds byte budget`);
-  return { value: JSON.parse(new TextDecoder().decode(bytes)), hash: await sha256(bytes) };
+  return { name, bytes, hash: await sha256(bytes) };
 }
 
 async function buildSnapshot(env) {
   const origin = env.PUBLIC_ORIGIN;
   if (!origin) throw new Error("PUBLIC_ORIGIN is not configured");
-  const [feedDoc, statusDoc, briefDoc, policyDoc] = await Promise.all([
-    fetchJson(origin, "intelligence-feed.json"),
-    fetchJson(origin, "source-status.json"),
-    fetchJson(origin, "v2-daily-brief.json"),
-    fetchJson(origin, "source-policy.json"),
+  const fetched = await Promise.all([
+    fetchArtifact(origin, "intelligence-feed.json"),
+    fetchArtifact(origin, "source-status.json"),
+    fetchArtifact(origin, "v2-daily-brief.json"),
+    fetchArtifact(origin, "source-policy.json"),
   ]);
   // Everything past the fetch is an integrity question about the artifacts
   // themselves.  Those failures must stay fail-closed instead of degrading to a
   // previous generation that no longer describes the published run.
   try {
-    return await buildSnapshotFromArtifacts({ feedDoc, statusDoc, briefDoc, policyDoc });
+    return await buildSnapshotFromArtifacts(fetched);
   } catch (error) {
     throw error instanceof SnapshotIntegrityError ? error : new SnapshotIntegrityError(String(error?.message || error));
   }
 }
 
-async function buildSnapshotFromArtifacts({ feedDoc, statusDoc, briefDoc, policyDoc }) {
+async function buildSnapshotFromArtifacts(fetched) {
+  // A served artifact that cannot be parsed, or that exceeds its byte budget, is
+  // a broken publication rather than an outage, so it stays inside this boundary.
+  const documents = {};
+  for (const artifact of fetched) {
+    if (artifact.bytes.byteLength > 32 * 1024 * 1024) throw new Error(`publication artifact ${artifact.name} exceeds byte budget`);
+    documents[artifact.name] = { value: JSON.parse(new TextDecoder().decode(artifact.bytes)), hash: artifact.hash };
+  }
+  const feedDoc = documents["intelligence-feed.json"];
+  const statusDoc = documents["source-status.json"];
+  const briefDoc = documents["v2-daily-brief.json"];
+  const policyDoc = documents["source-policy.json"];
   const feed = feedDoc.value;
   const status = statusDoc.value;
   const brief = briefDoc.value;

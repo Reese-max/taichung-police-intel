@@ -87,9 +87,11 @@ class QueryStoreTests(unittest.TestCase):
         store = qs.build_from_paths(qs.DEFAULT_FEED, qs.DEFAULT_STATUS, qs.DEFAULT_BRIEF)
         self.assertEqual(store["projection_version"], qs.PROJECTION_VERSION)
         legacy = dict(store, projection_version="publication-metadata-v2")
-        # Rows projected by an older version lack the document/evidence locators,
-        # so a saved store must fail closed instead of answering from it.
-        with self.assertRaises(ValueError):
+        # Re-seal the mutation so only the projection-version contract can refuse it.
+        legacy["projection_sha256"] = qs.sha256_bytes(qs.canonical_json(
+            {key: value for key, value in legacy.items() if key != "projection_sha256"}
+        ))
+        with self.assertRaisesRegex(ValueError, "unsupported query store"):
             qs.validate_store(legacy)
 
     def test_exact_canonical_id_lookup_is_strict(self):

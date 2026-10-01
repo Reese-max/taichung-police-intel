@@ -260,6 +260,46 @@ test("Worker fails closed instead of serving a superseded generation", async () 
   }
 });
 
+test("Worker fails closed when a served publication body cannot be parsed", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalNow = Date.now;
+  const bytes = Object.fromEntries(await Promise.all(
+    artifactNames.map(async name => [name, await readFile(new URL(name, base))]),
+  ));
+  const query = async (instance, args) => {
+    const response = await instance.fetch(new Request(endpoint, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tool: "search_evidence", arguments: args }),
+    }), env);
+    return { status: response.status, body: await response.json() };
+  };
+  try {
+    const instance = (await import("../../../workers/query-gateway/src/index.js?corrupt-body")).default;
+    globalThis.fetch = async url => {
+      const name = new URL(url).pathname.split("/").at(-1);
+      return new Response(bytes[name], { status: 200, headers: { "Content-Type": "application/json" } });
+    };
+    const first = await query(instance, { limit: 1 });
+    assert.equal(first.status, 200);
+
+    // A served-but-unparseable artifact is a broken publication, not an outage:
+    // the previous generation must not answer for it.
+    globalThis.fetch = async url => {
+      const name = new URL(url).pathname.split("/").at(-1);
+      const content = name === "intelligence-feed.json" ? "not-json" : bytes[name];
+      return new Response(content, { status: 200, headers: { "Content-Type": "application/json" } });
+    };
+    Date.now = () => originalNow() + 31_000;
+    const rejected = await query(instance, { limit: 1 });
+    assert.equal(rejected.status, 503);
+    assert.equal(rejected.body.error.code, "UPSTREAM_UNAVAILABLE");
+    assert.equal(rejected.body.query_generation_id, undefined);
+  } finally {
+    globalThis.fetch = originalFetch;
+    Date.now = originalNow;
+  }
+});
+
 test("Worker inherits the source freshness for an item without its own", async () => {
   const originalFetch = globalThis.fetch;
   const bytes = Object.fromEntries(await Promise.all(
