@@ -103,6 +103,8 @@ test("Worker answer gate host fails closed on a refused or partially indexed val
     temporal_scope: "CURRENT",
     proposition: { subject: "traffic:start", value: "16:00" },
   };
+  // A refused verdict carries a full evidence count on purpose: the refusal
+  // alone must fail the request, independently of the coverage check.
   await assert.rejects(
     () => validateAnswer(snapshot, [claim], () => ({
       gate_status: "BLOCKED",
@@ -110,7 +112,8 @@ test("Worker answer gate host fails closed on a refused or partially indexed val
       removed_claims: [],
       receipt: {
         schema_version: 1, validator_version: "answer-evidence-gate/3", gate_status: "BLOCKED",
-        failure_reason: "DUPLICATE_EVIDENCE_ID", publication_hash: null, claim_ids: [], evidence_ids: [], claims: [],
+        failure_reason: "DUPLICATE_EVIDENCE_ID", publication_hash: "f".repeat(64),
+        indexed_evidence_count: 1, claim_ids: [], evidence_ids: [], claims: [],
       },
     })),
     (error) => {

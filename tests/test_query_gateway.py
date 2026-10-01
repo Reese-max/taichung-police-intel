@@ -430,8 +430,14 @@ class QueryGatewayTests(unittest.TestCase):
         })
 
     def test_answer_gate_refuses_a_receipt_the_validator_never_produced(self):
+        catalog = self.gateway._trusted_evidence_catalog(self.gateway.store, self.gateway.clock())
+        # Each case isolates one guard: the refused receipt reports full
+        # coverage, the partial one reports none, and both carry the hashes the
+        # host asked for, so the binding check alone cannot reject either.
         cases = {
-            "refused": self._gate_output({"failure_reason": "DUPLICATE_EVIDENCE_ID"}),
+            "refused": self._gate_output(
+                {"failure_reason": "DUPLICATE_EVIDENCE_ID", "indexed_evidence_count": len(catalog)},
+            ),
             "partial": self._gate_output({"indexed_evidence_count": 0}, gate_status="QUALIFIED"),
         }
         for label, stdout in cases.items():
