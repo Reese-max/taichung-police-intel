@@ -859,6 +859,11 @@ class QueryGateway:
         receipt = output.get("receipt") if isinstance(output, dict) else None
         if not isinstance(receipt, dict) or receipt.get("publication_hash") != payload["publication_hash"] or receipt.get("evidence_catalog_hash") != catalog_hash:
             raise GatewayError("GATE_FAILED", "answer evidence receipt is not bound to this publication", 503)
+        # A host binding cannot prove the validator indexed the full catalog.
+        if output.get("gate_status") == "BLOCKED":
+            raise GatewayError("GATE_FAILED", "answer evidence gate refused the draft", 503)
+        if receipt.get("indexed_evidence_count") != len(evidence):
+            raise GatewayError("GATE_FAILED", "answer evidence gate did not index the full evidence catalog", 503)
         if receipt.get("validator_version") != ANSWER_VALIDATOR_VERSION:
             raise GatewayError("GATE_FAILED", "answer evidence validator version is not recognized", 503)
         receipt.pop("error_detail", None)
