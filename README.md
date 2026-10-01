@@ -143,8 +143,10 @@ For an MCP client using stdio, run `python scripts/query-gateway-stdio.py`; it
 reuses the same read-only JSON-RPC gateway. A reviewed located-facts bundle can
 be loaded with `--located-facts-bundle`; only hash-bound
 `CONFIRMED_OFFICIAL` facts enter the answer-evidence catalog. Publication
-rows also need the server-controlled `source_role=PRIMARY_OFFICIAL`; an HTTPS
-locator on a discovery or media row never makes it answer evidence.
+rows also need the `PRIMARY_OFFICIAL` marker on a source whose server-side
+catalog role is `PRIMARY_EVENT`/`PRIMARY_REFERENCE`; an HTTPS locator or a
+self-claimed role on a discovery, enrichment, or media row never makes it
+answer evidence.
 
 Set `NEXT_PUBLIC_QUERY_GATEWAY_URL=http://127.0.0.1:8788/query` when starting the Web app to enable **Ask GovIntel**. The default checked-in snapshot exposes five typed operations: `search_evidence`, `get_current_brief`, `get_publication_receipt`, `get_source_health`, and `validate_answer`. A validated PublicEvent store can additionally be supplied with `--public-events` for `search_events`, `get_event`, and `compare_event_versions`; a validated typed statistics store can be supplied with `--statistics` for `query_statistics`. Without those canonical stores, the domain operations stay explicitly `CAPABILITY_NOT_AVAILABLE` and are not advertised by MCP. All operations share the same read-only Gateway, reject arbitrary URL/SQL/path arguments, apply a process-local request cap, and report stale/partial/unknown states instead of converting them to zero events.
 

@@ -1,9 +1,12 @@
 import importlib.util
 import json
 import os
+import shutil
+import subprocess
 from datetime import datetime, timezone
 from threading import Thread
 import tempfile
+from unittest import mock
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 import unittest
@@ -429,6 +432,86 @@ class QueryGatewayTests(unittest.TestCase):
         )
         catalog = gateway._trusted_evidence_catalog(gateway.store, gateway.clock())
         self.assertEqual([row["evidence_id"] for row in catalog], [f"PUB-{official['canonical_id']}"])
+
+    def test_item_level_role_label_cannot_promote_a_non_official_source(self):
+        snapshot = gateway_module.load_snapshot()
+        official = dict(snapshot["store"]["items"][0], source_role="PRIMARY_OFFICIAL")
+        # CTX-POP is an ENRICHMENT row in the checked-in source catalog. An
+        # item-level PRIMARY_OFFICIAL label cannot override the server-side
+        # catalog classification.
+        forged = dict(
+            official,
+            canonical_id="ISSUE32-FORGED-ROLE",
+            title="背景資料來源偽稱官方證據",
+            source_id="CTX-POP",
+            source_role="PRIMARY_OFFICIAL",
+        )
+        snapshot["store"]["items"] = [official, forged]
+        gateway = gateway_module.QueryGateway(
+            snapshot=snapshot,
+            clock=lambda: datetime(2026, 9, 11, 9, 0, tzinfo=timezone.utc),
+        )
+        catalog = gateway._trusted_evidence_catalog(gateway.store, gateway.clock())
+        self.assertEqual([row["evidence_id"] for row in catalog], [f"PUB-{official['canonical_id']}"])
+
+    def test_answer_gate_runner_computes_catalog_hash_from_supplied_evidence(self):
+        node = shutil.which("node")
+        if node is None:
+            self.skipTest("node runtime is unavailable")
+        runner = ROOT / "scripts" / "answer-gate-runner.mjs"
+        claims = [{
+            "schema_version": 1,
+            "claim_id": "runner-hash-check",
+            "text": "候選主張",
+            "claim_type": "STATUS",
+            "temporal_scope": "CURRENT",
+            "proposition": {"subject": "publication:X:title", "value": "標題"},
+        }]
+        payload = {
+            "claims": claims,
+            "evidence": [],
+            "generated_at": "2026-09-11T09:00:00+00:00",
+            "publication_hash": "f" * 64,
+        }
+
+        def invoke(extra):
+            body = {**payload, **extra}
+            return subprocess.run(
+                [node, str(runner)],
+                input=json.dumps(body, ensure_ascii=False),
+                capture_output=True,
+                text=True,
+                timeout=20,
+                check=False,
+            )
+
+        forged = invoke({"evidence_catalog_hash": "0" * 64})
+        self.assertNotEqual(forged.returncode, 0)
+        honest = invoke({})
+        self.assertEqual(honest.returncode, 0, honest.stderr)
+        output = json.loads(honest.stdout)
+        expected = gateway_module._json_hash(payload["evidence"])
+        self.assertEqual(output["receipt"]["evidence_catalog_hash"], expected)
+        self.assertEqual(output["receipt"]["publication_hash"], payload["publication_hash"])
+
+    def test_gate_subprocess_failure_does_not_leak_stderr_to_callers(self):
+        marker = "INTERNAL-RUNNER-DETAIL-NOT-FOR-CLIENTS"
+        failed = subprocess.CompletedProcess(
+            args=["node"], returncode=1, stdout="", stderr=marker,
+        )
+        gateway = gateway_module.QueryGateway(
+            clock=lambda: datetime(2026, 9, 11, 9, 0, tzinfo=timezone.utc),
+        )
+        with mock.patch.object(gateway_module.subprocess, "run", return_value=failed):
+            with self.assertRaises(gateway_module.GatewayError) as caught:
+                gateway.execute("validate_answer", {"claims": [{
+                    "claim_type": "STATUS",
+                    "text": "觸發閘門",
+                    "proposition": {"subject": "s", "value": "v"},
+                }]})
+        self.assertEqual(caught.exception.code, "GATE_FAILED")
+        self.assertEqual(caught.exception.status, 503)
+        self.assertNotIn(marker, str(caught.exception))
 
     def test_located_facts_enter_gate_only_after_server_side_confirmation(self):
         snapshot = gateway_module.load_snapshot()

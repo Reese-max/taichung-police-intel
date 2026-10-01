@@ -37,6 +37,7 @@ DEFAULT_RATE_LIMIT = 60
 DEFAULT_QUERY_TIMEZONE = "Asia/Taipei"
 SOURCE_CATALOG = ROOT / "docs" / "govintel" / "source-catalog.v2.json"
 PUBLIC_EVIDENCE_SOURCE_STATUSES = frozenset({"PRODUCTION_ACTIVE", "AUDITED_EXISTING"})
+OFFICIAL_EVIDENCE_SOURCE_ROLES = frozenset({"PRIMARY_EVENT", "PRIMARY_REFERENCE"})
 
 _query_store_spec = importlib.util.spec_from_file_location("govintel_query_store", QUERY_STORE_PATH)
 if _query_store_spec is None or _query_store_spec.loader is None:
@@ -362,6 +363,20 @@ def approved_source_origins() -> dict[str, str]:
     }
 
 
+def official_evidence_source_ids() -> set[str]:
+    catalog = json.loads(SOURCE_CATALOG.read_text(encoding="utf-8"))
+    return {
+        str(row["source_id"])
+        for row in catalog.get("sources", [])
+        if (
+            isinstance(row, dict)
+            and row.get("source_id")
+            and row.get("role") in OFFICIAL_EVIDENCE_SOURCE_ROLES
+            and row.get("status") in PUBLIC_EVIDENCE_SOURCE_STATUSES
+        )
+    }
+
+
 def validate_located_facts_bundle(bundle: Any, approved_source_ids: set[str]) -> dict[str, Any]:
     document = bundle.get("document_version") if isinstance(bundle, dict) else None
     if not isinstance(document, dict) or type(document.get("schema_version")) is not int or document.get("schema_version") != 1:
@@ -648,11 +663,18 @@ class QueryGateway:
             for source_id in sources
         } if now is not None else {}
         catalog = []
+        try:
+            official_sources = official_evidence_source_ids()
+        except (OSError, ValueError) as error:
+            raise GatewayError("GATE_FAILED", "official source catalog is unavailable", 503) from error
         for item in store["items"]:
-            # A URL is only a locator. Discovery/enrichment rows may link to
-            # media or other context, but only explicitly classified official
-            # rows can become answer evidence.
+            # A URL is only a locator, and the row's own role label is only a
+            # producer claim. Evidence admission requires both the row's
+            # PRIMARY_OFFICIAL marker and a catalog-official source_id;
+            # discovery/enrichment rows can never satisfy the second check.
             if item.get("source_role") != "PRIMARY_OFFICIAL":
+                continue
+            if item.get("source_id") not in official_sources:
                 continue
             source = sources.get(item["source_id"], {})
             freshness = str(item.get("freshness_status") or source.get("freshness_status") or "UNKNOWN").upper()
@@ -748,8 +770,10 @@ class QueryGateway:
         except (OSError, subprocess.TimeoutExpired) as error:
             raise GatewayError("GATE_UNAVAILABLE", "answer evidence gate did not complete", 503) from error
         if result.returncode != 0:
-            detail = (result.stderr or "answer evidence gate failed").strip()[:256]
-            raise GatewayError("GATE_FAILED", detail, 503)
+            detail = (result.stderr or "").strip()[:256]
+            if detail:
+                sys.stderr.write(f"answer evidence gate failed: {detail}\n")
+            raise GatewayError("GATE_FAILED", "answer evidence gate failed", 503)
         try:
             output = json.loads(result.stdout)
         except json.JSONDecodeError as error:

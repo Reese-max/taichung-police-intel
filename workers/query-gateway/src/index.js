@@ -322,13 +322,22 @@ function publicSource(row) {
   return Object.fromEntries(fields.filter((key) => key in row).map((key) => [key, row[key]]));
 }
 
+const OFFICIAL_EVIDENCE_SOURCE_IDS = new Set(
+  sourceCatalog.sources
+    .filter((row) => ["PRIMARY_EVENT", "PRIMARY_REFERENCE"].includes(row.role)
+      && ["PRODUCTION_ACTIVE", "AUDITED_EXISTING"].includes(row.status))
+    .map((row) => row.source_id),
+);
+
 function trustedEvidence(snapshot) {
   const sourceStatus = Object.fromEntries(snapshot.sources.map((source) => [source.source_id, assessScope(snapshot, source.source_id).dataStatus]));
-  // A locator alone does not establish authority. Discovery and enrichment
-  // rows may carry links for navigation, but only a source explicitly marked
-  // PRIMARY_OFFICIAL can enter the answer evidence catalog.
+  // A locator alone does not establish authority, and the row's own role label
+  // is only a producer claim. Evidence admission requires both the row's
+  // PRIMARY_OFFICIAL marker and a catalog-official source_id; discovery and
+  // enrichment rows can never satisfy the second check.
   return snapshot.items.filter((item) =>
     item.source_role === "PRIMARY_OFFICIAL" &&
+    OFFICIAL_EVIDENCE_SOURCE_IDS.has(item.source_id) &&
     typeof item.official_url === "string" &&
     item.official_url.startsWith("https://"),
   ).map((item) => {

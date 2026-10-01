@@ -48,7 +48,7 @@ const UNKNOWN_TEXT = Object.freeze({
   OTHER: "官方來源未提供可驗證資料",
 });
 
-function canonicalize(value) {
+export function canonicalize(value) {
   if (Array.isArray(value)) return `[${value.map(canonicalize).join(",")}]`;
   if (value && typeof value === "object") {
     return `{${Object.keys(value)

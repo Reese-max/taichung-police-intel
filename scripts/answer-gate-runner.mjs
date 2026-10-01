@@ -2,7 +2,7 @@
 
 import { createHash } from "node:crypto";
 
-import { gateAnswer } from "../apps/web/lib/answer-evidence-gate.js";
+import { canonicalize, gateAnswer } from "../apps/web/lib/answer-evidence-gate.js";
 
 const HEX64 = /^[0-9a-f]{64}$/;
 const RENDERER_VERSION = "controlled-answer-renderer/1";
@@ -56,6 +56,15 @@ if (input.evidence_catalog_hash !== undefined && !HEX64.test(input.evidence_cata
   throw new Error("evidence_catalog_hash must be a SHA-256 hex digest");
 }
 
+// The catalog hash is computed here from the supplied evidence, never echoed
+// from the caller: the gateway compares this value with the hash it built
+// over the catalog it actually admitted, so a divergent runner cannot satisfy
+// the binding check.
+const evidenceCatalogHash = createHash("sha256").update(canonicalize(input.evidence), "utf8").digest("hex");
+if (input.evidence_catalog_hash !== undefined && input.evidence_catalog_hash !== evidenceCatalogHash) {
+  throw new Error("evidence_catalog_hash does not match the supplied evidence");
+}
+
 const result = gateAnswer({
   claims: input.claims,
   evidence: input.evidence,
@@ -72,7 +81,7 @@ const answer = finalClaims.map((entry) => entry.text).filter(Boolean);
 const receipt = {
   ...result.receipt,
   publication_hash: input.publication_hash ?? result.receipt?.publication_hash ?? null,
-  evidence_catalog_hash: input.evidence_catalog_hash ?? null,
+  evidence_catalog_hash: evidenceCatalogHash,
   renderer_version: RENDERER_VERSION,
   answer_sha256: hash(answer),
 };
