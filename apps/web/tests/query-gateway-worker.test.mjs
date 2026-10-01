@@ -266,6 +266,7 @@ test("Worker answer gate host fails closed on a refused or partially indexed val
       stable_id: "ITEM-1",
       title: "交通管制提前至 16:00",
       source_id: "S-009",
+      source_role: "PRIMARY_OFFICIAL",
       official_url: "https://example.gov.tw/traffic/notice-1",
       content_sha256: "e".repeat(64),
       trust_tier: "CANONICAL_PUBLICATION",
