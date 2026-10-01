@@ -73,6 +73,7 @@ MCP_TOOLS = [
             "additionalProperties": False,
             "properties": {
                 "q": {"type": "string", "maxLength": 512},
+                "canonical_id": {"type": "string", "maxLength": 256},
                 "source_id": {"type": "string", "maxLength": 64},
                 "change_type": {"type": "string", "maxLength": 64},
                 "limit": {"type": "integer", "minimum": 1, "maximum": 100},
@@ -657,6 +658,9 @@ class QueryGateway:
                 source.get("source_health") == "PASS"
                 and source.get("window_completeness") in {"COMPLETE_ZERO", "COMPLETE_WITH_ITEMS"}
                 and freshness in {"FRESH", "RECENT"}
+                # The projected status already resolved the item/source freshness
+                # fallback, so the label on the row and this decision cannot drift.
+                and item["verification_status"] == "VERIFIED"
             )
             canonical_id = item["canonical_id"]
             official_url = item.get("official_url")
@@ -671,7 +675,9 @@ class QueryGateway:
                 "document_version": item["content_sha256"],
                 "content_sha256": item["content_sha256"],
                 "trust_tier": item["trust_tier"],
-                "verification_status": "CONFIRMED_OFFICIAL",
+                # Mirror the projected status: a stale publication item is never
+                # confirmed-official evidence for the answer gate.
+                "verification_status": item["verification_status"],
                 "freshness": freshness,
                 "is_current": current,
                 "published_at": item.get("published_at") or item.get("data_as_of") or item.get("fetched_at"),
@@ -812,7 +818,7 @@ class QueryGateway:
         if not isinstance(arguments, dict):
             raise GatewayError("INVALID_ARGUMENTS", "arguments must be an object")
         allowed = {
-            "search_evidence": {"q", "source_id", "change_type", "limit", "cursor", "expected_generation"},
+            "search_evidence": {"q", "canonical_id", "source_id", "change_type", "limit", "cursor", "expected_generation"},
             "get_current_brief": set(),
             "get_publication_receipt": set(),
             "get_source_health": {"source_id"},
@@ -909,6 +915,7 @@ class QueryGateway:
                 return self._envelope(
                     tool, args, scope,
                     {"event_ids": [event_id], "evidence_ids": evidence_ids, "event": event,
+                     **query_domain.trust_tier_counts([event]),
                      "domain_query_generation_id": store["generation_id"]},
                     result_count=1, result_type="public_event",
                 )
@@ -926,7 +933,9 @@ class QueryGateway:
         scope = self._domain_scope(store, now)
         return self._envelope(
             tool, args, scope,
-            {"event_ids": [event_id], "comparison": comparison, "domain_query_generation_id": store["generation_id"]},
+            {"event_ids": [event_id], "comparison": comparison,
+             **query_domain.trust_tier_counts([comparison]),
+             "domain_query_generation_id": store["generation_id"]},
             result_count=1, result_type="event_comparison",
         )
 

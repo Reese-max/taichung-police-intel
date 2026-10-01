@@ -27,6 +27,9 @@ class SourcePolicyTests(unittest.TestCase):
             source_id: {
                 "source_health": "PASS",
                 "window_completeness": "COMPLETE_WITH_ITEMS",
+                # A run that reported anything else is incomplete scope, so
+                # coverage cannot license a bounded no-match on it.
+                "result": "NEW_ITEMS",
                 "freshness": "RECENT",
             }
             for source_id in policy["active_source_ids"]
@@ -143,6 +146,15 @@ class SourcePolicyTests(unittest.TestCase):
         self.assertEqual(degraded["status"], "PARTIAL")
         self.assertIn(removed, degraded["missing_required_sources"])
         self.assertFalse(degraded["can_state_bounded_no_match"])
+
+    def test_partial_run_result_cannot_license_a_bounded_no_match(self):
+        states = self.good_states()
+        target = self.baseline["active_source_ids"][0]
+        states[target]["result"] = "PARTIAL"
+        result = sp.assess_query(self.baseline, "publication_metadata", states)
+        self.assertEqual(result["status"], "PARTIAL")
+        self.assertIn(target, result["missing_required_sources"])
+        self.assertFalse(result["can_state_bounded_no_match"])
 
     def test_retirement_requires_explicit_receipt(self):
         retired_catalog = copy.deepcopy(self.catalog)
