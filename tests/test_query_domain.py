@@ -122,6 +122,24 @@ class QueryDomainTests(unittest.TestCase):
             "PE-VERIFIED": "VERIFIED",
         })
 
+    def test_lkg_flagged_event_is_not_reported_verified(self):
+        lkg_event = event("PE-LKG", status="CONFIRMED")
+        lkg_event["lkg"] = True
+        store = domain.build_event_store([lkg_event])
+        result = domain.query_events(store, {"limit": 10})
+        self.assertEqual(result["results"][0]["trust_tier"], "STALE")
+
+    def test_discovery_unverified_count_covers_the_full_match_set(self):
+        store = domain.build_event_store([
+            event("PE-OK", status="CONFIRMED"),
+            event("PE-C1", status="CANDIDATE"),
+            event("PE-C2", status="CANDIDATE"),
+        ])
+        result = domain.query_events(store, {"limit": 1})
+        self.assertEqual(result["result_count"], 1)
+        self.assertEqual(result["total_matches"], 3)
+        self.assertEqual(result["discovery_unverified_count"], 2)
+
     def test_statistics_store_is_typed_and_period_bound(self):
         store = domain.build_statistics_store([statistic("STAT-2", "2026-09"), statistic("STAT-1", "2026-08", provisional=True)])
         result = domain.query_statistics(store, {"dataset_id": "NPA-STAT-1", "period_from": "2026-08", "period_to": "2026-08", "limit": 10})

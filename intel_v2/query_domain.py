@@ -40,6 +40,7 @@ def event_trust_tier(event: dict[str, Any]) -> str:
     if fusion_status == "CONFLICT" or event.get("verification_status") in {"CONFLICT", "CONFLICTING"}:
         return "CONFLICT"
     if (fusion_status == "PARTIAL_LKG"
+            or event.get("lkg") is True
             or event.get("freshness_status") in {"STALE", "VERY_STALE"}
             or event.get("verification_status") in {"STALE", "VERY_STALE"}):
         return "STALE"
@@ -503,7 +504,11 @@ def query_events(store: dict[str, Any], arguments: dict[str, Any]) -> dict[str, 
         cursor=arguments.get("cursor"),
         now=lambda row: (-_event_start(row).timestamp(), row["public_event_id"]),
     )
-    return {"query_generation_id": store["generation_id"], **page}
+    return {
+        "query_generation_id": store["generation_id"],
+        "discovery_unverified_count": sum(1 for row in matches if row["trust_tier"] == "DISCOVERY_UNVERIFIED"),
+        **page,
+    }
 
 
 def get_event(store: dict[str, Any], event_id: str) -> dict[str, Any]:

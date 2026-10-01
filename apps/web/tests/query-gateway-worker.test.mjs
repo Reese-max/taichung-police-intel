@@ -76,3 +76,74 @@ test("Worker search applies q and preserves official evidence and publication bi
     globalThis.fetch = originalFetch;
   }
 });
+
+test("Worker rejects a cursor offset beyond the filtered result set", async () => {
+  const originalFetch = globalThis.fetch;
+  const bytes = Object.fromEntries(await Promise.all(
+    ["intelligence-feed.json", "source-status.json", "v2-daily-brief.json", "source-policy.json"]
+      .map(async name => [name, await readFile(new URL(name, base))]),
+  ));
+  globalThis.fetch = async url => {
+    const name = new URL(url).pathname.split("/").at(-1);
+    return new Response(bytes[name], { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+  const query = async (tool, args) => {
+    const response = await worker.fetch(new Request(endpoint, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tool, arguments: args }),
+    }), env);
+    return { status: response.status, body: await response.json() };
+  };
+  try {
+    const publication = (await query("get_publication_receipt", {})).body;
+    const generation = publication.publication_receipt.generation_id;
+    const all = (await query("search_evidence", { limit: 1 })).body;
+    const filterHash = createHash("sha256").update("[null,null,null,null]").digest("hex");
+    const cursor = Buffer.from(JSON.stringify({ generation, filters: filterHash, offset: all.total_matches + 1 }))
+      .toString("base64").replace(/\+/g, "-").replace(/\//g, "_");
+    const paged = await query("search_evidence", { cursor, limit: 8 });
+    assert.equal(paged.status, 400);
+    assert.equal(paged.body.error.code, "INVALID_ARGUMENTS");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("Worker serves the last good snapshot when a rebuild fails", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalNow = Date.now;
+  const bytes = Object.fromEntries(await Promise.all(
+    ["intelligence-feed.json", "source-status.json", "v2-daily-brief.json", "source-policy.json"]
+      .map(async name => [name, await readFile(new URL(name, base))]),
+  ));
+  const query = async (instance, args) => {
+    const response = await instance.fetch(new Request(endpoint, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tool: "search_evidence", arguments: args }),
+    }), env);
+    return { status: response.status, body: await response.json() };
+  };
+  try {
+    const healthy = (await import("../../../workers/query-gateway/src/index.js?snapshot-fallback")).default;
+    globalThis.fetch = async url => {
+      const name = new URL(url).pathname.split("/").at(-1);
+      return new Response(bytes[name], { status: 200, headers: { "Content-Type": "application/json" } });
+    };
+    const first = await query(healthy, { limit: 1 });
+    assert.equal(first.status, 200);
+
+    globalThis.fetch = async () => new Response("upstream", { status: 503 });
+    Date.now = () => originalNow() + 31_000;
+    const degraded = await query(healthy, { limit: 1 });
+    assert.equal(degraded.status, 200);
+    assert.equal(degraded.body.query_generation_id, first.body.query_generation_id);
+
+    const cold = (await import("../../../workers/query-gateway/src/index.js?snapshot-cold-failure")).default;
+    const unavailable = await query(cold, { limit: 1 });
+    assert.equal(unavailable.status, 503);
+    assert.equal(unavailable.body.error.code, "UPSTREAM_UNAVAILABLE");
+  } finally {
+    globalThis.fetch = originalFetch;
+    Date.now = originalNow;
+  }
+});

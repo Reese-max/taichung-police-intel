@@ -16,6 +16,7 @@ const RETENTION_POLICY = {
 const MAX_RATE = 60;
 const rateWindows = new Map();
 let snapshotCache = null;
+let snapshotBuild = null;
 
 const CAPABILITY_DEFINITIONS = [
   ["publication_metadata", "只代表 policy 中已啟用來源，不代表世界完整性。", () => true],
@@ -216,9 +217,19 @@ async function buildSnapshot(env) {
 async function getSnapshot(env) {
   const now = Date.now();
   if (snapshotCache && snapshotCache.expiresAt > now) return snapshotCache.value;
-  const value = buildSnapshot(env);
-  snapshotCache = { value, expiresAt: now + 30_000 };
-  try { return await value; } catch (error) { snapshotCache = null; throw error; }
+  // Concurrent requests share one in-flight rebuild, so a failure degrades every
+  // waiter to the same last usable snapshot instead of racing the cache write.
+  if (!snapshotBuild) snapshotBuild = buildSnapshot(env).finally(() => { snapshotBuild = null; });
+  try {
+    const value = await snapshotBuild;
+    snapshotCache = { value, expiresAt: Date.now() + 30_000 };
+    return value;
+  } catch (error) {
+    // A failed rebuild must not drop the last usable projection; assessScope still
+    // reports its stale/degraded state on every response built from it.
+    if (snapshotCache) return snapshotCache.value;
+    throw error;
+  }
 }
 
 function assessScope(snapshot, sourceId, now = Date.now()) {
@@ -303,6 +314,7 @@ async function queryStore(snapshot, { q: text = null, canonical_id: canonicalId 
   const selected = snapshot.items.filter((row) => (!canonicalId || row.canonical_id === canonicalId) && (!sourceId || row.source_id === sourceId) && (!changeType || row.change_type === changeType) &&
     (!needle || [row.title, row.committee, row.source_id, row.canonical_id].map((value) => String(value || "")).join(" ").toLocaleLowerCase().includes(needle)));
   selected.sort((a, b) => (parseInstant(b.published_at) || -Infinity) - (parseInstant(a.published_at) || -Infinity) || a.canonical_id.localeCompare(b.canonical_id));
+  if (offset > selected.length) throw new GatewayError("INVALID_ARGUMENTS", "cursor offset exceeds result set");
   const result = selected.slice(offset, offset + limit);
   const nextCursor = offset + result.length < selected.length
     ? btoa(JSON.stringify({ generation: snapshot.generationId, filters: filterHash, offset: offset + result.length })).replace(/\+/g, "-").replace(/\//g, "_")

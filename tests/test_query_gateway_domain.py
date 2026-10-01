@@ -104,8 +104,11 @@ class QueryGatewayDomainTests(unittest.TestCase):
         candidate = event()
         candidate["public_event_id"] = "PE-DOMAIN-CANDIDATE"
         candidate["fusion_status"] = "CANDIDATE"
+        second = event()
+        second["public_event_id"] = "PE-DOMAIN-CANDIDATE-2"
+        second["fusion_status"] = "CANDIDATE"
         snapshot = gateway_module.load_snapshot()
-        snapshot["event_store"] = gateway_module.query_domain.build_event_store([event(), candidate])
+        snapshot["event_store"] = gateway_module.query_domain.build_event_store([event(), candidate, second])
         gateway = gateway_module.QueryGateway(
             snapshot=snapshot,
             clock=lambda: datetime(2026, 9, 21, 9, 0, tzinfo=timezone.utc),
@@ -113,7 +116,12 @@ class QueryGatewayDomainTests(unittest.TestCase):
         result = gateway.execute("search_events", {"limit": 10})
         tiers = {row["public_event_id"]: row["trust_tier"] for row in result["events"]}
         self.assertEqual(tiers["PE-DOMAIN-CANDIDATE"], "DISCOVERY_UNVERIFIED")
-        self.assertEqual(result["discovery_unverified_count"], 1)
+        self.assertEqual(result["discovery_unverified_count"], 2)
+
+        # The count covers the whole matched set, not just the returned page.
+        paged = gateway.execute("search_events", {"limit": 1})
+        self.assertEqual(paged["result_count"], 1)
+        self.assertEqual(paged["discovery_unverified_count"], 2)
 
     def test_date_only_event_bounds_resolve_in_requested_timezone(self):
         query = self.gateway.execute("search_events", {

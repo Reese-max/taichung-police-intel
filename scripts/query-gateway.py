@@ -891,9 +891,6 @@ class QueryGateway:
             event_ids = [row["public_event_id"] for row in result["results"]]
             payload = {
                 "event_ids": event_ids, "events": result["results"],
-                "discovery_unverified_count": sum(
-                    row.get("trust_tier") == "DISCOVERY_UNVERIFIED" for row in result["results"]
-                ),
                 **{key: value for key, value in result.items() if key != "results"},
                 "domain_query_generation_id": result["query_generation_id"],
             }
