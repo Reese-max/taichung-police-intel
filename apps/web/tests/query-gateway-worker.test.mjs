@@ -10,6 +10,27 @@ const endpoint = "https://govintel-query-gateway.example/query";
 const mcpEndpoint = "https://govintel-query-gateway.example/mcp";
 const env = { PUBLIC_ORIGIN: origin, ALLOWED_ORIGINS: "https://reese-max.github.io" };
 
+// This test must run before any test that warms the worker's snapshot cache:
+// once a snapshot is cached, fetch is never consulted again in this file.
+test("Worker does not leak upstream failure details to clients", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response("upstream exploded", { status: 500 });
+  try {
+    const response = await worker.fetch(new Request(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Origin": "https://reese-max.github.io" },
+      body: JSON.stringify({ tool: "get_current_brief", arguments: {} }),
+    }), env);
+    assert.equal(response.status, 503);
+    const body = await response.json();
+    assert.equal(body.error.code, "UPSTREAM_UNAVAILABLE");
+    const serialized = JSON.stringify(body);
+    assert.ok(!serialized.includes("intelligence-feed.json") && !serialized.includes("HTTP 500"), serialized);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("Worker search and answer gate share official evidence across /query and MCP", async () => {
   const originalFetch = globalThis.fetch;
   const bytes = Object.fromEntries(await Promise.all(

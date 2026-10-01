@@ -38,6 +38,7 @@ DEFAULT_QUERY_TIMEZONE = "Asia/Taipei"
 SOURCE_CATALOG = ROOT / "docs" / "govintel" / "source-catalog.v2.json"
 PUBLIC_EVIDENCE_SOURCE_STATUSES = frozenset({"PRODUCTION_ACTIVE", "AUDITED_EXISTING"})
 OFFICIAL_EVIDENCE_SOURCE_ROLES = frozenset({"PRIMARY_EVENT", "PRIMARY_REFERENCE"})
+ANSWER_VALIDATOR_VERSION = "answer-evidence-gate/3"
 
 _query_store_spec = importlib.util.spec_from_file_location("govintel_query_store", QUERY_STORE_PATH)
 if _query_store_spec is None or _query_store_spec.loader is None:
@@ -351,6 +352,8 @@ def _valid_fact_review(review: Any) -> bool:
 
 def approved_source_origins() -> dict[str, str]:
     catalog = json.loads(SOURCE_CATALOG.read_text(encoding="utf-8"))
+    if not isinstance(catalog, dict):
+        raise ValueError("approved source catalog shape is invalid")
     return {
         str(row["source_id"]): str(urlsplit(row["entrypoint"]).hostname)
         for row in catalog.get("sources", [])
@@ -743,10 +746,19 @@ class QueryGateway:
             raise GatewayError("GATE_UNAVAILABLE", "answer evidence gate runtime is unavailable", 503)
         evidence = self._trusted_evidence_catalog(self.store, self.clock())
         if self.located_facts is not None:
+            # Bundle admission happens once at load; the live catalog stays
+            # authoritative, so a source demoted after admission stops feeding
+            # the gate exactly like a feed row would.
+            try:
+                located_official = official_evidence_source_ids()
+            except (OSError, ValueError) as error:
+                raise GatewayError("GATE_FAILED", "official source catalog is unavailable", 503) from error
             document = self.located_facts["document_version"]
             facts = {fact["fact_id"]: fact for fact in self.located_facts["facts"]}
             for row in self.located_facts["evidence_catalog"]:
                 if row.get("verification_status") != "CONFIRMED_OFFICIAL":
+                    continue
+                if row["source_id"] not in located_official:
                     continue
                 fact = facts.get(row["fact_id"])
                 if fact is None:
@@ -811,6 +823,8 @@ class QueryGateway:
         receipt = output.get("receipt") if isinstance(output, dict) else None
         if not isinstance(receipt, dict) or receipt.get("publication_hash") != payload["publication_hash"] or receipt.get("evidence_catalog_hash") != catalog_hash:
             raise GatewayError("GATE_FAILED", "answer evidence receipt is not bound to this publication", 503)
+        if receipt.get("validator_version") != ANSWER_VALIDATOR_VERSION:
+            raise GatewayError("GATE_FAILED", "answer evidence validator version is not recognized", 503)
         return output
 
     def _envelope(

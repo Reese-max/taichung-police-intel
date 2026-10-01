@@ -464,7 +464,8 @@ async function dispatchMcp(snapshot, request) {
     const payload = await execute(snapshot, request.params.name, request.params.arguments);
     return { jsonrpc: "2.0", id: request.id, result: { isError: false, content: [{ type: "text", text: JSON.stringify(payload) }], structuredContent: payload } };
   } catch (error) {
-    const gatewayError = error instanceof GatewayError ? error : new GatewayError("INVALID_ARGUMENTS", String(error?.message || error));
+    if (!(error instanceof GatewayError)) console.error("mcp dispatch failed", error);
+    const gatewayError = error instanceof GatewayError ? error : new GatewayError("INVALID_ARGUMENTS", "request could not be processed");
     return { jsonrpc: "2.0", id: request.id, result: { isError: true, content: [{ type: "text", text: JSON.stringify(jsonError(gatewayError.code, gatewayError.message)) }] } };
   }
 }
@@ -517,7 +518,8 @@ export default {
       if (url.pathname === "/query") return responseJson(await execute(snapshot, input?.tool, input?.arguments), 200, request, env);
       return responseJson(await dispatchMcp(snapshot, input), 200, request, env);
     } catch (error) {
-      const gatewayError = error instanceof GatewayError ? error : new GatewayError("UPSTREAM_UNAVAILABLE", String(error?.message || error), 503);
+      if (!(error instanceof GatewayError)) console.error("gateway request failed", error);
+      const gatewayError = error instanceof GatewayError ? error : new GatewayError("UPSTREAM_UNAVAILABLE", "upstream publication is unavailable", 503);
       return responseJson(jsonError(gatewayError.code, gatewayError.message), gatewayError.status, request, env);
     }
   },
