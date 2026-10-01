@@ -284,7 +284,10 @@ function assessScope(snapshot, sourceId, now = Date.now()) {
   else if (stamps.some((stamp) => stamp > now)) gaps.push({ source_id: null, reason: "FUTURE_PUBLICATION_TIME" });
   else if (now - Math.min(...stamps) > MAX_SNAPSHOT_AGE_MS) gaps.push({ source_id: null, reason: "STALE_SNAPSHOT" });
   for (const source of selected) {
-    if (source.source_health !== "PASS" || !["COMPLETE_ZERO", "COMPLETE_WITH_ITEMS"].includes(source.window_completeness)) gaps.push({ source_id: source.source_id, reason: "SOURCE_INCOMPLETE", source_health: source.source_health });
+    // `result` is part of the incomplete-source determination exactly as in the
+    // Python store: a source that reported a partial run is not complete scope.
+    if (source.source_health !== "PASS" || !["COMPLETE_ZERO", "COMPLETE_WITH_ITEMS"].includes(source.window_completeness) ||
+        !["NEW_ITEMS", "NO_NEW_ITEM"].includes(source.result)) gaps.push({ source_id: source.source_id, reason: "SOURCE_INCOMPLETE", source_health: source.source_health });
     const freshnessValue = String(source.freshness_status || "UNKNOWN").toUpperCase();
     if (["STALE", "VERY_STALE"].includes(freshnessValue)) gaps.push({ source_id: source.source_id, reason: "STALE_SOURCE_DATA", freshness_status: freshnessValue });
     else if (!["FRESH", "RECENT"].includes(freshnessValue)) gaps.push({ source_id: source.source_id, reason: "UNKNOWN_SOURCE_FRESHNESS", freshness_status: freshnessValue });

@@ -300,6 +300,36 @@ test("Worker fails closed when a served publication body cannot be parsed", asyn
   }
 });
 
+test("Worker treats a partially collected source as incomplete scope", async () => {
+  const originalFetch = globalThis.fetch;
+  const bytes = Object.fromEntries(await Promise.all(
+    artifactNames.map(async name => [name, await readFile(new URL(name, base))]),
+  ));
+  const fresh = refreshedPublicationArtifacts(bytes);
+  const status = JSON.parse(fresh["source-status.json"].toString("utf8"));
+  // Healthy-looking except that the run itself reported a partial result.
+  status.sources[0].result = "PARTIAL";
+  globalThis.fetch = async url => {
+    const name = new URL(url).pathname.split("/").at(-1);
+    const content = name === "source-status.json" ? Buffer.from(JSON.stringify(status), "utf8") : fresh[name];
+    return new Response(content, { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+  try {
+    const instance = (await import("../../../workers/query-gateway/src/index.js?partial-result")).default;
+    const response = await instance.fetch(new Request(endpoint, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tool: "search_evidence", arguments: { q: "zzzz-govintel-no-match-20261001", limit: 1 } }),
+    }), env);
+    const body = await response.json();
+    assert.equal(response.status, 200);
+    assert.ok(body.source_gaps.some((gap) => gap.reason === "SOURCE_INCOMPLETE"), JSON.stringify(body.source_gaps));
+    assert.notEqual(body.freshness, "RECENT");
+    assert.equal(body.answerable_no_match, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("Worker inherits the source freshness for an item without its own", async () => {
   const originalFetch = globalThis.fetch;
   const bytes = Object.fromEntries(await Promise.all(
