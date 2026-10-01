@@ -244,3 +244,76 @@ test("Worker query and MCP answer routes share a server-controlled evidence gate
     globalThis.fetch = originalFetch;
   }
 });
+
+
+test("Worker answer gate host fails closed on a refused or partially indexed validation", async () => {
+  // The Worker is the deployed Web/MCP gate host; it must refuse a verdict the
+  // validator never actually reached instead of stamping the publication hash
+  // onto it and returning a normal 200 answer_evidence envelope.
+  const { validateAnswer } = await import("../../../workers/query-gateway/src/index.js");
+  const snapshot = {
+    brief: { generated_at: "2026-09-21T09:00:00Z" },
+    generatedFrom: { brief_sha256: "f".repeat(64) },
+    sources: [{
+      source_id: "S-009",
+      source_health: "PASS",
+      window_completeness: "COMPLETE_WITH_ITEMS",
+      freshness_status: "FRESH",
+      last_checked_at: "2026-09-21T08:00:00Z",
+    }],
+    items: [{
+      canonical_id: "ITEM-1",
+      stable_id: "ITEM-1",
+      title: "交通管制提前至 16:00",
+      source_id: "S-009",
+      official_url: "https://example.gov.tw/traffic/notice-1",
+      content_sha256: "e".repeat(64),
+      trust_tier: "CANONICAL_PUBLICATION",
+      published_at: "2026-09-21T07:00:00Z",
+    }],
+  };
+  const claim = {
+    schema_version: 1,
+    claim_id: "traffic-time",
+    text: "交通管制提前至 16:00",
+    claim_type: "TIME",
+    temporal_scope: "CURRENT",
+    proposition: { subject: "traffic:start", value: "16:00" },
+  };
+  // A refused verdict carries a full evidence count on purpose: the refusal
+  // alone must fail the request, independently of the coverage check.
+  await assert.rejects(
+    () => validateAnswer(snapshot, [claim], () => ({
+      gate_status: "BLOCKED",
+      final_claims: [],
+      removed_claims: [],
+      receipt: {
+        schema_version: 1, validator_version: "answer-evidence-gate/3", gate_status: "BLOCKED",
+        failure_reason: "DUPLICATE_EVIDENCE_ID", publication_hash: "f".repeat(64),
+        indexed_evidence_count: 1, claim_ids: [], evidence_ids: [], claims: [],
+      },
+    })),
+    (error) => {
+      assert.equal(error.code, "GATE_FAILED");
+      assert.equal(error.status, 503);
+      return true;
+    },
+  );
+
+  await assert.rejects(
+    () => validateAnswer(snapshot, [claim], () => ({
+      gate_status: "QUALIFIED",
+      final_claims: [],
+      removed_claims: [],
+      receipt: {
+        schema_version: 1, validator_version: "answer-evidence-gate/3", gate_status: "QUALIFIED",
+        publication_hash: "f".repeat(64), claim_ids: [], evidence_ids: [], indexed_evidence_count: 0, claims: [],
+      },
+    })),
+    (error) => {
+      assert.equal(error.code, "GATE_FAILED");
+      assert.equal(error.status, 503);
+      return true;
+    },
+  );
+});
