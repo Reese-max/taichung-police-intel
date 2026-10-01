@@ -672,7 +672,9 @@ class QueryGateway:
                 "document_version": item["content_sha256"],
                 "content_sha256": item["content_sha256"],
                 "trust_tier": item["trust_tier"],
-                "verification_status": "CONFIRMED_OFFICIAL",
+                # Mirror the projected status: a stale publication item is never
+                # confirmed-official evidence for the answer gate.
+                "verification_status": item["verification_status"],
                 "freshness": freshness,
                 "is_current": current,
                 "published_at": item.get("published_at") or item.get("data_as_of") or item.get("fetched_at"),

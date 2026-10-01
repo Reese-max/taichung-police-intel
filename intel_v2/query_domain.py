@@ -512,9 +512,17 @@ def query_events(store: dict[str, Any], arguments: dict[str, Any]) -> dict[str, 
         cursor=arguments.get("cursor"),
         now=lambda row: (-_event_start(row).timestamp(), row["public_event_id"]),
     )
+    # Tier counts cover the whole matched set, not just the returned page: a zero
+    # discovery count alone must not read as "every match is verified".
     return {
         "query_generation_id": store["generation_id"],
+        "trust_tier_counts": {
+            tier: sum(1 for row in matches if row["trust_tier"] == tier)
+            for tier in sorted(TRUST_TIERS)
+        },
         "discovery_unverified_count": sum(1 for row in matches if row["trust_tier"] == "DISCOVERY_UNVERIFIED"),
+        "conflict_count": sum(1 for row in matches if row["trust_tier"] == "CONFLICT"),
+        "stale_count": sum(1 for row in matches if row["trust_tier"] == "STALE"),
         **page,
     }
 

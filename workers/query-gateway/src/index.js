@@ -168,6 +168,17 @@ async function buildSnapshot(env) {
     fetchJson(origin, "v2-daily-brief.json"),
     fetchJson(origin, "source-policy.json"),
   ]);
+  // Everything past the fetch is an integrity question about the artifacts
+  // themselves.  Those failures must stay fail-closed instead of degrading to a
+  // previous generation that no longer describes the published run.
+  try {
+    return await buildSnapshotFromArtifacts({ feedDoc, statusDoc, briefDoc, policyDoc });
+  } catch (error) {
+    throw error instanceof SnapshotIntegrityError ? error : new SnapshotIntegrityError(String(error?.message || error));
+  }
+}
+
+async function buildSnapshotFromArtifacts({ feedDoc, statusDoc, briefDoc, policyDoc }) {
   const feed = feedDoc.value;
   const status = statusDoc.value;
   const brief = briefDoc.value;
@@ -196,7 +207,7 @@ async function buildSnapshot(env) {
     active_source_ids: active,
   };
   const artifactHashes = { feed: feedDoc.hash, status: statusDoc.hash, brief: briefDoc.hash };
-  const material = { schema_version: 2, projection_version: "publication-metadata-v2", artifact_hashes: artifactHashes, policy: policyBinding };
+  const material = { schema_version: 2, projection_version: "publication-metadata-v3", artifact_hashes: artifactHashes, policy: policyBinding };
   const generationId = await sha256(canonicalJson(material));
   const generatedFrom = {
     collection_run_id: run,
@@ -225,10 +236,13 @@ async function getSnapshot(env) {
     snapshotCache = { value, expiresAt: Date.now() + 30_000 };
     return value;
   } catch (error) {
-    // A failed rebuild must not drop the last usable projection; assessScope still
-    // reports its stale/degraded state on every response built from it.
-    if (snapshotCache) return snapshotCache.value;
-    throw error;
+    // Inconsistent artifacts are an integrity failure: serving the previous
+    // generation would answer with data that no longer matches the publication.
+    if (error instanceof SnapshotIntegrityError || !snapshotCache) throw error;
+    // An unreachable upstream must not drop the last usable projection, but the
+    // response has to say so instead of reading as a successful fresh rebuild.
+    console.warn("query-gateway: index rebuild failed; serving last usable snapshot", String(error?.message || error));
+    return { ...snapshotCache.value, degradedSince: snapshotCache.value.degradedSince || new Date().toISOString() };
   }
 }
 
@@ -237,6 +251,10 @@ function assessScope(snapshot, sourceId, now = Date.now()) {
   if (!selected.length) return { dataStatus: "SOURCE_NOT_AVAILABLE", gaps: [{ source_id: sourceId, reason: "NOT_IN_APPROVED_SNAPSHOT" }] };
   const gaps = [];
   const meta = snapshot.generatedFrom;
+  // A projection served after a failed rebuild is degraded even when the
+  // artifacts themselves are still young, so a zero-match query cannot be read
+  // as a current, complete answer.
+  if (snapshot.degradedSince) gaps.push({ source_id: null, reason: "INDEX_REBUILD_FAILED", since: snapshot.degradedSince });
   if (meta.collection_status !== "SUCCEEDED" || meta.publication_status !== "READY" || meta.snapshot_complete !== true) gaps.push({ source_id: null, reason: "INCOMPLETE_PUBLICATION" });
   const stamps = [meta.feed_generated_at, meta.status_generated_at, meta.brief_generated_at].map(parseInstant);
   if (stamps.some((stamp) => !Number.isFinite(stamp))) gaps.push({ source_id: null, reason: "UNKNOWN_PUBLICATION_TIME" });
@@ -324,7 +342,9 @@ async function queryStore(snapshot, { q: text = null, canonical_id: canonicalId 
     schema_version: 2, query_generation_id: snapshot.generationId,
     canonical_artifact_hashes: { feed: snapshot.generatedFrom.feed_sha256, status: snapshot.generatedFrom.status_sha256, brief: snapshot.generatedFrom.brief_sha256 },
     publication_deployment_verified: false, policy: snapshot.policyBinding,
-    query_coverage: queryCoverage(snapshot, "publication_metadata", { text, canonical_id: canonicalId, source_id: sourceId, change_type: changeType }),
+    query_coverage: queryCoverage(snapshot, "publication_metadata", Object.fromEntries(
+      Object.entries({ text, canonical_id: canonicalId, source_id: sourceId, change_type: changeType }).filter(([, value]) => value !== null && value !== undefined),
+    )),
     data_status: scope.dataStatus, source_gaps: scope.gaps,
     source_status: snapshot.sources.filter((source) => !sourceId || source.source_id === sourceId),
     answerable_no_match: selected.length === 0 && scope.gaps.length === 0,
@@ -350,7 +370,7 @@ function trustedEvidence(snapshot) {
     return {
       schema_version: 1, evidence_id: `PUB-${item.canonical_id}`, evidence_type: "WRITTEN_OFFICIAL", source_id: item.source_id,
       locator: `${item.official_url}#publication:${item.canonical_id}`, document_version: item.content_sha256, content_sha256: item.content_sha256,
-      trust_tier: item.trust_tier, verification_status: "CONFIRMED_OFFICIAL", freshness: freshnessValue, is_current: current,
+      trust_tier: item.trust_tier, verification_status: item.verification_status, freshness: freshnessValue, is_current: current,
       published_at: item.published_at || item.data_as_of || item.fetched_at,
       assertions: [
         { subject: `publication:${item.canonical_id}:title`, value: item.title },
@@ -445,6 +465,10 @@ class GatewayError extends Error {
   constructor(code, message, status = 400) { super(message); this.code = code; this.status = status; }
 }
 
+// Publication artifacts that are present but mutually inconsistent: the index
+// cannot be rebuilt, and answering from an older generation would hide it.
+class SnapshotIntegrityError extends Error {}
+
 function mcpTools() {
   const readonly = { readOnlyHint: true, openWorldHint: false, destructiveHint: false };
   return [
@@ -508,7 +532,7 @@ export default {
       const snapshot = await getSnapshot(env);
       if (request.method === "GET" && url.pathname === "/health") {
         const scope = assessScope(snapshot);
-        return responseJson({ schema_version: 1, service: "govintel-query-gateway", server_version: SERVER_VERSION, status: "ok", publication_freshness: freshness(scope.dataStatus), publication_id: snapshot.generatedFrom.collection_run_id, publication_hash: snapshot.generatedFrom.brief_sha256, query_coverage: queryCoverage(snapshot, "publication_metadata"), policy: snapshot.policyBinding, retention: RETENTION_POLICY, source_gaps: scope.gaps, read_only: true }, 200, request, env);
+        return responseJson({ schema_version: 1, service: "govintel-query-gateway", server_version: SERVER_VERSION, status: snapshot.degradedSince ? "degraded" : "ok", publication_freshness: freshness(scope.dataStatus), publication_id: snapshot.generatedFrom.collection_run_id, publication_hash: snapshot.generatedFrom.brief_sha256, query_coverage: queryCoverage(snapshot, "publication_metadata"), policy: snapshot.policyBinding, retention: RETENTION_POLICY, source_gaps: scope.gaps, read_only: true }, 200, request, env);
       }
       if (request.method === "GET" && url.pathname === "/capabilities") return responseJson({ schema_version: 1, server_version: SERVER_VERSION, read_only: true, capabilities: ["search_evidence", "get_current_brief", "get_publication_receipt", "get_source_health", "validate_answer"], unavailable_capabilities: DOMAIN_CAPABILITIES, policy: snapshot.policyBinding, retention: RETENTION_POLICY }, 200, request, env);
       if (request.method !== "POST" || !["/query", "/mcp"].includes(url.pathname)) return responseJson(jsonError("NOT_FOUND", "route not found"), 404, request, env);

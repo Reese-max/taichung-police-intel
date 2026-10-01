@@ -61,6 +61,9 @@ test("Worker search applies q and preserves official evidence and publication bi
     assert.equal(exact.results[0].canonical_ref.evidence_id, `PUB-${item.stable_id}`);
     assert.match(exact.results[0].canonical_ref.document_version_id, /^DOCV-[A-F0-9]{20}$/);
 
+    const unscoped = (await query("search_evidence", { limit: 1, expected_generation: generation })).body;
+    assert.deepEqual(Object.keys(unscoped.query_coverage.requested_scope), []);
+
     const noMatch = (await query("search_evidence", { q: noMatchTerm, limit: 8, expected_generation: generation })).body;
     assert.equal(noMatch.total_matches, 0);
     assert.equal(noMatch.result_count, 0);
@@ -137,6 +140,17 @@ test("Worker serves the last good snapshot when a rebuild fails", async () => {
     const degraded = await query(healthy, { limit: 1 });
     assert.equal(degraded.status, 200);
     assert.equal(degraded.body.query_generation_id, first.body.query_generation_id);
+    // Serving the last usable index must stay visibly degraded: an unlabelled
+    // stale projection would let a zero-match query read as a current answer.
+    assert.notEqual(degraded.body.data_status, "SNAPSHOT_RECENT");
+    assert.equal(degraded.body.freshness, "STALE");
+    assert.equal(degraded.body.answerable_no_match, false);
+    assert.ok(degraded.body.source_gaps.some((gap) => gap.reason === "INDEX_REBUILD_FAILED"), JSON.stringify(degraded.body.source_gaps));
+
+    const health = await healthy.fetch(new Request("https://govintel-query-gateway.example/health"), env);
+    const healthBody = await health.json();
+    assert.equal(health.status, 200);
+    assert.equal(healthBody.status, "degraded");
 
     const cold = (await import("../../../workers/query-gateway/src/index.js?snapshot-cold-failure")).default;
     const unavailable = await query(cold, { limit: 1 });
@@ -145,5 +159,88 @@ test("Worker serves the last good snapshot when a rebuild fails", async () => {
   } finally {
     globalThis.fetch = originalFetch;
     Date.now = originalNow;
+  }
+});
+
+test("Worker fails closed instead of serving a superseded generation", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalNow = Date.now;
+  const bytes = Object.fromEntries(await Promise.all(
+    ["intelligence-feed.json", "source-status.json", "v2-daily-brief.json", "source-policy.json"]
+      .map(async name => [name, await readFile(new URL(name, base))]),
+  ));
+  const serve = table => async url => {
+    const name = new URL(url).pathname.split("/").at(-1);
+    return new Response(table[name], { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+  const query = async (instance, args) => {
+    const response = await instance.fetch(new Request(endpoint, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tool: "search_evidence", arguments: args }),
+    }), env);
+    return { status: response.status, body: await response.json() };
+  };
+  try {
+    const instance = (await import("../../../workers/query-gateway/src/index.js?integrity-fallback")).default;
+    globalThis.fetch = serve(bytes);
+    const first = await query(instance, { limit: 1 });
+    assert.equal(first.status, 200);
+
+    // Artifacts that no longer describe one collection run are an integrity
+    // failure, not an upstream outage: the previous generation must not answer.
+    const brief = JSON.parse(bytes["v2-daily-brief.json"].toString("utf8"));
+    brief.source_collection_run_id = `${brief.source_collection_run_id}-SUPERSEDED`;
+    globalThis.fetch = serve({ ...bytes, "v2-daily-brief.json": Buffer.from(JSON.stringify(brief), "utf8") });
+    Date.now = () => originalNow() + 31_000;
+    const rejected = await query(instance, { limit: 1 });
+    assert.equal(rejected.status, 503);
+    assert.equal(rejected.body.error.code, "UPSTREAM_UNAVAILABLE");
+    assert.match(rejected.body.error.message, /cross-generation publication artifacts/);
+    assert.equal(rejected.body.query_generation_id, undefined);
+  } finally {
+    globalThis.fetch = originalFetch;
+    Date.now = originalNow;
+  }
+});
+
+test("Worker never reports a stale publication item as current official evidence", async () => {
+  const originalFetch = globalThis.fetch;
+  const bytes = Object.fromEntries(await Promise.all(
+    ["intelligence-feed.json", "source-status.json", "v2-daily-brief.json", "source-policy.json"]
+      .map(async name => [name, await readFile(new URL(name, base))]),
+  ));
+  const call = async (instance, tool, args) => {
+    const response = await instance.fetch(new Request(endpoint, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tool, arguments: args }),
+    }), env);
+    return { status: response.status, body: await response.json() };
+  };
+  try {
+    const feed = JSON.parse(bytes["intelligence-feed.json"].toString("utf8"));
+    const item = feed.items.find(row => row.stable_id && row.official_url?.startsWith("https://"));
+    assert.ok(item, "fixture needs an official evidence locator");
+    feed.items = feed.items.map(row => (row.stable_id === item.stable_id ? { ...row, freshness_status: "STALE" } : row));
+    globalThis.fetch = async url => {
+      const name = new URL(url).pathname.split("/").at(-1);
+      const content = name === "intelligence-feed.json" ? Buffer.from(JSON.stringify(feed), "utf8") : bytes[name];
+      return new Response(content, { status: 200, headers: { "Content-Type": "application/json" } });
+    };
+    const instance = (await import("../../../workers/query-gateway/src/index.js?stale-evidence")).default;
+    const exact = await call(instance, "search_evidence", { canonical_id: item.stable_id, limit: 5 });
+    assert.equal(exact.body.result_count, 1);
+    assert.equal(exact.body.results[0].verification_status, "STALE");
+
+    const gated = await call(instance, "validate_answer", {
+      claims: [{
+        claim_id: "CLM-STALE", claim_type: "STATUS", temporal_scope: "CURRENT",
+        proposition: { subject: `publication:${item.stable_id}:title`, value: item.title },
+        cited_evidence_ids: [`PUB-${item.stable_id}`],
+      }],
+    });
+    assert.equal(gated.status, 200);
+    assert.notEqual(gated.body.final_claims[0].support_status, "SUPPORTED");
+  } finally {
+    globalThis.fetch = originalFetch;
   }
 });

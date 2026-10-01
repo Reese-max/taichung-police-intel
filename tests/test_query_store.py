@@ -56,6 +56,15 @@ class QueryStoreTests(unittest.TestCase):
         self.assertTrue(all(row["source_id"] == "S-004" for row in result["results"]))
         self.assertEqual(result["truncated"], result["total_matches"] > result["result_count"])
 
+    def test_store_saved_by_a_superseded_projection_is_refused(self):
+        store = qs.build_from_paths(qs.DEFAULT_FEED, qs.DEFAULT_STATUS, qs.DEFAULT_BRIEF)
+        self.assertEqual(store["projection_version"], qs.PROJECTION_VERSION)
+        legacy = dict(store, projection_version="publication-metadata-v2")
+        # Rows projected by an older version lack the document/evidence locators,
+        # so a saved store must fail closed instead of answering from it.
+        with self.assertRaises(ValueError):
+            qs.validate_store(legacy)
+
     def test_exact_canonical_id_lookup_is_strict(self):
         store = qs.build_from_paths(qs.DEFAULT_FEED, qs.DEFAULT_STATUS, qs.DEFAULT_BRIEF)
         canonical_id = store["items"][0]["canonical_id"]
