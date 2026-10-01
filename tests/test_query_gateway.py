@@ -1,9 +1,11 @@
 import importlib.util
 import json
 import os
+import subprocess
 from datetime import datetime, timezone
 from threading import Thread
 import tempfile
+from unittest import mock
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 import unittest
@@ -405,6 +407,59 @@ class QueryGatewayTests(unittest.TestCase):
         )
         self.assertEqual(bad_status, 400)
         self.assertEqual(bad["error"]["code"], "INVALID_ARGUMENTS")
+
+    def _gate_output(self, receipt_extra, gate_status="BLOCKED"):
+        publication_hash = self.gateway.store["generated_from"]["brief_sha256"]
+        catalog = self.gateway._trusted_evidence_catalog(self.gateway.store, self.gateway.clock())
+        return json.dumps({
+            "schema_version": 1,
+            "gate_status": gate_status,
+            "final_claims": [],
+            "answer": [],
+            "receipt": {
+                "schema_version": 1,
+                "validator_version": "answer-evidence-gate/3",
+                "gate_status": gate_status,
+                "publication_hash": publication_hash,
+                "evidence_catalog_hash": gateway_module._json_hash(catalog),
+                "claim_ids": [],
+                "evidence_ids": [],
+                "claims": [],
+                **receipt_extra,
+            },
+        })
+
+    def test_answer_gate_refuses_a_receipt_the_validator_never_produced(self):
+        cases = {
+            "refused": self._gate_output({"failure_reason": "DUPLICATE_EVIDENCE_ID"}),
+            "partial": self._gate_output({"indexed_evidence_count": 0}, gate_status="QUALIFIED"),
+        }
+        for label, stdout in cases.items():
+            completed = subprocess.CompletedProcess(
+                args=["node"], returncode=0, stdout=stdout, stderr="",
+            )
+            with mock.patch.object(gateway_module.subprocess, "run", return_value=completed):
+                with self.assertRaises(gateway_module.GatewayError) as caught:
+                    self.gateway.execute("validate_answer", {"claims": [{
+                        "claim_type": "STATUS",
+                        "text": "官方文件標題",
+                        "proposition": {"subject": "a", "value": "b"},
+                    }]})
+            self.assertEqual(caught.exception.code, "GATE_FAILED", label)
+            self.assertEqual(caught.exception.status, 503, label)
+
+    def test_answer_gate_accepts_a_fully_indexed_bound_receipt(self):
+        catalog = self.gateway._trusted_evidence_catalog(self.gateway.store, self.gateway.clock())
+        completed = subprocess.CompletedProcess(
+            args=["node"],
+            returncode=0,
+            stdout=self._gate_output({"indexed_evidence_count": len(catalog)}, gate_status="PASS"),
+            stderr="",
+        )
+        with mock.patch.object(gateway_module.subprocess, "run", return_value=completed):
+            output = self.gateway._run_answer_gate([{"claim_type": "STATUS", "text": "t", "proposition": {"subject": "a", "value": "b"}}])
+        self.assertEqual(output["gate_status"], "PASS")
+        self.assertEqual(output["receipt"]["indexed_evidence_count"], len(catalog))
 
     def test_located_facts_enter_gate_only_after_server_side_confirmation(self):
         snapshot = gateway_module.load_snapshot()

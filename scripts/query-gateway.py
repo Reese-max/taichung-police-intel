@@ -750,6 +750,13 @@ class QueryGateway:
         receipt = output.get("receipt") if isinstance(output, dict) else None
         if not isinstance(receipt, dict) or receipt.get("publication_hash") != payload["publication_hash"] or receipt.get("evidence_catalog_hash") != catalog_hash:
             raise GatewayError("GATE_FAILED", "answer evidence receipt is not bound to this publication", 503)
+        # The runner echoes this request's hashes onto whatever receipt it gets,
+        # so the binding check above cannot distinguish a verdict the validator
+        # produced from one it refused or could not fully evaluate.
+        if output.get("gate_status") == "BLOCKED":
+            raise GatewayError("GATE_FAILED", "answer evidence gate refused the draft", 503)
+        if receipt.get("indexed_evidence_count") != len(evidence):
+            raise GatewayError("GATE_FAILED", "answer evidence gate did not index the full evidence catalog", 503)
         return output
 
     def _envelope(

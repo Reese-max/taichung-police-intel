@@ -341,13 +341,22 @@ function trustedEvidence(snapshot) {
   }).sort((a, b) => a.evidence_id.localeCompare(b.evidence_id));
 }
 
-async function validateAnswer(snapshot, claims) {
+export async function validateAnswer(snapshot, claims, gate = gateAnswer) {
   const evidence = trustedEvidence(snapshot);
   const publicationHash = snapshot.generatedFrom.brief_sha256;
   const evidenceCatalogHash = await sha256(canonicalJson(evidence));
-  const result = gateAnswer({ claims, evidence, generated_at: snapshot.brief.generated_at });
-  const receipt = result.receipt;
+  const result = gate({ claims, evidence, generated_at: snapshot.brief.generated_at });
+  const receipt = result?.receipt;
+  // Same fail-closed admission as the Node/Python gate hosts: a refused verdict
+  // or a catalog the validator could not fully index is never stamped with this
+  // publication's hashes and never released as an answer_evidence envelope.
+  if (result?.gate_status === "BLOCKED") {
+    throw new GatewayError("GATE_FAILED", `answer evidence gate refused the draft: ${receipt?.failure_reason ?? "unknown"}`, 503);
+  }
   if (!receipt || typeof receipt !== "object") throw new GatewayError("GATE_FAILED", "answer evidence receipt is missing", 503);
+  if (receipt.indexed_evidence_count !== evidence.length) {
+    throw new GatewayError("GATE_FAILED", "answer evidence gate did not index the full evidence catalog", 503);
+  }
   const answer = (receipt.claims || []).map(controlledText).filter(Boolean);
   return {
     ...result,
