@@ -22,6 +22,7 @@ from intel_v2.handoff import (
     empty_state,
     find_handoff,
     handoff_markdown,
+    handoff_review_warnings,
     load_state,
     set_watch_status,
     sync_with_detail_rechecks,
@@ -149,14 +150,19 @@ def command_set_status(args: argparse.Namespace) -> int:
 def command_export(args: argparse.Namespace) -> int:
     state = load_state(args.handoff_state)
     handoff = find_handoff(state, args.brief_id)
+    warnings = handoff_review_warnings(state, handoff)
     if args.format == "json":
-        output = json.dumps(handoff, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+        payload = {"handoff": handoff, "review_warnings": warnings}
+        output = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     else:
-        output = handoff_markdown(handoff)
+        output = handoff_markdown(handoff, warnings)
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(output, encoding="utf-8")
-        print(f"HANDOFF_EXPORTED brief_id={handoff['brief_id']} output={args.output}")
+        print(
+            f"HANDOFF_EXPORTED brief_id={handoff['brief_id']} version={handoff['brief_version']} "
+            f"warnings={len(warnings)} output={args.output}"
+        )
     else:
         print(output, end="")
     return 0
@@ -234,6 +240,14 @@ def self_check() -> None:
     assert tracked["invalidations"][-1]["before"]["version"] == 1
     assert tracked["invalidations"][-1]["after"]["version"] == 2
 
+    warnings = handoff_review_warnings(state, first_handoff)
+    assert len(warnings) == 1
+    assert warnings[0]["confirmed_source_version"] == 1
+    assert warnings[0]["latest_source_version"] == 2
+    assert warnings[0]["evidence_locator"] == f"{identity}#v1"
+    assert "NEEDS_REVIEW" in handoff_markdown(first_handoff, warnings)
+    assert state["handoffs"][0] == first_handoff
+
     state, second_handoff = confirm_handoff(
         state,
         current_items={identity: second},
@@ -245,7 +259,11 @@ def self_check() -> None:
     assert second_handoff["items"][0]["source_version"] == 2
     assert second_handoff["items"][0]["evidence"]["locator"] == f"{identity}#v2"
     assert state["watch_items"][watch["watch_id"]]["status"] == "WATCHING"
-    print("HANDOFF_DEMO_OK cross_day=true invalidation=true versions=1->2 exact_locator=true")
+    assert handoff_review_warnings(state, first_handoff) == []
+    print(
+        "HANDOFF_DEMO_OK cross_day=true invalidation=true versions=1->2 "
+        "exact_locator=true export_warning=true"
+    )
 
 
 def parser() -> argparse.ArgumentParser:
