@@ -43,6 +43,9 @@ class NpaSourceInventoryTests(unittest.TestCase):
         self.assertGreater(canary["records"], 0)
         self.assertEqual(canary["parse_failures"], 0)
         self.assertEqual(canary["schema_drift"], 0)
+        stats = next(item for item in self.inventory["sources"] if item["inventory_id"] == "NPA-IMPORTANT-STATS")
+        self.assertIn("附件版本", stats["fields"])
+        self.assertIn("附件 SHA-256", stats["fields"])
 
     def test_invalid_excluded_row_cannot_become_public(self):
         broken = copy.deepcopy(self.inventory)
@@ -85,6 +88,27 @@ class NpaSourceInventoryTests(unittest.TestCase):
         self.assertEqual(records[0]["table_id"], "治安-01")
         self.assertIn("年度統計", records[0]["official_notes"])
         self.assertFalse(records[0]["realtime_allowed"])
+
+    def test_statistics_preserve_attachment_version_and_hash(self):
+        records = adapters.parse_important_statistics_rows(
+            [{
+                "統計期別": "2026-08",
+                "表號": "治安-01",
+                "機關別值": 12,
+                "官方註記": "初步統計",
+                "發布日": "2026-09-10",
+                "附件版本": "important-stats-2026-08-v1",
+                "附件 SHA-256": "a" * 64,
+            }],
+            observed_at="2026-09-21T09:00:00+08:00",
+        )
+        self.assertEqual(records[0]["attachment_version"], "important-stats-2026-08-v1")
+        self.assertEqual(records[0]["attachment_sha256"], "a" * 64)
+        with self.assertRaisesRegex(ValueError, "64-character hexadecimal"):
+            adapters.parse_important_statistics_rows(
+                [{"統計期別": "2026-08", "表號": "治安-01", "機關別值": 12, "附件 SHA-256": "not-a-hash"}],
+                observed_at="2026-09-21T09:00:00+08:00",
+            )
 
     def test_fraud_effectiveness_is_period_bound_reference_data(self):
         records = adapters.parse_fraud_effectiveness_rows(

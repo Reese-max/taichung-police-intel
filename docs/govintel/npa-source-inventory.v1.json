@@ -83,7 +83,7 @@
       "official_url": "https://www.npa.gov.tw/",
       "transport": "official metadata + ODS/structured attachment",
       "update_cadence": "PERIODIC_TABLE_RELEASE",
-      "fields": ["統計期別", "表號", "機關別", "數值", "官方註記"],
+      "fields": ["統計期別", "表號", "機關別", "數值", "官方註記", "附件版本", "附件 SHA-256"],
       "source_terms": "NPA_PUBLISHED_TERMS_REVIEW_REQUIRED",
       "contains_personal_data": false,
       "role": "PRIMARY_REFERENCE",

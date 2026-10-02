@@ -136,6 +136,17 @@ def parse_important_statistics_rows(
         value = row.get("value", row.get("數值", row.get("機關別值")))
         if value in (None, ""):
             raise ValueError("statistics row missing value")
+        attachment_version = _text(row, "attachment_version", "附件版本", "版本")
+        attachment_sha256 = _text(
+            row,
+            "attachment_sha256",
+            "附件 SHA-256",
+            "附件SHA256",
+            "附件 hash",
+            "附件雜湊",
+        )
+        if attachment_sha256 and not re.fullmatch(r"[0-9a-fA-F]{64}", attachment_sha256):
+            raise ValueError("attachment_sha256 must be a 64-character hexadecimal digest")
         result.append(
             {
                 "record_type": "REFERENCE_STATISTIC",
@@ -143,6 +154,8 @@ def parse_important_statistics_rows(
                 "table_id": table_id,
                 "period": period,
                 "published_at": _text(row, "published_at", "發布日"),
+                "attachment_version": attachment_version,
+                "attachment_sha256": attachment_sha256,
                 "value": value,
                 "official_notes": _text(row, "official_notes", "官方註記", "備註") or "",
                 "source_url": source_url,

@@ -34,7 +34,9 @@
       "表號": "治安-01",
       "機關別值": 12,
       "官方註記": "初步統計，正式數字以年度統計為準。",
-      "發布日": "2026-09-10"
+      "發布日": "2026-09-10",
+      "附件版本": "important-stats-2026-08-v1",
+      "附件 SHA-256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     }
   ],
   "fraud_effectiveness": [

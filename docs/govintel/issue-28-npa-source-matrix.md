@@ -7,7 +7,7 @@
 - Batch 1 的集會遊行、重要統計、反詐執行成效與 165 三類資料 fixture adapter；其中 172159 依官方 UTF-8 CSV schema 解析民國年／月、整數指標與來源版本 provenance，仍維持 `FIXTURE_ONLY`。
 - `S-036` 集會遊行與 `S-037` 警察機關地址的 catalog 綁定；兩者仍是 candidate，沒有 production collector 或部署宣稱。
 - 集會遊行的時間／路線／主管機關 identity 與 semantic-change receipt，並可和臺中交通公告 fixture 融合成一個 `PublicEvent`。
-- 重要統計保留 `period`、`table_id`、`value` 與官方註記；週統計、月報、年報與專題資料都標成 reference，不是即時事件。
+- 重要統計保留 `period`、`table_id`、`value`、官方註記、附件版本與 `attachment_sha256`；週統計、月報、年報與專題資料都標成 reference，不是即時事件。
 - 165 舊資料與 `CTX-165` 共用 `NPA-165-FAMILY`，同網域只計一次並保留 superseded 關係。
 - A1 CSV／JSON 共用 `NPA-A1-ACCIDENTS`；臺中 `S-034` 與全國 reference 以穩定事故 identity 合併，不新增第二個事件。
 - 個別失蹤人口、失竊車／車牌與失物個案明確阻擋在公開 canonical feed 外；只允許後續採用彙總統計。
