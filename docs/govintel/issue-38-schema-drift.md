@@ -7,6 +7,22 @@
 - `BREAKING_DRIFT`、`SOURCE_UNAVAILABLE` 與 `CONTENT_SHAPE_UNKNOWN` 不會產生完整窗口成功；`update_state` 保留 last-known-good 與 fingerprint history。
 - receipt 的 `review_inbox` 由既有 `intel_v2.review` 投影到 system health，不自動改 parser 或 production canonical data。
 
+## 只看「形狀」的契約指紋
+
+`observed_schema_fingerprint` 只描述觀察到的 schema，不描述資料量，因此來源正常新增資料時指紋不會漂移：
+
+- JSON/API 的 `pagination` 記錄的是 marker 的型別，不是 `totalPages` / `totalCount` 的數值。
+- `record_types` / `field_types` 記錄的是所有 row 實際觀察到的型別集合，不再只取第一筆。
+- HTML / RSS 以 `date_coverage` 分級（`ALL` / `PARTIAL` / `NONE` / `EMPTY`）取代 `n/m` 計數。
+- receipt 的每筆 source 另存 `fingerprint_signature`，讓 review 可以直接看到「觀察到什麼形狀」。
+
+## 逐列的 required field 與欄位數
+
+欄位集合只取所有 row 的聯集，原本會讓「部分 row 少一個 required 欄位」看起來正常：
+
+- JSON/API 與 data.gov JSON 只要有任何一列缺少 required 欄位，就是 `REQUIRED_FIELD_MISSING_IN_SOME_ROWS` / `MISSING_IN_SOME_ROWS_<field>` 的 `BREAKING_DRIFT`，不會退化成假零資料。
+- data.gov CSV 除了 header，還驗證每筆資料列的欄位數等於 header 欄位數；截斷列或未跳脫的引號造成欄位位移會產生 `ROW_COLUMN_COUNT_MISMATCH` 的 `BREAKING_DRIFT`。檔尾空白行不算資料列。
+
 驗證：
 
 ```bash

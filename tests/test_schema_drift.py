@@ -159,6 +159,125 @@ class SchemaDriftTests(unittest.TestCase):
         result = drift.observe(drift.CONTRACTS["CTX-165"], missing, content_type="text/csv", resource_id="r1")
         self.assertEqual(result["status"], "BREAKING_DRIFT")
 
+    def test_required_record_field_missing_from_only_some_rows_fails_closed(self):
+        partial = copy.deepcopy(API)
+        partial["data"]["data"].append({"proceedingsId": "p2", "date": "2026-09-11", "content": "無講者"})
+        result = drift.observe(drift.CONTRACTS["S-007"], json.dumps(partial), content_type="application/json")
+        self.assertEqual(result["status"], "BREAKING_DRIFT")
+        self.assertEqual(result["window_completeness"], "PARTIAL")
+        self.assertTrue(result["review_required"])
+        self.assertIn("REQUIRED_FIELD_MISSING_IN_SOME_ROWS", result["reasons"])
+        self.assertIn("MISSING_IN_SOME_ROWS_speaker", result["reasons"])
+
+    def test_data_gov_required_field_missing_from_only_some_rows_fails_closed(self):
+        rows = [
+            {"項目": "x", "欄位名稱": "y", "數值": "1", "資料時間日期": "2026-09-01", "資料週期": "月"},
+            {"項目": "z", "欄位名稱": "w", "資料時間日期": "2026-09-01", "資料週期": "月"},
+        ]
+        result = drift.observe(
+            drift.CONTRACTS["S-028"], json.dumps(rows), content_type="application/json", resource_id="r1"
+        )
+        self.assertEqual(result["status"], "BREAKING_DRIFT")
+        self.assertEqual(result["window_completeness"], "PARTIAL")
+        self.assertTrue(result["review_required"])
+        self.assertIn("REQUIRED_FIELD_MISSING_IN_SOME_ROWS", result["reasons"])
+        self.assertIn("MISSING_IN_SOME_ROWS_數值", result["reasons"])
+
+    def test_csv_row_column_count_drift_is_breaking(self):
+        header = "民國年月,網域,網站性質,法律依據,聲請單位\n"
+        truncated = drift.observe(
+            drift.CONTRACTS["CTX-165"], header + "11509,a.test\n", content_type="text/csv", resource_id="r1"
+        )
+        self.assertEqual(truncated["status"], "BREAKING_DRIFT")
+        self.assertEqual(truncated["window_completeness"], "PARTIAL")
+        self.assertTrue(truncated["review_required"])
+        self.assertIn("ROW_COLUMN_COUNT_MISMATCH", truncated["reasons"])
+
+        shifted = drift.observe(
+            drift.CONTRACTS["CTX-165"], header + '11509,"a,b,其他,法規,機關\n', content_type="text/csv", resource_id="r1"
+        )
+        self.assertEqual(shifted["status"], "BREAKING_DRIFT")
+        self.assertIn("ROW_COLUMN_COUNT_MISMATCH", shifted["reasons"])
+
+        unchanged = drift.observe(
+            drift.CONTRACTS["CTX-165"], header + "11509,a.test,其他,法規,機關\n", content_type="text/csv", resource_id="r1"
+        )
+        self.assertEqual(unchanged["status"], "NO_DRIFT")
+
+    def test_observed_schema_fingerprint_tracks_shape_not_data_volume(self):
+        def api_payload(total_pages: int, total_count: int) -> str:
+            return json.dumps({
+                "success": True,
+                "data": {
+                    "data": [{"proceedingsId": "p1", "date": "2026-09-10T00:00:00", "speaker": "甲", "content": "內容"}],
+                    "totalPages": total_pages,
+                    "totalCount": total_count,
+                },
+            })
+
+        one_page = drift.observe(drift.CONTRACTS["S-007"], api_payload(1, 1), content_type="application/json")
+        many_pages = drift.observe(drift.CONTRACTS["S-007"], api_payload(9, 812), content_type="application/json")
+        self.assertEqual(one_page["status"], "NO_DRIFT")
+        self.assertEqual(many_pages["status"], "NO_DRIFT")
+        self.assertEqual(one_page["observed_schema_fingerprint"], many_pages["observed_schema_fingerprint"])
+
+        list_url = "https://official.test/list"
+        one_item = drift.observe(
+            drift.CONTRACTS["S-001"],
+            '<li><a href="news_view.jsp?dataserno=1">新聞 115-09-10</a></li>',
+            content_type="text/html",
+            final_url=list_url,
+        )
+        two_items = drift.observe(
+            drift.CONTRACTS["S-001"],
+            '<li><a href="news_view.jsp?dataserno=1">新聞 115-09-10</a></li>'
+            '<li><a href="news_view.jsp?dataserno=2">新聞 115-09-11</a></li>',
+            content_type="text/html",
+            final_url=list_url,
+        )
+        self.assertEqual(one_item["status"], "NO_DRIFT")
+        self.assertEqual(two_items["status"], "NO_DRIFT")
+        self.assertEqual(one_item["observed_schema_fingerprint"], two_items["observed_schema_fingerprint"])
+
+        csv_one = "民國年月,網域,網站性質,法律依據,聲請單位\n11509,a.test,其他,法規,機關\n"
+        csv_many = csv_one + "11510,b.test,其他,法規,機關\n11511,c.test,其他,法規,機關\n"
+        self.assertEqual(
+            drift.observe(drift.CONTRACTS["CTX-165"], csv_one, content_type="text/csv", resource_id="r1")["observed_schema_fingerprint"],
+            drift.observe(drift.CONTRACTS["CTX-165"], csv_many, content_type="text/csv", resource_id="r1")["observed_schema_fingerprint"],
+        )
+
+        retyped = json.loads(api_payload(1, 1))
+        retyped["data"]["data"][0]["speaker"] = 7
+        drifted = drift.observe(drift.CONTRACTS["S-007"], json.dumps(retyped), content_type="application/json")
+        self.assertEqual(drifted["status"], "BREAKING_DRIFT")
+        self.assertNotEqual(drifted["observed_schema_fingerprint"], one_page["observed_schema_fingerprint"])
+
+    def test_observed_schema_fingerprint_reports_the_shape_it_observed(self):
+        def api_payload(speaker: object) -> str:
+            return json.dumps({
+                "success": True,
+                "data": {
+                    "data": [{"proceedingsId": "p1", "date": "2026-09-10T00:00:00", "speaker": speaker, "content": "內容"}],
+                    "totalPages": 1,
+                    "totalCount": 1,
+                },
+            })
+
+        expected = {
+            "transport": "JSON_API",
+            "record_fields": ["content", "date", "proceedingsId", "speaker"],
+            "record_types": {
+                "content": ["string"],
+                "date": ["string"],
+                "proceedingsId": ["string"],
+                "speaker": ["string"],
+            },
+            "pagination": {"data.totalCount": "integer", "data.totalPages": "integer"},
+        }
+        observed = drift.observe(drift.CONTRACTS["S-007"], api_payload("甲"), content_type="application/json")
+        self.assertEqual(json.loads(json.dumps(expected)), observed["fingerprint_signature"])
+        self.assertEqual(observed["observed_schema_fingerprint"], drift.canonical_hash(expected))
+
     def test_empty_resources_are_unknown_not_complete_zero(self):
         result = drift.observe(drift.CONTRACTS["S-028"], "[]", content_type="application/json", resource_id="r1")
         self.assertEqual(result["status"], "CONTENT_SHAPE_UNKNOWN")

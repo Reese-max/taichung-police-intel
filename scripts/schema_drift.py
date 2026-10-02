@@ -29,6 +29,7 @@ VALID_STATUSES = {
 }
 GOOD_STATUSES = {"NO_DRIFT", "ADDITIVE_COMPATIBLE"}
 CONTRACT_VERSION = "1.0"
+MAX_ROW_REASONS = 10
 
 
 def _news(source_id: str, name: str, pattern: str, *, published_required: bool = True) -> dict[str, Any]:
@@ -233,6 +234,7 @@ def _base_result(contract: dict[str, Any], body: bytes, observed_at: str | None,
         "transport": contract["transport"],
         "parser_version": contract["parser_version"],
         "observed_schema_fingerprint": None,
+        "fingerprint_signature": None,
         "sample_sha256": sha256(body),
         "resource_id": meta.get("resource_id"),
         "resource_id_changed": False,
@@ -247,10 +249,37 @@ def _base_result(contract: dict[str, Any], body: bytes, observed_at: str | None,
     }
 
 
+def _signature(result: dict[str, Any], signature: Any) -> dict[str, Any]:
+    """Record the observed shape so the fingerprint never encodes data volume."""
+    result["fingerprint_signature"] = signature
+    result["observed_schema_fingerprint"] = canonical_hash(signature)
+    return result
+
+
+def _coverage_class(covered: int, total: int) -> str:
+    if not total:
+        return "EMPTY"
+    if covered == total:
+        return "ALL"
+    return "NONE" if covered == 0 else "PARTIAL"
+
+
+def _observed_types(records: list[dict[str, Any]], fields: list[str]) -> dict[str, list[str]]:
+    return {
+        field: sorted({type_name(record[field]) for record in records if field in record})
+        for field in fields
+    }
+
+
+def _partially_present_fields(records: list[dict[str, Any]], required: list[str]) -> list[str]:
+    """Required fields the union of keys still hides because only some rows carry them."""
+    return sorted(field for field in required if any(field not in record for record in records))
+
+
 def _finish(result: dict[str, Any], signature: Any, status: str, reasons: list[str]) -> dict[str, Any]:
     if status not in VALID_STATUSES:
         raise ValueError(f"invalid drift status: {status}")
-    result["observed_schema_fingerprint"] = canonical_hash(signature)
+    _signature(result, signature)
     result["status"] = status
     result["reasons"] = sorted(set(reasons))
     result["review_required"] = status in {"BREAKING_DRIFT", "CONTENT_SHAPE_UNKNOWN", "SOURCE_UNAVAILABLE"} or bool(result.get("resource_id_changed"))
@@ -349,7 +378,7 @@ def _observe_html(contract: dict[str, Any], body: bytes, result: dict[str, Any],
     except Exception as error:
         result["reasons"] = ["HTML_LIST_ID_OR_SELECTOR_FAILED", type(error).__name__.upper()]
         result["status"] = "BREAKING_DRIFT"
-        result["observed_schema_fingerprint"] = canonical_hash({"transport": "HTML", "parse": "failed"})
+        _signature(result, {"transport": "HTML", "parse": "failed"})
         result["review_required"] = True
         return result
     fields = sorted({key for entry in entries for key in entry})
@@ -357,7 +386,7 @@ def _observe_html(contract: dict[str, Any], body: bytes, result: dict[str, Any],
     signature = {
         "transport": contract["transport"],
         "entry_fields": fields,
-        "date_coverage": f"{date_coverage}/{len(entries)}",
+        "date_coverage": _coverage_class(date_coverage, len(entries)),
         "id_pattern": contract["id_pattern"],
     }
     reasons: list[str] = []
@@ -381,14 +410,14 @@ def _observe_rss(contract: dict[str, Any], body: bytes, result: dict[str, Any], 
     except Exception as error:
         result["reasons"] = ["RSS_LIST_SHAPE_FAILED", type(error).__name__.upper()]
         result["status"] = "BREAKING_DRIFT"
-        result["observed_schema_fingerprint"] = canonical_hash({"transport": "RSS", "parse": "failed"})
+        _signature(result, {"transport": "RSS", "parse": "failed"})
         result["review_required"] = True
         return result
     fields = sorted({key for entry in entries for key in entry})
     signature = {
         "transport": contract["transport"],
         "entry_fields": fields,
-        "date_coverage": f"{sum(entry.get('published') is not None for entry in entries)}/{len(entries)}",
+        "date_coverage": _coverage_class(sum(entry.get("published") is not None for entry in entries), len(entries)),
     }
     missing = set(contract["required_fields"]) - set(fields)
     return _finish(result, signature, "BREAKING_DRIFT" if missing else "NO_DRIFT", ["REQUIRED_FIELD_MISSING"] if missing else [])
@@ -404,14 +433,13 @@ def _observe_fire_live(contract: dict[str, Any], body: bytes, result: dict[str, 
     except Exception as error:
         result["reasons"] = ["HTML_LIVE_SHAPE_FAILED", type(error).__name__.upper()]
         result["status"] = "BREAKING_DRIFT"
-        result["observed_schema_fingerprint"] = canonical_hash({"transport": "HTML_LIVE", "parse": "failed"})
+        _signature(result, {"transport": "HTML_LIVE", "parse": "failed"})
         result["review_required"] = True
         return result
     fields = sorted({key for entry in entries for key in entry})
     signature = {
         "transport": contract["transport"],
         "entry_fields": fields,
-        "entry_count": len(entries),
     }
     missing = sorted(set(contract["required_fields"]) - set(fields))
     status = "BREAKING_DRIFT" if missing else "NO_DRIFT"
@@ -455,6 +483,14 @@ def _observe_json_api(contract: dict[str, Any], body: bytes, result: dict[str, A
     ]
     if missing_fields:
         return _finish(result, {"transport": contract["transport"], "record_fields": fields}, "BREAKING_DRIFT", ["REQUIRED_FIELD_MISSING", *[f"MISSING_{field}" for field in missing_fields]])
+    partial_fields = _partially_present_fields(records, contract["record_required_fields"])
+    if partial_fields:
+        return _finish(
+            result,
+            {"transport": contract["transport"], "record_fields": fields},
+            "BREAKING_DRIFT",
+            ["REQUIRED_FIELD_MISSING_IN_SOME_ROWS", *[f"MISSING_IN_SOME_ROWS_{field}" for field in partial_fields]],
+        )
     if wrong_record_types:
         return _finish(result, {"transport": contract["transport"], "record_fields": fields}, "BREAKING_DRIFT", ["TYPE_CHANGED", *[f"TYPE_{field}" for field in wrong_record_types]])
     extra = sorted(set(fields) - set(contract["record_required_fields"]))
@@ -463,8 +499,12 @@ def _observe_json_api(contract: dict[str, Any], body: bytes, result: dict[str, A
     signature = {
         "transport": contract["transport"],
         "record_fields": fields,
-        "record_types": {field: type_name(records[0].get(field)) for field in fields},
-        "pagination": {path: get_path(payload, path)[1] for path in contract["pagination_paths"]},
+        "record_types": _observed_types(records, fields),
+        "pagination": {
+            path: type_name(get_path(payload, path)[1])
+            for path in contract["pagination_paths"]
+            if get_path(payload, path)[0]
+        },
     }
     return _finish(result, signature, status, reasons)
 
@@ -488,13 +528,21 @@ def _observe_data_gov_json(contract: dict[str, Any], body: bytes, result: dict[s
     ]
     if missing:
         return _finish(result, {"transport": contract["transport"], "record_fields": fields}, "BREAKING_DRIFT", ["REQUIRED_FIELD_MISSING", *[f"MISSING_{field}" for field in missing]])
+    partial_fields = _partially_present_fields(payload, contract["required_fields"])
+    if partial_fields:
+        return _finish(
+            result,
+            {"transport": contract["transport"], "record_fields": fields},
+            "BREAKING_DRIFT",
+            ["REQUIRED_FIELD_MISSING_IN_SOME_ROWS", *[f"MISSING_IN_SOME_ROWS_{field}" for field in partial_fields]],
+        )
     if wrong_types:
         return _finish(result, {"transport": contract["transport"], "record_fields": fields}, "BREAKING_DRIFT", ["TYPE_CHANGED", *[f"TYPE_{field}" for field in wrong_types]])
     extra = sorted(set(fields) - set(contract["required_fields"]))
     status = "ADDITIVE_COMPATIBLE" if extra else "NO_DRIFT"
     return _finish(
         result,
-        {"transport": contract["transport"], "record_fields": fields, "field_types": contract["field_types"]},
+        {"transport": contract["transport"], "record_fields": fields, "field_types": _observed_types(payload, fields)},
         status,
         ["ADDITIVE_FIELDS"] if extra else [],
     )
@@ -515,6 +563,19 @@ def _observe_data_gov_csv(contract: dict[str, Any], body: bytes, result: dict[st
         return _finish(result, {"transport": contract["transport"], "header": header}, "BREAKING_DRIFT", ["REQUIRED_HEADER_MISSING", *[f"MISSING_{field}" for field in missing]])
     if len(header) < contract["expected_column_count"]:
         return _finish(result, {"transport": contract["transport"], "header": header}, "BREAKING_DRIFT", ["COLUMN_COUNT_DECREASED"])
+    widths = [len(row) for row in rows[1:] if row]
+    mismatched = [index for index, width in enumerate(widths, start=1) if width != len(header)]
+    if mismatched:
+        return _finish(
+            result,
+            {"transport": contract["transport"], "header": header, "column_count": len(header), "row_column_counts": sorted(set(widths))},
+            "BREAKING_DRIFT",
+            [
+                "ROW_COLUMN_COUNT_MISMATCH",
+                f"MISMATCHED_ROW_COUNT_{len(mismatched)}",
+                *[f"ROW_{index}_COLUMNS_{widths[index - 1]}" for index in mismatched[:MAX_ROW_REASONS]],
+            ],
+        )
     extra = sorted(set(header) - required)
     if len(rows) == 1:
         return _finish(result, {"transport": contract["transport"], "header": header, "column_count": len(header)}, "CONTENT_SHAPE_UNKNOWN", ["NO_DATA_ROWS"])
