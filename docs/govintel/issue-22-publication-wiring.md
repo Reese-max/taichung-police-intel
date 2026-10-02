@@ -3,6 +3,7 @@
 本地候選接線已完成最小修正，仍不代表候選來源已升格為 production：
 
 - `online_collect.py --canary` 對 list-first collector 使用 `max_details=5`，其他 collector 不接收此選項；候選觀測仍是 bounded、read-only、不可自動 promotion。
+- `candidate-runtime-canary.py` 關閉 HTTP adapter 的隱性重試；每次實際請求（含手動跟隨的同來源 redirect）都計入每來源六次上限，避免把重試藏在 collector transport 之下。
 - list-first collector 最多讀取四頁；只有辨識到的 next pager 完整走完、每列日期可解析且日期順序及窗口邊界成立時，才會標記 `COMPLETE_*`。未知／編號-only／不可讀／超過上限或循環分頁一律 `PARTIAL`。
 - `online_collect.py` 的 Pages demo path 仍由 source policy 的 `PRODUCTION_ACTIVE` 集合驅動；明確 promotion 後，S-001／S-019／S-032 才會進入同一個 `source-status.json`、feed 與 CSV 產生流程。
 - feed projection 保留 `source_name` 與 HTTPS `official_url`，避免新來源進入後只剩裸 `source_id`。

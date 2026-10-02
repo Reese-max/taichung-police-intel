@@ -12,6 +12,8 @@ import sys
 import time
 from urllib.parse import urljoin, urlsplit
 
+from requests.adapters import HTTPAdapter
+
 ROOT = Path(__file__).resolve().parents[1]
 CANDIDATE_STATUSES = {"AUDITED_EXISTING", "VERIFIED_CANDIDATE"}
 
@@ -40,6 +42,11 @@ class BoundedSession:
             from online_collect import http_session
 
             transport = http_session()
+            # The collector session retries GETs behind this wrapper. That would
+            # make the wrapper's six-call budget undercount actual HTTP attempts.
+            # Count each attempt explicitly instead; redirects remain handled
+            # below and consume one budget unit apiece.
+            transport.mount("https://", HTTPAdapter(max_retries=0))
         self.transport = transport
         self.transport.trust_env = False
         self.transport.headers.update({

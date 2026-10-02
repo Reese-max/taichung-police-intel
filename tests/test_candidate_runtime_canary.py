@@ -85,13 +85,12 @@ class CanaryContractTests(unittest.TestCase):
             session.get("https://evil.example.test/")
         self.assertEqual(session.calls, 0)
 
-    def test_default_transport_reuses_collector_retry_policy(self):
+    def test_default_transport_disables_retries_inside_http_call_budget(self):
         session = module.BoundedSession("https://official.example.test/")
         try:
             retry = session.transport.adapters["https://"].max_retries
-            self.assertEqual(retry.total, 2)
-            self.assertEqual(set(retry.status_forcelist), {429, 500, 502, 503, 504})
-            self.assertIn("GET", retry.allowed_methods)
+            self.assertEqual(retry.total, 0)
+            self.assertFalse(retry.status_forcelist)
         finally:
             session.close()
 
