@@ -1,60 +1,44 @@
 # GovIntel AI｜跨機關公共事件整合、異動辨識與交班支援平台
 
-The former competition prototype name was **Taichung Police Public Intelligence**; this repository now documents the current GovIntel AI product.
+**Current product name:** GovIntel AI. The former `Taichung Police Public Intelligence` name and its Kiro competition package are historical provenance, not the current product status.
 
-An evidence-first public-information monitor that helps police policy staff prepare for council questions in five minutes.
+**Core JTBD:** help a police policy or handoff worker find what changed across public official notices, return to the source, and decide which prior brief needs review. The current public path uses five official Taichung council／government sources, exposes source health and gaps, and links evidence back to official council video timestamps.
 
-The demo compresses official Taichung council and government sources into one workflow: identify a priority issue, inspect source health and intelligence gaps, then jump to the exact official video timestamp. Chinese is the end-user language; the homepage toggle provides the complete English judge path.
+## Current GovIntel state (2026-10-02)
 
-## Current GovIntel state (2026-09-22)
+The [2026 GovIntel competition entry](./docs/govintel/competition-2026/README.md) is the canonical judge path. The [current status page](./docs/govintel/competition-2026/CURRENT_STATUS.md) records the complete claim/evidence table and fixed state semantics.
 
-| Area | State | Evidence boundary |
+| Current claim | Fixed status | Evidence boundary |
 |---|---|---|
-| Five-source council publication baseline | `PRODUCTION_ACTIVE` in the repository path | Checked-in source/status contracts pass; current public deployment is not verified here |
-| Shared source policy, query coverage, official document replay, Dashboard discovery adapter | `IMPLEMENTED_NOT_PRODUCTION` | Local deterministic tests and receipts; no scheduled activation or public deployment claim |
-| S-001/S-019/S-031/S-032/S-033 source expansion | `CANDIDATE_CANARY` | List/live adapters and fixtures exist; live seven-day promotion evidence remains open under #14/#22 |
-| PublicEvent fusion and NPA source matrix | `IMPLEMENTED_NOT_PRODUCTION` | Conservative core and offline fixtures; no live collector/UI write path |
-| Bounded public live-meeting session and post-event reconciliation core | `IMPLEMENTED_NOT_PRODUCTION` | `python scripts/live-meeting.py self-check`; fixture-only state machine, no live provider transport or unattended ASR |
-| Twinkle/public API overlay and full cross-agency real-time coverage | `DESIGN_ONLY` | Strategy and candidate metadata only; no automatic promotion |
-| Scheduled publication merge, natural MORNING/EVENING proof, current anonymous hash check | `BLOCKED` | #20 still needs normal review/merge and real production evidence |
-| Human task evaluation, adoption, award, and official submission receipt | `NOT_RUN` / `UNVERIFIED` | No scores or institutional adoption claims are populated |
+| Five-source publication baseline and council evidence journey | `PRODUCTION_ACTIVE` | [source policy](./docs/govintel/source-policy.approved.json), [public source status](https://reese-max.github.io/taichung-police-intel/data/source-status.json), and [latest scheduled run](https://github.com/Reese-max/taichung-police-intel/actions/runs/36952506907). The latest public snapshot is `PARTIAL`, not globally fresh. |
+| Source Policy, official document replay, Query Gateway, local-first handoff and PublicEvent fixture | `IMPLEMENTED_NOT_PRODUCTION` | Self-checks and checked-in fixtures are replayable; they do not prove live multi-agency service, multi-user approval, or adoption. |
+| News／city／traffic／fire source expansion | `CANDIDATE_CANARY` | [PR #16](https://github.com/Reese-max/taichung-police-intel/pull/16) and [Issue #22](https://github.com/Reese-max/taichung-police-intel/issues/22); Open PR／Issue is not production evidence. |
+| Twinkle hybrid, latest-information loop, full persistent tracking and production event fusion | `DESIGN_ONLY` | Strategy／issue／fixture boundaries are listed in the [competition docs](./docs/govintel/competition-2026/README.md). |
+| Complete scheduled-publication acceptance | `BLOCKED` | [Issue #20](https://github.com/Reese-max/taichung-police-intel/issues/20) remains open; the successful latest run does not replace its missing acceptance evidence. |
 
-The current judge entry is [docs/govintel/competition-2026/README.md](./docs/govintel/competition-2026/README.md). Historical Kiro/prototype receipts remain below and are labelled as historical.
+**Latest dated evidence:** [workflow run 36952506907](https://github.com/Reese-max/taichung-police-intel/actions/runs/36952506907) succeeded for `main@562141e` on 2026-10-02. The anonymous public source receipt reported `generated_at=2026-10-02T09:46:41+08:00`, `CR-DEMO-20261002-MORNING-SCHEDULE`, overall `PARTIAL`, and one failed source. This is a time-bound snapshot, not a human evaluation, eligibility decision, submission receipt, or full source-coverage claim.
 
-## Judge path
+## Quick judge path
 
-1. Read the priority brief on the homepage.
-2. Check the five official sources for health, freshness, gaps, and last-known-good.
-3. Open the evidence drawer.
-4. Click a transcript segment or word to seek the official council video.
-5. Review `.kiro/` and [Kiro usage evidence](./docs/KIRO_USAGE.md).
+1. Read the [current status and claim/evidence table](./docs/govintel/competition-2026/CURRENT_STATUS.md).
+2. Follow the [3–5 minute judge path](./docs/govintel/competition-2026/JUDGE_PATH.md) using the current build and `FIXTURE_ONLY` receipts.
+3. Open the local or [public demo](https://reese-max.github.io/taichung-police-intel/), inspect source health／gaps, open the evidence drawer, search `警察局`, and seek the official video timestamp.
+4. Read the [old-vs-new delta](./docs/govintel/competition-2026/OLD_VS_NEW.md), [evaluation results boundary](./docs/govintel/competition-2026/EVALUATION.md), and [limitations／safety](./docs/govintel/competition-2026/LIMITATIONS_AND_SAFETY.md).
 
-## Historical prototype receipts (not current deployment evidence)
+## Historical boundary
 
-| Deliverable | Current state |
-|---|---|
-| Working application | Local static production build passes |
-| Public demo | [https://reese-max.github.io/taichung-police-intel](https://reese-max.github.io/taichung-police-intel) returned anonymous HTTP 200 on 2026-09-22; public [`data/source-status.json`](https://reese-max.github.io/taichung-police-intel/data/source-status.json) is still the older 2026-09-11 snapshot, not this checkout's candidate |
-| Demo video | [2:43 English-captioned MP4](https://reese-max.github.io/taichung-police-intel/demo-video.mp4) — verified anonymously in Chrome 2026-08-24 |
-| Twice-daily updates | GitHub Actions schedules 06:30 and 18:30 Asia/Taipei; a current successful schedule pair is not proven here |
-| Source observability | Five official-source adapters emit health, completeness, gaps, SHA-256, and last-known-good; the checked-in snapshot remains subject to its recorded freshness |
-| Evidence navigation | 86 transcript segments and 1,036 word timestamps seek the official HLS video |
-| English judge path | Complete homepage, source-monitor, evidence-drawer, control, limitation, and official-source translation path passes browser QA |
-| Kiro assets | Four Steering files, three Specs, and three executable Hooks are checked in |
-| Kiro live-session proof | Authenticated V3 Spec sessions reviewed the architecture and implemented the English homepage path with executable acceptance tests |
-| Kiro model and usage | The three retained current-workspace sessions used Auto (`qdev::auto` in local records) and consumed 13.006002 credits; Auto did not disclose its routed base model |
-| Submission package | English README, script, checklist, submission draft, and captioned video are present; entrant details and form receipt remain pending |
+The old Kiro submission draft, 2026-08 deadline, prototype demo script／checklist／video, and Kiro usage evidence are preserved in [Historical competition / prior prototype evidence](./docs/govintel/historical/README.md). Root compatibility pointers remain only for existing repository verification; they are not the current judge path.
 
 ## Problem and users
 
 Police policy and council-liaison staff must monitor scattered official pages, proposals, reports, meeting records, and videos. Finding what changed can take one to two hours, and a summary without a source locator is difficult to trust under questioning.
 
-This competition version focuses on one real task: preparing for a council question. It uses public information only and excludes internal duty data, emergency dispatch, 110 calls, case-level criminal data, personal data, and operational command functions.
+The current public baseline focuses on preparing for a council question; the 2026 GovIntel addition extends the same evidence discipline toward cross-agency public-event changes and handoff review. It uses public information only and excludes internal duty data, emergency dispatch, 110 calls, case-level criminal data, personal data, and operational command functions.
 
 ## What works
 
 - A focused council-preparation brief for a police policy user.
-- Five live official-source adapters with isolated failure handling.
+- Five baseline official-source adapters with isolated failure handling.
 - Source health kept separate from date-window completeness.
 - Intelligence-gap reasons instead of silently turning collection failure into zero results.
 - Last-known-good retained when a later source fetch fails.
@@ -94,13 +78,13 @@ Requirements:
 - Node.js 20 or newer
 - Python 3.11 or newer
 - Git for the scheduled publication-state checkpoint and local replay
-- Kiro CLI V3 only for reproducing the Kiro workflow
+- Kiro CLI V3 only for reproducing the historical Kiro development evidence (optional)
 
 Install dependencies:
 
 ```bash
 npm ci --prefix apps/web
-python -m pip install -r requirements.txt
+python3 -m pip install -r requirements.txt
 ```
 
 No API key, login, database, or paid service is required to run the checked-in demo.
@@ -208,7 +192,7 @@ The read-only Taiwan Intel Dashboard discovery consumer is replayable with `pyth
 The `publication-state` checkpoint lifecycle is now part of `main`; deployment
 still requires a successful Pages workflow and anonymous HTTPS readback.
 
-After the repository is public, enable Pages with **Source: GitHub Actions**. The deployed demo and repository URLs are recorded in [SUBMISSION.md](./SUBMISSION.md). A workflow file is not deployment evidence; acceptance requires an anonymous HTTPS check.
+After the repository is public, enable Pages with **Source: GitHub Actions**. The current demo and repository URLs are recorded in the [2026 judge path](./docs/govintel/competition-2026/JUDGE_PATH.md); the former submission draft is historical. A workflow file is not deployment evidence; acceptance requires an anonymous HTTPS check.
 
 Repository: `https://github.com/Reese-max/taichung-police-intel`
 Demo: `https://reese-max.github.io/taichung-police-intel` (anonymous HTTPS readback is required after every publication). Inspect the public `data/source-status.json` for the current snapshot `generated_at`, each source's `last_checked_at`, and official `data_as_of`; a healthy source can remain `STALE` when its latest official record is old, and that state must not be read as proof that no current event exists.
@@ -244,11 +228,11 @@ The static artifact must also contain `out/index.html`, `out/api/health.json`, a
 ## Kiro workflow
 
 - `.kiro/steering/` defines product, technology, repository structure, and evidence/safety boundaries.
-- `.kiro/specs/` contains requirements, design, tasks, failure states, retry limits, and executable acceptance commands for three vertical slices.
+- `.kiro/specs/` contains requirements, design, tasks, failure states, retry limits, and executable acceptance commands for four vertical slices.
 - `.kiro/hooks/` routes save, Spec-ready, and task-finish events to the checked-in deterministic verifier.
 - The verifier deliberately fails if required Kiro artifacts or acceptance contracts are missing.
 
-Authenticated Kiro V3 sessions first reviewed all 16 Steering, Spec, and Hook artifacts, then implemented the English primary path, the two-card cap, and the homepage acceptance test. Entrant-directed browser review rejected the first static-guide-only attempt, found and fixed a drawer initialization defect in the accepted implementation, and reran the full gate. Session IDs, prompts, corrections, Hook truth, model disclosure, credits, and command output are recorded in [docs/KIRO_USAGE.md](./docs/KIRO_USAGE.md).
+The retained Kiro V3 sessions and their browser review are historical development evidence for the prior prototype, not a current runtime dependency or current competition result. Session IDs, prompts, corrections, Hook truth, model disclosure, credits, and command output are recorded in [Historical Kiro usage evidence](./docs/govintel/historical/competition-2026-08/KIRO_USAGE.md).
 
 ## Evidence and safety rules
 
@@ -262,18 +246,13 @@ Authenticated Kiro V3 sessions first reviewed all 16 Steering, Spec, and Hook ar
 - Answer drafts pass `apps/web/lib/answer-evidence-gate.js` before release: every factual claim needs exact official evidence (locator + document version), conflicting official sources surface as `CONFLICT` instead of a merged answer, stale sources cannot back current wording, and media-derived records never verify a claim. The shared gate emits one receipt with the publication hash and validator version for both Web Chat and MCP; the read-only `validate_answer` route binds that receipt to the server-controlled catalog and emits no free-text fallback.
 - Structured `STATISTIC` propositions and trusted catalog assertions can use `value: { value: decimal string, period: string, geography: string, unit: string }` (for example, `value: "130"`). A decimal string keeps the source digits exact; JSON numeric values are rejected because parsing can round them. The gate compares all four fields within a subject; a different period, geography, or unit neither supports nor conflicts with the requested statistic. Older scalar statistic assertions remain supported for existing located facts, but do not carry these scope or exact numeric-token guarantees. The typed statistics query store is not yet promoted into the trusted answer catalog; its original decimal tokens must be preserved before future promotion.
 
-## Historical Kiro competition package (2026-08)
+## Historical competition / prior prototype evidence
 
-The following files describe the earlier Kiro competition submission path. They
-are preserved for provenance and are not the current GovIntel release status.
-
-- [Submission draft](./SUBMISSION.md)
-- [Three-minute demo script](./docs/DEMO_SCRIPT.md)
-- [Submission checklist](./docs/SUBMISSION_CHECKLIST.md)
-- [Kiro usage evidence](./docs/KIRO_USAGE.md)
-- [Official submission form](https://forms.gle/xBLjk9nKMqbi2zie9)
-
-Official competition deadline: **2026-08-23 23:59 UTC**, which is **2026-08-24 07:59 Asia/Taipei**.
+The former Kiro submission draft, deadline, demo script, checklist, video and
+usage record are indexed in [Historical competition / prior prototype evidence](./docs/govintel/historical/README.md). They remain available for provenance, but
+must not be read as the current GovIntel release status, current 2026
+competition rules, or a completed submission. Root compatibility pointers are
+kept only because the existing repository verifier expects those paths.
 
 ## Costs and third parties
 
@@ -281,7 +260,7 @@ Official competition deadline: **2026-08-23 23:59 UTC**, which is **2026-08-24 0
 |---|---|---|---|
 | Next.js 16.3.1, React / React DOM 19.2.8, `pg` 8.23.0 | MIT | No API quota; no paid service required | `npm ci --prefix apps/web` |
 | hls.js 1.7.0 | Apache-2.0 | Official HLS host controls media availability | Installed by the same `npm ci` command |
-| Beautiful Soup 4.14.3 / jsonschema 4.26.0 | MIT | No external API quota | `python -m pip install -r requirements.txt` |
+| Beautiful Soup 4.14.3 / jsonschema 4.26.0 | MIT | No external API quota | `python3 -m pip install -r requirements.txt` |
 | requests 2.33.0 / psycopg 3.3.4 | Apache-2.0 / LGPL-3.0-only | Collectors make bounded public reads; PostgreSQL is not required by the demo | Same Python install command |
 | GitHub Pages / Actions | GitHub service terms; workflow uses GitHub-maintained checkout, setup, Pages, artifact, and deploy actions | Uses the account's included allowance and GitHub plan quotas | Enable Pages with GitHub Actions |
 | Kiro CLI V3 | Kiro service terms; core AI development workflow | Account-plan credits; the demo has no Kiro runtime dependency | Builder ID is needed only to reproduce the development sessions |
@@ -306,8 +285,8 @@ The retained current-workspace Kiro records show Auto as `qdev::auto`: 10.254967
 - Transcript quality is a historical baseline and has not received independent human sign-off.
 - The English path translates the product journey and source names; the official Chinese transcript remains Chinese and is explicitly labelled as navigation-only evidence.
 - The official `S-010` HLS CDN can fail in some Chrome sessions with `ERR_CONTENT_DECODING_FAILED`. A fatal media error or ten-second metadata timeout now preserves the transcript and provenance while showing a prominent link to the official council video. The local 2:43 product-demo MP4 is deliberately not substituted because it does not share the official evidence timeline.
-- The five source adapters passed local canaries and one GitHub-hosted scheduled EVENING run succeeded on 2026-08-23. A completed post-deployment MORNING plus EVENING pair has not yet been observed.
-- The public repository, demo, and captioned video have historical anonymous verification receipts; current deployment/version/hash status remains unverified in this checkout. Entrant details and form submission remain pending.
+- Current source freshness, scheduled run, and publication limits are time-bound in [CURRENT_STATUS.md](./docs/govintel/competition-2026/CURRENT_STATUS.md); a successful workflow does not erase `PARTIAL`, `STALE`, or `FAILED` source states.
+- Human evaluation, entrant details, official eligibility, form submission and institutional adoption remain unverified; see [EVALUATION.md](./docs/govintel/competition-2026/EVALUATION.md) and [LIMITATIONS_AND_SAFETY.md](./docs/govintel/competition-2026/LIMITATIONS_AND_SAFETY.md).
 
 ## License and data rights
 

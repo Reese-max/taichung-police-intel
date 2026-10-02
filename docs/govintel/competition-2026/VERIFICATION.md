@@ -1,6 +1,8 @@
-# 本輪驗證紀錄
+# Historical verification record
 
 日期：2026-09-16。基準 main：`e1d081bd04824c062c7ee99e7d74f9e478240743`。
+
+本頁保留當日 PR／candidate 的驗證邊界，不是目前 main、目前公開資料或本次 judge path 的最新 receipt。請以 [CURRENT_STATUS.md](./CURRENT_STATUS.md) 和其 dated Actions link 為現況。
 
 ## 證據取得與變更邊界
 
