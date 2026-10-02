@@ -34,6 +34,7 @@ GOOD_STATUSES = {"NO_DRIFT", "ADDITIVE_COMPATIBLE"}
 # fingerprints describe the older signature and are not comparable.
 CONTRACT_VERSION = "1.1"
 MAX_ROW_REASONS = 10
+MAX_SIGNATURE_NAMES = 500
 OBSERVATION_KEYS = {
     "body": (bytes, str),
     "http_status": (int,),
@@ -260,6 +261,7 @@ def _base_result(contract: dict[str, Any], body: bytes, observed_at: str | None,
         "source_health": "DEGRADED",
         "reasons": [],
         "review_required": False,
+        "http_status": meta.get("http_status"),
         "observed_at": observed_at or now_iso(),
         "requested_url": meta.get("requested_url"),
         "final_url": meta.get("final_url"),
@@ -281,10 +283,15 @@ def _coverage_class(covered: int, total: int) -> str:
     return "NONE" if covered == 0 else "PARTIAL"
 
 
+def _bounded(names: list[str]) -> list[str]:
+    """Cap remote-derived names so one response cannot inflate the published receipt."""
+    return sorted(names)[:MAX_SIGNATURE_NAMES]
+
+
 def _observed_types(records: list[dict[str, Any]], fields: list[str]) -> dict[str, list[str]]:
     return {
         field: sorted({type_name(record[field]) for record in records if field in record})
-        for field in fields
+        for field in _bounded(fields)
     }
 
 
@@ -395,6 +402,7 @@ def observe(
         resource_id=resource_id,
         requested_url=requested_url,
         final_url=final_url,
+        http_status=http_status,
     )
     if http_status < 200 or http_status >= 300:
         result["reasons"] = [error_reason or f"HTTP_{http_status}"]
@@ -457,7 +465,7 @@ def _observe_html(contract: dict[str, Any], body: bytes, result: dict[str, Any],
     date_coverage = sum(entry.get("published") is not None for entry in entries)
     signature = {
         "transport": contract["transport"],
-        "entry_fields": fields,
+        "entry_fields": _bounded(fields),
         "date_coverage": _coverage_class(date_coverage, len(entries)),
         "id_pattern": contract["id_pattern"],
     }
@@ -488,7 +496,7 @@ def _observe_rss(contract: dict[str, Any], body: bytes, result: dict[str, Any], 
     fields = sorted({key for entry in entries for key in entry})
     signature = {
         "transport": contract["transport"],
-        "entry_fields": fields,
+        "entry_fields": _bounded(fields),
         "date_coverage": _coverage_class(sum(entry.get("published") is not None for entry in entries), len(entries)),
     }
     missing = set(contract["required_fields"]) - set(fields)
@@ -511,7 +519,7 @@ def _observe_fire_live(contract: dict[str, Any], body: bytes, result: dict[str, 
     fields = sorted({key for entry in entries for key in entry})
     signature = {
         "transport": contract["transport"],
-        "entry_fields": fields,
+        "entry_fields": _bounded(fields),
     }
     missing = sorted(set(contract["required_fields"]) - set(fields))
     status = "BREAKING_DRIFT" if missing else "NO_DRIFT"
@@ -554,14 +562,14 @@ def _observe_json_api(contract: dict[str, Any], body: bytes, result: dict[str, A
         if any(field in record and type_name(record[field]) != expected for record in records)
     ]
     if missing_fields:
-        return _finish(result, {"transport": contract["transport"], "record_fields": fields}, "BREAKING_DRIFT", ["REQUIRED_FIELD_MISSING", *[f"MISSING_{field}" for field in missing_fields]])
+        return _finish(result, {"transport": contract["transport"], "record_fields": _bounded(fields)}, "BREAKING_DRIFT", ["REQUIRED_FIELD_MISSING", *[f"MISSING_{field}" for field in missing_fields]])
     contract_failures = _record_contract_failures(
         contract["record_required_fields"], records, wrong_record_types
     )
     if contract_failures:
         return _finish(
             result,
-            {"transport": contract["transport"], "record_fields": fields, "record_types": _observed_types(records, fields)},
+            {"transport": contract["transport"], "record_fields": _bounded(fields), "record_types": _observed_types(records, fields)},
             "BREAKING_DRIFT",
             contract_failures,
         )
@@ -570,7 +578,7 @@ def _observe_json_api(contract: dict[str, Any], body: bytes, result: dict[str, A
     reasons = ["ADDITIVE_FIELDS"] if extra else []
     signature = {
         "transport": contract["transport"],
-        "record_fields": fields,
+        "record_fields": _bounded(fields),
         "record_types": _observed_types(records, fields),
         "pagination": {
             path: type_name(get_path(payload, path)[1])
@@ -601,12 +609,12 @@ def _observe_data_gov_json(contract: dict[str, Any], body: bytes, result: dict[s
         if any(field in row and type_name(row[field]) != expected for row in payload)
     ]
     if missing:
-        return _finish(result, {"transport": contract["transport"], "record_fields": fields}, "BREAKING_DRIFT", ["REQUIRED_FIELD_MISSING", *[f"MISSING_{field}" for field in missing]])
+        return _finish(result, {"transport": contract["transport"], "record_fields": _bounded(fields)}, "BREAKING_DRIFT", ["REQUIRED_FIELD_MISSING", *[f"MISSING_{field}" for field in missing]])
     contract_failures = _record_contract_failures(contract["required_fields"], payload, wrong_types)
     if contract_failures:
         return _finish(
             result,
-            {"transport": contract["transport"], "record_fields": fields, "field_types": _observed_types(payload, fields)},
+            {"transport": contract["transport"], "record_fields": _bounded(fields), "field_types": _observed_types(payload, fields)},
             "BREAKING_DRIFT",
             contract_failures,
         )
@@ -614,7 +622,7 @@ def _observe_data_gov_json(contract: dict[str, Any], body: bytes, result: dict[s
     status = "ADDITIVE_COMPATIBLE" if extra else "NO_DRIFT"
     return _finish(
         result,
-        {"transport": contract["transport"], "record_fields": fields, "field_types": _observed_types(payload, fields)},
+        {"transport": contract["transport"], "record_fields": _bounded(fields), "field_types": _observed_types(payload, fields)},
         status,
         ["ADDITIVE_FIELDS"] if extra else [],
     )
@@ -635,9 +643,9 @@ def _observe_data_gov_csv(contract: dict[str, Any], body: bytes, result: dict[st
     required = set(contract["required_fields"])
     missing = sorted(required - set(header))
     if missing:
-        return _finish(result, {"transport": contract["transport"], "header": header}, "BREAKING_DRIFT", ["REQUIRED_HEADER_MISSING", *[f"MISSING_{field}" for field in missing]])
+        return _finish(result, {"transport": contract["transport"], "header": _bounded(header)}, "BREAKING_DRIFT", ["REQUIRED_HEADER_MISSING", *[f"MISSING_{field}" for field in missing]])
     if len(header) < contract["expected_column_count"]:
-        return _finish(result, {"transport": contract["transport"], "header": header}, "BREAKING_DRIFT", ["COLUMN_COUNT_DECREASED"])
+        return _finish(result, {"transport": contract["transport"], "header": _bounded(header)}, "BREAKING_DRIFT", ["COLUMN_COUNT_DECREASED"])
     # Blank lines are separators, not records, so they neither shift column
     # indices nor count as a data row.
     data_rows = [
@@ -667,7 +675,7 @@ def _observe_data_gov_csv(contract: dict[str, Any], body: bytes, result: dict[st
     status = "ADDITIVE_COMPATIBLE" if extra or len(header) > contract["expected_column_count"] else "NO_DRIFT"
     return _finish(
         result,
-        {"transport": contract["transport"], "header": header, "column_count": len(header), "value_types": {field: "string" for field in header}},
+        {"transport": contract["transport"], "header": _bounded(header), "column_count": len(header)},
         status,
         ["ADDITIVE_FIELDS"] if status == "ADDITIVE_COMPATIBLE" else [],
     )
@@ -690,8 +698,9 @@ def update_state(state: dict[str, Any], result: dict[str, Any]) -> dict[str, Any
     state = json.loads(json.dumps(state, ensure_ascii=False))
     state.setdefault("schema_version", 1)
     state.setdefault("sources", {})
-    # The marker tracks the contract version this code emits, so persisted
-    # fingerprints from an older fingerprint era are never read as current.
+    # Keep the state's top-level marker in step with the version this code
+    # writes. Each source record keeps its own version, and those per-record
+    # versions are what a fingerprint comparison should read.
     state["contract_version"] = CONTRACT_VERSION
     source_id = result["source_id"]
     old = state["sources"].get(source_id, {})
@@ -715,6 +724,11 @@ def update_state(state: dict[str, Any], result: dict[str, Any]) -> dict[str, Any
 
 def _validate_observation(item: dict[str, Any]) -> None:
     """Reject malformed replay evidence before it can reach the state file or receipt."""
+    for key in ("body_base64", "body_text"):
+        if key in item:
+            raise ValueError(
+                f"schema-drift observation has unsupported key: {key} (decode it into `body`, or use --input)"
+            )
     for key, expected in OBSERVATION_KEYS.items():
         if key not in item:
             continue
@@ -726,10 +740,14 @@ def _validate_observation(item: dict[str, Any]) -> None:
     observed_at = item.get("observed_at")
     if isinstance(observed_at, str):
         try:
-            datetime.fromisoformat(observed_at.replace("Z", "+00:00"))
+            parsed = datetime.fromisoformat(observed_at.replace("Z", "+00:00"))
         except ValueError as error:
             raise ValueError(f"schema-drift observation has invalid observed_at: {observed_at!r}") from error
-    unknown = sorted(set(item) - {"source_id", "body", "body_base64", "body_text", *OBSERVATION_KEYS})
+        # intel_v2.review refuses a naive timestamp, which would silently drop the
+        # whole Review Inbox projection instead of rejecting the evidence.
+        if parsed.tzinfo is None:
+            raise ValueError(f"schema-drift observation observed_at needs a timezone: {observed_at!r}")
+    unknown = sorted(set(item) - {"source_id", "body", *OBSERVATION_KEYS})
     if unknown:
         raise ValueError(f"schema-drift observation has unknown keys: {', '.join(unknown)}")
 
@@ -1051,7 +1069,11 @@ def main(argv: list[str] | None = None) -> int:
     receipt, next_state = build_receipt(observations, state=state)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(receipt, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    if args.input:
+    # Persist whenever observations were actually collected, otherwise the
+    # last-known-good, the fingerprint history and resource-id drift can never
+    # survive a run. The interrupted fallback deliberately leaves the state
+    # untouched: it records no observation worth keeping.
+    if args.input or args.live:
         args.state.parent.mkdir(parents=True, exist_ok=True)
         args.state.write_text(json.dumps(next_state, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(f"SCHEMA_DRIFT_RECEIPT_OK overall={receipt['overall']} sources={len(receipt['sources'])} output={args.output}")

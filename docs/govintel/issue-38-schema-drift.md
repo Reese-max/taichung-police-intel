@@ -23,8 +23,9 @@
 欄位集合只取所有 row 的聯集，原本會讓「部分 row 少一個 required 欄位」看起來正常：
 
 - JSON/API 與 data.gov JSON 只要有任何一列缺少 required 欄位，就是 `REQUIRED_FIELD_MISSING_IN_SOME_ROWS` / `MISSING_IN_SOME_ROWS_<field>` 的 `BREAKING_DRIFT`，不會退化成假零資料。同時缺少欄位又改型別時，兩類 reason 會一起回報。
-- data.gov CSV 除了 header，還驗證每筆資料列的欄位數等於 header 欄位數；截斷列或未跳脫的引號造成欄位位移會產生 `ROW_COLUMN_COUNT_MISMATCH` 的 `BREAKING_DRIFT`。`ROW_<n>_COLUMNS_<w>` 的 `<n>` 是原始資料列序號，reason 數量以 `MAX_ROW_REASONS` 為上限，總數記在 `MISMATCHED_ROW_COUNT_<n>`。
+- data.gov CSV 除了 header，還驗證每筆資料列的欄位數等於 header 欄位數；截斷列或未跳脫的引號造成欄位位移會產生 `ROW_COLUMN_COUNT_MISMATCH` 的 `BREAKING_DRIFT`。`ROW_<n>_COLUMNS_<w>` 的 `<n>` 是原始資料列序號，reason 數量以 `MAX_ROW_REASONS` 為上限，總數記在 `MISMATCHED_ROW_COUNT_<n>`。JSON 與 data.gov JSON 則是逐列檢查 required 欄位「是否存在」；CSV 的欄位名稱來自 header，所以對 CSV 只檢查欄位數，不做逐列欄位存在性判斷。
 - 空白行不是資料列：沒有儲存格、或只有空白字元且欄位數不等於 header 的行，都不算資料列，因此不會造成欄位位移，也不會讓只有 header 的檔案看起來像完整窗口（那是 `NO_DATA_ROWS` 的 `CONTENT_SHAPE_UNKNOWN`）。欄位數正確但值全空的一列仍然是資料列。
+- 刻意不做的事：required 欄位「有欄位但值是空字串」不算 schema drift。欄位存在與欄位有值是兩件事，後者是資料品質，publication lane 的 `source-status.json` / `intelligence_gaps` 已經負責；把它放進契約層只會在真實資源出現合法稀疏值時誤擋。
 - CSV 讀取本身失敗（超過 `csv` 欄位長度上限等）只會讓該來源變成 `UNPARSEABLE_CSV` 的 `CONTENT_SHAPE_UNKNOWN`，不會中止整份 receipt，也不會讓其他來源失去 last-known-good。
 - 這個欄位數檢查刻意比 production parser 嚴格。`canary-s028-165.py` 用 `csv.DictReader`，多出來的欄位會被 `restkey` 吞掉；monitor 必須先把這種不一致叫出來，而不是讓 parser 的靜默吸收決定結果。
 
@@ -32,8 +33,15 @@
 
 - JSON/API 的 contract 另宣告 `record_count_path`。當觀察到的筆數小於宣告總數時，狀態仍是契約正常的 `NO_DRIFT`、`review_required` 仍是 false，但 `window_completeness` 降為 `PARTIAL` 並加上 `PAGINATION_WINDOW_NOT_COVERED`；`observed_record_count` 與 `declared_total_count` 留在 result 裡。
 - 這是「不假設窗口完整」的證據欄位，不是告警。bounded collector 對議會 API 只取第一頁（`pageSize=200`），因此只要某個 keyword 的筆數超過一頁，PARTIAL 就是每次執行都會出現的預期狀態。system health 的 `source_contracts` stage 與 `overall` 只看 `status`，所以不會因此降級；要處理這種覆蓋落差需要擴充 collector 分頁，而不是擴充 monitor。
-- `--input` replay 的每筆 observation 會先驗證：欄位名稱必須是 `observe()` 接受的參數（`previous` 等內部參數不接受）、型別必須正確（`resource_id` / `requested_url` / `final_url` 允許 null）、`observed_at` 必須是可解析的 ISO-8601，`source_id` 必須在 contract 內且不重複。任何違規都在寫入 state 或 receipt 之前就拒絕。
+- `--input` replay 的每筆 observation 會先驗證：欄位名稱必須是 `observe()` 接受的參數（`previous` 等內部參數、`body_base64` / `body_text` 這種檔案格式欄位不接受）、型別必須正確（`resource_id` / `requested_url` / `final_url` 允許 null）、`observed_at` 必須是帶時區的 ISO-8601（`intel_v2.review` 拒絕 naive timestamp，會讓整個 Review Inbox 投影被丟掉），`source_id` 必須在 contract 內且不重複。任何違規都在寫入 state 或 receipt 之前就拒絕。
 - 進入 Review Inbox 的每一列都帶著該來源的 `last_known_good`，所以 `intel_v2.review` 投影出的 `evidence.before` 不再是 `null` — reviewer 從 inbox 就看得到「壞掉之前的契約指紋」。
+- 沒有當次 observation 的來源標成 `NO_CURRENT_OBSERVATION` 且 `review_required` 為 false：那是「這次沒看到」，不是來源有問題，沒有東西需要人工覆核；它只會把 `overall` 拉到 `UNKNOWN` 並讓 system health 的 `source_contracts` stage 變 `UNKNOWN`。
+
+## state 的寫入時機
+
+- `--live` 與 `--input` 都會寫回 `state/schema-drift-state.json`。只有這樣 last-known-good、fingerprint history 與 `RESOURCE_ID_CHANGED` 才可能跨執行存活 — `pages.yml` 每一次都會 `publication-state-branch.py restore` 這個檔案，再於 build 結尾 `persist` 回去。
+- `--live-interrupted-receipt` 不會寫 state。那是 live probe 被中斷後的 fail-closed fallback，它沒有觀察到任何東西，用它覆寫 state 只會污染歷史。
+- 每次 receipt 都記錄該次觀察到的 `http_status`，所以「HTTP 200 但契約壞掉」在 receipt 裡是看得見的，不只是 log。
 
 驗證：
 

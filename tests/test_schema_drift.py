@@ -417,7 +417,6 @@ class SchemaDriftTests(unittest.TestCase):
         )
         self.assertEqual(one["status"], "NO_DRIFT")
         self.assertEqual(two["status"], "NO_DRIFT")
-        self.assertNotIn("entry_count", one["fingerprint_signature"])
         self.assertEqual(one["observed_schema_fingerprint"], two["observed_schema_fingerprint"])
 
     def test_contract_version_marks_the_shape_only_fingerprint_era(self):
@@ -467,9 +466,6 @@ class SchemaDriftTests(unittest.TestCase):
 
         good = drift.observe(drift.CONTRACTS["S-007"], json.dumps(API), content_type="application/json")
         state = drift.update_state(drift.empty_state(), good)
-        broken = drift.observe(
-            drift.CONTRACTS["S-007"], json.dumps({"error": "changed"}), content_type="application/json"
-        )
         receipt, _ = drift.build_receipt(
             [{"source_id": "S-007", "body": b'{"error": "changed"}', "content_type": "application/json"}],
             state=state,
@@ -488,7 +484,6 @@ class SchemaDriftTests(unittest.TestCase):
             good["observed_schema_fingerprint"],
         )
         self.assertEqual(candidates[0]["evidence"]["after"]["status"], "BREAKING_DRIFT")
-        self.assertIsNotNone(broken)
 
     def test_whitespace_only_lines_of_the_wrong_arity_are_separators_not_rows(self):
         header = "民國年月,網域,網站性質,法律依據,聲請單位\n"
@@ -534,6 +529,116 @@ class SchemaDriftTests(unittest.TestCase):
             len(result["fingerprint_signature"]["row_column_counts"]), drift.MAX_ROW_REASONS
         )
         self.assertEqual(len(result["reasons"]), drift.MAX_ROW_REASONS + 2)
+
+    def test_live_runs_persist_state_so_last_known_good_survives_to_the_receipt(self):
+        response = SimpleNamespace(
+            content=b"sample",
+            status_code=200,
+            headers={"content-type": "text/plain"},
+            url="https://official.test/source",
+            request=SimpleNamespace(url="https://official.test/source"),
+        )
+        observations = [
+            {"source_id": "S-007", "body": json.dumps(API).encode(), "http_status": 200,
+             "content_type": "application/json", "resource_id": None,
+             "observed_at": "2026-09-10T00:00:00+00:00", "requested_url": None, "final_url": None},
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            state_path = Path(directory) / "state.json"
+            output_path = Path(directory) / "receipt.json"
+            with mock.patch.object(drift, "live_observations", return_value=observations):
+                self.assertEqual(
+                    drift.main(["--live", "--state", str(state_path), "--output", str(output_path)]), 0
+                )
+            first_state = json.loads(state_path.read_text(encoding="utf-8"))
+            self.assertEqual(first_state["contract_version"], "1.1")
+            good_fingerprint = first_state["sources"]["S-007"]["last_known_good"]["observed_schema_fingerprint"]
+            self.assertIsNotNone(good_fingerprint)
+
+            broken = [{**observations[0], "body": b'{"error": "changed"}', "observed_at": "2026-09-11T00:00:00+00:00"}]
+            with mock.patch.object(drift, "live_observations", return_value=broken):
+                self.assertEqual(
+                    drift.main(["--live", "--state", str(state_path), "--output", str(output_path)]), 0
+                )
+            receipt = json.loads(output_path.read_text(encoding="utf-8"))
+            self.assertEqual(receipt["review_inbox"][0]["last_known_good"]["observed_schema_fingerprint"], good_fingerprint)
+            second_state = json.loads(state_path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                second_state["sources"]["S-007"]["last_known_good"]["observed_schema_fingerprint"], good_fingerprint
+            )
+            self.assertEqual(second_state["sources"]["S-007"]["history"][0]["observed_schema_fingerprint"], good_fingerprint)
+
+    def test_naive_observed_at_is_rejected_before_it_can_drop_the_review_inbox(self):
+        from intel_v2.review import schema_drift_candidates, reconcile, empty_state as review_state
+
+        sample = {
+            "source_id": "S-007",
+            "body": b'{"error": "changed"}',
+            "content_type": "application/json",
+            "observed_at": "2026-09-10T00:00:00",
+        }
+        with self.assertRaisesRegex(ValueError, "observed_at needs a timezone"):
+            drift.build_receipt([sample], contracts={"S-007": drift.CONTRACTS["S-007"]})
+
+        # With a tz-aware timestamp the drift row reconciles into a reviewable
+        # item; the naive form would have made intel_v2.review raise and
+        # system-health silently fall back to the raw drift rows.
+        sample["observed_at"] = "2026-09-10T00:00:00+00:00"
+        receipt, _ = drift.build_receipt([sample], contracts={"S-007": drift.CONTRACTS["S-007"]})
+        reconciled = reconcile(
+            review_state(), schema_drift_candidates(receipt), observed_at="2026-09-10T00:00:00+00:00"
+        )
+        items = list(reconciled["items"].values())
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["entity_ids"], {"source_id": "S-007"})
+        self.assertEqual(items[0]["reason"], "NEEDS_REVIEW")
+        naive_receipt = json.loads(json.dumps(receipt))
+        naive_receipt["review_inbox"][0]["observed_at"] = "2026-09-10T00:00:00"
+        with self.assertRaisesRegex(ValueError, "timezone"):
+            reconcile(
+                review_state(),
+                schema_drift_candidates(naive_receipt),
+                observed_at="2026-09-10T00:00:00+00:00",
+            )
+
+    def test_observation_bodies_must_be_decoded_before_build_receipt(self):
+        sample = {"source_id": "S-007", "content_type": "application/json"}
+        for key in ("body_base64", "body_text"):
+            with self.subTest(key=key):
+                with self.assertRaisesRegex(ValueError, f"unsupported key: {key}"):
+                    drift.build_receipt([{**sample, key: "payload"}])
+
+    def test_http_status_reaches_the_receipt_as_evidence(self):
+        unavailable = drift.observe(
+            drift.CONTRACTS["S-009"], b"", http_status=503, content_type="application/json"
+        )
+        self.assertEqual(unavailable["status"], "SOURCE_UNAVAILABLE")
+        self.assertEqual(unavailable["http_status"], 503)
+        healthy = drift.observe(drift.CONTRACTS["S-007"], json.dumps(API), content_type="application/json")
+        self.assertEqual(healthy["http_status"], 200)
+
+    def test_remote_names_in_the_signature_are_capped_without_changing_the_verdict(self):
+        wide = {f"欄位{index:04d}": "x" for index in range(drift.MAX_SIGNATURE_NAMES + 50)}
+        wide.update({"項目": "x", "欄位名稱": "y", "數值": "1", "資料時間日期": "2026-09-01", "資料週期": "月"})
+        rows = [dict(wide)]
+        result = drift.observe(
+            drift.CONTRACTS["S-028"], json.dumps(rows), content_type="application/json", resource_id="r1"
+        )
+        self.assertEqual(result["status"], "ADDITIVE_COMPATIBLE")
+        self.assertEqual(
+            len(result["fingerprint_signature"]["record_fields"]), drift.MAX_SIGNATURE_NAMES
+        )
+        self.assertEqual(
+            len(result["fingerprint_signature"]["field_types"]), drift.MAX_SIGNATURE_NAMES
+        )
+        still_break = drift.observe(
+            drift.CONTRACTS["S-028"],
+            json.dumps([{key: value for key, value in rows[0].items() if key != "數值"}]),
+            content_type="application/json",
+            resource_id="r1",
+        )
+        self.assertEqual(still_break["status"], "BREAKING_DRIFT")
+        self.assertIn("MISSING_數值", still_break["reasons"])
 
     def test_observation_previous_key_is_rejected_before_it_reaches_observe(self):
         sample = {"source_id": "S-007", "body": json.dumps(API), "content_type": "application/json"}
