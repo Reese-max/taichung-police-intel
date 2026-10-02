@@ -13,6 +13,8 @@ test("public event demo is explicitly fixture-only and preserves the fusion evid
   assert.equal(data.production_verified, false);
   assert.equal(data.current_event.public_event_id, data.previous_event.public_event_id);
   assert.equal(data.current_event.independent_source_count, 3);
+  assert.equal(data.current_event.source_provenance.length, 3);
+  assert.deepEqual(data.current_event.source_provenance[0].acquisition_paths, ["DIRECT_OFFICIAL"]);
   assert.equal(data.documents.length, 3);
   assert.equal(data.current_event.fusion_status, "CONFLICT");
   assert.deepEqual(data.current_event.conflict_fields, ["event_start_at"]);
@@ -31,5 +33,6 @@ test("public event demo exposes safe local confirm, merge, and split previews", 
   assert.match(component, /預覽人工合併/);
   assert.match(component, /預覽人工拆分/);
   assert.match(component, /未改寫 canonical state/);
+  assert.match(component, /證據取得路徑/);
   assert.match(component, /production_verified !== false/);
 });
