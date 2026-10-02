@@ -162,6 +162,7 @@ def run_canary(collector, sources, now, *, session_factory=BoundedSession):
                 "detail_fetch_count": sum(
                     snapshot["purpose"] == "DETAIL" for snapshot in result["snapshots"]
                 ),
+                "pagination": result.get("pagination"),
                 "manifest_sha256": manifest,
                 "coverage_independently_verified": False,
             })

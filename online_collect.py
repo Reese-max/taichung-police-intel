@@ -414,17 +414,20 @@ def collect_s029(session: requests.Session, start: date, end: date) -> dict:
 NEWS_LIST_SOURCES = {
     "S-001": {
         "name": "臺中市政府警察局警政新聞",
+        "pages_candidate": True,
         "list_url": "https://www.police.taichung.gov.tw/ch/home.jsp?id=1&parentpath=0&mcustomize=news_list.jsp",
         "fallback_list_url": "https://www.police.taichung.gov.tw/ch/home.jsp?id=1",
         "id_pattern": r"news_view\.jsp[^\"']*dataserno=(\d+)",
     },
     "S-019": {
         "name": "臺中市政府市政會議紀錄與專案報告",
+        "pages_candidate": True,
         "list_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186",
         "id_pattern": r"/(\d+)/post\b",
     },
     "S-032": {
         "name": "臺中市政府交通局最新消息",
+        "pages_candidate": True,
         "list_url": "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,20",
         "id_pattern": r"index-1\.asp\?Parser=9,4,20,,,,(\d+)",
     },
@@ -670,7 +673,9 @@ def collect_news_list(
     config = NEWS_LIST_SOURCES[source_id]
     responses = []
     all_pages_seen = True
-    if config.get("format") == "rss":
+    is_rss = config.get("format") == "rss"
+    page_limit = 1 if is_rss else MAX_NEWS_LIST_PAGES
+    if is_rss:
         listing = get_news_listing(session, source_id)
         responses.append(snapshot(listing, "LIST"))
         entries = parse_news_rss(listing.content, listing.url)
@@ -763,6 +768,12 @@ def collect_news_list(
     return {
         "source_health": "PASS",
         "window_completeness": completeness,
+        "pagination": {
+            "strategy": "rss" if is_rss else "next-link",
+            "pages_fetched": sum(response["purpose"] == "LIST" for response in responses),
+            "page_limit": page_limit,
+            "complete": all_pages_seen,
+        },
         "window_item_count": len(window_items),
         "snapshot_item_count": len(items),
         "items": items,
@@ -1858,6 +1869,18 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
             "item_count": len(collected_items),
         }
 
+    from scripts.candidate_lane import collect_pages_candidate_lane
+
+    candidate_status, candidate_items, candidate_summary = collect_pages_candidate_lane(
+        globals(),
+        window_start.date(),
+        window_end.date(),
+        prior,
+        prior_feed,
+        now,
+        next_at,
+    )
+
     failed = sum(item["result"] == "FAILED" for item in source_status)
     partial = sum(item["result"] == "PARTIAL" for item in source_status)
     status = "FAILED" if failed == len(source_status) else "PARTIAL" if failed or partial else "SUCCEEDED"
@@ -1877,6 +1900,7 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
             "status": status,
         },
         "sources": source_status,
+        "candidate_sources": candidate_status,
     }
     save_state(output, state)
 
@@ -1895,6 +1919,8 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
         "collection_run_id": collection_run_id,
         "items": deduped_items,
         "source_summary": source_summary,
+        "candidate_items": candidate_items,
+        "candidate_source_summary": candidate_summary,
     }
     save_state(feed_output, feed_state)
 

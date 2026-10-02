@@ -315,6 +315,40 @@ class ListFirstGatingTests(unittest.TestCase):
         self.assertEqual(complete["snapshot_item_count"], 3)
         self.assertEqual(session.fetched, [oc.NEWS_LIST_SOURCES["S-032"]["list_url"], second_url])
         self.assertEqual([row["purpose"] for row in complete["snapshots"]], ["LIST", "LIST"])
+        self.assertEqual(
+            complete["pagination"],
+            {"strategy": "next-link", "pages_fetched": 2, "page_limit": 4, "complete": True},
+        )
+
+    def test_four_page_cap_exposes_incomplete_pagination_metadata(self):
+        base_url = oc.NEWS_LIST_SOURCES["S-032"]["list_url"]
+        page_urls = [base_url] + [f"{base_url}&page={page}" for page in range(2, 6)]
+        pages = {}
+        for page_number in range(1, 6):
+            article_id = 21751 - page_number
+            published = date(2026, 9, 11 - page_number).isoformat()
+            body = (
+                f'<li><a href="index-1.asp?Parser=9,4,20,,,,{article_id}">'
+                f"新聞 {published}</a><span>{published}</span></li>"
+            )
+            if page_number < 5:
+                body += (
+                    f'<a rel="next" href="/news/index.asp?Parser=9,4,20&page={page_number + 1}">'
+                    "Next</a>"
+                )
+            pages[page_urls[page_number - 1]] = _page(body)
+
+        result, session = _collect("S-032", pages[page_urls[0]], max_details=0, **pages)
+
+        self.assertEqual(result["pagination"], {
+            "strategy": "next-link",
+            "pages_fetched": 4,
+            "page_limit": 4,
+            "complete": False,
+        })
+        self.assertEqual(result["window_completeness"], "PARTIAL")
+        self.assertEqual(session.fetched, page_urls[:4])
+        self.assertNotIn(page_urls[4], session.fetched)
 
 
 class CanaryEntryTests(unittest.TestCase):

@@ -145,6 +145,101 @@ def validate_profile_view_consistency(profile_views: list[dict]) -> None:
                 canonical_by_item[item_key] = canonical
 
 
+def validate_candidate_source_context(feed: dict, status: dict, state: dict, brief: dict) -> None:
+    """Check candidate observations are visible but absent from active V2 events."""
+    lane_present = (
+        "candidate_sources" in status
+        or "candidate_items" in feed
+        or "candidate_source_context" in brief
+    )
+    if not lane_present:
+        return
+    try:
+        from scripts.candidate_publication import load_candidate_publication_sources
+
+        expected = tuple(load_candidate_publication_sources())
+    except (OSError, ValueError) as error:
+        fail(f"candidate source policy is invalid: {error}")
+    source_rows = status.get("candidate_sources")
+    if not isinstance(source_rows, list):
+        fail("source status candidate_sources must be an array")
+    by_id = {row.get("source_id"): row for row in source_rows if isinstance(row, dict)}
+    if set(by_id) != set(expected) or len(by_id) != len(source_rows):
+        fail("source status candidate IDs do not match the Issue #22 scope")
+    for source_id in expected:
+        row = by_id[source_id]
+        if row.get("integration_status") != "CANDIDATE" or row.get("promotion_eligible") is not False:
+            fail(f"candidate source was promoted in source status: {source_id}")
+
+    candidate_items = feed.get("candidate_items")
+    if not isinstance(candidate_items, list):
+        fail("feed candidate_items must be an array")
+    for item in candidate_items:
+        if not isinstance(item, dict) or item.get("source_id") not in expected:
+            fail("candidate feed contains a source outside the Issue #22 scope")
+        if item.get("integration_status") != "CANDIDATE" or item.get("promotion_eligible") is not False:
+            fail("candidate feed item is missing its CANDIDATE guard")
+        if not str(item.get("official_url") or "").startswith("https://"):
+            fail("candidate feed item lacks an HTTPS official link")
+    if any(
+        isinstance(item, dict) and item.get("source_id") in expected
+        for item in feed.get("items", [])
+    ):
+        fail("candidate source item leaked into the active feed")
+
+    context = brief.get("candidate_source_context")
+    if not isinstance(context, dict):
+        fail("candidate source context is missing from the V2 brief")
+    if (
+        context.get("scope") != "ISSUE22_CANDIDATE_ONLY"
+        or context.get("integration_status") != "CANDIDATE"
+        or context.get("promotion_eligible") is not False
+    ):
+        fail("V2 candidate context is missing its CANDIDATE-only scope")
+    if context.get("collection_run_id") != feed.get("collection_run_id"):
+        fail("V2 candidate context does not match the feed run")
+    context_sources = context.get("sources")
+    if not isinstance(context_sources, list):
+        fail("V2 candidate context sources must be an array")
+    context_by_id = {row.get("source_id"): row for row in context_sources if isinstance(row, dict)}
+    if set(context_by_id) != set(expected) or len(context_by_id) != len(context_sources):
+        fail("V2 candidate context source IDs do not match the Issue #22 scope")
+    status_fields = (
+        "source_id", "source_name", "source_url", "source_health", "window_completeness",
+        "freshness_status", "last_checked_at", "intelligence_gaps", "pagination",
+        "integration_status", "promotion_eligible",
+    )
+    for source_id in expected:
+        expected_row = {key: by_id[source_id].get(key) for key in status_fields}
+        if context_by_id[source_id] != expected_row:
+            fail(f"V2 candidate source context differs from source status: {source_id}")
+
+    item_fields = (
+        "stable_id", "stable_key", "source_id", "source_name", "title", "official_url",
+        "published_at", "source_health", "window_completeness", "change_type", "eligibility",
+        "integration_status", "promotion_eligible",
+    )
+    expected_context_items = [{key: item.get(key) for key in item_fields} for item in candidate_items]
+    if context.get("items") != expected_context_items:
+        fail("V2 candidate context items differ from candidate feed observations")
+
+    if any(
+        str(identity).startswith(f"{source_id}:")
+        for identity in state.get("items", {})
+        for source_id in expected
+    ):
+        fail("candidate source leaked into V2 active item state")
+    event_items = []
+    for key in ("priority_items", "tracking_items", "other_changes"):
+        event_items.extend(item for item in brief.get(key, []) if isinstance(item, dict))
+    for view in brief.get("profile_views", []):
+        if isinstance(view, dict):
+            for key in ("priority_items", "tracking_items", "other_changes"):
+                event_items.extend(item for item in view.get(key, []) if isinstance(item, dict))
+    if any(item.get("source_id") in expected for item in event_items):
+        fail("candidate source leaked into V2 active events")
+
+
 def verify(
     *,
     feed_path: Path,
@@ -291,6 +386,8 @@ def verify(
         fail("publication_status must be READY or PARTIAL")
     if bool(brief.get("snapshot_complete")) != (brief.get("publication_status") == "READY"):
         fail("snapshot_complete/publication_status mismatch")
+
+    validate_candidate_source_context(feed, status, state, brief)
 
     return {
         "run_id": run_id,

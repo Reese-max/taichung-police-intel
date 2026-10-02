@@ -116,6 +116,17 @@ test("V2 dashboard is police-first, Top 3 capped, and evidence-bound", async () 
   assert.doesNotMatch(source, /\bitems\.slice\(0, 5\)/);
 });
 
+test("candidate sources are labelled as inactive observations with official evidence links", async () => {
+  const source = await readFile(componentUrl, "utf8");
+  assert.match(source, /candidate_source_context/);
+  assert.match(source, /candidate-source-observations/);
+  assert.match(source, /候選來源觀察（尚未啟用）/);
+  assert.match(source, /只供人工檢視/);
+  assert.match(source, /CANDIDATE/);
+  assert.match(source, /item\.official_url/);
+  assert.match(source, /SOURCE_NAMES\[source\.source_id\]/);
+});
+
 test("Ask GovIntel is a bounded shared-gateway entry rather than a fake chatbot", async () => {
   const [dashboard, panel] = await Promise.all([
     readFile(componentUrl, "utf8"),

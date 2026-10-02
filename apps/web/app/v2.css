@@ -633,6 +633,40 @@
 .v2-source-health-grid p,
 .v2-source-health-grid small { color: var(--text-muted); }
 
+.v2-candidate-observations {
+  border-color: rgba(245, 180, 75, 0.45);
+}
+
+.v2-candidate-observations > summary {
+  color: #f7cc7b;
+}
+
+.v2-candidate-note {
+  margin: 0;
+  padding: 0 14px 12px;
+  color: var(--text-muted);
+}
+
+.v2-candidate-status {
+  padding: 2px 7px;
+  color: #f7cc7b;
+  background: rgba(245, 180, 75, 0.12);
+  border: 1px solid rgba(245, 180, 75, 0.32);
+  border-radius: 999px;
+  font-size: 0.74rem;
+}
+
+.v2-candidate-item-list {
+  display: grid;
+  gap: 6px;
+  margin: 4px 0 0;
+  padding-left: 18px;
+}
+
+.v2-candidate-item-list a {
+  line-height: 1.45;
+}
+
 .v2-system-health {
   margin-top: 28px;
   background: var(--surface-solid);
