@@ -36,6 +36,7 @@ from collect import (
     timestamp,
 )
 from intel_v2.detail_recheck import classify_observation
+from intel_v2.detail_recheck_budget import plan_recheck_budget, record_recheck_budget
 from intel_v2.detail_recheck_http import recheck_detail
 from intel_v2.located_facts import validate_document_url
 
@@ -908,6 +909,47 @@ def _save_detail_snapshot(
     return snapshot_id
 
 
+def _detail_budget_host(row: dict) -> str:
+    """Return the approved host used for the per-host request cap."""
+    try:
+        source = validate_document_url(row["source_id"], row["requested_url"])
+        host = urllib.parse.urlsplit(source["entrypoint"]).hostname
+    except (ValueError, TypeError):
+        host = None
+    if not host:
+        try:
+            host = urllib.parse.urlsplit(str(row["requested_url"])).hostname
+        except (ValueError, TypeError):
+            host = None
+    return str(host or f"unresolved:{row['source_id']}")
+
+
+def _defer_detail_recheck(
+    connection,
+    row: dict,
+    decision: dict,
+    reason: str,
+    observed_at: datetime,
+) -> None:
+    due_at = decision["due_at"] if reason != "RUN_LIMIT_REACHED" else None
+    connection.execute(
+        """
+        UPDATE detail_recheck_state
+        SET next_check_at = COALESCE(%s, next_check_at),
+            budget_state = %s::jsonb,
+            updated_at = %s
+        WHERE source_id = %s AND stable_key = %s
+        """,
+        (
+            datetime.fromisoformat(due_at) if due_at else None,
+            _detail_json(decision["budget_state"]),
+            observed_at,
+            row["source_id"],
+            row["stable_key"],
+        ),
+    )
+
+
 def run_detail_rechecks(
     connection,
     session: requests.Session,
@@ -916,6 +958,7 @@ def run_detail_rechecks(
     *,
     limit: int = DETAIL_RECHECK_MAX_PER_RUN,
     interval_hours: float = DETAIL_RECHECK_INTERVAL_HOURS,
+    budget_policy: dict | None = None,
 ) -> list[dict]:
     if not isinstance(limit, int) or limit < 0:
         raise ValueError("detail recheck limit must be non-negative")
@@ -930,7 +973,7 @@ def run_detail_rechecks(
             f"""
             SELECT source_id, stable_key, requested_url, last_checked_at, next_check_at,
                    etag, last_modified, document_version_id, body_sha256,
-                   normalized_text_sha256, attachments
+                   normalized_text_sha256, attachments, budget_state
             FROM detail_recheck_state
             WHERE next_check_at <= %s AND source_id IN ({placeholders})
             ORDER BY next_check_at, source_id, stable_key
@@ -939,8 +982,50 @@ def run_detail_rechecks(
             """,
             (observed_at, *source_ids, limit),
         ).fetchall()
+        observed = timestamp(observed_at)
+        decisions = {
+            (item["source_id"], item["stable_key"]): item
+            for item in plan_recheck_budget(
+                [
+                    {
+                        "source_id": row["source_id"],
+                        "stable_key": row["stable_key"],
+                        "host": _detail_budget_host(row),
+                        "budget_state": row.get("budget_state"),
+                    }
+                    for row in rows
+                ],
+                now=observed,
+                policy=budget_policy,
+            )
+        }
         outcomes = []
+        requested = 0
         for row in rows:
+            decision = decisions[(row["source_id"], row["stable_key"])]
+            if decision["decision"] != "ALLOW" or requested >= limit:
+                reason = decision["reason"] if decision["decision"] != "ALLOW" else "RUN_LIMIT_REACHED"
+                _defer_detail_recheck(connection, row, decision, reason, observed_at)
+                outcomes.append(
+                    {
+                        "source_id": row["source_id"],
+                        "stable_key": row["stable_key"],
+                        "requested_url": row["requested_url"],
+                        "status": "SKIPPED",
+                        "reason": reason,
+                        "review_required": False,
+                        "classification": None,
+                        "snapshot_id": None,
+                        "budget": {
+                            "reason": reason,
+                            "due_at": decision["due_at"],
+                            "failure_streak": decision["failure_streak"],
+                            "retry_deadline_exceeded": decision["retry_deadline_exceeded"],
+                        },
+                    }
+                )
+                continue
+            requested += 1
             previous = _detail_previous(row)
             try:
                 source = validate_document_url(row["source_id"], row["requested_url"])
@@ -979,6 +1064,14 @@ def run_detail_rechecks(
             }
             checked_at = datetime.fromisoformat(classification["last_checked_at"])
             next_check_at = detail_next_check(classification, checked_at, interval_hours=interval_hours)
+            budget_state = record_recheck_budget(
+                row.get("budget_state"),
+                classification,
+                now=observed,
+                policy=budget_policy,
+            )
+            if budget_state["deferred_until"]:
+                next_check_at = max(next_check_at, datetime.fromisoformat(budget_state["deferred_until"]))
             public_result = {key: value for key, value in result.items() if key != "response_body"}
             connection.execute(
                 """
@@ -998,7 +1091,8 @@ def run_detail_rechecks(
                     changed_fields = %s::jsonb,
                     last_result = %s::jsonb,
                     last_snapshot_id = COALESCE(%s, last_snapshot_id),
-                    updated_at = %s
+                    updated_at = %s,
+                    budget_state = %s::jsonb
                 WHERE source_id = %s AND stable_key = %s
                 """,
                 (
@@ -1018,6 +1112,7 @@ def run_detail_rechecks(
                     _detail_json(public_result),
                     snapshot_id,
                     observed_at,
+                    _detail_json(budget_state),
                     row["source_id"],
                     row["stable_key"],
                 ),
@@ -1031,6 +1126,7 @@ def run_detail_rechecks(
                     "review_required": classification["review_required"],
                     "classification": public_result["classification"],
                     "snapshot_id": snapshot_id,
+                    "budget": budget_state,
                 }
             )
     return outcomes
