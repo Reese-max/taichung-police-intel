@@ -28,8 +28,24 @@ VALID_STATUSES = {
     "SOURCE_UNAVAILABLE",
 }
 GOOD_STATUSES = {"NO_DRIFT", "ADDITIVE_COMPATIBLE"}
-CONTRACT_VERSION = "1.0"
+# 1.1: the observed schema fingerprint became shape-only (pagination marker types
+# instead of values, per-record type sets instead of the first record, a date
+# coverage class instead of an n/m ratio, no entry counts). Persisted 1.0
+# fingerprints describe the older signature and are not comparable.
+CONTRACT_VERSION = "1.1"
 MAX_ROW_REASONS = 10
+OBSERVATION_KEYS = {
+    "body": (bytes, str),
+    "http_status": (int,),
+    "content_type": (str,),
+    # A failed probe legitimately records these as null instead of a value.
+    "resource_id": (str, type(None)),
+    "observed_at": (str,),
+    "requested_url": (str, type(None)),
+    "final_url": (str, type(None)),
+    "error_reason": (str,),
+    "previous": (dict,),
+}
 
 
 def _news(source_id: str, name: str, pattern: str, *, published_required: bool = True) -> dict[str, Any]:
@@ -128,6 +144,7 @@ CONTRACTS: dict[str, dict[str, Any]] = {
             "content": "string",
         },
         "pagination_paths": ["data.totalPages", "data.totalCount"],
+        "record_count_path": "data.totalCount",
     },
     "S-009": {
         "source_id": "S-009",
@@ -147,6 +164,7 @@ CONTRACTS: dict[str, dict[str, Any]] = {
         "record_required_fields": ["billId"],
         "record_type_fields": {"billId": "string"},
         "pagination_paths": ["data.totalPages", "data.totalCount"],
+        "record_count_path": "data.totalCount",
     },
     "S-028": {
         "source_id": "S-028",
@@ -276,6 +294,42 @@ def _partially_present_fields(records: list[dict[str, Any]], required: list[str]
     return sorted(field for field in required if any(field not in record for record in records))
 
 
+def _record_contract_failures(
+    required: list[str],
+    records: list[dict[str, Any]],
+    wrong_types: list[str],
+) -> list[str]:
+    """Report a partly-missing required field and a type change in one fail-closed verdict."""
+    partial_fields = _partially_present_fields(records, required)
+    if not partial_fields and not wrong_types:
+        return []
+    reasons: list[str] = []
+    if partial_fields:
+        reasons.append("REQUIRED_FIELD_MISSING_IN_SOME_ROWS")
+        reasons.extend(f"MISSING_IN_SOME_ROWS_{field}" for field in partial_fields)
+    if wrong_types:
+        reasons.append("TYPE_CHANGED")
+        reasons.extend(f"TYPE_{field}" for field in wrong_types)
+    return reasons
+
+
+def _apply_pagination_coverage(
+    result: dict[str, Any], contract: dict[str, Any], payload: Any, records: list[Any]
+) -> dict[str, Any]:
+    """A contract-healthy source still fails closed when only part of the window was observed."""
+    count_path = contract.get("record_count_path")
+    present, declared = get_path(payload, count_path) if count_path else (False, None)
+    result["observed_record_count"] = len(records)
+    result["declared_total_count"] = declared if present else None
+    if not present or isinstance(declared, bool) or not isinstance(declared, int):
+        return result
+    if len(records) >= declared:
+        return result
+    result["window_completeness"] = "PARTIAL"
+    result["reasons"] = sorted(set(result["reasons"]) | {"PAGINATION_WINDOW_NOT_COVERED"})
+    return result
+
+
 def _finish(result: dict[str, Any], signature: Any, status: str, reasons: list[str]) -> dict[str, Any]:
     if status not in VALID_STATUSES:
         raise ValueError(f"invalid drift status: {status}")
@@ -291,9 +345,12 @@ def _finish(result: dict[str, Any], signature: Any, status: str, reasons: list[s
     return result
 
 
+def _base_content_type(content_type: str) -> str:
+    return (content_type or "").split(";", 1)[0].strip().lower()
+
+
 def _content_type_ok(content_type: str, expected: list[str]) -> bool:
-    actual = (content_type or "").split(";", 1)[0].strip().lower()
-    return actual in {item.lower() for item in expected}
+    return _base_content_type(content_type) in {item.lower() for item in expected}
 
 
 def _resource_drift(result: dict[str, Any], previous: dict[str, Any] | None) -> None:
@@ -336,7 +393,11 @@ def observe(
     if not _content_type_ok(content_type, contract["expected_content_types"]):
         return _finish(
             result,
-            {"transport": contract["transport"], "expected_content_types": contract["expected_content_types"], "actual_content_type": content_type},
+            {
+                "transport": contract["transport"],
+                "expected_content_types": sorted(_base_content_type(item) for item in contract["expected_content_types"]),
+                "actual_content_type": _base_content_type(content_type),
+            },
             "CONTENT_SHAPE_UNKNOWN",
             ["CONTENT_TYPE_MISMATCH"],
         )
@@ -378,7 +439,7 @@ def _observe_html(contract: dict[str, Any], body: bytes, result: dict[str, Any],
     except Exception as error:
         result["reasons"] = ["HTML_LIST_ID_OR_SELECTOR_FAILED", type(error).__name__.upper()]
         result["status"] = "BREAKING_DRIFT"
-        _signature(result, {"transport": "HTML", "parse": "failed"})
+        _signature(result, {"source_id": contract["source_id"], "transport": contract["transport"], "parse": "failed"})
         result["review_required"] = True
         return result
     fields = sorted({key for entry in entries for key in entry})
@@ -410,7 +471,7 @@ def _observe_rss(contract: dict[str, Any], body: bytes, result: dict[str, Any], 
     except Exception as error:
         result["reasons"] = ["RSS_LIST_SHAPE_FAILED", type(error).__name__.upper()]
         result["status"] = "BREAKING_DRIFT"
-        _signature(result, {"transport": "RSS", "parse": "failed"})
+        _signature(result, {"source_id": contract["source_id"], "transport": contract["transport"], "parse": "failed"})
         result["review_required"] = True
         return result
     fields = sorted({key for entry in entries for key in entry})
@@ -433,7 +494,7 @@ def _observe_fire_live(contract: dict[str, Any], body: bytes, result: dict[str, 
     except Exception as error:
         result["reasons"] = ["HTML_LIVE_SHAPE_FAILED", type(error).__name__.upper()]
         result["status"] = "BREAKING_DRIFT"
-        _signature(result, {"transport": "HTML_LIVE", "parse": "failed"})
+        _signature(result, {"source_id": contract["source_id"], "transport": contract["transport"], "parse": "failed"})
         result["review_required"] = True
         return result
     fields = sorted({key for entry in entries for key in entry})
@@ -483,16 +544,16 @@ def _observe_json_api(contract: dict[str, Any], body: bytes, result: dict[str, A
     ]
     if missing_fields:
         return _finish(result, {"transport": contract["transport"], "record_fields": fields}, "BREAKING_DRIFT", ["REQUIRED_FIELD_MISSING", *[f"MISSING_{field}" for field in missing_fields]])
-    partial_fields = _partially_present_fields(records, contract["record_required_fields"])
-    if partial_fields:
+    contract_failures = _record_contract_failures(
+        contract["record_required_fields"], records, wrong_record_types
+    )
+    if contract_failures:
         return _finish(
             result,
-            {"transport": contract["transport"], "record_fields": fields},
+            {"transport": contract["transport"], "record_fields": fields, "record_types": _observed_types(records, fields)},
             "BREAKING_DRIFT",
-            ["REQUIRED_FIELD_MISSING_IN_SOME_ROWS", *[f"MISSING_IN_SOME_ROWS_{field}" for field in partial_fields]],
+            contract_failures,
         )
-    if wrong_record_types:
-        return _finish(result, {"transport": contract["transport"], "record_fields": fields}, "BREAKING_DRIFT", ["TYPE_CHANGED", *[f"TYPE_{field}" for field in wrong_record_types]])
     extra = sorted(set(fields) - set(contract["record_required_fields"]))
     status = "ADDITIVE_COMPATIBLE" if extra else "NO_DRIFT"
     reasons = ["ADDITIVE_FIELDS"] if extra else []
@@ -506,7 +567,9 @@ def _observe_json_api(contract: dict[str, Any], body: bytes, result: dict[str, A
             if get_path(payload, path)[0]
         },
     }
-    return _finish(result, signature, status, reasons)
+    return _apply_pagination_coverage(
+        _finish(result, signature, status, reasons), contract, payload, records
+    )
 
 
 def _observe_data_gov_json(contract: dict[str, Any], body: bytes, result: dict[str, Any], previous: dict[str, Any] | None) -> dict[str, Any]:
@@ -528,16 +591,14 @@ def _observe_data_gov_json(contract: dict[str, Any], body: bytes, result: dict[s
     ]
     if missing:
         return _finish(result, {"transport": contract["transport"], "record_fields": fields}, "BREAKING_DRIFT", ["REQUIRED_FIELD_MISSING", *[f"MISSING_{field}" for field in missing]])
-    partial_fields = _partially_present_fields(payload, contract["required_fields"])
-    if partial_fields:
+    contract_failures = _record_contract_failures(contract["required_fields"], payload, wrong_types)
+    if contract_failures:
         return _finish(
             result,
-            {"transport": contract["transport"], "record_fields": fields},
+            {"transport": contract["transport"], "record_fields": fields, "field_types": _observed_types(payload, fields)},
             "BREAKING_DRIFT",
-            ["REQUIRED_FIELD_MISSING_IN_SOME_ROWS", *[f"MISSING_IN_SOME_ROWS_{field}" for field in partial_fields]],
+            contract_failures,
         )
-    if wrong_types:
-        return _finish(result, {"transport": contract["transport"], "record_fields": fields}, "BREAKING_DRIFT", ["TYPE_CHANGED", *[f"TYPE_{field}" for field in wrong_types]])
     extra = sorted(set(fields) - set(contract["required_fields"]))
     status = "ADDITIVE_COMPATIBLE" if extra else "NO_DRIFT"
     return _finish(
@@ -563,21 +624,23 @@ def _observe_data_gov_csv(contract: dict[str, Any], body: bytes, result: dict[st
         return _finish(result, {"transport": contract["transport"], "header": header}, "BREAKING_DRIFT", ["REQUIRED_HEADER_MISSING", *[f"MISSING_{field}" for field in missing]])
     if len(header) < contract["expected_column_count"]:
         return _finish(result, {"transport": contract["transport"], "header": header}, "BREAKING_DRIFT", ["COLUMN_COUNT_DECREASED"])
-    widths = [len(row) for row in rows[1:] if row]
-    mismatched = [index for index, width in enumerate(widths, start=1) if width != len(header)]
+    # Blank lines are separators, not records, so they neither shift column
+    # indices nor count as a data row.
+    data_rows = [(index, row) for index, row in enumerate(rows[1:], start=1) if row]
+    mismatched = [(index, len(row)) for index, row in data_rows if len(row) != len(header)]
     if mismatched:
         return _finish(
             result,
-            {"transport": contract["transport"], "header": header, "column_count": len(header), "row_column_counts": sorted(set(widths))},
+            {"transport": contract["transport"], "header": header, "column_count": len(header), "row_column_counts": sorted({width for _, width in mismatched})},
             "BREAKING_DRIFT",
             [
                 "ROW_COLUMN_COUNT_MISMATCH",
                 f"MISMATCHED_ROW_COUNT_{len(mismatched)}",
-                *[f"ROW_{index}_COLUMNS_{widths[index - 1]}" for index in mismatched[:MAX_ROW_REASONS]],
+                *[f"ROW_{index}_COLUMNS_{width}" for index, width in mismatched[:MAX_ROW_REASONS]],
             ],
         )
     extra = sorted(set(header) - required)
-    if len(rows) == 1:
+    if not data_rows:
         return _finish(result, {"transport": contract["transport"], "header": header, "column_count": len(header)}, "CONTENT_SHAPE_UNKNOWN", ["NO_DATA_ROWS"])
     status = "ADDITIVE_COMPATIBLE" if extra or len(header) > contract["expected_column_count"] else "NO_DRIFT"
     return _finish(
@@ -626,6 +689,27 @@ def update_state(state: dict[str, Any], result: dict[str, Any]) -> dict[str, Any
     return state
 
 
+def _validate_observation(item: dict[str, Any]) -> None:
+    """Reject malformed replay evidence before it can reach the state file or receipt."""
+    for key, expected in OBSERVATION_KEYS.items():
+        if key not in item:
+            continue
+        value = item[key]
+        if expected == (int,) and isinstance(value, bool):
+            raise ValueError(f"schema-drift observation has invalid {key}: {value!r}")
+        if not isinstance(value, expected):
+            raise ValueError(f"schema-drift observation has invalid {key}: {value!r}")
+    observed_at = item.get("observed_at")
+    if isinstance(observed_at, str):
+        try:
+            datetime.fromisoformat(observed_at.replace("Z", "+00:00"))
+        except ValueError as error:
+            raise ValueError(f"schema-drift observation has invalid observed_at: {observed_at!r}") from error
+    unknown = sorted(set(item) - {"source_id", "body", "body_base64", "body_text", *OBSERVATION_KEYS})
+    if unknown:
+        raise ValueError(f"schema-drift observation has unknown keys: {', '.join(unknown)}")
+
+
 def build_receipt(
     observations: list[dict[str, Any]] | None = None,
     *,
@@ -642,6 +726,7 @@ def build_receipt(
             raise ValueError(f"schema-drift observation has unknown source_id: {source_id}")
         if source_id in observations_by_id:
             raise ValueError(f"schema-drift observation has duplicate source_id: {source_id}")
+        _validate_observation(item)
         observations_by_id[source_id] = item
     receipt_sources = []
     review_inbox = []

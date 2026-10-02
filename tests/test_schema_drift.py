@@ -278,6 +278,173 @@ class SchemaDriftTests(unittest.TestCase):
         self.assertEqual(json.loads(json.dumps(expected)), observed["fingerprint_signature"])
         self.assertEqual(observed["observed_schema_fingerprint"], drift.canonical_hash(expected))
 
+    def test_partly_missing_and_retyped_fields_report_both_in_one_verdict(self):
+        payload = copy.deepcopy(API)
+        payload["data"]["data"].append({"proceedingsId": 2, "date": "2026-09-11", "content": "無講者"})
+        result = drift.observe(drift.CONTRACTS["S-007"], json.dumps(payload), content_type="application/json")
+        self.assertEqual(result["status"], "BREAKING_DRIFT")
+        self.assertIn("REQUIRED_FIELD_MISSING_IN_SOME_ROWS", result["reasons"])
+        self.assertIn("MISSING_IN_SOME_ROWS_speaker", result["reasons"])
+        self.assertIn("TYPE_CHANGED", result["reasons"])
+        self.assertIn("TYPE_proceedingsId", result["reasons"])
+        self.assertEqual(
+            result["fingerprint_signature"]["record_types"]["proceedingsId"], ["integer", "string"]
+        )
+
+    def test_single_page_of_a_larger_window_is_not_a_complete_window(self):
+        one_of_many = copy.deepcopy(API)
+        one_of_many["data"]["totalPages"] = 9
+        one_of_many["data"]["totalCount"] = 1800
+        result = drift.observe(
+            drift.CONTRACTS["S-007"], json.dumps(one_of_many), content_type="application/json"
+        )
+        self.assertEqual(result["status"], "NO_DRIFT")
+        self.assertEqual(result["window_completeness"], "PARTIAL")
+        self.assertIn("PAGINATION_WINDOW_NOT_COVERED", result["reasons"])
+        self.assertEqual(result["observed_record_count"], 1)
+        self.assertEqual(result["declared_total_count"], 1800)
+        self.assertFalse(result["review_required"])
+
+        covered = drift.observe(drift.CONTRACTS["S-007"], json.dumps(API), content_type="application/json")
+        self.assertEqual(covered["window_completeness"], "COMPLETE_WITH_ITEMS")
+        self.assertNotIn("PAGINATION_WINDOW_NOT_COVERED", covered["reasons"])
+        self.assertEqual(covered["declared_total_count"], 1)
+
+    def test_csv_header_with_only_blank_rows_is_not_a_complete_window(self):
+        for body in (
+            "民國年月,網域,網站性質,法律依據,聲請單位\n\n",
+            "民國年月,網域,網站性質,法律依據,聲請單位\n\r\n\r\n",
+        ):
+            with self.subTest(body=body):
+                result = drift.observe(
+                    drift.CONTRACTS["CTX-165"], body, content_type="text/csv", resource_id="r1"
+                )
+                self.assertEqual(result["status"], "CONTENT_SHAPE_UNKNOWN")
+                self.assertEqual(result["window_completeness"], "PARTIAL")
+                self.assertEqual(result["reasons"], ["NO_DATA_ROWS"])
+
+    def test_csv_row_reasons_name_the_file_row_and_stay_bounded(self):
+        header = "民國年月,網域,網站性質,法律依據,聲請單位\n"
+        good = "11509,a.test,其他,法規,機關\n"
+        body = header + good + "\n" + "11509,short\n" + good
+        result = drift.observe(drift.CONTRACTS["CTX-165"], body, content_type="text/csv", resource_id="r1")
+        self.assertEqual(result["status"], "BREAKING_DRIFT")
+        self.assertIn("ROW_COLUMN_COUNT_MISMATCH", result["reasons"])
+        self.assertIn("MISMATCHED_ROW_COUNT_1", result["reasons"])
+        self.assertIn("ROW_3_COLUMNS_2", result["reasons"])
+        self.assertNotIn("ROW_2_COLUMNS_2", result["reasons"])
+
+        noisy = drift.observe(
+            drift.CONTRACTS["CTX-165"], header + "11509,short\n" * 500, content_type="text/csv", resource_id="r1"
+        )
+        row_reasons = [
+            reason for reason in noisy["reasons"]
+            if reason.startswith("ROW_") and reason != "ROW_COLUMN_COUNT_MISMATCH"
+        ]
+        self.assertEqual(len(row_reasons), drift.MAX_ROW_REASONS)
+        self.assertIn("MISMATCHED_ROW_COUNT_500", noisy["reasons"])
+        self.assertEqual(len(noisy["reasons"]), drift.MAX_ROW_REASONS + 2)
+
+    def test_large_well_formed_csv_stays_no_drift(self):
+        header = "民國年月,網域,網站性質,法律依據,聲請單位\n"
+        body = header + "".join(
+            f"115{index % 100:02d},host{index}.test,其他,法規,機關\n" for index in range(5000)
+        )
+        result = drift.observe(drift.CONTRACTS["CTX-165"], body, content_type="text/csv", resource_id="r1")
+        self.assertEqual(result["status"], "NO_DRIFT")
+        self.assertEqual(result["reasons"], [])
+
+    def test_fingerprint_is_shape_only_across_content_type_parameters_and_sources(self):
+        body = json.dumps(API)
+        plain = drift.observe(drift.CONTRACTS["S-007"], body, content_type="application/json")
+        parametrized = drift.observe(drift.CONTRACTS["S-007"], body, content_type="application/json; charset=utf-8")
+        self.assertEqual(
+            plain["observed_schema_fingerprint"], parametrized["observed_schema_fingerprint"]
+        )
+
+        mismatch = drift.observe(drift.CONTRACTS["S-007"], b"<html />", content_type="text/html; charset=big5")
+        other_mismatch = drift.observe(drift.CONTRACTS["S-007"], b"<html />", content_type="text/html;q=0.9")
+        self.assertEqual(
+            mismatch["observed_schema_fingerprint"], other_mismatch["observed_schema_fingerprint"]
+        )
+        self.assertEqual(
+            mismatch["fingerprint_signature"]["actual_content_type"],
+            other_mismatch["fingerprint_signature"]["actual_content_type"],
+        )
+
+        broken_html = "<html><body>200 but changed</body></html>"
+        fingerprints = {
+            drift.observe(contract, broken_html, content_type="text/html")["observed_schema_fingerprint"]
+            for contract in (drift.CONTRACTS["S-001"], drift.CONTRACTS["S-019"], drift.CONTRACTS["S-032"])
+        }
+        self.assertEqual(len(fingerprints), 3)
+
+    def test_every_fingerprinted_outcome_records_the_signature_it_hashed(self):
+        api_result = drift.observe(drift.CONTRACTS["S-007"], json.dumps(API), content_type="application/json")
+        self.assertIsNotNone(api_result["fingerprint_signature"])
+        for contract, body, content_type in (
+            (drift.CONTRACTS["S-001"], b"<html>no list</html>", "text/html"),
+            (drift.CONTRACTS["S-033"], b"<rss><channel></channel></rss>", "application/xml"),
+            (drift.CONTRACTS["S-031"], b"<div>no live list</div>", "text/html"),
+            (drift.CONTRACTS["S-007"], b"not-json", "application/json"),
+        ):
+            with self.subTest(source_id=contract["source_id"]):
+                result = drift.observe(contract, body, content_type=content_type)
+                self.assertIsNotNone(result["observed_schema_fingerprint"])
+                self.assertIsNotNone(result["fingerprint_signature"])
+                self.assertEqual(
+                    result["observed_schema_fingerprint"],
+                    drift.canonical_hash(result["fingerprint_signature"]),
+                )
+
+        for contract, kwargs in (
+            (drift.CONTRACTS["S-009"], {"http_status": 503, "content_type": "application/json"}),
+            (drift.CONTRACTS["S-028"], {"http_status": 503, "content_type": "application/json"}),
+        ):
+            with self.subTest(source_id=contract["source_id"]):
+                result = drift.observe(contract, b"", **kwargs)
+                self.assertEqual(result["status"], "SOURCE_UNAVAILABLE")
+                self.assertIsNone(result["fingerprint_signature"])
+        unknown = drift._unknown(drift.CONTRACTS["S-007"], "NO_CURRENT_OBSERVATION")
+        self.assertIsNone(unknown["fingerprint_signature"])
+
+    def test_fire_live_fingerprint_ignores_incident_count(self):
+        one = drift.observe(drift.CONTRACTS["S-031"], FIRE_LIVE, content_type="text/html")
+        two = drift.observe(
+            drift.CONTRACTS["S-031"],
+            FIRE_LIVE + FIRE_LIVE.split(b"<ul", 1)[1],
+            content_type="text/html",
+        )
+        self.assertEqual(one["status"], "NO_DRIFT")
+        self.assertEqual(two["status"], "NO_DRIFT")
+        self.assertNotIn("entry_count", one["fingerprint_signature"])
+        self.assertEqual(one["observed_schema_fingerprint"], two["observed_schema_fingerprint"])
+
+    def test_contract_version_marks_the_shape_only_fingerprint_era(self):
+        self.assertEqual(drift.CONTRACT_VERSION, "1.1")
+        self.assertEqual(drift.empty_state()["contract_version"], "1.1")
+        observed = drift.observe(drift.CONTRACTS["S-007"], json.dumps(API), content_type="application/json")
+        self.assertEqual(observed["contract_version"], "1.1")
+        state = drift.update_state(drift.empty_state(), observed)
+        self.assertEqual(state["contract_version"], "1.1")
+
+    def test_replay_observations_are_validated_before_reaching_the_receipt(self):
+        sample = {"source_id": "S-007", "body": json.dumps(API), "content_type": "application/json"}
+        for bad in (
+            {**sample, "observed_at": "not-a-date"},
+            {**sample, "resource_id": {"nested": 1}},
+            {**sample, "http_status": "200"},
+            {**sample, "http_status": True},
+            {**sample, "final_url": ["https://official.test"]},
+            {**sample, "bogus": "injected"},
+        ):
+            with self.subTest(bad=sorted(set(bad) - {"body"})):
+                with self.assertRaisesRegex(ValueError, "observation has"):
+                    drift.build_receipt([bad], contracts={"S-007": drift.CONTRACTS["S-007"]})
+        accepted = {**sample, "resource_id": None, "requested_url": None, "error_reason": "LIVE_FETCH_TIMEOUT"}
+        receipt, _ = drift.build_receipt([accepted], contracts={"S-007": drift.CONTRACTS["S-007"]})
+        self.assertEqual(receipt["sources"][0]["source_id"], "S-007")
+
     def test_empty_resources_are_unknown_not_complete_zero(self):
         result = drift.observe(drift.CONTRACTS["S-028"], "[]", content_type="application/json", resource_id="r1")
         self.assertEqual(result["status"], "CONTENT_SHAPE_UNKNOWN")
