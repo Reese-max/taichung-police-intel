@@ -129,6 +129,40 @@ def _normalise(value: Any, normalizer: str) -> Any:
     return value
 
 
+_CONTEXT_BOUNDARIES = "。；;！!？?\t\n "
+
+
+def _context_segment(text: str, start: int, end: int) -> tuple[str, int]:
+    left = start
+    while left > 0 and text[left - 1] not in _CONTEXT_BOUNDARIES:
+        left -= 1
+    right = end
+    while right < len(text) and text[right] not in _CONTEXT_BOUNDARIES:
+        right += 1
+    return text[left:right], left
+
+
+def _uncertainty_context(text: str, start: int, end: int) -> str:
+    segment, segment_start = _context_segment(text, start, end)
+    left = text[:segment_start].rstrip(_CONTEXT_BOUNDARIES)
+    left_segment = left
+    for i in range(len(left) - 1, -1, -1):
+        if left[i] in _CONTEXT_BOUNDARIES:
+            left_segment = left[i + 1:]
+            break
+    return f"{left_segment} {segment}"
+
+
+def _uncertain_time_reason(segment: str) -> str | None:
+    if "不再" in segment or "取消" in segment:
+        return "TIME_NEGATED"
+    if "尚未決定" in segment or "未決定" in segment or "尚未確定" in segment or "未確定" in segment:
+        return "TIME_UNDECIDED"
+    if "原訂" in segment or "改為" in segment or "改成" in segment or "延後" in segment or "延期" in segment:
+        return "TIME_RESCHEDULED"
+    return None
+
+
 def _date_value(value: str) -> str | None:
     match = DATE_RE.search(value)
     if not match:
@@ -233,6 +267,10 @@ def extract_html_facts(document: dict[str, Any], body: bytes, rules: list[dict[s
                 status, reason = "NEEDS_REVIEW", "AMBIGUOUS_VALID_TIME"
         if len(matches) != 1:
             status, reason = "NEEDS_REVIEW", "AMBIGUOUS_TEXT_MATCH"
+        uncertainty = _uncertain_time_reason(_uncertainty_context(text, match.start(), match.end()))
+        if uncertainty is not None:
+            status, reason = "NEEDS_REVIEW", uncertainty
+            valid_time, valid_time_source = None, None
         locator = {
             "type": "HTML_TEXT_RANGE",
             "start": match.start(),
@@ -282,6 +320,63 @@ def extract_json_facts(document: dict[str, Any], body: bytes, rules: list[dict[s
         valid_time_source = {"type": "JSON_VALUE"} if rule.get("value_is_date") else None
         facts.append(_fact(document, rule, raw_value, locator, "FACT_CANDIDATE", None, valid_time, valid_time_source))
     return facts
+
+
+def compare_document_versions(
+    old_document: dict[str, Any],
+    old_facts: list[dict[str, Any]],
+    new_document: dict[str, Any],
+    new_facts: list[dict[str, Any]],
+    *,
+    basis: str = "UNSPECIFIED",
+) -> dict[str, Any]:
+    """Diff two acquired versions of the same source identity.
+
+    ``basis`` labels the comparison set (e.g. SYNTHETIC_MODIFIED_COPY for an
+    explicitly marked copy); callers must not present a synthetic replay as a
+    real official revision.
+    """
+    def keyed(facts):
+        return {(f.get("subject_id"), f.get("predicate")): f for f in facts if isinstance(f, dict)}
+
+    old_by_key = keyed(old_facts)
+    new_by_key = keyed(new_facts)
+    affected = []
+    for key in sorted(set(old_by_key) | set(new_by_key)):
+        old = old_by_key.get(key)
+        new = new_by_key.get(key)
+        if old is None:
+            affected.append({"subject_id": key[0], "predicate": key[1], "change": "ADDED",
+                             "old_normalized_value": None, "new_normalized_value": new.get("normalized_value"),
+                             "old_valid_time": None, "new_valid_time": new.get("valid_time")})
+            continue
+        if new is None:
+            affected.append({"subject_id": key[0], "predicate": key[1], "change": "REMOVED",
+                             "old_normalized_value": old.get("normalized_value"), "new_normalized_value": None,
+                             "old_valid_time": old.get("valid_time"), "new_valid_time": None})
+            continue
+        if old.get("normalized_value") != new.get("normalized_value"):
+            change = "VALUE_CHANGED"
+        elif old.get("valid_time") != new.get("valid_time"):
+            change = "VALID_TIME_CHANGED"
+        elif old.get("verification_status") != new.get("verification_status"):
+            change = "VERIFICATION_CHANGED"
+        else:
+            continue
+        affected.append({"subject_id": key[0], "predicate": key[1], "change": change,
+                         "old_normalized_value": old.get("normalized_value"),
+                         "new_normalized_value": new.get("normalized_value"),
+                         "old_valid_time": old.get("valid_time"),
+                         "new_valid_time": new.get("valid_time")})
+    return {
+        "basis": basis,
+        "source_identity_matches": old_document.get("original_source_identity") == new_document.get("original_source_identity"),
+        "document_version_changed": old_document.get("document_version_id") != new_document.get("document_version_id"),
+        "raw_bytes_sha256_changed": old_document.get("raw_bytes_sha256") != new_document.get("raw_bytes_sha256"),
+        "extracted_text_sha256_changed": old_document.get("extracted_text_sha256") != new_document.get("extracted_text_sha256"),
+        "extractor_version_matches": old_document.get("extractor_version") == new_document.get("extractor_version"),
+        "affected_facts": affected,
+    }
 
 
 def verify_fact(document: dict[str, Any], body: bytes, fact: dict[str, Any]) -> dict[str, Any]:

@@ -55,6 +55,29 @@ source itself must also be `PRODUCTION_ACTIVE` or `AUDITED_EXISTING` in the
 server catalog; unpromoted `VERIFIED_CANDIDATE` sources are rejected before
 their facts can enter the trusted catalog.
 
+Located-fact extraction is not definite from bare values. Sentence-level safety
+guard: when the context segment around a matched time — including the
+adjacent token immediately to its left — contains an explicit
+reschedule marker (`原訂`/`改為`/`改成`/`延後`/`延期`), an open decision
+(`尚未決定`/`未決定`/`尚未確定`/`未確定`), or a negation (`不再`/`取消`), the fact stays
+`NEEDS_REVIEW` with `TIME_RESCHEDULED` / `TIME_UNDECIDED` / `TIME_NEGATED` and
+`valid_time=null`. `活動開始 18:00` vs `道路管制開始 16:00` remain distinct
+subject/predicate roles; nothing definite is promoted from an ambiguous quote.
+
+`compare_document_versions(old_document, old_facts, new_document, new_facts,
+basis=...)` diffs two acquisitions of the same source identity: it reports
+document version/hash changes and classifies affected facts as
+`ADDED`/`REMOVED`/`VALUE_CHANGED`/`VALID_TIME_CHANGED`/`VERIFICATION_CHANGED`.
+A same-url, same-title change such as 17:00→16:00 is labelled via `basis`
+(e.g. `SYNTHETIC_MODIFIED_COPY`) and new facts never become
+`CONFIRMED_OFFICIAL` automatically — a synthetic replay is not a real official
+revision.
+
+Known comparison limits: duplicate `(subject_id, predicate)` rows collapse to
+the last one; when several fields change at once only the first is reported;
+diffing a different `original_source_identity` is flagged via
+`source_identity_matches: false` rather than refused.
+
 ## 2026-09-21 local replay
 
 The live S-028 bundle was confirmed into a temporary test-only output using
