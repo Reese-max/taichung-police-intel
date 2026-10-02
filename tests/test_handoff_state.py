@@ -89,6 +89,34 @@ class HandoffStateTests(unittest.TestCase):
         )
         self.assertEqual(updated["handoffs"][0]["brief_id"], first_handoff["brief_id"])
 
+    def test_budget_refused_recheck_never_invalidates_a_confirmed_claim(self):
+        current = dict(item(), document_version_id="DOCV-OLD")
+        state, watch, _ = add_watch(empty_state(), current, created_at=T0)
+        state, _ = confirm_handoff(
+            state,
+            current_items={current["identity"]: current},
+            publication={"collection_run_id": "RUN-1"},
+            generated_at=T0,
+            confirmed_at=T0,
+        )
+        updated = sync_with_detail_rechecks(
+            state,
+            [
+                {
+                    "source_id": "S-001",
+                    "stable_key": "event-1",
+                    "status": "SKIPPED",
+                    "reason": "BACKOFF_ACTIVE",
+                    "classification": None,
+                }
+            ],
+            observed_at=T1,
+        )
+        self.assertEqual(updated["watch_items"][watch["watch_id"]]["status"], "WATCHING")
+        self.assertEqual(updated["watch_items"][watch["watch_id"]]["invalidations"], [])
+        with self.assertRaisesRegex(ValueError, "classification is required"):
+            sync_with_detail_rechecks(state, [{"source_id": "S-001", "stable_key": "event-1"}], observed_at=T1)
+
     def test_detail_recheck_reopens_only_matching_confirmed_claim(self):
         current = dict(item(), document_version_id="DOCV-OLD")
         state, watch, _ = add_watch(empty_state(), current, created_at=T0)

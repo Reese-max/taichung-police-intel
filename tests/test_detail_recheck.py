@@ -1,4 +1,5 @@
 import unittest
+from datetime import datetime, timedelta
 
 from intel_v2.detail_recheck import classify_observation, plan_recheck
 from intel_v2.detail_recheck_budget import (
@@ -112,7 +113,10 @@ class DetailRecheckBudgetTests(unittest.TestCase):
 
     def state_with_attempts(self, *minutes_ago, **overrides):
         state = empty_budget_state()
-        state["attempts"] = [f"2026-09-21T{12 - (offset // 60):02d}:{offset % 60:02d}:00+08:00" for offset in minutes_ago]
+        state["attempts"] = [
+            (datetime.fromisoformat(NOW) - timedelta(minutes=offset)).isoformat(timespec="seconds")
+            for offset in minutes_ago
+        ]
         state.update(overrides)
         return state
 
@@ -258,16 +262,75 @@ class DetailRecheckBudgetTests(unittest.TestCase):
         self.assertIsNone(after["deadline_at"])
         self.assertFalse(after["retry_deadline_exceeded"])
 
-    def test_unavailable_counts_as_an_attempt_without_escalating_backoff(self):
-        state = self.state_with_attempts(10, 20, failure_streak=2)
+    def test_unavailable_consumes_an_attempt_without_erasing_an_outstanding_backoff(self):
+        state = self.state_with_attempts(
+            10, 20, failure_streak=2, deferred_until="2026-09-21T11:00:00+08:00", deadline_at=NOW
+        )
         after = record_recheck_budget(state, {"status": "UNAVAILABLE"}, now=NOW)
-        self.assertEqual(after["failure_streak"], 0)
-        self.assertIsNone(after["deferred_until"])
+        self.assertEqual(
+            after["failure_streak"],
+            2,
+            "an alternating 429/404 source must not be able to reset its own retry deadline",
+        )
+        self.assertEqual(after["deferred_until"], "2026-09-21T11:00:00+08:00")
+        self.assertTrue(after["retry_deadline_exceeded"])
+        self.assertEqual(after["last_decision"], "INCOMPLETE")
         self.assertEqual(len(after["attempts"]), 3)
-        decision = plan_recheck_budget(
-            [self.target("a", budget_state=state)], now=NOW, policy={"per_source_limit": 2}
+        exhausted = plan_recheck_budget(
+            [self.target("a", budget_state=self.state_with_attempts(10, 20))],
+            now=NOW,
+            policy={"per_source_limit": 2},
         )[0]
+        self.assertEqual(exhausted["reason"], "SOURCE_BUDGET_EXHAUSTED")
+
+    def test_run_limit_holds_back_targets_beyond_the_per_run_ceiling(self):
+        targets = [self.target(f"a{index}") for index in range(3)]
+        decisions = plan_recheck_budget(targets, now=NOW, run_limit=1)
+        self.assertEqual(
+            [item["reason"] for item in decisions],
+            ["ALLOWED", "RUN_LIMIT_REACHED", "RUN_LIMIT_REACHED"],
+        )
+        self.assertIsNone(decisions[1]["due_at"], "a run-limit refusal must keep the existing due cursor")
+        self.assertEqual(decisions[1]["budget_state"]["last_decision"], "RUN_LIMIT_REACHED")
+
+    def test_duplicate_and_future_attempts_do_not_inflate_the_counter(self):
+        state = self.state_with_attempts(10, 10, 10)
+        state["attempts"].append("2026-09-21T18:00:00+08:00")
+        decision = plan_recheck_budget(
+            [self.target("a", budget_state=state)], now=NOW, policy={"per_source_limit": 1}
+        )[0]
+        self.assertEqual(decision["source_attempts_in_window"], 1)
         self.assertEqual(decision["reason"], "SOURCE_BUDGET_EXHAUSTED")
+
+    def test_malformed_stored_ledger_is_refused_instead_of_raising(self):
+        decisions = plan_recheck_budget(
+            [
+                self.target("a", budget_state={"attempts": "oops"}),
+                self.target("b", budget_state=empty_budget_state()),
+            ],
+            now=NOW,
+        )
+        self.assertEqual([item["reason"] for item in decisions], ["INVALID_BUDGET_STATE", "ALLOWED"])
+        self.assertEqual(
+            decisions[0]["due_at"],
+            "2026-09-21T13:00:00+08:00",
+            "a poisoned ledger must be re-examined, never requested blind",
+        )
+        self.assertEqual(decisions[0]["budget_state"]["attempts"], [])
+        stored = decisions[0]["budget_state"]
+        self.assertEqual(
+            stored["last_decision"],
+            "INVALID_BUDGET_STATE",
+            "the refusal must round-trip through the validator or the row stays unacknowledgeable",
+        )
+        self.assertEqual([row["stable_key"] for row in pending_retry_rows([self.target("a", budget_state=stored)], now=NOW)], ["a"])
+        acknowledged = acknowledge_recheck_budget(stored, now=NOW)
+        self.assertFalse(acknowledged["retry_deadline_exceeded"])
+        self.assertEqual(
+            plan_recheck_budget([self.target("a", budget_state=acknowledged)], now=NOW)[0]["reason"],
+            "ALLOWED",
+            "a repaired ledger must let the target back into the schedule",
+        )
 
     def test_attempts_outside_the_window_are_neither_counted_nor_kept(self):
         state = self.state_with_attempts(120)
@@ -305,9 +368,11 @@ class DetailRecheckBudgetTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "stable_key"):
             plan_recheck_budget([{"source_id": "S-004", "host": "www.tccc.gov.tw"}], now=NOW)
         with self.assertRaisesRegex(ValueError, "failure_streak"):
-            plan_recheck_budget(
-                [self.target("a", budget_state={"attempts": [], "failure_streak": "many"})], now=NOW
+            record_recheck_budget(
+                {"attempts": [], "failure_streak": "many"}, {"status": "UNCHANGED"}, now=NOW
             )
+        with self.assertRaisesRegex(ValueError, "run_limit"):
+            plan_recheck_budget([self.target("a")], now=NOW, run_limit=-1)
         with self.assertRaisesRegex(ValueError, "timestamp"):
             plan_recheck_budget([self.target("a")], now="2026-09-21 12:00:00")
         self.assertEqual(DEFAULT_RECHECK_BUDGET_POLICY["per_source_limit"], 3)

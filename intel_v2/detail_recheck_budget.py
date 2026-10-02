@@ -32,15 +32,25 @@ DEFAULT_RECHECK_BUDGET_POLICY = {
 }
 POLICY_KEYS = tuple(DEFAULT_RECHECK_BUDGET_POLICY)
 BACKING_OFF_STATUSES = {"DEFERRED"}
+SUCCESS_STATUSES = {
+    "BASELINE",
+    "UNCHANGED",
+    "MATERIAL_CHANGE",
+    "ATTACHMENT_CHANGED",
+    "PRESENTATION_ONLY",
+    "NOT_MODIFIED",
+}
 ALLOWED_REASON = "ALLOWED"
 DEFER_REASONS = (
     "RETRY_DEADLINE_EXCEEDED",
     "BACKOFF_ACTIVE",
     "SOURCE_BUDGET_EXHAUSTED",
     "HOST_BUDGET_EXHAUSTED",
+    "RUN_LIMIT_REACHED",
 )
-OUTCOME_REASONS = ("BACKED_OFF", "COMPLETED")
-KNOWN_REASONS = (ALLOWED_REASON, *DEFER_REASONS, *OUTCOME_REASONS)
+OUTCOME_REASONS = ("BACKED_OFF", "COMPLETED", "INCOMPLETE", "NOT_DUE")
+REFUSAL_REASONS = ("INVALID_BUDGET_STATE",)
+KNOWN_REASONS = (ALLOWED_REASON, *DEFER_REASONS, *OUTCOME_REASONS, *REFUSAL_REASONS)
 
 
 def empty_budget_state() -> dict[str, Any]:
@@ -76,16 +86,22 @@ def _policy(policy: dict[str, Any] | None) -> dict[str, Any]:
     return resolved
 
 
+def recheck_budget_policy(policy: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Return a validated policy copy, raising before any state is touched."""
+    return _policy(policy)
+
+
 def _attempts(value: Any, window_seconds: int, now: Any) -> list[str]:
     if value is None:
         return []
     if not isinstance(value, list) or any(not isinstance(item, str) or not item for item in value):
         raise ValueError("budget_state attempts must be a list of timestamps")
     floor = now - timedelta(seconds=window_seconds)
-    kept = []
+    kept = set()
     for item in value:
-        if _timestamp(item) > floor:
-            kept.append(_stamp(_timestamp(item)))
+        stamp = _timestamp(item)
+        if floor < stamp <= now:
+            kept.add(_stamp(stamp))
     return sorted(kept)
 
 
@@ -138,33 +154,83 @@ def plan_recheck_budget(
     *,
     now: str,
     policy: dict[str, Any] | None = None,
+    run_limit: int | None = None,
 ) -> list[dict[str, Any]]:
     """Decide which due detail targets may be requested in this run.
 
-    Each granted request consumes a per-source and per-host slot for the rest
-    of the batch, so a run can never exceed the configured caps even when the
-    database hands back more due rows than the cap allows.
+    Each granted request consumes a per-source, per-host and (when given) a
+    per-run slot for the rest of the batch, so a run can never exceed the
+    configured caps even when the database hands back more due rows than the
+    caps allow.  A target whose stored ledger cannot be decoded is refused as
+    ``INVALID_BUDGET_STATE`` instead of raising, so one poisoned row cannot
+    abort a whole collection run.
     """
     resolved = _policy(policy)
     current = _timestamp(now)
     if not isinstance(targets, list):
         raise ValueError("recheck budget targets must be a list")
+    if run_limit is not None and (not isinstance(run_limit, int) or isinstance(run_limit, bool) or run_limit < 0):
+        raise ValueError("run_limit must be a non-negative integer")
     states = [_target(item) for item in targets]
-    normalized = [
-        normalize_budget_state(item.get("budget_state"), now=now, policy=resolved) for item in states
-    ]
+    normalized: list[dict[str, Any] | None] = []
+    invalid: list[dict[str, Any]] = []
+    for item in states:
+        try:
+            normalized.append(normalize_budget_state(item.get("budget_state"), now=now, policy=resolved))
+        except (TypeError, ValueError):
+            normalized.append(None)
+            invalid.append(item)
     source_totals: dict[str, int] = {}
     host_totals: dict[str, int] = {}
     for state, item in zip(normalized, states):
+        if state is None:
+            continue
         source_totals[item["source_id"]] = source_totals.get(item["source_id"], 0) + len(state["attempts"])
         host_totals[item["host"]] = host_totals.get(item["host"], 0) + len(state["attempts"])
 
     decisions = []
     granted_sources: dict[str, int] = {}
     granted_hosts: dict[str, int] = {}
-    for item, state in zip(states, normalized):
+    granted_total = 0
+    for state, item in zip(normalized, states):
         source = item["source_id"]
         host = item["host"]
+        if state is None:
+            # The stored ledger could not be decoded, so the target is refused
+            # for one window and the row is rewritten with a clean, listable and
+            # acknowledgeable refusal state instead of staying poisoned.
+            reason = "INVALID_BUDGET_STATE"
+            due_at = _stamp(current + timedelta(seconds=resolved["window_seconds"]))
+            decision_state = {
+                "schema_version": 1,
+                "attempts": [],
+                "failure_streak": 0,
+                "deferred_until": due_at,
+                "first_deferred_at": _stamp(current),
+                "deadline_at": _stamp(current + timedelta(hours=resolved["backoff_deadline_hours"])),
+                "retry_deadline_exceeded": False,
+                "acknowledged_at": None,
+                "last_decision": reason,
+                "last_decided_at": _stamp(current),
+            }
+            source_used = source_totals.get(source, 0)
+            host_used = host_totals.get(host, 0)
+            decisions.append(
+                {
+                    "source_id": source,
+                    "stable_key": item["stable_key"],
+                    "host": host,
+                    "decision": "DEFER",
+                    "reason": reason,
+                    "due_at": due_at,
+                    "source_attempts_in_window": source_used,
+                    "host_attempts_in_window": host_used,
+                    "failure_streak": 0,
+                    "retry_deadline_exceeded": False,
+                    "budget_state": decision_state,
+                }
+            )
+            continue
         source_used = source_totals[source] + granted_sources.get(source, 0)
         host_used = host_totals[host] + granted_hosts.get(host, 0)
         if _deadline_exceeded(state, current):
@@ -175,16 +241,21 @@ def plan_recheck_budget(
             reason = "SOURCE_BUDGET_EXHAUSTED"
         elif host_used >= resolved["per_host_limit"]:
             reason = "HOST_BUDGET_EXHAUSTED"
+        elif run_limit is not None and granted_total >= run_limit:
+            reason = "RUN_LIMIT_REACHED"
         else:
             reason = ALLOWED_REASON
         if reason == ALLOWED_REASON:
             granted_sources[source] = granted_sources.get(source, 0) + 1
             granted_hosts[host] = granted_hosts.get(host, 0) + 1
+            granted_total += 1
             due_at = None
         elif reason == "BACKOFF_ACTIVE":
             due_at = state["deferred_until"]
         elif reason == "RETRY_DEADLINE_EXCEEDED":
             due_at = _stamp(current + timedelta(hours=resolved["backoff_deadline_hours"]))
+        elif reason == "RUN_LIMIT_REACHED":
+            due_at = None
         else:
             due_at = _stamp(current + timedelta(seconds=resolved["window_seconds"]))
         decision_state = dict(state)
@@ -247,11 +318,16 @@ def record_recheck_budget(
             _timestamp(budget_state["first_deferred_at"]) + timedelta(hours=resolved["backoff_deadline_hours"])
         )
     else:
-        outcome = "COMPLETED"
-        budget_state["failure_streak"] = 0
-        budget_state["deferred_until"] = None
-        budget_state["first_deferred_at"] = None
-        budget_state["deadline_at"] = None
+        outcome = "COMPLETED" if status in SUCCESS_STATUSES else "INCOMPLETE"
+        if status in SUCCESS_STATUSES:
+            budget_state["failure_streak"] = 0
+            budget_state["deferred_until"] = None
+            budget_state["first_deferred_at"] = None
+            budget_state["deadline_at"] = None
+        # Any other non-success status (an unavailable document, a transport
+        # error) consumes an attempt but must not erase an outstanding
+        # backoff streak, or an alternating 429/404 source could defer its
+        # retry deadline forever.
     budget_state["retry_deadline_exceeded"] = _deadline_exceeded(budget_state, current)
     budget_state["last_decision"] = outcome
     budget_state["last_decided_at"] = _stamp(current)
