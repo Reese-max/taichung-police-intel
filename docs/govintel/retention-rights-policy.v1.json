@@ -261,6 +261,7 @@
     }
   ],
   "replay_limitation_reasons": {
+    "REPLAY_EVIDENCE_INCOMPLETE": "The record is missing declared #36 replay provenance or audit linkage, so the planner refuses to claim replay is preserved.",
     "SOURCE_NO_LONGER_AVAILABLE_REPLAY_PARTIAL": "#36 replay keeps provenance but cannot re-fetch the withdrawn original."
   },
   "replay_evidence_fields": [

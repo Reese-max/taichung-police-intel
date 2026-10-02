@@ -49,6 +49,10 @@ if _retention_policy_spec is None or _retention_policy_spec.loader is None:
 retention_policy_module = importlib.util.module_from_spec(_retention_policy_spec)
 _retention_policy_spec.loader.exec_module(retention_policy_module)
 RETENTION_POLICY = retention_policy_module.compile_policy()
+# The retention block every outward response advertises. Derived from the compiled
+# policy so it cannot drift, and conservative by construction: it carries the rights
+# status and terms status so a consumer cannot render UNKNOWN as an open permission.
+RETENTION_BINDING = retention_policy_module.policy_binding(RETENTION_POLICY)
 
 CAPABILITIES = (
     "search_evidence",
@@ -784,12 +788,7 @@ class QueryGateway:
             "discovery_unverified_count": 0,
             "truncated": truncated,
             "policy": self.store["policy"],
-            "retention": {
-                "policy_version": RETENTION_POLICY["policy_version"],
-                "policy_hash": RETENTION_POLICY["policy_hash"],
-                "public_projection": "METADATA_LINK_ONLY",
-                "full_text_allowed": False,
-            },
+            "retention": dict(RETENTION_BINDING),
             "result_type": result_type,
             "receipt": {
                 "schema_version": 1,
@@ -1090,12 +1089,7 @@ class QueryGateway:
             "capabilities": available,
             "unavailable_capabilities": sorted(set(UNIMPLEMENTED) - set(available)),
             "policy": self.store["policy"],
-            "retention": {
-                "policy_version": RETENTION_POLICY["policy_version"],
-                "policy_hash": RETENTION_POLICY["policy_hash"],
-                "public_projection": "METADATA_LINK_ONLY",
-                "full_text_allowed": False,
-            },
+            "retention": dict(RETENTION_BINDING),
         }
 
     def mcp_tools(self) -> list[dict[str, Any]]:
@@ -1118,12 +1112,7 @@ class QueryGateway:
             "publication_hash": self.store["generated_from"]["brief_sha256"],
             "query_coverage": scope["query_coverage"],
             "policy": self.store["policy"],
-            "retention": {
-                "policy_version": RETENTION_POLICY["policy_version"],
-                "policy_hash": RETENTION_POLICY["policy_hash"],
-                "public_projection": "METADATA_LINK_ONLY",
-                "full_text_allowed": False,
-            },
+            "retention": dict(RETENTION_BINDING),
             "source_gaps": scope["source_gaps"],
             "read_only": True,
         }

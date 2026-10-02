@@ -15,7 +15,6 @@ CATALOG = ROOT / "docs" / "govintel" / "source-catalog.v2.json"
 POLICY = ROOT / "docs" / "govintel" / "retention-rights-policy.v1.json"
 PUBLIC_PROJECTIONS = {"LINK_ONLY", "METADATA_LINK_ONLY", "EVIDENCE_BOUND_SUMMARY_ONLY"}
 NO_PUBLIC_PROJECTION = "NONE"
-LAYER_PROJECTIONS = PUBLIC_PROJECTIONS | {NO_PUBLIC_PROJECTION}
 RETENTION_LAYERS = {"raw_snapshot", "normalized_document", "canonical_event", "publication", "query_index"}
 RAW_LAYERS = {"raw_snapshot", "normalized_document"}
 CANONICAL_LAYERS = RETENTION_LAYERS - RAW_LAYERS
@@ -30,15 +29,26 @@ LAYER_POLICY_FIELDS = {"retention_class_source", "archive_eligibility", "public_
 RETENTION_CLASS_SOURCES = {"raw_retention_class", "canonical_retention_class"}
 REPLAY_STATUSES = {"NOT_REQUIRED", "PRESERVED", "LIMITED", "BLOCKED"}
 REPLAY_LIMITATION_SOURCE_UNAVAILABLE = "SOURCE_NO_LONGER_AVAILABLE_REPLAY_PARTIAL"
+REPLAY_LIMITATION_NO_EVIDENCE = "REPLAY_EVIDENCE_INCOMPLETE"
+REPLAY_LIMITATION_REASONS = {REPLAY_LIMITATION_SOURCE_UNAVAILABLE, REPLAY_LIMITATION_NO_EVIDENCE}
+# A retention sweep must never quietly outrank a window that still demands human review.
+NON_OVERRIDABLE_EXPIRY_ACTIONS = {"REVIEW_REQUIRED"}
+RIGHTS_STATUSES = {"UNKNOWN", "PROJECT_CONTROLLED"}
+UNKNOWN_RIGHTS = "UNKNOWN"
+LAYER_PROJECTIONS = PUBLIC_PROJECTIONS | {NO_PUBLIC_PROJECTION}
+QUERY_INDEX_PROJECTION = "METADATA_LINK_ONLY"
 SENSITIVE_RECORD_FLAGS = ("contains_personal_data", "sensitive")
+GOVERNANCE_RECORD_FLAGS = (*SENSITIVE_RECORD_FLAGS, "source_available", "replay_required")
+DEFAULT_TRUE_RECORD_FLAGS = frozenset({"source_available"})
 # Raw captured payloads are never publishable; the class allowlist drops them and the
 # projection reports them. Every other prohibited field is a governance marker that must
 # block the archive instead of being quietly projected away.
 CONTENT_PAYLOAD_FIELDS = {"raw_payload", "raw_bytes", "body", "full_text"}
 # Governance metadata a projection consumes itself; never re-published as content and never
 # reported as a dropped payload field.
+# A class is never a record field: governance is chosen by the caller, never by the payload.
 RECORD_CONTROL_FIELDS = {
-    "record_id", "source_id", "class_id", "layer", "captured_at",
+    "record_id", "source_id", "layer", "captured_at",
     "source_available", "replay_required", "aggregate_only", "personal_data",
     *SENSITIVE_RECORD_FLAGS,
 }
@@ -118,6 +128,8 @@ def _compile_layer_policies(layer_policies: Any) -> dict[str, Any]:
             raise ValueError(f"layer archive eligibility is invalid: {layer}")
         if value["public_projection"] not in LAYER_PROJECTIONS:
             raise ValueError(f"layer public projection is invalid: {layer}")
+        if value["public_projection"] == NO_PUBLIC_PROJECTION and value["archive_eligibility"] != "NOT_ARCHIVABLE":
+            raise ValueError(f"layer that publishes nothing must not be archivable: {layer}")
         compiled_layers[layer] = dict(value)
     return compiled_layers
 
@@ -134,15 +146,15 @@ def _compile_data_types(matrix: Any, classes: dict[str, Any], layer_policies: di
         if not isinstance(data_type, str) or not data_type.strip() or data_type in seen:
             raise ValueError("data type matrix entries must have unique non-empty data_type names")
         seen.add(data_type)
-        if entry.get("kind") == "CONTENT":
+        if entry.get("kind") not in DATA_TYPE_KINDS:
+            raise ValueError(f"data type kind is unsupported: {data_type}")
+        if entry["kind"] == "CONTENT":
             if entry.get("class_id") not in classes:
                 raise ValueError(f"data type references unknown retention class: {data_type}")
-        elif entry.get("kind") == "LAYER":
+        elif entry["kind"] == "LAYER":
             if entry.get("layer") not in layer_policies:
                 raise ValueError(f"data type references unknown retention layer: {data_type}")
             referenced_layers.add(entry["layer"])
-        else:
-            raise ValueError(f"data type kind is unsupported: {data_type}")
     if referenced_layers != set(layer_policies):
         raise ValueError("every retention layer must be governed by exactly one data type matrix entry")
     return seen
@@ -174,23 +186,31 @@ def compile_policy(catalog: dict[str, Any] | None = None, policy: dict[str, Any]
         if window["expired_action"] not in EXPIRY_ACTIONS:
             raise ValueError(f"retention window action is invalid: {window_id}")
 
+    missing_sections = sorted(name for name in REQUIRED_POLICY_SECTIONS if name not in policy)
+    if missing_sections:
+        raise ValueError(f"retention policy is missing required sections: {','.join(missing_sections)}")
     rights_status_values = _require_documented_values(
-        policy.get("rights_status_values"), "rights_status_values")
+        policy["rights_status_values"], "rights_status_values")
     terms_status_values = _require_documented_values(
-        policy.get("terms_status_values"), "terms_status_values")
+        policy["terms_status_values"], "terms_status_values")
+    if set(rights_status_values) - RIGHTS_STATUSES:
+        raise ValueError("rights_status_values declares an undocumented rights status")
+    if set(terms_status_values) - TERMS_STATUSES:
+        raise ValueError("terms_status_values declares an undocumented terms status")
     replay_limitation_reasons = _require_documented_values(
-        policy.get("replay_limitation_reasons"), "replay_limitation_reasons")
-    if REPLAY_LIMITATION_SOURCE_UNAVAILABLE not in replay_limitation_reasons:
-        raise ValueError("replay limitations must document a withdrawn-source reason")
+        policy["replay_limitation_reasons"], "replay_limitation_reasons")
+    if set(REPLAY_LIMITATION_REASONS) - set(replay_limitation_reasons):
+        raise ValueError("replay limitations must document every reason the planner can emit")
     replay_evidence_fields = _require_field_list(
-        policy.get("replay_evidence_fields"), "replay_evidence_fields")
+        policy["replay_evidence_fields"], "replay_evidence_fields")
+    _require_field_list(policy["prohibited_public_fields"], "prohibited_public_fields")
     layer_policies = _compile_layer_policies(policy.get("layer_policies"))
     declared_data_types = _compile_data_types(policy.get("data_type_matrix"), classes, layer_policies)
 
     compiled_classes = {}
     for class_id, value in classes.items():
-        if not isinstance(value, dict) or set(REQUIRED_CLASS_FIELDS) - set(value):
-            raise ValueError(f"retention class is incomplete: {class_id}")
+        if not isinstance(value, dict) or set(value) != REQUIRED_CLASS_FIELDS:
+            raise ValueError(f"retention class fields do not match the compiled vocabulary: {class_id}")
         if value["rights_status"] == "UNKNOWN" and value["terms_status"] != UNKNOWN_RIGHTS_TERMS_STATUS:
             raise ValueError(f"unknown rights must not be presented as an open permission: {class_id}")
         if value["rights_status"] not in rights_status_values:
@@ -296,32 +316,65 @@ def compile_policy(catalog: dict[str, Any] | None = None, policy: dict[str, Any]
     }
 
 
-def _record_flag(record: dict[str, Any], field: str) -> bool:
-    value = record.get(field, False)
+def _record_flag(record: dict[str, Any], field: str, *, default: bool = False) -> bool:
+    if field not in record:
+        return default
+    value = record[field]
     if type(value) is not bool:
-        raise ValueError(f"{field} must be a boolean")
+        raise ValueError(f"{field} must be a boolean, not null")
     return value
 
 
-def _governance(compiled: dict[str, Any], record: dict[str, Any]) -> dict[str, Any]:
+def _json_safe(value: Any, field: str, record_id: str) -> Any:
+    try:
+        json.dumps(value, ensure_ascii=False)
+    except (TypeError, ValueError) as error:
+        raise ValueError(f"projection field is not JSON serializable: {record_id} -> {field}") from error
+    return value
+
+
+def _validate_governance_flags(record: dict[str, Any]) -> None:
+    """Every governance boolean must be a real boolean; an explicit null is a contract error."""
+    for flag in GOVERNANCE_RECORD_FLAGS:
+        _record_flag(record, flag, default=flag in DEFAULT_TRUE_RECORD_FLAGS)
+
+
+def _governance(compiled: dict[str, Any], record: dict[str, Any],
+                *, class_id: str | None = None, layer: str | None = None) -> dict[str, Any]:
+    """Resolve the governance that applies to one record.
+
+    ``class_id`` is a trusted caller argument, never read from the record: a stored
+    payload must not be able to re-classify itself into a more permissive policy.
+    """
     if not isinstance(record, dict):
         raise ValueError("retention records must be objects")
     record_id = record.get("record_id")
     if not isinstance(record_id, str) or not record_id.strip():
         raise ValueError("retention record requires a non-empty record_id")
+    _validate_governance_flags(record)
     source_id = record.get("source_id")
     if not isinstance(source_id, str) or source_id not in compiled["source_policies"]:
         raise ValueError(f"unknown retention source: {source_id}")
-    source_policy = compiled["source_policies"][source_id]
-    class_id = record.get("class_id", source_policy["class_id"])
-    if class_id not in compiled["classes"]:
-        raise ValueError(f"unknown retention class: {class_id}")
+    resolved_class = class_id or compiled["source_policies"][source_id]["class_id"]
+    if resolved_class not in compiled["classes"]:
+        raise ValueError(f"unknown retention class: {resolved_class}")
+    resolved_layer = layer if layer is not None else record.get("layer")
+    if resolved_layer not in compiled["layer_policies"]:
+        raise ValueError(f"unsupported retention layer: {resolved_layer}")
+    # Source-level facts (terms_url, data_types) stay bound to the source and the class
+    # supplies class governance. The layer policy is kept in its own namespaced keys so
+    # it can tighten what is publishable without overwriting the class's own rights.
+    layer_policy = compiled["layer_policies"][resolved_layer]
     return {
-        **source_policy,
-        **compiled["classes"][class_id],
-        "class_id": class_id,
+        **compiled["source_policies"][source_id],
+        **compiled["classes"][resolved_class],
+        "class_id": resolved_class,
         "record_id": record_id,
         "source_id": source_id,
+        "layer": resolved_layer,
+        "layer_archive_eligibility": layer_policy["archive_eligibility"],
+        "layer_public_projection": layer_policy["public_projection"],
+        "layer_retention_class_source": layer_policy["retention_class_source"],
     }
 
 
@@ -331,13 +384,21 @@ def _assert_no_prohibited(record: dict[str, Any], compiled: dict[str, Any], reco
         raise ValueError(f"prohibited field(s) present: {record_id} -> {','.join(prohibited)}")
 
 
-def archive_decision(record: dict[str, Any], *, policy: dict[str, Any] | None = None) -> dict[str, Any]:
+def archive_decision(record: dict[str, Any], *, policy: dict[str, Any] | None = None,
+                     class_id: str | None = None) -> dict[str, Any]:
+    """Decide whether one record may enter the public evidence archive.
+
+    A layer declared ``NOT_ARCHIVABLE`` outranks the class, so raw snapshots and
+    normalized documents can never be archived just because their source class would
+    otherwise allow it.
+    """
     compiled = compile_policy() if policy is None else policy
-    governance = _governance(compiled, record)
+    governance = _governance(compiled, record, class_id=class_id)
     decision = {
         "record_id": governance["record_id"],
         "source_id": governance["source_id"],
         "class_id": governance["class_id"],
+        "layer": governance["layer"],
         "archive_eligibility": governance["archive_eligibility"],
         "sensitive_default": governance["sensitive_default"],
     }
@@ -354,30 +415,38 @@ def archive_decision(record: dict[str, Any], *, policy: dict[str, Any] | None = 
     if governance["sensitive_default"] and aggregate_only is not True:
         return {**decision, "decision": "BLOCKED",
                 "reason": f"{governance['class_id']} is sensitive by default and the record does not declare aggregate_only"}
+    if governance["layer_archive_eligibility"] == "NOT_ARCHIVABLE":
+        return {**decision, "decision": "BLOCKED",
+                "reason": f"retention layer is never publicly archivable: {governance['layer']}",
+                "blocking_archive_eligibility": governance["layer_archive_eligibility"]}
     if governance["archive_eligibility"] == "NOT_ARCHIVABLE":
-        return {**decision, "decision": "BLOCKED", "reason": "layer or class is never publicly archivable"}
+        return {**decision, "decision": "BLOCKED",
+                "reason": f"retention class is never publicly archivable: {governance['class_id']}",
+                "blocking_archive_eligibility": governance["archive_eligibility"]}
     return {**decision, "decision": "ARCHIVE",
-            "reason": f"{governance['class_id']} may enter the public evidence archive as a projection"}
+            "reason": f"{governance['class_id']}/{governance['layer']} may enter the public evidence archive as a projection"}
 
 
-def project_public_record(record: dict[str, Any], *, policy: dict[str, Any] | None = None) -> dict[str, Any]:
+def project_public_record(record: dict[str, Any], *, policy: dict[str, Any] | None = None,
+                          class_id: str | None = None,
+                          layer: str | None = None) -> dict[str, Any]:
     """Publish only the class-allowlisted fields of a record, then gate the result.
 
     Content fields outside the allowlist are dropped and reported in ``dropped_fields``
     so a rights decision is auditable instead of silent. Personal-data and sensitive
-    markers survive the drop and still fail the archive gate closed.
+    markers survive the drop and still fail the archive gate closed. A layer that is
+    ``NOT_ARCHIVABLE`` or that publishes ``NONE`` yields no fields at all.
     """
     compiled = compile_policy() if policy is None else policy
-    governance = _governance(compiled, record)
-    layer = record.get("layer")
-    if layer not in compiled["layer_policies"]:
-        raise ValueError(f"unsupported retention layer: {layer}")
-    blocked = archive_decision(record, policy=compiled)
+    governance = _governance(compiled, record, class_id=class_id, layer=layer)
+    layer = governance["layer"]
+    blocked = archive_decision(record, policy=compiled, class_id=class_id)
     if blocked["decision"] != "ARCHIVE":
         raise ValueError(f"record is not allowed into the public archive: {blocked['reason']}")
-    source_available = _record_flag(record, "source_available") if "source_available" in record else True
+    source_available = _record_flag(record, "source_available", default=True)
     projected = {
-        key: value for key, value in record.items()
+        key: _json_safe(value, key, governance["record_id"])
+        for key, value in record.items()
         if key in governance["public_fields"] and key not in RECORD_CONTROL_FIELDS
     }
     dropped = sorted(
@@ -397,11 +466,13 @@ def project_public_record(record: dict[str, Any], *, policy: dict[str, Any] | No
         "layer": layer,
         "data_types": list(governance["data_types"]),
         "public_projection": governance["public_projection"],
+        "layer_public_projection": governance["layer_public_projection"],
         "rights_status": governance["rights_status"],
         "terms_status": governance["terms_status"],
         "terms_url": governance["terms_url"],
         "review_required": governance["review_required"],
         "archive_eligibility": governance["archive_eligibility"],
+        "layer_archive_eligibility": governance["layer_archive_eligibility"],
         "withdrawal_behavior": governance["withdrawal_behavior"],
         "withdrawal_projection": withdrawal_projection,
         "source_availability": source_availability,
@@ -423,23 +494,31 @@ def project_query_index(records: list[dict[str, Any]], *, observed_at: str,
     layer_policy = compiled["layer_policies"]["query_index"]
     entries = []
     for record in records:
-        governance = _governance(compiled, record)
-        sanitized = {key: value for key, value in record.items()
-                     if key not in set(compiled["prohibited_public_fields"])}
-        projection = project_public_record(dict(sanitized, layer="query_index"), policy=compiled)
+        governance = _governance(compiled, record, layer="query_index")
+        # Gate the record as stored. Scrubbing first would downgrade a governance
+        # marker (private notes, personal data, credentials) into a silent success.
+        blocked = archive_decision(record, policy=compiled)
+        if blocked["decision"] != "ARCHIVE":
+            raise ValueError(
+                f"record is not allowed into the public archive: {blocked['reason']}")
+        suppressed = sorted(set(record) & set(compiled["prohibited_public_fields"]))
+        sanitized = {key: value for key, value in record.items() if key not in suppressed}
+        entry = project_public_record(sanitized, policy=compiled, layer="query_index")
         retention_class = governance[layer_policy["retention_class_source"]]
         raw_retention_class = governance["raw_retention_class"]
         max_age_days = compiled["retention_windows"][raw_retention_class]["max_age_days"]
         captured = _timestamp(record.get("captured_at"), "captured_at")
-        entries.append({
-            **projection,
-            "archive_eligibility": layer_policy["archive_eligibility"],
+        entry.update({
             "retention_class": retention_class,
             "source_raw_retention_class": raw_retention_class,
             "source_raw_retention_expired": max_age_days is not None and captured + timedelta(days=max_age_days) <= now,
             "extends_source_retention": False,
-            "suppressed_fields": sorted(set(record) & set(compiled["prohibited_public_fields"])),
+            "suppressed_fields": suppressed,
         })
+        # Hash the entry the caller receives, not the pre-merge projection.
+        entry.pop("projection_hash", None)
+        entry["projection_hash"] = sha256(entry)
+        entries.append(entry)
     index = {
         "schema_version": 1,
         "projection": "query-index-v1",
@@ -463,6 +542,7 @@ def plan_expiry(records: list[dict[str, Any]], *, observed_at: str, policy: dict
         if not isinstance(record, dict):
             raise ValueError("retention records must be objects")
         _assert_no_prohibited(record, compiled, str(record.get("record_id", "unknown")))
+        _validate_governance_flags(record)
         record_id = record.get("record_id")
         source_id = record.get("source_id")
         layer = record.get("layer")
@@ -478,7 +558,10 @@ def plan_expiry(records: list[dict[str, Any]], *, observed_at: str, policy: dict
         if not isinstance(audit_refs, list) or any(not isinstance(value, str) or not value.strip() for value in audit_refs):
             raise ValueError("audit_refs must be a string array")
         replay_required = _record_flag(record, "replay_required")
-        source_available = _record_flag(record, "source_available") if "source_available" in record else True
+        source_available = _record_flag(record, "source_available", default=True)
+        missing_replay_fields = sorted(
+            field for field in compiled["replay_evidence_fields"] if field not in record
+        ) if replay_required else []
         source_policy = compiled["source_policies"][source_id]
         retention_class = source_policy["raw_retention_class" if layer in RAW_LAYERS else "canonical_retention_class"]
         window = compiled["retention_windows"][retention_class]
@@ -501,13 +584,24 @@ def plan_expiry(records: list[dict[str, Any]], *, observed_at: str, policy: dict
                 action = "BLOCKED_NO_AUDIT_LINKAGE"
         replay_status = "NOT_REQUIRED"
         replay_limitation = None
+        overridden_expired_action = None
         if replay_required:
-            if status == "BLOCKED":
+            if not audit_refs or missing_replay_fields:
+                # Nothing is linked, so retention must not claim it is preserving replay.
                 replay_status = "BLOCKED"
+                replay_limitation = REPLAY_LIMITATION_NO_EVIDENCE
+            elif status == "BLOCKED":
+                replay_status = "BLOCKED"
+                replay_limitation = REPLAY_LIMITATION_NO_EVIDENCE
             elif not expired:
                 replay_status = "PRESERVED"
+            elif window["expired_action"] in NON_OVERRIDABLE_EXPIRY_ACTIONS:
+                # A window that still demands human review keeps demanding it.
+                replay_status = "PRESERVED"
+                replay_limitation = REPLAY_LIMITATION_NO_EVIDENCE
             else:
                 # #36 replay must never lose evidence to a silent retention sweep.
+                overridden_expired_action = window["expired_action"]
                 action = "KEEP_AUDIT_LINKAGE"
                 if source_available:
                     replay_status = "PRESERVED"
@@ -529,6 +623,8 @@ def plan_expiry(records: list[dict[str, Any]], *, observed_at: str, policy: dict
             "replay_required": replay_required,
             "replay_status": replay_status,
             "replay_limitation": replay_limitation,
+            "replay_missing_fields": missing_replay_fields,
+            "overridden_expired_action": overridden_expired_action,
             "source_available": source_available,
         })
     receipt = {
@@ -538,23 +634,69 @@ def plan_expiry(records: list[dict[str, Any]], *, observed_at: str, policy: dict
         "observed_at": now.isoformat(),
         "policy_version": compiled["policy_version"],
         "policy_hash": compiled["policy_hash"],
+        "replay_evidence_fields": compiled["replay_evidence_fields"],
         "records": planned,
         "counts": {
             "total": len(planned),
             "retained": sum(row["status"] == "RETAINED" for row in planned),
             "expired": sum(row["status"] == "EXPIRED" for row in planned),
             "blocked": sum(row["status"] == "BLOCKED" for row in planned),
+            "replay_preserved": sum(row["replay_status"] == "PRESERVED" for row in planned),
             "replay_limited": sum(row["replay_status"] == "LIMITED" for row in planned),
+            "replay_blocked": sum(row["replay_status"] == "BLOCKED" for row in planned),
         },
     }
+    if any(row["replay_status"] not in REPLAY_STATUSES for row in planned):
+        raise ValueError("planner emitted an undocumented replay status")
+    if any(row["replay_limitation"] is not None
+           and row["replay_limitation"] not in compiled["replay_limitation_reasons"] for row in planned):
+        raise ValueError("planner emitted an undocumented replay limitation")
     receipt["receipt_sha256"] = sha256(receipt)
     return receipt
+
+
+def _json_bool(value: Any) -> str:
+    """Receipt lines are machine-readable, so booleans print as JSON true/false."""
+    return "true" if value else "false"
+
+
+def policy_binding(compiled: dict[str, Any] | None = None) -> dict[str, Any]:
+    """The minimum retention facts any outward surface may advertise.
+
+    Derived from the compiled policy so a stale hand-written binding cannot be served,
+    and conservative by construction: it reports the rights status and terms status so
+    an UNKNOWN permission can never be rendered as an open one.
+    """
+    compiled = compile_policy() if compiled is None else compiled
+    rights_statuses = {value["rights_status"] for value in compiled["classes"].values()}
+    terms_statuses = {value["terms_status"] for value in compiled["classes"].values()}
+    # A public surface must quote the most conservative class in the policy, never the
+    # most permissive one, so an unverified permission can never render as an open one.
+    return {
+        "schema_version": 1,
+        "policy_version": compiled["policy_version"],
+        "policy_hash": compiled["policy_hash"],
+        "public_projection": QUERY_INDEX_PROJECTION,
+        "full_text_allowed": any(value["full_text_allowed"] for value in compiled["classes"].values()),
+        "excerpt_allowed": any(value["excerpt_allowed"] for value in compiled["classes"].values()),
+        "rights_status": UNKNOWN_RIGHTS if UNKNOWN_RIGHTS in rights_statuses else sorted(rights_statuses)[0],
+        "rights_status_values": sorted(rights_statuses),
+        "terms_status": (
+            UNKNOWN_RIGHTS_TERMS_STATUS if UNKNOWN_RIGHTS_TERMS_STATUS in terms_statuses
+            else sorted(terms_statuses)[0]
+        ),
+        "terms_status_values": sorted(terms_statuses),
+        "review_required": all(value["review_required"] for value in compiled["classes"].values()),
+        "query_index_extends_source_retention": False,
+    }
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--self-check", action="store_true")
     parser.add_argument("--json", action="store_true")
+    parser.add_argument("--binding", action="store_true",
+                        help="emit the smallest retention binding a public surface may advertise")
     parser.add_argument("--plan", type=Path, help="JSON retention manifest for a read-only expiry dry-run")
     parser.add_argument("--project", type=Path, help="JSON manifest of records to project into the public query index")
     parser.add_argument("--at", help="Timezone-aware observation time for --plan/--project")
@@ -599,13 +741,18 @@ def main() -> int:
         return 0
     if args.json:
         print(json.dumps(compiled, ensure_ascii=False, indent=2, sort_keys=True))
+    elif args.binding:
+        print(json.dumps(policy_binding(compiled), ensure_ascii=False, indent=2, sort_keys=True))
     else:
         print(
             "RETENTION_POLICY_SELF_CHECK_OK "
             f"version={compiled['policy_version']} "
             f"policy_hash={compiled['policy_hash'][:12]} sources={len(compiled['source_policies'])} "
             f"data_types={len(compiled['data_types'])} layers={len(compiled['layer_policies'])} "
-            "dry_run=true audit_preserved=true full_text_allowed=false"
+            f"full_text_allowed={_json_bool(policy_binding(compiled)['full_text_allowed'])} "
+            f"rights_status={policy_binding(compiled)['rights_status']} "
+            f"terms_status={policy_binding(compiled)['terms_status']} "
+            "purge_executed=false dry_run=true"
         )
     return 0
 
