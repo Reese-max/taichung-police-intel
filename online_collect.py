@@ -35,7 +35,13 @@ from collect import (
     scheduled_time,
     timestamp,
 )
-from intel_v2.detail_recheck import classify_observation
+from intel_v2.detail_recheck import classify_observation, plan_recheck
+from intel_v2.detail_recheck_budget import (
+    budget_state_for_storage,
+    plan_recheck_budget,
+    recheck_budget_policy,
+    record_recheck_budget,
+)
 from intel_v2.detail_recheck_http import recheck_detail
 from intel_v2.located_facts import validate_document_url
 
@@ -908,6 +914,66 @@ def _save_detail_snapshot(
     return snapshot_id
 
 
+def _detail_budget_host(row: dict) -> str:
+    """Return the approved host used for the per-host request cap."""
+    try:
+        source = validate_document_url(row["source_id"], row["requested_url"])
+        host = urllib.parse.urlsplit(source["entrypoint"]).hostname
+    except (ValueError, TypeError, OSError):
+        host = None
+    if not host:
+        try:
+            host = urllib.parse.urlsplit(str(row["requested_url"])).hostname
+        except (ValueError, TypeError, OSError):
+            host = None
+    return str(host or f"unresolved:{row['source_id']}")
+
+
+def _defer_detail_recheck(
+    connection,
+    row: dict,
+    *,
+    due_at: str | None,
+    budget_state: dict,
+    observed_at: datetime,
+) -> None:
+    connection.execute(
+        """
+        UPDATE detail_recheck_state
+        SET next_check_at = GREATEST(next_check_at, COALESCE(%s, next_check_at)),
+            budget_state = %s::jsonb,
+            updated_at = %s
+        WHERE source_id = %s AND stable_key = %s
+        """,
+        (
+            datetime.fromisoformat(due_at) if due_at else None,
+            _detail_json(budget_state),
+            observed_at,
+            row["source_id"],
+            row["stable_key"],
+        ),
+    )
+
+
+def _detail_recheck_outcome(row: dict, reason: str, budget_state: dict, decision: dict) -> dict:
+    """Return a refused-target outcome that carries no document evidence."""
+    return {
+        "source_id": row["source_id"],
+        "stable_key": row["stable_key"],
+        "requested_url": row["requested_url"],
+        "status": "SKIPPED",
+        "reason": reason,
+        "review_required": False,
+        "classification": None,
+        "snapshot_id": None,
+        "budget": {
+            "reason": reason,
+            "due_at": decision["due_at"],
+            "state": budget_state,
+        },
+    }
+
+
 def run_detail_rechecks(
     connection,
     session: requests.Session,
@@ -916,13 +982,25 @@ def run_detail_rechecks(
     *,
     limit: int = DETAIL_RECHECK_MAX_PER_RUN,
     interval_hours: float = DETAIL_RECHECK_INTERVAL_HOURS,
+    budget_policy: dict | None = None,
 ) -> list[dict]:
-    if not isinstance(limit, int) or limit < 0:
+    if not isinstance(limit, int) or isinstance(limit, bool) or limit < 0:
         raise ValueError("detail recheck limit must be non-negative")
     if not source_run_ids or limit == 0:
         return []
+    # Validate the policy before opening the row-lock transaction so a bad
+    # operator input can never abort a collection run mid-flight.
+    resolved_policy = recheck_budget_policy(budget_policy)
     source_ids = sorted(source_run_ids)
     placeholders = ", ".join(["%s"] * len(source_ids))
+    # The candidate batch is the unit of accounting: it must be wider than the
+    # request limit, otherwise the per-source and per-host caps could never
+    # arbitrate between due targets.
+    candidate_limit = max(
+        limit,
+        resolved_policy["per_source_limit"],
+        resolved_policy["per_host_limit"],
+    )
     # ponytail: one row lock spans one bounded request; split claim/worker
     # phases only if recheck throughput becomes a measured bottleneck.
     with connection.transaction():
@@ -930,17 +1008,83 @@ def run_detail_rechecks(
             f"""
             SELECT source_id, stable_key, requested_url, last_checked_at, next_check_at,
                    etag, last_modified, document_version_id, body_sha256,
-                   normalized_text_sha256, attachments
+                   normalized_text_sha256, attachments, budget_state
             FROM detail_recheck_state
             WHERE next_check_at <= %s AND source_id IN ({placeholders})
             ORDER BY next_check_at, source_id, stable_key
             LIMIT %s
             FOR UPDATE SKIP LOCKED
             """,
-            (observed_at, *source_ids, limit),
+            (observed_at, *source_ids, candidate_limit),
         ).fetchall()
+        observed = timestamp(observed_at)
+        # Due-ness is decided once, with the same TTL planner the transport
+        # uses, so a target that is not due never consumes a budget slot.
+        due_keys = {
+            (row["source_id"], row["stable_key"])
+            for row in rows
+            if plan_recheck(
+                _detail_previous(row),
+                observed,
+                interval_hours=interval_hours,
+            )["status"]
+            == "DUE"
+        }
+        decisions = {
+            (item["source_id"], item["stable_key"]): item
+            for item in plan_recheck_budget(
+                [
+                    {
+                        "source_id": row["source_id"],
+                        "stable_key": row["stable_key"],
+                        "host": _detail_budget_host(row),
+                        "budget_state": row.get("budget_state"),
+                    }
+                    for row in rows
+                    if (row["source_id"], row["stable_key"]) in due_keys
+                ],
+                now=observed,
+                policy=resolved_policy,
+                run_limit=limit,
+            )
+        }
         outcomes = []
         for row in rows:
+            key = (row["source_id"], row["stable_key"])
+            if key not in due_keys:
+                checked = row.get("last_checked_at")
+                base = checked if isinstance(checked, datetime) else observed_at
+                next_due = timestamp(max(base + timedelta(hours=interval_hours), observed_at))
+                state = budget_state_for_storage(
+                    row.get("budget_state"), now=observed, policy=resolved_policy
+                )
+                state["last_decision"] = "NOT_DUE"
+                _defer_detail_recheck(
+                    connection,
+                    row,
+                    due_at=next_due,
+                    budget_state=state,
+                    observed_at=observed_at,
+                )
+                outcomes.append(
+                    _detail_recheck_outcome(row, "NOT_DUE", state, {"due_at": next_due})
+                )
+                continue
+            decision = decisions[key]
+            if decision["decision"] != "ALLOW":
+                _defer_detail_recheck(
+                    connection,
+                    row,
+                    due_at=decision["due_at"],
+                    budget_state=decision["budget_state"],
+                    observed_at=observed_at,
+                )
+                outcomes.append(
+                    _detail_recheck_outcome(
+                        row, decision["reason"], decision["budget_state"], decision
+                    )
+                )
+                continue
             previous = _detail_previous(row)
             try:
                 source = validate_document_url(row["source_id"], row["requested_url"])
@@ -959,7 +1103,29 @@ def run_detail_rechecks(
             except (ValueError, TypeError, OSError, requests.RequestException) as error:
                 result = _detail_unavailable(row["requested_url"], previous, observed_at, error)
 
-            classification = result["classification"]
+            classification = result.get("classification")
+            if not isinstance(classification, dict):
+                # Defence in depth: the target was planned as due but the
+                # transport refused to classify it, so no document evidence
+                # exists.  Never record that as a completed check.
+                checked = row.get("last_checked_at")
+                base = checked if isinstance(checked, datetime) else observed_at
+                next_due = timestamp(max(base + timedelta(hours=interval_hours), observed_at))
+                state = budget_state_for_storage(
+                    row.get("budget_state"), now=observed, policy=resolved_policy
+                )
+                state["last_decision"] = "NOT_DUE"
+                _defer_detail_recheck(
+                    connection,
+                    row,
+                    due_at=next_due,
+                    budget_state=state,
+                    observed_at=observed_at,
+                )
+                outcomes.append(
+                    _detail_recheck_outcome(row, "NOT_DUE", state, {"due_at": next_due})
+                )
+                continue
             snapshot_id = _save_detail_snapshot(
                 connection,
                 source_run_ids[row["source_id"]],
@@ -979,6 +1145,14 @@ def run_detail_rechecks(
             }
             checked_at = datetime.fromisoformat(classification["last_checked_at"])
             next_check_at = detail_next_check(classification, checked_at, interval_hours=interval_hours)
+            budget_state = record_recheck_budget(
+                row.get("budget_state"),
+                classification,
+                now=observed,
+                policy=resolved_policy,
+            )
+            if budget_state["deferred_until"]:
+                next_check_at = max(next_check_at, datetime.fromisoformat(budget_state["deferred_until"]))
             public_result = {key: value for key, value in result.items() if key != "response_body"}
             connection.execute(
                 """
@@ -998,7 +1172,8 @@ def run_detail_rechecks(
                     changed_fields = %s::jsonb,
                     last_result = %s::jsonb,
                     last_snapshot_id = COALESCE(%s, last_snapshot_id),
-                    updated_at = %s
+                    updated_at = %s,
+                    budget_state = %s::jsonb
                 WHERE source_id = %s AND stable_key = %s
                 """,
                 (
@@ -1018,6 +1193,7 @@ def run_detail_rechecks(
                     _detail_json(public_result),
                     snapshot_id,
                     observed_at,
+                    _detail_json(budget_state),
                     row["source_id"],
                     row["stable_key"],
                 ),
@@ -1028,9 +1204,15 @@ def run_detail_rechecks(
                     "stable_key": row["stable_key"],
                     "requested_url": row["requested_url"],
                     "status": classification["status"],
+                    "reason": None,
                     "review_required": classification["review_required"],
                     "classification": public_result["classification"],
                     "snapshot_id": snapshot_id,
+                    "budget": {
+                        "reason": None,
+                        "due_at": timestamp(next_check_at),
+                        "state": budget_state,
+                    },
                 }
             )
     return outcomes

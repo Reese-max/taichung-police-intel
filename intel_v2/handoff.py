@@ -305,6 +305,10 @@ def sync_with_detail_rechecks(
         raise ValueError("detail rechecks must be an array")
     for raw_outcome in outcomes:
         outcome = _as_dict(raw_outcome)
+        if outcome.get("status") == "SKIPPED":
+            # A budget-refused recheck fetched nothing, so it cannot prove any
+            # stored claim stale.
+            continue
         classification = outcome.get("classification")
         if not isinstance(classification, dict):
             raise ValueError("detail recheck classification is required")

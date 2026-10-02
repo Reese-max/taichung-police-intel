@@ -99,6 +99,17 @@ class ReviewInboxTests(unittest.TestCase):
             "classification": {"status": "UNCHANGED", "review_required": False},
         }]), [])
 
+    def test_budget_refused_outcome_produces_no_candidate_and_keeps_fail_closed_shape(self):
+        self.assertEqual(detail_recheck_candidates([{
+            "source_id": "S-004",
+            "stable_key": "agenda-1",
+            "status": "SKIPPED",
+            "reason": "BACKOFF_ACTIVE",
+            "classification": None,
+        }]), [])
+        with self.assertRaisesRegex(ValueError, "classification is required"):
+            detail_recheck_candidates([{"source_id": "S-004", "stable_key": "agenda-1"}])
+
     def test_runtime_envelopes_project_all_review_reason_types(self):
         payload = {
             "schema_drift": {
