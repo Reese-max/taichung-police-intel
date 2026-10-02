@@ -121,6 +121,29 @@ class PublicEventFusionTests(unittest.TestCase):
         self.assertEqual(len(current), 1)
         self.assertNotEqual(current[0]["public_event_id"], before[0]["public_event_id"])
 
+    def test_complete_snapshot_preserves_prior_document_versions_when_one_source_updates(self):
+        previous_documents = [document("CITY"), document("POLICE"), document("TRAFFIC")]
+        previous = fusion.fuse_documents(previous_documents)
+        updated = document("POLICE", version="v2", start="16:00")
+        current = fusion.reconcile_public_events(
+            previous,
+            [previous_documents[0], updated, previous_documents[2]],
+            snapshot_complete=True,
+        )
+
+        self.assertEqual(len(current), 1)
+        event = current[0]
+        self.assertEqual(event["public_event_id"], previous[0]["public_event_id"])
+        self.assertEqual(event["fusion_status"], "CONFLICT")
+        self.assertEqual(
+            {link["document_version_id"] for link in event["linked_document_versions"]},
+            {"doc-CITY:v1", "doc-POLICE:v1", "doc-POLICE:v2", "doc-TRAFFIC:v1"},
+        )
+        self.assertEqual(
+            {link["document_version_id"] for link in event["linked_document_versions"] if link["document_id"] != "doc-POLICE"},
+            {"doc-CITY:v1", "doc-TRAFFIC:v1"},
+        )
+
     def test_pending_reschedule_is_not_auto_merged(self):
         previous = fusion.fuse_documents([document("CITY"), document("POLICE")])
         after = document("CITY", day="2026-09-21", version="v2")
@@ -187,6 +210,15 @@ class PublicEventFusionTests(unittest.TestCase):
         self.assertIn("district_id", event["conflict_fields"])
         self.assertIsNone(event["district_id"])
 
+    def test_official_cancellation_conflicts_with_an_unupdated_official_source(self):
+        cancelled = document("CITY")
+        cancelled["status"] = "CANCELLED"
+        active = document("POLICE")
+        active["status"] = "ACTIVE"
+        event = fusion.fuse_documents([cancelled, active])[0]
+        self.assertEqual(event["fusion_status"], "CONFLICT")
+        self.assertEqual(event["conflict_fields"], ["status"])
+
     def test_direct_and_dashboard_paths_do_not_add_independent_evidence(self):
         events = fusion.fuse_documents([
             document("DIRECT", independent="official:cwa:alert-1"),
@@ -194,6 +226,23 @@ class PublicEventFusionTests(unittest.TestCase):
         ])
         self.assertEqual(events[0]["independent_source_count"], 1)
         self.assertEqual(events[0]["fusion_status"], "CANDIDATE")
+
+    def test_same_independent_source_keeps_acquisition_paths_in_provenance(self):
+        direct = document("DIRECT", independent="official:cwa:alert-1")
+        dashboard = document("DASHBOARD", independent="official:cwa:alert-1")
+        direct["acquisition_path"] = "DIRECT_OFFICIAL"
+        dashboard["acquisition_path"] = "TWINKLE"
+        event = fusion.fuse_documents([direct, dashboard])[0]
+
+        self.assertEqual(event["independent_source_count"], 1)
+        self.assertEqual(event["source_provenance"], [{
+            "independent_source_id": "official:cwa:alert-1",
+            "acquisition_paths": ["DIRECT_OFFICIAL", "TWINKLE"],
+            "document_version_ids": ["doc-DASHBOARD:v1", "doc-DIRECT:v1"],
+        }])
+        linked = {link["document_id"]: link for link in event["linked_document_versions"]}
+        self.assertEqual(linked["doc-DIRECT"]["acquisition_paths"], ["DIRECT_OFFICIAL"])
+        self.assertEqual(linked["doc-DASHBOARD"]["acquisition_paths"], ["TWINKLE"])
 
     def test_equivalent_timezone_values_do_not_conflict(self):
         left = document("CITY")

@@ -62,6 +62,18 @@ function isValidDemo(data) {
     || !Number.isInteger(event.independent_source_count)
     || !Array.isArray(event.independent_source_ids)
     || event.independent_source_count !== event.independent_source_ids.length
+    || !Array.isArray(event.source_provenance)
+    || event.source_provenance.length !== event.independent_source_count
+    || !event.source_provenance.every((source) => (
+      isObject(source)
+      && typeof source.independent_source_id === "string"
+      && Array.isArray(source.acquisition_paths)
+      && source.acquisition_paths.length > 0
+      && source.acquisition_paths.every((path) => typeof path === "string")
+      && Array.isArray(source.document_version_ids)
+      && source.document_version_ids.length > 0
+      && source.document_version_ids.every((versionId) => typeof versionId === "string")
+    ))
   ) return false;
   if (!documents.every((document) => (
     isObject(document)
@@ -168,6 +180,7 @@ export default function PublicEventFusionDemo() {
           <div><dt>事件日期</dt><dd>{event.event_date}</dd></div>
           <div><dt>行政區候選</dt><dd>西屯區（{event.location_candidates.join("、")}）</dd></div>
           <div><dt>融合理由</dt><dd>{event.link_reasons.join("、")}</dd></div>
+          <div><dt>證據取得路徑</dt><dd>{event.source_provenance.map((source) => `${source.independent_source_id}: ${source.acquisition_paths.join("、")}`).join("；")}</dd></div>
         </dl>
 
         <details className="v2-fusion-documents" open>

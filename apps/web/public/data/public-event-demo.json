@@ -17,6 +17,11 @@
     "location_candidates": ["location:tc-xitun"],
     "independent_source_count": 3,
     "independent_source_ids": ["S-001", "S-032", "S-033"],
+    "source_provenance": [
+      {"independent_source_id": "S-001", "acquisition_paths": ["DIRECT_OFFICIAL"], "document_version_ids": ["doc-S-001:v2"]},
+      {"independent_source_id": "S-032", "acquisition_paths": ["DIRECT_OFFICIAL"], "document_version_ids": ["doc-S-032:v1"]},
+      {"independent_source_id": "S-033", "acquisition_paths": ["DIRECT_OFFICIAL"], "document_version_ids": ["doc-S-033:v1"]}
+    ],
     "link_reasons": ["stable_named_event_id", "event_date"],
     "conflict_fields": ["event_start_at"],
     "source_state": "CURRENT",
@@ -27,6 +32,7 @@
         "document_version_id": "doc-S-001:v2",
         "source_id": "S-001",
         "independent_source_id": "S-001",
+        "acquisition_paths": ["DIRECT_OFFICIAL"],
         "official_url": "https://www.police.taichung.gov.tw/"
       },
       {
@@ -34,6 +40,7 @@
         "document_version_id": "doc-S-032:v1",
         "source_id": "S-032",
         "independent_source_id": "S-032",
+        "acquisition_paths": ["DIRECT_OFFICIAL"],
         "official_url": "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,20"
       },
       {
@@ -41,6 +48,7 @@
         "document_version_id": "doc-S-033:v1",
         "source_id": "S-033",
         "independent_source_id": "S-033",
+        "acquisition_paths": ["DIRECT_OFFICIAL"],
         "official_url": "https://www.news.taichung.gov.tw/"
       }
     ]
