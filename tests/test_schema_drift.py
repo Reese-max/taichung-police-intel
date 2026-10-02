@@ -509,6 +509,13 @@ class SchemaDriftTests(unittest.TestCase):
             drift.CONTRACTS["CTX-165"], header + ",,,,\n", content_type="text/csv", resource_id="r1"
         )
         self.assertEqual(empty_values["status"], "NO_DRIFT")
+        # A line that carries delimiters is a record even when every cell is
+        # blank, so a short all-blank row cannot pass as a complete window.
+        short_blank = drift.observe(
+            drift.CONTRACTS["CTX-165"], header + good + ",,,\n", content_type="text/csv", resource_id="r1"
+        )
+        self.assertEqual(short_blank["status"], "BREAKING_DRIFT")
+        self.assertIn("ROW_COLUMN_COUNT_MISMATCH", short_blank["reasons"])
 
     def test_unreadable_csv_only_fails_its_own_source(self):
         header = "民國年月,網域,網站性質,法律依據,聲請單位\n"
@@ -533,9 +540,26 @@ class SchemaDriftTests(unittest.TestCase):
         self.assertLessEqual(
             len(result["fingerprint_signature"]["row_column_counts"]), drift.MAX_ROW_REASONS
         )
-        self.assertLessEqual(
-            len(result["fingerprint_signature"]["header"]), drift.MAX_SIGNATURE_NAMES
+
+    def test_wide_csv_header_is_capped_in_the_signature_but_not_the_verdict(self):
+        required = ["民國年月", "網域", "網站性質", "法律依據", "聲請單位"]
+        wide = required + [f"備註{index:04d}" for index in range(drift.MAX_SIGNATURE_NAMES)]
+        header = ",".join(wide) + "\n"
+        body = header + ",".join(["x"] * len(wide)) + "\n"
+        result = drift.observe(drift.CONTRACTS["CTX-165"], body, content_type="text/csv", resource_id="r1")
+        self.assertEqual(result["status"], "ADDITIVE_COMPATIBLE")
+        self.assertEqual(result["window_completeness"], "COMPLETE_WITH_ITEMS")
+        self.assertEqual(len(result["fingerprint_signature"]["header"]), drift.MAX_SIGNATURE_NAMES)
+
+        truncated = drift.observe(
+            drift.CONTRACTS["CTX-165"],
+            header + ",".join(["x"] * (len(wide) - 1)) + "\n",
+            content_type="text/csv",
+            resource_id="r1",
         )
+        self.assertEqual(truncated["status"], "BREAKING_DRIFT")
+        self.assertIn("ROW_COLUMN_COUNT_MISMATCH", truncated["reasons"])
+        self.assertEqual(len(truncated["fingerprint_signature"]["header"]), drift.MAX_SIGNATURE_NAMES)
         self.assertLessEqual(len(result["reasons"]), drift.MAX_ROW_REASONS + 2)
 
     def test_live_runs_persist_state_so_last_known_good_survives_to_the_receipt(self):
@@ -750,15 +774,41 @@ class SchemaDriftTests(unittest.TestCase):
         )
         self.assertEqual(receipt["sources"][0]["source_id"], "S-007")
 
-    def test_fingerprints_are_unique_per_source(self):
+    def test_identical_shapes_from_two_sources_never_share_a_fingerprint(self):
+        # Same observed shape, two different source_ids: the healthy path, the
+        # empty-record path, the error-object path and the unparseable path all
+        # have to stay distinguishable, because the receipt keys them by source
+        # while a fingerprint read in isolation does not.
         rows = json.dumps(
-            [{"項目": "x", "欄位名稱": "y", "數值": "1", "資料時間日期": "2026-09-01", "資料週期": "月"}]
+            [{"項目": "x", "欄位名稱": "y", "數值": "1", "資料時間日期": "2026-09-01", "資料週期": "月", "地區": "北屯區"}]
         )
-        fingerprints = {
-            drift.observe(contract, rows, content_type="application/json", resource_id="r1")["observed_schema_fingerprint"]
+        healthy = [
+            drift.observe(
+                contract, rows, content_type="application/json", resource_id="r1"
+            )["observed_schema_fingerprint"]
             for contract in (drift.CONTRACTS["S-028"], drift.CONTRACTS["CTX-POP"])
-        }
-        self.assertEqual(len(fingerprints), 2)
+        ]
+        self.assertEqual(len(set(healthy)), 2)
+
+        record = {"proceedingsId": "p1", "billId": "b1", "date": "d", "speaker": "s", "content": "c"}
+        council = json.dumps({"success": True, "data": {"data": [record], "totalPages": 1, "totalCount": 1}})
+        api = [
+            drift.observe(contract, council, content_type="application/json")["observed_schema_fingerprint"]
+            for contract in (drift.CONTRACTS["S-007"], drift.CONTRACTS["S-009"])
+        ]
+        self.assertEqual(len(set(api)), 2)
+
+        for body, content_type in (
+            (b"not-json", "application/json"),
+            (b'<html />', "text/html"),
+            (b'{"error": "x"}', "application/json"),
+        ):
+            with self.subTest(body=body):
+                broken = [
+                    drift.observe(contract, body, content_type=content_type)["observed_schema_fingerprint"]
+                    for contract in (drift.CONTRACTS["S-007"], drift.CONTRACTS["S-009"])
+                ]
+                self.assertEqual(len(set(broken)), 2)
 
     def test_empty_resources_are_unknown_not_complete_zero(self):
         result = drift.observe(drift.CONTRACTS["S-028"], "[]", content_type="application/json", resource_id="r1")

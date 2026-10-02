@@ -274,8 +274,12 @@ def _base_result(contract: dict[str, Any], body: bytes, observed_at: str | None,
 
 def _signature(result: dict[str, Any], signature: Any) -> dict[str, Any]:
     """Record the observed shape so the fingerprint never encodes data volume."""
-    result["fingerprint_signature"] = signature
-    result["observed_schema_fingerprint"] = canonical_hash(signature)
+    # Every fingerprint is scoped to its own source. Two datasets that publish
+    # the same column names must not report the same schema fingerprint, so the
+    # scope is injected here rather than repeated in each signature literal.
+    scoped = {"source_id": result["source_id"], **signature}
+    result["fingerprint_signature"] = scoped
+    result["observed_schema_fingerprint"] = canonical_hash(scoped)
     return result
 
 
@@ -323,11 +327,16 @@ def _record_contract_failures(
     return reasons
 
 
-def _is_blank_separator(row: list[str], expected_columns: int) -> bool:
-    """A line that carries no cell at all, or only whitespace in the wrong arity, is not a record."""
+def _is_blank_separator(row: list[str]) -> bool:
+    """A line with no delimiter at all is padding, not a record.
+
+    Only a single empty or whitespace-only cell counts. A line that carries
+    delimiters is a record even when every cell is blank, so a short all-blank
+    row is still a column-count mismatch instead of disappearing silently.
+    """
     if not row:
         return True
-    return len(row) != expected_columns and all(not cell.strip() for cell in row)
+    return len(row) == 1 and not row[0].strip()
 
 
 def _apply_pagination_coverage(
@@ -472,13 +481,12 @@ def _observe_html(contract: dict[str, Any], body: bytes, result: dict[str, Any],
     except Exception as error:
         result["reasons"] = ["HTML_LIST_ID_OR_SELECTOR_FAILED", type(error).__name__.upper()]
         result["status"] = "BREAKING_DRIFT"
-        _signature(result, {"source_id": contract["source_id"], "transport": contract["transport"], "parse": "failed"})
+        _signature(result, {"transport": contract["transport"], "parse": "failed"})
         result["review_required"] = True
         return result
     fields = sorted({key for entry in entries for key in entry})
     date_coverage = sum(entry.get("published") is not None for entry in entries)
     signature = {
-        "source_id": contract["source_id"],
         "transport": contract["transport"],
         "entry_fields": _bounded(fields),
         "date_coverage": _coverage_class(date_coverage, len(entries)),
@@ -505,12 +513,11 @@ def _observe_rss(contract: dict[str, Any], body: bytes, result: dict[str, Any], 
     except Exception as error:
         result["reasons"] = ["RSS_LIST_SHAPE_FAILED", type(error).__name__.upper()]
         result["status"] = "BREAKING_DRIFT"
-        _signature(result, {"source_id": contract["source_id"], "transport": contract["transport"], "parse": "failed"})
+        _signature(result, {"transport": contract["transport"], "parse": "failed"})
         result["review_required"] = True
         return result
     fields = sorted({key for entry in entries for key in entry})
     signature = {
-        "source_id": contract["source_id"],
         "transport": contract["transport"],
         "entry_fields": _bounded(fields),
         "date_coverage": _coverage_class(sum(entry.get("published") is not None for entry in entries), len(entries)),
@@ -529,12 +536,11 @@ def _observe_fire_live(contract: dict[str, Any], body: bytes, result: dict[str, 
     except Exception as error:
         result["reasons"] = ["HTML_LIVE_SHAPE_FAILED", type(error).__name__.upper()]
         result["status"] = "BREAKING_DRIFT"
-        _signature(result, {"source_id": contract["source_id"], "transport": contract["transport"], "parse": "failed"})
+        _signature(result, {"transport": contract["transport"], "parse": "failed"})
         result["review_required"] = True
         return result
     fields = sorted({key for entry in entries for key in entry})
     signature = {
-        "source_id": contract["source_id"],
         "transport": contract["transport"],
         "entry_fields": _bounded(fields),
     }
@@ -594,7 +600,6 @@ def _observe_json_api(contract: dict[str, Any], body: bytes, result: dict[str, A
     status = "ADDITIVE_COMPATIBLE" if extra else "NO_DRIFT"
     reasons = ["ADDITIVE_FIELDS"] if extra else []
     signature = {
-        "source_id": contract["source_id"],
         "transport": contract["transport"],
         "record_fields": _bounded(fields),
         "record_types": _observed_types(records, fields),
@@ -668,7 +673,7 @@ def _observe_data_gov_csv(contract: dict[str, Any], body: bytes, result: dict[st
     # indices nor count as a data row.
     data_rows = [
         (index, row) for index, row in enumerate(rows[1:], start=1)
-        if not _is_blank_separator(row, len(header))
+        if not _is_blank_separator(row)
     ]
     mismatched = [(index, len(row)) for index, row in data_rows if len(row) != len(header)]
     if mismatched:
