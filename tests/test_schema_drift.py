@@ -490,7 +490,7 @@ class SchemaDriftTests(unittest.TestCase):
         )
         self.assertEqual(candidates[0]["evidence"]["after"]["status"], "BREAKING_DRIFT")
 
-    def test_whitespace_only_lines_of_the_wrong_arity_are_separators_not_rows(self):
+    def test_only_delimiter_free_lines_count_as_csv_padding(self):
         header = "民國年月,網域,網站性質,法律依據,聲請單位\n"
         good = "11509,a.test,其他,法規,機關\n"
         for separator in ("   \n", " \t \n", "\r\n"):
@@ -560,7 +560,7 @@ class SchemaDriftTests(unittest.TestCase):
         self.assertEqual(truncated["status"], "BREAKING_DRIFT")
         self.assertIn("ROW_COLUMN_COUNT_MISMATCH", truncated["reasons"])
         self.assertEqual(len(truncated["fingerprint_signature"]["header"]), drift.MAX_SIGNATURE_NAMES)
-        self.assertLessEqual(len(result["reasons"]), drift.MAX_ROW_REASONS + 2)
+        self.assertLessEqual(len(truncated["reasons"]), drift.MAX_ROW_REASONS + 2)
 
     def test_live_runs_persist_state_so_last_known_good_survives_to_the_receipt(self):
         observations = [
@@ -867,8 +867,14 @@ class SchemaDriftTests(unittest.TestCase):
         observations = drift.live_observations(session=object(), fetch_source=fetch)
         self.assertEqual({item["source_id"] for item in observations}, set(drift.CONTRACTS))
         failed = next(item for item in observations if item["source_id"] == "S-009")
-        self.assertEqual(failed["http_status"], 503)
+        # No response was received, so the receipt must not attribute a status.
+        self.assertEqual(failed["http_status"], 0)
         self.assertEqual(failed["error_reason"], "LIVE_FETCH_RUNTIMEERROR")
+        observed = drift.observe(drift.CONTRACTS["S-009"], b"", http_status=failed["http_status"], error_reason=failed["error_reason"])
+        self.assertEqual(observed["status"], "SOURCE_UNAVAILABLE")
+        self.assertEqual(observed["reasons"], ["LIVE_FETCH_RUNTIMEERROR"])
+        self.assertEqual(observed["http_status"], 0)
+        self.assertTrue(observed["review_required"])
 
     def test_live_observations_retries_transient_connection_once(self):
         response = SimpleNamespace(

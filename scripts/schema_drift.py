@@ -277,7 +277,7 @@ def _signature(result: dict[str, Any], signature: Any) -> dict[str, Any]:
     # Every fingerprint is scoped to its own source. Two datasets that publish
     # the same column names must not report the same schema fingerprint, so the
     # scope is injected here rather than repeated in each signature literal.
-    scoped = {"source_id": result["source_id"], **signature}
+    scoped = {**signature, "source_id": result["source_id"]}
     result["fingerprint_signature"] = scoped
     result["observed_schema_fingerprint"] = canonical_hash(scoped)
     return result
@@ -428,7 +428,7 @@ def observe(
         http_status=http_status,
     )
     if http_status < 200 or http_status >= 300:
-        result["reasons"] = [error_reason or f"HTTP_{http_status}"]
+        result["reasons"] = [error_reason or (f"HTTP_{http_status}" if http_status else "TRANSPORT_FAILURE")]
         result["status"] = "SOURCE_UNAVAILABLE"
         result["review_required"] = True
         return result
@@ -761,6 +761,13 @@ def _write_state(path: Path, state: dict[str, Any]) -> None:
         handle.flush()
         os.fsync(handle.fileno())
     os.replace(temporary, path)
+    directory = os.open(path.parent, os.O_RDONLY)
+    try:
+        os.fsync(directory)
+    except OSError:
+        pass
+    finally:
+        os.close(directory)
 
 
 def _validate_observation(item: dict[str, Any]) -> None:
@@ -984,7 +991,9 @@ def _failed_observation(source_id: str, error: Exception) -> dict[str, Any]:
     return {
         "source_id": source_id,
         "body": b"",
-        "http_status": 503,
+        # No response was ever received, so there is no status to report. 0 would
+        # read as a server answer; the reason carries the transport failure.
+        "http_status": 0,
         "content_type": "",
         "resource_id": None,
         "observed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
