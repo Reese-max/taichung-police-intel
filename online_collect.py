@@ -1399,7 +1399,7 @@ def canary() -> None:
     for source_id in P0_SOURCES:
         started = time.monotonic()
         options = {"max_details": CANARY_MAX_DETAILS} if COLLECTORS.get(source_id) is collect_news_list else {}
-        result = collect_source(session, source_id, start, end, **options)
+        result = collect_source(session, source_id, start, end, {}, **options)
         summary[source_id] = {
             "source_health": result["source_health"],
             "window_completeness": result["window_completeness"],
