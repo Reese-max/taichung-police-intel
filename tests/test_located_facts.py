@@ -219,6 +219,94 @@ class LocatedFactsTests(unittest.TestCase):
                 verified_at=STAMP,
             )
 
+    def test_uncertain_time_sentences_stay_needs_review_with_distinct_reasons(self):
+        body = (
+            "<p>2026-09-21 原訂17:00改16:00管制</p>"
+            "<p>2026-09-21 尚未決定是否提前管制</p>"
+            "<p>不再於16:00管制</p>"
+        ).encode("utf-8")
+        document = self.html_document(body)
+        bundle = build_bundle(document, body, [
+            {"subject_id": "road:A", "predicate": "road_control_start_at", "needle": "原訂17:00改16:00"},
+            {"subject_id": "road:B", "predicate": "road_control_start_at", "needle": "尚未決定是否提前管制"},
+            {"subject_id": "road:C", "predicate": "road_control_start_at", "needle": "不再於16:00"},
+        ])
+        statuses = [fact["verification_status"] for fact in bundle["facts"]]
+        self.assertEqual(statuses, ["NEEDS_REVIEW"] * 3)
+        reasons = {fact["review_reason"] for fact in bundle["facts"]}
+        self.assertEqual(reasons, {"TIME_RESCHEDULED", "TIME_UNDECIDED", "TIME_NEGATED"})
+        self.assertTrue(all(fact["valid_time"] is None for fact in bundle["facts"]))
+
+    def test_version_diff_marks_synthetic_copy_as_changed_facts(self):
+        from intel_v2.located_facts import compare_document_versions
+        original_body = (
+            "<article><p>公告日期：2026-09-21</p><p>活動開始 18:00；道路管制 17:00。</p></article>"
+        ).encode("utf-8")
+        document_v1 = self.html_document(original_body)
+        bundle_v1 = build_bundle(document_v1, original_body, [
+            {"subject_id": "road:A", "predicate": "road_control_start_at", "needle": "17:00", "date_needle": "2026-09-21"},
+        ])
+        synthetic_modified_body = original_body.replace(b"17:00", b"16:00")
+        document_v2 = self.html_document(synthetic_modified_body)
+        bundle_v2 = build_bundle(document_v2, synthetic_modified_body, [
+            {"subject_id": "road:A", "predicate": "road_control_start_at", "needle": "16:00", "date_needle": "2026-09-21"},
+        ])
+        self.assertEqual(document_v1["document_id"], document_v2["document_id"])
+        self.assertNotEqual(document_v1["document_version_id"], document_v2["document_version_id"])
+        diff = compare_document_versions(
+            document_v1, bundle_v1["facts"], document_v2, bundle_v2["facts"],
+            basis="SYNTHETIC_MODIFIED_COPY",
+        )
+        self.assertEqual(diff["basis"], "SYNTHETIC_MODIFIED_COPY")
+        self.assertTrue(diff["document_version_changed"])
+        affected = diff["affected_facts"]
+        self.assertEqual(len(affected), 1)
+        self.assertEqual(affected[0]["change"], "VALUE_CHANGED")
+        self.assertEqual(affected[0]["old_normalized_value"], "17:00")
+        self.assertEqual(affected[0]["new_normalized_value"], "16:00")
+        all_facts = bundle_v1["facts"] + bundle_v2["facts"]
+        self.assertTrue(all(
+            fact["verification_status"] in {"FACT_CANDIDATE", "NEEDS_REVIEW"} for fact in all_facts
+        ))
+
+    def test_marker_separated_from_time_by_space_still_uncertain(self):
+        body = (
+            "<p>2026-09-21 原訂：延後至 16:00</p>"
+            "<p>2026-09-21 尚未確定是否提前 16:00</p>"
+            "<p>不再於 16:00</p>"
+        ).encode("utf-8")
+        document = self.html_document(body)
+        bundle = build_bundle(document, body, [
+            {"subject_id": "road:A", "predicate": "road_control_start_at", "needle": "16:00"},
+            {"subject_id": "road:B", "predicate": "road_control_start_at", "needle": "尚未確定是否提前 16:00"},
+            {"subject_id": "road:C", "predicate": "road_control_start_at", "needle": "不再於 16:00"},
+        ])
+        reasons = {fact["review_reason"] for fact in bundle["facts"]}
+        self.assertEqual(reasons, {"TIME_RESCHEDULED", "TIME_UNDECIDED", "TIME_NEGATED"})
+        self.assertTrue(all(fact["verification_status"] == "NEEDS_REVIEW" for fact in bundle["facts"]))
+
+    def test_version_diff_reports_added_removed_and_identity_mismatch(self):
+        from intel_v2.located_facts import compare_document_versions
+        original_body = (
+            "<article><p>公告日期：2026-09-21</p><p>活動開始 18:00；道路管制 17:00。</p></article>"
+        ).encode("utf-8")
+        document_v1 = self.html_document(original_body)
+        bundle_v1 = build_bundle(document_v1, original_body, [
+            {"subject_id": "event:A", "predicate": "event_start_at", "needle": "18:00", "date_needle": "2026-09-21"},
+            {"subject_id": "road:A", "predicate": "road_control_start_at", "needle": "17:00", "date_needle": "2026-09-21"},
+        ])
+        removed_body = original_body.replace("；道路管制 17:00".encode(), "".encode())
+        document_v2 = self.html_document(removed_body)
+        bundle_v2 = build_bundle(document_v2, removed_body, [
+            {"subject_id": "event:A", "predicate": "event_start_at", "needle": "18:00", "date_needle": "2026-09-21"},
+        ])
+        diff = compare_document_versions(document_v1, bundle_v1["facts"], document_v2, bundle_v2["facts"], basis="SYNTHETIC_MODIFIED_COPY")
+        self.assertTrue(diff["document_version_changed"])
+        self.assertEqual([a["change"] for a in diff["affected_facts"]], ["REMOVED"])
+        other = acquire_document(source_id="S-028", requested_url="https://data.gov.tw/dataset/88147", final_url="https://data.gov.tw/dataset/88147", body=b"{}", content_type="application/json", fetched_at=STAMP)
+        mismatch = compare_document_versions(document_v1, bundle_v1["facts"], other, [], basis="SYNTHETIC_MODIFIED_COPY")
+        self.assertFalse(mismatch["source_identity_matches"])
+
     def test_unapproved_origin_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "outside the approved source origin"):
             acquire_document(
