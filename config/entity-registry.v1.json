@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "registry_version": 1,
-  "updated_at": "2026-09-17",
+  "registry_version": 2,
+  "updated_at": "2026-10-03",
   "entities": [
     {
       "entity_id": "agency:tc-police",
@@ -376,6 +376,160 @@
       "jurisdiction": "臺中市",
       "status": "CONFIRMED",
       "evidence": "official-road-name"
+    },
+    {
+      "entity_id": "location:tc-zhongzheng-road",
+      "kind": "location",
+      "location_type": "road",
+      "canonical_label": "中正路",
+      "aliases": ["臺中市中正路", "台中市中正路"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "fixture:road-name"
+    },
+    {
+      "entity_id": "location:nt-zhongzheng-road",
+      "kind": "location",
+      "location_type": "road",
+      "canonical_label": "中正路",
+      "aliases": ["新北市中正路"],
+      "jurisdiction": "新北市",
+      "status": "CONFIRMED",
+      "evidence": "fixture:road-name"
+    },
+    {
+      "entity_id": "location:tc-zhongshan-road",
+      "kind": "location",
+      "location_type": "road",
+      "canonical_label": "中山路",
+      "aliases": ["臺中市中山路", "台中市中山路"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "fixture:road-name"
+    },
+    {
+      "entity_id": "location:tn-zhongshan-road",
+      "kind": "location",
+      "location_type": "road",
+      "canonical_label": "中山路",
+      "aliases": ["臺南市中山路"],
+      "jurisdiction": "臺南市",
+      "status": "CONFIRMED",
+      "evidence": "fixture:road-name"
+    },
+    {
+      "entity_id": "location:tc-city-hall",
+      "kind": "location",
+      "location_type": "venue",
+      "canonical_label": "臺中市政府",
+      "aliases": ["台中市政府", "中市府"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "fixture:venue-name"
+    },
+    {
+      "entity_id": "location:tc-city-council",
+      "kind": "location",
+      "location_type": "venue",
+      "canonical_label": "臺中市議會",
+      "aliases": ["台中市議會"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "fixture:venue-name"
+    },
+    {
+      "entity_id": "location:tc-railway-station",
+      "kind": "location",
+      "location_type": "venue",
+      "canonical_label": "臺中車站",
+      "aliases": ["台中車站", "臺中火車站", "台中火車站"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "fixture:venue-name"
+    },
+    {
+      "entity_id": "location:tc-national-theater",
+      "kind": "location",
+      "location_type": "venue",
+      "canonical_label": "臺中國家歌劇院",
+      "aliases": ["台中國家歌劇院"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "fixture:venue-name"
+    },
+    {
+      "entity_id": "location:tc-rainbow-village",
+      "kind": "location",
+      "location_type": "venue",
+      "canonical_label": "彩虹眷村",
+      "aliases": [],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "fixture:venue-name"
+    },
+    {
+      "entity_id": "location:tc-intercontinental-baseball",
+      "kind": "location",
+      "location_type": "venue",
+      "canonical_label": "臺中洲際棒球場",
+      "aliases": ["台中洲際棒球場"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "fixture:venue-name"
+    },
+    {
+      "entity_id": "location:tc-wuri-fishing-port",
+      "kind": "location",
+      "location_type": "venue",
+      "canonical_label": "梧棲漁港",
+      "aliases": [],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "fixture:venue-name"
+    },
+    {
+      "entity_id": "named_event:tc-new-year-eve-2026",
+      "kind": "named_event",
+      "event_type": "civic_event",
+      "canonical_label": "臺中市政府跨年晚會",
+      "aliases": ["台中市政府跨年晚會", "臺中跨年晚會", "中市跨年晚會"],
+      "jurisdiction": "臺中市",
+      "event_date": "2026-12-31",
+      "status": "CONFIRMED",
+      "evidence": "fixture:named-event-occurrence"
+    },
+    {
+      "entity_id": "named_event:tc-new-year-eve-2027",
+      "kind": "named_event",
+      "event_type": "civic_event",
+      "canonical_label": "臺中市政府跨年晚會",
+      "aliases": ["台中市政府跨年晚會", "臺中跨年晚會", "中市跨年晚會"],
+      "jurisdiction": "臺中市",
+      "event_date": "2027-12-31",
+      "status": "CONFIRMED",
+      "evidence": "fixture:named-event-occurrence"
+    },
+    {
+      "entity_id": "named_event:tc-council-regular-2026q4",
+      "kind": "named_event",
+      "event_type": "council_session",
+      "canonical_label": "臺中市議會定期會",
+      "aliases": ["台中市議會定期會", "中市議會定期會"],
+      "jurisdiction": "臺中市",
+      "event_date": "2026-10-06",
+      "status": "CONFIRMED",
+      "evidence": "fixture:named-event-occurrence"
+    },
+    {
+      "entity_id": "named_event:tc-council-regular-2027q1",
+      "kind": "named_event",
+      "event_type": "council_session",
+      "canonical_label": "臺中市議會定期會",
+      "aliases": ["台中市議會定期會", "中市議會定期會"],
+      "jurisdiction": "臺中市",
+      "event_date": "2027-03-09",
+      "status": "CONFIRMED",
+      "evidence": "fixture:named-event-occurrence"
     }
   ]
 }
