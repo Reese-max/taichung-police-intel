@@ -400,43 +400,83 @@ function ActionCard({ item, index, tracked, onAddWatch, storageReady }) {
   );
 }
 
-function SourceHealthSummary({ sourceStatus, canReassure }) {
+function SourceHealthSummary({ sourceStatus, canReassure, candidateContext }) {
   const sources = Array.isArray(sourceStatus?.sources) ? sourceStatus.sources : [];
-  if (!sources.length) return null;
+  const candidateSources = Array.isArray(candidateContext?.sources) ? candidateContext.sources : [];
+  const candidateItems = Array.isArray(candidateContext?.items) ? candidateContext.items : [];
+  if (!sources.length && !candidateSources.length) return null;
 
   return (
-    <details className="v2-source-health">
-      <summary>查看 {sources.length} 個官方來源的快照健康狀態</summary>
-      <div className="v2-source-health-grid">
-        {sources.map((source) => (
-          <article key={source.source_id}>
-            <div>
-              <span
-                className={`v2-source-dot ${canReassure && source.source_health === "PASS" ? "pass" : "fail"}`}
-                aria-hidden="true"
-              />
-              <strong>{source.source_id}</strong>
-            </div>
-            <h3>{SOURCE_NAMES[source.source_id] || source.source_name}</h3>
-            <p>
-              {source.source_health} · {source.freshness_status}
-            </p>
-            <small>最後檢查：{formatDateTime(source.last_checked_at)}</small>
-            {isHealthyStaleSource(source) && (
-              <small data-testid={`healthy-stale-note-${source.source_id}`}>
-                已成功核對官方來源；最新資料日期較舊，不能解讀為目前沒有事件。
-              </small>
-            )}
-            {source.intelligence_gaps?.length > 0 && (
-              <small>缺口：{source.intelligence_gaps.join("、")}</small>
-            )}
-            <a href={source.source_url} target="_blank" rel="noreferrer">
-              官方來源
-            </a>
-          </article>
-        ))}
-      </div>
-    </details>
+    <>
+      {sources.length > 0 && (
+        <details className="v2-source-health">
+          <summary>查看 {sources.length} 個官方來源的快照健康狀態</summary>
+          <div className="v2-source-health-grid">
+            {sources.map((source) => (
+              <article key={source.source_id}>
+                <div>
+                  <span
+                    className={`v2-source-dot ${canReassure && source.source_health === "PASS" ? "pass" : "fail"}`}
+                    aria-hidden="true"
+                  />
+                  <strong>{source.source_id}</strong>
+                </div>
+                <h3>{SOURCE_NAMES[source.source_id] || source.source_name}</h3>
+                <p>
+                  {source.source_health} · {source.freshness_status}
+                </p>
+                <small>最後檢查：{formatDateTime(source.last_checked_at)}</small>
+                {isHealthyStaleSource(source) && (
+                  <small data-testid={`healthy-stale-note-${source.source_id}`}>
+                    已成功核對官方來源；最新資料日期較舊，不能解讀為目前沒有事件。
+                  </small>
+                )}
+                {source.intelligence_gaps?.length > 0 && (
+                  <small>缺口：{source.intelligence_gaps.join("、")}</small>
+                )}
+                <a href={source.source_url} target="_blank" rel="noreferrer">
+                  官方來源
+                </a>
+              </article>
+            ))}
+          </div>
+        </details>
+      )}
+      {candidateSources.length > 0 && (
+        <details className="v2-source-health v2-candidate-observations" data-testid="candidate-source-observations">
+          <summary>候選來源觀察（尚未啟用）· {candidateSources.length} 個來源 / {candidateItems.length} 筆觀察</summary>
+          <p className="v2-candidate-note">
+            下列來源維持 CANDIDATE，只供人工檢視；不列入正式事件、來源健康總數或自動追蹤。
+          </p>
+          <div className="v2-source-health-grid">
+            {candidateSources.map((source) => (
+              <article key={source.source_id}>
+                <div>
+                  <strong>{source.source_id}</strong>
+                  <span className="v2-candidate-status">候選觀察</span>
+                </div>
+                <h3>{SOURCE_NAMES[source.source_id] || source.source_name}</h3>
+                <p>{source.source_health} · {source.window_completeness} · {source.freshness_status}</p>
+                <small>最後檢查：{formatDateTime(source.last_checked_at)}</small>
+                {source.intelligence_gaps?.length > 0 && (
+                  <small>缺口：{source.intelligence_gaps.join("、")}</small>
+                )}
+                <a href={source.source_url} target="_blank" rel="noreferrer">官方來源</a>
+                <ul className="v2-candidate-item-list">
+                  {candidateItems.filter((item) => item.source_id === source.source_id).map((item) => (
+                    <li key={item.stable_id}>
+                      <a href={item.official_url} target="_blank" rel="noreferrer">
+                        {item.title || "（官方資料未提供標題）"}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            ))}
+          </div>
+        </details>
+      )}
+    </>
   );
 }
 
@@ -996,7 +1036,13 @@ export default function V2DailyDashboard() {
             notice={reviewNotice}
             error={reviewError}
           />
-          {!generationMixed && <SourceHealthSummary sourceStatus={sourceStatus} canReassure={assessment.canReassure} />}
+          {!generationMixed && (
+            <SourceHealthSummary
+              sourceStatus={sourceStatus}
+              canReassure={assessment.canReassure}
+              candidateContext={publication?.candidate_source_context}
+            />
+          )}
           <PublicationProvenance
             publication={publication}
             archive={archive}

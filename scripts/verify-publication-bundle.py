@@ -10,6 +10,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "apps" / "web" / "public" / "data"
 SOURCE_POLICY = ROOT / "scripts" / "source-policy.py"
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 
 def load_expected_sources() -> set[str]:
@@ -44,7 +46,90 @@ def source_ids(sources: object) -> list[str]:
     return ids
 
 
-def main() -> int:
+def validate_candidate_lane(status: dict, feed: dict, *, active_ids: set[str], required: bool) -> None:
+    """Validate the isolated candidate lane without widening active feed contracts."""
+    lane_present = (
+        "candidate_sources" in status
+        or "candidate_items" in feed
+        or "candidate_source_summary" in feed
+    )
+    if not lane_present and not required:
+        return
+    from scripts.candidate_publication import load_candidate_publication_sources
+    from intel_v2.located_facts import validate_document_url
+
+    expected = set(load_candidate_publication_sources())
+    if expected & active_ids:
+        raise ValueError("candidate publication IDs overlap active source policy")
+    candidate_sources = status.get("candidate_sources")
+    if not isinstance(candidate_sources, list):
+        raise ValueError("source-status candidate_sources must be an array")
+    ids = source_ids(candidate_sources)
+    if set(ids) != expected or len(ids) != len(expected):
+        raise ValueError(f"source-status candidate IDs invalid: {ids}")
+    by_id = {row["source_id"]: row for row in candidate_sources}
+    for source_id, row in by_id.items():
+        if row.get("integration_status") != "CANDIDATE" or row.get("promotion_eligible") is not False:
+            raise ValueError(f"{source_id}: source status is not CANDIDATE-only")
+        if row.get("source_health") not in {"PASS", "DEGRADED", "FAILED"}:
+            raise ValueError(f"{source_id}: invalid candidate source health")
+        if row.get("window_completeness") not in {"COMPLETE_ZERO", "COMPLETE_WITH_ITEMS", "PARTIAL"}:
+            raise ValueError(f"{source_id}: invalid candidate window completeness")
+        if not str(row.get("source_url") or "").startswith("https://"):
+            raise ValueError(f"{source_id}: candidate source URL must be HTTPS")
+        try:
+            validate_document_url(source_id, row["source_url"])
+        except ValueError as error:
+            raise ValueError(f"{source_id}: candidate source URL is outside its catalog origin") from error
+
+    candidate_items = feed.get("candidate_items")
+    if not isinstance(candidate_items, list):
+        raise ValueError("intelligence-feed candidate_items must be an array")
+    active_items = feed.get("items") or []
+    if any(isinstance(item, dict) and item.get("source_id") in expected for item in active_items):
+        raise ValueError("candidate item leaked into active feed items")
+    candidate_ids = []
+    for item in candidate_items:
+        if not isinstance(item, dict):
+            raise ValueError("candidate feed contains a non-object item")
+        source_id = item.get("source_id")
+        if source_id not in expected:
+            raise ValueError(f"candidate feed contains source outside scope: {source_id}")
+        candidate_ids.append(source_id)
+        if item.get("integration_status") != "CANDIDATE" or item.get("promotion_eligible") is not False:
+            raise ValueError(f"{item.get('stable_id')}: candidate item is missing its CANDIDATE guard")
+        if item.get("eligibility") not in {"INELIGIBLE_CANDIDATE", "INELIGIBLE_CANDIDATE_SOURCE_FAILED"}:
+            raise ValueError(f"{item.get('stable_id')}: candidate item has an active eligibility")
+        if item.get("change_type") not in {"CANDIDATE_OBSERVATION", "LKG"}:
+            raise ValueError(f"{item.get('stable_id')}: candidate item has an active change type")
+        if not item.get("stable_id") or not item.get("stable_key"):
+            raise ValueError("candidate feed item is missing a stable identity")
+        if not str(item.get("official_url") or "").startswith("https://"):
+            raise ValueError(f"{item.get('stable_id')}: candidate official URL must be HTTPS")
+        try:
+            validate_document_url(source_id, item["official_url"])
+        except ValueError as error:
+            raise ValueError(f"{item.get('stable_id')}: candidate link is outside its catalog origin") from error
+
+    candidate_summary = feed.get("candidate_source_summary")
+    if not isinstance(candidate_summary, dict) or set(candidate_summary) != expected:
+        raise ValueError(f"candidate_source_summary must cover exactly {sorted(expected)}")
+    for source_id in expected:
+        row = candidate_summary[source_id]
+        if (
+            not isinstance(row, dict)
+            or row.get("integration_status") != "CANDIDATE"
+            or row.get("promotion_eligible") is not False
+        ):
+            raise ValueError(f"{source_id}: candidate source summary is not CANDIDATE-only")
+        item_count = sum(candidate_id == source_id for candidate_id in candidate_ids)
+        if row.get("item_count") != item_count:
+            raise ValueError(f"{source_id}: candidate item count does not match candidate_items")
+        if row.get("health") != by_id[source_id].get("source_health"):
+            raise ValueError(f"{source_id}: candidate health summary mismatch")
+
+
+def main(*, require_candidate_lane: bool = False) -> int:
     errors: list[str] = []
 
     try:
@@ -86,6 +171,11 @@ def main() -> int:
         errors.append("intelligence-feed.json must use schema_version=1")
     if summary.get("schema_version") != 1:
         errors.append("intelligence-summary.json must use schema_version=1")
+
+    try:
+        validate_candidate_lane(status, feed, active_ids=expected_sources, required=require_candidate_lane)
+    except (OSError, ValueError) as error:
+        errors.append(str(error))
 
     status_sources = status.get("sources")
     try:
@@ -202,4 +292,9 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--require-candidate-lane", action="store_true")
+    args = parser.parse_args()
+    raise SystemExit(main(require_candidate_lane=args.require_candidate_lane))

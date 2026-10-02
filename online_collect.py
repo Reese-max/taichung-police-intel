@@ -48,6 +48,8 @@ MAX_REDIRECTS = 3
 API_S007 = "https://yishi.tccc.gov.tw/api/ProceedingsBackWeb/FrontList"
 API_S009 = "https://yishi.tccc.gov.tw/api/Proposal/FrontList"
 PARSER_VERSION = "p0-live-1"
+MAX_NEWS_LIST_PAGES = 4
+CANARY_MAX_DETAILS = 5
 SOURCE_ROWS = {
     source_id: (name, "PRIMARY_OFFICIAL", "PREP_CORE", "ACTIVE")
     for source_id, (name, _) in P0_SOURCES.items()
@@ -412,17 +414,20 @@ def collect_s029(session: requests.Session, start: date, end: date) -> dict:
 NEWS_LIST_SOURCES = {
     "S-001": {
         "name": "臺中市政府警察局警政新聞",
+        "pages_candidate": True,
         "list_url": "https://www.police.taichung.gov.tw/ch/home.jsp?id=1&parentpath=0&mcustomize=news_list.jsp",
         "fallback_list_url": "https://www.police.taichung.gov.tw/ch/home.jsp?id=1",
         "id_pattern": r"news_view\.jsp[^\"']*dataserno=(\d+)",
     },
     "S-019": {
         "name": "臺中市政府市政會議紀錄與專案報告",
+        "pages_candidate": True,
         "list_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186",
         "id_pattern": r"/(\d+)/post\b",
     },
     "S-032": {
         "name": "臺中市政府交通局最新消息",
+        "pages_candidate": True,
         "list_url": "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,20",
         "id_pattern": r"index-1\.asp\?Parser=9,4,20,,,,(\d+)",
     },
@@ -473,6 +478,55 @@ def parse_news_list(html: bytes, base_url: str, id_pattern: str) -> list[dict]:
     if not entries:
         raise ValueError("news list has no parseable entries")
     return entries
+
+
+def next_news_list_page(html: bytes, base_url: str, source_id: str) -> tuple[str | None, bool]:
+    """Return a safe next-page URL and whether pagination needs accounting for."""
+    soup = BeautifulSoup(html, "html.parser")
+    pagination_hint = False
+    for control in soup.find_all(["a", "link", "button"]):
+        label = " ".join(control.stripped_strings).strip().lower()
+        title = str(control.get("title") or "").strip().lower()
+        aria_label = str(control.get("aria-label") or "").strip().lower()
+        classes = {str(value).lower() for value in control.get("class", [])}
+        rel = {str(value).lower() for value in control.get("rel", [])}
+        href = str(control.get("href") or "").strip()
+        labels = (label, title, aria_label)
+        is_next = (
+            any(any(token in value for token in ("下一頁", "下一页", "下頁", "下页")) for value in labels if value)
+            or any(re.search(r"\bnext(?:\s+page)?\b", value) for value in labels if value)
+            or "next" in rel
+            or any("next" in value for value in classes)
+        )
+        numbered = any(
+            re.fullmatch(r"(?:第\s*)?\d{1,4}\s*(?:頁|页)?", value)
+            for value in labels
+            if value
+        )
+        if not is_next:
+            if numbered and (
+                re.search(r"[?&](?:page|intpage)=\d+", href, re.I)
+                or re.search(r"javascript:\s*list\(", href, re.I)
+            ):
+                pagination_hint = True
+            continue
+        pagination_hint = True
+        if not href or href.startswith("#"):
+            return None, True
+        if href.lower().startswith("javascript:"):
+            match = re.fullmatch(r"javascript:\s*list\((\d{1,4}),\s*(\d{1,4})\)\s*;?", href, re.I)
+            if source_id != "S-001" or not match or int(match.group(1)) < 1:
+                return None, True
+            parts = urllib.parse.urlsplit(base_url)
+            query = [
+                (key, value)
+                for key, value in urllib.parse.parse_qsl(parts.query, keep_blank_values=True)
+                if key.lower() not in {"page", "intpage"}
+            ]
+            query.extend((("page", match.group(1)), ("intpage", match.group(2))))
+            return urllib.parse.urlunsplit(parts._replace(query=urllib.parse.urlencode(query))), True
+        return urllib.parse.urljoin(base_url, href), True
+    return None, pagination_hint
 
 
 def parse_news_rss(xml: bytes, base_url: str) -> list[dict]:
@@ -615,14 +669,49 @@ def collect_news_list(
     existing: dict[str, dict] | None = None,
     max_details: int | None = None,
 ) -> dict:
-    """Collect a candidate list with bounded detail-page requests."""
+    """Collect a candidate list with bounded list and detail-page requests."""
     config = NEWS_LIST_SOURCES[source_id]
-    listing = get_news_listing(session, source_id)
-    responses = [snapshot(listing, "LIST")]
-    if config.get("format") == "rss":
+    responses = []
+    all_pages_seen = True
+    is_rss = config.get("format") == "rss"
+    page_limit = 1 if is_rss else MAX_NEWS_LIST_PAGES
+    if is_rss:
+        listing = get_news_listing(session, source_id)
+        responses.append(snapshot(listing, "LIST"))
         entries = parse_news_rss(listing.content, listing.url)
+        observed_entries = entries
     else:
-        entries = parse_news_list(listing.content, listing.url, config["id_pattern"])
+        entries = []
+        observed_entries = []
+        seen_keys = set()
+        seen_pages = set()
+        page_url = config["list_url"]
+        for _ in range(MAX_NEWS_LIST_PAGES):
+            if page_url in seen_pages:
+                all_pages_seen = False
+                break
+            seen_pages.add(page_url)
+            listing = (
+                get_news_listing(session, source_id)
+                if page_url == config["list_url"]
+                else get(session, page_url, source_id=source_id)
+            )
+            responses.append(snapshot(listing, "LIST"))
+            page_entries = parse_news_list(listing.content, listing.url, config["id_pattern"])
+            observed_entries.extend(page_entries)
+            for entry in page_entries:
+                if entry["stable_key"] not in seen_keys:
+                    entries.append(entry)
+                    seen_keys.add(entry["stable_key"])
+            next_url, has_next = next_news_list_page(listing.content, listing.url, source_id)
+            if not has_next:
+                break
+            if not next_url or next_url in seen_pages:
+                all_pages_seen = False
+                break
+            page_url = next_url
+        else:
+            all_pages_seen = False
     existing = existing or {}
     details_fetched = 0
     items = []
@@ -661,16 +750,17 @@ def collect_news_list(
             }
         )
 
-    dated = [date.fromisoformat(item["published_at"][:10]) for item in items if item["published_at"]]
+    dated = [entry["published"] for entry in observed_entries if entry["published"]]
     window_items = [
         item for item in items
         if item["published_at"] and start <= date.fromisoformat(item["published_at"][:10]) <= end
     ]
     reverse_chronological = all(left >= right for left, right in zip(dated, dated[1:]))
+    complete_list = all_pages_seen and len(dated) == len(observed_entries) and reverse_chronological
     reaches_before_window = bool(dated) and min(dated) < start
-    if window_items and reverse_chronological and reaches_before_window:
+    if complete_list and window_items and reaches_before_window:
         completeness = "COMPLETE_WITH_ITEMS"
-    elif dated and reverse_chronological and max(dated) < start:
+    elif complete_list and dated and max(dated) < start:
         completeness = "COMPLETE_ZERO"
     else:
         completeness = "PARTIAL"
@@ -678,6 +768,12 @@ def collect_news_list(
     return {
         "source_health": "PASS",
         "window_completeness": completeness,
+        "pagination": {
+            "strategy": "rss" if is_rss else "next-link",
+            "pages_fetched": sum(response["purpose"] == "LIST" for response in responses),
+            "page_limit": page_limit,
+            "complete": all_pages_seen,
+        },
         "window_item_count": len(window_items),
         "snapshot_item_count": len(items),
         "items": items,
@@ -1313,7 +1409,8 @@ def canary() -> None:
     summary = {}
     for source_id in P0_SOURCES:
         started = time.monotonic()
-        result = collect_source(session, source_id, start, end)
+        options = {"max_details": CANARY_MAX_DETAILS} if COLLECTORS.get(source_id) is collect_news_list else {}
+        result = collect_source(session, source_id, start, end, {}, **options)
         summary[source_id] = {
             "source_health": result["source_health"],
             "window_completeness": result["window_completeness"],
@@ -1772,6 +1869,18 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
             "item_count": len(collected_items),
         }
 
+    from scripts.candidate_lane import collect_pages_candidate_lane
+
+    candidate_status, candidate_items, candidate_summary = collect_pages_candidate_lane(
+        globals(),
+        window_start.date(),
+        window_end.date(),
+        prior,
+        prior_feed,
+        now,
+        next_at,
+    )
+
     failed = sum(item["result"] == "FAILED" for item in source_status)
     partial = sum(item["result"] == "PARTIAL" for item in source_status)
     status = "FAILED" if failed == len(source_status) else "PARTIAL" if failed or partial else "SUCCEEDED"
@@ -1791,6 +1900,7 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
             "status": status,
         },
         "sources": source_status,
+        "candidate_sources": candidate_status,
     }
     save_state(output, state)
 
@@ -1809,6 +1919,8 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
         "collection_run_id": collection_run_id,
         "items": deduped_items,
         "source_summary": source_summary,
+        "candidate_items": candidate_items,
+        "candidate_source_summary": candidate_summary,
     }
     save_state(feed_output, feed_state)
 

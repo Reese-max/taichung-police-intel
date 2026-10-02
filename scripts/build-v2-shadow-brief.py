@@ -160,6 +160,61 @@ def source_health_projection(source_status: dict | None) -> dict:
     }
 
 
+def candidate_source_context_projection(source_status: dict | None, feed: dict) -> dict | None:
+    """Expose candidate observations separately from active V2 events and health."""
+    if not source_status or "candidate_sources" not in source_status:
+        return None
+    from scripts.candidate_publication import load_candidate_publication_sources
+
+    expected_ids = tuple(load_candidate_publication_sources())
+    status_rows = {
+        row.get("source_id"): row
+        for row in source_status.get("candidate_sources", [])
+        if isinstance(row, dict)
+    }
+    candidate_items = [
+        item for item in feed.get("candidate_items", [])
+        if isinstance(item, dict)
+    ]
+    sources = []
+    for source_id in expected_ids:
+        row = status_rows.get(source_id)
+        if not row:
+            continue
+        sources.append({
+            "source_id": source_id,
+            "source_name": row.get("source_name"),
+            "source_url": row.get("source_url"),
+            "source_health": row.get("source_health"),
+            "window_completeness": row.get("window_completeness"),
+            "freshness_status": row.get("freshness_status"),
+            "last_checked_at": row.get("last_checked_at"),
+            "intelligence_gaps": row.get("intelligence_gaps") or [],
+            "pagination": row.get("pagination"),
+            "integration_status": row.get("integration_status"),
+            "promotion_eligible": row.get("promotion_eligible"),
+        })
+    return {
+        "scope": "ISSUE22_CANDIDATE_ONLY",
+        "integration_status": "CANDIDATE",
+        "promotion_eligible": False,
+        "collection_run_id": feed.get("collection_run_id"),
+        "generated_at": feed.get("generated_at"),
+        "sources": sources,
+        "items": [
+            {
+                key: item.get(key)
+                for key in (
+                    "stable_id", "stable_key", "source_id", "source_name", "title",
+                    "official_url", "published_at", "source_health", "window_completeness",
+                    "change_type", "eligibility", "integration_status", "promotion_eligible",
+                )
+            }
+            for item in candidate_items
+        ],
+    }
+
+
 def event_projection(
     event: ChangeEvent,
     publication_tier: str,
@@ -339,6 +394,9 @@ def main() -> int:
     brief["snapshot_complete"] = snapshot_complete
     brief["source_health"] = source_health_projection(source_status)
     brief["source_status_generated_at"] = source_status.get("generated_at") if source_status else None
+    candidate_context = candidate_source_context_projection(source_status, feed)
+    if candidate_context is not None:
+        brief["candidate_source_context"] = candidate_context
 
     save_json(args.state, state)
     save_json(args.handoff_state, handoff_state)

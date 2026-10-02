@@ -35,6 +35,61 @@ class PublicationBundleTests(unittest.TestCase):
     def test_checked_in_bundle_passes(self):
         self.assertEqual(module.main(), 0)
 
+    def test_candidate_lane_is_separate_and_must_remain_ineligible(self):
+        from scripts.candidate_publication import load_candidate_publication_sources
+
+        sources = load_candidate_publication_sources()
+        active_ids = module.load_expected_sources()
+        self.assertFalse(set(sources) & active_ids)
+        status_rows = []
+        candidate_items = []
+        candidate_summary = {}
+        for index, (source_id, source) in enumerate(sources.items()):
+            status_rows.append({
+                "source_id": source_id,
+                "source_name": source["name"],
+                "source_url": source["entrypoint"],
+                "source_health": "PASS",
+                "window_completeness": "COMPLETE_WITH_ITEMS",
+                "integration_status": "CANDIDATE",
+                "promotion_eligible": False,
+            })
+            candidate_items.append({
+                "stable_id": f"FEED-{source_id}-{index}",
+                "stable_key": str(index),
+                "source_id": source_id,
+                "official_url": source["entrypoint"],
+                "eligibility": "INELIGIBLE_CANDIDATE",
+                "change_type": "CANDIDATE_OBSERVATION",
+                "integration_status": "CANDIDATE",
+                "promotion_eligible": False,
+            })
+            candidate_summary[source_id] = {
+                "health": "PASS",
+                "item_count": 1,
+                "integration_status": "CANDIDATE",
+                "promotion_eligible": False,
+            }
+        status = {"candidate_sources": status_rows}
+        feed = {
+            "items": [],
+            "candidate_items": candidate_items,
+            "candidate_source_summary": candidate_summary,
+        }
+        module.validate_candidate_lane(status, feed, active_ids=active_ids, required=True)
+
+        forged = {**feed, "items": [candidate_items[0]]}
+        with self.assertRaisesRegex(ValueError, "leaked into active feed"):
+            module.validate_candidate_lane(status, forged, active_ids=active_ids, required=True)
+        promoted = {**status, "candidate_sources": [
+            {**row, "promotion_eligible": True} if row["source_id"] == "S-032" else row
+            for row in status_rows
+        ]}
+        with self.assertRaisesRegex(ValueError, "CANDIDATE-only"):
+            module.validate_candidate_lane(promoted, feed, active_ids=active_ids, required=True)
+        with self.assertRaisesRegex(ValueError, "candidate_sources must be an array"):
+            module.validate_candidate_lane({}, {"items": [], "candidate_items": []}, active_ids=active_ids, required=True)
+
 
 if __name__ == "__main__":
     unittest.main()
