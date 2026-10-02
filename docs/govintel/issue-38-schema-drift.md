@@ -14,7 +14,9 @@
 - JSON/API 的 `pagination` 記錄的是 marker 的型別，不是 `totalPages` / `totalCount` 的數值。
 - `record_types` / `field_types` 記錄的是所有 row 實際觀察到的型別集合，不再只取第一筆。
 - HTML / RSS 以 `date_coverage` 分級（`ALL` / `PARTIAL` / `NONE` / `EMPTY`）取代 `n/m` 計數。
+- 每個 signature 都帶 `source_id`，所以兩個欄位結構相同但來源不同的 dataset 不會拿到同一個 fingerprint。
 - receipt 的每筆 source 另存 `fingerprint_signature`，讓 review 可以直接看到「觀察到什麼形狀」。這會隨 receipt 一起發佈到 `apps/web/public/data/schema-drift.json`；內容只有公開政府來源的欄位名稱、CSV header 與 content type，沒有查詢參數或內容本文。
+- 從遠端回應帶進 signature 的名稱清單都受 `MAX_SIGNATURE_NAMES`（500）限制：欄位名稱、CSV header、`row_column_counts`。這個上限只作用在 signature 的呈現，required 欄位存在性、型別與欄位數判定都用完整清單，所以上限不會改變任何 verdict。
 - 指紋反映的是「這一筆觀測看到的形狀」，不是資料量。`record_types` / `field_types` 是這一列取樣到的型別集合，`date_coverage` 也是這一頁的覆蓋分級，所以某個 optional 欄位在某一頁全部是 null、下一頁出現值時，指紋仍會變。這是刻意的取樣誠實，不是告警：目前沒有任何 alert 以指紋比較觸發，只有 `resource_id` 變更會升級成需要覆核。
 - `contract_version` 已推進到 `1.1`。1.0 以前持久化的 fingerprint 是舊 signature（含 pagination 數值、`n/m` 計數與 `entry_count`），與 1.1 之後的值不可直接比較；`update_state` 會把 state 頂層的 marker 更新成當前版本，但保留每筆 `current` / `last_known_good` / `history` 各自記錄的版本。
 
@@ -31,15 +33,16 @@
 
 ## 窗口覆蓋與 replay 證據
 
-- JSON/API 的 contract 另宣告 `record_count_path`。當觀察到的筆數小於宣告總數時，狀態仍是契約正常的 `NO_DRIFT`、`review_required` 仍是 false，但 `window_completeness` 降為 `PARTIAL` 並加上 `PAGINATION_WINDOW_NOT_COVERED`；`observed_record_count` 與 `declared_total_count` 留在 result 裡。
+- JSON/API 的 contract 另宣告 `record_count_path` 與 `page_count_path`。當觀察到的筆數小於宣告總數，或來源宣告超過一頁時，狀態仍是契約正常的 `NO_DRIFT`、`review_required` 仍是 false，但 `window_completeness` 降為 `PARTIAL` 並加上 `PAGINATION_WINDOW_NOT_COVERED`；`observed_record_count`、`declared_total_count`、`declared_total_pages` 留在 result 裡。一次 observation 就是一頁，所以宣告多頁的來源不可能被單頁完整觀察到。
 - 這是「不假設窗口完整」的證據欄位，不是告警。bounded collector 對議會 API 只取第一頁（`pageSize=200`），因此只要某個 keyword 的筆數超過一頁，PARTIAL 就是每次執行都會出現的預期狀態。system health 的 `source_contracts` stage 與 `overall` 只看 `status`，所以不會因此降級；要處理這種覆蓋落差需要擴充 collector 分頁，而不是擴充 monitor。
-- `--input` replay 的每筆 observation 會先驗證：欄位名稱必須是 `observe()` 接受的參數（`previous` 等內部參數、`body_base64` / `body_text` 這種檔案格式欄位不接受）、型別必須正確（`resource_id` / `requested_url` / `final_url` 允許 null）、`observed_at` 必須是帶時區的 ISO-8601（`intel_v2.review` 拒絕 naive timestamp，會讓整個 Review Inbox 投影被丟掉），`source_id` 必須在 contract 內且不重複。任何違規都在寫入 state 或 receipt 之前就拒絕。
+- `resource_id` 的比對基準是 `last_known_good`，不是上一筆 `current`。抓不到資源的那次執行（例如 data.gov.tw 回 503）`current.resource_id` 是 null，若拿它當基準，一次暫時故障之後資料集換版就不會再產生 `RESOURCE_ID_CHANGED`，而且永遠不會再回報。基準在確認過一次正常比較後才會前進。
+- `--input` replay 的每筆 observation 會先驗證：欄位名稱必須是 `observe()` 接受的參數（`previous` 等內部參數、`body_base64` / `body_text` 這種檔案格式欄位不接受）、型別必須正確（`resource_id` / `requested_url` / `final_url` 允許 null）、metadata 字串不得超過 `MAX_OBSERVATION_TEXT`（4096，`body` 本身不算）、`observed_at` 必須是帶時區的 ISO-8601（`intel_v2.review` 拒絕 naive timestamp，會讓整個 Review Inbox 投影被丟掉），`source_id` 必須在 contract 內且不重複。任何違規都在寫入 state 或 receipt 之前就拒絕。
 - 進入 Review Inbox 的每一列都帶著該來源的 `last_known_good`，所以 `intel_v2.review` 投影出的 `evidence.before` 不再是 `null` — reviewer 從 inbox 就看得到「壞掉之前的契約指紋」。
 - 沒有當次 observation 的來源標成 `NO_CURRENT_OBSERVATION` 且 `review_required` 為 false：那是「這次沒看到」，不是來源有問題，沒有東西需要人工覆核；它只會把 `overall` 拉到 `UNKNOWN` 並讓 system health 的 `source_contracts` stage 變 `UNKNOWN`。
 
 ## state 的寫入時機
 
-- `--live` 與 `--input` 都會寫回 `state/schema-drift-state.json`。只有這樣 last-known-good、fingerprint history 與 `RESOURCE_ID_CHANGED` 才可能跨執行存活 — `pages.yml` 每一次都會 `publication-state-branch.py restore` 這個檔案，再於 build 結尾 `persist` 回去。
+- `--live` 與 `--input` 都會寫回 `state/schema-drift-state.json`。只有這樣 last-known-good、fingerprint history 與 `RESOURCE_ID_CHANGED` 才可能跨執行存活 — `pages.yml` 每一次都會 `publication-state-branch.py restore` 這個檔案，再於 build 結尾 `persist` 回去。寫入走 temporary file + `os.replace` + `fsync`：cron 用 `timeout --signal=TERM` 包住 live probe，直接 `write_text` 被砍斷會留下一個壞掉的 state，而 publication state 是以 blob hash 還原、不解析 JSON，壞掉之後每一次執行都會失敗且自我修復不了。
 - `--live-interrupted-receipt` 不會寫 state。那是 live probe 被中斷後的 fail-closed fallback，它沒有觀察到任何東西，用它覆寫 state 只會污染歷史。
 - 每次 receipt 都記錄該次觀察到的 `http_status`，所以「HTTP 200 但契約壞掉」在 receipt 裡是看得見的，不只是 log。
 

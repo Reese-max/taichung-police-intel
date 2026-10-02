@@ -10,6 +10,7 @@ import hashlib
 import importlib.util
 import io
 import json
+import os
 import re
 import sys
 import time
@@ -35,6 +36,7 @@ GOOD_STATUSES = {"NO_DRIFT", "ADDITIVE_COMPATIBLE"}
 CONTRACT_VERSION = "1.1"
 MAX_ROW_REASONS = 10
 MAX_SIGNATURE_NAMES = 500
+MAX_OBSERVATION_TEXT = 4096
 OBSERVATION_KEYS = {
     "body": (bytes, str),
     "http_status": (int,),
@@ -145,6 +147,7 @@ CONTRACTS: dict[str, dict[str, Any]] = {
         },
         "pagination_paths": ["data.totalPages", "data.totalCount"],
         "record_count_path": "data.totalCount",
+        "page_count_path": "data.totalPages",
     },
     "S-009": {
         "source_id": "S-009",
@@ -165,6 +168,7 @@ CONTRACTS: dict[str, dict[str, Any]] = {
         "record_type_fields": {"billId": "string"},
         "pagination_paths": ["data.totalPages", "data.totalCount"],
         "record_count_path": "data.totalCount",
+        "page_count_path": "data.totalPages",
     },
     "S-028": {
         "source_id": "S-028",
@@ -337,11 +341,21 @@ def _apply_pagination_coverage(
     """
     count_path = contract.get("record_count_path")
     present, declared = get_path(payload, count_path) if count_path else (False, None)
+    pages_path = contract.get("page_count_path")
+    has_pages, declared_pages = get_path(payload, pages_path) if pages_path else (False, None)
     result["observed_record_count"] = len(records)
     result["declared_total_count"] = declared if present else None
-    if not present or isinstance(declared, bool) or not isinstance(declared, int):
-        return result
-    if len(records) >= declared:
+    result["declared_total_pages"] = declared_pages if has_pages else None
+    declared_count = declared if isinstance(declared, int) and not isinstance(declared, bool) else None
+    declared_page_count = (
+        declared_pages if isinstance(declared_pages, int) and not isinstance(declared_pages, bool) else None
+    )
+    # One observation is one page, so a source that declares more than one page
+    # is never fully observed even when the record total happens to line up.
+    uncovered = len(records) < declared_count if declared_count is not None else False
+    if declared_page_count is not None and declared_page_count > 1:
+        uncovered = True
+    if not uncovered:
         return result
     result["window_completeness"] = "PARTIAL"
     result["reasons"] = sorted(set(result["reasons"]) | {"PAGINATION_WINDOW_NOT_COVERED"})
@@ -464,6 +478,7 @@ def _observe_html(contract: dict[str, Any], body: bytes, result: dict[str, Any],
     fields = sorted({key for entry in entries for key in entry})
     date_coverage = sum(entry.get("published") is not None for entry in entries)
     signature = {
+        "source_id": contract["source_id"],
         "transport": contract["transport"],
         "entry_fields": _bounded(fields),
         "date_coverage": _coverage_class(date_coverage, len(entries)),
@@ -495,6 +510,7 @@ def _observe_rss(contract: dict[str, Any], body: bytes, result: dict[str, Any], 
         return result
     fields = sorted({key for entry in entries for key in entry})
     signature = {
+        "source_id": contract["source_id"],
         "transport": contract["transport"],
         "entry_fields": _bounded(fields),
         "date_coverage": _coverage_class(sum(entry.get("published") is not None for entry in entries), len(entries)),
@@ -518,6 +534,7 @@ def _observe_fire_live(contract: dict[str, Any], body: bytes, result: dict[str, 
         return result
     fields = sorted({key for entry in entries for key in entry})
     signature = {
+        "source_id": contract["source_id"],
         "transport": contract["transport"],
         "entry_fields": _bounded(fields),
     }
@@ -577,6 +594,7 @@ def _observe_json_api(contract: dict[str, Any], body: bytes, result: dict[str, A
     status = "ADDITIVE_COMPATIBLE" if extra else "NO_DRIFT"
     reasons = ["ADDITIVE_FIELDS"] if extra else []
     signature = {
+        "source_id": contract["source_id"],
         "transport": contract["transport"],
         "record_fields": _bounded(fields),
         "record_types": _observed_types(records, fields),
@@ -658,7 +676,7 @@ def _observe_data_gov_csv(contract: dict[str, Any], body: bytes, result: dict[st
             result,
             {
                 "transport": contract["transport"],
-                "header": header,
+                "header": _bounded(header),
                 "column_count": len(header),
                 "row_column_counts": sorted({width for _, width in mismatched})[:MAX_ROW_REASONS],
             },
@@ -671,7 +689,7 @@ def _observe_data_gov_csv(contract: dict[str, Any], body: bytes, result: dict[st
         )
     extra = sorted(set(header) - required)
     if not data_rows:
-        return _finish(result, {"transport": contract["transport"], "header": header, "column_count": len(header)}, "CONTENT_SHAPE_UNKNOWN", ["NO_DATA_ROWS"])
+        return _finish(result, {"transport": contract["transport"], "header": _bounded(header), "column_count": len(header)}, "CONTENT_SHAPE_UNKNOWN", ["NO_DATA_ROWS"])
     status = "ADDITIVE_COMPATIBLE" if extra or len(header) > contract["expected_column_count"] else "NO_DRIFT"
     return _finish(
         result,
@@ -722,6 +740,24 @@ def update_state(state: dict[str, Any], result: dict[str, Any]) -> dict[str, Any
     return state
 
 
+def _write_state(path: Path, state: dict[str, Any]) -> None:
+    """Replace the durable state atomically.
+
+    The cron wraps the live probe in `timeout`, so a plain write can leave a
+    truncated file behind. Publication state is restored by blob hash without
+    parsing JSON, which would reinstall that truncation on every later run and
+    fail the build permanently.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + ".tmp")
+    payload = json.dumps(state, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    with temporary.open("w", encoding="utf-8") as handle:
+        handle.write(payload)
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.replace(temporary, path)
+
+
 def _validate_observation(item: dict[str, Any]) -> None:
     """Reject malformed replay evidence before it can reach the state file or receipt."""
     for key in ("body_base64", "body_text"):
@@ -737,6 +773,10 @@ def _validate_observation(item: dict[str, Any]) -> None:
             raise ValueError(f"schema-drift observation has invalid {key}: {value!r}")
         if not isinstance(value, expected):
             raise ValueError(f"schema-drift observation has invalid {key}: {value!r}")
+        # `body` is a fetched payload (the real CTX-165 CSV is megabytes); the
+        # metadata strings are not, and they reach the published receipt.
+        if key != "body" and isinstance(value, str) and len(value) > MAX_OBSERVATION_TEXT:
+            raise ValueError(f"schema-drift observation has oversized {key}")
     observed_at = item.get("observed_at")
     if isinstance(observed_at, str):
         try:
@@ -774,7 +814,11 @@ def build_receipt(
     review_inbox = []
     for source_id, contract in contracts.items():
         old = state.get("sources", {}).get(source_id, {})
-        previous = old.get("current")
+        # A run that could not read the resource still becomes `current`, so the
+        # last-known-good record is the baseline that survives an outage. Using
+        # `current` alone would silently drop RESOURCE_ID_CHANGED forever after
+        # one failed probe.
+        previous = old.get("last_known_good") or old.get("current")
         observation = observations_by_id.get(source_id)
         if observation:
             result = observe(contract, observation.get("body", b""), previous=previous, **{key: value for key, value in observation.items() if key not in {"source_id", "body"}})
@@ -1074,8 +1118,7 @@ def main(argv: list[str] | None = None) -> int:
     # survive a run. The interrupted fallback deliberately leaves the state
     # untouched: it records no observation worth keeping.
     if args.input or args.live:
-        args.state.parent.mkdir(parents=True, exist_ok=True)
-        args.state.write_text(json.dumps(next_state, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        _write_state(args.state, next_state)
     print(f"SCHEMA_DRIFT_RECEIPT_OK overall={receipt['overall']} sources={len(receipt['sources'])} output={args.output}")
     return 0
 

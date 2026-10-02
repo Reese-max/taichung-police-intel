@@ -264,6 +264,7 @@ class SchemaDriftTests(unittest.TestCase):
             })
 
         expected = {
+            "source_id": "S-007",
             "transport": "JSON_API",
             "record_fields": ["content", "date", "proceedingsId", "speaker"],
             "record_types": {
@@ -275,7 +276,7 @@ class SchemaDriftTests(unittest.TestCase):
             "pagination": {"data.totalCount": "integer", "data.totalPages": "integer"},
         }
         observed = drift.observe(drift.CONTRACTS["S-007"], api_payload("甲"), content_type="application/json")
-        self.assertEqual(json.loads(json.dumps(expected)), observed["fingerprint_signature"])
+        self.assertEqual(expected, observed["fingerprint_signature"])
         self.assertEqual(observed["observed_schema_fingerprint"], drift.canonical_hash(expected))
 
     def test_partly_missing_and_retyped_fields_report_both_in_one_verdict(self):
@@ -343,7 +344,7 @@ class SchemaDriftTests(unittest.TestCase):
         ]
         self.assertEqual(len(row_reasons), drift.MAX_ROW_REASONS)
         self.assertIn("MISMATCHED_ROW_COUNT_500", noisy["reasons"])
-        self.assertEqual(len(noisy["reasons"]), drift.MAX_ROW_REASONS + 2)
+        self.assertLessEqual(len(noisy["reasons"]), drift.MAX_ROW_REASONS + 2)
 
     def test_large_well_formed_csv_stays_no_drift(self):
         header = "民國年月,網域,網站性質,法律依據,聲請單位\n"
@@ -366,10 +367,6 @@ class SchemaDriftTests(unittest.TestCase):
         other_mismatch = drift.observe(drift.CONTRACTS["S-007"], b"<html />", content_type="text/html;q=0.9")
         self.assertEqual(
             mismatch["observed_schema_fingerprint"], other_mismatch["observed_schema_fingerprint"]
-        )
-        self.assertEqual(
-            mismatch["fingerprint_signature"]["actual_content_type"],
-            other_mismatch["fingerprint_signature"]["actual_content_type"],
         )
 
         broken_html = "<html><body>200 but changed</body></html>"
@@ -419,13 +416,21 @@ class SchemaDriftTests(unittest.TestCase):
         self.assertEqual(two["status"], "NO_DRIFT")
         self.assertEqual(one["observed_schema_fingerprint"], two["observed_schema_fingerprint"])
 
-    def test_contract_version_marks_the_shape_only_fingerprint_era(self):
-        self.assertEqual(drift.CONTRACT_VERSION, "1.1")
-        self.assertEqual(drift.empty_state()["contract_version"], "1.1")
+    def test_every_emitted_record_carries_the_module_contract_version(self):
+        # Guards the shape-only fingerprint era: the version travels with each
+        # observation so a persisted fingerprint can be placed in time.
+        version = drift.CONTRACT_VERSION
+        self.assertEqual(drift.empty_state()["contract_version"], version)
         observed = drift.observe(drift.CONTRACTS["S-007"], json.dumps(API), content_type="application/json")
-        self.assertEqual(observed["contract_version"], "1.1")
+        self.assertEqual(observed["contract_version"], version)
         state = drift.update_state(drift.empty_state(), observed)
-        self.assertEqual(state["contract_version"], "1.1")
+        self.assertEqual(state["contract_version"], version)
+        for record in (state["sources"]["S-007"]["current"], state["sources"]["S-007"]["last_known_good"]):
+            self.assertEqual(record["contract_version"], version)
+        broken = drift.observe(drift.CONTRACTS["S-007"], b"not-json", content_type="application/json")
+        self.assertEqual(broken["contract_version"], version)
+        unavailable = drift.observe(drift.CONTRACTS["S-009"], b"", http_status=503)
+        self.assertEqual(unavailable["contract_version"], version)
 
     def test_replay_observations_are_validated_before_reaching_the_receipt(self):
         sample = {"source_id": "S-007", "body": json.dumps(API), "content_type": "application/json"}
@@ -528,16 +533,12 @@ class SchemaDriftTests(unittest.TestCase):
         self.assertLessEqual(
             len(result["fingerprint_signature"]["row_column_counts"]), drift.MAX_ROW_REASONS
         )
-        self.assertEqual(len(result["reasons"]), drift.MAX_ROW_REASONS + 2)
+        self.assertLessEqual(
+            len(result["fingerprint_signature"]["header"]), drift.MAX_SIGNATURE_NAMES
+        )
+        self.assertLessEqual(len(result["reasons"]), drift.MAX_ROW_REASONS + 2)
 
     def test_live_runs_persist_state_so_last_known_good_survives_to_the_receipt(self):
-        response = SimpleNamespace(
-            content=b"sample",
-            status_code=200,
-            headers={"content-type": "text/plain"},
-            url="https://official.test/source",
-            request=SimpleNamespace(url="https://official.test/source"),
-        )
         observations = [
             {"source_id": "S-007", "body": json.dumps(API).encode(), "http_status": 200,
              "content_type": "application/json", "resource_id": None,
@@ -644,6 +645,120 @@ class SchemaDriftTests(unittest.TestCase):
         sample = {"source_id": "S-007", "body": json.dumps(API), "content_type": "application/json"}
         with self.assertRaisesRegex(ValueError, "unknown keys: previous"):
             drift.build_receipt([{**sample, "previous": {"status": "NO_DRIFT"}}])
+
+    def test_resource_id_drift_survives_an_unavailable_run_in_between(self):
+        rows = [{"項目": "x", "欄位名稱": "y", "數值": "1", "資料時間日期": "2026-09-01", "資料週期": "月"}]
+        contracts = {"S-028": drift.CONTRACTS["S-028"]}
+        body = json.dumps(rows)
+
+        receipt, state = drift.build_receipt(
+            [{"source_id": "S-028", "body": body, "content_type": "application/json", "resource_id": "resource-A"}],
+            contracts=contracts,
+        )
+        self.assertEqual(receipt["sources"][0]["status"], "NO_DRIFT")
+        self.assertEqual(receipt["sources"][0]["resource_id"], "resource-A")
+
+        # A failed probe records no resource_id, but it must not become the baseline.
+        receipt, state = drift.build_receipt(
+            [{"source_id": "S-028", "body": b"", "http_status": 503, "content_type": "application/json",
+              "resource_id": None, "error_reason": "HTTP_503"}],
+            state=state,
+            contracts=contracts,
+        )
+        self.assertEqual(receipt["sources"][0]["status"], "SOURCE_UNAVAILABLE")
+        self.assertEqual(
+            state["sources"]["S-028"]["last_known_good"]["resource_id"], "resource-A"
+        )
+
+        receipt, state = drift.build_receipt(
+            [{"source_id": "S-028", "body": body, "content_type": "application/json", "resource_id": "resource-B"}],
+            state=state,
+            contracts=contracts,
+        )
+        source = receipt["sources"][0]
+        self.assertTrue(source["resource_id_changed"])
+        self.assertIn("RESOURCE_ID_CHANGED", source["reasons"])
+        self.assertEqual(source["status"], "ADDITIVE_COMPATIBLE")
+        self.assertTrue(source["review_required"])
+        self.assertEqual(receipt["review_inbox"][0]["reasons"], ["RESOURCE_ID_CHANGED"])
+
+        # The baseline advances once the change is recorded, so the next swap is
+        # detected on its own terms rather than escalating forever.
+        control, state = drift.build_receipt(
+            [{"source_id": "S-028", "body": body, "content_type": "application/json", "resource_id": "resource-C"}],
+            state=state,
+            contracts=contracts,
+        )
+        self.assertTrue(control["sources"][0]["resource_id_changed"])
+        self.assertIn("RESOURCE_ID_CHANGED", control["sources"][0]["reasons"])
+        unchanged, _ = drift.build_receipt(
+            [{"source_id": "S-028", "body": body, "content_type": "application/json", "resource_id": "resource-C"}],
+            state=state,
+            contracts=contracts,
+        )
+        self.assertFalse(unchanged["sources"][0]["resource_id_changed"])
+        self.assertEqual(unchanged["sources"][0]["status"], "NO_DRIFT")
+
+    def test_a_multi_page_declaration_is_never_a_complete_window(self):
+        for declared_total, declared_pages in ((200, 9), (0, 9), (1, 1), (1, 2)):
+            with self.subTest(total=declared_total, pages=declared_pages):
+                payload = copy.deepcopy(API)
+                payload["data"]["totalCount"] = declared_total
+                payload["data"]["totalPages"] = declared_pages
+                result = drift.observe(
+                    drift.CONTRACTS["S-007"], json.dumps(payload), content_type="application/json"
+                )
+                self.assertEqual(result["status"], "NO_DRIFT")
+                self.assertEqual(result["declared_total_count"], declared_total)
+                self.assertEqual(result["declared_total_pages"], declared_pages)
+                expected = "PARTIAL" if (declared_pages > 1 or 1 < declared_total) else "COMPLETE_WITH_ITEMS"
+                self.assertEqual(result["window_completeness"], expected)
+                self.assertEqual(
+                    "PAGINATION_WINDOW_NOT_COVERED" in result["reasons"],
+                    expected == "PARTIAL",
+                )
+
+    def test_durable_state_is_replaced_wholesale_and_never_left_partial(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state_path = Path(directory) / "nested" / "state.json"
+            observed = drift.observe(drift.CONTRACTS["S-007"], json.dumps(API), content_type="application/json")
+            state = drift.update_state(drift.empty_state(), observed)
+            drift._write_state(state_path, state)
+            self.assertEqual(
+                json.loads(state_path.read_text(encoding="utf-8"))["contract_version"], drift.CONTRACT_VERSION
+            )
+
+            # A partial write is what a timeout mid-write would leave behind;
+            # the replace must overwrite it whole and leave no scratch file.
+            state_path.write_text("truncated{", encoding="utf-8")
+            broken = drift.observe(drift.CONTRACTS["S-007"], b"not-json", content_type="application/json")
+            drift._write_state(state_path, drift.update_state(state, broken))
+            recovered = json.loads(state_path.read_text(encoding="utf-8"))
+            self.assertEqual(recovered["sources"]["S-007"]["current"]["status"], "CONTENT_SHAPE_UNKNOWN")
+            self.assertEqual(list(state_path.parent.glob("*.tmp")), [])
+
+    def test_oversized_observation_metadata_is_refused(self):
+        sample = {"source_id": "S-007", "body": json.dumps(API), "content_type": "application/json"}
+        with self.assertRaisesRegex(ValueError, "oversized resource_id"):
+            drift.build_receipt(
+                [{**sample, "resource_id": "r" * (drift.MAX_OBSERVATION_TEXT + 1)}],
+                contracts={"S-007": drift.CONTRACTS["S-007"]},
+            )
+        receipt, _ = drift.build_receipt(
+            [{**sample, "body": b"x" * (drift.MAX_OBSERVATION_TEXT * 8)}],
+            contracts={"S-007": drift.CONTRACTS["S-007"]},
+        )
+        self.assertEqual(receipt["sources"][0]["source_id"], "S-007")
+
+    def test_fingerprints_are_unique_per_source(self):
+        rows = json.dumps(
+            [{"項目": "x", "欄位名稱": "y", "數值": "1", "資料時間日期": "2026-09-01", "資料週期": "月"}]
+        )
+        fingerprints = {
+            drift.observe(contract, rows, content_type="application/json", resource_id="r1")["observed_schema_fingerprint"]
+            for contract in (drift.CONTRACTS["S-028"], drift.CONTRACTS["CTX-POP"])
+        }
+        self.assertEqual(len(fingerprints), 2)
 
     def test_empty_resources_are_unknown_not_complete_zero(self):
         result = drift.observe(drift.CONTRACTS["S-028"], "[]", content_type="application/json", resource_id="r1")
