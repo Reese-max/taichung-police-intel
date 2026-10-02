@@ -4,7 +4,7 @@
 
 目前 checkout 已完成：
 
-- Batch 1 的集會遊行、重要統計、反詐執行成效與 165 三類資料 fixture adapter。
+- Batch 1 的集會遊行、重要統計、反詐執行成效與 165 三類資料 fixture adapter；其中 172159 依官方 UTF-8 CSV schema 解析民國年／月、整數指標與來源版本 provenance，仍維持 `FIXTURE_ONLY`。
 - `S-036` 集會遊行與 `S-037` 警察機關地址的 catalog 綁定；兩者仍是 candidate，沒有 production collector 或部署宣稱。
 - 集會遊行的時間／路線／主管機關 identity 與 semantic-change receipt，並可和臺中交通公告 fixture 融合成一個 `PublicEvent`。
 - 重要統計保留 `period`、`table_id`、`value` 與官方註記；週統計、月報、年報與專題資料都標成 reference，不是即時事件。
