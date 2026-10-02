@@ -44,7 +44,6 @@ OBSERVATION_KEYS = {
     "requested_url": (str, type(None)),
     "final_url": (str, type(None)),
     "error_reason": (str,),
-    "previous": (dict,),
 }
 
 
@@ -313,10 +312,22 @@ def _record_contract_failures(
     return reasons
 
 
+def _is_blank_separator(row: list[str], expected_columns: int) -> bool:
+    """A line that carries no cell at all, or only whitespace in the wrong arity, is not a record."""
+    if not row:
+        return True
+    return len(row) != expected_columns and all(not cell.strip() for cell in row)
+
+
 def _apply_pagination_coverage(
     result: dict[str, Any], contract: dict[str, Any], payload: Any, records: list[Any]
 ) -> dict[str, Any]:
-    """A contract-healthy source still fails closed when only part of the window was observed."""
+    """Report an uncovered window instead of implying the first page is the whole window.
+
+    The bounded collector only requests one page, so a source with more matches
+    than ``pageSize`` is expected to land here every run. The contract verdict
+    is untouched; only the window claim and the evidence for it change.
+    """
     count_path = contract.get("record_count_path")
     present, declared = get_path(payload, count_path) if count_path else (False, None)
     result["observed_record_count"] = len(records)
@@ -612,9 +623,12 @@ def _observe_data_gov_json(contract: dict[str, Any], body: bytes, result: dict[s
 def _observe_data_gov_csv(contract: dict[str, Any], body: bytes, result: dict[str, Any], previous: dict[str, Any] | None) -> dict[str, Any]:
     try:
         text = body.decode("utf-8-sig")
-        rows = list(csv.reader(io.StringIO(text)))
     except UnicodeDecodeError:
         return _finish(result, {"transport": contract["transport"], "parse": "unsupported_encoding"}, "CONTENT_SHAPE_UNKNOWN", ["UNSUPPORTED_ENCODING"])
+    try:
+        rows = list(csv.reader(io.StringIO(text)))
+    except csv.Error:
+        return _finish(result, {"transport": contract["transport"], "parse": "unreadable_csv"}, "CONTENT_SHAPE_UNKNOWN", ["UNPARSEABLE_CSV"])
     if not rows or not rows[0]:
         return _finish(result, {"transport": contract["transport"]}, "CONTENT_SHAPE_UNKNOWN", ["CSV_HEADER_MISSING"])
     header = rows[0]
@@ -626,12 +640,20 @@ def _observe_data_gov_csv(contract: dict[str, Any], body: bytes, result: dict[st
         return _finish(result, {"transport": contract["transport"], "header": header}, "BREAKING_DRIFT", ["COLUMN_COUNT_DECREASED"])
     # Blank lines are separators, not records, so they neither shift column
     # indices nor count as a data row.
-    data_rows = [(index, row) for index, row in enumerate(rows[1:], start=1) if row]
+    data_rows = [
+        (index, row) for index, row in enumerate(rows[1:], start=1)
+        if not _is_blank_separator(row, len(header))
+    ]
     mismatched = [(index, len(row)) for index, row in data_rows if len(row) != len(header)]
     if mismatched:
         return _finish(
             result,
-            {"transport": contract["transport"], "header": header, "column_count": len(header), "row_column_counts": sorted({width for _, width in mismatched})},
+            {
+                "transport": contract["transport"],
+                "header": header,
+                "column_count": len(header),
+                "row_column_counts": sorted({width for _, width in mismatched})[:MAX_ROW_REASONS],
+            },
             "BREAKING_DRIFT",
             [
                 "ROW_COLUMN_COUNT_MISMATCH",
@@ -667,8 +689,10 @@ def empty_state() -> dict[str, Any]:
 def update_state(state: dict[str, Any], result: dict[str, Any]) -> dict[str, Any]:
     state = json.loads(json.dumps(state, ensure_ascii=False))
     state.setdefault("schema_version", 1)
-    state.setdefault("contract_version", CONTRACT_VERSION)
     state.setdefault("sources", {})
+    # The marker tracks the contract version this code emits, so persisted
+    # fingerprints from an older fingerprint era are never read as current.
+    state["contract_version"] = CONTRACT_VERSION
     source_id = result["source_id"]
     old = state["sources"].get(source_id, {})
     current = old.get("current")
@@ -751,6 +775,7 @@ def build_receipt(
                 "reasons": result["reasons"],
                 "observed_at": result["observed_at"],
                 "state": "OPEN",
+                "last_known_good": source_state.get("last_known_good"),
             })
     statuses = {item["status"] for item in receipt_sources}
     overall = "BLOCKED" if "BREAKING_DRIFT" in statuses or "SOURCE_UNAVAILABLE" in statuses else "DEGRADED" if "ADDITIVE_COMPATIBLE" in statuses else "UNKNOWN" if statuses - {"NO_DRIFT"} else "HEALTHY"

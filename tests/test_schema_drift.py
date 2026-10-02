@@ -445,6 +445,101 @@ class SchemaDriftTests(unittest.TestCase):
         receipt, _ = drift.build_receipt([accepted], contracts={"S-007": drift.CONTRACTS["S-007"]})
         self.assertEqual(receipt["sources"][0]["source_id"], "S-007")
 
+    def test_state_marks_the_current_contract_version_over_a_persisted_older_one(self):
+        persisted = drift.empty_state()
+        persisted["contract_version"] = "1.0"
+        persisted["sources"] = {
+            "S-007": {
+                "current": {"contract_version": "1.0", "observed_schema_fingerprint": "a" * 64, "status": "NO_DRIFT"},
+                "last_known_good": {"contract_version": "1.0", "observed_schema_fingerprint": "a" * 64},
+                "history": [],
+            }
+        }
+        observed = drift.observe(drift.CONTRACTS["S-007"], json.dumps(API), content_type="application/json")
+        updated = drift.update_state(persisted, observed)
+        self.assertEqual(updated["contract_version"], "1.1")
+        self.assertEqual(updated["sources"]["S-007"]["last_known_good"]["contract_version"], "1.1")
+        self.assertEqual(updated["sources"]["S-007"]["history"][0]["contract_version"], "1.0")
+        self.assertEqual(updated["sources"]["S-007"]["history"][0]["observed_schema_fingerprint"], "a" * 64)
+
+    def test_review_inbox_carries_the_last_known_good_the_reviewer_needs(self):
+        from intel_v2.review import schema_drift_candidates
+
+        good = drift.observe(drift.CONTRACTS["S-007"], json.dumps(API), content_type="application/json")
+        state = drift.update_state(drift.empty_state(), good)
+        broken = drift.observe(
+            drift.CONTRACTS["S-007"], json.dumps({"error": "changed"}), content_type="application/json"
+        )
+        receipt, _ = drift.build_receipt(
+            [{"source_id": "S-007", "body": b'{"error": "changed"}', "content_type": "application/json"}],
+            state=state,
+            contracts={"S-007": drift.CONTRACTS["S-007"]},
+        )
+        self.assertEqual(len(receipt["review_inbox"]), 1)
+        self.assertEqual(
+            receipt["review_inbox"][0]["last_known_good"]["observed_schema_fingerprint"],
+            good["observed_schema_fingerprint"],
+        )
+        candidates = schema_drift_candidates(receipt)
+        self.assertEqual(len(candidates), 1)
+        self.assertIsNotNone(candidates[0]["evidence"]["before"])
+        self.assertEqual(
+            candidates[0]["evidence"]["before"]["observed_schema_fingerprint"],
+            good["observed_schema_fingerprint"],
+        )
+        self.assertEqual(candidates[0]["evidence"]["after"]["status"], "BREAKING_DRIFT")
+        self.assertIsNotNone(broken)
+
+    def test_whitespace_only_lines_of_the_wrong_arity_are_separators_not_rows(self):
+        header = "民國年月,網域,網站性質,法律依據,聲請單位\n"
+        good = "11509,a.test,其他,法規,機關\n"
+        for separator in ("   \n", " \t \n", "\r\n"):
+            with self.subTest(separator=separator):
+                result = drift.observe(
+                    drift.CONTRACTS["CTX-165"], header + good + separator, content_type="text/csv", resource_id="r1"
+                )
+                self.assertEqual(result["status"], "NO_DRIFT")
+                self.assertEqual(result["reasons"], [])
+        blank_body = drift.observe(
+            drift.CONTRACTS["CTX-165"], header + "   \n", content_type="text/csv", resource_id="r1"
+        )
+        self.assertEqual(blank_body["status"], "CONTENT_SHAPE_UNKNOWN")
+        self.assertEqual(blank_body["reasons"], ["NO_DATA_ROWS"])
+        empty_values = drift.observe(
+            drift.CONTRACTS["CTX-165"], header + ",,,,\n", content_type="text/csv", resource_id="r1"
+        )
+        self.assertEqual(empty_values["status"], "NO_DRIFT")
+
+    def test_unreadable_csv_only_fails_its_own_source(self):
+        header = "民國年月,網域,網站性質,法律依據,聲請單位\n"
+        oversized = header + "11509," + ("x" * 200_000) + ",其他,法規,機關\n"
+        result = drift.observe(drift.CONTRACTS["CTX-165"], oversized, content_type="text/csv", resource_id="r1")
+        self.assertEqual(result["status"], "CONTENT_SHAPE_UNKNOWN")
+        self.assertEqual(result["reasons"], ["UNPARSEABLE_CSV"])
+        self.assertEqual(result["window_completeness"], "PARTIAL")
+        self.assertTrue(result["review_required"])
+
+        receipt, _ = drift.build_receipt(
+            [{"source_id": "CTX-165", "body": oversized, "content_type": "text/csv", "resource_id": "r1"}]
+        )
+        self.assertEqual(receipt["overall"], "UNKNOWN")
+        self.assertEqual(len(receipt["sources"]), len(drift.CONTRACTS))
+
+    def test_row_column_counts_in_the_signature_stay_bounded(self):
+        header = "民國年月,網域,網站性質,法律依據,聲請單位\n"
+        body = header + "".join(f"{','.join(['x'] * width)}\n" for width in range(1, 40))
+        result = drift.observe(drift.CONTRACTS["CTX-165"], body, content_type="text/csv", resource_id="r1")
+        self.assertEqual(result["status"], "BREAKING_DRIFT")
+        self.assertLessEqual(
+            len(result["fingerprint_signature"]["row_column_counts"]), drift.MAX_ROW_REASONS
+        )
+        self.assertEqual(len(result["reasons"]), drift.MAX_ROW_REASONS + 2)
+
+    def test_observation_previous_key_is_rejected_before_it_reaches_observe(self):
+        sample = {"source_id": "S-007", "body": json.dumps(API), "content_type": "application/json"}
+        with self.assertRaisesRegex(ValueError, "unknown keys: previous"):
+            drift.build_receipt([{**sample, "previous": {"status": "NO_DRIFT"}}])
+
     def test_empty_resources_are_unknown_not_complete_zero(self):
         result = drift.observe(drift.CONTRACTS["S-028"], "[]", content_type="application/json", resource_id="r1")
         self.assertEqual(result["status"], "CONTENT_SHAPE_UNKNOWN")
