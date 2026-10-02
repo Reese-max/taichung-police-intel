@@ -231,11 +231,144 @@ class ListFirstGatingTests(unittest.TestCase):
         self.assertEqual(_collect("S-001", recent_only)[0]["window_completeness"], "PARTIAL")
         self.assertEqual(_collect("S-001", unordered)[0]["window_completeness"], "PARTIAL")
 
+    def test_undated_rows_make_window_partial(self):
+        undated = _page(
+            """
+            <li><a href="index-1.asp?Parser=9,4,20,,,,21750">新訊 2026-09-10</a></li>
+            <li><a href="index-1.asp?Parser=9,4,20,,,,21749">日期不明</a></li>
+            <li><a href="index-1.asp?Parser=9,4,20,,,,21748">舊訊 2026-09-01</a></li>
+            """
+        )
+        self.assertEqual(_collect("S-032", undated, max_details=0)[0]["window_completeness"], "PARTIAL")
+
+    def test_unreadable_pager_makes_window_partial(self):
+        otherwise_complete = _page(
+            """
+            <li><a href="index-1.asp?Parser=9,4,20,,,,21750">新訊 2026-09-10</a></li>
+            <li><a href="index-1.asp?Parser=9,4,20,,,,21749">舊訊 2026-09-01</a></li>
+            <a rel="next" href="javascript:loadMore()">下一頁</a>
+            """
+        )
+        self.assertEqual(_collect("S-032", otherwise_complete, max_details=0)[0]["window_completeness"], "PARTIAL")
+
+    def test_numbered_only_pager_makes_window_partial(self):
+        otherwise_complete = _page(
+            """
+            <li><a href="index-1.asp?Parser=9,4,20,,,,21750">新訊 2026-09-10</a></li>
+            <li><a href="index-1.asp?Parser=9,4,20,,,,21749">舊訊 2026-09-01</a></li>
+            <a href="?Page=2">2</a>
+            """
+        )
+        self.assertEqual(_collect("S-032", otherwise_complete, max_details=0)[0]["window_completeness"], "PARTIAL")
+
+    def test_police_javascript_pager_uses_bounded_read_only_get(self):
+        first = _page(
+            """
+            <li><a href="home.jsp?mcustomize=news_view.jsp&dataserno=1">115-09-10 新訊</a></li>
+            <li><a href="home.jsp?mcustomize=news_view.jsp&dataserno=2">115-09-01 舊訊</a></li>
+            <a href="javascript:list(2,1)">下一頁</a>
+            """
+        )
+        second = _page('<li><a href="home.jsp?mcustomize=news_view.jsp&dataserno=3">115-08-30 更早</a></li>')
+        second_url = oc.NEWS_LIST_SOURCES["S-001"]["list_url"] + "&page=2&intpage=1"
+        result, session = _collect("S-001", first, max_details=0, **{second_url: second})
+        self.assertEqual(result["window_completeness"], "COMPLETE_WITH_ITEMS")
+        self.assertEqual(session.fetched[-1], second_url)
+
+    def test_repeated_page_and_cross_page_date_reversal_are_partial(self):
+        first = _page(
+            """
+            <li><a href="index-1.asp?Parser=9,4,20,,,,21750">新訊 2026-09-10</a></li>
+            <li><a href="index-1.asp?Parser=9,4,20,,,,21749">舊訊 2026-09-01</a></li>
+            <a rel="next" href="/news/index.asp?Parser=9,4,20&page=2">Next</a>
+            """
+        )
+        second_url = "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,20&page=2"
+        loop = _page(
+            '<li><a href="index-1.asp?Parser=9,4,20,,,,21748">更早 2026-08-30</a></li>'
+            '<a rel="next" href="/news/index.asp?Parser=9,4,20&page=2">Next</a>'
+        )
+        reversal = _page('<li><a href="index-1.asp?Parser=9,4,20,,,,21748">亂序 2026-09-11</a></li>')
+        self.assertEqual(_collect("S-032", first, max_details=0, **{second_url: loop})[0]["window_completeness"], "PARTIAL")
+        self.assertEqual(_collect("S-032", first, max_details=0, **{second_url: reversal})[0]["window_completeness"], "PARTIAL")
+
+    def test_two_page_list_needs_all_pages_before_claiming_complete(self):
+        first = _page(
+            """
+            <li><a href="index-1.asp?Parser=9,4,20,,,,21750">新訊 2026-09-10</a></li>
+            <li><a href="index-1.asp?Parser=9,4,20,,,,21749">舊訊 2026-09-01</a></li>
+            <a rel="next" href="/news/index.asp?Parser=9,4,20&page=2">下一頁</a>
+            """
+        )
+        second_url = "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,20&page=2"
+        second = _page(
+            '<li><a href="index-1.asp?Parser=9,4,20,,,,21748">更早 2026-08-30</a></li>'
+        )
+        with mock.patch.object(oc, "MAX_NEWS_LIST_PAGES", 1):
+            first_only, session = _collect("S-032", first, max_details=0)
+        self.assertEqual(first_only["window_completeness"], "PARTIAL")
+        self.assertEqual(session.fetched, [oc.NEWS_LIST_SOURCES["S-032"]["list_url"]])
+
+        complete, session = _collect("S-032", first, max_details=0, **{second_url: second})
+        self.assertEqual(complete["window_completeness"], "COMPLETE_WITH_ITEMS")
+        self.assertEqual(complete["window_item_count"], 1)
+        self.assertEqual(complete["snapshot_item_count"], 3)
+        self.assertEqual(session.fetched, [oc.NEWS_LIST_SOURCES["S-032"]["list_url"], second_url])
+        self.assertEqual([row["purpose"] for row in complete["snapshots"]], ["LIST", "LIST"])
+
+
+class CanaryEntryTests(unittest.TestCase):
+    @staticmethod
+    def _result():
+        return {
+            "source_health": "PASS",
+            "window_completeness": "COMPLETE_ZERO",
+            "window_item_count": 0,
+            "snapshot_item_count": 0,
+            "snapshots": [],
+            "manifest_sha256": "a" * 64,
+        }
+
+    def test_canary_bounds_news_detail_fetches_at_entrypoint(self):
+        calls = []
+
+        def collect_source(_session, source_id, start, end, existing=None, **kwargs):
+            calls.append((source_id, start, end, existing, kwargs))
+            return self._result()
+
+        with mock.patch.object(oc, "P0_SOURCES", {"S-001": ("Police", "https://official.test/list")}), \
+             mock.patch.object(oc, "http_session", return_value=object()), \
+             mock.patch.object(oc, "collect_source", side_effect=collect_source):
+            oc.canary()
+
+        self.assertEqual(calls[0][0], "S-001")
+        self.assertEqual(calls[0][4], {"max_details": 5})
+
+    def test_canary_does_not_pass_news_options_to_non_news_collectors(self):
+        calls = []
+
+        def collect_source(_session, source_id, start, end, existing=None, **kwargs):
+            calls.append((source_id, kwargs))
+            return self._result()
+
+        with mock.patch.object(
+            oc, "P0_SOURCES", {
+                "S-004": ("Council", "https://official.test/council"),
+                "S-001": ("Police", "https://official.test/news"),
+            }
+        ), mock.patch.object(oc, "http_session", return_value=object()), mock.patch.object(
+            oc, "collect_source", side_effect=collect_source
+        ):
+            oc.canary()
+
+        self.assertEqual(dict(calls)["S-004"], {})
+        self.assertEqual(dict(calls)["S-001"], {"max_details": 5})
+
 
 class RocDateTests(unittest.TestCase):
     def test_roc_formats(self):
-        self.assertEqual(oc.roc_date("115-09-10"), date(2026, 9, 10))
-        self.assertEqual(oc.roc_date("115年9月10日"), date(2026, 9, 10))
+        self.assertEqual(oc.roc_date("115-09-16"), date(2026, 9, 16))
+        self.assertEqual(oc.roc_date("115年9月16日"), date(2026, 9, 16))
         self.assertEqual(oc.roc_date("115.07.27"), date(2026, 7, 27))
         self.assertIsNone(oc.roc_date("沒有日期"))
 
@@ -247,6 +380,7 @@ class RocDateTests(unittest.TestCase):
     def test_invalid_dates_fail_closed(self):
         self.assertIsNone(oc.roc_date("2026-13-40"))
         self.assertIsNone(oc.roc_date("115-02-30"))
+        self.assertIsNone(oc.roc_date("115年2月30日"))
 
 
 if __name__ == "__main__":
