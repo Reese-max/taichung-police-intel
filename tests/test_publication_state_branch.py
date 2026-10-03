@@ -169,7 +169,10 @@ class PublicationStateBranchTests(unittest.TestCase):
 
         self.assertEqual(len(rejected_pushes), 1)
         self.assertEqual(rejected_pushes[0][:2], ("push", "origin"))
-        self.assertTrue(rejected_pushes[0][2].endswith(":refs/heads/publication-state"))
+        self.assertRegex(
+            rejected_pushes[0][2],
+            r"\A[0-9a-f]{40}:refs/heads/publication-state\Z",
+        )
         self.assertEqual(self.head("main"), main_before)
         self.assertEqual(self.head("publication-state"), state_before)
         self.assertTrue(
