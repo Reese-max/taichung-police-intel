@@ -1,0 +1,118 @@
+{
+  "created_at": "2026-10-03",
+  "currency": "TWD",
+  "fingerprint": "govintel/v6/commute-reopen-replay-evaluation/v1",
+  "notes": [
+    "本輪為離線重播：不呼叫付費模型、不招募代辦、不外傳參與者資料，因此 model_request 與 human_hour 一律不是 0 成本宣稱，而是 NOT_APPLICABLE／NOT_RUN。",
+    "共同公告只處理一次：model_requests 與有效更新數、追蹤條件數無關，重播在 2 條追蹤條件與 5 筆有效更新下仍是 0 次模型請求。",
+    "時間只覆蓋重播本身的機器執行時間；找資料、開原文、理解條件、核對與修正的人工時間尚未量測。"
+  ],
+  "records": [
+    {
+      "arm": "C_v6",
+      "count": 9,
+      "measured": null,
+      "status": "MEASURED_REPLAY_ONLY",
+      "unit": "completed_query"
+    },
+    {
+      "arm": "C_v6",
+      "count": 5,
+      "measured": null,
+      "status": "MEASURED_REPLAY_ONLY",
+      "unit": "effective_update"
+    },
+    {
+      "arm": "C_v6",
+      "count": 2,
+      "measured": null,
+      "status": "MEASURED_REPLAY_ONLY",
+      "unit": "tracked_condition"
+    },
+    {
+      "arm": "C_v6",
+      "count": 0,
+      "measured": null,
+      "status": "NOT_APPLICABLE_NO_MODEL_CALL",
+      "unit": "model_request"
+    },
+    {
+      "arm": "C_v6",
+      "count": null,
+      "measured": null,
+      "status": "NOT_RUN",
+      "unit": "human_hour"
+    },
+    {
+      "arm": "C_RULES_ONLY",
+      "count": 9,
+      "measured": null,
+      "status": "MEASURED_REPLAY_ONLY",
+      "unit": "completed_query"
+    },
+    {
+      "arm": "C_RULES_ONLY",
+      "count": 5,
+      "measured": null,
+      "status": "MEASURED_REPLAY_ONLY",
+      "unit": "effective_update"
+    },
+    {
+      "arm": "C_RULES_ONLY",
+      "count": 0,
+      "measured": null,
+      "status": "NOT_APPLICABLE_NO_MODEL_CALL",
+      "unit": "model_request"
+    },
+    {
+      "arm": "C_RULES_ONLY",
+      "count": null,
+      "measured": null,
+      "status": "NOT_RUN",
+      "unit": "human_hour"
+    },
+    {
+      "arm": "B_v6",
+      "count": null,
+      "measured": null,
+      "status": "NOT_RUN",
+      "unit": "completed_query"
+    },
+    {
+      "arm": "B_v6",
+      "count": null,
+      "measured": null,
+      "status": "NOT_RUN",
+      "unit": "model_request"
+    },
+    {
+      "arm": "B_v6",
+      "count": null,
+      "measured": null,
+      "status": "NOT_RUN",
+      "unit": "human_hour"
+    },
+    {
+      "arm": "A_v1",
+      "count": null,
+      "measured": null,
+      "status": "NOT_RUN",
+      "unit": "completed_query"
+    },
+    {
+      "arm": "A_v1",
+      "count": null,
+      "measured": null,
+      "status": "NOT_RUN",
+      "unit": "median_total_task_seconds"
+    },
+    {
+      "arm": "A_v1",
+      "count": null,
+      "measured": null,
+      "status": "NOT_RUN",
+      "unit": "human_hour"
+    }
+  ],
+  "schema_version": 1
+}

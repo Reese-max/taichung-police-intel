@@ -17,6 +17,14 @@
     "C": {"method": "full_new_workflow", "model": null, "prompt_hash": null, "results": null},
     "C_minus_D": {"method": "C_without_selected_background_dataset", "results": null}
   },
+  "v6_arms_note": "v6 另立明確版本與 method ID；上方 arms 的 v1 定義與歷史結果保持凍結，不靜默改寫。v6 情境在 eval/gold/v6/commute-reopen-v1/，fingerprint govintel/v6/commute-reopen-replay-evaluation/v1。",
+  "v6_dataset": "govintel-gold-v6-commute-reopen-v1",
+  "v6_arms": {
+    "A_v6": {"method_id": "A_v1_manual_same_sources_same_cutoff", "status": "NOT_RUN", "results": null},
+    "B_v6": {"method_id": "B_v6_same_scope_search_generic_summary", "status": "NOT_RUN", "results": null},
+    "C_v6": {"method_id": "C_v6_full_query_and_tracking", "status": "REPLAYED", "results": null},
+    "C_RULES_ONLY": {"method_id": "C_RULES_ONLY_v6_rules_only_no_semantic", "status": "REPLAYED", "results": null}
+  },
   "result_fields_required_per_arm": [
     "task_count", "event_count", "true_positives", "false_positives", "false_negatives",
     "false_merges", "missed_merges", "claims_checked", "unsupported_claims",

@@ -231,13 +231,26 @@ npm run check
 
 ```bash
 python scripts/schema_drift.py --self-check
+
+# v6 commute-road reopen replay scored against the gold cases (issue #108)
+npm run replay:commute
 ```
 
-Expected final line:
+Expected final lines:
 
 ```text
 VERIFY_OK mode=full ... secrets=0
+COMMUTE_REOPEN_SELF_CHECK_OK ...
 ```
+
+`npm run replay:commute` replays the synthetic commute-road session (save a tracked
+condition, close the station, reopen, deferral, explicit lift, cancel) from one
+checkout and scores it with the same `scripts/evaluate-govintel.py` metrics the v1
+gold harness uses. Every road name, date and original text in it is synthetic and
+describes no real road condition or road safety. Measured results, the separately
+scored `B_v6` / `C_RULES_ONLY` arms, the zero-denominator and `NOT_RUN` rules, and
+what was deliberately left unexecuted are documented in
+[docs/govintel/issue-108-commute-reopen-replay.md](docs/govintel/issue-108-commute-reopen-replay.md).
 
 The static artifact must also contain `out/index.html`, `out/api/health.json`, and `out/api/status.json`.
 
@@ -308,6 +321,7 @@ The retained current-workspace Kiro records show Auto as `qdev::auto`: 10.254967
 - The official `S-010` HLS CDN can fail in some Chrome sessions with `ERR_CONTENT_DECODING_FAILED`. A fatal media error or ten-second metadata timeout now preserves the transcript and provenance while showing a prominent link to the official council video. The local 2:43 product-demo MP4 is deliberately not substituted because it does not share the official evidence timeline.
 - The five source adapters passed local canaries and one GitHub-hosted scheduled EVENING run succeeded on 2026-08-23. A completed post-deployment MORNING plus EVENING pair has not yet been observed.
 - The public repository, demo, and captioned video have historical anonymous verification receipts; current deployment/version/hash status remains unverified in this checkout. Entrant details and form submission remain pending.
+- The v6 commute-road reopen replay (#108) is an offline, synthetic scenario scored against human-written gold cases. No real-browser run, no consented human study, no real official documents and no real source coverage were exercised, so its measured precision/recall say nothing about production accuracy or road safety. Arms `A` and `B_v6` human timing stay `NOT_RUN`, and the v6 arm definitions do not replace the frozen v1 arm B.
 
 ## License and data rights
 

@@ -71,6 +71,14 @@ const required = [
   "scripts/npa-source-inventory.py",
   "scripts/feedback.py",
   "scripts/verify-source-policy-integration.py",
+  "scripts/replay-commute-reopen.py",
+  "intel_v2/commute_replay.py",
+  "eval/gold/v6/commute-reopen-v1/manifest.json",
+  "eval/gold/v6/commute-reopen-v1/session.json",
+  "eval/gold/v6/commute-reopen-v1/cases.jsonl",
+  "eval/gold/v6/commute-reopen-v1/annotations.json",
+  "eval/gold/v6/commute-reopen-v1/cost-ledger.json",
+  "tests/test_commute_reopen_replay.py",
   "intel_v2/npa_source_adapters.py",
   "intel_v2/feedback.py",
   "docs/govintel/npa-source-inventory.v1.json",
@@ -360,6 +368,8 @@ if (["quick", "full"].includes(mode) && !failures.length) {
       ["asr-self-check", ["-X", "utf8", "groq-asr-canary.py", "--self-check"]],
       ["cer-self-check", ["-X", "utf8", "evaluation/evaluate-asr-cer.py", "--self-check"]],
       ["online-collector-self-check", ["-X", "utf8", "online_collect.py", "--self-check"]],
+      ["commute-reopen-replay-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_commute_reopen_replay.py", "-v"]],
+      ["commute-reopen-replay-self-check", ["-X", "utf8", "scripts/replay-commute-reopen.py", "--self-check"]],
       ["candidate-observation-window-self-check", ["-X", "utf8", "scripts/verify-candidate-observation-window.py", "--self-check"]],
     ];
     for (const [label, args] of checks) run(python.command, [...python.prefix, ...args], label);

@@ -1,0 +1,28 @@
+{
+  "annotation_version": "v6-commute-reopen-annotation-1",
+  "annotated_at": "2026-10-03",
+  "annotator_role": "issue-108-worker",
+  "annotation_order": [
+    "先讀每個開站時點前已取得的原文與 before/after 差異",
+    "再依「當時已取得、符合啟用條件、未讀的實質更新」寫出預期集合",
+    "最後才執行重播並比對；差異視為缺陷，不回頭竄改標註"
+  ],
+  "disputes": [],
+  "dispute_policy": "未解決爭議另列，不暗刪不利案例。",
+  "model_output_used_as_gold": false,
+  "notes": [
+    "全部案例為合成情境，標籤為 synthetic；沒有真實官方案例、人工修改的真實文件副本或真實來源資料。",
+    "annotation 由實作者依標準答案推導，再以重播核對；核對只證明實作與標註一致，不等於第三方複核。",
+    "第一輪真人標註（3–5 位同意參與者）尚未執行，狀態保持 NOT_RUN。"
+  ],
+  "review": {
+    "reviewed_by": "issue-108-worker-second-pass",
+    "review_scope": "每個開站時點的預期更新 ID 集合、狀態分類與條件狀態",
+    "unresolved_disagreements": 0
+  },
+  "split": {
+    "development_reopen_ids": ["R1", "R2", "R3"],
+    "heldout_reopen_ids": ["R4", "R5", "R6", "R7", "R8", "R9"],
+    "rule": "同一事件版本與其轉載不跨 dev／holdout。"
+  }
+}
