@@ -21,7 +21,9 @@ code/data/policy/parser/model/prompt 版本、資料 hash、重播時鐘與 publ
 
 ## 情境（全部合成）
 
-`eval/gold/v6/commute-reopen-v1/session.json` 是一則「測試路 A 至 B」的通勤追蹤，
+`eval/gold/v6/commute-reopen-v1/session.json` 是一則「測試路 A 至 B」的通勤追蹤。
+情境使用 `S-SYN-*` 合成來源代號，不引用來源目錄中的任何真實來源；`origin` 描述的是角色，
+不是真實發布者。
 另加一條區域條件 `C-DISTRICT-XITUN` 與一條測試路 C 至 D 的工程，用來驗證
 「同事件多條件命中」與「解除後仍可見」。
 
@@ -30,8 +32,8 @@ code/data/policy/parser/model/prompt 版本、資料 hash、重播時鐘與 publ
 | R1 | 10/05 10:00 | UPD-001 | NEW_UPDATES | v1 施工，保存條件後第一次重開 |
 | R2 | 10/06 17:20 | — | NO_NEW_ITEMS | 同源轉載、重複取回、純排版版本都不提示 |
 | R3 | 10/08 08:50 | UPD-005 | NEW_UPDATES | v2 只改結束日；追蹤結束日同步往後移，條件不解除 |
-| R4 | 10/08 18:10 | — | SOURCE_GAP | S-001 連線失敗 |
-| R5 | 10/09 09:20 | — | SOURCE_GAP | S-031 PARTIAL；S-001 恢復後的完整擷取缺少已取得的延期公告 |
+| R4 | 10/08 18:10 | — | SOURCE_GAP | S-SYN-ROAD 連線失敗 |
+| R5 | 10/09 09:20 | — | SOURCE_GAP | S-SYN-FIRE PARTIAL；S-SYN-ROAD 恢復後的完整擷取缺少已取得的延期公告 |
 | R6 | 10/09 17:10 | — | STALE_TRACKED_END | 預定日期已到但沒有明文解除 |
 | R7 | 10/09 17:40 | UPD-006 | NEW_UPDATES | v3 明文解除（只解除道路條件） |
 | R8 | 10/09 18:00 | UPD-007 | NEW_UPDATES | 另一工程仍可見 |
@@ -95,7 +97,7 @@ arm 的 `policy_overrides` 寫在 manifest 裡，CLI 直接讀它執行；
 | `PROBE_MIRROR_AS_EVIDENCE` | 同源鏡像視為獨立證據 | 1 次轉載誤報 |
 | `PROBE_FORMATTING_AS_SUBSTANTIVE` | 純排版視為實質 | 1 次排版誤報 |
 | `PROBE_DEDUPE_OFF` | 關閉重複取回去重 | 1 次重複取回誤報 |
-| `PROBE_ONE_ALERT_PER_DOCUMENT` | 每份官方文件只提示一次 | 3 次實質更正被誤去重（recall 0.4） |
+| `PROBE_ONE_ALERT_PER_DOCUMENT` | 每份官方文件只提示一次 | 3 次實質更正被誤去重（recall 0.5） |
 | `PROBE_PROMPT_AFTER_CANCEL` | 忽略使用者的取消 | R9 提示已取消條件的更新，記為 `post_cancel_prompt` |
 | `PROBE_AUTO_LIFT_ON_TRACKED_END` | 到期自動解除 | R3、R6、R7、R8 的缺口清單被清空（R6 狀態因此被誤報） |
 | `PROBE_CANCEL_MOVED_LATER` | 把取消時間往後移 | R9 多提示一次，證明取消判斷讀取現況 |
@@ -163,6 +165,6 @@ R9 取消條件後，被提示的更新原文仍是 `AVAILABLE`；
 ## 重播與評測邊界
 
 - 合成路名、日期與原文不代表真實路況或道路安全；每筆 update 的 `rights` 都是
-  `SYNTHETIC_NO_REAL_ROAD`。
+  `SYNTHETIC_NO_REAL_ROAD`，來源代號是 `S-SYN-*`，不對應任何真實機關或來源目錄條目。
 - 來源未通過時，只能交付有資料截止的離線查詢與追蹤驗證包；本單不聲稱完整即時涵蓋。
 - 不評背景推播投遞、不建立通知管線，也不把帳號、跨裝置同步或更多縣市納入本輪。

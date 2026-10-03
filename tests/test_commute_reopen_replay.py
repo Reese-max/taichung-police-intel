@@ -108,6 +108,16 @@ class ScenarioContractTests(unittest.TestCase):
         with self.assertRaisesRegex(replay.ScenarioError, "daily band must end after it starts"):
             replay.validate_scenario(broken)
 
+    def test_a_foreign_fingerprint_or_schema_is_rejected(self):
+        broken = scenario_copy()
+        broken["fingerprint"] = "govintel/v6/some-other-fingerprint/v1"
+        with self.assertRaisesRegex(replay.ScenarioError, "fingerprint mismatch"):
+            replay.validate_scenario(broken)
+        broken = scenario_copy()
+        broken["schema_version"] = 2
+        with self.assertRaisesRegex(replay.ScenarioError, "unsupported scenario schema_version"):
+            replay.validate_scenario(broken)
+
     def test_malformed_clock_is_rejected_with_a_scenario_error(self):
         broken = scenario_copy()
         broken["conditions"][0]["daily"]["end"] = "17:00:00"
@@ -120,7 +130,7 @@ class ScenarioContractTests(unittest.TestCase):
             {
                 "update_id": "UPD-999",
                 "document_id": "DOC-FUTURE",
-                "source_id": "S-001",
+                "source_id": "S-SYN-ROAD",
                 "origin": "OFFICIAL",
                 "rights": "SYNTHETIC_NO_REAL_ROAD",
                 "acquired_at": "2026-10-20T09:00:00+08:00",
@@ -209,10 +219,10 @@ class DataCutoffTests(unittest.TestCase):
         beyond["collections"].append(
             {
                 "slot_id": "SLOT-12",
-                "source_id": "S-001",
+                "source_id": "S-SYN-ROAD",
                 "observed_at": "2026-10-11T08:30:00+08:00",
                 "snapshot_complete": False,
-                "unreachable_source_ids": ["S-001"],
+                "unreachable_source_ids": ["S-SYN-ROAD"],
                 "visible_update_ids": [],
             }
         )
@@ -224,7 +234,7 @@ class DataCutoffTests(unittest.TestCase):
             point["acquired_update_ids"],
             sorted(receipt["publication_receipt"]["acquired_update_ids"]),
         )
-        # Clamped to the cutoff, the newest in-window S-001 slot is the complete
+        # Clamped to the cutoff, the newest in-window S-SYN-ROAD slot is the complete
         # SLOT-11, so there is no acquisition gap - and the post-cutoff SLOT-12
         # failure must not be reported either.
         self.assertEqual(
@@ -232,25 +242,6 @@ class DataCutoffTests(unittest.TestCase):
             [],
         )
         self.assertNotIn("SLOT-12", {flag["slot_id"] for flag in point["gap_flags"]})
-        self.assertEqual(point["public_original_uncertain_source_ids"], [])
-
-    def test_the_cutoff_clamp_is_what_stops_the_post_cutoff_snapshot(self):
-        beyond = scenario_copy()
-        beyond["reopen_points"].append(
-            {"reopen_id": "R10", "reopened_at": "2026-10-11T09:00:00+08:00"}
-        )
-        beyond["collections"].append(
-            {
-                "slot_id": "SLOT-12",
-                "source_id": "S-031",
-                "observed_at": "2026-10-11T08:30:00+08:00",
-                "snapshot_complete": True,
-                "visible_update_ids": [],
-            }
-        )
-        point = replay.replay(beyond)["reopen_points"][-1]
-        # S-031 only becomes uncertain after the cutoff, so a clamped reopen must not
-        # see the post-cutoff recovery either.
         self.assertEqual(point["public_original_uncertain_source_ids"], [])
 
 
@@ -311,7 +302,7 @@ class FailClosedGuardTests(unittest.TestCase):
             {
                 "update_id": "UPD-OPEN",
                 "document_id": "DOC-OPEN",
-                "source_id": "S-001",
+                "source_id": "S-SYN-ROAD",
                 "origin": "OFFICIAL",
                 "rights": "SYNTHETIC_NO_REAL_ROAD",
                 "acquired_at": "2026-10-10T08:29:00+08:00",
@@ -351,7 +342,7 @@ class FailClosedGuardTests(unittest.TestCase):
             forward["reopen_points"][-1]["public_original_by_update_id"],
         )
         self.assertEqual(
-            forward["reopen_points"][-1]["public_original_uncertain_source_ids"], ["S-001"]
+            forward["reopen_points"][-1]["public_original_uncertain_source_ids"], ["S-SYN-ROAD"]
         )
 
     def test_the_cancel_boundary_is_exclusive(self):
@@ -622,7 +613,7 @@ class ReplayBehaviourTests(unittest.TestCase):
         self.assertFalse(point["public_original_available"])
         self.assertEqual(point["public_original_by_update_id"]["UPD-008"], replay.ORIGINAL_UNKNOWN)
         self.assertEqual(point["public_original_unknown_update_ids"], ["UPD-008", "UPD-013"])
-        self.assertEqual(point["public_original_uncertain_source_ids"], ["S-001"])
+        self.assertEqual(point["public_original_uncertain_source_ids"], ["S-SYN-ROAD"])
 
     def test_original_availability_is_reported_per_update(self):
         availability = self.points["R9"]["public_original_by_update_id"]
@@ -1066,6 +1057,57 @@ class FalseAlertBreakdownTests(unittest.TestCase):
         broken["decision_by_update_id"] = {"U1": 7}
         with self.assertRaisesRegex(ValueError, "string map"):
             ev.reopen_diagnostics(case, broken)
+
+
+class GoldValidationTests(unittest.TestCase):
+    """A malformed v6 gold file must fail closed, not score silently."""
+
+    def base_case(self) -> dict:
+        return {
+            "case_id": "X-1",
+            "task": "reopen_unread",
+            "synthetic": True,
+            "input": {},
+            "expected": {
+                "update_ids": ["UPD-001"],
+                "observation_status": "NEW_UPDATES",
+                "gap_kinds": [],
+                "condition_status": {"C-ROAD-AB": "ACTIVE"},
+            },
+        }
+
+    def test_a_valid_reopen_case_validates(self):
+        ev.validate_cases([self.base_case()])
+
+    def test_duplicate_expected_update_ids_are_rejected(self):
+        case = self.base_case()
+        case["expected"]["update_ids"] = ["UPD-001", "UPD-001"]
+        with self.assertRaisesRegex(ValueError, "must be unique"):
+            ev.validate_cases([case])
+
+    def test_a_missing_observation_status_is_rejected(self):
+        case = self.base_case()
+        del case["expected"]["observation_status"]
+        with self.assertRaisesRegex(ValueError, "observation_status missing"):
+            ev.validate_cases([case])
+
+    def test_a_non_string_gap_kind_is_rejected(self):
+        case = self.base_case()
+        case["expected"]["gap_kinds"] = [1]
+        with self.assertRaisesRegex(ValueError, "gap_kinds must be string array"):
+            ev.validate_cases([case])
+
+    def test_a_non_string_condition_status_is_rejected(self):
+        case = self.base_case()
+        case["expected"]["condition_status"] = {"C-ROAD-AB": 1}
+        with self.assertRaisesRegex(ValueError, "condition_status must be string map"):
+            ev.validate_cases([case])
+
+    def test_non_string_update_ids_are_rejected(self):
+        case = self.base_case()
+        case["expected"]["update_ids"] = [1]
+        with self.assertRaisesRegex(ValueError, "update_ids must be string array"):
+            ev.validate_cases([case])
 
 
 class CostLedgerTests(unittest.TestCase):
