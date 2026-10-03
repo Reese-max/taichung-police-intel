@@ -501,6 +501,7 @@ export default function PublicQueryPage() {
                 </div>
               )}
               {results.results.length > 0 ? (
+                <>
                 <ul className="pq-event-list">
                   {results.results.map((event) => (
                     <li key={event.public_event_id} className="pq-event-card">
@@ -584,6 +585,7 @@ export default function PublicQueryPage() {
                     <p>還有更多結果。使用捲動或分頁載入（目前為簡化版，僅顯示第一頁）。</p>
                   </div>
                 )}
+                </>
               ) : (
                 <div className="pq-empty" role="status">
                   <p>找不到符合條件的公共事件。</p>
