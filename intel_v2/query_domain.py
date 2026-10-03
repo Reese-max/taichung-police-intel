@@ -413,6 +413,8 @@ def _event_matches(event: dict[str, Any], arguments: dict[str, Any]) -> bool:
         return False
     if arguments.get("event_status") and arguments["event_status"] != (event.get("event_status") or event.get("source_state")):
         return False
+    if arguments.get("source_state") and arguments["source_state"] != event.get("source_state"):
+        return False
     if "tracked" in arguments and bool(arguments["tracked"]) != bool(event.get("tracked", event.get("tracking_id"))):
         return False
     if arguments.get("changed_only") and not bool(event.get("changed", event.get("changed_fields") or event.get("change_type"))):
