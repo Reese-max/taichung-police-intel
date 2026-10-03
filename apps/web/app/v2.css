@@ -1625,20 +1625,20 @@
     width: min(100% - 20px, 1180px);
     padding-top: 10px;
   }
-  
+
   .pq-header {
     padding: 22px 18px;
     border-radius: 15px;
   }
-  
+
   .pq-search-row {
     grid-template-columns: 1fr;
   }
-  
+
   .pq-actions {
     flex-direction: column;
   }
-  
+
   .pq-btn-primary,
   .pq-btn-secondary,
   .pq-btn-detail,
@@ -1647,11 +1647,11 @@
     width: 100%;
     justify-content: center;
   }
-  
+
   .pq-comparison-versions {
     grid-template-columns: 1fr;
   }
-  
+
   .pq-drawer {
     width: 100vw;
     border-radius: 16px 16px 0 0;

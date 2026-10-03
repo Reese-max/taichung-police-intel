@@ -35,7 +35,7 @@ class PublicQueryInterfaceTests(unittest.TestCase):
         """Test that the public query page has the required search form with five filter types."""
         page_path = ROOT / "apps" / "web" / "app" / "public-query" / "page.js"
         content = page_path.read_text(encoding="utf-8")
-        
+
         # Check for the five filter types mentioned in the issue
         filters = ["district", "category", "agency", "time_from", "time_to", "q"]
         for filter_name in filters:
@@ -100,7 +100,7 @@ class PublicQueryInterfaceTests(unittest.TestCase):
             ],
         }
         store = self.query_domain.build_event_store([event])
-        
+
         # Test search_events with district filter
         result = self.query_domain.query_events(store, {"district": "location:tc-west", "limit": 10})
         self.assertEqual(result["result_count"], 1)
@@ -149,7 +149,7 @@ class PublicQueryInterfaceTests(unittest.TestCase):
             ],
         }
         store = self.query_domain.build_event_store([event])
-        
+
         result = self.query_domain.get_event(store, "PE-TEST-2")
         self.assertEqual(result["public_event_id"], "PE-TEST-2")
         self.assertIn("tracking", result)
@@ -197,7 +197,7 @@ class PublicQueryInterfaceTests(unittest.TestCase):
             ],
         }
         store = self.query_domain.build_event_store([event])
-        
+
         comparison = self.query_domain.compare_event_versions(
             store, "PE-TEST-3", before_version="doc-test:v1", after_version="doc-test:v2"
         )
@@ -227,7 +227,7 @@ class PublicQueryInterfaceTests(unittest.TestCase):
             "official_note": "統計期別資料",
         }
         store = self.query_domain.build_statistics_store([stat])
-        
+
         result = self.query_domain.query_statistics(store, {"dataset_id": "NPA-STAT-1", "period_from": "2026-08", "limit": 10})
         self.assertEqual(result["result_count"], 1)
         self.assertEqual(result["results"][0]["statistic_id"], "STAT-TEST-1")

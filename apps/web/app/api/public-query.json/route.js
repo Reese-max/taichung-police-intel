@@ -90,24 +90,24 @@ function _eventEnd(event) {
 function _eventMatches(event, args) {
   if (args.public_event_id && event.public_event_id !== args.public_event_id) return false;
   if (args.q && !`${event.canonical_title} ${event.event_type || ""}`.toLowerCase().includes(args.q.toLowerCase())) return false;
-  
+
   const locations = new Set([event.district_id, ...(event.location_ids || []), ...(event.location_candidates || [])]);
   if (args.region && !locations.has(args.region)) return false;
   if (args.district && !locations.has(args.district)) return false;
-  
+
   const agencies = new Set([...(event.agency_ids || []), ...(event.independent_source_ids || [])]);
   if (args.agency && !agencies.has(args.agency)) return false;
-  
+
   if (args.category && event.event_type !== args.category) return false;
   if (args.verification_status && (event.verification_status || event.fusion_status) !== args.verification_status) return false;
   if (args.event_status && (event.event_status || event.source_state) !== args.event_status) return false;
   if (args.tracked !== undefined && !!args.tracked !== !!(event.tracked || event.tracking_id)) return false;
   if (args.changed_only && !(event.changed || event.changed_fields?.length || event.change_type)) return false;
-  
+
   const lower = args.time_from ? _timeBound(args.time_from, "time_from") : null;
   const upper = args.time_to ? _timeBound(args.time_to, "time_to") : null;
   if (lower && upper && upper < lower) throw new Error("time_to must not precede time_from");
-  
+
   const hasTime = event.start_at || event.end_at || event.event_date;
   if ((lower || upper) && !hasTime) return false;
   if (lower && _eventEnd(event) < lower) return false;
@@ -158,14 +158,14 @@ function queryEvents(store, args) {
   delete filters.limit;
   delete filters.cursor;
   delete filters.expected_generation;
-  
+
   const limit = args.limit || 20;
   const cursor = args.cursor;
-  
+
   let matches = store.public_events.filter(event => _eventMatches(event, args));
   matches = matches.map(projectEvent);
   matches.sort((a, b) => -_eventStart(a).getTime() + _eventStart(b).getTime() || a.public_event_id.localeCompare(b.public_event_id));
-  
+
   let offset = 0;
   if (cursor) {
     try {
@@ -174,12 +174,12 @@ function queryEvents(store, args) {
       offset = token.offset;
     } catch { throw new Error("invalid cursor"); }
   }
-  
+
   const selected = matches.slice(offset, offset + limit);
   const nextCursor = offset + selected.length < matches.length
     ? btoa(JSON.stringify({ generation: store.generation_id, filters: "hash", offset: offset + selected.length }))
     : null;
-  
+
   return {
     query_generation_id: store.generation_id,
     total_matches: matches.length,
@@ -208,7 +208,7 @@ function getEvent(store, eventId) {
 function compareEventVersions(store, eventId, beforeVersion, afterVersion) {
   const event = store.public_events.find(e => e.public_event_id === eventId);
   if (!event) throw new Error(`Event not found: ${eventId}`);
-  
+
   const versions = (event.version_history || []).map(v => ({
     document_version_id: v.document_version_id || v.version_id,
     observed_at: v.observed_at,
@@ -217,20 +217,20 @@ function compareEventVersions(store, eventId, beforeVersion, afterVersion) {
     fields: v.fields || {},
     changed_fields: v.changed_fields || [],
   })).sort((a, b) => (a.observed_at || "").localeCompare(b.observed_at || ""));
-  
+
   const byId = Object.fromEntries(versions.map(v => [v.document_version_id, v]));
-  
+
   let before = beforeVersion ? byId[beforeVersion] : null;
   let after = afterVersion ? byId[afterVersion] : null;
-  
+
   if (beforeVersion && !before) throw new Error(`Version not found: ${beforeVersion}`);
   if (afterVersion && !after) throw new Error(`Version not found: ${afterVersion}`);
-  
+
   if (!before && !after && versions.length >= 2) {
     before = versions[versions.length - 2];
     after = versions[versions.length - 1];
   }
-  
+
   if (!before || !after || before === after) {
     return {
       comparison_status: "NO_COMPARABLE_VERSION_HISTORY",
@@ -243,7 +243,7 @@ function compareEventVersions(store, eventId, beforeVersion, afterVersion) {
       affected_handoff_claims: event.affected_handoff_claims || [],
     };
   }
-  
+
   const beforeFields = before.fields || {};
   const afterFields = after.fields || {};
   const changed = new Set([
@@ -251,7 +251,7 @@ function compareEventVersions(store, eventId, beforeVersion, afterVersion) {
     ...(after.changed_fields || []),
     ...Object.keys({...beforeFields, ...afterFields}).filter(k => beforeFields[k] !== afterFields[k]),
   ]);
-  
+
   return {
     comparison_status: "COMPARED",
     public_event_id: eventId,
@@ -272,10 +272,10 @@ function queryStatistics(store, args) {
   delete filters.limit;
   delete filters.cursor;
   delete filters.expected_generation;
-  
+
   const limit = args.limit || 20;
   const cursor = args.cursor;
-  
+
   let rows = store.statistics.filter(row => {
     if (args.dataset_id && row.dataset_id !== args.dataset_id) return false;
     if (args.metric && row.metric !== args.metric) return false;
@@ -286,9 +286,9 @@ function queryStatistics(store, args) {
     if (args.period_to && row.period > args.period_to) return false;
     return true;
   });
-  
+
   rows.sort((a, b) => a.period.localeCompare(b.period) || a.dataset_id.localeCompare(b.dataset_id) || a.statistic_id.localeCompare(b.statistic_id));
-  
+
   let offset = 0;
   if (cursor) {
     try {
@@ -297,12 +297,12 @@ function queryStatistics(store, args) {
       offset = token.offset;
     } catch { throw new Error("invalid cursor"); }
   }
-  
+
   const selected = rows.slice(offset, offset + limit);
   const nextCursor = offset + selected.length < rows.length
     ? btoa(JSON.stringify({ generation: store.generation_id, filters: "hash", offset: offset + selected.length }))
     : null;
-  
+
   return {
     query_generation_id: store.generation_id,
     total_matches: rows.length,
