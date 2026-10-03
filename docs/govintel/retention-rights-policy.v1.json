@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "policy_version": 1,
-  "updated_at": "2026-09-21",
+  "policy_version": 2,
+  "updated_at": "2026-10-03",
   "purpose": "Conservative public projection and retention defaults; not a legal rights determination.",
   "retention_windows": {
     "SOURCE_TERMS_REVIEW": {
@@ -33,57 +33,120 @@
     "OFFICIAL_METADATA_LINK": {
       "rights_status": "UNKNOWN",
       "public_projection": "METADATA_LINK_ONLY",
-      "public_fields": ["source_id", "source_name", "title", "official_url", "published_at", "data_as_of", "fetched_at", "freshness_status", "change_type", "evidence_count", "content_sha256"],
+      "public_fields": [
+        "source_id",
+        "source_name",
+        "title",
+        "official_url",
+        "published_at",
+        "data_as_of",
+        "fetched_at",
+        "freshness_status",
+        "change_type",
+        "evidence_count",
+        "content_sha256"
+      ],
       "full_text_allowed": false,
       "excerpt_allowed": false,
       "raw_retention_class": "SOURCE_TERMS_REVIEW",
       "canonical_retention_class": "PROVENANCE_HISTORY",
       "review_required": true,
-      "withdrawal_behavior": "KEEP_HASH_MARK_SOURCE_UNAVAILABLE"
+      "withdrawal_behavior": "KEEP_HASH_MARK_SOURCE_UNAVAILABLE",
+      "terms_status": "CATALOG_ENTRYPOINT_NOT_A_LICENSE",
+      "archive_eligibility": "EVIDENCE_ARCHIVE",
+      "sensitive_default": false,
+      "withdrawal_projection": "SOURCE_NO_LONGER_AVAILABLE"
     },
     "OFFICIAL_MEDIA_LINK": {
       "rights_status": "UNKNOWN",
       "public_projection": "LINK_ONLY",
-      "public_fields": ["source_id", "source_name", "title", "official_url", "published_at", "observed_at", "content_sha256"],
+      "public_fields": [
+        "source_id",
+        "source_name",
+        "title",
+        "official_url",
+        "published_at",
+        "observed_at",
+        "content_sha256"
+      ],
       "full_text_allowed": false,
       "excerpt_allowed": false,
       "raw_retention_class": "SHORT_LIVED_SOURCE_TERMS_REVIEW",
       "canonical_retention_class": "PROVENANCE_HISTORY",
       "review_required": true,
-      "withdrawal_behavior": "KEEP_LOCATOR_MARK_SOURCE_UNAVAILABLE"
+      "withdrawal_behavior": "KEEP_LOCATOR_MARK_SOURCE_UNAVAILABLE",
+      "terms_status": "CATALOG_ENTRYPOINT_NOT_A_LICENSE",
+      "archive_eligibility": "PROVENANCE_ONLY",
+      "sensitive_default": false,
+      "withdrawal_projection": "SOURCE_NO_LONGER_AVAILABLE"
     },
     "OFFICIAL_TRANSIENT_METADATA": {
       "rights_status": "UNKNOWN",
       "public_projection": "METADATA_LINK_ONLY",
-      "public_fields": ["source_id", "source_name", "official_url", "observed_at", "data_as_of", "freshness_status", "change_type", "content_sha256"],
+      "public_fields": [
+        "source_id",
+        "source_name",
+        "official_url",
+        "observed_at",
+        "data_as_of",
+        "freshness_status",
+        "change_type",
+        "content_sha256"
+      ],
       "full_text_allowed": false,
       "excerpt_allowed": false,
       "raw_retention_class": "SHORT_LIVED_SOURCE_TERMS_REVIEW",
       "canonical_retention_class": "PROVENANCE_HISTORY",
       "review_required": true,
-      "withdrawal_behavior": "KEEP_HASH_MARK_SOURCE_UNAVAILABLE"
+      "withdrawal_behavior": "KEEP_HASH_MARK_SOURCE_UNAVAILABLE",
+      "terms_status": "CATALOG_ENTRYPOINT_NOT_A_LICENSE",
+      "archive_eligibility": "PROVENANCE_ONLY",
+      "sensitive_default": false,
+      "withdrawal_projection": "SOURCE_NO_LONGER_AVAILABLE"
     },
     "REFERENCE_METADATA": {
       "rights_status": "UNKNOWN",
       "public_projection": "METADATA_LINK_ONLY",
-      "public_fields": ["source_id", "source_name", "title", "official_url", "period", "dataset_id", "fetched_at", "content_sha256"],
+      "public_fields": [
+        "source_id",
+        "source_name",
+        "title",
+        "official_url",
+        "period",
+        "dataset_id",
+        "fetched_at",
+        "content_sha256"
+      ],
       "full_text_allowed": false,
       "excerpt_allowed": false,
       "raw_retention_class": "SOURCE_TERMS_REVIEW",
       "canonical_retention_class": "PERIOD_AND_PROVENANCE_HISTORY",
       "review_required": true,
-      "withdrawal_behavior": "KEEP_DATASET_ID_MARK_SOURCE_UNAVAILABLE"
+      "withdrawal_behavior": "KEEP_DATASET_ID_MARK_SOURCE_UNAVAILABLE",
+      "terms_status": "CATALOG_ENTRYPOINT_NOT_A_LICENSE",
+      "archive_eligibility": "EVIDENCE_ARCHIVE",
+      "sensitive_default": true,
+      "withdrawal_projection": "SOURCE_NO_LONGER_AVAILABLE"
     },
     "DERIVED_SUMMARY": {
       "rights_status": "PROJECT_CONTROLLED",
       "public_projection": "EVIDENCE_BOUND_SUMMARY_ONLY",
-      "public_fields": ["claim_id", "evidence_ids", "publication_hash", "generated_at"],
+      "public_fields": [
+        "claim_id",
+        "evidence_ids",
+        "publication_hash",
+        "generated_at"
+      ],
       "full_text_allowed": false,
       "excerpt_allowed": false,
       "raw_retention_class": "DERIVATION_RECEIPT_ONLY",
       "canonical_retention_class": "DERIVATION_HISTORY",
       "review_required": true,
-      "withdrawal_behavior": "RETRACT_PROJECTION_KEEP_AUDIT_RECEIPT"
+      "withdrawal_behavior": "RETRACT_PROJECTION_KEEP_AUDIT_RECEIPT",
+      "terms_status": "PROJECT_OWNED_NO_THIRD_PARTY_LICENSE",
+      "archive_eligibility": "EVIDENCE_ARCHIVE",
+      "sensitive_default": false,
+      "withdrawal_projection": "RETRACTED"
     }
   },
   "source_classes": {
@@ -117,5 +180,105 @@
     "personal_data",
     "operational_fields",
     "credentials"
-  ]
+  ],
+  "layer_policies": {
+    "raw_snapshot": {
+      "retention_class_source": "raw_retention_class",
+      "archive_eligibility": "NOT_ARCHIVABLE",
+      "public_projection": "NONE"
+    },
+    "normalized_document": {
+      "retention_class_source": "raw_retention_class",
+      "archive_eligibility": "NOT_ARCHIVABLE",
+      "public_projection": "NONE"
+    },
+    "canonical_event": {
+      "retention_class_source": "canonical_retention_class",
+      "archive_eligibility": "EVIDENCE_ARCHIVE",
+      "public_projection": "METADATA_LINK_ONLY"
+    },
+    "publication": {
+      "retention_class_source": "canonical_retention_class",
+      "archive_eligibility": "EVIDENCE_ARCHIVE",
+      "public_projection": "METADATA_LINK_ONLY"
+    },
+    "query_index": {
+      "retention_class_source": "canonical_retention_class",
+      "archive_eligibility": "PROVENANCE_ONLY",
+      "public_projection": "METADATA_LINK_ONLY"
+    }
+  },
+  "data_type_matrix": [
+    {
+      "data_type": "OFFICIAL_OPEN_DATA_STRUCTURED_RECORD",
+      "kind": "CONTENT",
+      "class_id": "REFERENCE_METADATA"
+    },
+    {
+      "data_type": "OFFICIAL_HTML_PDF_ATTACHMENT",
+      "kind": "CONTENT",
+      "class_id": "OFFICIAL_METADATA_LINK"
+    },
+    {
+      "data_type": "OFFICIAL_TRANSIENT_LIVE_ALERT",
+      "kind": "CONTENT",
+      "class_id": "OFFICIAL_TRANSIENT_METADATA"
+    },
+    {
+      "data_type": "MEDIA_RSS_NEWS_DISCOVERY_METADATA",
+      "kind": "CONTENT",
+      "class_id": "OFFICIAL_MEDIA_LINK"
+    },
+    {
+      "data_type": "LLM_DERIVED_SUMMARY_LABEL",
+      "kind": "CONTENT",
+      "class_id": "DERIVED_SUMMARY"
+    },
+    {
+      "data_type": "RAW_SNAPSHOT",
+      "kind": "LAYER",
+      "layer": "raw_snapshot"
+    },
+    {
+      "data_type": "NORMALIZED_DOCUMENT",
+      "kind": "LAYER",
+      "layer": "normalized_document"
+    },
+    {
+      "data_type": "CANONICAL_GOVINTEL_EVENT",
+      "kind": "LAYER",
+      "layer": "canonical_event"
+    },
+    {
+      "data_type": "CANONICAL_GOVINTEL_RECEIPT",
+      "kind": "LAYER",
+      "layer": "publication"
+    },
+    {
+      "data_type": "QUERY_INDEX",
+      "kind": "LAYER",
+      "layer": "query_index"
+    }
+  ],
+  "replay_limitation_reasons": {
+    "REPLAY_EVIDENCE_INCOMPLETE": "The record is missing declared #36 replay provenance or audit linkage, so the planner refuses to claim replay is preserved.",
+    "REPLAY_REVIEW_WINDOW_PENDING": "The retention window still demands human review, so the evidence is retained but replay stays pending that review rather than preserved.",
+    "SOURCE_NO_LONGER_AVAILABLE_REPLAY_PARTIAL": "#36 replay keeps provenance but cannot re-fetch the withdrawn original."
+  },
+  "replay_evidence_fields": [
+    "source_snapshot_ref",
+    "content_sha256",
+    "official_url",
+    "locator",
+    "created_at",
+    "updated_at"
+  ],
+  "terms_status_values": {
+    "CATALOG_ENTRYPOINT_NOT_A_LICENSE": "Only the source catalog entrypoint is known; it is a collection locator, not a reuse permission.",
+    "PROJECT_OWNED_NO_THIRD_PARTY_LICENSE": "No third-party license applies because the project owns the derivation."
+  },
+  "rights_status_values": {
+    "UNKNOWN": "No third-party reuse permission verified; metadata/link projection only and review_required stays true.",
+    "PROJECT_CONTROLLED": "Artifact derived and owned inside this project; not a third-party license grant."
+  }
 }

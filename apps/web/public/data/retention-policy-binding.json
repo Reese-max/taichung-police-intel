@@ -1,0 +1,21 @@
+{
+  "catalog_hash": "95ae82270eaab6f6270d9c00c8122e9bcfafbaf0dd216dc575a5f0b99544c51a",
+  "excerpt_allowed": false,
+  "full_text_allowed": false,
+  "policy_hash": "bb29e8e5e0b083ae23b783acfa824d751e19721b4b67ceedb12d4a16ed90565b",
+  "policy_version": 2,
+  "public_projection": "METADATA_LINK_ONLY",
+  "query_index_extends_source_retention": false,
+  "review_required": true,
+  "rights_status": "UNKNOWN",
+  "rights_status_values": [
+    "PROJECT_CONTROLLED",
+    "UNKNOWN"
+  ],
+  "schema_version": 1,
+  "terms_status": "CATALOG_ENTRYPOINT_NOT_A_LICENSE",
+  "terms_status_values": [
+    "CATALOG_ENTRYPOINT_NOT_A_LICENSE",
+    "PROJECT_OWNED_NO_THIRD_PARTY_LICENSE"
+  ]
+}
