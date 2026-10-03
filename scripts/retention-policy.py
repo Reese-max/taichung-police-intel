@@ -30,19 +30,26 @@ RETENTION_CLASS_SOURCES = {"raw_retention_class", "canonical_retention_class"}
 REPLAY_STATUSES = {"NOT_REQUIRED", "PRESERVED", "LIMITED", "BLOCKED"}
 REPLAY_LIMITATION_SOURCE_UNAVAILABLE = "SOURCE_NO_LONGER_AVAILABLE_REPLAY_PARTIAL"
 REPLAY_LIMITATION_NO_EVIDENCE = "REPLAY_EVIDENCE_INCOMPLETE"
-REPLAY_LIMITATION_REASONS = {REPLAY_LIMITATION_SOURCE_UNAVAILABLE, REPLAY_LIMITATION_NO_EVIDENCE}
+REPLAY_REVIEW_WINDOW_PENDING = "REPLAY_REVIEW_WINDOW_PENDING"
+REPLAY_LIMITATION_REASONS = {
+    REPLAY_LIMITATION_SOURCE_UNAVAILABLE,
+    REPLAY_LIMITATION_NO_EVIDENCE,
+    REPLAY_REVIEW_WINDOW_PENDING,
+}
 # A retention sweep must never quietly outrank a window that still demands human review.
 NON_OVERRIDABLE_EXPIRY_ACTIONS = {"REVIEW_REQUIRED"}
 RIGHTS_STATUSES = {"UNKNOWN", "PROJECT_CONTROLLED"}
 UNKNOWN_RIGHTS = "UNKNOWN"
 LAYER_PROJECTIONS = PUBLIC_PROJECTIONS | {NO_PUBLIC_PROJECTION}
 QUERY_INDEX_LAYER = "query_index"
+# A query index is a projection: it can never widen or resurrect the source retention it
+# reads from. One constant so the entry, the index and the binding cannot disagree.
+QUERY_INDEX_EXTENDS_SOURCE_RETENTION = False
 SENSITIVE_RECORD_FLAGS = ("contains_personal_data", "sensitive")
 GOVERNANCE_RECORD_FLAGS = (
     *SENSITIVE_RECORD_FLAGS, "source_available", "replay_required", "aggregate_only",
 )
 DEFAULT_TRUE_RECORD_FLAGS = frozenset({"source_available"})
-REPLAY_REVIEW_WINDOW_PENDING = "REPLAY_REVIEW_WINDOW_PENDING"
 # Raw captured payloads are never publishable; the class allowlist drops them and the
 # projection reports them. Every other prohibited field is a governance marker that must
 # block the archive instead of being quietly projected away.
@@ -170,6 +177,10 @@ def _compile_data_types(matrix: Any, classes: dict[str, Any], layer_policies: di
 def compile_policy(catalog: dict[str, Any] | None = None, policy: dict[str, Any] | None = None) -> dict[str, Any]:
     catalog = load_json(CATALOG) if catalog is None else catalog
     policy = load_json(POLICY) if policy is None else policy
+    if not isinstance(catalog, dict):
+        raise ValueError("source catalog must be an object")
+    if not isinstance(policy, dict):
+        raise ValueError("retention policy must be an object")
     if catalog.get("schema_version") != 2 or not isinstance(catalog.get("sources"), list):
         raise ValueError("source catalog schema is unsupported")
     if policy.get("schema_version") != 1 or not isinstance(policy.get("policy_version"), int):
@@ -324,12 +335,13 @@ def compile_policy(catalog: dict[str, Any] | None = None, policy: dict[str, Any]
     }
 
 
-def _record_flag(record: dict[str, Any], field: str, *, default: bool = False) -> bool:
+def _record_flag(record: dict[str, Any], field: str, *, default: bool | None = None) -> bool:
     if field not in record:
-        return default
+        # A flag absent from the record reads as its documented default.
+        return field in DEFAULT_TRUE_RECORD_FLAGS if default is None else default
     value = record[field]
     if type(value) is not bool:
-        raise ValueError(f"{field} must be a boolean, not {value!r}")
+        raise ValueError(f"{field} must be a boolean, not {type(value).__name__}")
     return value
 
 
@@ -455,7 +467,7 @@ def project_public_record(record: dict[str, Any], *, policy: dict[str, Any] | No
     blocked = archive_decision(record, policy=compiled, class_id=class_id, layer=layer)
     if blocked["decision"] != "ARCHIVE":
         raise ValueError(f"record is not allowed into the public archive: {blocked['reason']}")
-    source_available = _record_flag(record, "source_available", default=True)
+    source_available = _record_flag(record, "source_available")
     projected = {
         key: _json_safe(value, key, governance["record_id"])
         for key, value in record.items()
@@ -532,7 +544,7 @@ def project_query_index(records: list[dict[str, Any]], *, observed_at: str,
             "retention_class": retention_class,
             "source_raw_retention_class": raw_retention_class,
             "source_raw_retention_expired": max_age_days is not None and captured + timedelta(days=max_age_days) <= now,
-            "extends_source_retention": False,
+            "extends_source_retention": QUERY_INDEX_EXTENDS_SOURCE_RETENTION,
             "suppressed_fields": suppressed,
         })
         # Hash the entry the caller receives, not the pre-merge projection.
@@ -546,7 +558,7 @@ def project_query_index(records: list[dict[str, Any]], *, observed_at: str,
         "policy_hash": compiled["policy_hash"],
         "observed_at": now.isoformat(),
         "projection_only": True,
-        "extends_source_retention": False,
+        "extends_source_retention": QUERY_INDEX_EXTENDS_SOURCE_RETENTION,
         "entry_count": len(entries),
         "entries": entries,
     }
@@ -578,7 +590,7 @@ def plan_expiry(records: list[dict[str, Any]], *, observed_at: str, policy: dict
         if not isinstance(audit_refs, list) or any(not isinstance(value, str) or not value.strip() for value in audit_refs):
             raise ValueError("audit_refs must be a string array")
         replay_required = _record_flag(record, "replay_required")
-        source_available = _record_flag(record, "source_available", default=True)
+        source_available = _record_flag(record, "source_available")
         missing_replay_fields = sorted(
             field for field in compiled["replay_evidence_fields"] if field not in record
         ) if replay_required else []
@@ -619,8 +631,9 @@ def plan_expiry(records: list[dict[str, Any]], *, observed_at: str, policy: dict
                 replay_limitation = REPLAY_REVIEW_WINDOW_PENDING
             else:
                 # #36 replay must never lose evidence to a silent retention sweep.
-                overridden_expired_action = window["expired_action"]
-                action = "KEEP_AUDIT_LINKAGE"
+                if action != "KEEP_AUDIT_LINKAGE":
+                    overridden_expired_action = action
+                    action = "KEEP_AUDIT_LINKAGE"
                 if source_available:
                     replay_status = "PRESERVED"
                 else:
@@ -712,8 +725,8 @@ def policy_binding(compiled: dict[str, Any] | None = None) -> dict[str, Any]:
             else sorted(terms_statuses)[0]
         ),
         "terms_status_values": sorted(terms_statuses),
-        "review_required": all(value["review_required"] for value in compiled["classes"].values()),
-        "query_index_extends_source_retention": False,
+        "review_required": any(value["review_required"] for value in compiled["classes"].values()),
+        "query_index_extends_source_retention": QUERY_INDEX_EXTENDS_SOURCE_RETENTION,
     }
 
 
@@ -765,7 +778,9 @@ def main() -> int:
             f"extends_source_retention={index['extends_source_retention']}"
         )
         return 0
-    if args.json and not args.self_check:
+    if args.self_check and (args.json or args.binding):
+        raise ValueError("--self-check cannot be combined with --json or --binding; pick one mode")
+    if args.json:
         print(json.dumps(compiled, ensure_ascii=False, indent=2, sort_keys=True))
     elif args.binding:
         print(json.dumps(policy_binding(compiled), ensure_ascii=False, indent=2, sort_keys=True))

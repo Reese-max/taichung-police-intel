@@ -137,5 +137,11 @@ test("expiry dry-run and query-index projection run end to end", () => {
   });
   assert.equal(index.status, 1);
   assert.match(index.stderr, /unsupported retention layer for the query index: canonical_event/);
+
+  // Output modes are mutually exclusive so a receipt cannot be silently suppressed.
+  const ambiguous = spawnSync(command, ["-X", "utf8", "scripts/retention-policy.py",
+    "--self-check", "--binding"], { cwd: repo, encoding: "utf8", timeout: 60000 });
+  assert.equal(ambiguous.status, 1);
+  assert.match(ambiguous.stderr, /cannot be combined/);
   rmSync(dir, { recursive: true, force: true });
 });

@@ -37,6 +37,7 @@ const required = [
   "apps/web/public/data/source-status.json",
   "apps/web/public/data/system-health.json",
   "apps/web/public/data/source-policy.json",
+  "apps/web/public/data/retention-policy-binding.json",
   "apps/web/public/data/public-event-demo.json",
   "apps/web/components/PublicEventFusionDemo.js",
   "apps/web/scripts/sync-source-policy.mjs",

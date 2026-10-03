@@ -4,7 +4,7 @@
 
 ## 已實作的範圍（以及還沒做的部分）
 
-已接線：**對外綁定**。`scripts/query-gateway.py` 的每個 response 與 `workers/query-gateway/src/index.js` 都引用同一份由 `retention-policy.py --binding` 產生的 `RETENTION_BINDING`，因此 UI 與 gateway 不可能各自宣稱不同的權利狀態。
+已接線：**對外綁定**。`scripts/query-gateway.py` 在每個帶 `retention` 欄位的 response 上引用啟動時推導出的 `RETENTION_BINDING`；`workers/query-gateway/src/index.js` 則 import 由 `retention-policy.py --binding` 產生的 `apps/web/public/data/retention-policy-binding.json`（變數名 `RETENTION_POLICY`）。兩邊不可能各自宣稱不同的權利狀態。MCP `initialize`／`tools/list` 外層封裝本來就不帶 `retention` 欄位。
 
 尚未接線（**本議題不宣稱已完成**）：archive gate 目前只由 `scripts/retention-policy.py` 的 CLI 與測試呼叫。實際的 live query 路徑是 `scripts/query-store.py` → `apps/web/public/data/*.json` → gateway／worker，它並沒有 import retention module；`scripts/query-store.py` 內另有一個同名但無關的 `policy_binding` 區域變數。collector 與 `scripts/migration_replay.py` 也仍走自己的資料管線。換句話說：`--project`／`--plan` 的規則已經是正確且測試過的守門員，但把它們插進 live query 路徑是後續議題的工作。
 
@@ -74,7 +74,7 @@ class 的欄位集合是**精確比對**：多一個或少一個欄位都會讓 
 - `audit_refs` 為空或缺少 `replay_evidence_fields` 宣告的 provenance 時，`replay_status: BLOCKED` 且附 `REPLAY_EVIDENCE_INCOMPLETE`，不會宣稱保留了不存在的 linkage；
 - 原本的 `expired_action` 是 `REVIEW_REQUIRED` 時（raw 或 canonical layer 都算），`replay_status: LIMITED` 並附 `REPLAY_REVIEW_WINDOW_PENDING`：證據被保留，但重播仍在等人審，不會標成 preserved；
 - `PRESERVED` 與 limitation 互斥；planner 產生前會自我檢查這個不變式。
-- 若來源已撤下且證據齊全，`replay_status: LIMITED` 並附 `SOURCE_NO_LONGER_AVAILABLE_REPLAY_PARTIAL`，明確標示無法完整重播，而不是假裝還能重播。
+- 若 record **已過期**、證據齊全，但來源已撤下，`replay_status: LIMITED` 並附 `SOURCE_NO_LONGER_AVAILABLE_REPLAY_PARTIAL`，明確標示無法完整重播，而不是假裝還能重播。（未過期的 withdrawn record 一律是 `RETAINED`／`PRESERVED`：還沒到期就沒有被清除的風險。）
 
 `replay_evidence_fields` 是 planner 實際比對的清單，缺項會逐項列在 `replay_missing_fields`；`replay_limitation_reasons` 必須涵蓋 planner 會發出的每一種原因，否則 compile 失敗。
 
