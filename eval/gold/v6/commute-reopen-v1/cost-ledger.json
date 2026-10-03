@@ -10,97 +10,18 @@
   ],
   "records": [
     {
-      "arm": "C_v6",
-      "count": 9,
-      "measured": null,
-      "status": "MEASURED_REPLAY_ONLY",
-      "unit": "completed_query"
-    },
-    {
-      "arm": "C_v6",
-      "count": 8,
-      "count_definition": "實質更新（substantive updates），不是已提示的更新數",
-      "measured": null,
-      "status": "MEASURED_REPLAY_ONLY",
-      "unit": "effective_update"
-    },
-    {
-      "arm": "C_v6",
-      "count": 2,
-      "measured": null,
-      "status": "MEASURED_REPLAY_ONLY",
-      "unit": "tracked_condition"
-    },
-    {
-      "arm": "C_v6",
-      "count": 0,
-      "measured": null,
-      "status": "NOT_APPLICABLE_NO_MODEL_CALL",
-      "unit": "model_request"
-    },
-    {
-      "arm": "C_v6",
-      "count": null,
-      "measured": null,
-      "status": "NOT_RUN",
-      "unit": "human_hour"
-    },
-    {
-      "arm": "C_RULES_ONLY",
-      "count": 9,
-      "measured": null,
-      "status": "MEASURED_REPLAY_ONLY",
-      "unit": "completed_query"
-    },
-    {
-      "arm": "C_RULES_ONLY",
-      "count": 8,
-      "count_definition": "實質更新（substantive updates），不是已提示的更新數",
-      "measured": null,
-      "status": "MEASURED_REPLAY_ONLY",
-      "unit": "effective_update"
-    },
-    {
-      "arm": "C_RULES_ONLY",
-      "count": 0,
-      "measured": null,
-      "status": "NOT_APPLICABLE_NO_MODEL_CALL",
-      "unit": "model_request"
-    },
-    {
-      "arm": "C_RULES_ONLY",
-      "count": null,
-      "measured": null,
-      "status": "NOT_RUN",
-      "unit": "human_hour"
-    },
-    {
-      "arm": "B_v6",
+      "arm": "A_v1",
       "count": null,
       "measured": null,
       "status": "NOT_RUN",
       "unit": "completed_query"
-    },
-    {
-      "arm": "B_v6",
-      "count": null,
-      "measured": null,
-      "status": "NOT_RUN",
-      "unit": "model_request"
-    },
-    {
-      "arm": "B_v6",
-      "count": null,
-      "measured": null,
-      "status": "NOT_RUN",
-      "unit": "human_hour"
     },
     {
       "arm": "A_v1",
       "count": null,
       "measured": null,
       "status": "NOT_RUN",
-      "unit": "completed_query"
+      "unit": "human_hour"
     },
     {
       "arm": "A_v1",
@@ -110,11 +31,112 @@
       "unit": "median_total_task_seconds"
     },
     {
-      "arm": "A_v1",
+      "arm": "B_v6",
+      "count": 9,
+      "measured": null,
+      "status": "MEASURED_REPLAY_ONLY",
+      "unit": "completed_query"
+    },
+    {
+      "arm": "B_v6",
+      "count": 8,
+      "count_definition": "實質更新（substantive updates），不是已提示的更新數",
+      "measured": null,
+      "status": "MEASURED_REPLAY_ONLY",
+      "unit": "effective_update"
+    },
+    {
+      "arm": "B_v6",
       "count": null,
       "measured": null,
       "status": "NOT_RUN",
       "unit": "human_hour"
+    },
+    {
+      "arm": "B_v6",
+      "count": 0,
+      "measured": null,
+      "status": "NOT_APPLICABLE_NO_MODEL_CALL",
+      "unit": "model_request"
+    },
+    {
+      "arm": "B_v6",
+      "count": 2,
+      "measured": null,
+      "status": "MEASURED_REPLAY_ONLY",
+      "unit": "tracked_condition"
+    },
+    {
+      "arm": "C_RULES_ONLY",
+      "count": 9,
+      "measured": null,
+      "status": "MEASURED_REPLAY_ONLY",
+      "unit": "completed_query"
+    },
+    {
+      "arm": "C_RULES_ONLY",
+      "count": 8,
+      "count_definition": "實質更新（substantive updates），不是已提示的更新數",
+      "measured": null,
+      "status": "MEASURED_REPLAY_ONLY",
+      "unit": "effective_update"
+    },
+    {
+      "arm": "C_RULES_ONLY",
+      "count": null,
+      "measured": null,
+      "status": "NOT_RUN",
+      "unit": "human_hour"
+    },
+    {
+      "arm": "C_RULES_ONLY",
+      "count": 0,
+      "measured": null,
+      "status": "NOT_APPLICABLE_NO_MODEL_CALL",
+      "unit": "model_request"
+    },
+    {
+      "arm": "C_RULES_ONLY",
+      "count": 2,
+      "measured": null,
+      "status": "MEASURED_REPLAY_ONLY",
+      "unit": "tracked_condition"
+    },
+    {
+      "arm": "C_v6",
+      "count": 9,
+      "measured": null,
+      "status": "MEASURED_REPLAY_ONLY",
+      "unit": "completed_query"
+    },
+    {
+      "arm": "C_v6",
+      "count": 8,
+      "count_definition": "實質更新（substantive updates），不是已提示的更新數",
+      "measured": null,
+      "status": "MEASURED_REPLAY_ONLY",
+      "unit": "effective_update"
+    },
+    {
+      "arm": "C_v6",
+      "count": null,
+      "measured": null,
+      "status": "NOT_RUN",
+      "unit": "human_hour"
+    },
+    {
+      "arm": "C_v6",
+      "count": 0,
+      "measured": null,
+      "status": "NOT_APPLICABLE_NO_MODEL_CALL",
+      "unit": "model_request"
+    },
+    {
+      "arm": "C_v6",
+      "count": 2,
+      "measured": null,
+      "status": "MEASURED_REPLAY_ONLY",
+      "unit": "tracked_condition"
     }
   ],
   "schema_version": 1

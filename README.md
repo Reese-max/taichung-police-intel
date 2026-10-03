@@ -231,16 +231,18 @@ npm run check
 
 ```bash
 python scripts/schema_drift.py --self-check
+```
 
+```bash
 # v6 commute-road reopen replay scored against the gold cases (issue #108)
 npm run replay:commute
 ```
 
-Expected final lines:
+Expected final lines, in this order:
 
 ```text
-VERIFY_OK mode=full ... secrets=0
 COMMUTE_REOPEN_SELF_CHECK_OK ...
+VERIFY_OK mode=full ... secrets=0
 ```
 
 `npm run replay:commute` replays the synthetic commute-road session (save a tracked

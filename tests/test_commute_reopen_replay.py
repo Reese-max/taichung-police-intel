@@ -33,10 +33,11 @@ def gold_cases() -> tuple[dict, list[dict]]:
     return rc.load_gold_cases(DATA_DIR / "manifest.json")
 
 
-def run_arm(arm: str, scenario=None, manifest=None, cases=None):
+def run_arm(arm: str, scenario=None, manifest=None, cases=None, overrides=None):
     scenario = scenario if scenario is not None else replay.load_scenario(DATA_DIR / "session.json")
     manifest, cases = gold_cases() if manifest is None else (manifest, cases)
-    overrides = rc.load_arms(manifest)[arm]
+    if overrides is None:
+        overrides = rc.load_arms(manifest)[arm]
     return rc.run_arm(arm, overrides, scenario, manifest, cases)
 
 
@@ -142,6 +143,140 @@ class ScenarioContractTests(unittest.TestCase):
         self.assertEqual(decisions["UPD-999"], replay.NOT_YET_ACQUIRED)
 
 
+class OpenEndedIntervalTests(unittest.TestCase):
+    """An update without an end date stays open for the whole tracked window."""
+
+    def setUp(self):
+        self.condition = {
+            "condition_id": "C-ROAD-AB",
+            "kind": "ROAD_CONDITION",
+            "road": "測試路 A 至 B",
+            "daily": {"start": "09:00", "end": "17:00"},
+            "tracked_from": "2026-10-05T09:00:00+08:00",
+        }
+
+    def update(self, start: str, end: str | None) -> dict:
+        payload = {
+            "road": "測試路 A 至 B",
+            "status": "IN_PROGRESS",
+            "effective_from": start,
+            "effective_to": end,
+            "daily": {"start": "09:00", "end": "17:00"},
+            "text": "【合成測試】",
+        }
+        return {"payload": payload}
+
+    def test_open_ended_update_starting_after_the_band_still_matches(self):
+        update = self.update("2026-10-08T18:00:00+08:00", None)
+        self.assertTrue(
+            replay.intersects_tracked_band(update, self.condition, "2026-10-09T17:00:00+08:00")
+        )
+        closed = self.update("2026-10-08T18:00:00+08:00", "2026-10-09T17:00:00+08:00")
+        self.assertTrue(
+            replay.intersects_tracked_band(closed, self.condition, "2026-10-09T17:00:00+08:00")
+        )
+
+    def test_open_ended_update_past_the_tracked_window_does_not_match(self):
+        update = self.update("2026-10-10T18:00:00+08:00", None)
+        self.assertFalse(
+            replay.intersects_tracked_band(update, self.condition, "2026-10-09T17:00:00+08:00")
+        )
+
+    def test_the_shipped_fixture_exercises_an_open_ended_window(self):
+        scenario = replay.load_scenario(DATA_DIR / "session.json")
+        lifted = next(
+            update for update in scenario["updates"] if update["update_id"] == "UPD-006"
+        )
+        self.assertIsNone(lifted["payload"]["effective_to"])
+        receipt = replay.replay(scenario)
+        points = {point["reopen_id"]: point for point in receipt["reopen_points"]}
+        self.assertEqual(points["R7"]["prompted_update_ids"], ["UPD-006"])
+
+
+class FailClosedGuardTests(unittest.TestCase):
+    def setUp(self):
+        self.scenario = replay.load_scenario(DATA_DIR / "session.json")
+
+    def test_a_repost_must_reference_an_earlier_update(self):
+        broken = scenario_copy()
+        broken["updates"][0]["upstream_update_id"] = "UPD-008"
+        with self.assertRaisesRegex(replay.ScenarioError, "repost must reference an earlier update"):
+            replay.validate_scenario(broken)
+
+    def test_reopen_points_must_be_ordered(self):
+        broken = scenario_copy()
+        broken["reopen_points"][2]["reopened_at"] = "2026-10-05T11:00:00+08:00"
+        with self.assertRaisesRegex(replay.ScenarioError, "must be ordered"):
+            replay.validate_scenario(broken)
+
+    def test_tracked_from_is_required(self):
+        broken = scenario_copy()
+        del broken["conditions"][0]["tracked_from"]
+        with self.assertRaisesRegex(replay.ScenarioError, "tracked_from missing"):
+            replay.validate_scenario(broken)
+
+    def test_saved_at_and_reopened_at_are_required(self):
+        broken = scenario_copy()
+        del broken["conditions"][0]["saved_at"]
+        with self.assertRaisesRegex(replay.ScenarioError, "saved_at missing"):
+            replay.validate_scenario(broken)
+        broken = scenario_copy()
+        del broken["reopen_points"][0]["reopened_at"]
+        with self.assertRaisesRegex(replay.ScenarioError, "missing reopened_at"):
+            replay.validate_scenario(broken)
+
+    def test_two_unreachable_slots_for_one_source_report_one_gap(self):
+        duplicated = scenario_copy()
+        clone = dict(duplicated["collections"][4])
+        clone["slot_id"] = "SLOT-5-DUPLICATE"
+        duplicated["collections"].append(clone)
+        receipt = replay.replay(duplicated)
+        # A gap that is still the current state repeats across reopen points, but
+        # it must appear at most once per reopen point.
+        for point in receipt["reopen_points"]:
+            flags = [
+                (flag["kind"], flag.get("source_id"), flag.get("condition_id"), flag["observed_at"])
+                for flag in point["gap_flags"]
+            ]
+            self.assertEqual(len(flags), len(set(flags)), point["reopen_id"])
+        reported = [
+            (flag["kind"], flag.get("source_id"), flag.get("condition_id"), flag["observed_at"])
+            for point in receipt["reopen_points"]
+            for flag in point["gap_flags"]
+        ]
+        self.assertIn(
+            (replay.GAP_CONNECTION_FAILURE, "S-001", None, "2026-10-08T18:10:00+08:00"), reported
+        )
+
+    def test_the_cancel_boundary_is_exclusive(self):
+        condition = dict(self.scenario["conditions"][0])
+        condition["condition_id"] = "C-X"
+        moment = replay._as_datetime(condition["cancelled_at"], "cancelled_at")
+        self.assertFalse(replay._condition_active(condition, moment))
+        self.assertTrue(replay._condition_cancelled(condition, moment))
+        self.assertEqual(replay._condition_status(condition, moment, {}), replay.CANCELLED)
+        before = moment - replay.timedelta(minutes=1)
+        self.assertTrue(replay._condition_active(condition, before))
+        self.assertEqual(replay._condition_status(condition, before, {}), replay.ACTIVE)
+
+    def test_a_condition_only_lifts_on_official_text(self):
+        receipt = replay.replay(self.scenario)
+        summary = receipt["condition_summary"]["lifted_by_update_id"]
+        self.assertEqual(summary, {"C-ROAD-AB": "UPD-006"})
+
+    def test_an_undeclared_mirror_is_a_new_document_and_says_so(self):
+        # Content identity is scoped per document, so provenance must be declared.
+        # This test pins that behaviour so it cannot change unnoticed.
+        broken = scenario_copy()
+        for update in broken["updates"]:
+            if update["update_id"] == "UPD-002":
+                update["upstream_update_id"] = None
+        broken["updates"][0]["content_sha256"] = broken["updates"][0]["content_sha256"]
+        receipt = replay.replay(broken)
+        points = {point["reopen_id"]: point for point in receipt["reopen_points"]}
+        self.assertEqual(points["R2"]["prompted_update_ids"], ["UPD-002"])
+
+
 class GoldCaseTests(unittest.TestCase):
     def setUp(self):
         self.manifest, self.cases = gold_cases()
@@ -179,7 +314,24 @@ class GoldCaseTests(unittest.TestCase):
             },
         )
 
-    def test_event_versions_and_reposts_never_cross_the_dev_holdout_split(self):
+    def test_the_event_level_split_limitation_is_declared(self):
+        # One synthetic event cannot be split by event, so the limitation is stated
+        # rather than papered over.
+        self.assertIn("split_limitation", self.manifest)
+        self.assertIn("cannot", self.manifest["split_limitation"].lower().replace("無法滿足", "cannot"))
+        self.assertTrue(self.manifest["coverage_limitations"])
+        scenario = replay.load_scenario(DATA_DIR / "session.json")
+        expected_by_split: dict[str, set[str]] = {"development": set(), "heldout": set()}
+        for case in self.cases:
+            key = "development" if case["case_id"] in self.manifest["development_reopen_ids"] else "heldout"
+            expected_by_split[key].update(case["expected"]["update_ids"])
+        documents = {update["update_id"]: update["document_id"] for update in scenario["updates"]}
+        development_docs = {documents[uid] for uid in expected_by_split["development"]}
+        heldout_docs = {documents[uid] for uid in expected_by_split["heldout"]}
+        # The declared limitation is exactly what this scenario does.
+        self.assertTrue(development_docs & heldout_docs)
+
+    def test_expected_update_sets_of_the_two_splits_do_not_overlap(self):
         development = set(self.manifest["development_reopen_ids"])
         heldout = set(self.manifest["heldout_reopen_ids"])
         self.assertFalse(development & heldout)
@@ -322,12 +474,25 @@ class ReplayBehaviourTests(unittest.TestCase):
         for point in self.receipt["reopen_points"]:
             self.assertEqual(
                 point["public_original_available"],
-                all(point["public_original_by_update_id"][uid] for uid in point["prompted_update_ids"]),
+                all(
+                    point["public_original_by_update_id"][uid] == replay.ORIGINAL_AVAILABLE
+                    for uid in point["prompted_update_ids"]
+                ),
+                point["reopen_id"],
+            )
+            self.assertEqual(
+                point["public_original_unknown_update_ids"],
+                [
+                    uid
+                    for uid in point["prompted_update_ids"]
+                    if point["public_original_by_update_id"][uid] == replay.ORIGINAL_UNKNOWN
+                ],
                 point["reopen_id"],
             )
         # The official listing keeps every document the station prompted, including
         # after the road condition was cancelled.
         self.assertTrue(self.points["R9"]["public_original_available"])
+        self.assertEqual(self.points["R9"]["public_original_uncertain_source_ids"], [])
         vanished = scenario_copy()
         for collection in vanished["collections"]:
             if collection["slot_id"] == "SLOT-11":
@@ -339,13 +504,26 @@ class ReplayBehaviourTests(unittest.TestCase):
         dropped = replay.replay(vanished)["reopen_points"][-1]
         self.assertEqual(dropped["prompted_update_ids"], ["UPD-008"])
         self.assertFalse(dropped["public_original_available"])
-        self.assertFalse(dropped["public_original_by_update_id"]["UPD-008"])
+        self.assertEqual(dropped["public_original_by_update_id"]["UPD-008"], replay.ORIGINAL_REMOVED)
+
+    def test_an_unreachable_source_leaves_the_original_unknown_not_removed(self):
+        unreachable = scenario_copy()
+        for collection in unreachable["collections"]:
+            if collection["slot_id"] == "SLOT-11":
+                collection["snapshot_complete"] = False
+        point = replay.replay(unreachable)["reopen_points"][-1]
+        self.assertEqual(point["prompted_update_ids"], ["UPD-008"])
+        self.assertFalse(point["public_original_available"])
+        self.assertEqual(point["public_original_by_update_id"]["UPD-008"], replay.ORIGINAL_UNKNOWN)
+        self.assertEqual(point["public_original_unknown_update_ids"], ["UPD-008"])
+        self.assertEqual(point["public_original_uncertain_source_ids"], ["S-001"])
 
     def test_original_availability_is_reported_per_update(self):
         availability = self.points["R9"]["public_original_by_update_id"]
-        self.assertTrue(availability["UPD-008"])
-        self.assertTrue(availability["UPD-006"])
-        self.assertFalse(availability["UPD-002"])  # the mirror was never in the official listing
+        self.assertEqual(availability["UPD-008"], replay.ORIGINAL_AVAILABLE)
+        self.assertEqual(availability["UPD-006"], replay.ORIGINAL_AVAILABLE)
+        # The mirror was never in the official listing.
+        self.assertEqual(availability["UPD-002"], replay.ORIGINAL_REMOVED)
 
     def test_explicit_lift_is_road_scoped_and_a_new_project_still_matches(self):
         self.assertEqual(self.points["R7"]["prompted_update_ids"], ["UPD-006"])
@@ -427,8 +605,22 @@ class ScoreTests(unittest.TestCase):
         self.assertEqual(arms["C_v6"], {})
         self.assertEqual(arms["A_v1"], {})
         for arm, overrides in arms.items():
-            policy = replay.policy_from_mapping(overrides)
-            self.assertEqual(policy.to_dict(), run_arm(arm)["policy"])
+            # policy_from_mapping must accept every published override.
+            self.assertIsInstance(replay.policy_from_mapping(overrides), replay.ReplayPolicy)
+
+    def test_the_cli_refuses_an_arm_the_manifest_does_not_declare(self):
+        import sys as _sys
+
+        argv = _sys.argv
+        try:
+            _sys.argv = ["replay-commute-reopen.py", "--arm", "NOT_AN_ARM"]
+            with self.assertRaises(SystemExit):
+                rc.main()
+            _sys.argv = ["replay-commute-reopen.py", "--arm", "A_v1"]
+            with self.assertRaises(SystemExit):
+                rc.main()
+        finally:
+            _sys.argv = argv
 
     def test_a_perfect_reopen_run_also_matches_the_gold_case_fields(self):
         report = self.run["report"]
@@ -453,6 +645,65 @@ class ScoreTests(unittest.TestCase):
         prediction = dict(replay.prediction_rows(self.run["receipt"])[7]["prediction"])
         prediction["multi_condition_update_ids"] = ["UPD-007"]
         self.assertEqual(ev.reopen_diagnostics(case, prediction)["multi_condition_correct"], 0)
+
+    def test_condition_status_and_f1_are_pinned_to_the_gold_not_assumed(self):
+        report = self.run["report"]["reopen_unread"]
+        self.assertEqual(report["f1"], 1.0)
+        self.assertEqual(report["condition_status_accuracy"], 1.0)
+        rows = self.run["receipt"]["reopen_points"]
+        predictions = {row["case_id"]: row["prediction"] for row in replay.prediction_rows(self.run["receipt"])}
+        # Claiming every condition is lifted must not score as a perfect match.
+        broken = dict(predictions["R1"])
+        broken["condition_status"] = {key: replay.LIFTED_BY_OFFICIAL_TEXT for key in broken["condition_status"]}
+        case = next(case for case in gold_cases()[1] if case["case_id"] == "R1")
+        self.assertEqual(ev.reopen_diagnostics(case, broken)["condition_status_correct"], 0)
+        # A prompt set with no overlap cannot produce f1 = 1.
+        empty = dict(predictions["R1"])
+        empty["update_ids"] = []
+        diagnostics = ev.reopen_diagnostics(case, empty)
+        self.assertEqual(diagnostics["tp"], 0)
+        self.assertEqual(diagnostics["multi_condition_correct"], 0)
+        self.assertEqual(rows[0]["reopen_id"], "R1")
+
+    def test_a_prediction_that_prompts_nothing_scores_no_multi_condition_match(self):
+        manifest, cases = gold_cases()
+        predictions = {
+            case["case_id"]: {
+                "update_ids": [],
+                "observation_status": case["expected"]["observation_status"],
+                "gap_kinds": list(case["expected"]["gap_kinds"]),
+                "condition_status": dict(case["expected"]["condition_status"]),
+                "decision_by_update_id": {},
+                "substance_by_update_id": {},
+                "cancelled_condition_by_update_id": {},
+                "multi_condition_update_ids": [],
+            }
+            for case in cases
+        }
+        report = ev.evaluate(manifest, cases, predictions)["reopen_unread"]
+        self.assertEqual(report["tp"], 0)
+        self.assertEqual(report["recall"], 0.0)
+        self.assertLess(report["multi_condition_accuracy"], 1.0)
+
+    def test_substance_attribution_wins_over_read_state(self):
+        # Losing read tracking and formatting-substantive-ness at once must not hide
+        # the layout defect behind the read-state bucket.
+        metrics = run_arm(
+            "COMBINED_DEFECT",
+            overrides={"track_read_state": False, "formatting_is_substantive": True},
+        )["report"]["reopen_unread"]
+        self.assertGreater(metrics["false_alert_breakdown"]["layout_only_false_alert"], 0)
+
+    def test_declared_targets_are_assessed_not_just_copied(self):
+        assessment = {row["target"]: row for row in self.run["report"]["target_assessment"]}
+        self.assertEqual(assessment["precision"]["status"], "MET")
+        self.assertEqual(assessment["recall"]["status"], "MET")
+        self.assertEqual(assessment["median_total_time_reduction_vs_arm_a"]["status"], "NOT_RUN")
+        self.assertEqual(assessment["correctness_not_lower_than_arm_a"]["status"], "NOT_RUN")
+        self.assertEqual(assessment["median_total_time_reduction_vs_arm_a"]["measured"], None)
+        for row in assessment.values():
+            if row["status"] == "NOT_RUN":
+                self.assertTrue(row["reason"], row["target"])
 
     def test_rules_only_ablation_is_scored_separately_and_is_worse(self):
         report = run_arm("C_RULES_ONLY")["report"]["reopen_unread"]
@@ -711,19 +962,30 @@ class CostLedgerTests(unittest.TestCase):
         self.assertEqual(counts["tracked_condition"], 2)
 
     def test_ledger_counts_agree_with_the_replay_receipt(self):
-        receipt = run_arm("C_v6")["receipt"]["cost_scope"]
+        for arm in ("C_v6", "C_RULES_ONLY", "B_v6"):
+            scope = run_arm(arm)["receipt"]["cost_scope"]
+            counts = {
+                row["unit"]: row["count"] for row in self.ledger["records"] if row["arm"] == arm
+            }
+            self.assertEqual(counts["completed_query"], scope["queries_completed"], arm)
+            self.assertEqual(counts["effective_update"], scope["effective_updates"], arm)
+            self.assertEqual(counts["tracked_condition"], scope["tracked_conditions"], arm)
+            self.assertEqual(counts["model_request"], scope["model_requests"], arm)
+        prompted = run_arm("C_v6")["receipt"]["counters"]["prompted_updates"]
         counts = {
-            (row["unit"]): row["count"]
+            row["unit"]: row["count"]
             for row in self.ledger["records"]
             if row["arm"] == "C_v6"
         }
-        self.assertEqual(counts["completed_query"], receipt["queries_completed"])
-        self.assertEqual(counts["effective_update"], receipt["effective_updates"])
-        self.assertEqual(counts["tracked_condition"], receipt["tracked_conditions"])
-        self.assertEqual(counts["model_request"], receipt["model_requests"])
         # The prompted count is a different number and must not be confused with it.
-        prompted = run_arm("C_v6")["receipt"]["counters"]["prompted_updates"]
         self.assertNotEqual(counts["effective_update"], prompted)
+
+    def test_an_unrun_arm_records_nothing_measured(self):
+        rows = [row for row in self.ledger["records"] if row["arm"] == "A_v1"]
+        self.assertTrue(rows)
+        for row in rows:
+            self.assertIsNone(row["count"])
+            self.assertEqual(row["status"], "NOT_RUN")
 
     def test_planned_scale_is_declared_beside_the_actual_counts(self):
         planned = self.manifest["planned_scale"]
@@ -754,6 +1016,15 @@ class AnnotationTests(unittest.TestCase):
     def test_model_output_is_never_its_own_gold(self):
         self.assertIs(self.annotations["model_output_used_as_gold"], False)
         self.assertEqual(self.annotations["disputes"], [])
+
+    def test_the_annotation_review_declares_that_it_is_a_self_review(self):
+        review = self.annotations["review"]
+        self.assertEqual(review["review_type"], "SELF_REVIEW_BY_IMPLEMENTER")
+        self.assertIsNone(review["independent_reviewer"])
+        self.assertEqual(review["independent_review"], "NOT_RUN")
+        self.assertTrue(
+            any("沒有第三方複核" in note or "不能當成獨立標註" in note for note in self.annotations["notes"])
+        )
 
     def test_split_matches_the_manifest(self):
         manifest, cases = gold_cases()

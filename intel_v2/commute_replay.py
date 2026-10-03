@@ -98,6 +98,12 @@ GAP_SOURCE_ITEM_MISSING = "SOURCE_ITEM_MISSING"
 ACQUISITION_GAP_KINDS = (GAP_CONNECTION_FAILURE, GAP_PARTIAL_COVERAGE, GAP_SOURCE_ITEM_MISSING)
 GAP_SCHEDULED_END_PASSED = "SCHEDULED_END_PASSED"
 
+# Public availability of an official original, as a tri-state: an unreachable
+# source leaves it UNKNOWN, which is never reported as removed or as available.
+ORIGINAL_AVAILABLE = "AVAILABLE"
+ORIGINAL_REMOVED = "REMOVED"
+ORIGINAL_UNKNOWN = "UNKNOWN"
+
 NOT_SAVED = "NOT_SAVED"
 ACTIVE = "ACTIVE"
 LIFTED_BY_OFFICIAL_TEXT = "LIFTED_BY_OFFICIAL_TEXT"
@@ -248,6 +254,8 @@ def validate_scenario(scenario: dict[str, Any]) -> None:
             )
         if not condition.get("tracked_from"):
             raise ScenarioError(f"condition tracked_from missing: {condition_id}")
+        if not condition.get("saved_at"):
+            raise ScenarioError(f"condition saved_at missing: {condition_id}")
         _as_datetime(condition["tracked_from"], f"{condition_id} tracked_from")
         _as_datetime(condition["saved_at"], f"{condition_id} saved_at")
         if condition.get("cancelled_at"):
@@ -298,6 +306,8 @@ def validate_scenario(scenario: dict[str, Any]) -> None:
         if reopen_id in reopen_ids:
             raise ScenarioError(f"duplicate reopen_id: {reopen_id}")
         reopen_ids.add(reopen_id)
+        if not reopen.get("reopened_at"):
+            raise ScenarioError(f"reopen_point missing reopened_at: {reopen_id}")
         opened = _as_datetime(reopen["reopened_at"], f"{reopen_id} reopened_at")
         if previous is not None and opened < previous:
             raise ScenarioError("reopen_points must be ordered")
@@ -349,7 +359,11 @@ def intersects_tracked_band(
     tracked_from_at = _as_datetime(condition["tracked_from"], "tracked_from")
     tracked_end_at = _as_datetime(tracked_end, "tracked_end") if tracked_end else None
     day = start.date()
-    last_day = (end or start).date()
+    # An update without an end date stays open. Searching only its start date would
+    # drop a multi-day closure that begins after the daily band, so the horizon is
+    # the tracked end (or the declared end), whichever is later.
+    horizon = max(end or start, tracked_end_at or start)
+    last_day = horizon.date()
     while day <= last_day:
         window_start = datetime.combine(day, band_start, start.tzinfo)
         window_end = datetime.combine(day, band_end, start.tzinfo)
@@ -459,26 +473,28 @@ def _classify_substance(
         first_seen = not document_raw
         document_raw.add(raw_hash)
         document_identity.add(identity_hash)
+        if known_raw:
+            substance_class = SUBSTANCE_REPEAT_FETCH
+        elif known_identity:
+            substance_class = SUBSTANCE_LAYOUT_ONLY
+        else:
+            substance_class = SUBSTANCE_FIRST_SEEN if first_seen else SUBSTANCE_NEW_REVISION
         if policy.dedupe_scope == "document" and document_id in substantive_documents:
-            substance[update_id] = (False, DUPLICATE_FETCH, SUBSTANCE_NEW_REVISION)
+            substance[update_id] = (False, DUPLICATE_FETCH, substance_class)
         elif known_raw:
             substance[update_id] = (
-                (True, PROMPTED, SUBSTANCE_REPEAT_FETCH)
+                (True, PROMPTED, substance_class)
                 if not policy.dedupe_repeat_fetches
-                else (False, DUPLICATE_FETCH, SUBSTANCE_REPEAT_FETCH)
+                else (False, DUPLICATE_FETCH, substance_class)
             )
         elif known_identity:
             substance[update_id] = (
-                (True, PROMPTED, SUBSTANCE_LAYOUT_ONLY)
+                (True, PROMPTED, substance_class)
                 if policy.formatting_is_substantive
-                else (False, FORMAT_ONLY, SUBSTANCE_LAYOUT_ONLY)
+                else (False, FORMAT_ONLY, substance_class)
             )
         else:
-            substance[update_id] = (
-                True,
-                PROMPTED,
-                SUBSTANCE_FIRST_SEEN if first_seen else SUBSTANCE_NEW_REVISION,
-            )
+            substance[update_id] = (True, PROMPTED, substance_class)
             substantive_documents.add(document_id)
     return substance
 
@@ -601,26 +617,43 @@ def observation_status(gap_flags: list[dict[str, Any]], prompted: list[str]) -> 
     return NO_NEW_ITEMS
 
 
-def public_original_documents(scenario: dict[str, Any], moment: datetime) -> set[str]:
-    """Documents whose official original is still retrievable at ``moment``.
+def public_original_documents(
+    scenario: dict[str, Any],
+    moment: datetime,
+) -> tuple[set[str], set[str]]:
+    """Which official originals are still retrievable at ``moment``.
 
-    Derived from the newest complete snapshot per source: a document that the
-    current official listing has dropped is no longer public, which is a
-    different fact from "the station stopped prompting".
+    Returns the available document IDs and the sources whose current state is
+    uncertain. Availability is read from the newest *complete* snapshot per
+    source, because an unreachable source is an unknown, not evidence that the
+    publisher took the document down; those sources are reported separately so an
+    unknown is never recorded as "the original was removed".
     """
 
     available: set[str] = set()
-    for collection in latest_collections(scenario, moment).values():
-        if not collection.get("snapshot_complete", True):
+    uncertain: set[str] = set()
+    complete_by_source: dict[str, dict[str, Any]] = {}
+    for collection in scenario["collections"]:
+        if _as_datetime(collection["observed_at"], "observed_at") > moment:
             continue
+        source_id = collection.get("source_id") or collection["slot_id"]
+        if not collection.get("snapshot_complete", True):
+            uncertain.add(source_id)
+            continue
+        uncertain.discard(source_id)
+        known = complete_by_source.get(source_id)
+        if known is None or _as_datetime(collection["observed_at"], "observed_at") >= _as_datetime(
+            known["observed_at"], "observed_at"
+        ):
+            complete_by_source[source_id] = collection
+    for source_id, collection in complete_by_source.items():
         visible = set(collection.get("visible_update_ids", []))
-        source_id = collection.get("source_id")
         for update in scenario["updates"]:
-            if source_id and update["source_id"] != source_id:
+            if collection.get("source_id") and update["source_id"] != source_id:
                 continue
             if update["update_id"] in visible:
                 available.add(update["document_id"])
-    return available
+    return available, uncertain
 
 
 def replay(scenario: dict[str, Any], policy: ReplayPolicy = DEFAULT_POLICY) -> dict[str, Any]:
@@ -659,9 +692,11 @@ def replay(scenario: dict[str, Any], policy: ReplayPolicy = DEFAULT_POLICY) -> d
 
     for reopen in scenario["reopen_points"]:
         moment = _as_datetime(reopen["reopened_at"], "reopened_at")
+        # Everything derived for this reopen is clamped to the data cutoff: a reopen
+        # after the cutoff may not report gaps or originals from later snapshots.
         horizon = min(moment, cutoff)
-        available = public_original_documents(scenario, moment)
-        gaps = gap_flags(scenario, moment, conditions, tracked_end_by_condition, policy)
+        available, uncertain_sources = public_original_documents(scenario, horizon)
+        gaps = gap_flags(scenario, horizon, conditions, tracked_end_by_condition, policy)
         acquired_here = sorted(
             update["update_id"]
             for update in updates
@@ -793,7 +828,13 @@ def replay(scenario: dict[str, Any], policy: ReplayPolicy = DEFAULT_POLICY) -> d
                 read_update_ids.add(update_id)
 
         public_by_update = {
-            update_id: updates_by_id[update_id]["document_id"] in available
+            update_id: (
+                ORIGINAL_UNKNOWN
+                if updates_by_id[update_id]["source_id"] in uncertain_sources
+                else ORIGINAL_AVAILABLE
+                if updates_by_id[update_id]["document_id"] in available
+                else ORIGINAL_REMOVED
+            )
             for update_id in acquired_here
         }
         substance_by_update = {
@@ -812,10 +853,19 @@ def replay(scenario: dict[str, Any], policy: ReplayPolicy = DEFAULT_POLICY) -> d
                 "dispositions": dispositions,
                 "public_original_by_update_id": public_by_update,
                 "substance_by_update_id": substance_by_update,
+                "public_original_uncertain_source_ids": sorted(uncertain_sources),
                 # Every prompt the station made still has a retrievable official
-                # original, including after the user cancelled the condition.
+                # original, including after the user cancelled the condition. An
+                # unreachable source leaves the originals it supplies UNKNOWN, never
+                # "taken down" and never silently available.
                 "public_original_available": all(
-                    public_by_update[update_id] for update_id in prompted_sorted
+                    public_by_update[update_id] == ORIGINAL_AVAILABLE
+                    for update_id in prompted_sorted
+                ),
+                "public_original_unknown_update_ids": sorted(
+                    update_id
+                    for update_id in prompted_sorted
+                    if public_by_update[update_id] == ORIGINAL_UNKNOWN
                 ),
             }
         )

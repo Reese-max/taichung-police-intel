@@ -44,6 +44,10 @@
   },
   "case_file": "cases.jsonl",
   "cost_file": "cost-ledger.json",
+  "coverage_limitations": [
+    "取得缺漏的開站時點（R4、R5）預期集合為空，因此 missed_while_source_gap 在本輪沒有可觀測案例；計數規則以單元測試驗證，實際缺口覆蓋留待第一輪真實來源。",
+    "唯一會產生漏報的 arm（PROBE_ONE_ALERT_PER_DOCUMENT）三筆漏報都是誤去重，因此 missed_by_matching_rule 與 missed_without_recorded_reason 在本輪同樣沒有可觀測案例。"
+  ],
   "created_at": "2026-10-03",
   "dataset_id": "govintel-gold-v6-commute-reopen-v1",
   "dataset_type": "SYNTHETIC_SCENARIO_SEED",
@@ -86,7 +90,8 @@
   },
   "scenario_file": "session.json",
   "schema_version": 1,
-  "split_rule": "事件版本與轉載不跨 dev／holdout；重播只用當時已取得且不晚於資料截止的資料。",
+  "split_limitation": "本合成情境只有一個事件（測試路 A 至 B 的施工公告），它的版本鏈橫跨兩組，因此無法滿足 issue #108 的「事件版本與轉載不跨 dev／holdout」要求；可檢查的性質只有兩組的預期更新 ID 集合不相交。事件層級切分要等第一輪 20 事件／60 文件的資料，狀態保持 NOT_RUN。",
+  "split_rule": "開發／保留集以開站時點切分；同一事件的不同版本不進同一個開站時點的預期集合。",
   "targets": {
     "correctness_not_lower_than_arm_a": true,
     "median_total_time_reduction_vs_arm_a": 0.3,

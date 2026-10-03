@@ -78,7 +78,8 @@ arm 的 `policy_overrides` 寫在 manifest 裡，CLI 直接讀它執行；
 - 來源取得缺漏（`source_acquisition_gap`）另列，不併入精確率／召回率分子分母。
 - 零分母為 `null`；缺口 reopen 的預期集合是空集合，因此取得缺漏不會變成漏報。
 - 目標值（P≥85%、R≥90%、相對 A 中位總時間降低≥30%）寫在 manifest 的 `targets`，
-  與實測值分列；本輪未達標與未執行分開記錄。
+  報告另外給 `target_assessment`：P、R 逐項標 `MET`／`UNMET` 並附實測值；
+  需要 A 組才能比較的兩項標 `NOT_RUN` 並附原因，不會被寫成未達標。
 
 ## 驗收讀取當前實作
 
@@ -93,13 +94,28 @@ arm 的 `policy_overrides` 寫在 manifest 裡，CLI 直接讀它執行；
 | `PROBE_DEDUPE_OFF` | 關閉重複取回去重 | 1 次重複取回誤報 |
 | `PROBE_ONE_ALERT_PER_DOCUMENT` | 每份官方文件只提示一次 | 3 次實質更正被誤去重（recall 0.4） |
 | `PROBE_PROMPT_AFTER_CANCEL` | 忽略使用者的取消 | R9 提示已取消條件的更新，記為 `post_cancel_prompt` |
-| `PROBE_AUTO_LIFT_ON_TRACKED_END` | 到期自動解除 | R6 狀態被誤報，缺口被隱藏 |
+| `PROBE_AUTO_LIFT_ON_TRACKED_END` | 到期自動解除 | R3、R6、R7、R8 的缺口清單被清空（R6 狀態因此被誤報） |
 | `PROBE_CANCEL_MOVED_LATER` | 把取消時間往後移 | R9 多提示一次，證明取消判斷讀取現況 |
 
-## 標註與切分
+## 切分限制
+
+開發／保留集以**開站時點**切分（R1–R3／R4–R9），可檢查的性質是兩組的預期更新 ID 集合不相交。
+本合成情境只有一個事件，它的版本鏈必然橫跨兩組，因此**無法**滿足 issue #108 的
+「事件版本與轉載不跨 dev／holdout」要求；這一點寫在 manifest 的 `split_limitation`，
+不假裝已滿足。事件層級切分要等第一輪 20 事件／60 文件的資料。
+
+同樣地，manifest 的 `coverage_limitations` 記錄：取得缺漏的開站時點（R4、R5）預期集合為空，
+所以 `missed_while_source_gap` 在本輪沒有可觀測案例；唯一會產生漏報的 arm 三筆都是誤去重，
+所以 `missed_by_matching_rule` 與 `missed_without_recorded_reason` 同樣沒有可觀測案例。
+這些計數規則以單元測試驗證，實際覆蓋留待第一輪真實來源。
+
+## 標註與複核
 
 `annotations.json`：先讀原文與 before/after 差異標準答案，再寫預期集合，最後才執行重播。
-模型輸出不得自任 gold；未解決爭議另列。dev = R1–R3、holdout = R4–R9，同一事件版本與其
+模型輸出不得自任 gold；未解決爭議另列。複核由實作者本人做第二次，
+`review.review_type` 標為 `SELF_REVIEW_BY_IMPLEMENTER`、
+`independent_reviewer` 為 `null`、`independent_review` 為 `NOT_RUN` ——
+本輪沒有第三方複核，不能當成獨立標註。dev = R1–R3、holdout = R4–R9，同一事件版本與其
 轉載不跨組（以「被當成提示對象的更新 ID」檢查，兩組不相交）。
 
 ## 成本
@@ -113,10 +129,13 @@ arm 的 `policy_overrides` 寫在 manifest 裡，CLI 直接讀它執行；
 
 ## 原文可查
 
-每個開站時點的 receipt 都帶 `public_original_by_update_id`：它由「該來源最新一次完整
-擷取是否仍列出這份文件」算出，不是寫死的 true。R9 取消條件後，被提示的更新原文仍在
-清單上（`public_original_available: true`）；測試把該文件從清單移除後，同一個指標變 false，
-證明它是算出來的。
+每個開站時點的 receipt 都帶 `public_original_by_update_id`，是三態而不是布靈：
+`AVAILABLE`（該來源最新一次完整擷取仍列出這份文件）、`REMOVED`（已不再列出）、
+`UNKNOWN`（該來源最新一次擷取不完整，現況無法確認）。
+來源失聯是未知，不是「原文被下架」；`public_original_uncertain_source_ids` 會列出這些來源。
+R9 取消條件後，被提示的更新原文仍是 `AVAILABLE`；
+測試把該文件從清單移除後變 `REMOVED`，把來源設為不完整後變 `UNKNOWN`，
+證明這三態是算出來的而不是寫死的。
 
 ## 本輪未執行（NOT_RUN）
 

@@ -251,12 +251,14 @@ def reopen_diagnostics(case: dict[str, Any], prediction: dict[str, Any]) -> dict
     counters["missed_by_matching_rule"] = 0
     counters["missed_without_recorded_reason"] = 0
     for update_id in false_positives:
-        if decisions.get(update_id) == REPORTED_ALREADY_READ:
-            counters["already_read_repeat"] += 1
-            continue
         substance = substances.get(update_id)
         if substance in SUBSTANCE_FALSE_ALERT:
+            # What the update *is* is the deeper defect: a prompt that re-alerts a
+            # layout-only republication must not be filed as a read-state repeat.
             counters[SUBSTANCE_FALSE_ALERT[substance]] += 1
+            continue
+        if decisions.get(update_id) == REPORTED_ALREADY_READ:
+            counters["already_read_repeat"] += 1
             continue
         if cancelled_conditions.get(update_id):
             counters["post_cancel_prompt"] += 1
@@ -284,9 +286,12 @@ def reopen_diagnostics(case: dict[str, Any], prediction: dict[str, Any]) -> dict
         "expected_id_count": len(expected_ids),
         "predicted_id_count": len(predicted_ids),
         "multi_condition_prompt_count": len(set(multi) & predicted_ids),
+        # Compare the declared set against gold, not gold-intersected-with-the-
+        # prediction: intersecting both sides would score a prediction that prompts
+        # nothing as a perfect multi-condition match.
         "multi_condition_correct": int(
-            sorted(set(multi) & predicted_ids)
-            == sorted(set(expected.get("multi_condition_update_ids", [])) & predicted_ids)
+            sorted(set(multi)) == sorted(set(expected.get("multi_condition_update_ids", [])))
+            and set(multi) <= predicted_ids
         ),
         "multi_condition_total": 1 if "multi_condition_update_ids" in expected else 0,
         "source_gap_kinds": sorted(set(gap_kinds)),
@@ -355,6 +360,40 @@ def aggregate_reopen(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "multi_condition_accuracy": safe_ratio(multi_correct, multi_total),
         "condition_status_accuracy": safe_ratio(condition_correct, condition_total),
     }
+
+
+def target_assessment(manifest: dict[str, Any], metrics: dict[str, Any]) -> list[dict[str, Any]]:
+    """Score the declared targets against the measured run, or record why not.
+
+    A target whose comparison arm was never run is ``NOT_RUN``, never ``met`` and
+    never ``unmet``: an unexecuted comparison cannot fail.
+    """
+
+    targets = manifest.get("targets")
+    if not isinstance(targets, dict):
+        return []
+    rows: list[dict[str, Any]] = []
+    for name, target in sorted(targets.items()):
+        row: dict[str, Any] = {"target": name, "target_value": target}
+        if name == "precision":
+            measured = metrics.get("precision")
+            row["measured"] = measured
+            row["status"] = "NOT_MEASURED" if measured is None else (
+                "MET" if measured >= target else "UNMET"
+            )
+        elif name == "recall":
+            measured = metrics.get("recall")
+            row["measured"] = measured
+            row["status"] = "NOT_MEASURED" if measured is None else (
+                "MET" if measured >= target else "UNMET"
+            )
+        else:
+            # Timing and correctness need arm A, which this round did not run.
+            row["measured"] = None
+            row["status"] = "NOT_RUN"
+            row["reason"] = "comparison arm A_v1 was not executed in this round"
+        rows.append(row)
+    return rows
 
 
 def not_run_arms(manifest: dict[str, Any]) -> list[dict[str, Any]]:
@@ -470,6 +509,7 @@ def evaluate(manifest: dict[str, Any], cases: list[dict[str, Any]], predictions:
         "reopen_unread": aggregate_reopen(reopen_rows),
         "reopen_unread_rows": reopen_rows,
         "targets": manifest.get("targets"),
+        "target_assessment": target_assessment(manifest, aggregate_reopen(reopen_rows)),
         "not_run": not_run_arms(manifest),
     }
 

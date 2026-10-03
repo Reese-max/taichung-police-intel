@@ -244,6 +244,8 @@ def self_check() -> int:
     if wider_receipt["cost_scope"]["model_requests"] != 0:
         raise SystemExit("SELF_CHECK_FAIL model requests must not scale with condition count")
 
+    for row in baseline["report"]["target_assessment"]:
+        print(f"  target={row['target']} status={row['status']} measured={row['measured']}")
     print(
         "COMMUTE_REOPEN_SELF_CHECK_OK "
         f"scenario={receipt['scenario_id']} data_hash={receipt['data_hash'][:12]} "
