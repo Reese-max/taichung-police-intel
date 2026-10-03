@@ -3,6 +3,7 @@
   "arms": {
     "A_v1": {
       "human_participants": "NOT_RUN",
+      "human_timing_status": "NOT_RUN",
       "median_total_task_seconds": null,
       "method_id": "A_v1_manual_same_sources_same_cutoff",
       "note": "第一輪受試者尚未執行；沒有真人資料就沒有可比較結果。",
@@ -10,6 +11,7 @@
       "status": "NOT_RUN"
     },
     "B_v6": {
+      "human_timing_status": "NOT_RUN",
       "method_id": "B_v6_same_scope_search_generic_summary",
       "note": "同範圍搜尋＋一般摘要，資料截止與指定回查時點一致。與 v1 模板的 B（same_new_workflow_without_semantic_AI）不是同一組。",
       "policy_overrides": {
@@ -19,9 +21,10 @@
         "track_read_state": false
       },
       "results": null,
-      "status": "NOT_RUN"
+      "status": "REPLAYED"
     },
     "C_RULES_ONLY": {
+      "human_timing_status": "NOT_RUN",
       "method_id": "C_RULES_ONLY_v6_rules_only_no_semantic",
       "note": "保留 C 的介面、資料與站內提示規則，只關閉語意處理；不得與 B_v6 混為同組。",
       "policy_overrides": {
@@ -31,6 +34,7 @@
       "status": "REPLAYED"
     },
     "C_v6": {
+      "human_timing_status": "NOT_RUN",
       "method_id": "C_v6_full_query_and_tracking",
       "note": "完整 v6 查詢與追蹤。離線重播不呼叫任何模型。",
       "policy_overrides": {},
@@ -72,9 +76,10 @@
     "STALE_TRACKED_END"
   ],
   "planned_scale": {
-    "actual_events": 3,
+    "actual_definition": "actual_events = 不含鏡像轉載的官方文件數（document_id 去重）；actual_source_documents = scenario 出現的來源 ID 數。",
+    "actual_events": 5,
     "actual_reopen_points": 9,
-    "actual_source_documents": 3,
+    "actual_source_documents": 2,
     "missing_samples_reason": "第一輪規模（20 事件／60 原始文件）尚未執行；只交付合成情境與明確分母，不為湊數納入重複或歷史資料。",
     "planned_events": 20,
     "planned_source_documents": 60

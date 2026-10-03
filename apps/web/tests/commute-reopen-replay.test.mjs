@@ -34,10 +34,14 @@ test("commute reopen replay single command reproduces the gold expected sets", (
   const result = runPython(["-X", "utf8", "scripts/replay-commute-reopen.py", "--self-check"]);
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   assert.match(result.stdout, /COMMUTE_REOPEN_SELF_CHECK_OK/);
-  // The full arm must be exact; every other arm is a live, worse measurement.
+  // The full arm must be exact; every other arm is a live, worse measurement, and
+  // each false-alert counter must be reachable from real replay output.
   assert.match(result.stdout, /tp=5 fp=0 fn=0/);
   assert.match(result.stdout, /arm=C_RULES_ONLY .*fp=2/);
+  assert.match(result.stdout, /arm=B_v6 .*fp=17/);
   assert.match(result.stdout, /arm=PROBE_ONE_ALERT_PER_DOCUMENT .*fn=3/);
+  assert.match(result.stdout, /arm=PROBE_PROMPT_AFTER_CANCEL .*fp=1/);
+  assert.match(result.stdout, /arm=PROBE_CANCEL_MOVED_LATER .*fp=1/);
   assert.match(result.stdout, /model_requests=0/);
 });
 

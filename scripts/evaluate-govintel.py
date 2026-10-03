@@ -15,13 +15,29 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST = ROOT / "eval/gold/v1/manifest.json"
-DEFAULT_SCENARIO = ROOT / "eval/gold/v6/commute-reopen-v1/session.json"
 
-# Disposition reasons a station prompt can be wrong for. Each is counted on its
-# own so one number never hides another (issue #108 acceptance).
-FALSE_ALERT_REASONS = ("ALREADY_READ", "FORMAT_ONLY", "REPOST_MIRROR", "POST_CANCEL")
-DEDUPE_REASONS = ("FORMAT_ONLY", "REPOST_MIRROR", "DUPLICATE_FETCH")
+# Reopen defects, each counted on its own so one number never hides another
+# (issue #108 acceptance). A prompted update is attributed by what it *is*, not
+# only by the decision the station recorded: a policy that promotes a layout-only
+# republication still labels the prompt PROMPTED.
+FALSE_ALERT_REASONS = (
+    "already_read_repeat",
+    "layout_only_false_alert",
+    "repost_false_alert",
+    "duplicate_fetch_false_alert",
+    "post_cancel_prompt",
+)
+SUBSTANCE_FALSE_ALERT = {
+    "LAYOUT_ONLY": "layout_only_false_alert",
+    "MIRROR_REPOST": "repost_false_alert",
+    "REPEAT_FETCH": "duplicate_fetch_false_alert",
+}
+# Reasons that mean the update was suppressed as a duplicate of something already
+# known. Missing an expected update for one of these is a wrongly deduped
+# substantive correction, not a coverage gap.
+DEDUPE_DECISIONS = ("FORMAT_ONLY", "REPOST_MIRROR", "DUPLICATE_FETCH")
 GAP_REASONS = ("CONNECTION_FAILURE", "PARTIAL_COVERAGE", "SOURCE_ITEM_MISSING")
+REPORTED_ALREADY_READ = "ALREADY_READ"
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -206,6 +222,25 @@ def reopen_diagnostics(case: dict[str, Any], prediction: dict[str, Any]) -> dict
         multi = []
     if not isinstance(multi, list) or any(not isinstance(item, str) for item in multi):
         raise ValueError(f"prediction {case['case_id']} multi_condition_update_ids must be string array")
+    substances = prediction.get("substance_by_update_id")
+    if substances is None:
+        substances = {}
+    if not isinstance(substances, dict) or any(
+        not isinstance(key, str) or not isinstance(value, str) for key, value in substances.items()
+    ):
+        raise ValueError(f"prediction {case['case_id']} substance_by_update_id must be string map")
+    cancelled_conditions = prediction.get("cancelled_condition_by_update_id")
+    if cancelled_conditions is None:
+        cancelled_conditions = {}
+    if not isinstance(cancelled_conditions, dict) or any(
+        not isinstance(key, str)
+        or not isinstance(value, list)
+        or any(not isinstance(item, str) for item in value)
+        for key, value in cancelled_conditions.items()
+    ):
+        raise ValueError(
+            f"prediction {case['case_id']} cancelled_condition_by_update_id must be string list map"
+        )
 
     false_positives = predicted_ids - expected_ids
     false_negatives = expected_ids - predicted_ids
@@ -213,16 +248,32 @@ def reopen_diagnostics(case: dict[str, Any], prediction: dict[str, Any]) -> dict
     counters["other_false_alert"] = 0
     counters["distinct_correction_wrongly_deduped"] = 0
     counters["missed_while_source_gap"] = 0
+    counters["missed_by_matching_rule"] = 0
     counters["missed_without_recorded_reason"] = 0
     for update_id in false_positives:
-        reason = decisions.get(update_id, "UNRECORDED")
-        counters[reason if reason in counters else "other_false_alert"] += 1
+        if decisions.get(update_id) == REPORTED_ALREADY_READ:
+            counters["already_read_repeat"] += 1
+            continue
+        substance = substances.get(update_id)
+        if substance in SUBSTANCE_FALSE_ALERT:
+            counters[SUBSTANCE_FALSE_ALERT[substance]] += 1
+            continue
+        if cancelled_conditions.get(update_id):
+            counters["post_cancel_prompt"] += 1
+            continue
+        counters["other_false_alert"] += 1
     for update_id in false_negatives:
         reason = decisions.get(update_id)
-        if reason in DEDUPE_REASONS:
+        if reason in DEDUPE_DECISIONS:
             counters["distinct_correction_wrongly_deduped"] += 1
-        elif set(gap_kinds) & set(GAP_REASONS):
+        elif set(expected.get("gap_kinds", [])) & set(GAP_REASONS):
+            # The gold gap list is the standard answer for what the station should
+            # have known, so a miss during a real acquisition gap is coverage, not
+            # a matching defect. Reading the prediction here would let an
+            # under-reporting harness excuse its own misses.
             counters["missed_while_source_gap"] += 1
+        elif reason:
+            counters["missed_by_matching_rule"] += 1
         else:
             counters["missed_without_recorded_reason"] += 1
     return {
@@ -233,7 +284,13 @@ def reopen_diagnostics(case: dict[str, Any], prediction: dict[str, Any]) -> dict
         "expected_id_count": len(expected_ids),
         "predicted_id_count": len(predicted_ids),
         "multi_condition_prompt_count": len(set(multi) & predicted_ids),
+        "multi_condition_correct": int(
+            sorted(set(multi) & predicted_ids)
+            == sorted(set(expected.get("multi_condition_update_ids", [])) & predicted_ids)
+        ),
+        "multi_condition_total": 1 if "multi_condition_update_ids" in expected else 0,
         "source_gap_kinds": sorted(set(gap_kinds)),
+        "gold_gap_kinds": sorted(set(expected.get("gap_kinds", []))),
         "observation_status_correct": int(prediction.get("observation_status") == expected["observation_status"]),
         "observation_status_total": 1,
         "gap_kind_correct": int(set(gap_kinds) == set(expected.get("gap_kinds", []))),
@@ -251,6 +308,7 @@ def aggregate_reopen(rows: list[dict[str, Any]]) -> dict[str, Any]:
     counters: dict[str, int] = {}
     observation_total = observation_correct = 0
     gap_total = gap_correct = 0
+    multi_total = multi_correct = 0
     condition_total = condition_correct = 0
     multi_pairs = 0
     source_gap_reopen_points = 0
@@ -264,6 +322,8 @@ def aggregate_reopen(rows: list[dict[str, Any]]) -> dict[str, Any]:
         observation_correct += row["observation_status_correct"]
         gap_total += row["gap_kind_total"]
         gap_correct += row["gap_kind_correct"]
+        multi_total += row["multi_condition_total"]
+        multi_correct += row["multi_condition_correct"]
         condition_total += row["condition_status_total"]
         condition_correct += row["condition_status_correct"]
         if set(row["source_gap_kinds"]) & set(GAP_REASONS):
@@ -292,25 +352,43 @@ def aggregate_reopen(rows: list[dict[str, Any]]) -> dict[str, Any]:
         },
         "observation_status_accuracy": safe_ratio(observation_correct, observation_total),
         "gap_kind_accuracy": safe_ratio(gap_correct, gap_total),
+        "multi_condition_accuracy": safe_ratio(multi_correct, multi_total),
         "condition_status_accuracy": safe_ratio(condition_correct, condition_total),
     }
 
 
 def not_run_arms(manifest: dict[str, Any]) -> list[dict[str, Any]]:
+    """List everything an arm did not measure, with the scope of each gap.
+
+    A replayed arm still has no human timing, so one status field cannot describe
+    both. Every entry names the scope it is about.
+    """
+
     arms = manifest.get("arms")
     if not isinstance(arms, dict):
         return []
     pending = []
     for arm_id, arm in sorted(arms.items()):
-        if not isinstance(arm, dict) or arm.get("status") != "NOT_RUN":
+        if not isinstance(arm, dict):
             continue
-        pending.append(
-            {
-                "arm": arm_id,
-                "method_id": arm.get("method_id"),
-                "status": "NOT_RUN",
-            }
-        )
+        if arm.get("status") == "NOT_RUN":
+            pending.append(
+                {
+                    "arm": arm_id,
+                    "method_id": arm.get("method_id"),
+                    "scope": "arm",
+                    "status": "NOT_RUN",
+                }
+            )
+        if arm.get("human_timing_status") == "NOT_RUN":
+            pending.append(
+                {
+                    "arm": arm_id,
+                    "method_id": arm.get("method_id"),
+                    "scope": "human_timing",
+                    "status": "NOT_RUN",
+                }
+            )
     return pending
 
 
@@ -357,7 +435,12 @@ def evaluate(manifest: dict[str, Any], cases: list[dict[str, Any]], predictions:
             claim_correct += int(support_status == expected["support_status"])
         elif task == "reopen_unread":
             reopen_rows.append(reopen_diagnostics(case, prediction))
-        if prediction == expected:
+        if task == "reopen_unread":
+            # A reopen prediction legitimately carries per-update diagnostics the
+            # gold never enumerates, so compare the fields the gold declares.
+            if all(prediction.get(key) == value for key, value in expected.items()):
+                exact_case_matches += 1
+        elif prediction == expected:
             exact_case_matches += 1
 
     evaluated = len(cases) - len(missing)

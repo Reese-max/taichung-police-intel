@@ -31,7 +31,7 @@ code/data/policy/parser/model/prompt 版本、資料 hash、重播時鐘與 publ
 | R2 | 10/06 17:20 | — | NO_NEW_ITEMS | 同源轉載、重複取回、純排版版本都不提示 |
 | R3 | 10/08 08:50 | UPD-005 | NEW_UPDATES | v2 只改結束日；追蹤結束日同步往後移，條件不解除 |
 | R4 | 10/08 18:10 | — | SOURCE_GAP | S-001 連線失敗 |
-| R5 | 10/09 09:10 | — | SOURCE_GAP | S-031 PARTIAL＋資料消失 |
+| R5 | 10/09 09:20 | — | SOURCE_GAP | S-031 PARTIAL；S-001 恢復後的完整擷取缺少已取得的延期公告 |
 | R6 | 10/09 17:10 | — | STALE_TRACKED_END | 預定日期已到但沒有明文解除 |
 | R7 | 10/09 17:40 | UPD-006 | NEW_UPDATES | v3 明文解除（只解除道路條件） |
 | R8 | 10/09 18:00 | UPD-007 | NEW_UPDATES | 另一工程仍可見 |
@@ -43,12 +43,16 @@ code/data/policy/parser/model/prompt 版本、資料 hash、重播時鐘與 publ
 
 ## 公平比較：分開的方法組
 
-| arm | method ID | 狀態 | 本輪結果 |
-| --- | --- | --- | --- |
-| A | `A_v1_manual_same_sources_same_cutoff` | NOT_RUN | 未執行真人對照 |
-| B | `B_v6_same_scope_search_generic_summary` | REPLAYED（無讀取追蹤） | precision 0.227（17 次已讀重複提示） |
-| C | `C_v6_full_query_and_tracking` | REPLAYED | precision 1.0、recall 1.0（tp 5／fp 0／fn 0） |
-| C_RULES_ONLY | `C_RULES_ONLY_v6_rules_only_no_semantic` | REPLAYED | precision 0.714（2 次誤報） |
+| arm | method ID | 重播 | 人工時間 | 本輪結果 |
+| --- | --- | --- | --- | --- |
+| A_v1 | `A_v1_manual_same_sources_same_cutoff` | NOT_RUN | NOT_RUN | 未執行真人對照 |
+| B_v6 | `B_v6_same_scope_search_generic_summary` | REPLAYED | NOT_RUN | precision 0.227（17 次已讀重複提示） |
+| C_v6 | `C_v6_full_query_and_tracking` | REPLAYED | NOT_RUN | precision 1.0、recall 1.0（tp 5／fp 0／fn 0） |
+| C_RULES_ONLY | `C_RULES_ONLY_v6_rules_only_no_semantic` | REPLAYED | NOT_RUN | precision 0.714（2 次誤報：範圍外、日期無法驗證） |
+
+arm 的 `policy_overrides` 寫在 manifest 裡，CLI 直接讀它執行；
+所以「公開的方法定義」與「實際量測的設定」不會各自漂移。
+`A_v1` 完全未執行，`B_v6` 只完成離線重播，兩者的人工時間都沒有測過。
 
 `B_v6`（同範圍搜尋＋一般摘要）與 v1 模板的 `B`（`same_new_workflow_without_semantic_AI`）
 **不是同一組**。v1 的定義與歷史結果在
@@ -62,9 +66,15 @@ code/data/policy/parser/model/prompt 版本、資料 hash、重播時鐘與 publ
   receipt 的 `counters.prompted_condition_pairs`（8）與 `multi_condition_hit`（3）
   並列顯示，`tp` 仍是 5。
 - 失敗模式分開計數，不混成一個總數：
-  `ALREADY_READ`／`FORMAT_ONLY`／`REPOST_MIRROR`／`POST_CANCEL`／`other_false_alert`，
+  `already_read_repeat`／`layout_only_false_alert`／`repost_false_alert`／
+  `duplicate_fetch_false_alert`／`post_cancel_prompt`／`other_false_alert`，
   漏報另分 `distinct_correction_wrongly_deduped`／`missed_while_source_gap`／
-  `missed_without_recorded_reason`。
+  `missed_by_matching_rule`／`missed_without_recorded_reason`。
+  歸因用的是「這筆更新本身是什麼」（排版／轉載／重複取回／已取消條件）加上
+  station 記錄的決定，而不是單看 decision 標籤；否則一個把純排版當成實質更新的
+  錯誤政策只會記成 `PROMPTED`，所有排版、轉載與重複取回的缺陷都會被塞進同一格。
+- 「來源缺口期間漏掉」以 gold 的 `gap_kinds` 判定，不看預測端自己回報的缺口，
+  否則一個少報缺口的 harness 可以替自己的漏報開脫。
 - 來源取得缺漏（`source_acquisition_gap`）另列，不併入精確率／召回率分子分母。
 - 零分母為 `null`；缺口 reopen 的預期集合是空集合，因此取得缺漏不會變成漏報。
 - 目標值（P≥85%、R≥90%、相對 A 中位總時間降低≥30%）寫在 manifest 的 `targets`，
@@ -82,6 +92,7 @@ code/data/policy/parser/model/prompt 版本、資料 hash、重播時鐘與 publ
 | `PROBE_FORMATTING_AS_SUBSTANTIVE` | 純排版視為實質 | 1 次排版誤報 |
 | `PROBE_DEDUPE_OFF` | 關閉重複取回去重 | 1 次重複取回誤報 |
 | `PROBE_ONE_ALERT_PER_DOCUMENT` | 每份官方文件只提示一次 | 3 次實質更正被誤去重（recall 0.4） |
+| `PROBE_PROMPT_AFTER_CANCEL` | 忽略使用者的取消 | R9 提示已取消條件的更新，記為 `post_cancel_prompt` |
 | `PROBE_AUTO_LIFT_ON_TRACKED_END` | 到期自動解除 | R6 狀態被誤報，缺口被隱藏 |
 | `PROBE_CANCEL_MOVED_LATER` | 把取消時間往後移 | R9 多提示一次，證明取消判斷讀取現況 |
 
@@ -95,8 +106,17 @@ code/data/policy/parser/model/prompt 版本、資料 hash、重播時鐘與 publ
 
 `cost-ledger.json` 分列每次完成查詢、每個有效更新、每個追蹤條件，以及模型請求與人工工時。
 本輪為離線重播：`model_request = 0` 且狀態是 `NOT_APPLICABLE_NO_MODEL_CALL`，不是「零成本」宣稱；
-`human_hour` 一律 `NOT_RUN`。自檢另外把條件數從 2 增加到 5、有效更新增加到 8，
-`model_requests` 仍是 0 —— 共同公告不會因使用者或條件數逐份重跑模型。
+`human_hour` 一律 `NOT_RUN`。`effective_update = 8` 指的是實質更新筆數，
+不是提示次數（5），兩者都可在 receipt 的 `cost_scope` 與 `counters` 對照。
+自檢另外把追蹤條件從 2 條增加到 5 條，`model_requests` 仍是 0
+—— 共同公告不會因使用者或條件數逐份重跑模型。
+
+## 原文可查
+
+每個開站時點的 receipt 都帶 `public_original_by_update_id`：它由「該來源最新一次完整
+擷取是否仍列出這份文件」算出，不是寫死的 true。R9 取消條件後，被提示的更新原文仍在
+清單上（`public_original_available: true`）；測試把該文件從清單移除後，同一個指標變 false，
+證明它是算出來的。
 
 ## 本輪未執行（NOT_RUN）
 

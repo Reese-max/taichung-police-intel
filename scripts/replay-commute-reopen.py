@@ -36,16 +36,29 @@ _spec.loader.exec_module(ev)
 from intel_v2 import commute_replay as replay_module  # noqa: E402
 
 DEFAULT_MANIFEST = ROOT / "eval/gold/v6/commute-reopen-v1/manifest.json"
-DEFAULT_CASES = ROOT / "eval/gold/v6/commute-reopen-v1/cases.jsonl"
+DEFAULT_SCENARIO = ROOT / "eval/gold/v6/commute-reopen-v1/session.json"
 
-# One entry per comparison arm. Each is a real decision of the current
-# implementation, not a stored answer: `--self-check` proves every arm differs
-# from the full v6 arm, so the acceptance cannot pass on frozen fixtures.
-ARMS: dict[str, dict[str, Any]] = {
-    "C_v6": {},
-    "C_RULES_ONLY": {"semantic_matching": False},
-    "B_v6": {"track_read_state": False},
-}
+def load_arms(manifest: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Read each comparison arm's policy from the published manifest.
+
+    The arm definition is data, not code: whatever the manifest declares is what
+    ``--arm`` runs, so a published method ID can never drift from the measurement.
+    """
+
+    arms = manifest.get("arms")
+    if not isinstance(arms, dict) or not arms:
+        raise SystemExit("v6 gold manifest declares no arms")
+    resolved: dict[str, dict[str, Any]] = {}
+    for arm_id, arm in sorted(arms.items()):
+        if not isinstance(arm, dict):
+            raise SystemExit(f"arm {arm_id} must be an object")
+        overrides = arm.get("policy_overrides", {})
+        if not isinstance(overrides, dict):
+            raise SystemExit(f"arm {arm_id} policy_overrides must be an object")
+        # Fail closed on a policy the current implementation cannot express.
+        replay_module.policy_from_mapping(overrides)
+        resolved[arm_id] = overrides
+    return resolved
 # Probes that must each break a different rule. They are not scored arms; they
 # exist so a review can see the matching and dedupe decisions are live. Each probe
 # declares the defect it must produce: a prompt defect adds a false alert, while a
@@ -66,6 +79,10 @@ PROBES: dict[str, dict[str, Any]] = {
     "PROBE_ONE_ALERT_PER_DOCUMENT": {
         "overrides": {"dedupe_scope": "document"},
         "must_break": "wrongly_deduped_update",
+    },
+    "PROBE_PROMPT_AFTER_CANCEL": {
+        "overrides": {"honour_condition_cancel": False},
+        "must_break": "false_alert",
     },
     "PROBE_AUTO_LIFT_ON_TRACKED_END": {
         "overrides": {"auto_lift_on_tracked_end": True},
@@ -108,6 +125,7 @@ def perfect(report: dict[str, Any]) -> bool:
         and metrics["recall"] == 1.0
         and metrics["observation_status_accuracy"] == 1.0
         and metrics["gap_kind_accuracy"] == 1.0
+        and metrics["multi_condition_accuracy"] == 1.0
         and metrics["condition_status_accuracy"] == 1.0
     )
 
@@ -125,15 +143,20 @@ def summarise(run: dict[str, Any]) -> dict[str, Any]:
         "multi_condition_prompt_count": metrics["multi_condition_prompt_count"],
         "observation_status_accuracy": metrics["observation_status_accuracy"],
         "gap_kind_accuracy": metrics["gap_kind_accuracy"],
+        "multi_condition_accuracy": metrics["multi_condition_accuracy"],
         "condition_status_accuracy": metrics["condition_status_accuracy"],
     }
 
 
 def self_check() -> int:
-    scenario = replay_module.load_scenario()
+    scenario = replay_module.load_scenario(DEFAULT_SCENARIO)
     manifest, cases = load_gold_cases()
+    arms = load_arms(manifest)
+    for required in ("C_v6", "C_RULES_ONLY", "B_v6"):
+        if required not in arms:
+            raise SystemExit(f"SELF_CHECK_FAIL manifest does not declare arm {required}")
 
-    baseline = run_arm("C_v6", ARMS["C_v6"], scenario, manifest, cases)
+    baseline = run_arm("C_v6", arms["C_v6"], scenario, manifest, cases)
     if not perfect(baseline["report"]):
         raise SystemExit(f"SELF_CHECK_FAIL full v6 arm does not reproduce gold: {summarise(baseline)}")
 
@@ -152,8 +175,10 @@ def self_check() -> int:
 
     lines = [summarise(baseline)]
 
-    for arm, overrides in ARMS.items():
+    for arm, overrides in arms.items():
         if arm == "C_v6":
+            continue
+        if manifest["arms"][arm].get("status") != "REPLAYED":
             continue
         run = run_arm(arm, overrides, scenario, manifest, cases)
         summary = summarise(run)
@@ -166,7 +191,7 @@ def self_check() -> int:
     for probe, spec in PROBES.items():
         run = run_arm(probe, spec["overrides"], scenario, manifest, cases)
         summary = summarise(run)
-        if run["receipt"] == baseline["receipt"]:
+        if run["receipt"]["reopen_points"] == baseline["receipt"]["reopen_points"]:
             raise SystemExit(f"SELF_CHECK_FAIL {probe} changed nothing")
         if spec["must_break"] == "false_alert" and summary["fp"] <= 0:
             raise SystemExit(f"SELF_CHECK_FAIL {probe} did not add a false alert")
@@ -189,6 +214,23 @@ def self_check() -> int:
     if later_run["receipt"]["reopen_points"][-1] == baseline["receipt"]["reopen_points"][-1]:
         raise SystemExit("SELF_CHECK_FAIL the cancel decision is not read from the live scenario")
     lines.append(summarise(later_run))
+
+    # Each false-alert counter must be reachable from real replay output, not only
+    # from a hand-built prediction row.
+    expected_false_alerts = {
+        "PROBE_FORMATTING_AS_SUBSTANTIVE": "layout_only_false_alert",
+        "PROBE_MIRROR_AS_EVIDENCE": "repost_false_alert",
+        "PROBE_DEDUPE_OFF": "duplicate_fetch_false_alert",
+        "PROBE_PROMPT_AFTER_CANCEL": "post_cancel_prompt",
+    }
+    for probe, counter in expected_false_alerts.items():
+        metrics = run_arm(probe, PROBES[probe]["overrides"], scenario, manifest, cases)["report"][
+            "reopen_unread"
+        ]
+        if metrics["false_alert_breakdown"].get(counter, 0) <= 0:
+            raise SystemExit(f"SELF_CHECK_FAIL {probe} never reached the {counter} counter")
+        if metrics["false_alert_breakdown"]["other_false_alert"] != 0:
+            raise SystemExit(f"SELF_CHECK_FAIL {probe} still leaks into other_false_alert")
 
     wider = json.loads(json.dumps(scenario))
     for index in range(3, 6):
@@ -223,9 +265,9 @@ def self_check() -> int:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--scenario", type=Path, default=replay_module.SCENARIO_PATH)
+    parser.add_argument("--scenario", type=Path, default=DEFAULT_SCENARIO)
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
-    parser.add_argument("--arm", choices=sorted(ARMS), default="C_v6")
+    parser.add_argument("--arm")
     parser.add_argument("--predictions", type=Path)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--self-check", action="store_true")
@@ -240,7 +282,13 @@ def main() -> int:
     manifest_path = args.manifest if args.manifest.is_absolute() else ROOT / args.manifest
     scenario = replay_module.load_scenario(scenario_path)
     manifest, cases = load_gold_cases(manifest_path)
-    run = run_arm(args.arm, ARMS[args.arm], scenario, manifest, cases)
+    arms = load_arms(manifest)
+    arm = args.arm or "C_v6"
+    if arm not in arms:
+        raise SystemExit(f"unknown arm {arm}; the manifest declares {sorted(arms)}")
+    if manifest["arms"][arm].get("status") != "REPLAYED":
+        raise SystemExit(f"arm {arm} is {manifest['arms'][arm].get('status')}; nothing to replay")
+    run = run_arm(arm, arms[arm], scenario, manifest, cases)
     if args.predictions:
         target = args.predictions if args.predictions.is_absolute() else ROOT / args.predictions
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -256,7 +304,7 @@ def main() -> int:
             json.dumps(run, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
     else:
-        print(json.dumps({"arm": args.arm, "summary": summarise(run)}, ensure_ascii=False, indent=2, sort_keys=True))
+        print(json.dumps({"arm": arm, "summary": summarise(run)}, ensure_ascii=False, indent=2, sort_keys=True))
     return 0
 
 

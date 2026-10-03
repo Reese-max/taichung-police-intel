@@ -36,7 +36,8 @@ def gold_cases() -> tuple[dict, list[dict]]:
 def run_arm(arm: str, scenario=None, manifest=None, cases=None):
     scenario = scenario if scenario is not None else replay.load_scenario(DATA_DIR / "session.json")
     manifest, cases = gold_cases() if manifest is None else (manifest, cases)
-    return rc.run_arm(arm, rc.ARMS[arm], scenario, manifest, cases)
+    overrides = rc.load_arms(manifest)[arm]
+    return rc.run_arm(arm, overrides, scenario, manifest, cases)
 
 
 def scenario_copy() -> dict:
@@ -85,6 +86,31 @@ class ScenarioContractTests(unittest.TestCase):
         broken = scenario_copy()
         broken["synthetic"] = False
         with self.assertRaisesRegex(replay.ScenarioError, "synthetic"):
+            replay.validate_scenario(broken)
+
+    def test_unverifiable_interval_is_rejected_not_treated_as_irrelevant(self):
+        broken = scenario_copy()
+        broken["updates"][0]["payload"]["effective_to"] = "2026-10-04T17:00:00+08:00"
+        broken["updates"][0]["content_sha256"] = replay.normalized_payload_sha256(
+            broken["updates"][0]["payload"], replay.VOLATILE_FIELDS
+        )
+        with self.assertRaisesRegex(replay.ScenarioError, "effective_to precedes effective_from"):
+            replay.validate_scenario(broken)
+
+    def test_daily_band_that_can_never_intersect_is_rejected(self):
+        broken = scenario_copy()
+        broken["conditions"][0]["daily"] = {"start": "22:00", "end": "06:00"}
+        with self.assertRaisesRegex(replay.ScenarioError, "daily band must end after it starts"):
+            replay.validate_scenario(broken)
+        broken = scenario_copy()
+        broken["conditions"][0]["daily"] = {"start": "09:00", "end": "09:00"}
+        with self.assertRaisesRegex(replay.ScenarioError, "daily band must end after it starts"):
+            replay.validate_scenario(broken)
+
+    def test_malformed_clock_is_rejected_with_a_scenario_error(self):
+        broken = scenario_copy()
+        broken["conditions"][0]["daily"]["end"] = "17:00:00"
+        with self.assertRaisesRegex(replay.ScenarioError, "must be HH:MM"):
             replay.validate_scenario(broken)
 
     def test_documents_acquired_after_the_cutoff_are_never_replayed(self):
@@ -230,7 +256,10 @@ class ReplayBehaviourTests(unittest.TestCase):
     def test_source_failures_and_missing_documents_never_lift_the_condition(self):
         for reopen_id, kinds in (
             ("R4", {replay.GAP_CONNECTION_FAILURE}),
-            ("R5", {replay.GAP_CONNECTION_FAILURE, replay.GAP_PARTIAL_COVERAGE}),
+            (
+                "R5",
+                {replay.GAP_PARTIAL_COVERAGE, replay.GAP_SOURCE_ITEM_MISSING},
+            ),
             ("R6", {replay.GAP_SCHEDULED_END_PASSED}),
         ):
             point = self.points[reopen_id]
@@ -241,6 +270,82 @@ class ReplayBehaviourTests(unittest.TestCase):
         self.assertEqual(self.points["R4"]["observation_status"], replay.SOURCE_GAP)
         self.assertEqual(self.points["R5"]["observation_status"], replay.SOURCE_GAP)
         self.assertEqual(self.points["R6"]["observation_status"], replay.STALE_TRACKED_END)
+
+    def test_a_document_that_disappears_is_reported_as_a_missing_item(self):
+        missing = [
+            flag
+            for flag in self.points["R5"]["gap_flags"]
+            if flag["kind"] == replay.GAP_SOURCE_ITEM_MISSING
+        ]
+        self.assertTrue(missing, "R5 must exercise the missing-item branch")
+        self.assertEqual({flag["document_id"] for flag in missing}, {"DOC-ROAD-AB"})
+
+    def test_acquisition_gaps_are_counted_apart_from_the_stale_tracked_end(self):
+        counters = self.receipt["counters"]
+        acquisition = sum(
+            1
+            for point in self.receipt["reopen_points"]
+            for flag in point["gap_flags"]
+            if flag["kind"] in replay.ACQUISITION_GAP_KINDS
+        )
+        stale = sum(
+            1
+            for point in self.receipt["reopen_points"]
+            for flag in point["gap_flags"]
+            if flag["kind"] == replay.GAP_SCHEDULED_END_PASSED
+        )
+        self.assertEqual(counters["source_acquisition_gap"], acquisition)
+        self.assertEqual(counters["stale_tracked_end_observation"], stale)
+        self.assertEqual(acquisition, 3)
+        self.assertEqual(stale, 4)
+
+    def test_a_reopen_may_not_mark_a_later_update_read(self):
+        broken = scenario_copy()
+        for reopen in broken["reopen_points"]:
+            if reopen["reopen_id"] == "R6":
+                reopen["read_update_ids"] = ["UPD-008"]
+        with self.assertRaisesRegex(replay.ScenarioError, "not acquired at this reopen"):
+            replay.replay(broken)
+
+    def test_a_read_mark_on_an_already_acquired_update_is_honoured(self):
+        marked = scenario_copy()
+        for reopen in marked["reopen_points"]:
+            if reopen["reopen_id"] == "R1":
+                reopen["read_update_ids"] = []
+        receipt = replay.replay(marked)
+        points = {point["reopen_id"]: point for point in receipt["reopen_points"]}
+        self.assertEqual(points["R1"]["prompted_update_ids"], ["UPD-001"])
+        # Not read at R1, so R2 would prompt it again; this proves the mark is read.
+        self.assertEqual(points["R2"]["prompted_update_ids"], ["UPD-001"])
+
+    def test_public_original_availability_is_derived_not_asserted(self):
+        for point in self.receipt["reopen_points"]:
+            self.assertEqual(
+                point["public_original_available"],
+                all(point["public_original_by_update_id"][uid] for uid in point["prompted_update_ids"]),
+                point["reopen_id"],
+            )
+        # The official listing keeps every document the station prompted, including
+        # after the road condition was cancelled.
+        self.assertTrue(self.points["R9"]["public_original_available"])
+        vanished = scenario_copy()
+        for collection in vanished["collections"]:
+            if collection["slot_id"] == "SLOT-11":
+                collection["visible_update_ids"] = [
+                    uid
+                    for uid in collection["visible_update_ids"]
+                    if uid not in {"UPD-007", "UPD-008"}
+                ]
+        dropped = replay.replay(vanished)["reopen_points"][-1]
+        self.assertEqual(dropped["prompted_update_ids"], ["UPD-008"])
+        self.assertFalse(dropped["public_original_available"])
+        self.assertFalse(dropped["public_original_by_update_id"]["UPD-008"])
+
+    def test_original_availability_is_reported_per_update(self):
+        availability = self.points["R9"]["public_original_by_update_id"]
+        self.assertTrue(availability["UPD-008"])
+        self.assertTrue(availability["UPD-006"])
+        self.assertFalse(availability["UPD-002"])  # the mirror was never in the official listing
 
     def test_explicit_lift_is_road_scoped_and_a_new_project_still_matches(self):
         self.assertEqual(self.points["R7"]["prompted_update_ids"], ["UPD-006"])
@@ -297,14 +402,57 @@ class ScoreTests(unittest.TestCase):
         self.assertEqual(report["source_acquisition_gap"]["reopen_point_count"], 2)
         self.assertEqual(report["false_alert_breakdown"]["missed_while_source_gap"], 0)
 
-    def test_not_run_arms_are_reported_as_not_run_not_as_pass(self):
-        arms = {entry["arm"]: entry["status"] for entry in self.run["report"]["not_run"]}
-        self.assertEqual(arms, {"A_v1": "NOT_RUN", "B_v6": "NOT_RUN"})
-        method_ids = {entry["method_id"] for entry in self.run["report"]["not_run"]}
+    def test_not_run_scopes_are_reported_not_as_pass(self):
+        pending = self.run["report"]["not_run"]
+        scopes = {(entry["arm"], entry["scope"]) for entry in pending}
+        # A_v1 was never run at all; every replayed arm still has no human timing.
+        self.assertIn(("A_v1", "arm"), scopes)
+        for arm in ("A_v1", "B_v6", "C_v6", "C_RULES_ONLY"):
+            self.assertIn((arm, "human_timing"), scopes)
+        self.assertNotIn(("C_v6", "arm"), scopes)
+        self.assertEqual({entry["status"] for entry in pending}, {"NOT_RUN"})
         self.assertEqual(
-            method_ids,
-            {"A_v1_manual_same_sources_same_cutoff", "B_v6_same_scope_search_generic_summary"},
+            {entry["method_id"] for entry in pending if entry["arm"] == "A_v1"},
+            {"A_v1_manual_same_sources_same_cutoff"},
         )
+
+    def test_manifest_arm_definitions_are_what_the_cli_actually_runs(self):
+        manifest, _ = gold_cases()
+        arms = rc.load_arms(manifest)
+        self.assertEqual(
+            arms["C_RULES_ONLY"],
+            {"semantic_matching": False},
+        )
+        self.assertEqual(arms["B_v6"]["track_read_state"], False)
+        self.assertEqual(arms["C_v6"], {})
+        self.assertEqual(arms["A_v1"], {})
+        for arm, overrides in arms.items():
+            policy = replay.policy_from_mapping(overrides)
+            self.assertEqual(policy.to_dict(), run_arm(arm)["policy"])
+
+    def test_a_perfect_reopen_run_also_matches_the_gold_case_fields(self):
+        report = self.run["report"]
+        self.assertEqual(report["exact_case_match_count"], report["evaluated_cases"])
+        self.assertEqual(report["exact_case_match_rate"], 1.0)
+
+    def test_gold_declared_multi_condition_sets_are_scored(self):
+        report = self.run["report"]["reopen_unread"]
+        self.assertEqual(report["multi_condition_accuracy"], 1.0)
+        _, cases = gold_cases()
+        declared = {
+            case["case_id"]: case["expected"]["multi_condition_update_ids"] for case in cases
+        }
+        self.assertEqual(declared["R1"], ["UPD-001"])
+        self.assertEqual(declared["R8"], [])
+        rows = {row["case_id"]: row for row in self.run["report"]["reopen_unread_rows"]}
+        self.assertEqual(rows["R1"]["multi_condition_correct"], 1)
+        self.assertEqual(rows["R8"]["multi_condition_correct"], 1)
+        # The gold set, not the prediction, decides the comparison: a prediction that
+        # declares a multi-condition hit where the gold declares none is a miss.
+        case = next(case for case in cases if case["case_id"] == "R8")
+        prediction = dict(replay.prediction_rows(self.run["receipt"])[7]["prediction"])
+        prediction["multi_condition_update_ids"] = ["UPD-007"]
+        self.assertEqual(ev.reopen_diagnostics(case, prediction)["multi_condition_correct"], 0)
 
     def test_rules_only_ablation_is_scored_separately_and_is_worse(self):
         report = run_arm("C_RULES_ONLY")["report"]["reopen_unread"]
@@ -313,10 +461,22 @@ class ScoreTests(unittest.TestCase):
         self.assertLess(report["precision"], 1.0)
         self.assertEqual(report["fn"], 0)
 
+    def test_rules_only_false_alerts_are_time_reasoning_defects(self):
+        breakdown = run_arm("C_RULES_ONLY")["report"]["reopen_unread"]["false_alert_breakdown"]
+        self.assertGreater(breakdown["other_false_alert"], 0)
+        for counter in (
+            "already_read_repeat",
+            "layout_only_false_alert",
+            "repost_false_alert",
+            "duplicate_fetch_false_alert",
+            "post_cancel_prompt",
+        ):
+            self.assertEqual(breakdown[counter], 0, counter)
+
     def test_search_only_arm_repeats_already_read_updates(self):
         run = run_arm("B_v6")
         report = run["report"]["reopen_unread"]
-        self.assertEqual(report["false_alert_breakdown"]["ALREADY_READ"], 17)
+        self.assertEqual(report["false_alert_breakdown"]["already_read_repeat"], 17)
         self.assertEqual(report["false_alert_breakdown"]["other_false_alert"], 0)
         # Every repeat adds both a condition pair and a false alert, so the raw
         # pair count runs far ahead of the deduplicated true positive count.
@@ -328,7 +488,7 @@ class ScoreTests(unittest.TestCase):
         self.assertEqual(report["gap_kind_accuracy"], 1.0)
         rows = {row["case_id"]: row for row in self.run["report"]["reopen_unread_rows"]}
         self.assertEqual(rows["R4"]["source_gap_kinds"], ["CONNECTION_FAILURE"])
-        self.assertEqual(rows["R5"]["source_gap_kinds"], ["CONNECTION_FAILURE", "PARTIAL_COVERAGE"])
+        self.assertEqual(rows["R5"]["source_gap_kinds"], ["PARTIAL_COVERAGE", "SOURCE_ITEM_MISSING"])
         self.assertEqual(rows["R6"]["source_gap_kinds"], ["SCHEDULED_END_PASSED"])
 
     def test_zero_denominator_is_null_rather_than_a_perfect_score(self):
@@ -367,6 +527,11 @@ class LiveDecisionTests(unittest.TestCase):
         self.assertEqual(metrics["false_alert_breakdown"]["distinct_correction_wrongly_deduped"], 3)
         self.assertLess(metrics["recall"], 1.0)
 
+    def test_prompting_after_a_cancel_is_attributed_to_the_cancel(self):
+        metrics = self.assertDiffers(run_probe("PROBE_PROMPT_AFTER_CANCEL"))
+        self.assertEqual(metrics["false_alert_breakdown"]["post_cancel_prompt"], 1)
+        self.assertEqual(metrics["false_alert_breakdown"]["other_false_alert"], 0)
+
     def test_auto_lift_would_hide_the_stale_tracked_end(self):
         metrics = self.assertDiffers(run_probe("PROBE_AUTO_LIFT_ON_TRACKED_END"))
         self.assertLess(metrics["observation_status_accuracy"], 1.0)
@@ -401,7 +566,17 @@ class LiveDecisionTests(unittest.TestCase):
 class FalseAlertBreakdownTests(unittest.TestCase):
     """The per-mode counters must not hide one failure inside another."""
 
-    def build(self, expected_ids, predicted_ids, decisions, gap_kinds=(), status="NEW_UPDATES"):
+    def build(
+        self,
+        expected_ids,
+        predicted_ids,
+        decisions,
+        gap_kinds=(),
+        gold_gap_kinds=(),
+        substances=None,
+        cancelled=None,
+        status="NEW_UPDATES",
+    ):
         case = {
             "case_id": "RC-1",
             "task": "reopen_unread",
@@ -410,8 +585,9 @@ class FalseAlertBreakdownTests(unittest.TestCase):
             "expected": {
                 "update_ids": list(expected_ids),
                 "observation_status": "NEW_UPDATES",
-                "gap_kinds": [],
+                "gap_kinds": sorted(gold_gap_kinds),
                 "condition_status": {},
+                "multi_condition_update_ids": [],
             },
         }
         prediction = {
@@ -420,6 +596,8 @@ class FalseAlertBreakdownTests(unittest.TestCase):
             "gap_kinds": sorted(gap_kinds),
             "condition_status": {},
             "decision_by_update_id": decisions,
+            "substance_by_update_id": substances or {},
+            "cancelled_condition_by_update_id": cancelled or {},
             "multi_condition_update_ids": [],
         }
         return case, prediction
@@ -427,38 +605,66 @@ class FalseAlertBreakdownTests(unittest.TestCase):
     def test_each_false_alert_mode_gets_its_own_counter(self):
         case, prediction = self.build(
             expected_ids=["U1", "U2"],
-            predicted_ids=["U1", "R1", "R2", "R3", "R4"],
+            predicted_ids=["U1", "R1", "R2", "R3", "R4", "R5"],
             decisions={
                 "U2": "DUPLICATE_FETCH",
                 "R1": "ALREADY_READ",
-                "R2": "FORMAT_ONLY",
-                "R3": "REPOST_MIRROR",
-                "R4": "POST_CANCEL",
+                "R2": "PROMPTED",
+                "R3": "PROMPTED",
+                "R4": "PROMPTED",
+                "R5": "PROMPTED",
             },
+            substances={
+                "R1": "NEW_REVISION",
+                "R2": "LAYOUT_ONLY",
+                "R3": "MIRROR_REPOST",
+                "R4": "REPEAT_FETCH",
+                "R5": "NEW_REVISION",
+            },
+            cancelled={"R5": ["C-ROAD-AB"]},
         )
         diagnostics = ev.reopen_diagnostics(case, prediction)
         self.assertEqual(diagnostics["tp"], 1)
-        self.assertEqual(diagnostics["fp"], 4)
+        self.assertEqual(diagnostics["fp"], 5)
         self.assertEqual(diagnostics["fn"], 1)
         counters = diagnostics["counters"]
-        self.assertEqual(counters["ALREADY_READ"], 1)
-        self.assertEqual(counters["FORMAT_ONLY"], 1)
-        self.assertEqual(counters["REPOST_MIRROR"], 1)
-        self.assertEqual(counters["POST_CANCEL"], 1)
+        self.assertEqual(counters["already_read_repeat"], 1)
+        self.assertEqual(counters["layout_only_false_alert"], 1)
+        self.assertEqual(counters["repost_false_alert"], 1)
+        self.assertEqual(counters["duplicate_fetch_false_alert"], 1)
+        self.assertEqual(counters["post_cancel_prompt"], 1)
         self.assertEqual(counters["distinct_correction_wrongly_deduped"], 1)
         self.assertEqual(counters["other_false_alert"], 0)
 
-    def test_a_miss_during_a_source_gap_is_counted_as_a_gap_not_a_dedupe(self):
+    def test_a_miss_during_a_gold_source_gap_is_coverage_not_a_matching_defect(self):
+        # The harness under-reports its own gap, but the gold says a source was
+        # unreachable: the miss is coverage, not a matching defect.
         case, prediction = self.build(
             expected_ids=["U9"],
             predicted_ids=[],
             decisions={"U9": "NOT_YET_ACQUIRED"},
-            gap_kinds=["CONNECTION_FAILURE"],
+            gold_gap_kinds=["CONNECTION_FAILURE"],
         )
         diagnostics = ev.reopen_diagnostics(case, prediction)
         self.assertEqual(diagnostics["counters"]["missed_while_source_gap"], 1)
         self.assertEqual(diagnostics["counters"]["distinct_correction_wrongly_deduped"], 0)
-        self.assertEqual(diagnostics["counters"]["missed_without_recorded_reason"], 0)
+        self.assertEqual(diagnostics["counters"]["missed_by_matching_rule"], 0)
+
+    def test_a_miss_with_a_recorded_reason_is_not_reported_as_unrecorded(self):
+        case, prediction = self.build(
+            expected_ids=["U9", "U8"],
+            predicted_ids=[],
+            decisions={"U9": "OUTSIDE_TRACKED_WINDOW", "U8": "DATE_UNVERIFIED"},
+        )
+        counters = ev.reopen_diagnostics(case, prediction)["counters"]
+        self.assertEqual(counters["missed_by_matching_rule"], 2)
+        self.assertEqual(counters["missed_without_recorded_reason"], 0)
+        self.assertEqual(counters["distinct_correction_wrongly_deduped"], 0)
+
+    def test_a_miss_with_no_recorded_reason_is_still_flagged(self):
+        case, prediction = self.build(expected_ids=["U9"], predicted_ids=[], decisions={})
+        counters = ev.reopen_diagnostics(case, prediction)["counters"]
+        self.assertEqual(counters["missed_without_recorded_reason"], 1)
 
     def test_multi_condition_hits_never_raise_the_true_positive_count(self):
         case, prediction = self.build(expected_ids=["U1"], predicted_ids=["U1"], decisions={})
@@ -502,15 +708,43 @@ class CostLedgerTests(unittest.TestCase):
         )
         counts = {row["unit"]: row["count"] for row in self.ledger["records"] if row["arm"] == "C_v6"}
         self.assertEqual(counts["completed_query"], 9)
-        self.assertEqual(counts["effective_update"], 5)
         self.assertEqual(counts["tracked_condition"], 2)
+
+    def test_ledger_counts_agree_with_the_replay_receipt(self):
+        receipt = run_arm("C_v6")["receipt"]["cost_scope"]
+        counts = {
+            (row["unit"]): row["count"]
+            for row in self.ledger["records"]
+            if row["arm"] == "C_v6"
+        }
+        self.assertEqual(counts["completed_query"], receipt["queries_completed"])
+        self.assertEqual(counts["effective_update"], receipt["effective_updates"])
+        self.assertEqual(counts["tracked_condition"], receipt["tracked_conditions"])
+        self.assertEqual(counts["model_request"], receipt["model_requests"])
+        # The prompted count is a different number and must not be confused with it.
+        prompted = run_arm("C_v6")["receipt"]["counters"]["prompted_updates"]
+        self.assertNotEqual(counts["effective_update"], prompted)
 
     def test_planned_scale_is_declared_beside_the_actual_counts(self):
         planned = self.manifest["planned_scale"]
         self.assertEqual(planned["planned_events"], 20)
         self.assertEqual(planned["planned_source_documents"], 60)
         self.assertLess(planned["actual_events"], planned["planned_events"])
+        self.assertLess(planned["actual_source_documents"], planned["planned_source_documents"])
         self.assertTrue(planned["missing_samples_reason"])
+
+    def test_actual_scale_counts_are_derivable_from_the_scenario(self):
+        scenario = replay.load_scenario(DATA_DIR / "session.json")
+        planned = self.manifest["planned_scale"]
+        documents = {
+            update["document_id"] for update in scenario["updates"] if not update.get("upstream_update_id")
+        }
+        self.assertEqual(planned["actual_events"], len(documents))
+        self.assertEqual(
+            planned["actual_source_documents"], len({update["source_id"] for update in scenario["updates"]})
+        )
+        self.assertEqual(planned["actual_reopen_points"], len(scenario["reopen_points"]))
+        self.assertIn("document_id", planned["actual_definition"])
 
 
 class AnnotationTests(unittest.TestCase):
