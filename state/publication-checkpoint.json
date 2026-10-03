@@ -11,9 +11,22 @@
     "state/v2-shadow-state.json": "397c95893f206c43e1b64414b2039acb6627d1390228e3e74d91f212698bdffd"
   },
   "generation_id": "96a0648206bb38e5b761288c3b2e4e6058e03459753f80984cb6664d1951a904",
+  "http_verification": {
+    "attempt": 1,
+    "base_url": "https://reese-max.github.io/taichung-police-intel/",
+    "generation_id": "96a0648206bb38e5b761288c3b2e4e6058e03459753f80984cb6664d1951a904",
+    "verified_at": "2026-10-03T15:16:55.396231+00:00",
+    "verified_files": {
+      "apps/web/public/data/feed-export.csv": "ea7e9505e9d03664942448393602f34cc4758e25fa122258267a3565de1bfcf4",
+      "apps/web/public/data/intelligence-feed.json": "d9389a68d0e9d11296fb678aade9428ac2ec07aa3bfd0505adbfc7f3a1d0e947",
+      "apps/web/public/data/intelligence-summary.json": "65b1f374ded28efb56c22e6aa032486f26ef62c39ec407b8df2884ab7187a266",
+      "apps/web/public/data/source-status.json": "869b27731cf406dc1991fd3b51c618b729a21a80c780698b6397bb62ab070641",
+      "apps/web/public/data/v2-daily-brief.json": "898bd25d225494b46d620ac307deabd220e9f852f31fda40111ba11580bb8795"
+    }
+  },
   "producer_attempt": "1",
   "producer_run_id": "37130808917",
   "schema_version": 1,
   "slot": "evening",
-  "state": "PENDING_PUBLICATION"
+  "state": "PUBLISHED"
 }
