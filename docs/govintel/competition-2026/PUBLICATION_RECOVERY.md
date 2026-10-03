@@ -2,6 +2,15 @@
 
 基準：`e1d081bd04824c062c7ee99e7d74f9e478240743`。已知排程在資料 push 至受保護 main 被拒；不能為了展示關閉 PR／verify／分支保護。
 
+## 2026-10-03 production recheck（修正已合併並跑過真實排程）
+
+- 修正版 workflow 已在 `main@562141e396c693e115b3fce10594c434c401a58e`；`publication-state` checkpoint、跨 job `publication_outcome` finalizer、`if: always()` 證據保留皆在正式排程實際執行。
+- 晨／晚排程成功憑據（皆在現行 main）：EVENING `36744214186`（09-30，`PUBLIC_DATA_VERIFIED`）、`36896609394`（10-01）；MORNING `36801047512`（10-01）、`36952506907`（10-02）、`37085607707`（10-03）。
+- 真實失敗演練 `37033001280`（run 建立於 10-02T16:18Z，屬 `30 10 * * *` UTC cron 的 evening slot 延遲執行；實際蒐集於 10-03T00:18+08:00，故 run ID 為 `CR-DEMO-20261003-EVENING-SCHEDULE`）：build 成功、deploy 的公開位元組／hash 核對步驟失敗（`public_verify=failure`）；finalizer 以 `PUBLICATION_NOT_CONFIRMED` 回報實際失敗階段、保留成功上傳的證據 artifact 連結、明確警告不得當成零新事件或部署成功，run 結論為 failure。保留了 last-known-good：state 留在 `PENDING_PUBLICATION` checkpoint `e5114e63`。
+- 重試安全：下一輪排程 `37085607707`（建立於 10-03T01:18Z，`30 22 * * *` UTC cron 的 morning slot）還原 `pending_recovery=true`，原樣重放 pending bundle（未重抓、未推進 diff，故供應中的 `collection_run_id` 維持原批 `CR-DEMO-20261003-EVENING-SCHEDULE`），部署後核對公開位元組並於 `2026-10-03T01:39:24Z` 署名 `PUBLISHED`。
+- 匿名 HTTPS 核對（2026-10-03 執行）：`https://reese-max.github.io/taichung-police-intel/` 五個公開資料檔的 SHA-256 與已署名 checkpoint 的 `verified_files` 完全一致；feed 內 `collection_run_id=CR-DEMO-20261003-EVENING-SCHEDULE`、`generated_at=2026-10-03T00:18:54+08:00`，與重放批次相符。
+- 尚未在自然排程觀測到 Pages **artifact-upload** 本身失敗的一輪；該路徑目前由決定性測試覆蓋（PR #100）。
+
 ## 2026-09-22 external-state recheck
 
 - GitHub Pages is public and workflow-backed, but the latest scheduled run
@@ -29,7 +38,7 @@
   legacy files therefore do not prove that the candidate checkpoint workflow
   has run.
 
-## 本地候選已改，仍須合併／正式執行驗證
+## 本地候選已改，仍須合併／正式執行驗證（2026-09 合併前記錄；已合併，見 2026-10-03 recheck）
 
 1. `.github/workflows/pages.yml` 不再直接 push 受保護 `main`；V1/V2 durable state 改保存到專用 `publication-state` 分支，並以 restore baseline、pending checkpoint 與非快轉競態檢查保護未發布資料。
 2. build 的主要步驟有 outcome 輸出，留證步驟涵蓋 state persist、Pages artifact 與下游 deploy 失敗；artifact URL 只在上傳成功且有實際回執時顯示。
@@ -37,11 +46,11 @@
 4. 最終 `publication_outcome` 等待 build/deploy，指出各階段 success/failure/skipped/unknown；本地 full gate 在隔離 PostgreSQL service 下為 `VERIFY_OK required=102`。
 5. 前端以最舊的本輪核對時間與快照時間判斷逾期；16 小時是現行早晚更新的暫定 UI 年齡上限（12 小時間隔＋4 小時容忍），不是服務 SLA。背景統計的舊期別仍另外顯示，不混成抓取故障。
 
-## 正式環境仍未完成
+## 正式環境仍未完成（2026-09 合併前記錄，已被上方 2026-10-03 recheck 取代）
 
-**本地 protected-main 根因修正已完成，但尚未合併到 `main`，所以 #20 仍不能關閉。**遠端排程仍執行舊 workflow；人工取消、runner 損壞、連線中斷也可能讓 `always()` 無法取得產物，報告不得保證一定存在 artifact。正式關閉仍需有效 review／merge、晨晚自然 run、匿名公開 hash 驗證與 failure drill。
+**（保留為歷史記錄：修正當時尚未合併到 `main`。）**遠端排程仍執行舊 workflow；人工取消、runner 損壞、連線中斷也可能讓 `always()` 無法取得產物，報告不得保證一定存在 artifact。正式關閉仍需有效 review／merge、晨晚自然 run、匿名公開 hash 驗證與 failure drill。
 
-## 下一個必要外部決策
+## 下一個必要外部決策（2026-09 合併前記錄；修正已合併，晨晚 run 與匿名 hash receipt 已取得）
 
 核准並合併本地候選的受保護分支修正，沿用既有 review／verify 規則；不得 force push、添加廣泛 bypass 或另建任意自動合併權限。合併後再取得晨晚自然 run 與匿名公開版本／hash receipt。
 
