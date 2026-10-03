@@ -36,10 +36,13 @@ NON_OVERRIDABLE_EXPIRY_ACTIONS = {"REVIEW_REQUIRED"}
 RIGHTS_STATUSES = {"UNKNOWN", "PROJECT_CONTROLLED"}
 UNKNOWN_RIGHTS = "UNKNOWN"
 LAYER_PROJECTIONS = PUBLIC_PROJECTIONS | {NO_PUBLIC_PROJECTION}
-QUERY_INDEX_PROJECTION = "METADATA_LINK_ONLY"
+QUERY_INDEX_LAYER = "query_index"
 SENSITIVE_RECORD_FLAGS = ("contains_personal_data", "sensitive")
-GOVERNANCE_RECORD_FLAGS = (*SENSITIVE_RECORD_FLAGS, "source_available", "replay_required")
+GOVERNANCE_RECORD_FLAGS = (
+    *SENSITIVE_RECORD_FLAGS, "source_available", "replay_required", "aggregate_only",
+)
 DEFAULT_TRUE_RECORD_FLAGS = frozenset({"source_available"})
+REPLAY_REVIEW_WINDOW_PENDING = "REPLAY_REVIEW_WINDOW_PENDING"
 # Raw captured payloads are never publishable; the class allowlist drops them and the
 # projection reports them. Every other prohibited field is a governance marker that must
 # block the archive instead of being quietly projected away.
@@ -108,10 +111,12 @@ def _require_documented_values(section: Any, field: str) -> dict[str, str]:
 
 
 def _require_field_list(section: Any, field: str) -> list[str]:
-    if (not isinstance(section, list) or not section or
-            len(section) != len(set(section)) or
-            any(not isinstance(item, str) or not item.strip() for item in section)):
+    if not isinstance(section, list) or not section:
         raise ValueError(f"{field} must be a non-empty array of unique strings")
+    if any(not isinstance(item, str) or not item.strip() for item in section):
+        raise ValueError(f"{field} entries must be non-empty strings")
+    if len(section) != len(set(section)):
+        raise ValueError(f"{field} entries must be unique")
     return section
 
 
@@ -131,6 +136,8 @@ def _compile_layer_policies(layer_policies: Any) -> dict[str, Any]:
         if value["public_projection"] == NO_PUBLIC_PROJECTION and value["archive_eligibility"] != "NOT_ARCHIVABLE":
             raise ValueError(f"layer that publishes nothing must not be archivable: {layer}")
         compiled_layers[layer] = dict(value)
+    if compiled_layers[QUERY_INDEX_LAYER]["public_projection"] not in PUBLIC_PROJECTIONS:
+        raise ValueError("the query index layer must publish a public projection")
     return compiled_layers
 
 
@@ -173,11 +180,14 @@ def compile_policy(catalog: dict[str, Any] | None = None, policy: dict[str, Any]
     prohibited = policy.get("prohibited_public_fields")
     if not isinstance(classes, dict) or not isinstance(source_classes, dict) or not isinstance(retention_windows, dict) or not isinstance(prohibited, list):
         raise ValueError("retention policy sections are invalid")
-    catalog_ids = {row.get("source_id") for row in catalog["sources"] if isinstance(row, dict)}
+    if any(not isinstance(row, dict) for row in catalog["sources"]):
+        raise ValueError("every catalog source must be an object")
+    catalog_ids = {row.get("source_id") for row in catalog["sources"]}
     if None in catalog_ids or set(source_classes) != catalog_ids:
         raise ValueError("every catalog source must have exactly one retention class")
-    if len(prohibited) != len(set(prohibited)) or any(not isinstance(field, str) for field in prohibited):
-        raise ValueError("prohibited public fields must be unique strings")
+    _require_field_list(prohibited, "prohibited_public_fields")
+    if not CONTENT_PAYLOAD_FIELDS <= set(prohibited):
+        raise ValueError("every content payload field must be prohibited")
     for window_id, window in retention_windows.items():
         if not isinstance(window, dict) or set(window) != {"max_age_days", "expired_action"}:
             raise ValueError(f"retention window is invalid: {window_id}")
@@ -228,11 +238,8 @@ def compile_policy(catalog: dict[str, Any] | None = None, policy: dict[str, Any]
             raise ValueError(f"withdrawal projection must match withdrawal behavior: {class_id}")
         if type(value["sensitive_default"]) is not bool:
             raise ValueError(f"sensitive_default must be a boolean: {class_id}")
-        if (not isinstance(value["public_fields"], list) or
-                len(value["public_fields"]) != len(set(value["public_fields"])) or
-                any(not isinstance(field, str) for field in value["public_fields"])):
-            raise ValueError(f"public fields are invalid: {class_id}")
-        if set(value["public_fields"]) & set(prohibited):
+        public_fields = _require_field_list(value["public_fields"], f"public_fields:{class_id}")
+        if set(public_fields) & set(prohibited):
             raise ValueError(f"public field is prohibited: {class_id}")
         if value["full_text_allowed"] or value["excerpt_allowed"]:
             raise ValueError(f"full text/excerpts require a separately reviewed policy: {class_id}")
@@ -300,6 +307,7 @@ def compile_policy(catalog: dict[str, Any] | None = None, policy: dict[str, Any]
         "retention_windows": dict(sorted(retention_windows.items())),
         "layer_policies": dict(sorted(layer_policies.items())),
         "data_types": dict(sorted(compiled_data_types.items())),
+        "class_data_types": {key: sorted(value) for key, value in sorted(class_data_types.items())},
         "rights_status_values": dict(sorted(rights_status_values.items())),
         "terms_status_values": dict(sorted(terms_status_values.items())),
         "replay_evidence_fields": sorted(replay_evidence_fields),
@@ -321,7 +329,7 @@ def _record_flag(record: dict[str, Any], field: str, *, default: bool = False) -
         return default
     value = record[field]
     if type(value) is not bool:
-        raise ValueError(f"{field} must be a boolean, not null")
+        raise ValueError(f"{field} must be a boolean, not {value!r}")
     return value
 
 
@@ -334,9 +342,13 @@ def _json_safe(value: Any, field: str, record_id: str) -> Any:
 
 
 def _validate_governance_flags(record: dict[str, Any]) -> None:
-    """Every governance boolean must be a real boolean; an explicit null is a contract error."""
+    """Every governance boolean must be a real boolean; an explicit null is a contract error.
+
+    Only the type is checked here. Whether a missing flag means ``False`` or ``True`` is
+    the caller's decision, so each call site reads the flag it actually acts on.
+    """
     for flag in GOVERNANCE_RECORD_FLAGS:
-        _record_flag(record, flag, default=flag in DEFAULT_TRUE_RECORD_FLAGS)
+        _record_flag(record, flag)
 
 
 def _governance(compiled: dict[str, Any], record: dict[str, Any],
@@ -368,6 +380,8 @@ def _governance(compiled: dict[str, Any], record: dict[str, Any],
     return {
         **compiled["source_policies"][source_id],
         **compiled["classes"][resolved_class],
+        # Data types are a property of the class that was actually applied.
+        "data_types": compiled["class_data_types"][resolved_class],
         "class_id": resolved_class,
         "record_id": record_id,
         "source_id": source_id,
@@ -385,7 +399,7 @@ def _assert_no_prohibited(record: dict[str, Any], compiled: dict[str, Any], reco
 
 
 def archive_decision(record: dict[str, Any], *, policy: dict[str, Any] | None = None,
-                     class_id: str | None = None) -> dict[str, Any]:
+                     class_id: str | None = None, layer: str | None = None) -> dict[str, Any]:
     """Decide whether one record may enter the public evidence archive.
 
     A layer declared ``NOT_ARCHIVABLE`` outranks the class, so raw snapshots and
@@ -393,7 +407,7 @@ def archive_decision(record: dict[str, Any], *, policy: dict[str, Any] | None = 
     otherwise allow it.
     """
     compiled = compile_policy() if policy is None else policy
-    governance = _governance(compiled, record, class_id=class_id)
+    governance = _governance(compiled, record, class_id=class_id, layer=layer)
     decision = {
         "record_id": governance["record_id"],
         "source_id": governance["source_id"],
@@ -409,9 +423,7 @@ def archive_decision(record: dict[str, Any], *, policy: dict[str, Any] | None = 
     for flag in SENSITIVE_RECORD_FLAGS:
         if _record_flag(record, flag):
             return {**decision, "decision": "BLOCKED", "reason": f"{flag} is true"}
-    aggregate_only = record.get("aggregate_only")
-    if aggregate_only is not None and type(aggregate_only) is not bool:
-        raise ValueError("aggregate_only must be a boolean")
+    aggregate_only = _record_flag(record, "aggregate_only")
     if governance["sensitive_default"] and aggregate_only is not True:
         return {**decision, "decision": "BLOCKED",
                 "reason": f"{governance['class_id']} is sensitive by default and the record does not declare aggregate_only"}
@@ -440,7 +452,7 @@ def project_public_record(record: dict[str, Any], *, policy: dict[str, Any] | No
     compiled = compile_policy() if policy is None else policy
     governance = _governance(compiled, record, class_id=class_id, layer=layer)
     layer = governance["layer"]
-    blocked = archive_decision(record, policy=compiled, class_id=class_id)
+    blocked = archive_decision(record, policy=compiled, class_id=class_id, layer=layer)
     if blocked["decision"] != "ARCHIVE":
         raise ValueError(f"record is not allowed into the public archive: {blocked['reason']}")
     source_available = _record_flag(record, "source_available", default=True)
@@ -470,6 +482,7 @@ def project_public_record(record: dict[str, Any], *, policy: dict[str, Any] | No
         "rights_status": governance["rights_status"],
         "terms_status": governance["terms_status"],
         "terms_url": governance["terms_url"],
+        "catalog_hash": compiled["catalog_hash"],
         "review_required": governance["review_required"],
         "archive_eligibility": governance["archive_eligibility"],
         "layer_archive_eligibility": governance["layer_archive_eligibility"],
@@ -494,13 +507,20 @@ def project_query_index(records: list[dict[str, Any]], *, observed_at: str,
     layer_policy = compiled["layer_policies"]["query_index"]
     entries = []
     for record in records:
-        governance = _governance(compiled, record, layer="query_index")
-        # Gate the record as stored. Scrubbing first would downgrade a governance
-        # marker (private notes, personal data, credentials) into a silent success.
-        blocked = archive_decision(record, policy=compiled)
+        if not isinstance(record, dict):
+            raise ValueError("query index records must be objects")
+        # Gate the record as stored, against the layer this rebuild writes into, before
+        # anything else. Scrubbing first, or trusting the record's own layer claim,
+        # would downgrade a governance marker into a silent success.
+        blocked = archive_decision(record, policy=compiled, layer=QUERY_INDEX_LAYER)
         if blocked["decision"] != "ARCHIVE":
             raise ValueError(
                 f"record is not allowed into the public archive: {blocked['reason']}")
+        if record.get("layer", QUERY_INDEX_LAYER) != QUERY_INDEX_LAYER:
+            # A record that claims another layer is either mis-filed or probing for a
+            # weaker gate; either way it does not belong in this index.
+            raise ValueError(f"unsupported retention layer for the query index: {record.get('layer')}")
+        governance = _governance(compiled, record, layer=QUERY_INDEX_LAYER)
         suppressed = sorted(set(record) & set(compiled["prohibited_public_fields"]))
         sanitized = {key: value for key, value in record.items() if key not in suppressed}
         entry = project_public_record(sanitized, policy=compiled, layer="query_index")
@@ -577,7 +597,7 @@ def plan_expiry(records: list[dict[str, Any]], *, observed_at: str, policy: dict
                 if not audit_refs:
                     status = "BLOCKED"
                     action = "BLOCKED_NO_AUDIT_LINKAGE"
-                else:
+                elif window["expired_action"] not in NON_OVERRIDABLE_EXPIRY_ACTIONS:
                     action = "KEEP_AUDIT_LINKAGE"
             elif action == "PURGE_RAW_KEEP_AUDIT" and not audit_refs:
                 status = "BLOCKED"
@@ -590,15 +610,13 @@ def plan_expiry(records: list[dict[str, Any]], *, observed_at: str, policy: dict
                 # Nothing is linked, so retention must not claim it is preserving replay.
                 replay_status = "BLOCKED"
                 replay_limitation = REPLAY_LIMITATION_NO_EVIDENCE
-            elif status == "BLOCKED":
-                replay_status = "BLOCKED"
-                replay_limitation = REPLAY_LIMITATION_NO_EVIDENCE
             elif not expired:
                 replay_status = "PRESERVED"
             elif window["expired_action"] in NON_OVERRIDABLE_EXPIRY_ACTIONS:
-                # A window that still demands human review keeps demanding it.
-                replay_status = "PRESERVED"
-                replay_limitation = REPLAY_LIMITATION_NO_EVIDENCE
+                # A window that still demands human review keeps demanding it, so the
+                # evidence is retained but replay is pending that review, not preserved.
+                replay_status = "LIMITED"
+                replay_limitation = REPLAY_REVIEW_WINDOW_PENDING
             else:
                 # #36 replay must never lose evidence to a silent retention sweep.
                 overridden_expired_action = window["expired_action"]
@@ -651,6 +669,13 @@ def plan_expiry(records: list[dict[str, Any]], *, observed_at: str, policy: dict
     if any(row["replay_limitation"] is not None
            and row["replay_limitation"] not in compiled["replay_limitation_reasons"] for row in planned):
         raise ValueError("planner emitted an undocumented replay limitation")
+    # A row may never claim replay is preserved while also declaring a limitation, and a
+    # limitation may never be attached to a record that does not require replay.
+    for row in planned:
+        if row["replay_status"] == "PRESERVED" and row["replay_limitation"] is not None:
+            raise ValueError(f"preserved replay cannot carry a limitation: {row['record_id']}")
+        if row["replay_limitation"] is not None and not row["replay_required"]:
+            raise ValueError(f"replay limitation on a record that does not require replay: {row['record_id']}")
     receipt["receipt_sha256"] = sha256(receipt)
     return receipt
 
@@ -676,9 +701,10 @@ def policy_binding(compiled: dict[str, Any] | None = None) -> dict[str, Any]:
         "schema_version": 1,
         "policy_version": compiled["policy_version"],
         "policy_hash": compiled["policy_hash"],
-        "public_projection": QUERY_INDEX_PROJECTION,
-        "full_text_allowed": any(value["full_text_allowed"] for value in compiled["classes"].values()),
-        "excerpt_allowed": any(value["excerpt_allowed"] for value in compiled["classes"].values()),
+        "catalog_hash": compiled["catalog_hash"],
+        "public_projection": compiled["layer_policies"][QUERY_INDEX_LAYER]["public_projection"],
+        "full_text_allowed": all(value["full_text_allowed"] for value in compiled["classes"].values()),
+        "excerpt_allowed": all(value["excerpt_allowed"] for value in compiled["classes"].values()),
         "rights_status": UNKNOWN_RIGHTS if UNKNOWN_RIGHTS in rights_statuses else sorted(rights_statuses)[0],
         "rights_status_values": sorted(rights_statuses),
         "terms_status": (
@@ -739,7 +765,7 @@ def main() -> int:
             f"extends_source_retention={index['extends_source_retention']}"
         )
         return 0
-    if args.json:
+    if args.json and not args.self_check:
         print(json.dumps(compiled, ensure_ascii=False, indent=2, sort_keys=True))
     elif args.binding:
         print(json.dumps(policy_binding(compiled), ensure_ascii=False, indent=2, sort_keys=True))

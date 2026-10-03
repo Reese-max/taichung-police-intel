@@ -2,9 +2,11 @@
 
 `docs/govintel/retention-rights-policy.v1.json`（`policy_version` 2）與 `scripts/retention-policy.py` 是本專案的保存、授權與公開邊界規則來源。它只給保守預設，不做法律結論。
 
-## 已實作的範圍
+## 已實作的範圍（以及還沒做的部分）
 
-`compile_policy()` / `archive_decision()` / `project_public_record()` / `project_query_index()` / `plan_expiry()` 是唯一會產生公開投影或保留動作的入口，`scripts/query-gateway.py` 的每個對外 response 都直接引用同一份 `RETENTION_BINDING`。collector 與 `scripts/migration_replay.py` 目前尚未改用它們自己的資料管線（那是後續議題）；本議題不假裝它們已經共用這套規則。
+已接線：**對外綁定**。`scripts/query-gateway.py` 的每個 response 與 `workers/query-gateway/src/index.js` 都引用同一份由 `retention-policy.py --binding` 產生的 `RETENTION_BINDING`，因此 UI 與 gateway 不可能各自宣稱不同的權利狀態。
+
+尚未接線（**本議題不宣稱已完成**）：archive gate 目前只由 `scripts/retention-policy.py` 的 CLI 與測試呼叫。實際的 live query 路徑是 `scripts/query-store.py` → `apps/web/public/data/*.json` → gateway／worker，它並沒有 import retention module；`scripts/query-store.py` 內另有一個同名但無關的 `policy_binding` 區域變數。collector 與 `scripts/migration_replay.py` 也仍走自己的資料管線。換句話說：`--project`／`--plan` 的規則已經是正確且測試過的守門員，但把它們插進 live query 路徑是後續議題的工作。
 
 ## 資料類型矩陣
 
@@ -50,7 +52,7 @@ class 的欄位集合是**精確比對**：多一個或少一個欄位都會讓 
 
 ## 治理 class 由呼叫端決定，不由資料決定
 
-`class_id` 是 `project_public_record()`／`archive_decision()` 的**可信參數**，不會從 record JSON 讀取。理由：一個存在資料庫裡的 payload 不該能把自己改標成權限較寬鬆的 class（例如把 `REFERENCE_METADATA` 換成 `DERIVED_SUMMARY` 來繞過 sensitive-default gate）。要把 project 自有衍生物當成 `DERIVED_SUMMARY` 投影，必須由呼叫端明確指定。
+`class_id` 是 `project_public_record()`／`archive_decision()` 的**可信參數**，不會從 record JSON 讀取。理由：一個存在資料庫裡的 payload 不該能把自己改標成權限較寬鬆的 class（例如把 `REFERENCE_METADATA` 換成 `DERIVED_SUMMARY` 來繞過 sensitive-default gate）。輸出中的 `terms_url` 另綁 `catalog_hash`，所以 catalog 改動也會被看見。要把 project 自有衍生物當成 `DERIVED_SUMMARY` 投影，必須由呼叫端明確指定。
 
 ## 個資與敏感資料
 
@@ -61,7 +63,7 @@ class 的欄位集合是**精確比對**：多一個或少一個欄位都會讓 
 - class 為 `sensitive_default`（`REFERENCE_METADATA`）而 record 未宣告 `aggregate_only: true` → `BLOCKED`（#28 的「排除或只用彙總」）；
 - layer 或 class 為 `NOT_ARCHIVABLE` → `BLOCKED`。
 
-`raw_payload`、`raw_bytes`、`body`、`full_text` 屬於內容負載：投影會丟棄並記在 `dropped_fields`，所以 media 的 link-only 投影仍然成立；purge 路徑（`plan_expiry`）對任何 prohibited 欄位則直接報錯，不進入規劃。投影值若無法 JSON 序列化會回報是哪個欄位，而不是讓整個索引建置中斷。
+`raw_payload`、`raw_bytes`、`body`、`full_text` 屬於內容負載（compile 會確認它們都在 `prohibited_public_fields` 內）：投影會丟棄並記在 `dropped_fields`，query-index 路徑則記在 `suppressed_fields`，所以 media 的 link-only 投影仍然成立；purge 路徑（`plan_expiry`）對任何 prohibited 欄位則直接報錯，不進入規劃。投影值若無法 JSON 序列化會回報是哪個欄位，而不是讓整個索引建置中斷。
 
 ## Expiry 與 replay 證據
 
@@ -69,8 +71,9 @@ class 的欄位集合是**精確比對**：多一個或少一個欄位都會讓 
 
 - canonical／publication／query index 到期必須有 `audit_refs`，否則 `BLOCKED_NO_AUDIT_LINKAGE`；
 - `replay_required: true` 的 record 不會被保留策略靜默清除：到期且原本的動作允許覆寫時，action 改為 `KEEP_AUDIT_LINKAGE`，`overridden_expired_action` 記錄被覆寫的原動作；
-- 原本的 `expired_action` 是 `REVIEW_REQUIRED` 時**不覆寫**——需要人審的窗口仍然需要人審；
 - `audit_refs` 為空或缺少 `replay_evidence_fields` 宣告的 provenance 時，`replay_status: BLOCKED` 且附 `REPLAY_EVIDENCE_INCOMPLETE`，不會宣稱保留了不存在的 linkage；
+- 原本的 `expired_action` 是 `REVIEW_REQUIRED` 時（raw 或 canonical layer 都算），`replay_status: LIMITED` 並附 `REPLAY_REVIEW_WINDOW_PENDING`：證據被保留，但重播仍在等人審，不會標成 preserved；
+- `PRESERVED` 與 limitation 互斥；planner 產生前會自我檢查這個不變式。
 - 若來源已撤下且證據齊全，`replay_status: LIMITED` 並附 `SOURCE_NO_LONGER_AVAILABLE_REPLAY_PARTIAL`，明確標示無法完整重播，而不是假裝還能重播。
 
 `replay_evidence_fields` 是 planner 實際比對的清單，缺項會逐項列在 `replay_missing_fields`；`replay_limitation_reasons` 必須涵蓋 planner 會發出的每一種原因，否則 compile 失敗。
@@ -79,7 +82,7 @@ class 的欄位集合是**精確比對**：多一個或少一個欄位都會讓 
 
 `project_query_index()` 輸出 `projection_only: true`、`extends_source_retention: false`，逐筆：
 
-- 先對原始 record 跑 `archive_decision()`（fail closed），再剝除 prohibited 欄位並記在 `suppressed_fields`；
+- 先對原始 record 跑 `archive_decision(record, layer="query_index")`（fail closed），再剝除 prohibited 欄位並記在 `suppressed_fields`；宣告其他 layer 的 record 直接拒絕，不會因為自稱 `canonical_event` 就取得較弱的 gate；
 - 只保留 class allowlist 欄位，`full_text`／`body` 即使出現在舊 rebuild 輸入也不會被投影出去；
 - 標出 `source_raw_retention_expired`，讓 UI 知道 raw 窗口已過——它不放棄該筆記錄的 metadata/link 投影（那是 canonical/provenance 規則允許的），只是不讓任何人重新取得已過期的全文；
 - `projection_hash` 與 `index_hash` 都描述呼叫端實際收到的內容。
@@ -88,7 +91,7 @@ class 的欄位集合是**精確比對**：多一個或少一個欄位都會讓 
 
 `python3 scripts/retention-policy.py --binding` 產生 `apps/web/public/data/retention-policy-binding.json`，`workers/query-gateway/src/index.js` 直接 import 這份檔案，`scripts/query-gateway.py` 則在啟動時由編譯後的政策推導同一組欄位。`apps/web/tests/retention-policy.test.mjs` 會比對已檢入的檔案與 `--binding` 輸出，所以手寫的舊 `policy_version`／`policy_hash` 無法存活。
 
-binding 以**最嚴格**的 class 為準回報 rights/terms 狀態（任一 class 為 `UNKNOWN` 就報 `UNKNOWN`），因此 consumer 不可能把未驗證的權限畫成已開放授權。
+binding 的每個欄位都由編譯後的政策推導：`public_projection` 來自 query index layer，`full_text_allowed`／`excerpt_allowed` 以「全部 class 都允許」為準，`catalog_hash` 一併輸出。rights/terms 狀態則以**最嚴格**的 class 為準（任一 class 為 `UNKNOWN` 就報 `UNKNOWN`），因此 consumer 不可能把未驗證的權限畫成已開放授權。
 
 ## 驗證
 

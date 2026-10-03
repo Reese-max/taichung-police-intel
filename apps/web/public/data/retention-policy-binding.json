@@ -1,7 +1,8 @@
 {
+  "catalog_hash": "95ae82270eaab6f6270d9c00c8122e9bcfafbaf0dd216dc575a5f0b99544c51a",
   "excerpt_allowed": false,
   "full_text_allowed": false,
-  "policy_hash": "afa1be68f2f506226652b9369ff59168a0344113b639281cd46132a2e9e8f2fd",
+  "policy_hash": "bb29e8e5e0b083ae23b783acfa824d751e19721b4b67ceedb12d4a16ed90565b",
   "policy_version": 2,
   "public_projection": "METADATA_LINK_ONLY",
   "query_index_extends_source_retention": false,

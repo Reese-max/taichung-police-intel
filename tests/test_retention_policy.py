@@ -551,6 +551,16 @@ class RetentionPolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "unknown retention class"):
             retention.archive_decision(record, class_id="NOT_A_CLASS")
         self.assertNotIn("class_id", retention.RECORD_CONTROL_FIELDS)
+        overridden = retention.project_public_record(dict(record), class_id="DERIVED_SUMMARY")
+        self.assertEqual(overridden["class_id"], "DERIVED_SUMMARY")
+        self.assertEqual(overridden["rights_status"], "PROJECT_CONTROLLED")
+        self.assertEqual(overridden["data_types"],
+                         retention.compile_policy()["class_data_types"]["DERIVED_SUMMARY"])
+        with self.assertRaisesRegex(ValueError, "sensitive by default"):
+            retention.project_public_record(dict(record, class_id="DERIVED_SUMMARY"))
+        aggregate = retention.project_public_record(dict(record, aggregate_only=True))
+        self.assertEqual(aggregate["class_id"], "REFERENCE_METADATA")
+        self.assertEqual(aggregate["rights_status"], "UNKNOWN")
 
     def test_non_serializable_projection_value_is_reported_not_crashed(self):
         with self.assertRaisesRegex(ValueError, "not JSON serializable"):
@@ -605,6 +615,24 @@ class RetentionPolicyTests(unittest.TestCase):
         self.assertEqual(row["action"], "REVIEW_REQUIRED")
         self.assertIsNone(row["overridden_expired_action"])
         self.assertEqual(row["replay_missing_fields"], [])
+        # Evidence is retained, but replay is pending that review, not preserved.
+        self.assertEqual(row["replay_status"], "LIMITED")
+        self.assertEqual(row["replay_limitation"], "REPLAY_REVIEW_WINDOW_PENDING")
+        self.assertIn("REPLAY_REVIEW_WINDOW_PENDING", compiled["replay_limitation_reasons"])
+
+        # A canonical layer must not downgrade the review window either.
+        policy["retention_windows"]["PROVENANCE_HISTORY"] = {
+            "max_age_days": 7,
+            "expired_action": "REVIEW_REQUIRED",
+        }
+        canonical = retention.plan_expiry(
+            [dict(record, layer="canonical_event")],
+            observed_at="2026-09-21T00:00:00+00:00",
+            policy=retention.compile_policy(policy=policy),
+        )["records"][0]
+        self.assertEqual(canonical["action"], "REVIEW_REQUIRED")
+        self.assertEqual(canonical["replay_status"], "LIMITED")
+        self.assertEqual(canonical["replay_limitation"], "REPLAY_REVIEW_WINDOW_PENDING")
 
         purged = retention.compile_policy()
         full = retention.plan_expiry([record], observed_at="2026-09-21T00:00:00+00:00", policy=purged)["records"][0]
@@ -759,8 +787,156 @@ class RetentionPolicyTests(unittest.TestCase):
     def test_gateway_advertises_the_compiled_binding_not_a_hand_written_block(self):
         gateway = (ROOT / "scripts" / "query-gateway.py").read_text(encoding="utf-8")
         self.assertIn('"retention": dict(RETENTION_BINDING)', gateway)
-        self.assertNotIn('"public_projection": "METADATA_LINK_ONLY",\n                "full_text_allowed": False,', gateway)
         self.assertEqual(gateway.count('"retention": dict(RETENTION_BINDING)'), 3)
+        self.assertNotIn("RETENTION_POLICY = {", gateway)
+
+    def test_query_index_gates_the_layer_it_writes_into_not_the_layer_claimed(self):
+        policy = retention.load_json(retention.POLICY)
+        policy["layer_policies"]["query_index"] = {
+            "retention_class_source": "canonical_retention_class",
+            "archive_eligibility": "NOT_ARCHIVABLE",
+            "public_projection": "METADATA_LINK_ONLY",
+        }
+        compiled = retention.compile_policy(policy=policy)
+        record = {
+            "record_id": "news-1",
+            "source_id": "S-001",
+            "layer": "canonical_event",
+            "captured_at": "2026-01-01T00:00:00+00:00",
+            "title": "警政新聞",
+            "official_url": "https://www.police.taichung.gov.tw/ch/home.jsp?id=1",
+        }
+        # Declaring query_index still hits the layer's own NOT_ARCHIVABLE gate.
+        with self.assertRaisesRegex(ValueError, "never publicly archivable"):
+            retention.project_query_index(
+                [dict(record, layer="query_index")],
+                observed_at="2026-09-21T00:00:00+00:00",
+                policy=compiled,
+            )
+        with self.assertRaisesRegex(ValueError, "never publicly archivable"):
+            retention.project_public_record(dict(record), policy=compiled, layer="query_index")
+        # Under the shipped policy a canonical_event record is archivable but still does
+        # not belong in this index.
+        with self.assertRaisesRegex(ValueError, "unsupported retention layer for the query index"):
+            retention.project_query_index(
+                [record], observed_at="2026-09-21T00:00:00+00:00", policy=retention.compile_policy())
+        # The same record is fine as a canonical event, so the block is the layer, not the data.
+        canonical = retention.project_public_record(dict(record), policy=compiled, layer="canonical_event")
+        self.assertEqual(canonical["projected_fields"]["title"], "警政新聞")
+
+    def test_preserved_replay_can_never_carry_a_limitation(self):
+        compiled = retention.compile_policy()
+        record = {
+            "record_id": "replay-raw",
+            "source_id": "S-010",
+            "layer": "raw_snapshot",
+            "captured_at": "2026-01-01T00:00:00+00:00",
+            "content_sha256": "a" * 64,
+            "audit_refs": ["AUDIT-REPLAY-1"],
+            "replay_required": True,
+            "source_snapshot_ref": "SNAP-1",
+            "official_url": "https://www.tccc.gov.tw/",
+            "locator": "#quality",
+            "created_at": "2026-01-01T00:00:00+00:00",
+            "updated_at": "2026-01-01T00:00:00+00:00",
+        }
+        for source_available, expected_status, expected_limitation in (
+            (None, "PRESERVED", None),
+            (True, "PRESERVED", None),
+            (False, "LIMITED", "SOURCE_NO_LONGER_AVAILABLE_REPLAY_PARTIAL"),
+        ):
+            row = dict(record)
+            if source_available is None:
+                row.pop("source_available", None)
+            else:
+                row["source_available"] = source_available
+            planned = retention.plan_expiry(
+                [row], observed_at="2026-09-21T00:00:00+00:00", policy=compiled)["records"][0]
+            self.assertEqual(planned["replay_status"], expected_status)
+            self.assertEqual(planned["replay_limitation"], expected_limitation)
+            self.assertEqual(planned["action"], "KEEP_AUDIT_LINKAGE")
+
+    def test_binding_projection_follows_the_query_index_layer(self):
+        policy = retention.load_json(retention.POLICY)
+        policy["layer_policies"]["query_index"]["public_projection"] = "LINK_ONLY"
+        compiled = retention.compile_policy(policy=policy)
+        self.assertEqual(retention.policy_binding(compiled)["public_projection"], "LINK_ONLY")
+        self.assertEqual(retention.compile_policy()["layer_policies"]["query_index"]["public_projection"],
+                         "METADATA_LINK_ONLY")
+
+    def test_query_index_layer_must_publish_something_the_binding_can_advertise(self):
+        policy = retention.load_json(retention.POLICY)
+        policy["layer_policies"]["query_index"] = {
+            "retention_class_source": "canonical_retention_class",
+            "archive_eligibility": "NOT_ARCHIVABLE",
+            "public_projection": "NONE",
+        }
+        with self.assertRaisesRegex(ValueError, "query index layer must publish"):
+            retention.compile_policy(policy=policy)
+
+    def test_binding_aggregates_conservatively_and_binds_the_catalog(self):
+        compiled = retention.compile_policy()
+        binding = retention.policy_binding(compiled)
+        self.assertEqual(binding["catalog_hash"], compiled["catalog_hash"])
+        self.assertEqual(binding["public_projection"],
+                         compiled["layer_policies"]["query_index"]["public_projection"])
+        self.assertTrue(binding["review_required"])
+        catalog = retention.load_json(retention.CATALOG)
+        catalog["sources"][0]["entrypoint"] = "https://www.police.taichung.gov.tw/ch/moved.jsp"
+        moved = retention.compile_policy(catalog=catalog)
+        self.assertEqual(moved["policy_hash"], compiled["policy_hash"])
+        self.assertNotEqual(moved["catalog_hash"], compiled["catalog_hash"])
+        self.assertEqual(retention.policy_binding(moved)["catalog_hash"], moved["catalog_hash"])
+        projection = retention.project_public_record({
+            "record_id": "news-1",
+            "source_id": "S-001",
+            "layer": "canonical_event",
+            "captured_at": "2026-09-01T00:00:00+00:00",
+        }, policy=moved)
+        self.assertEqual(projection["catalog_hash"], moved["catalog_hash"])
+        self.assertEqual(projection["terms_url"], "https://www.police.taichung.gov.tw/ch/moved.jsp")
+
+    def test_content_payload_fields_must_stay_prohibited(self):
+        policy = retention.load_json(retention.POLICY)
+        policy["prohibited_public_fields"] = [
+            field for field in policy["prohibited_public_fields"] if field != "raw_payload"
+        ]
+        with self.assertRaisesRegex(ValueError, "content payload field must be prohibited"):
+            retention.compile_policy(policy=policy)
+
+    def test_malformed_policy_input_is_reported_as_a_value_error(self):
+        policy = retention.load_json(retention.POLICY)
+        for section in ("replay_evidence_fields", "prohibited_public_fields"):
+            malformed = copy.deepcopy(policy)
+            malformed[section] = [{}]
+            with self.subTest(section=section):
+                with self.assertRaises(ValueError):
+                    retention.compile_policy(policy=malformed)
+        nested_field = copy.deepcopy(policy)
+        nested_field["classes"]["OFFICIAL_MEDIA_LINK"]["public_fields"] = [{"raw": "payload"}]
+        with self.assertRaises(ValueError):
+            retention.compile_policy(policy=nested_field)
+        bad_catalog = retention.load_json(retention.CATALOG)
+        bad_catalog["sources"].append("not-an-object")
+        with self.assertRaisesRegex(ValueError, "every catalog source must be an object"):
+            retention.compile_policy(catalog=bad_catalog)
+
+    def test_null_governance_flags_are_rejected_including_aggregate_only(self):
+        for field in ("aggregate_only", "replay_required", "source_available",
+                      "contains_personal_data", "sensitive"):
+            record = {
+                "record_id": "news-1",
+                "source_id": "S-001",
+                "layer": "canonical_event",
+                "captured_at": "2026-09-01T00:00:00+00:00",
+                field: None,
+            }
+            with self.subTest(field=field):
+                with self.assertRaisesRegex(ValueError, field):
+                    retention.archive_decision(record)
+                with self.assertRaisesRegex(ValueError, field):
+                    retention.plan_expiry([dict(record, content_sha256="a" * 64)],
+                                          observed_at="2026-09-21T00:00:00+00:00")
 
 
 if __name__ == "__main__":

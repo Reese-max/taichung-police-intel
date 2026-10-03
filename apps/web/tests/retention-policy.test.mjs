@@ -82,10 +82,12 @@ test("deployed worker gateway serves the generated binding, not a hand-written o
     new URL("../../../workers/query-gateway/src/index.js", import.meta.url), "utf8",
   );
   assert.match(worker, /retention-policy-binding\.json/);
-  const compiled = JSON.parse(retention(["--json"]).stdout);
-  assert.ok(!worker.includes(compiled.policy_hash) || worker.includes("retention-policy-binding.json"));
-  assert.doesNotMatch(worker, /policy_hash:\s*"[0-9a-f]{64}"/);
-  assert.doesNotMatch(worker, /policy_version:\s*\d+\s*,\s*\n\s*policy_hash/);
+  // No hand-written retention literal and no pinned retention hash may survive.
+  assert.doesNotMatch(worker, /RETENTION_POLICY = \{/);
+  const retentionPolicy = JSON.parse(retention(["--json"]).stdout);
+  assert.equal(worker.includes(retentionPolicy.policy_hash), false);
+  // The protocol version must stay pinned; verify-query-gateway-production.py checks it.
+  assert.match(worker, /MCP_PROTOCOL_VERSION = "2025-06-18"/);
 });
 
 test("expiry dry-run and query-index projection run end to end", () => {
@@ -125,7 +127,8 @@ test("expiry dry-run and query-index projection run end to end", () => {
   assert.equal(receipt.counts.total, 2);
   assert.equal(receipt.receipt_sha256.length, 64);
 
-  // A raw snapshot is NOT_ARCHIVABLE, so the rebuild must refuse it rather than publish it.
+  // The rebuild only accepts query_index records; the raw snapshot must be refused
+  // rather than projected, and the exit code must be non-zero.
   const index = spawnSync(command, ["-X", "utf8", "scripts/retention-policy.py", "--project", manifest,
     "--at", "2026-09-21T00:00:00+00:00"], {
     cwd: repo,
@@ -133,6 +136,6 @@ test("expiry dry-run and query-index projection run end to end", () => {
     timeout: 60000,
   });
   assert.equal(index.status, 1);
-  assert.match(index.stderr, /never publicly archivable/);
+  assert.match(index.stderr, /unsupported retention layer for the query index: canonical_event/);
   rmSync(dir, { recursive: true, force: true });
 });
