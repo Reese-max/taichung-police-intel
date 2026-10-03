@@ -81,7 +81,7 @@
   ],
   "planned_scale": {
     "actual_definition": "actual_events = 不含鏡像轉載的官方文件數（document_id 去重）；actual_source_documents = scenario 出現的來源 ID 數。",
-    "actual_events": 5,
+    "actual_events": 6,
     "actual_reopen_points": 9,
     "actual_source_documents": 2,
     "missing_samples_reason": "第一輪規模（20 事件／60 原始文件）尚未執行；只交付合成情境與明確分母，不為湊數納入重複或歷史資料。",

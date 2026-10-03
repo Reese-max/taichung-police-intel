@@ -35,7 +35,7 @@ code/data/policy/parser/model/prompt 版本、資料 hash、重播時鐘與 publ
 | R6 | 10/09 17:10 | — | STALE_TRACKED_END | 預定日期已到但沒有明文解除 |
 | R7 | 10/09 17:40 | UPD-006 | NEW_UPDATES | v3 明文解除（只解除道路條件） |
 | R8 | 10/09 18:00 | UPD-007 | NEW_UPDATES | 另一工程仍可見 |
-| R9 | 10/10 08:30 | UPD-008 | NEW_UPDATES | 取消道路條件後停止該條件提示，原文仍可查 |
+| R9 | 10/10 08:30 | UPD-008、UPD-013 | NEW_UPDATES | 取消道路條件後停止該條件提示，原文仍可查；UPD-013 未公告結束時間但仍落在追蹤範圍 |
 
 每個開站時點的預期集合是「當時已取得、符合啟用條件、未讀的實質更新」。
 `沒有新項目 / 來源失聯 / 預定日期已到` 是四個不同的狀態，不合併。
@@ -46,9 +46,9 @@ code/data/policy/parser/model/prompt 版本、資料 hash、重播時鐘與 publ
 | arm | method ID | 重播 | 人工時間 | 本輪結果 |
 | --- | --- | --- | --- | --- |
 | A_v1 | `A_v1_manual_same_sources_same_cutoff` | NOT_RUN | NOT_RUN | 未執行真人對照 |
-| B_v6 | `B_v6_same_scope_search_generic_summary` | REPLAYED | NOT_RUN | precision 0.227（17 次已讀重複提示） |
-| C_v6 | `C_v6_full_query_and_tracking` | REPLAYED | NOT_RUN | precision 1.0、recall 1.0（tp 5／fp 0／fn 0） |
-| C_RULES_ONLY | `C_RULES_ONLY_v6_rules_only_no_semantic` | REPLAYED | NOT_RUN | precision 0.714（2 次誤報：範圍外、日期無法驗證） |
+| B_v6 | `B_v6_same_scope_search_generic_summary` | REPLAYED | NOT_RUN | precision 0.261（17 次已讀重複提示） |
+| C_v6 | `C_v6_full_query_and_tracking` | REPLAYED | NOT_RUN | precision 1.0、recall 1.0（tp 6／fp 0／fn 0） |
+| C_RULES_ONLY | `C_RULES_ONLY_v6_rules_only_no_semantic` | REPLAYED | NOT_RUN | precision 0.75（2 次誤報：範圍外、日期無法驗證） |
 
 arm 的 `policy_overrides` 寫在 manifest 裡，CLI 直接讀它執行；
 所以「公開的方法定義」與「實際量測的設定」不會各自漂移。
@@ -63,8 +63,9 @@ arm 的 `policy_overrides` 寫在 manifest 裡，CLI 直接讀它執行；
 ## 評分口徑
 
 - 以穩定更新 ID 計 TP／FP／FN；同一事件命中多條條件只算一次 TP。
-  receipt 的 `counters.prompted_condition_pairs`（8）與 `multi_condition_hit`（3）
-  並列顯示，`tp` 仍是 5。
+  receipt 的 `counters.prompted_condition_pairs`（9）與 `multi_condition_hit`（3）
+  並列顯示，`tp` 仍是 6。多條件集合以 gold 宣告者為準比對，不與預測端取交集，
+  因此「什麼都沒提示」的預測不會拿到滿分。
 - 失敗模式分開計數，不混成一個總數：
   `already_read_repeat`／`layout_only_false_alert`／`repost_false_alert`／
   `duplicate_fetch_false_alert`／`post_cancel_prompt`／`other_false_alert`，
@@ -73,6 +74,8 @@ arm 的 `policy_overrides` 寫在 manifest 裡，CLI 直接讀它執行；
   歸因用的是「這筆更新本身是什麼」（排版／轉載／重複取回／已取消條件）加上
   station 記錄的決定，而不是單看 decision 標籤；否則一個把純排版當成實質更新的
   錯誤政策只會記成 `PROMPTED`，所有排版、轉載與重複取回的缺陷都會被塞進同一格。
+  「更新本身是什麼」優先於已讀狀態：同一個政策同時失去已讀追蹤與排版判斷時，
+  8 次排版誤報仍記為 `layout_only_false_alert`，不會被 17 次已讀重複提示吞掉。
 - 「來源缺口期間漏掉」以 gold 的 `gap_kinds` 判定，不看預測端自己回報的缺口，
   否則一個少報缺口的 harness 可以替自己的漏報開脫。
 - 來源取得缺漏（`source_acquisition_gap`）另列，不併入精確率／召回率分子分母。
@@ -96,6 +99,13 @@ arm 的 `policy_overrides` 寫在 manifest 裡，CLI 直接讀它執行；
 | `PROBE_PROMPT_AFTER_CANCEL` | 忽略使用者的取消 | R9 提示已取消條件的更新，記為 `post_cancel_prompt` |
 | `PROBE_AUTO_LIFT_ON_TRACKED_END` | 到期自動解除 | R3、R6、R7、R8 的缺口清單被清空（R6 狀態因此被誤報） |
 | `PROBE_CANCEL_MOVED_LATER` | 把取消時間往後移 | R9 多提示一次，證明取消判斷讀取現況 |
+
+## 未公告結束時間的公告
+
+UPD-013 是一筆沒有 `effective_to` 的延長公告，起始時段落在每日 09:00–17:00 之外。
+匹配時先把每日時段裁切到追蹤範圍再判斷是否重疊，因此它不會因為「自己起始那天落在
+時段外」而被漏掉，也不會因為追蹤範圍已經裁掉那個時段而被誤報。
+追蹤範圍超過 400 天時直接拒絕重播，避免開放式區間變成無界掃描。
 
 ## 切分限制
 
@@ -122,8 +132,8 @@ arm 的 `policy_overrides` 寫在 manifest 裡，CLI 直接讀它執行；
 
 `cost-ledger.json` 分列每次完成查詢、每個有效更新、每個追蹤條件，以及模型請求與人工工時。
 本輪為離線重播：`model_request = 0` 且狀態是 `NOT_APPLICABLE_NO_MODEL_CALL`，不是「零成本」宣稱；
-`human_hour` 一律 `NOT_RUN`。`effective_update = 8` 指的是實質更新筆數，
-不是提示次數（5），兩者都可在 receipt 的 `cost_scope` 與 `counters` 對照。
+`human_hour` 一律 `NOT_RUN`。`effective_update = 9` 指的是實質更新筆數，
+不是提示次數（6），兩者都可在 receipt 的 `cost_scope` 與 `counters` 對照。
 自檢另外把追蹤條件從 2 條增加到 5 條，`model_requests` 仍是 0
 —— 共同公告不會因使用者或條件數逐份重跑模型。
 

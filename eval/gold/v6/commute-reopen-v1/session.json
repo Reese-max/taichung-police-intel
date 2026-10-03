@@ -130,7 +130,8 @@
         "UPD-008",
         "UPD-010",
         "UPD-011",
-        "UPD-012"
+        "UPD-012",
+        "UPD-013"
       ]
     }
   ],
@@ -525,6 +526,34 @@
       "rights": "SYNTHETIC_NO_REAL_ROAD",
       "source_id": "S-001",
       "update_id": "UPD-012",
+      "upstream_update_id": null
+    },
+    {
+      "acquired_at": "2026-10-10T08:25:00+08:00",
+      "content_sha256": "d7d8a4d20263a016ce0725be353ab9e6e5636f5f042d8b6da9b57062f00f2caa",
+      "document_id": "DOC-ROAD-CD-OPEN",
+      "origin": "OFFICIAL",
+      "payload": {
+        "daily": {
+          "end": "17:00",
+          "start": "09:00"
+        },
+        "district": "西屯區（合成）",
+        "effective_from": "2026-10-12T18:00:00+08:00",
+        "effective_to": null,
+        "layout": {
+          "columns": 4,
+          "template": "table-v1"
+        },
+        "punctuation_style": "fullwidth",
+        "road": "測試路 C 至 D",
+        "status": "IN_PROGRESS",
+        "text": "【合成測試】測試路 C 至 D 另一工程延長管制，自 10/12 18:00 起實施，結束時間另行公告。"
+      },
+      "published_at": "2026-10-10T08:25:00+08:00",
+      "rights": "SYNTHETIC_NO_REAL_ROAD",
+      "source_id": "S-001",
+      "update_id": "UPD-013",
       "upstream_update_id": null
     }
   ]

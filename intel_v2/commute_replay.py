@@ -110,6 +110,8 @@ LIFTED_BY_OFFICIAL_TEXT = "LIFTED_BY_OFFICIAL_TEXT"
 CANCELLED = "CANCELLED"
 
 DEDUPE_SCOPES = ("content", "document")
+# Upper bound on how far an open-ended update's horizon is scanned.
+MAX_TRACKED_SPAN = timedelta(days=400)
 
 
 class ScenarioError(ValueError):
@@ -254,6 +256,10 @@ def validate_scenario(scenario: dict[str, Any]) -> None:
             )
         if not condition.get("tracked_from"):
             raise ScenarioError(f"condition tracked_from missing: {condition_id}")
+        if not condition.get("tracked_end"):
+            # Without a tracked end the open-ended-update horizon has nothing to bound
+            # it, so an unbounded condition could match anything.
+            raise ScenarioError(f"condition tracked_end missing: {condition_id}")
         if not condition.get("saved_at"):
             raise ScenarioError(f"condition saved_at missing: {condition_id}")
         _as_datetime(condition["tracked_from"], f"{condition_id} tracked_from")
@@ -285,6 +291,7 @@ def validate_scenario(scenario: dict[str, Any]) -> None:
         update_ids.add(update_id)
 
     slot_ids: set[str] = set()
+    previous_slot: datetime | None = None
     for collection in scenario["collections"]:
         for key in ("slot_id", "observed_at", "snapshot_complete"):
             if key not in collection:
@@ -292,7 +299,10 @@ def validate_scenario(scenario: dict[str, Any]) -> None:
         if collection["slot_id"] in slot_ids:
             raise ScenarioError(f"duplicate slot_id: {collection['slot_id']}")
         slot_ids.add(collection["slot_id"])
-        _as_datetime(collection["observed_at"], f"{collection['slot_id']} observed_at")
+        observed_at = _as_datetime(collection["observed_at"], f"{collection['slot_id']} observed_at")
+        if previous_slot is not None and observed_at < previous_slot:
+            raise ScenarioError("collections must be ordered by observed_at")
+        previous_slot = observed_at
         for update_id in collection.get("visible_update_ids", []):
             if update_id not in update_ids:
                 raise ScenarioError(f"collection references unknown update: {update_id}")
@@ -358,23 +368,27 @@ def intersects_tracked_band(
     band_end = _clock(condition["daily"]["end"], "daily.end")
     tracked_from_at = _as_datetime(condition["tracked_from"], "tracked_from")
     tracked_end_at = _as_datetime(tracked_end, "tracked_end") if tracked_end else None
-    day = start.date()
     # An update without an end date stays open. Searching only its start date would
     # drop a multi-day closure that begins after the daily band, so the horizon is
-    # the tracked end (or the declared end), whichever is later.
+    # the later of the declared end and the tracked end, bounded so a far-future
+    # tracked end cannot turn the scan into an unbounded loop.
     horizon = max(end or start, tracked_end_at or start)
+    if horizon - start > MAX_TRACKED_SPAN:
+        raise ScenarioError(
+            f"tracked window is longer than {MAX_TRACKED_SPAN.days} days: "
+            f"{condition['condition_id']} tracked_end={tracked_end!r}"
+        )
+    day = start.date()
     last_day = horizon.date()
     while day <= last_day:
         window_start = datetime.combine(day, band_start, start.tzinfo)
         window_end = datetime.combine(day, band_end, start.tzinfo)
-        if start <= window_end and (end is None or window_start <= end):
-            in_range = True
-            if window_end < tracked_from_at:
-                in_range = False
-            if tracked_end_at is not None and window_start > tracked_end_at:
-                in_range = False
-            if in_range:
-                return True
+        # Clip the daily band to the tracked range first; otherwise an update fully
+        # outside the tracked range can be reported as matching an empty window.
+        lower = window_start if tracked_from_at is None else max(window_start, tracked_from_at)
+        upper = window_end if tracked_end_at is None else min(window_end, tracked_end_at)
+        if lower <= upper and start <= upper and (end is None or lower <= end):
+            return True
         day += timedelta(days=1)
     return False
 
@@ -589,21 +603,7 @@ def gap_flags(
                     "auto_lifted": False,
                 }
             )
-    unique: list[dict[str, Any]] = []
-    seen: set[tuple[Any, ...]] = set()
-    for flag in flags:
-        key = (
-            flag["kind"],
-            flag.get("source_id"),
-            flag.get("condition_id"),
-            flag.get("document_id"),
-            flag["observed_at"],
-        )
-        if key in seen:
-            continue
-        seen.add(key)
-        unique.append(flag)
-    return unique
+    return flags
 
 
 def observation_status(gap_flags: list[dict[str, Any]], prompted: list[str]) -> str:
@@ -633,19 +633,12 @@ def public_original_documents(
     available: set[str] = set()
     uncertain: set[str] = set()
     complete_by_source: dict[str, dict[str, Any]] = {}
-    for collection in scenario["collections"]:
-        if _as_datetime(collection["observed_at"], "observed_at") > moment:
-            continue
-        source_id = collection.get("source_id") or collection["slot_id"]
+    # Uncertainty follows the newest slot per source, never the listing order.
+    for source_id, collection in latest_collections(scenario, moment).items():
         if not collection.get("snapshot_complete", True):
             uncertain.add(source_id)
             continue
-        uncertain.discard(source_id)
-        known = complete_by_source.get(source_id)
-        if known is None or _as_datetime(collection["observed_at"], "observed_at") >= _as_datetime(
-            known["observed_at"], "observed_at"
-        ):
-            complete_by_source[source_id] = collection
+        complete_by_source[source_id] = collection
     for source_id, collection in complete_by_source.items():
         visible = set(collection.get("visible_update_ids", []))
         for update in scenario["updates"]:
@@ -728,7 +721,7 @@ def replay(scenario: dict[str, Any], policy: ReplayPolicy = DEFAULT_POLICY) -> d
                 )
                 continue
             matched, match_reason, cancelled = match_conditions(
-                update, conditions, moment, policy, tracked_end_by_condition
+                update, conditions, horizon, policy, tracked_end_by_condition
             )
             if not matched:
                 dispositions.append(
@@ -808,7 +801,7 @@ def replay(scenario: dict[str, Any], policy: ReplayPolicy = DEFAULT_POLICY) -> d
                     tracked_end_by_condition[condition_id] = effective_to
 
         condition_status = {
-            condition["condition_id"]: _condition_status(condition, moment, lifted_by_update_id)
+            condition["condition_id"]: _condition_status(condition, horizon, lifted_by_update_id)
             for condition in conditions
         }
         # The gap set stays as the commuter saw it at this reopen: a deferral read

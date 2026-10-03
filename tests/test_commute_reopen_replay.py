@@ -193,6 +193,67 @@ class OpenEndedIntervalTests(unittest.TestCase):
         self.assertEqual(points["R7"]["prompted_update_ids"], ["UPD-006"])
 
 
+class DataCutoffTests(unittest.TestCase):
+    """Nothing derived at a reopen may come from past the data cutoff."""
+
+    def setUp(self):
+        self.scenario = replay.load_scenario(DATA_DIR / "session.json")
+
+    def test_a_reopen_after_the_cutoff_sees_nothing_new(self):
+        beyond = scenario_copy()
+        beyond["reopen_points"].append(
+            {"reopen_id": "R10", "reopened_at": "2026-10-11T09:00:00+08:00"}
+        )
+        # A collection that only exists after the cutoff must not leak gaps, originals
+        # or prompts into the post-cutoff reopen.
+        beyond["collections"].append(
+            {
+                "slot_id": "SLOT-12",
+                "source_id": "S-001",
+                "observed_at": "2026-10-11T08:30:00+08:00",
+                "snapshot_complete": False,
+                "unreachable_source_ids": ["S-001"],
+                "visible_update_ids": [],
+            }
+        )
+        receipt = replay.replay(beyond)
+        point = receipt["reopen_points"][-1]
+        self.assertEqual(point["reopen_id"], "R10")
+        self.assertEqual(point["prompted_update_ids"], [])
+        self.assertEqual(
+            point["acquired_update_ids"],
+            sorted(receipt["publication_receipt"]["acquired_update_ids"]),
+        )
+        # Clamped to the cutoff, the newest in-window S-001 slot is the complete
+        # SLOT-11, so there is no acquisition gap - and the post-cutoff SLOT-12
+        # failure must not be reported either.
+        self.assertEqual(
+            [flag for flag in point["gap_flags"] if flag["kind"] in replay.ACQUISITION_GAP_KINDS],
+            [],
+        )
+        self.assertNotIn("SLOT-12", {flag["slot_id"] for flag in point["gap_flags"]})
+        self.assertEqual(point["public_original_uncertain_source_ids"], [])
+
+    def test_the_cutoff_clamp_is_what_stops_the_post_cutoff_snapshot(self):
+        beyond = scenario_copy()
+        beyond["reopen_points"].append(
+            {"reopen_id": "R10", "reopened_at": "2026-10-11T09:00:00+08:00"}
+        )
+        beyond["collections"].append(
+            {
+                "slot_id": "SLOT-12",
+                "source_id": "S-031",
+                "observed_at": "2026-10-11T08:30:00+08:00",
+                "snapshot_complete": True,
+                "visible_update_ids": [],
+            }
+        )
+        point = replay.replay(beyond)["reopen_points"][-1]
+        # S-031 only becomes uncertain after the cutoff, so a clamped reopen must not
+        # see the post-cutoff recovery either.
+        self.assertEqual(point["public_original_uncertain_source_ids"], [])
+
+
 class FailClosedGuardTests(unittest.TestCase):
     def setUp(self):
         self.scenario = replay.load_scenario(DATA_DIR / "session.json")
@@ -225,27 +286,72 @@ class FailClosedGuardTests(unittest.TestCase):
         with self.assertRaisesRegex(replay.ScenarioError, "missing reopened_at"):
             replay.validate_scenario(broken)
 
-    def test_two_unreachable_slots_for_one_source_report_one_gap(self):
-        duplicated = scenario_copy()
-        clone = dict(duplicated["collections"][4])
-        clone["slot_id"] = "SLOT-5-DUPLICATE"
-        duplicated["collections"].append(clone)
-        receipt = replay.replay(duplicated)
-        # A gap that is still the current state repeats across reopen points, but
-        # it must appear at most once per reopen point.
-        for point in receipt["reopen_points"]:
-            flags = [
-                (flag["kind"], flag.get("source_id"), flag.get("condition_id"), flag["observed_at"])
-                for flag in point["gap_flags"]
-            ]
-            self.assertEqual(len(flags), len(set(flags)), point["reopen_id"])
-        reported = [
-            (flag["kind"], flag.get("source_id"), flag.get("condition_id"), flag["observed_at"])
-            for point in receipt["reopen_points"]
-            for flag in point["gap_flags"]
-        ]
-        self.assertIn(
-            (replay.GAP_CONNECTION_FAILURE, "S-001", None, "2026-10-08T18:10:00+08:00"), reported
+    def test_collections_must_be_ordered(self):
+        broken = scenario_copy()
+        broken["collections"] = list(reversed(broken["collections"]))
+        with self.assertRaisesRegex(replay.ScenarioError, "collections must be ordered"):
+            replay.validate_scenario(broken)
+
+    def test_a_tracked_end_is_required_so_an_open_horizon_stays_bounded(self):
+        broken = scenario_copy()
+        del broken["conditions"][0]["tracked_end"]
+        with self.assertRaisesRegex(replay.ScenarioError, "tracked_end missing"):
+            replay.validate_scenario(broken)
+
+    def test_a_tracked_window_longer_than_the_cap_is_rejected(self):
+        far = scenario_copy()
+        for condition in far["conditions"]:
+            condition["tracked_end"] = "2027-10-09T17:00:00+08:00"
+        receipt = replay.replay(far)
+        self.assertEqual(receipt["reopen_points"][-1]["prompted_update_ids"], ["UPD-008", "UPD-013"])
+        broken = scenario_copy()
+        for condition in broken["conditions"]:
+            condition["tracked_end"] = "2036-10-09T17:00:00+08:00"
+        broken["updates"].append(
+            {
+                "update_id": "UPD-OPEN",
+                "document_id": "DOC-OPEN",
+                "source_id": "S-001",
+                "origin": "OFFICIAL",
+                "rights": "SYNTHETIC_NO_REAL_ROAD",
+                "acquired_at": "2026-10-10T08:29:00+08:00",
+                "published_at": "2026-10-10T08:29:00+08:00",
+                "upstream_update_id": None,
+                "content_sha256": "0" * 64,
+                "payload": {
+                    "road": "測試路 A 至 B",
+                    "district": "北屯區（合成）",
+                    "status": "IN_PROGRESS",
+                    "effective_from": "2026-10-10T18:00:00+08:00",
+                    "effective_to": None,
+                    "daily": {"start": "09:00", "end": "17:00"},
+                    "text": "【合成測試】",
+                },
+            }
+        )
+        broken["updates"][-1]["content_sha256"] = replay.normalized_payload_sha256(
+            broken["updates"][-1]["payload"], replay.VOLATILE_FIELDS
+        )
+        with self.assertRaisesRegex(replay.ScenarioError, "longer than"):
+            replay.replay(broken)
+
+    def test_gap_reporting_is_independent_of_the_collection_order(self):
+        ordered = scenario_copy()
+        for collection in ordered["collections"]:
+            if collection["slot_id"] == "SLOT-11":
+                collection["snapshot_complete"] = False
+        forward = replay.replay(ordered)
+        # A valid scenario keeps collections ordered, but the newest-slot rule must
+        # still be what decides which snapshot counts, not the listing position.
+        by_time = sorted(ordered["collections"], key=lambda item: item["observed_at"])
+        self.assertEqual(
+            replay.replay({**ordered, "collections": by_time})["reopen_points"][-1][
+                "public_original_by_update_id"
+            ],
+            forward["reopen_points"][-1]["public_original_by_update_id"],
+        )
+        self.assertEqual(
+            forward["reopen_points"][-1]["public_original_uncertain_source_ids"], ["S-001"]
         )
 
     def test_the_cancel_boundary_is_exclusive(self):
@@ -271,7 +377,6 @@ class FailClosedGuardTests(unittest.TestCase):
         for update in broken["updates"]:
             if update["update_id"] == "UPD-002":
                 update["upstream_update_id"] = None
-        broken["updates"][0]["content_sha256"] = broken["updates"][0]["content_sha256"]
         receipt = replay.replay(broken)
         points = {point["reopen_id"]: point for point in receipt["reopen_points"]}
         self.assertEqual(points["R2"]["prompted_update_ids"], ["UPD-002"])
@@ -499,12 +604,13 @@ class ReplayBehaviourTests(unittest.TestCase):
                 collection["visible_update_ids"] = [
                     uid
                     for uid in collection["visible_update_ids"]
-                    if uid not in {"UPD-007", "UPD-008"}
+                    if uid not in {"UPD-007", "UPD-008", "UPD-013"}
                 ]
         dropped = replay.replay(vanished)["reopen_points"][-1]
-        self.assertEqual(dropped["prompted_update_ids"], ["UPD-008"])
+        self.assertEqual(dropped["prompted_update_ids"], ["UPD-008", "UPD-013"])
         self.assertFalse(dropped["public_original_available"])
         self.assertEqual(dropped["public_original_by_update_id"]["UPD-008"], replay.ORIGINAL_REMOVED)
+        self.assertEqual(dropped["public_original_by_update_id"]["UPD-013"], replay.ORIGINAL_REMOVED)
 
     def test_an_unreachable_source_leaves_the_original_unknown_not_removed(self):
         unreachable = scenario_copy()
@@ -512,10 +618,10 @@ class ReplayBehaviourTests(unittest.TestCase):
             if collection["slot_id"] == "SLOT-11":
                 collection["snapshot_complete"] = False
         point = replay.replay(unreachable)["reopen_points"][-1]
-        self.assertEqual(point["prompted_update_ids"], ["UPD-008"])
+        self.assertEqual(point["prompted_update_ids"], ["UPD-008", "UPD-013"])
         self.assertFalse(point["public_original_available"])
         self.assertEqual(point["public_original_by_update_id"]["UPD-008"], replay.ORIGINAL_UNKNOWN)
-        self.assertEqual(point["public_original_unknown_update_ids"], ["UPD-008"])
+        self.assertEqual(point["public_original_unknown_update_ids"], ["UPD-008", "UPD-013"])
         self.assertEqual(point["public_original_uncertain_source_ids"], ["S-001"])
 
     def test_original_availability_is_reported_per_update(self):
@@ -535,7 +641,7 @@ class ReplayBehaviourTests(unittest.TestCase):
 
     def test_cancel_stops_the_prompt_but_keeps_other_conditions_and_the_original_text(self):
         point = self.points["R9"]
-        self.assertEqual(point["prompted_update_ids"], ["UPD-008"])
+        self.assertEqual(point["prompted_update_ids"], ["UPD-008", "UPD-013"])
         self.assertEqual(point["condition_status"]["C-ROAD-AB"], replay.CANCELLED)
         self.assertEqual(point["condition_status"]["C-DISTRICT-XITUN"], replay.ACTIVE)
         self.assertEqual(self.decisions("R9")["UPD-012"], replay.POST_CANCEL)
@@ -554,7 +660,7 @@ class ScoreTests(unittest.TestCase):
 
     def test_full_v6_arm_reproduces_every_gold_expected_set(self):
         report = self.run["report"]["reopen_unread"]
-        self.assertEqual((report["tp"], report["fp"], report["fn"]), (5, 0, 0))
+        self.assertEqual((report["tp"], report["fp"], report["fn"]), (6, 0, 0))
         self.assertEqual(report["precision"], 1.0)
         self.assertEqual(report["recall"], 1.0)
         self.assertEqual(report["observation_status_accuracy"], 1.0)
@@ -565,13 +671,13 @@ class ScoreTests(unittest.TestCase):
     def test_multi_condition_hits_do_not_inflate_true_positives(self):
         report = self.run["report"]["reopen_unread"]
         receipt = self.run["receipt"]
-        # Eight (update, condition) pairs behind five prompted updates: three of
+        # Nine (update, condition) pairs behind six prompted updates: three of
         # them matched two tracked conditions. The extra match must never be
         # scored twice.
-        self.assertEqual(receipt["counters"]["prompted_condition_pairs"], 8)
-        self.assertEqual(receipt["counters"]["prompted_updates"], 5)
+        self.assertEqual(receipt["counters"]["prompted_condition_pairs"], 9)
+        self.assertEqual(receipt["counters"]["prompted_updates"], 6)
         self.assertEqual(report["multi_condition_prompt_count"], 3)
-        self.assertEqual(report["tp"], 5)
+        self.assertEqual(report["tp"], 6)
         self.assertEqual(report["tp"], report["expected_id_denominator"])
         self.assertEqual(report["fp"], 0)
 
@@ -605,8 +711,11 @@ class ScoreTests(unittest.TestCase):
         self.assertEqual(arms["C_v6"], {})
         self.assertEqual(arms["A_v1"], {})
         for arm, overrides in arms.items():
-            # policy_from_mapping must accept every published override.
-            self.assertIsInstance(replay.policy_from_mapping(overrides), replay.ReplayPolicy)
+            # The receipt must carry the published overrides, so `--arm` cannot run
+            # something other than what the manifest documents.
+            expected = replay.policy_from_mapping(overrides).to_dict()
+            self.assertEqual(run_arm(arm, overrides=overrides)["receipt"]["policy"], expected, arm)
+            self.assertEqual(run_arm(arm)["receipt"]["policy"], expected, arm)
 
     def test_the_cli_refuses_an_arm_the_manifest_does_not_declare(self):
         import sys as _sys
@@ -687,12 +796,32 @@ class ScoreTests(unittest.TestCase):
 
     def test_substance_attribution_wins_over_read_state(self):
         # Losing read tracking and formatting-substantive-ness at once must not hide
-        # the layout defect behind the read-state bucket.
+        # the layout defect behind the read-state bucket. The counts are pinned: with
+        # the read-state check first these become 24/1 instead of 17/8.
         metrics = run_arm(
             "COMBINED_DEFECT",
             overrides={"track_read_state": False, "formatting_is_substantive": True},
         )["report"]["reopen_unread"]
-        self.assertGreater(metrics["false_alert_breakdown"]["layout_only_false_alert"], 0)
+        self.assertEqual(metrics["false_alert_breakdown"]["layout_only_false_alert"], 8)
+        self.assertEqual(metrics["false_alert_breakdown"]["already_read_repeat"], 17)
+        self.assertEqual(metrics["false_alert_breakdown"]["other_false_alert"], 0)
+
+    def test_a_repeat_fetch_that_was_also_read_is_filed_as_a_duplicate_fetch(self):
+        metrics = run_arm(
+            "COMBINED_DEFECT",
+            overrides={"track_read_state": False, "dedupe_repeat_fetches": False},
+        )["report"]["reopen_unread"]
+        self.assertEqual(metrics["false_alert_breakdown"]["duplicate_fetch_false_alert"], 8)
+        self.assertEqual(metrics["false_alert_breakdown"]["already_read_repeat"], 17)
+        self.assertEqual(metrics["false_alert_breakdown"]["other_false_alert"], 0)
+
+    def test_a_target_over_a_zero_denominator_is_not_measured(self):
+        manifest, _ = gold_cases()
+        empty = ev.evaluate(manifest, [], {})["target_assessment"]
+        by_name = {row["target"]: row for row in empty}
+        self.assertEqual(by_name["precision"]["status"], "NOT_MEASURED")
+        self.assertEqual(by_name["recall"]["status"], "NOT_MEASURED")
+        self.assertIsNone(by_name["precision"]["measured"])
 
     def test_declared_targets_are_assessed_not_just_copied(self):
         assessment = {row["target"]: row for row in self.run["report"]["target_assessment"]}
@@ -707,7 +836,7 @@ class ScoreTests(unittest.TestCase):
 
     def test_rules_only_ablation_is_scored_separately_and_is_worse(self):
         report = run_arm("C_RULES_ONLY")["report"]["reopen_unread"]
-        self.assertEqual(report["tp"], 5)
+        self.assertEqual(report["tp"], 6)
         self.assertEqual(report["fp"], 2)
         self.assertLess(report["precision"], 1.0)
         self.assertEqual(report["fn"], 0)

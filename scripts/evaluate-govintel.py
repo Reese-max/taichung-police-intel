@@ -391,7 +391,13 @@ def target_assessment(manifest: dict[str, Any], metrics: dict[str, Any]) -> list
             # Timing and correctness need arm A, which this round did not run.
             row["measured"] = None
             row["status"] = "NOT_RUN"
-            row["reason"] = "comparison arm A_v1 was not executed in this round"
+            row["reason"] = "needs a comparison arm that was not executed: " + ", ".join(
+                sorted(
+                    arm_id
+                    for arm_id, arm in (manifest.get("arms") or {}).items()
+                    if isinstance(arm, dict) and arm.get("status") == "NOT_RUN"
+                )
+            )
         rows.append(row)
     return rows
 
