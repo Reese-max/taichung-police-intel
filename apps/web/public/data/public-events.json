@@ -1,0 +1,177 @@
+{
+  "schema_version": 1,
+  "store_type": "PUBLIC_EVENT_QUERY",
+  "generated_at": "2026-09-22T09:00:00+08:00",
+  "source_ids": ["S-001", "S-032", "S-033"],
+  "features": {
+    "region": true,
+    "agency": true,
+    "category": true,
+    "time_range": true,
+    "verification_status": true,
+    "event_status": true,
+    "tracked": true,
+    "changed_only": true
+  },
+  "public_events": [
+    {
+      "schema_version": 1,
+      "public_event_id": "PE-8afdf11371b3c9246fa0",
+      "event_type": "large_event",
+      "canonical_title": "大型活動交通資訊",
+      "event_date": "2026-09-20",
+      "start_at": "2026-09-20T16:00:00+08:00",
+      "end_at": "2026-09-20T22:00:00+08:00",
+      "district_id": "location:tc-xitun",
+      "location_candidates": ["location:tc-xitun"],
+      "location_ids": ["location:tc-xitun"],
+      "agency_ids": ["agency:police", "agency:traffic"],
+      "independent_source_ids": ["S-001", "S-032", "S-033"],
+      "independent_source_count": 3,
+      "fusion_status": "CONFLICT",
+      "source_state": "CURRENT",
+      "linked_document_versions": [
+        {
+          "document_id": "doc-S-001",
+          "document_version_id": "doc-S-001:v2",
+          "source_id": "S-001",
+          "official_url": "https://www.police.taichung.gov.tw/",
+          "evidence_locator": "fixture:list-row:S-001:event-2026"
+        },
+        {
+          "document_id": "doc-S-032",
+          "document_version_id": "doc-S-032:v1",
+          "source_id": "S-032",
+          "official_url": "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,20",
+          "evidence_locator": "fixture:list-row:S-032:event-2026"
+        },
+        {
+          "document_id": "doc-S-033",
+          "document_version_id": "doc-S-033:v1",
+          "source_id": "S-033",
+          "official_url": "https://www.news.taichung.gov.tw/",
+          "evidence_locator": "fixture:list-row:S-033:event-2026"
+        }
+      ],
+      "version_history": [
+        {
+          "document_version_id": "doc-S-001:v1",
+          "observed_at": "2026-09-19T10:00:00+08:00",
+          "published_at": "2026-09-19T10:00:00+08:00",
+          "fields": {"start_at": "2026-09-20T18:00:00+08:00"},
+          "changed_fields": []
+        },
+        {
+          "document_version_id": "doc-S-001:v2",
+          "observed_at": "2026-09-20T10:00:00+08:00",
+          "published_at": "2026-09-20T10:00:00+08:00",
+          "fields": {"start_at": "2026-09-20T16:00:00+08:00"},
+          "changed_fields": ["start_at"]
+        }
+      ],
+      "changed_fields": ["start_at"],
+      "conflict_fields": ["start_at"],
+      "uncertain_fields": [],
+      "created_at": "2026-09-19T10:00:00+08:00",
+      "updated_at": "2026-09-20T10:00:00+08:00"
+    },
+    {
+      "schema_version": 1,
+      "public_event_id": "PE-23a24b65e2c027af9a8c",
+      "event_type": "traffic_control",
+      "canonical_title": "待人工核對的活動公告",
+      "event_date": "2026-09-20",
+      "start_at": "2026-09-20T18:00:00+08:00",
+      "end_at": "2026-09-20T22:00:00+08:00",
+      "district_id": "location:tc-xitun",
+      "location_candidates": ["location:tc-xitun"],
+      "location_ids": ["location:tc-xitun"],
+      "agency_ids": ["agency:police"],
+      "independent_source_ids": ["S-001"],
+      "independent_source_count": 1,
+      "fusion_status": "CANDIDATE",
+      "source_state": "CURRENT",
+      "linked_document_versions": [
+        {
+          "document_id": "doc-S-001-candidate",
+          "document_version_id": "doc-S-001:candidate",
+          "source_id": "S-001",
+          "official_url": "https://www.police.taichung.gov.tw/",
+          "evidence_locator": "fixture:list-row:S-001:candidate-2026"
+        }
+      ],
+      "version_history": [],
+      "changed_fields": [],
+      "conflict_fields": [],
+      "uncertain_fields": [],
+      "created_at": "2026-09-20T10:00:00+08:00",
+      "updated_at": "2026-09-20T10:00:00+08:00"
+    },
+    {
+      "schema_version": 1,
+      "public_event_id": "PE-traffic-20260921",
+      "event_type": "traffic_control",
+      "canonical_title": "西屯路交通管制公告",
+      "event_date": "2026-09-21",
+      "start_at": "2026-09-21T09:00:00+08:00",
+      "end_at": "2026-09-21T17:00:00+08:00",
+      "district_id": "location:tc-xitun",
+      "location_candidates": ["location:tc-xitun", "location:tc-nantun"],
+      "location_ids": ["location:tc-xitun"],
+      "agency_ids": ["agency:traffic"],
+      "independent_source_ids": ["S-032"],
+      "independent_source_count": 1,
+      "fusion_status": "CONFIRMED",
+      "source_state": "CURRENT",
+      "linked_document_versions": [
+        {
+          "document_id": "doc-S-032-traffic",
+          "document_version_id": "doc-S-032:v2",
+          "source_id": "S-032",
+          "official_url": "https://www.traffic.taichung.gov.tw/news/12345",
+          "evidence_locator": "fixture:traffic-control-20260921"
+        }
+      ],
+      "version_history": [],
+      "changed_fields": [],
+      "conflict_fields": [],
+      "uncertain_fields": [],
+      "created_at": "2026-09-21T08:00:00+08:00",
+      "updated_at": "2026-09-21T08:00:00+08:00"
+    },
+    {
+      "schema_version": 1,
+      "public_event_id": "PE-police-20260922",
+      "event_type": "police_announcement",
+      "canonical_title": "霧峰分局整建案進度說明",
+      "event_date": "2026-09-22",
+      "start_at": "2026-09-22T10:00:00+08:00",
+      "end_at": "2026-09-22T12:00:00+08:00",
+      "district_id": "location:tc-wufeng",
+      "location_candidates": ["location:tc-wufeng"],
+      "location_ids": ["location:tc-wufeng"],
+      "agency_ids": ["agency:police"],
+      "independent_source_ids": ["S-001"],
+      "independent_source_count": 1,
+      "fusion_status": "CONFIRMED",
+      "source_state": "CURRENT",
+      "linked_document_versions": [
+        {
+          "document_id": "doc-S-001-wufeng",
+          "document_version_id": "doc-S-001:v3",
+          "source_id": "S-001",
+          "official_url": "https://www.police.taichung.gov.tw/news/67890",
+          "evidence_locator": "fixture:wufeng-rebuild-20260922"
+        }
+      ],
+      "version_history": [],
+      "changed_fields": [],
+      "conflict_fields": [],
+      "uncertain_fields": [],
+      "created_at": "2026-09-22T09:00:00+08:00",
+      "updated_at": "2026-09-22T09:00:00+08:00"
+    }
+  ],
+  "store_sha256": "a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456",
+  "generation_id": "f1e2d3c4b5a697889900112233445566778899aabbccddeeff0011223344556677"
+}
