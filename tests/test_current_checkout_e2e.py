@@ -46,6 +46,69 @@ def unlink_after_http_release(path, attempts=100):
             time.sleep(0.01)
 
 
+class V6BrowserBindingTests(unittest.TestCase):
+    def setUp(self):
+        self.ctx = {"identity": {"code_sha": "a" * 40}, "hashes": {key: key * 20 for key in ("feed", "status", "brief")}}
+        self.release = {"code_sha": "a" * 40, "release_id": "b" * 64, "evidence_level": "BUILD_ONLY", "artifact_hashes": self.ctx["hashes"]}
+
+    def fake_run(self, status="PASS", code=0, metrics=None):
+        def execute(args, cwd, timeout, env):
+            self.assertIn("--served-code-sha", args)
+            self.assertEqual(env.get("CHROMIUM_PATH"), "/test/chromium")
+            output = Path(args[args.index("--out") + 1])
+            vc.write_json(output / "browser-acceptance.json", {
+                "status": status, "execution_scope": "ACTUAL_BROWSER_FINITE_SYNTHETIC_UI_FLOW",
+                "checks": [{"id": "actual-query-save", "status": status}],
+                "metrics": metrics if metrics is not None else {"browser_precision": None, "browser_recall": None},
+                "served_release_binding": {"status": "PASS", "served_code_sha": self.release["code_sha"],
+                    "release_id": self.release["release_id"], "evidence_level": "BUILD_ONLY", "artifact_hashes": self.release["artifact_hashes"]},
+            })
+            return subprocess.CompletedProcess(args, code, "actual browser result", "")
+        return execute
+
+    def run_helper(self, execute):
+        with tempfile.TemporaryDirectory() as tmp, patch.object(vc, "http_json", return_value=(200, self.release)), patch.object(vc, "run", side_effect=execute):
+            return vc.run_v6_browser_checks(self.ctx, "http://127.0.0.1:9999", Path(tmp), "/test/chromium")
+
+    def test_actual_browser_receipt_bound_to_same_build_can_pass(self):
+        self.assertEqual(self.run_helper(self.fake_run())["status"], "PASS")
+
+    def test_browser_failure_is_not_replaced_with_python_fixture_success(self):
+        self.assertEqual(self.run_helper(self.fake_run("FAIL", 1))["status"], "FAIL")
+
+    def test_wrong_served_build_fails_before_browser_run(self):
+        self.release["code_sha"] = "c" * 40
+        with tempfile.TemporaryDirectory() as tmp, patch.object(vc, "http_json", return_value=(200, self.release)), patch.object(vc, "run") as execute:
+            result = vc.run_v6_browser_checks(self.ctx, "http://127.0.0.1:9999", Path(tmp), None)
+        self.assertEqual(result["status"], "FAIL")
+        self.assertIn("BUILD_ONLY", result["detail"])
+        execute.assert_not_called()
+
+    def test_wrong_served_artifact_hash_fails_before_browser_run(self):
+        self.release["artifact_hashes"] = {**self.release["artifact_hashes"], "feed": "wrong"}
+        with tempfile.TemporaryDirectory() as tmp, patch.object(vc, "http_json", return_value=(200, self.release)), patch.object(vc, "run") as execute:
+            result = vc.run_v6_browser_checks(self.ctx, "http://127.0.0.1:9999", Path(tmp), None)
+        self.assertEqual(result["status"], "FAIL")
+        execute.assert_not_called()
+
+    def test_fixture_metrics_cannot_be_inserted_into_browser_receipt(self):
+        self.assertEqual(self.run_helper(self.fake_run(metrics={"browser_precision": 1.0, "browser_recall": 1.0}))["status"], "FAIL")
+
+    def test_skip_browser_preserves_both_lanes_as_not_run(self):
+        with patch.object(vc, "run_browser_checks") as legacy, patch.object(vc, "run_v6_browser_checks") as v6:
+            checks, pending = vc.run_browser_lanes(self.ctx, "http://127.0.0.1:9999", Path("evidence"), None, True)
+        self.assertEqual(checks, [])
+        self.assertEqual({row["id"] for row in pending}, {"browser_e2e", "v6_browser_e2e"})
+        legacy.assert_not_called(); v6.assert_not_called()
+
+    def test_full_browser_lane_retains_legacy_and_v6_checks(self):
+        with patch.object(vc, "run_browser_checks", return_value={"id": "browser_e2e", "status": "PASS"}) as legacy, patch.object(vc, "run_v6_browser_checks", return_value={"id": "v6_browser_e2e", "status": "FAIL"}) as v6:
+            checks, pending = vc.run_browser_lanes(self.ctx, "http://127.0.0.1:9999", Path("evidence"), None, False)
+        self.assertEqual([row["id"] for row in checks], ["browser_e2e", "v6_browser_e2e"])
+        self.assertEqual(pending, [])
+        legacy.assert_called_once(); v6.assert_called_once()
+
+
 class IdentityTests(unittest.TestCase):
     def test_identity_records_code_sha_and_lock_hash(self):
         identity = vc.collect_identity(ROOT)

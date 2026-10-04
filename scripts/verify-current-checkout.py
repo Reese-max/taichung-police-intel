@@ -737,6 +737,69 @@ def run_browser_checks(ctx: dict[str, Any], base: str, evidence: Path, chrome_pa
                         screenshots=doc.get("screenshots"), log="browser-stdout.log")
 
 
+def run_v6_browser_checks(ctx: dict[str, Any], base: str, evidence: Path, chrome_path: str | None) -> dict[str, Any]:
+    """Observe the served v6 UI and bind it to this build-only checkout."""
+
+    check_id = "v6_browser_e2e"
+    evidence.mkdir(parents=True, exist_ok=True)
+    log_name = "v6-browser-stdout.log"
+    try:
+        status, release = http_json(base + "/data/release.json")
+        code_sha = ctx["identity"]["code_sha"]
+        if status != 200 or not isinstance(release, dict):
+            raise ValueError(f"served release manifest HTTP {status}")
+        if release.get("code_sha") != code_sha or release.get("evidence_level") != "BUILD_ONLY":
+            raise ValueError("served release is not bound to the current BUILD_ONLY checkout")
+        for name, digest in (ctx.get("hashes") or {}).items():
+            if name in {"feed", "status", "brief"} and release.get("artifact_hashes", {}).get(name) != digest:
+                raise ValueError(f"served release {name} hash does not match candidate context")
+        if not isinstance(release.get("release_id"), str) or len(release["release_id"]) != 64:
+            raise ValueError("served release ID is missing")
+        driver = ROOT / "scripts" / "e2e-v6-browser.mjs"
+        if not driver.is_file():
+            raise ValueError("scripts/e2e-v6-browser.mjs missing")
+        env = dict(os.environ)
+        if chrome_path:
+            env["CHROMIUM_PATH"] = chrome_path
+        result = run(["node", str(driver), "--base-url", base, "--out", str(evidence),
+                      "--served-code-sha", code_sha, "--served-build-hash", release["release_id"]],
+                     ROOT, timeout=240, env=env)
+        (evidence / log_name).write_text(result.stdout + "\n" + result.stderr, encoding="utf-8")
+        doc = json.loads((evidence / "browser-acceptance.json").read_text(encoding="utf-8"))
+        rows = doc.get("checks")
+        binding = doc.get("served_release_binding") or {}
+        if result.returncode != 0 or doc.get("status") != "PASS" or not isinstance(rows, list) or not rows:
+            raise ValueError(f"browser driver failed or produced no checks: exit={result.returncode}")
+        if any(row.get("status") != "PASS" for row in rows):
+            raise ValueError("browser receipt contains failed or unexecuted checks")
+        if doc.get("execution_scope") != "ACTUAL_BROWSER_FINITE_SYNTHETIC_UI_FLOW":
+            raise ValueError("browser receipt scope is not actual finite UI execution")
+        metrics = doc.get("metrics") or {}
+        if "browser_precision" not in metrics or "browser_recall" not in metrics or any(
+            metrics[key] is not None for key in ("browser_precision", "browser_recall")
+        ):
+            raise ValueError("browser receipt must not substitute fixture precision/recall")
+        if (binding.get("status") != "PASS" or binding.get("served_code_sha") != code_sha
+                or binding.get("release_id") != release["release_id"]
+                or binding.get("evidence_level") != "BUILD_ONLY"
+                or binding.get("artifact_hashes") != release.get("artifact_hashes")):
+            raise ValueError("browser observations are not bound to the served build and artifact hashes")
+        return check_record(check_id, True, f"{len(rows)}/{len(rows)} actual v6 browser checks; BUILD_ONLY",
+                            receipt="browser-acceptance.json", log=log_name,
+                            served_code_sha=code_sha, release_id=release["release_id"],
+                            execution_scope=doc["execution_scope"])
+    except Exception as error:
+        return check_record(check_id, False, f"{type(error).__name__}: {error}", log=log_name)
+
+
+def run_browser_lanes(ctx: dict[str, Any], base: str, evidence: Path, chrome_path: str | None, skip: bool):
+    if skip:
+        return [], [{"id": name, "status": "NOT_RUN", "reason": "--skip-browser"}
+                    for name in ("browser_e2e", "v6_browser_e2e")]
+    return [run_browser_checks(ctx, base, evidence / "browser", chrome_path),
+            run_v6_browser_checks(ctx, base, evidence / "v6-browser", chrome_path)], []
+
+
 def run_sabotage_check(root: Path, evidence_dir: Path) -> dict[str, Any]:
     tmp = Path(tempfile.mkdtemp(prefix="govintel-sabotage-"))
     evidence_dir.mkdir(parents=True, exist_ok=True)
@@ -983,10 +1046,9 @@ def main(argv=None) -> int:
                     checks.extend(http_checks)
                 except Exception as error:
                     checks.append(check_record("http_checks", False, f"{type(error).__name__}: {error}"))
-                if args.skip_browser:
-                    not_run.append({"id": "browser_e2e", "status": "NOT_RUN", "reason": "--skip-browser"})
-                else:
-                    checks.append(run_browser_checks(ctx, base, evidence / "browser", args.chrome_path))
+                browser_checks, browser_not_run = run_browser_lanes(ctx, base, evidence, args.chrome_path, args.skip_browser)
+                checks.extend(browser_checks)
+                not_run.extend(browser_not_run)
             finally:
                 server.shutdown()
                 server.server_close()
@@ -996,10 +1058,12 @@ def main(argv=None) -> int:
         else:
             not_run.append({"id": "http_checks", "status": "NOT_RUN", "reason": "web build failed"})
             not_run.append({"id": "browser_e2e", "status": "NOT_RUN", "reason": "web build failed"})
+            not_run.append({"id": "v6_browser_e2e", "status": "NOT_RUN", "reason": "web build failed"})
     elif ctx is not None:
         not_run.append({"id": "web_build", "status": "NOT_RUN", "reason": "core mode"})
         not_run.append({"id": "http_checks", "status": "NOT_RUN", "reason": "core mode"})
         not_run.append({"id": "browser_e2e", "status": "NOT_RUN", "reason": "core mode"})
+        not_run.append({"id": "v6_browser_e2e", "status": "NOT_RUN", "reason": "core mode"})
 
     if args.skip_sabotage:
         not_run.append({"id": "sabotage_detection", "status": "NOT_RUN", "reason": "--skip-sabotage"})

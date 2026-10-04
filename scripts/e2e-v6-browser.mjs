@@ -6,6 +6,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 const { chromium } = createRequire(import.meta.url)("playwright-core");
 
 const flags = Object.fromEntries(process.argv.slice(2).reduce((rows, item, index, args) => {
@@ -20,6 +21,7 @@ const out = path.resolve(flags.out);
 await mkdir(out, { recursive: true });
 const storageKey = "govintel.v2.conditions.v1";
 const checks = [], events = [], contexts = [];
+let servedRelease = null, servedBinding = { status: "NOT_RUN", reason: "served release manifest not available" };
 let browser, page, chain = true;
 const unread = (target) => target.locator('.lc-update[data-kind="UPDATE"]').filter({ has: target.getByRole("button", { name: "標記這次更新已讀", exact: true }) });
 const state = (target) => target.evaluate((key) => JSON.parse(localStorage.getItem(key) || "null"), storageKey);
@@ -97,6 +99,24 @@ let fatal = null;
 try {
   browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || "/usr/bin/chromium", headless: true, args: ["--no-sandbox", "--disable-dev-shm-usage"] });
   page = await newPage();
+  try {
+    const response = await fetch(`${root}/data/release.json`, { signal: AbortSignal.timeout(5000) });
+    if (response.ok) {
+      servedRelease = await response.json();
+      const hashes = {};
+      for (const [key, name] of Object.entries({ feed: "intelligence-feed.json", status: "source-status.json", brief: "v2-daily-brief.json" })) {
+        const resource = await fetch(`${root}/data/${name}`, { signal: AbortSignal.timeout(5000) });
+        if (!resource.ok) throw new Error(`served ${name} HTTP ${resource.status}`);
+        hashes[key] = createHash("sha256").update(Buffer.from(await resource.arrayBuffer())).digest("hex");
+      }
+      assert.match(servedRelease.code_sha, /^[a-f0-9]{40}$/);
+      assert.equal(servedRelease.evidence_level, "BUILD_ONLY");
+      assert.deepEqual(servedRelease.artifact_hashes, hashes);
+      if (flags["served-code-sha"]) assert.equal(servedRelease.code_sha, flags["served-code-sha"]);
+      if (flags["served-build-hash"]) assert.equal(servedRelease.release_id, flags["served-build-hash"]);
+      servedBinding = { status: "PASS", served_code_sha: servedRelease.code_sha, release_id: servedRelease.release_id, evidence_level: "BUILD_ONLY", artifact_hashes: hashes };
+    } else if (flags["served-code-sha"] || flags["served-build-hash"]) throw new Error(`required served release HTTP ${response.status}`);
+  } catch (error) { servedBinding = { status: "FAIL", reason: String(error.message) }; }
   await check("01-visible-navigation", page, async () => {
     await page.goto(`${root}/`);
     const nav = page.getByRole("navigation", { name: "主要導覽" });
@@ -124,12 +144,14 @@ try {
   await check("04-extension-and-read", page, async () => {
     await tracking(page, "R3"); await unreadCount(page, 1);
     const card = unread(page).first(); assert.match(await card.textContent(), /UPD-005/);
+    const displayed = (await observation(page)).cards.find((row) => row.unread);
+    assert.equal(displayed.update_id, "UPD-005");
     const saved = await state(page); const condition = Object.values(saved.conditions)[0];
     assert.equal(Date.parse(condition.tracked_time_to), Date.parse("2026-10-09T17:00:00+08:00"));
     assert.equal(condition.filters.time_to, "2026-10-07T17:00+08:00");
     assert.equal(condition.enabled, true);
     await card.getByRole("button", { name: "標記這次更新已讀", exact: true }).click(); await unreadCount(page, 0);
-    return { displayed_update_id: "UPD-005", observed_unread_before_read: 1, derived_tracked_end: condition.tracked_time_to, original_filter_end: condition.filters.time_to };
+    return { displayed_update_id: displayed.update_id, observed_unread_before_read: 1, derived_tracked_end: condition.tracked_time_to, original_filter_end: condition.filters.time_to };
   }, { dependent: true });
   await check("05-read-persists-across-reopen", page, async () => {
     await page.reload(); await tracking(page, "R3"); await unreadCount(page, 0);
@@ -151,9 +173,11 @@ try {
   await check("08-explicit-lift-read-keeps-condition", page, async () => {
     await tracking(page, "R7"); await unreadCount(page, 1);
     const card = unread(page).first(); assert.match(await card.textContent(), /UPD-006/); assert.match(await card.textContent(), /解除/);
+    const displayed = (await observation(page)).cards.find((row) => row.unread);
+    assert.equal(displayed.update_id, "UPD-006");
     await card.getByRole("button", { name: "標記這次更新已讀", exact: true }).click(); await unreadCount(page, 0);
     assert.equal(Object.values((await state(page)).conditions)[0].enabled, true);
-    return { displayed_update_id: "UPD-006", explicit_lift_visible: true, read_does_not_cancel_condition: true };
+    return { displayed_update_id: displayed.update_id, explicit_lift_visible: true, read_does_not_cancel_condition: true };
   }, { dependent: true });
   await check("09-user-cancel-stops-prompts", page, async () => {
     await page.getByRole("button", { name: "取消追蹤條件", exact: true }).click();
@@ -185,8 +209,8 @@ try {
   });
   for (const [snapshot, label] of [["R4", "FAILED"], ["R5", "PARTIAL"]]) await check(`13-query-${snapshot}-source-gap`, validation, async () => {
     await replayQuery(validation, snapshot); await validation.locator("#pq-road").fill("測試路 A 至 B"); await submit(validation);
-    await waitText(validation, new RegExp(label));
-    assert.equal(await validation.locator(".pq-gaps").isVisible(), true);
+    await validation.locator(".pq-gaps").waitFor({ state: "visible" });
+    assert.match(await validation.locator(".pq-gaps").textContent(), new RegExp(label));
     return { snapshot, source_gap_label: label, cached_records_not_complete_source_success: true };
   });
   const badHash = await newPage();
@@ -219,7 +243,7 @@ try {
   await check("16-source-page-failure-not-zero", sources, async () => {
     await sources.goto(`${root}/sources/`); await waitText(sources, /來源狀態暫時無法取得/);
     assert.equal(await sources.locator(".govintel-source-card").count(), 0);
-    assert.equal(await sources.getByRole("alert").count(), 1);
+    assert.equal(await sources.locator(".govintel-sources").getByRole("alert").count(), 1);
     return { controlled_503_visible: true, source_state_not_reported_as_successful_zero: true };
   });
   const mobile = await newPage({ viewport: { width: 375, height: 812 }, isMobile: true, deviceScaleFactor: 1 });
@@ -238,6 +262,36 @@ try {
     assert.equal(await details.evaluate((node) => node === document.activeElement), true);
     return { widths, dialog_escape_closes: true, focus_returns_to_trigger: true };
   });
+  const background = await newPage();
+  await check("18-D1-fixed-period-values", background, async () => {
+    await background.goto(`${root}/public-query/`);
+    await background.getByRole("button", { name: "D1／D2 參考資料", exact: true }).click();
+    await background.locator("#pq-population-district").selectOption("66000060");
+    assert.equal(await background.locator("#pq-population-district option").count(), 29);
+    const text = await background.locator(".pq-population").textContent();
+    assert.match(text, /235,441 人/); assert.match(text, /94,971 戶/); assert.match(text, /2023-12/);
+    assert.match(text, /不是目前人口、現場人潮/);
+    await waitText(background, /機關參考，管轄另行確認/);
+    return { district_code: "66000060", population: 235441, households: 94971, period: "2023-12", scope: "historical background sample, no comprehension or real-time effect claim" };
+  });
+  for (const kind of ["wrong-period", "bad-hash"]) {
+    const mutation = await newPage();
+    await mutation.route("**/data/population-112Y12M.json", async (route) => {
+      const response = await route.fetch(); const json = await response.json();
+      if (kind === "wrong-period") json.period = "112Y11M";
+      else json.districts.find((row) => row.district_code === "66000060").population += 1;
+      await route.fulfill({ response, json });
+    });
+    await check(`19-D1-${kind}-refused`, mutation, async () => {
+      await mutation.goto(`${root}/public-query/`);
+      await mutation.getByRole("button", { name: "D1／D2 參考資料", exact: true }).click();
+      await mutation.locator(".pq-population [role=alert]").waitFor({ state: "visible" });
+      const error = await mutation.locator(".pq-population [role=alert]").textContent();
+      assert.match(error, kind === "wrong-period" ? /固定期別或來源收據無法驗證/ : /hash 不符/);
+      assert.equal(await mutation.locator("#pq-population-district").count(), 0);
+      return { controlled_mutation: kind, historical_value_display: "refused", observed_error: error };
+    });
+  }
 } catch (error) { fatal = String(error.stack || error); }
 finally {
   for (let index = 0; index < contexts.length; index++) {
@@ -249,10 +303,11 @@ finally {
 let driverCommit = null;
 try { driverCommit = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(); } catch {}
 const receipt = {
-  schema_version: 1, status: fatal || checks.some((row) => row.status !== "PASS") ? "FAIL" : "PASS",
+  schema_version: 1, status: fatal || servedBinding.status === "FAIL" || checks.some((row) => row.status !== "PASS") ? "FAIL" : "PASS",
   execution_scope: "ACTUAL_BROWSER_FINITE_SYNTHETIC_UI_FLOW", base_url: root,
   generated_at: new Date().toISOString(), driver_checkout_commit: driverCommit,
-  served_checkout_identity: "Not inferred from driver checkout; bind this receipt to the server build separately.",
+  served_release_binding: servedBinding,
+  served_checkout_identity: "Observed served release only; driver checkout SHA is never substituted for server identity.",
   browser: "Chromium", viewport_primary: { width: 1280, height: 900 }, mobile_width: 375,
   checks, fatal, observed_browser_events: events,
   not_measured: ["Python gold TP/FP/FN equivalence", "production source coverage", "human task time and effectiveness", "semantic AI gain", "event-level holdout generalization"],
