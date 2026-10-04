@@ -214,5 +214,42 @@ class DownloadListDateTruthTests(unittest.TestCase):
         self.assertEqual(feed["items"][0]["eligibility"], "INELIGIBLE_PARTIAL")
 
 
+class PopulationBackgroundTests(unittest.TestCase):
+    def csv(self, *, period="112Y12M", population="100", town_id="66000180", labels=True):
+        from intel_v2.population_background import FIELDS, LABELS
+
+        header = ','.join(FIELDS) + '\n'
+        description = ','.join(LABELS[field] for field in FIELDS) + '\n' if labels else ''
+        row = f'66000,臺中市,{town_id},大雅區,30,{population},40,60,{period}\n'
+        return (header + description + row).encode('utf-8')
+
+    def test_exact_official_label_row_is_skipped_and_counts_are_integers(self):
+        from intel_v2.population_background import parse_population_csv
+
+        for labels in (True, False):
+            rows = parse_population_csv(self.csv(labels=labels), expected_period="112Y12M")
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["P_CNT"], 100)
+            self.assertEqual(rows[0]["TOWN_ID"], "66000180")
+
+    def test_dynamic_newer_period_is_not_accepted_as_requested_historical_period(self):
+        from intel_v2.population_background import parse_population_csv
+
+        with self.assertRaisesRegex(ValueError, "period mismatch"):
+            parse_population_csv(self.csv(period="114Y12M"), expected_period="112Y12M")
+
+    def test_missing_counts_duplicate_id_and_inconsistent_totals_fail_closed(self):
+        from intel_v2.population_background import parse_population_csv
+
+        csv_body = self.csv()
+        invalid = [self.csv(population=""), self.csv(population="99"), self.csv(town_id="65000180"),
+                   self.csv(population="NaN"), csv_body + csv_body.splitlines(keepends=True)[-1],
+                   csv_body.replace('人口數'.encode(), '未知欄位'.encode(), 1)]
+        for body in invalid:
+            with self.subTest(body=body):
+                with self.assertRaises(ValueError):
+                    parse_population_csv(body, expected_period="112Y12M")
+
+
 if __name__ == "__main__":
     unittest.main()

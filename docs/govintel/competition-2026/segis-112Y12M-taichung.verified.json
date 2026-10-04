@@ -1,0 +1,310 @@
+{
+  "schema_version": 1,
+  "status": "VERIFIED_HISTORICAL_BACKGROUND_SAMPLE",
+  "production_active": false,
+  "source_id": "S-035",
+  "source_name": "SEGIS 112年12月行政區人口統計（鄉鎮市區）",
+  "authority": "內政部統計處",
+  "source_url": "https://segis.moi.gov.tw/STATCloud/QueryInterfaceView?COL=Tr2i5dY3GU8B0WZY2aNaKQ%253d%253d",
+  "period": "112Y12M",
+  "period_label": "2023 年 12 月",
+  "observed_at": "2026-10-05T01:28:18.419461+08:00",
+  "source_receipt": {
+    "http_status": 200,
+    "download_method": "官方固定期別查詢頁的 CSV 下載按鈕；未使用會更新期別的 JSON 開放服務。",
+    "zip_bytes": 9932,
+    "zip_sha256": "d2648b7ab2649b1257099937d246d9e0639c86614ac2ad1accd355c53882d870",
+    "csv_filename": "112年12月行政區人口統計_鄉鎮市區.csv",
+    "csv_bytes": 28502,
+    "raw_csv_sha256": "95500e06310098d4c194a26e4aeba00e7142d5c9e441a62fe18f71250d65496b",
+    "character_encoding": "UTF-8",
+    "download_endpoint": "https://segis.moi.gov.tw/FileDownload/Download.aspx"
+  },
+  "license": {
+    "classification": "公開免申請",
+    "name": "政府資料開放授權條款",
+    "terms_url": "https://segis.moi.gov.tw/STATCloud/DataUseInfo",
+    "terms_sha256": "9c8ad45331a54597980b6ef7b03ee2f7afb840d75e251dd2f3e9cd6e14a50ed0",
+    "attribution": "來源：內政部統計處／內政部社會經濟資料服務平台；112 年 12 月（2023-12）行政區人口統計。",
+    "transformation_notice": "資料已變更：移除官方中文欄位說明列、篩選臺中市並依鄉鎮市區代碼排序；未修改人口或戶數數值。"
+  },
+  "validation": {
+    "scope": "固定期別原始 CSV 完整解析後篩選臺中市；非 production promotion",
+    "field_contract": [
+      "COUNTY_ID",
+      "COUNTY",
+      "TOWN_ID",
+      "TOWN",
+      "H_CNT",
+      "P_CNT",
+      "M_CNT",
+      "F_CNT",
+      "INFO_TIME"
+    ],
+    "description_row_handling": "僅移除與官方九欄中文說明完全相符的第一列。",
+    "national_row_count": 368,
+    "observed_periods": [
+      "112Y12M"
+    ],
+    "duplicate_town_period_count": 0,
+    "missing_value_count": 0,
+    "nonnegative_integer_counts": true,
+    "sex_total_mismatch_count": 0,
+    "county_town_codes_match": true,
+    "taichung_district_count": 29
+  },
+  "county_code": "66000",
+  "county_name": "臺中市",
+  "totals": {
+    "population": 2845909,
+    "households": 1059625,
+    "male_population": 1391681,
+    "female_population": 1454228
+  },
+  "districts": [
+    {
+      "district_code": "66000010",
+      "district_name": "中區",
+      "population": 17784,
+      "households": 8226,
+      "male_population": 8718,
+      "female_population": 9066
+    },
+    {
+      "district_code": "66000020",
+      "district_name": "東區",
+      "population": 76852,
+      "households": 30670,
+      "male_population": 37844,
+      "female_population": 39008
+    },
+    {
+      "district_code": "66000030",
+      "district_name": "南區",
+      "population": 126907,
+      "households": 52114,
+      "male_population": 60453,
+      "female_population": 66454
+    },
+    {
+      "district_code": "66000040",
+      "district_name": "西區",
+      "population": 113548,
+      "households": 47293,
+      "male_population": 53425,
+      "female_population": 60123
+    },
+    {
+      "district_code": "66000050",
+      "district_name": "北區",
+      "population": 144097,
+      "households": 62236,
+      "male_population": 68338,
+      "female_population": 75759
+    },
+    {
+      "district_code": "66000060",
+      "district_name": "西屯區",
+      "population": 235441,
+      "households": 94971,
+      "male_population": 112101,
+      "female_population": 123340
+    },
+    {
+      "district_code": "66000070",
+      "district_name": "南屯區",
+      "population": 182232,
+      "households": 71961,
+      "male_population": 86537,
+      "female_population": 95695
+    },
+    {
+      "district_code": "66000080",
+      "district_name": "北屯區",
+      "population": 304179,
+      "households": 120351,
+      "male_population": 144417,
+      "female_population": 159762
+    },
+    {
+      "district_code": "66000090",
+      "district_name": "豐原區",
+      "population": 163948,
+      "households": 56638,
+      "male_population": 80546,
+      "female_population": 83402
+    },
+    {
+      "district_code": "66000100",
+      "district_name": "東勢區",
+      "population": 47468,
+      "households": 17640,
+      "male_population": 24156,
+      "female_population": 23312
+    },
+    {
+      "district_code": "66000110",
+      "district_name": "大甲區",
+      "population": 74684,
+      "households": 24676,
+      "male_population": 37379,
+      "female_population": 37305
+    },
+    {
+      "district_code": "66000120",
+      "district_name": "清水區",
+      "population": 89924,
+      "households": 32178,
+      "male_population": 45798,
+      "female_population": 44126
+    },
+    {
+      "district_code": "66000130",
+      "district_name": "沙鹿區",
+      "population": 98805,
+      "households": 34085,
+      "male_population": 49475,
+      "female_population": 49330
+    },
+    {
+      "district_code": "66000140",
+      "district_name": "梧棲區",
+      "population": 61019,
+      "households": 20715,
+      "male_population": 30510,
+      "female_population": 30509
+    },
+    {
+      "district_code": "66000150",
+      "district_name": "后里區",
+      "population": 53653,
+      "households": 17373,
+      "male_population": 26941,
+      "female_population": 26712
+    },
+    {
+      "district_code": "66000160",
+      "district_name": "神岡區",
+      "population": 64362,
+      "households": 20776,
+      "male_population": 32735,
+      "female_population": 31627
+    },
+    {
+      "district_code": "66000170",
+      "district_name": "潭子區",
+      "population": 108979,
+      "households": 38728,
+      "male_population": 53616,
+      "female_population": 55363
+    },
+    {
+      "district_code": "66000180",
+      "district_name": "大雅區",
+      "population": 95708,
+      "households": 31694,
+      "male_population": 47480,
+      "female_population": 48228
+    },
+    {
+      "district_code": "66000190",
+      "district_name": "新社區",
+      "population": 23089,
+      "households": 7888,
+      "male_population": 11909,
+      "female_population": 11180
+    },
+    {
+      "district_code": "66000200",
+      "district_name": "石岡區",
+      "population": 14093,
+      "households": 4940,
+      "male_population": 7273,
+      "female_population": 6820
+    },
+    {
+      "district_code": "66000210",
+      "district_name": "外埔區",
+      "population": 31163,
+      "households": 10182,
+      "male_population": 15926,
+      "female_population": 15237
+    },
+    {
+      "district_code": "66000220",
+      "district_name": "大安區",
+      "population": 18073,
+      "households": 5741,
+      "male_population": 9514,
+      "female_population": 8559
+    },
+    {
+      "district_code": "66000230",
+      "district_name": "烏日區",
+      "population": 80194,
+      "households": 29887,
+      "male_population": 39777,
+      "female_population": 40417
+    },
+    {
+      "district_code": "66000240",
+      "district_name": "大肚區",
+      "population": 55955,
+      "households": 19094,
+      "male_population": 28459,
+      "female_population": 27496
+    },
+    {
+      "district_code": "66000250",
+      "district_name": "龍井區",
+      "population": 78413,
+      "households": 25830,
+      "male_population": 39324,
+      "female_population": 39089
+    },
+    {
+      "district_code": "66000260",
+      "district_name": "霧峰區",
+      "population": 63822,
+      "households": 21453,
+      "male_population": 32253,
+      "female_population": 31569
+    },
+    {
+      "district_code": "66000270",
+      "district_name": "太平區",
+      "population": 198212,
+      "households": 72172,
+      "male_population": 97475,
+      "female_population": 100737
+    },
+    {
+      "district_code": "66000280",
+      "district_name": "大里區",
+      "population": 212511,
+      "households": 75385,
+      "male_population": 103558,
+      "female_population": 108953
+    },
+    {
+      "district_code": "66000290",
+      "district_name": "和平區",
+      "population": 10794,
+      "households": 4728,
+      "male_population": 5744,
+      "female_population": 5050
+    }
+  ],
+  "usage_limits": [
+    "人口與戶數為 2023 年 12 月歷史背景，不是目前人口或即時人流。",
+    "地區人口不等於活動出席人數或受影響人口。",
+    "行政區代碼與名稱可供背景關聯；人口資料不能推論機關管轄、可用警力或現場狀態。"
+  ],
+  "alternate_service_warning": {
+    "source": "查詢頁的 JSON 開放服務連結",
+    "observed_period": "114Y12M",
+    "http_status": 200,
+    "raw_sha256": "c7b331016226bb7ff93baf4f236f2156721171a562309a0a7beba6bd3498382f",
+    "result": "服務期別不符合112Y12M；不能用該回應覆蓋固定歷史 CSV。"
+  }
+}
