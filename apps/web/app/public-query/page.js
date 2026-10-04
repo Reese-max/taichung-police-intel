@@ -107,6 +107,7 @@ export default function PublicQueryPage() {
 
   async function handleSearch(cursor = null) {
     const request = ++sequence.current;
+    closeDetail();
     setState("loading"); setError(null); setSaveNotice(""); setSaveError("");
     try {
       const submitted = cursor ? results.submitted_filters : normalizeQueryFilters(draft);
@@ -130,6 +131,7 @@ export default function PublicQueryPage() {
         data = { ...data, events: mode === "published" ? [] : rows, results: rows, submitted_filters: submitted };
       }
       if (request !== sequence.current) return;
+      closeDetail();
       setResults({ ...data, query_mode: mode }); setState("ready");
     } catch (reason) {
       if (request !== sequence.current) return;
