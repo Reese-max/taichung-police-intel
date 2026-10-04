@@ -319,6 +319,9 @@ async function getSnapshot(env) {
     // Inconsistent publication or release artifacts always fail closed, even
     // when this Worker has a previously verified generation in its cache.
     if (error instanceof SnapshotIntegrityError) {
+      // Once the origin has contradicted this generation, an ensuing outage
+      // cannot revive it through the last-known-good fallback.
+      if (snapshotCache?.key === key) snapshotCache = null;
       throw new GatewayError("QUERY_TEMPORARILY_UNAVAILABLE", "release binding is unavailable", 503);
     }
     // A different deployment must never reuse another version's cache.

@@ -191,6 +191,10 @@ test("a release outage cannot mask a concurrent publication integrity failure", 
   assert.equal(rejected.status, 503);
   assert.equal(rejected.body.error.code, "QUERY_TEMPORARILY_UNAVAILABLE");
   assert.equal(rejected.body.results, undefined);
+  t.mock.method(globalThis, "fetch", async () => new Response("unavailable", { status: 503 }));
+  const stillRejected = await request("/query", { tool: "search_evidence", arguments: {} });
+  assert.equal(stillRejected.status, 503, "an outage must not revive a generation invalidated by integrity failure");
+  assert.equal(stillRejected.body.results, undefined);
 });
 
 test("an expired cached publication cannot degrade across Worker deployments", async t => {
