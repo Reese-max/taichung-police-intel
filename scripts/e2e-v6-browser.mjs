@@ -76,7 +76,7 @@ async function roadFilters(target) {
 }
 async function submit(target) {
   await target.locator('form button[type="submit"]').click();
-  await target.locator(".pq-results, .pq-error").first().waitFor({ state: "visible" });
+  await target.locator(".pq-result-meta, .pq-error").first().waitFor({ state: "visible" });
 }
 async function tracking(target, snapshot = "R1", { navigate = false } = {}) {
   if (navigate) await target.goto(`${root}/tracking/`);

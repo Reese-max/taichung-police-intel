@@ -51,14 +51,22 @@ test("v6 extension leaves the frozen v1 gold harness intact", () => {
   assert.match(result.stdout, /GOLD_EVAL_SELF_CHECK_OK dataset=govintel-gold-v1 cases=15/);
 });
 
-test("v6 evaluation manifest records the frozen v1 arm B definition", () => {
+test("v6 methods stay distinct from the frozen v1 dataset and unexecuted policy proxies", () => {
   const result = spawnSync(python.command, [...python.prefix, "-X", "utf8", "-c", [
     "import json,sys",
     "template=json.load(open('docs/govintel/competition-2026/evaluation-manifest.template.json',encoding='utf-8'))",
     "v6=json.load(open('eval/gold/v6/commute-reopen-v1/manifest.json',encoding='utf-8'))",
-    "assert template['arms']['B']['method']=='same_new_workflow_without_semantic_AI', template['arms']['B']",
+    "assert template['schema_version']==2 and template['proposal_version']=='v6_2026-10-01'",
+    "assert template['arms']['A']['method']=='direct_official_manual_query_and_update_recheck'",
+    "assert template['arms']['B']['method']=='same_scope_search_and_general_summary'",
+    "assert template['arms']['C']['method']=='full_GovIntel_public_query_and_browser_tracking'",
+    "assert template['arms']['C_semantic_off']['method']=='same_C_interface_data_tracking_read_rules_without_semantic_processing'",
+    "assert all(arm['method_execution_status']=='NOT_RUN' and arm['results'] is None for arm in template['arms'].values())",
+    "assert template['engineering_policy_replay']['evaluation_scope']=='SYNTHETIC_DETERMINISTIC_POLICY_REPLAY'",
     "assert 'B_v6' in v6['arms'] and v6['arms']['B_v6']['method_id']!='same_new_workflow_without_semantic_AI'",
     "assert v6['arms']['C_RULES_ONLY']['method_id']!=v6['arms']['B_v6']['method_id']",
+    "assert all(arm['method_execution_status']=='NOT_RUN' for arm in v6['arms'].values())",
+    "assert v6['evaluation_scope']=='SYNTHETIC_DETERMINISTIC_POLICY_REPLAY'",
     "print('METHOD_IDS_OK')",
   ].join("\n")], { cwd: repo, encoding: "utf8" });
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
