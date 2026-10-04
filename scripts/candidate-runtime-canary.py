@@ -41,7 +41,13 @@ class BoundedSession:
 
             transport = http_session()
         self.transport = transport
-        self.transport.trust_env = False
+        # Retain the runtime's proxy and CA settings. Adapter retries are hidden
+        # from the call counter, so each request in this bounded probe gets one
+        # attempt even though the production collector may retry transient errors.
+        from urllib3.util.retry import Retry
+
+        for adapter in getattr(self.transport, "adapters", {}).values():
+            adapter.max_retries = Retry(total=0, connect=0, read=0, redirect=0, status=0)
         self.transport.headers.update({
             "User-Agent": "GovIntelCandidateCanary/1.0 (+public-source-monitor)",
             "Accept-Language": "zh-TW",

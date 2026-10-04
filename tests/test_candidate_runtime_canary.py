@@ -85,13 +85,33 @@ class CanaryContractTests(unittest.TestCase):
             session.get("https://evil.example.test/")
         self.assertEqual(session.calls, 0)
 
-    def test_default_transport_reuses_collector_retry_policy(self):
+    def test_default_transport_preserves_runtime_proxy_and_ca_settings(self):
+        session = module.BoundedSession("https://official.example.test/")
+        try:
+            self.assertTrue(session.transport.trust_env)
+        finally:
+            session.close()
+
+    def test_default_transport_has_no_hidden_retries_outside_call_budget(self):
         session = module.BoundedSession("https://official.example.test/")
         try:
             retry = session.transport.adapters["https://"].max_retries
-            self.assertEqual(retry.total, 2)
-            self.assertEqual(set(retry.status_forcelist), {429, 500, 502, 503, 504})
-            self.assertIn("GET", retry.allowed_methods)
+            self.assertEqual(retry.total, 0)
+            self.assertEqual(retry.connect, 0)
+            self.assertEqual(retry.read, 0)
+            self.assertEqual(retry.status, 0)
+        finally:
+            session.close()
+
+    def test_injected_requests_transport_is_also_retry_free(self):
+        from online_collect import http_session
+
+        transport = http_session()
+        session = module.BoundedSession("https://official.example.test/", transport)
+        try:
+            self.assertIs(session.transport, transport)
+            self.assertTrue(transport.trust_env)
+            self.assertTrue(all(adapter.max_retries.total == 0 for adapter in transport.adapters.values()))
         finally:
             session.close()
 
@@ -123,6 +143,35 @@ class CanaryContractTests(unittest.TestCase):
             session.close()
         self.assertEqual(len(transport.calls), 1)
         self.assertFalse(transport.calls[0][1]["allow_redirects"])
+        self.assertTrue(transport.trust_env)
+
+    def test_each_redirect_consumes_call_budget_and_seventh_request_is_blocked(self):
+        class Transport:
+            headers = {}
+
+            def __init__(self):
+                self.calls = []
+                self.closed = 0
+
+            def get(self, url, **kwargs):
+                self.calls.append(url)
+                response = SimpleNamespace(status_code=302, headers={"location": "/redirect"})
+                response.close = lambda: setattr(self, "closed", self.closed + 1)
+                return response
+
+            def close(self):
+                pass
+
+        transport = Transport()
+        session = module.BoundedSession("https://official.example.test/", transport)
+        for _ in range(2):
+            with self.assertRaisesRegex(RuntimeError, "redirect budget exhausted"):
+                session.get("https://official.example.test/list")
+        with self.assertRaisesRegex(RuntimeError, "HTTP budget exhausted"):
+            session.get("https://official.example.test/list")
+        self.assertEqual(session.calls, 6)
+        self.assertEqual(len(transport.calls), 6)
+        self.assertEqual(transport.closed, 6)
 
     def test_catalog_candidate_inventory_includes_live_adapters(self):
         import online_collect
