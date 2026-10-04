@@ -3,14 +3,19 @@ import test from "node:test";
 
 import {
   addLocalCondition,
+  clearLocalConditions,
+  conditionDatasetStatus,
   cancelLocalCondition,
   emptyLocalConditions,
   getUnreadUpdates,
   loadLocalConditions,
+  initializeConditionBaselines,
+  markDisplayedUpdatesRead,
   markLocalRead,
   matchPublishedItems,
   projectLocalConditions,
   saveLocalConditions,
+  saveLocalConditionRequest,
   updateLocalCondition,
   validateLocalConditions,
 } from "../lib/local-conditions.js";
@@ -251,9 +256,118 @@ test("cancel missing condition throws", () => {
   assert.throws(() => cancelLocalCondition(state, "missing", T0), /找不到條件/);
 });
 
-test("baseline generation is set on first match", () => {
+test("projection does not mutate baseline state", () => {
   const state = emptyLocalConditions();
   const added = addLocalCondition(state, condition({ baseline_generation: null }), T0);
   const matches = matchPublishedItems(added, [publishedItem()], "gen-1");
   assert.equal(added.conditions["cond-1"].baseline_generation, null);
+});
+
+test("equivalent conditions deduplicate independently of ID, order, and keyword case", () => {
+  const first = addLocalCondition(emptyLocalConditions(), { filters: { keywords: ["ROAD", "交通"], source_id: ["S-032", "S-001"] } }, T0);
+  const second = addLocalCondition(first, { condition_id: "another", filters: { source_id: ["S-001", "S-032"], keywords: ["交通", "road"] } }, T1);
+  assert.deepEqual(second, first);
+});
+
+test("initial data stays baseline, later material version is unread, and layout hashes do not notify", () => {
+  const base = addLocalCondition(emptyLocalConditions(), condition(), T0);
+  const first = initializeConditionBaselines(base, [publishedItem()], { generation: "g1", generated_at: T0, snapshot_complete: true });
+  assert.equal(first.conditions["cond-1"].baseline_generation, "g1");
+  assert.equal(getUnreadUpdates(first, [publishedItem()]).length, 0);
+  assert.equal(projectLocalConditions(first, [publishedItem()])[0].update_kind, "INITIAL");
+  const revision = publishedItem({ source_version: 2, change_type: "DEADLINE_CHANGED" });
+  assert.equal(getUnreadUpdates(first, [revision]).length, 1);
+  assert.equal(getUnreadUpdates(first, [{ ...revision, source_version: 3, materiality: "FORMAT_ONLY" }]).length, 0);
+  assert.equal(getUnreadUpdates(first, [{ ...publishedItem(), content_sha256: "new-layout-hash" }]).length, 0);
+});
+
+test("backfilled old announcements are history even when acquired after baseline", () => {
+  const base = initializeConditionBaselines(addLocalCondition(emptyLocalConditions(), condition(), T1), [], { generation: "g1", generated_at: T1 });
+  const old = { ...publishedItem(), published_at: T0, acquired_at: T2 };
+  assert.equal(projectLocalConditions(base, [old])[0].update_kind, "HISTORICAL");
+  assert.equal(getUnreadUpdates(base, [old]).length, 0);
+  const lateCapture = { ...old, published_at: T2, end_at: T0 };
+  assert.equal(projectLocalConditions(base, [lateCapture])[0].update_kind, "HISTORICAL");
+});
+
+test("read coverage requires all currently matched conditions; cancelling one preserves the remaining read", () => {
+  let state = addLocalCondition(emptyLocalConditions(), { condition_id: "c1", filters: { source_id: ["S-032"] } }, T0);
+  state = addLocalCondition(state, { condition_id: "c2", filters: { keywords: ["交通"] } }, T0);
+  const item = publishedItem();
+  const oneRead = markLocalRead(state, "c1", item.event_id, 1, T1);
+  assert.equal(getUnreadUpdates(oneRead, [item]).length, 1);
+  const allRead = markDisplayedUpdatesRead(state, projectLocalConditions(state, [item]), T1);
+  assert.equal(getUnreadUpdates(allRead, [item]).length, 0);
+  const cancelled = cancelLocalCondition(allRead, "c1", T2);
+  assert.equal(getUnreadUpdates(cancelled, [item]).length, 0);
+});
+
+test("marking displayed v2 does not mark later v3 or unseen rows", () => {
+  const state = addLocalCondition(emptyLocalConditions(), condition(), T0);
+  const v2 = publishedItem({ source_version: 2, change_type: "REVISED" });
+  const next = markDisplayedUpdatesRead(state, projectLocalConditions(state, [v2]), T1);
+  assert.deepEqual(getUnreadUpdates(next, [v2, publishedItem({ source_version: 3, change_type: "REVISED" }), publishedItem({ event_id: "other" })]).map((item) => [item.event_id, item.source_version]), [["event-1", 3], ["other", 1]]);
+  assert.throws(() => markDisplayedUpdatesRead(next, [{ ...v2, change_key: "wrong" }]), /版本不一致/);
+});
+
+test("filter edits and re-enablement reset baseline while preserving previously read versions", () => {
+  let state = initializeConditionBaselines(addLocalCondition(emptyLocalConditions(), condition(), T0), [publishedItem()], { generation: "g1", generated_at: T0 });
+  state = markLocalRead(state, "cond-1", "event-1", 2, T1);
+  const changed = updateLocalCondition(state, "cond-1", { filters: { keywords: ["道路"] } }, T1);
+  assert.equal(changed.conditions["cond-1"].baseline_initialized, false);
+  assert.equal(changed.conditions["cond-1"].condition_version, 2);
+  assert.ok(changed.read_entries["event-1#v2"]);
+  const enabled = updateLocalCondition(cancelLocalCondition(state, "cond-1", T1), "cond-1", { enabled: true }, T2);
+  assert.equal(enabled.conditions["cond-1"].baseline_initialized, false);
+});
+
+test("synthetic read and conditions are isolated from published data", () => {
+  let state = addLocalCondition(emptyLocalConditions(), { condition_id: "real", filters: { keywords: ["交通"] } }, T0);
+  state = addLocalCondition(state, { condition_id: "demo", filters: { keywords: ["交通"] }, namespace: "demo:commute" }, T0);
+  const item = publishedItem();
+  const demo = projectLocalConditions(state, [item], { namespace: "demo:commute" });
+  assert.deepEqual(demo[0].hit_condition_ids, ["demo"]);
+  state = markDisplayedUpdatesRead(state, demo, T1);
+  assert.equal(getUnreadUpdates(state, [item], { namespace: "demo:commute" }).length, 0);
+  assert.equal(getUnreadUpdates(state, [item]).length, 1);
+  assert.ok(state.read_entries["demo:commute::event-1#v1"]);
+});
+
+test("partial checks do not advance successful completeness, and mixed generations refuse baseline", () => {
+  const base = addLocalCondition(emptyLocalConditions(), condition(), T0);
+  const partial = initializeConditionBaselines(base, [publishedItem()], { generation: "g1", generated_at: T0, snapshot_complete: false });
+  assert.equal(partial.conditions["cond-1"].baseline_complete, false);
+  assert.equal(partial.last_successful_check, undefined);
+  assert.throws(() => initializeConditionBaselines(base, [], { generation_mixed: true }), /世代不一致/);
+  const pub = { source_collection_run_id: "g1", generated_at: T0, snapshot_complete: true };
+  const archive = { collection_run_id: "g1", generated_at: T0, items: [] };
+  const status = { latest_collection_run: { collection_run_id: "g1" }, generated_at: T0, sources: [{ source_id: "S-032", source_health: "FAILED", freshness_status: "STALE" }] };
+  assert.equal(conditionDatasetStatus(pub, archive, status).complete, false);
+  assert.equal(conditionDatasetStatus(pub, { ...archive, collection_run_id: "g2" }, status).mixed, true);
+  assert.equal(conditionDatasetStatus(pub, archive, null).present, false);
+});
+
+test("shared query save is atomic on storage failure and never overwrites unknown format", () => {
+  const target = storage({ schema_version: 2 });
+  assert.throws(() => saveLocalConditionRequest(condition(), [], {}, target), /格式不相容/);
+  assert.equal(JSON.parse(target.getItem("govintel.v2.conditions.v1")).schema_version, 2);
+  const quota = { getItem: () => null, setItem: () => { throw new Error("quota"); } };
+  assert.throws(() => saveLocalConditionRequest(condition(), [publishedItem()], { generation: "g1" }, quota), /quota/);
+});
+
+test("storage contains IDs and filters only; explicit clear removes just the tracking key", () => {
+  const values = new Map([["unrelated", "retained"]]);
+  const target = { getItem: (key) => values.get(key) || null, setItem: (key, value) => values.set(key, value), removeItem: (key) => values.delete(key) };
+  const next = saveLocalConditionRequest(condition(), [{ ...publishedItem(), full_document: "private-document-body" }], { generation: "g1", generated_at: T0 }, target);
+  assert.equal(JSON.stringify(next).includes("private-document-body"), false);
+  clearLocalConditions(target);
+  assert.equal(values.has("govintel.v2.conditions.v1"), false);
+  assert.equal(values.get("unrelated"), "retained");
+});
+
+test("reserved condition IDs and corrupt read indexes fail closed", () => {
+  assert.throws(() => addLocalCondition(emptyLocalConditions(), { condition_id: "__proto__", filters: {} }), /ID 無效/);
+  const state = markLocalRead(emptyLocalConditions(), "c1", "event-1", 1, T0);
+  state.read_entries.wrong = state.read_entries["event-1#v1"];
+  assert.throws(() => validateLocalConditions(state), /索引無法驗證/);
 });
