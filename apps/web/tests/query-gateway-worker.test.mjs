@@ -109,6 +109,7 @@ test("Worker query and MCP answer routes share a server-controlled evidence gate
   const brief = JSON.parse(bytes["v2-daily-brief.json"].toString("utf8"));
   const now = new Date(Date.now() - 1_000).toISOString();
   const collectionRunId = "CR-ISSUE32-WORKER-ANSWER-GATE";
+  const noMatchTerm = "zzzz-govintel-no-match-20261001";
   feed.collection_run_id = collectionRunId;
   feed.generated_at = now;
   statusDoc.latest_collection_run.collection_run_id = collectionRunId;

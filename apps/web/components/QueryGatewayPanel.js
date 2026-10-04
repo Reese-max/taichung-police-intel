@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { FEEDBACK_REASONS } from "../lib/local-review.js";
 import { queryGateway } from "../lib/query-release-client.js";
+import { validateControlledAnswer } from "../lib/controlled-answer-client.js";
 
 const ENDPOINT = process.env.NEXT_PUBLIC_QUERY_GATEWAY_URL || "/query";
 const FEEDBACK_REASON_LABELS = {
@@ -24,20 +25,6 @@ async function sha256Json(value) {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-function buildControlledAnswerClaims(response) {
-  return (Array.isArray(response?.results) ? response.results : []).map((item) => ({
-    schema_version: 1,
-    claim_id: `publication-${item.canonical_id}`,
-    text: item.title,
-    claim_type: "STATUS",
-    temporal_scope: "CURRENT",
-    proposition: {
-      subject: `publication:${item.canonical_id}:title`,
-      value: item.title,
-    },
-    cited_evidence_ids: [`PUB-${item.canonical_id}`],
-  }));
-}
 
 async function gatewayFeedbackItem(response, targetType) {
   const queryId = response?.query_id;
@@ -101,7 +88,7 @@ function GatewayFeedbackForm({ response, targetType, onFeedback, disabled }) {
   );
 }
 
-function QueryResult({ response, onFeedback, feedbackReady }) {
+function QueryResult({ response, onFeedback, feedbackReady, releaseContext }) {
   const results = Array.isArray(response.results) ? response.results : [];
   const sources = Array.isArray(response.sources) ? response.sources : [];
   const brief = response.brief;
@@ -112,21 +99,11 @@ function QueryResult({ response, onFeedback, feedbackReady }) {
   const [answerError, setAnswerError] = useState("");
 
   async function validateResults() {
-    const claims = buildControlledAnswerClaims(response);
-    if (!claims.length) return;
+    if (!response.results?.length) return;
     setAnswerState("loading");
     setAnswerError("");
     try {
-      const result = await fetch(ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tool: "validate_answer",
-          arguments: { claims, expected_generation: response.query_generation_id },
-        }),
-      });
-      const payload = await result.json();
-      if (!result.ok || payload.error) throw new Error(payload.error?.message || `Gateway HTTP ${result.status}`);
+      const payload = await validateControlledAnswer(ENDPOINT, response, releaseContext);
       setAnswerResponse(payload);
       setAnswerState("ready");
     } catch (reason) {
@@ -239,16 +216,17 @@ export default function QueryGatewayPanel({ onFeedback, feedbackReady = false, p
   const [response, setResponse] = useState(null);
   const [state, setState] = useState("idle");
   const [error, setError] = useState("");
+  const releaseContext = process.env.NEXT_PUBLIC_QUERY_GATEWAY_URL ? {
+    basePath: process.env.NEXT_PUBLIC_BASE_PATH || "",
+    codeSha: process.env.NEXT_PUBLIC_RELEASE_CODE_SHA,
+    publicationGeneration,
+  } : null;
 
   async function run(tool, argumentsValue) {
     setState("loading");
     setError("");
     try {
-      const payload = await queryGateway(ENDPOINT, tool, argumentsValue, process.env.NEXT_PUBLIC_QUERY_GATEWAY_URL ? {
-        basePath: process.env.NEXT_PUBLIC_BASE_PATH || "",
-        codeSha: process.env.NEXT_PUBLIC_RELEASE_CODE_SHA,
-        publicationGeneration,
-      } : null);
+      const payload = await queryGateway(ENDPOINT, tool, argumentsValue, releaseContext);
       setResponse(payload);
       setState("ready");
     } catch (reason) {
@@ -296,7 +274,7 @@ export default function QueryGatewayPanel({ onFeedback, feedbackReady = false, p
       {state === "loading" && <p className="v2-query-message" role="status">正在核對公開快照……</p>}
       {state === "error" && <p className="v2-query-message error" role="alert">{error}</p>}
       {state === "ready" && response && (
-        <QueryResult key={response.query_id} response={response} onFeedback={onFeedback} feedbackReady={feedbackReady} />
+        <QueryResult key={response.query_id} response={response} onFeedback={onFeedback} feedbackReady={feedbackReady} releaseContext={releaseContext} />
       )}
     </section>
   );

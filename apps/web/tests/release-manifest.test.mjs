@@ -173,3 +173,36 @@ test("answer receipts bind the actual gate catalog as a release becomes stale", 
   assert.equal(stale.body.release.release_id, release.release_id);
   assert.notEqual(stale.body.answer_evidence_receipt.evidence_catalog_hash, fresh.body.answer_evidence_receipt.evidence_catalog_hash);
 });
+
+test("a release outage cannot mask a concurrent publication integrity failure", async t => {
+  let now = Date.parse(builtAt);
+  t.mock.method(Date, "now", () => now);
+  const { bytes } = await fixture();
+  const request = await withWorker(t, bytes);
+  assert.equal((await request("/health")).status, 200);
+  now += 31_000;
+  t.mock.method(globalThis, "fetch", async url => {
+    const name = new URL(url).pathname.split("/").at(-1);
+    if (name === "release.json") return new Response("unavailable", { status: 503 });
+    if (name === "intelligence-feed.json") return new Response("corrupt body");
+    return new Response(bytes[name]);
+  });
+  const rejected = await request("/query", { tool: "search_evidence", arguments: {} });
+  assert.equal(rejected.status, 503);
+  assert.equal(rejected.body.error.code, "QUERY_TEMPORARILY_UNAVAILABLE");
+  assert.equal(rejected.body.results, undefined);
+});
+
+test("an expired cached publication cannot degrade across Worker deployments", async t => {
+  let now = Date.parse(builtAt);
+  t.mock.method(Date, "now", () => now);
+  const { bytes } = await fixture();
+  const request = await withWorker(t, bytes);
+  assert.equal((await request("/health")).status, 200);
+  now += 31_000;
+  t.mock.method(globalThis, "fetch", async () => new Response("unavailable", { status: 503 }));
+  const otherDeployment = { ...env, CF_VERSION_METADATA: { id: "different-worker", tag: "b".repeat(40) } };
+  const rejected = await request("/health", undefined, otherDeployment);
+  assert.equal(rejected.status, 503);
+  assert.equal(rejected.body.release, undefined);
+});

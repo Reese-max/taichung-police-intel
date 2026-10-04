@@ -68,6 +68,8 @@ const required = [
   "apps/web/lib/answer-evidence-gate.js",
   "apps/web/tests/answer-evidence-gate.test.mjs",
   "apps/web/tests/answer-gate-runner.test.mjs",
+  "apps/web/lib/controlled-answer-client.js",
+  "apps/web/tests/controlled-answer-client.test.mjs",
   "scripts/verify-current-checkout.py",
   "scripts/retention-policy.py",
   "scripts/schema_drift.py",

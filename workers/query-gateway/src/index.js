@@ -272,10 +272,17 @@ export async function createReleaseManifest(snapshot, codeSha, builtAt = isoNow(
 }
 
 async function buildBoundSnapshot(env) {
-  const [snapshot, artifact] = await Promise.all([
+  // A network failure must not win a race against an artifact integrity failure
+  // and turn a broken publication into a last-known-good response.
+  const results = await Promise.allSettled([
     buildSnapshot(env),
     fetchArtifact(env.PUBLIC_ORIGIN, "release.json"),
   ]);
+  const failures = results.filter(result => result.status === "rejected").map(result => result.reason);
+  const integrityFailure = failures.find(error => error instanceof SnapshotIntegrityError);
+  if (integrityFailure) throw integrityFailure;
+  if (failures.length) throw failures[0];
+  const [snapshot, artifact] = results.map(result => result.value);
   try {
     if (artifact.bytes.byteLength > 64 * 1024) throw new Error("release exceeds byte budget");
     const manifest = JSON.parse(new TextDecoder().decode(artifact.bytes));
