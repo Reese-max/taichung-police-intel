@@ -81,13 +81,21 @@ class DependencyInstallTests(unittest.TestCase):
                 return subprocess.CompletedProcess(args, 0, "installed", "")
 
             build = subprocess.CompletedProcess(["npm", "run", "build"], 0, "built", "")
-            with patch.object(vc, "run", side_effect=install), patch.object(vc.subprocess, "run", return_value=build):
+            inherited = {"NEXT_PUBLIC_QUERY_GATEWAY_URL": "https://other-deployment.invalid/query",
+                         "NEXT_PUBLIC_RELEASE_CODE_SHA": "f" * 40,
+                         "PAGES_BASE_PATH": "/different-site", "NEXT_PUBLIC_BASE_PATH": "/different-site"}
+            with patch.dict(vc.os.environ, inherited), patch.object(vc, "run", side_effect=install), \
+                    patch.object(vc.subprocess, "run", return_value=build) as built:
                 result = vc.build_web_site(root, root / "logs")
 
             self.assertEqual(result["status"], "PASS", result)
             self.assertEqual(install_dirs, [root, web])
             self.assertTrue((root / "logs" / "npm-ci-root.log").is_file())
             self.assertTrue((root / "logs" / "npm-ci-web.log").is_file())
+            build_env = built.call_args.kwargs["env"]
+            self.assertEqual(build_env["NEXT_PUBLIC_QUERY_GATEWAY_URL"], "/query")
+            for variable in ("NEXT_PUBLIC_RELEASE_CODE_SHA", "PAGES_BASE_PATH", "NEXT_PUBLIC_BASE_PATH"):
+                self.assertNotIn(variable, build_env)
 
     def test_failed_web_install_blocks_build(self):
         with tempfile.TemporaryDirectory() as tmp:

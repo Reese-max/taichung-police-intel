@@ -825,6 +825,10 @@ def build_web_site(root: Path, log_dir: Path) -> dict[str, Any]:
     env = dict(os.environ)
     env.pop("PAGES_BASE_PATH", None)
     env.pop("NEXT_PUBLIC_BASE_PATH", None)
+    # The receipt verifies this checkout's loopback service. Inherited public
+    # build settings must never direct browser checks at another deployment.
+    env["NEXT_PUBLIC_QUERY_GATEWAY_URL"] = "/query"
+    env.pop("NEXT_PUBLIC_RELEASE_CODE_SHA", None)
     try:
         build = subprocess.run([npm, "run", "build"], cwd=web, env=env,
                                capture_output=True, text=True, encoding="utf-8", timeout=600)
@@ -835,6 +839,29 @@ def build_web_site(root: Path, log_dir: Path) -> dict[str, Any]:
     return check_record("web_build", build.returncode == 0 and out.is_file(),
                         f"next build exit={build.returncode}, out/index.html {'present' if out.is_file() else 'missing'}",
                         log="logs/next-build.log")
+
+
+def build_loopback_release(ctx: dict[str, Any], log_dir: Path) -> dict[str, Any]:
+    root = ctx["root"]
+    data = root / "apps" / "web" / "out" / "data"
+    output = data / "release.json"
+    code_sha = ctx["identity"]["code_sha"]
+    try:
+        result = run(["node", str(root / "scripts" / "build-release-manifest.mjs"),
+                      "--data-dir", str(data), "--code-sha", str(code_sha),
+                      "--output", str(output)], root, timeout=60)
+        (log_dir / "build-release.log").write_text(result.stdout + "\n" + result.stderr, encoding="utf-8")
+        if result.returncode:
+            raise ValueError(f"release builder exit={result.returncode}")
+        release = json.loads(output.read_text(encoding="utf-8"))
+        if release.get("code_sha") != code_sha or release.get("evidence_level") != "BUILD_ONLY":
+            raise ValueError("release manifest is not bound to this build-only checkout")
+        return check_record("build_only_release", True,
+                            f"release={release['release_id']} evidence=BUILD_ONLY; no production deployment claim",
+                            log="logs/build-release.log")
+    except Exception as error:
+        return check_record("build_only_release", False, f"{type(error).__name__}: {error}",
+                            log="logs/build-release.log")
 
 
 def finalize_status(receipt: dict[str, Any]) -> str:
@@ -945,6 +972,7 @@ def main(argv=None) -> int:
         checks.append(build)
         serve_dir = None
         if build["status"] == "PASS":
+            checks.append(build_loopback_release(ctx, log_dir))
             serve_dir = prepare_serve_dir(ctx, evidence / "serve", ROOT / "apps" / "web" / "out")
             ctx["serve_dir"] = serve_dir
             server, base = start_server(ctx, serve_dir)
