@@ -1,6 +1,637 @@
 {
+  "contract_version": "1.1",
   "schema_version": 1,
-  "contract_version": "1.0",
-  "updated_at": null,
-  "sources": {}
+  "sources": {
+    "CTX-165": {
+      "current": {
+        "contract_version": "1.1",
+        "final_url": "https://opdadm.moi.gov.tw/api/v1/no-auth/resource/api/dataset/29E8E643-88ED-4952-B21E-BD42A3B7108C/resource/AC203439-1B72-4BE8-A54B-BE2F26452169/download",
+        "fingerprint_signature": {
+          "column_count": 5,
+          "header": [
+            "民國年月",
+            "法律依據",
+            "網域",
+            "網站性質",
+            "聲請單位"
+          ],
+          "source_id": "CTX-165",
+          "transport": "DATA_GOV_CSV"
+        },
+        "http_status": 200,
+        "observed_at": "2026-10-04T19:39:00+00:00",
+        "observed_schema_fingerprint": "39ca06e30287e63ec70dc219ea78349b4d1fbca4223b3a627fa5b615ad49425e",
+        "parser_version": "canary-s028-165:1",
+        "reasons": [],
+        "requested_url": "https://opdadm.moi.gov.tw/api/v1/no-auth/resource/api/dataset/29E8E643-88ED-4952-B21E-BD42A3B7108C/resource/AC203439-1B72-4BE8-A54B-BE2F26452169/download",
+        "resource_id": "AC203439-1B72-4BE8-A54B-BE2F26452169",
+        "resource_id_changed": false,
+        "review_required": false,
+        "sample_sha256": "5964f56d1d89479d5b6fc163d885d2abecefcb597b0b1dc113ff8bf87ae61a54",
+        "source_health": "PASS",
+        "source_id": "CTX-165",
+        "source_name": "165反詐騙諮詢專線－遭停止解析涉詐網站",
+        "status": "NO_DRIFT",
+        "transport": "DATA_GOV_CSV",
+        "window_completeness": "COMPLETE_WITH_ITEMS"
+      },
+      "history": [],
+      "last_known_good": {
+        "contract_version": "1.1",
+        "observed_at": "2026-10-04T19:39:00+00:00",
+        "observed_schema_fingerprint": "39ca06e30287e63ec70dc219ea78349b4d1fbca4223b3a627fa5b615ad49425e",
+        "resource_id": "AC203439-1B72-4BE8-A54B-BE2F26452169",
+        "sample_sha256": "5964f56d1d89479d5b6fc163d885d2abecefcb597b0b1dc113ff8bf87ae61a54",
+        "status": "NO_DRIFT"
+      }
+    },
+    "CTX-POP": {
+      "current": {
+        "contract_version": "1.1",
+        "final_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=e2ec75c8-2866-4332-b5d5-a048bbb231d3",
+        "fingerprint_signature": {
+          "field_types": {
+            "地區": [
+              "string"
+            ],
+            "市話": [
+              "string"
+            ],
+            "數值": [
+              "string"
+            ],
+            "機關代碼": [
+              "string"
+            ],
+            "欄位名稱": [
+              "string"
+            ],
+            "縣市別代碼": [
+              "string"
+            ],
+            "行動電話": [
+              "string"
+            ],
+            "行政區域代碼": [
+              "string"
+            ],
+            "資料時間日期": [
+              "string"
+            ],
+            "資料週期": [
+              "string"
+            ],
+            "郵遞區號": [
+              "string"
+            ],
+            "電子郵件": [
+              "string"
+            ],
+            "項目": [
+              "string"
+            ]
+          },
+          "record_fields": [
+            "地區",
+            "市話",
+            "數值",
+            "機關代碼",
+            "欄位名稱",
+            "縣市別代碼",
+            "行動電話",
+            "行政區域代碼",
+            "資料時間日期",
+            "資料週期",
+            "郵遞區號",
+            "電子郵件",
+            "項目"
+          ],
+          "source_id": "CTX-POP",
+          "transport": "DATA_GOV_JSON"
+        },
+        "http_status": 200,
+        "observed_at": "2026-10-04T19:38:51+00:00",
+        "observed_schema_fingerprint": "40cb88fe6222d8c103e41789bcc7df653e87267a523035fa151a769cf4a6412d",
+        "parser_version": "canary-s028-165:1",
+        "reasons": [
+          "ADDITIVE_FIELDS"
+        ],
+        "requested_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=e2ec75c8-2866-4332-b5d5-a048bbb231d3",
+        "resource_id": "e2ec75c8-2866-4332-b5d5-a048bbb231d3",
+        "resource_id_changed": false,
+        "review_required": false,
+        "sample_sha256": "cbf6b57c03fe2da197c58b05613b7a5529cc070792644aae1865ae84014827fa",
+        "source_health": "PASS",
+        "source_id": "CTX-POP",
+        "source_name": "臺中市各區戶數、人口數按戶別及性別分",
+        "status": "ADDITIVE_COMPATIBLE",
+        "transport": "DATA_GOV_JSON",
+        "window_completeness": "COMPLETE_WITH_ITEMS"
+      },
+      "history": [],
+      "last_known_good": {
+        "contract_version": "1.1",
+        "observed_at": "2026-10-04T19:38:51+00:00",
+        "observed_schema_fingerprint": "40cb88fe6222d8c103e41789bcc7df653e87267a523035fa151a769cf4a6412d",
+        "resource_id": "e2ec75c8-2866-4332-b5d5-a048bbb231d3",
+        "sample_sha256": "cbf6b57c03fe2da197c58b05613b7a5529cc070792644aae1865ae84014827fa",
+        "status": "ADDITIVE_COMPATIBLE"
+      }
+    },
+    "S-001": {
+      "current": {
+        "contract_version": "1.1",
+        "final_url": null,
+        "fingerprint_signature": null,
+        "http_status": 0,
+        "observed_at": "2026-10-04T19:32:18+00:00",
+        "observed_schema_fingerprint": null,
+        "parser_version": "online_collect:p0-live-1",
+        "reasons": [
+          "LIVE_FETCH_CONNECTIONERROR"
+        ],
+        "requested_url": null,
+        "resource_id": null,
+        "resource_id_changed": false,
+        "review_required": true,
+        "sample_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "source_health": "DEGRADED",
+        "source_id": "S-001",
+        "source_name": "臺中市政府警察局警政新聞",
+        "status": "SOURCE_UNAVAILABLE",
+        "transport": "HTML_LIST_DETAIL",
+        "window_completeness": "PARTIAL"
+      },
+      "history": [],
+      "last_known_good": null
+    },
+    "S-007": {
+      "current": {
+        "contract_version": "1.1",
+        "declared_total_count": 20906,
+        "declared_total_pages": 105,
+        "final_url": "https://yishi.tccc.gov.tw/api/ProceedingsBackWeb/FrontList?keywordList=%E8%AD%A6%E5%AF%9F%E5%B1%80&pageNumber=1&pageSize=200",
+        "fingerprint_signature": {
+          "pagination": {
+            "data.totalCount": "integer",
+            "data.totalPages": "integer"
+          },
+          "record_fields": [
+            "content",
+            "date",
+            "meetingTypeName",
+            "name",
+            "proceedingsId",
+            "sessionDisplay",
+            "sessionType",
+            "sessionTypeSort",
+            "speaker",
+            "subTerm",
+            "term"
+          ],
+          "record_types": {
+            "content": [
+              "string"
+            ],
+            "date": [
+              "string"
+            ],
+            "meetingTypeName": [
+              "string"
+            ],
+            "name": [
+              "string"
+            ],
+            "proceedingsId": [
+              "string"
+            ],
+            "sessionDisplay": [
+              "string"
+            ],
+            "sessionType": [
+              "string"
+            ],
+            "sessionTypeSort": [
+              "integer"
+            ],
+            "speaker": [
+              "string"
+            ],
+            "subTerm": [
+              "integer"
+            ],
+            "term": [
+              "integer"
+            ]
+          },
+          "source_id": "S-007",
+          "transport": "JSON_API"
+        },
+        "http_status": 200,
+        "observed_at": "2026-10-04T19:38:41+00:00",
+        "observed_record_count": 200,
+        "observed_schema_fingerprint": "eae5bed06423aa859e72caada48d52edbb6597c27a2763130d96af16465ba07e",
+        "parser_version": "online_collect:p0-live-1",
+        "reasons": [
+          "ADDITIVE_FIELDS",
+          "PAGINATION_WINDOW_NOT_COVERED"
+        ],
+        "requested_url": "https://yishi.tccc.gov.tw/api/ProceedingsBackWeb/FrontList?keywordList=%E8%AD%A6%E5%AF%9F%E5%B1%80&pageNumber=1&pageSize=200",
+        "resource_id": null,
+        "resource_id_changed": false,
+        "review_required": false,
+        "sample_sha256": "4a126c060e751a40f1783b3da0fcf3bb9699e8e72d1e2e9e8875df5c2af52d02",
+        "source_health": "PASS",
+        "source_id": "S-007",
+        "source_name": "臺中市議會議事資訊系統－議事錄",
+        "status": "ADDITIVE_COMPATIBLE",
+        "transport": "JSON_API",
+        "window_completeness": "PARTIAL"
+      },
+      "history": [],
+      "last_known_good": {
+        "contract_version": "1.1",
+        "observed_at": "2026-10-04T19:38:41+00:00",
+        "observed_schema_fingerprint": "eae5bed06423aa859e72caada48d52edbb6597c27a2763130d96af16465ba07e",
+        "resource_id": null,
+        "sample_sha256": "4a126c060e751a40f1783b3da0fcf3bb9699e8e72d1e2e9e8875df5c2af52d02",
+        "status": "ADDITIVE_COMPATIBLE"
+      }
+    },
+    "S-009": {
+      "current": {
+        "contract_version": "1.1",
+        "declared_total_count": 108,
+        "declared_total_pages": 1,
+        "final_url": "https://yishi.tccc.gov.tw/api/Proposal/FrontList?keywordList=%E8%AD%A6%E5%AF%9F%E5%B1%80&pageNumber=1&pageSize=200",
+        "fingerprint_signature": {
+          "pagination": {
+            "data.totalCount": "integer",
+            "data.totalPages": "integer"
+          },
+          "record_fields": [
+            "billAttribute",
+            "billAttributeSort",
+            "billId",
+            "billNumber",
+            "billType",
+            "billTypeSort",
+            "closureType",
+            "closureTypeSort",
+            "committee",
+            "execution",
+            "executionSort",
+            "jointSignatory",
+            "proposalRationale",
+            "proposalRationaleSort",
+            "resolution",
+            "resolutionSort",
+            "seq",
+            "session",
+            "sponsor"
+          ],
+          "record_types": {
+            "billAttribute": [
+              "string"
+            ],
+            "billAttributeSort": [
+              "integer"
+            ],
+            "billId": [
+              "string"
+            ],
+            "billNumber": [
+              "string"
+            ],
+            "billType": [
+              "string"
+            ],
+            "billTypeSort": [
+              "integer"
+            ],
+            "closureType": [
+              "string"
+            ],
+            "closureTypeSort": [
+              "integer"
+            ],
+            "committee": [
+              "string"
+            ],
+            "execution": [
+              "string"
+            ],
+            "executionSort": [
+              "string"
+            ],
+            "jointSignatory": [
+              "string"
+            ],
+            "proposalRationale": [
+              "string"
+            ],
+            "proposalRationaleSort": [
+              "string"
+            ],
+            "resolution": [
+              "string"
+            ],
+            "resolutionSort": [
+              "string"
+            ],
+            "seq": [
+              "integer"
+            ],
+            "session": [
+              "string"
+            ],
+            "sponsor": [
+              "string"
+            ]
+          },
+          "source_id": "S-009",
+          "transport": "JSON_API"
+        },
+        "http_status": 200,
+        "observed_at": "2026-10-04T19:38:42+00:00",
+        "observed_record_count": 108,
+        "observed_schema_fingerprint": "f8db9d7800ed74e9e057349414c4367bd57fa2503bee2f064076eed11e4ddc15",
+        "parser_version": "online_collect:p0-live-1",
+        "reasons": [
+          "ADDITIVE_FIELDS"
+        ],
+        "requested_url": "https://yishi.tccc.gov.tw/api/Proposal/FrontList?keywordList=%E8%AD%A6%E5%AF%9F%E5%B1%80&pageNumber=1&pageSize=200",
+        "resource_id": null,
+        "resource_id_changed": false,
+        "review_required": false,
+        "sample_sha256": "20ab12ad1298475a7dda8221edcc9e2bddd46ffab0cbba0b5a83c64bbf0d85d0",
+        "source_health": "PASS",
+        "source_id": "S-009",
+        "source_name": "臺中市議會議事資訊系統－各項提案",
+        "status": "ADDITIVE_COMPATIBLE",
+        "transport": "JSON_API",
+        "window_completeness": "COMPLETE_WITH_ITEMS"
+      },
+      "history": [],
+      "last_known_good": {
+        "contract_version": "1.1",
+        "observed_at": "2026-10-04T19:38:42+00:00",
+        "observed_schema_fingerprint": "f8db9d7800ed74e9e057349414c4367bd57fa2503bee2f064076eed11e4ddc15",
+        "resource_id": null,
+        "sample_sha256": "20ab12ad1298475a7dda8221edcc9e2bddd46ffab0cbba0b5a83c64bbf0d85d0",
+        "status": "ADDITIVE_COMPATIBLE"
+      }
+    },
+    "S-019": {
+      "current": {
+        "contract_version": "1.1",
+        "final_url": null,
+        "fingerprint_signature": null,
+        "http_status": 0,
+        "observed_at": "2026-10-04T19:38:23+00:00",
+        "observed_schema_fingerprint": null,
+        "parser_version": "online_collect:p0-live-1",
+        "reasons": [
+          "LIVE_FETCH_CONNECTIONERROR"
+        ],
+        "requested_url": null,
+        "resource_id": null,
+        "resource_id_changed": false,
+        "review_required": true,
+        "sample_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "source_health": "DEGRADED",
+        "source_id": "S-019",
+        "source_name": "臺中市政府市政會議紀錄與專案報告",
+        "status": "SOURCE_UNAVAILABLE",
+        "transport": "HTML_LIST_DETAIL",
+        "window_completeness": "PARTIAL"
+      },
+      "history": [],
+      "last_known_good": null
+    },
+    "S-028": {
+      "current": {
+        "contract_version": "1.1",
+        "final_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=09800419-4015-4223-a9f2-18d0b4e53e68",
+        "fingerprint_signature": {
+          "field_types": {
+            "地區": [
+              "string"
+            ],
+            "市話": [
+              "string"
+            ],
+            "數值": [
+              "string"
+            ],
+            "機關代碼": [
+              "string"
+            ],
+            "欄位名稱": [
+              "string"
+            ],
+            "縣市別代碼": [
+              "string"
+            ],
+            "行動電話": [
+              "string"
+            ],
+            "行政區域代碼": [
+              "string"
+            ],
+            "資料時間日期": [
+              "string"
+            ],
+            "資料週期": [
+              "string"
+            ],
+            "郵遞區號": [
+              "string"
+            ],
+            "電子郵件": [
+              "string"
+            ],
+            "項目": [
+              "string"
+            ]
+          },
+          "record_fields": [
+            "地區",
+            "市話",
+            "數值",
+            "機關代碼",
+            "欄位名稱",
+            "縣市別代碼",
+            "行動電話",
+            "行政區域代碼",
+            "資料時間日期",
+            "資料週期",
+            "郵遞區號",
+            "電子郵件",
+            "項目"
+          ],
+          "source_id": "S-028",
+          "transport": "DATA_GOV_JSON"
+        },
+        "http_status": 200,
+        "observed_at": "2026-10-04T19:38:49+00:00",
+        "observed_schema_fingerprint": "151d98768fd1e5a1efbf8f4fa21436320b14b2b808cfd2d9bcda78bcf2dd5732",
+        "parser_version": "canary-s028-165:1",
+        "reasons": [
+          "ADDITIVE_FIELDS"
+        ],
+        "requested_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=09800419-4015-4223-a9f2-18d0b4e53e68",
+        "resource_id": "09800419-4015-4223-a9f2-18d0b4e53e68",
+        "resource_id_changed": false,
+        "review_required": false,
+        "sample_sha256": "de45807b7f6de97f2ce3ef31bd41daff97d136360b49f4e584dae0cf95977504",
+        "source_health": "PASS",
+        "source_id": "S-028",
+        "source_name": "臺中市受（處）理刑事案件－分局別",
+        "status": "ADDITIVE_COMPATIBLE",
+        "transport": "DATA_GOV_JSON",
+        "window_completeness": "COMPLETE_WITH_ITEMS"
+      },
+      "history": [],
+      "last_known_good": {
+        "contract_version": "1.1",
+        "observed_at": "2026-10-04T19:38:49+00:00",
+        "observed_schema_fingerprint": "151d98768fd1e5a1efbf8f4fa21436320b14b2b808cfd2d9bcda78bcf2dd5732",
+        "resource_id": "09800419-4015-4223-a9f2-18d0b4e53e68",
+        "sample_sha256": "de45807b7f6de97f2ce3ef31bd41daff97d136360b49f4e584dae0cf95977504",
+        "status": "ADDITIVE_COMPATIBLE"
+      }
+    },
+    "S-031": {
+      "current": {
+        "contract_version": "1.1",
+        "final_url": "https://www.fire.taichung.gov.tw/caselist/index.asp?Parser=99,8,226",
+        "fingerprint_signature": {
+          "entry_fields": [
+            "category",
+            "dispatch_unit",
+            "district",
+            "event_type",
+            "observed_at",
+            "source_modified_at",
+            "stable_key",
+            "status"
+          ],
+          "source_id": "S-031",
+          "transport": "HTML_LIVE_SNAPSHOT"
+        },
+        "http_status": 200,
+        "observed_at": "2026-10-04T19:38:28+00:00",
+        "observed_schema_fingerprint": "47c2cbe52471e9c7cc4fa76d13ffe5a01525104560eb434aae287b352d3148ca",
+        "parser_version": "online_collect:p0-live-1",
+        "reasons": [],
+        "requested_url": "https://www.fire.taichung.gov.tw/caselist/index.asp?Parser=99,8,226",
+        "resource_id": null,
+        "resource_id_changed": false,
+        "review_required": false,
+        "sample_sha256": "13d817889cbcfdf0c305f1a786763cbddc8c180f0a24018465f9513e09b01d39",
+        "source_health": "PASS",
+        "source_id": "S-031",
+        "source_name": "臺中市政府消防局即時災情",
+        "status": "NO_DRIFT",
+        "transport": "HTML_LIVE_SNAPSHOT",
+        "window_completeness": "PARTIAL"
+      },
+      "history": [],
+      "last_known_good": {
+        "contract_version": "1.1",
+        "observed_at": "2026-10-04T19:38:28+00:00",
+        "observed_schema_fingerprint": "47c2cbe52471e9c7cc4fa76d13ffe5a01525104560eb434aae287b352d3148ca",
+        "resource_id": null,
+        "sample_sha256": "13d817889cbcfdf0c305f1a786763cbddc8c180f0a24018465f9513e09b01d39",
+        "status": "NO_DRIFT"
+      }
+    },
+    "S-032": {
+      "current": {
+        "contract_version": "1.1",
+        "final_url": "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,20",
+        "fingerprint_signature": {
+          "date_coverage": "ALL",
+          "entry_fields": [
+            "detail_url",
+            "published",
+            "stable_key",
+            "title"
+          ],
+          "id_pattern": "index-1\\.asp\\?Parser=9,4,20,,,,(\\d+)",
+          "source_id": "S-032",
+          "transport": "HTML_LIST_DETAIL"
+        },
+        "http_status": 200,
+        "observed_at": "2026-10-04T19:38:25+00:00",
+        "observed_schema_fingerprint": "98b99108d6e847c3b387b06b279f5c45e59a49fc0eaff89cca1d554647c80a2a",
+        "parser_version": "online_collect:p0-live-1",
+        "reasons": [],
+        "requested_url": "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,20",
+        "resource_id": null,
+        "resource_id_changed": false,
+        "review_required": false,
+        "sample_sha256": "3ac9f246d6bb1a756c45773eba122eea3e3e3449c18dd8b4dde603a9b19533c4",
+        "source_health": "PASS",
+        "source_id": "S-032",
+        "source_name": "臺中市政府交通局最新消息",
+        "status": "NO_DRIFT",
+        "transport": "HTML_LIST_DETAIL",
+        "window_completeness": "COMPLETE_WITH_ITEMS"
+      },
+      "history": [],
+      "last_known_good": {
+        "contract_version": "1.1",
+        "observed_at": "2026-10-04T19:38:25+00:00",
+        "observed_schema_fingerprint": "98b99108d6e847c3b387b06b279f5c45e59a49fc0eaff89cca1d554647c80a2a",
+        "resource_id": null,
+        "sample_sha256": "3ac9f246d6bb1a756c45773eba122eea3e3e3449c18dd8b4dde603a9b19533c4",
+        "status": "NO_DRIFT"
+      }
+    },
+    "S-033": {
+      "current": {
+        "contract_version": "1.1",
+        "final_url": "https://www.taichung.gov.tw/10179/564770/rss?nodeId=9962",
+        "fingerprint_signature": {
+          "date_coverage": "ALL",
+          "entry_fields": [
+            "detail_url",
+            "published",
+            "stable_key",
+            "title"
+          ],
+          "source_id": "S-033",
+          "transport": "RSS_LIST_DETAIL"
+        },
+        "http_status": 200,
+        "observed_at": "2026-10-04T19:38:26+00:00",
+        "observed_schema_fingerprint": "4fc6c2966cedee7b875279d323f8f2e54419b283c9a3ae778c42606abfe51b17",
+        "parser_version": "online_collect:p0-live-1",
+        "reasons": [],
+        "requested_url": "https://www.taichung.gov.tw/10179/564770/rss?nodeId=9962",
+        "resource_id": null,
+        "resource_id_changed": false,
+        "review_required": false,
+        "sample_sha256": "ef0d6d56b15cf285fc6f0cea33bf6869a3b8356aa0102bb8de75a41d10c63102",
+        "source_health": "PASS",
+        "source_id": "S-033",
+        "source_name": "臺中市政府市政新聞",
+        "status": "NO_DRIFT",
+        "transport": "RSS_LIST_DETAIL",
+        "window_completeness": "COMPLETE_WITH_ITEMS"
+      },
+      "history": [],
+      "last_known_good": {
+        "contract_version": "1.1",
+        "observed_at": "2026-10-04T19:38:26+00:00",
+        "observed_schema_fingerprint": "4fc6c2966cedee7b875279d323f8f2e54419b283c9a3ae778c42606abfe51b17",
+        "resource_id": null,
+        "sample_sha256": "ef0d6d56b15cf285fc6f0cea33bf6869a3b8356aa0102bb8de75a41d10c63102",
+        "status": "NO_DRIFT"
+      }
+    }
+  },
+  "updated_at": "2026-10-04T19:39:00+00:00"
 }
