@@ -21,7 +21,7 @@ DEFAULT_STATUS = ROOT / "apps/web/public/data/source-status.json"
 DEFAULT_BRIEF = ROOT / "apps/web/public/data/v2-daily-brief.json"
 DEFAULT_OUTPUT = ROOT / "apps/web/public/data/query-store.json"
 SCHEMA_VERSION = 2
-PROJECTION_VERSION = "publication-metadata-v2"
+PROJECTION_VERSION = "publication-metadata-v3"
 SOURCE_POLICY = ROOT / "scripts/source-policy.py"
 MAX_BYTES = 32 * 1024 * 1024
 MAX_ROWS = 10000
@@ -75,7 +75,7 @@ def instant(value):
     return stamp.astimezone(timezone.utc)
 
 
-def project_feed_item(item: dict[str, Any], feed_hash: str) -> dict[str, Any]:
+def project_feed_item(item: dict[str, Any], feed_hash: str, *, source_freshness: dict[str, str] | None = None) -> dict[str, Any]:
     if not isinstance(item, dict):
         raise ValueError("invalid feed row; refusing silent omission")
     stable_id, title, source_id = (_string(item.get(k)) for k in ("stable_id", "title", "source_id"))
@@ -97,16 +97,26 @@ def project_feed_item(item: dict[str, Any], feed_hash: str) -> dict[str, Any]:
     for key in ("published_at", "data_as_of", "fetched_at"):
         if item.get(key) is not None:
             instant(item[key])
+    # An item without its own freshness inherits the source row's, which is the same
+    # effective freshness the evidence catalog and answer gate use.
+    freshness = str(item.get("freshness_status") or (source_freshness or {}).get(source_id) or "UNKNOWN").upper()
     return {
         "record_type": "publication_item", "canonical_id": stable_id, "title": title,
-        "source_id": source_id, "official_url": official_url,
+        "source_id": source_id, "source_role": _string(item.get("source_role")), "official_url": official_url,
         **{key: item.get(key) for key in ("published_at", "data_as_of", "fetched_at", "change_type",
-                                        "freshness_status", "source_health", "window_completeness")},
+                                          "freshness_status", "source_health", "window_completeness")},
         "committee": str(item.get("committee") or ""),
         "next_milestone": item.get("next_milestone"),
         "evidence_count": count, "content_sha256": content_hash,
         "trust_tier": "CANONICAL_PUBLICATION",
-        "canonical_ref": {"artifact": "intelligence-feed.json", "artifact_sha256": feed_hash, "stable_id": stable_id},
+        # Unknown or stale source freshness must never look verified in a result.
+        "verification_status": "VERIFIED" if freshness in {"FRESH", "RECENT"} else "STALE",
+        "canonical_ref": {
+            "artifact": "intelligence-feed.json", "artifact_sha256": feed_hash, "stable_id": stable_id,
+            # These are stable projection locators, not new canonical records.
+            "document_version_id": f"DOCV-{content_hash[:20].upper()}",
+            "evidence_id": f"PUB-{stable_id}",
+        },
     }
 
 
@@ -149,7 +159,13 @@ def build_store(feed: dict[str, Any], status: dict[str, Any], brief: dict[str, A
     rows, sources = feed.get("items"), status.get("sources")
     if not isinstance(rows, list) or not isinstance(sources, list) or len(rows) > MAX_ROWS:
         raise ValueError("invalid or unbounded canonical arrays")
-    projected = [project_feed_item(item, hashes["feed"]) for item in rows]
+    # Only object rows contribute a freshness fallback; malformed rows are still
+    # rejected by the projection below instead of being skipped here.
+    source_freshness = {
+        _string(source.get("source_id")): str(source.get("freshness_status") or "UNKNOWN").upper()
+        for source in sources if isinstance(source, dict)
+    }
+    projected = [project_feed_item(item, hashes["feed"], source_freshness=source_freshness) for item in rows]
     projected.sort(key=lambda r: r["canonical_id"])
     if len({r["canonical_id"] for r in projected}) != len(projected):
         raise ValueError("duplicate canonical_id in publication projection")
@@ -304,15 +320,18 @@ def query_coverage(store, capability_id, *, requested_scope=None):
     return coverage
 
 
-def query_store(store: dict[str, Any], *, text=None, source_id=None, change_type=None,
+def query_store(store: dict[str, Any], *, text=None, canonical_id=None, source_id=None, change_type=None,
                 limit=20, cursor=None, expected_generation=None, now=None,
                 capability_id="publication_metadata") -> dict[str, Any]:
     validate_store(store)
     if type(limit) is not int or not 1 <= limit <= 100:
         raise ValueError("limit must be an integer between 1 and 100")
-    for name, value, length in (("text", text, 512), ("source_id", source_id, 64), ("change_type", change_type, 64)):
+    for name, value, length in (("text", text, 512), ("canonical_id", canonical_id, 256),
+                                ("source_id", source_id, 64), ("change_type", change_type, 64)):
         if value is not None and (not isinstance(value, str) or len(value) > length):
             raise ValueError(f"invalid {name}")
+    if canonical_id is not None and not canonical_id.strip():
+        raise ValueError("invalid canonical_id")
     if change_type and change_type not in CHANGES:
         raise ValueError("unknown change_type")
     if not isinstance(capability_id, str) or not capability_id.strip() or len(capability_id) > 64:
@@ -324,7 +343,7 @@ def query_store(store: dict[str, Any], *, text=None, source_id=None, change_type
         raise ValueError("query clock must be timezone-aware")
     now = now.astimezone(timezone.utc)
     needle = text.casefold().strip() if text else None
-    filter_hash = sha256_bytes(canonical_json([needle, source_id, change_type]))
+    filter_hash = sha256_bytes(canonical_json([needle, canonical_id, source_id, change_type]))
     offset = 0
     if cursor is not None:
         try:
@@ -340,6 +359,8 @@ def query_store(store: dict[str, Any], *, text=None, source_id=None, change_type
             raise ValueError("invalid cursor: generation/filter/offset mismatch") from error
     selected = []
     for row in store["items"]:
+        if canonical_id and row["canonical_id"] != canonical_id:
+            continue
         if source_id and row["source_id"] != source_id:
             continue
         if change_type and row["change_type"] != change_type:
@@ -370,6 +391,7 @@ def query_store(store: dict[str, Any], *, text=None, source_id=None, change_type
             key: value
             for key, value in {
                 "text": text,
+                "canonical_id": canonical_id,
                 "source_id": source_id,
                 "change_type": change_type,
             }.items()
@@ -402,6 +424,7 @@ def parse_args():
     query = sub.add_parser("query")
     query.add_argument("--store", type=Path, default=DEFAULT_OUTPUT)
     query.add_argument("--q")
+    query.add_argument("--canonical-id")
     query.add_argument("--source-id")
     query.add_argument("--change-type")
     query.add_argument("--limit", type=int, default=20)
@@ -430,7 +453,7 @@ def main():
         print(f"QUERY_STORE_BUILT generation={store['generation_id']} items={len(store['items'])} output={args.output}")
     elif args.command == "query":
         store, _ = load_json(args.store)
-        result = query_store(store, text=args.q, source_id=args.source_id, change_type=args.change_type,
+        result = query_store(store, text=args.q, canonical_id=args.canonical_id, source_id=args.source_id, change_type=args.change_type,
                              limit=args.limit, cursor=args.cursor, expected_generation=args.expected_generation)
         print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
     else:

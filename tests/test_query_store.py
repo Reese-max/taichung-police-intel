@@ -26,9 +26,16 @@ class QueryStoreTests(unittest.TestCase):
         store = qs.build_from_paths(qs.DEFAULT_FEED, qs.DEFAULT_STATUS, qs.DEFAULT_BRIEF)
         for row in store["items"]:
             self.assertEqual(row["trust_tier"], "CANONICAL_PUBLICATION")
+            self.assertEqual(row["source_role"], "PRIMARY_OFFICIAL")
             self.assertEqual(row["canonical_ref"]["artifact"], "intelligence-feed.json")
             self.assertEqual(row["canonical_ref"]["stable_id"], row["canonical_id"])
             self.assertEqual(len(row["canonical_ref"]["artifact_sha256"]), 64)
+            self.assertEqual(row["canonical_ref"]["evidence_id"], f"PUB-{row['canonical_id']}")
+            self.assertEqual(
+                row["canonical_ref"]["document_version_id"],
+                f"DOCV-{row['content_sha256'][:20].upper()}",
+            )
+            self.assertIn(row["verification_status"], {"VERIFIED", "STALE"})
             self.assertNotIn("payload", row)
             self.assertNotIn("raw", row)
 
@@ -49,6 +56,55 @@ class QueryStoreTests(unittest.TestCase):
         self.assertLessEqual(result["result_count"], 1)
         self.assertTrue(all(row["source_id"] == "S-004" for row in result["results"]))
         self.assertEqual(result["truncated"], result["total_matches"] > result["result_count"])
+
+    def test_item_without_own_freshness_inherits_the_source_row(self):
+        item = {
+            "stable_id": "PE-FRESHNESS-FALLBACK",
+            "title": "無自有時效的公告項目",
+            "source_id": "S-004",
+            "official_url": "https://www.police.taichung.gov.tw/news/1",
+            "evidence_count": 1,
+            "content_sha256": "c" * 64,
+        }
+        # The projected status and the evidence catalog resolve freshness the same
+        # way, so an item row can never be labelled STALE while its source-backed
+        # evidence row is treated as current.
+        self.assertEqual(qs.project_feed_item(item, "a" * 64)["verification_status"], "STALE")
+        self.assertEqual(
+            qs.project_feed_item(item, "a" * 64, source_freshness={"S-004": "FRESH"})["verification_status"], "VERIFIED"
+        )
+        self.assertEqual(
+            qs.project_feed_item(item, "a" * 64, source_freshness={"S-004": "RECENT"})["verification_status"], "VERIFIED"
+        )
+        self.assertEqual(
+            qs.project_feed_item(item, "a" * 64, source_freshness={"S-004": "STALE"})["verification_status"], "STALE"
+        )
+        explicit = dict(item, freshness_status="STALE")
+        self.assertEqual(
+            qs.project_feed_item(explicit, "a" * 64, source_freshness={"S-004": "FRESH"})["verification_status"], "STALE"
+        )
+
+    def test_store_saved_by_a_superseded_projection_is_refused(self):
+        store = qs.build_from_paths(qs.DEFAULT_FEED, qs.DEFAULT_STATUS, qs.DEFAULT_BRIEF)
+        self.assertEqual(store["projection_version"], qs.PROJECTION_VERSION)
+        legacy = dict(store, projection_version="publication-metadata-v2")
+        # Re-seal the mutation so only the projection-version contract can refuse it.
+        legacy["projection_sha256"] = qs.sha256_bytes(qs.canonical_json(
+            {key: value for key, value in legacy.items() if key != "projection_sha256"}
+        ))
+        with self.assertRaisesRegex(ValueError, "unsupported query store"):
+            qs.validate_store(legacy)
+
+    def test_exact_canonical_id_lookup_is_strict(self):
+        store = qs.build_from_paths(qs.DEFAULT_FEED, qs.DEFAULT_STATUS, qs.DEFAULT_BRIEF)
+        canonical_id = store["items"][0]["canonical_id"]
+        result = qs.query_store(store, canonical_id=canonical_id, limit=10)
+        self.assertEqual([row["canonical_id"] for row in result["results"]], [canonical_id])
+        self.assertEqual(result["total_matches"], 1)
+
+        missing = qs.query_store(store, canonical_id="does-not-exist", limit=10)
+        self.assertEqual(missing["results"], [])
+        self.assertEqual(missing["total_matches"], 0)
 
     def test_query_store_is_bound_to_current_source_policy(self):
         store = qs.build_from_paths(qs.DEFAULT_FEED, qs.DEFAULT_STATUS, qs.DEFAULT_BRIEF)

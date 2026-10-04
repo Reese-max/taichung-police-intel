@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { FEEDBACK_REASONS } from "../lib/local-review.js";
+import { queryGateway } from "../lib/query-release-client.js";
+import { validateControlledAnswer } from "../lib/controlled-answer-client.js";
 
 const ENDPOINT = process.env.NEXT_PUBLIC_QUERY_GATEWAY_URL || "/query";
 const FEEDBACK_REASON_LABELS = {
@@ -22,6 +24,7 @@ async function sha256Json(value) {
   const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes);
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
+
 
 async function gatewayFeedbackItem(response, targetType) {
   const queryId = response?.query_id;
@@ -85,12 +88,31 @@ function GatewayFeedbackForm({ response, targetType, onFeedback, disabled }) {
   );
 }
 
-function QueryResult({ response, onFeedback, feedbackReady }) {
+function QueryResult({ response, onFeedback, feedbackReady, releaseContext }) {
   const results = Array.isArray(response.results) ? response.results : [];
   const sources = Array.isArray(response.sources) ? response.sources : [];
   const brief = response.brief;
   const publicationReceipt = response.publication_receipt;
   const coverage = response.query_coverage;
+  const [answerState, setAnswerState] = useState("idle");
+  const [answerResponse, setAnswerResponse] = useState(null);
+  const [answerError, setAnswerError] = useState("");
+
+  async function validateResults() {
+    if (!response.results?.length) return;
+    setAnswerState("loading");
+    setAnswerError("");
+    try {
+      const payload = await validateControlledAnswer(ENDPOINT, response, releaseContext);
+      setAnswerResponse(payload);
+      setAnswerState("ready");
+    } catch (reason) {
+      setAnswerResponse(null);
+      setAnswerError(reason?.message || "受控回答核對失敗");
+      setAnswerState("error");
+    }
+  }
+
   return (
     <div className="v2-query-result" role="status">
       <div className="v2-query-result-heading">
@@ -129,7 +151,7 @@ function QueryResult({ response, onFeedback, feedbackReady }) {
           {results.map((item) => (
             <li key={item.canonical_id}>
               <a href={item.official_url} target="_blank" rel="noreferrer">{item.title}</a>
-              <small>{item.source_id} · {item.freshness_status || "UNKNOWN"}</small>
+              <small>{item.source_id} · {item.verification_status || item.freshness_status || "UNKNOWN"}</small>
             </li>
           ))}
         </ul>
@@ -138,6 +160,30 @@ function QueryResult({ response, onFeedback, feedbackReady }) {
           {response.answerable_no_match ? "核准快照內沒有符合條件的資料。" : "目前不能把零結果解讀成沒有事件，請先處理上方資料缺口。"}
         </p>
       ) : null}
+      {results.length > 0 && response.result_type === "publication_metadata" && (
+        <section className="v2-query-answer-gate" aria-label="受控回答核對">
+          <button type="button" onClick={validateResults} disabled={answerState === "loading"}>
+            {answerState === "loading" ? "正在核對回答……" : "核對受控回答"}
+          </button>
+          {answerState === "error" && <p className="v2-query-message error" role="alert">{answerError}</p>}
+          {answerResponse && answerState === "ready" && (
+            <div data-testid="answer-evidence-result">
+              <p>{answerResponse.gate_status === "PASS" ? "回答已由官方證據核對。" : "回答已核對，但僅能保留有證據的內容。"}</p>
+              {answerResponse.answer?.map((text, index) => <p key={`${text}-${index}`}>{text}</p>)}
+              <small className="v2-query-receipt">validator: {answerResponse.answer_evidence_receipt?.validator_version}</small>
+              <small className="v2-query-receipt">answer evidence: {answerResponse.answer_evidence_receipt?.evidence_ids?.join(", ") || "none"}</small>
+              {onFeedback && (
+                <GatewayFeedbackForm
+                  response={answerResponse}
+                  targetType="ANSWER"
+                  onFeedback={onFeedback}
+                  disabled={!feedbackReady}
+                />
+              )}
+            </div>
+          )}
+        </section>
+      )}
       <small className="v2-query-receipt">publication hash: {response.publication_hash}</small>
       <small className="v2-query-receipt" data-testid="query-generation">query generation: {response.query_generation_id}</small>
       {response.retention && (
@@ -165,23 +211,22 @@ function QueryResult({ response, onFeedback, feedbackReady }) {
   );
 }
 
-export default function QueryGatewayPanel({ onFeedback, feedbackReady = false }) {
+export default function QueryGatewayPanel({ onFeedback, feedbackReady = false, publicationGeneration }) {
   const [query, setQuery] = useState("");
   const [response, setResponse] = useState(null);
   const [state, setState] = useState("idle");
   const [error, setError] = useState("");
+  const releaseContext = process.env.NEXT_PUBLIC_QUERY_GATEWAY_URL ? {
+    basePath: process.env.NEXT_PUBLIC_BASE_PATH || "",
+    codeSha: process.env.NEXT_PUBLIC_RELEASE_CODE_SHA,
+    publicationGeneration,
+  } : null;
 
   async function run(tool, argumentsValue) {
     setState("loading");
     setError("");
     try {
-      const result = await fetch(ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tool, arguments: argumentsValue }),
-      });
-      const payload = await result.json();
-      if (!result.ok || payload.error) throw new Error(payload.error?.message || `Gateway HTTP ${result.status}`);
+      const payload = await queryGateway(ENDPOINT, tool, argumentsValue, releaseContext);
       setResponse(payload);
       setState("ready");
     } catch (reason) {
@@ -229,7 +274,7 @@ export default function QueryGatewayPanel({ onFeedback, feedbackReady = false })
       {state === "loading" && <p className="v2-query-message" role="status">正在核對公開快照……</p>}
       {state === "error" && <p className="v2-query-message error" role="alert">{error}</p>}
       {state === "ready" && response && (
-        <QueryResult response={response} onFeedback={onFeedback} feedbackReady={feedbackReady} />
+        <QueryResult key={response.query_id} response={response} onFeedback={onFeedback} feedbackReady={feedbackReady} releaseContext={releaseContext} />
       )}
     </section>
   );

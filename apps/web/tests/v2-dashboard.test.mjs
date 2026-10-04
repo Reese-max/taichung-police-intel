@@ -134,6 +134,10 @@ test("Ask GovIntel is a bounded shared-gateway entry rather than a fake chatbot"
   assert.match(panel, /覆蓋狀態/);
   assert.match(panel, /targetType="QUERY"/);
   assert.match(panel, /targetType="ANSWER"/);
+  assert.match(panel, /validateControlledAnswer/);
+  assert.match(await readFile(new URL("../lib/controlled-answer-client.js", import.meta.url), "utf8"), /validate_answer/);
+  assert.match(await readFile(new URL("../lib/controlled-answer-client.js", import.meta.url), "utf8"), /expected_generation/);
+  assert.match(panel, /answer_evidence_receipt/);
   assert.match(panel, /original_output_sha256/);
   assert.match(panel, /Dashboard 仍可使用/);
   assert.doesNotMatch(panel, /new Function|eval\(|arbitrary/);

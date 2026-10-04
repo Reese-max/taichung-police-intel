@@ -100,6 +100,56 @@ class QueryGatewayDomainTests(unittest.TestCase):
         self.assertFalse(stats["statistics"][0]["provisional"])
         self.assertEqual(stats["result_type"], "statistics")
 
+    def test_discovery_event_is_counted_and_not_promoted_to_verified(self):
+        candidate = event()
+        candidate["public_event_id"] = "PE-DOMAIN-CANDIDATE"
+        candidate["fusion_status"] = "CANDIDATE"
+        second = event()
+        second["public_event_id"] = "PE-DOMAIN-CANDIDATE-2"
+        second["fusion_status"] = "CANDIDATE"
+        snapshot = gateway_module.load_snapshot()
+        snapshot["event_store"] = gateway_module.query_domain.build_event_store([event(), candidate, second])
+        gateway = gateway_module.QueryGateway(
+            snapshot=snapshot,
+            clock=lambda: datetime(2026, 9, 21, 9, 0, tzinfo=timezone.utc),
+        )
+        result = gateway.execute("search_events", {"limit": 10})
+        tiers = {row["public_event_id"]: row["trust_tier"] for row in result["events"]}
+        self.assertEqual(tiers["PE-DOMAIN-CANDIDATE"], "DISCOVERY_UNVERIFIED")
+        self.assertEqual(result["discovery_unverified_count"], 2)
+
+        # The count covers the whole matched set, not just the returned page.
+        paged = gateway.execute("search_events", {"limit": 1})
+        self.assertEqual(paged["result_count"], 1)
+        self.assertEqual(paged["discovery_unverified_count"], 2)
+
+    def test_single_event_envelopes_never_report_a_non_verified_event_as_clean(self):
+        snapshot = gateway_module.load_snapshot()
+        conflict = event()
+        conflict["public_event_id"] = "PE-DOMAIN-CONFLICT"
+        conflict["fusion_status"] = "CONFLICT"
+        stale = event()
+        stale["public_event_id"] = "PE-DOMAIN-LKG"
+        stale["fusion_status"] = "PARTIAL_LKG"
+        snapshot["event_store"] = gateway_module.query_domain.build_event_store([conflict, stale])
+        gateway = gateway_module.QueryGateway(
+            snapshot=snapshot,
+            clock=lambda: datetime(2026, 9, 21, 9, 0, tzinfo=timezone.utc),
+        )
+        for event_id, tier, counter in (
+            ("PE-DOMAIN-CONFLICT", "CONFLICT", "conflict_count"),
+            ("PE-DOMAIN-LKG", "STALE", "stale_count"),
+        ):
+            result = gateway.execute("get_event", {"event_id": event_id})
+            self.assertEqual(result["event"]["trust_tier"], tier)
+            self.assertEqual(result[counter], 1, event_id)
+            self.assertEqual(result["discovery_unverified_count"], 0, event_id)
+            self.assertEqual(result["trust_tier_counts"][tier], 1, event_id)
+
+        comparison = gateway.execute("compare_event_versions", {"event_id": "PE-DOMAIN-LKG"})
+        self.assertEqual(comparison["comparison"]["trust_tier"], "STALE")
+        self.assertEqual(comparison["stale_count"], 1)
+
     def test_date_only_event_bounds_resolve_in_requested_timezone(self):
         query = self.gateway.execute("search_events", {
             "time_from": "2026-09-20",
