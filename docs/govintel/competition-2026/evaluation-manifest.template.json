@@ -1,7 +1,7 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "status": "NOT_RUN",
-  "description": "Empty evaluation template; no scores, adoption or award claims.",
+  "description": "Empty v6 evaluation template; planned product methods have not been executed. Synthetic deterministic policy replay is a separate engineering scope.",
   "code_commit": null,
   "dataset_manifest_hash": null,
   "information_cutoff": null,
@@ -9,13 +9,37 @@
   "split_by": "event_and_time",
   "development_event_ids": [],
   "heldout_event_ids": [],
-  "annotation": {"reviewer_count": null, "disagreements": null, "adjudication_reference": null},
+  "annotation": {
+    "reviewer_count": null,
+    "disagreements": null,
+    "adjudication_reference": null
+  },
   "arms": {
-    "A": {"method": "manual_same_sources_same_cutoff", "results": null},
-    "B0": {"method": "frozen_previous_V2", "commit": null, "results": null},
-    "B": {"method": "same_new_workflow_without_semantic_AI", "results": null},
-    "C": {"method": "full_new_workflow", "model": null, "prompt_hash": null, "results": null},
-    "C_minus_D": {"method": "C_without_selected_background_dataset", "results": null}
+    "A": {
+      "method": "direct_official_manual_query_and_update_recheck",
+      "method_execution_status": "NOT_RUN",
+      "results": null
+    },
+    "B": {
+      "method": "same_scope_search_and_general_summary",
+      "method_execution_status": "NOT_RUN",
+      "search_tool": null,
+      "model": null,
+      "prompt_hash": null,
+      "results": null
+    },
+    "C": {
+      "method": "full_GovIntel_public_query_and_browser_tracking",
+      "method_execution_status": "NOT_RUN",
+      "model": null,
+      "prompt_hash": null,
+      "results": null
+    },
+    "C_semantic_off": {
+      "method": "same_C_interface_data_tracking_read_rules_without_semantic_processing",
+      "method_execution_status": "NOT_RUN",
+      "results": null
+    }
   },
   "v6_arms_note": "v6 另立明確版本與 method ID；上方 arms 的 v1 定義與歷史結果保持凍結，不靜默改寫。v6 情境在 eval/gold/v6/commute-reopen-v1/，fingerprint govintel/v6/commute-reopen-replay-evaluation/v1。",
   "v6_dataset": "govintel-gold-v6-commute-reopen-v1",
@@ -26,14 +50,52 @@
     "C_RULES_ONLY": {"method_id": "C_RULES_ONLY_v6_rules_only_no_semantic", "status": "REPLAYED", "human_timing_status": "NOT_RUN", "results": null}
   },
   "result_fields_required_per_arm": [
-    "task_count", "event_count", "true_positives", "false_positives", "false_negatives",
-    "false_merges", "missed_merges", "claims_checked", "unsupported_claims",
-    "abstentions", "task_completions", "median_total_task_seconds", "human_correction_seconds"
+    "task_count",
+    "event_count",
+    "true_positives",
+    "false_positives",
+    "false_negatives",
+    "false_merges",
+    "missed_merges",
+    "claims_checked",
+    "unsupported_claims",
+    "abstentions",
+    "task_completions",
+    "median_total_task_seconds",
+    "human_correction_seconds",
+    "correct_answers",
+    "wrong_answers",
+    "answerable_tasks",
+    "new_updates",
+    "material_revisions",
+    "historical_backfills",
+    "repeat_alerts",
+    "false_release_claims",
+    "source_acquisition_gaps"
   ],
-  "human_study": {"status": "NOT_RUN", "participant_count": null, "consent_record_private": null, "counterbalanced_order": null, "aggregate_results": null},
-  "runtime_evidence": {"ci_url": null, "browser_run": null, "deployment_receipt": null, "anonymous_version_hash_check": null},
-  "cost": {"currency": "TWD", "model": null, "compute_storage": null, "human_hours": null},
-  "safety": {"private_data_in_public_artifacts": null, "source_failure_as_zero": null},
+  "human_study": {
+    "status": "NOT_RUN",
+    "participant_count": null,
+    "consent_record_private": null,
+    "counterbalanced_order": null,
+    "aggregate_results": null
+  },
+  "runtime_evidence": {
+    "ci_url": null,
+    "browser_run": null,
+    "deployment_receipt": null,
+    "anonymous_version_hash_check": null
+  },
+  "cost": {
+    "currency": "TWD",
+    "model": null,
+    "compute_storage": null,
+    "human_hours": null
+  },
+  "safety": {
+    "private_data_in_public_artifacts": null,
+    "source_failure_as_zero": null
+  },
   "limitations": [],
   "failed_cases": [],
   "rules": [
@@ -42,7 +104,58 @@
     "Targets are not observed results.",
     "Same-origin mirrors are not independent evidence.",
     "Do not publish raw participant data, consent forms, credentials or internal police information.",
-    "B0 vs C measures product changes; B vs C isolates semantic AI.",
-    "A successful unit test is not a human-study, provider or deployment result."
-  ]
+    "A successful unit test is not a human-study, provider or deployment result.",
+    "A/B/C share question, source scope, information cutoff and scheduled reopen times.",
+    "C_semantic_off changes only semantic processing, not C interface, data, tracking or read-state rules.",
+    "Real source revisions and synthetic fixtures are reported separately.",
+    "Source acquisition gaps are separate from recall over acquired matching unread material updates.",
+    "Release requires explicit evidence, not expiry, source failure or disappearance.",
+    "Do not claim policy replay metrics as search-summary, semantic-AI or human-study results."
+  ],
+  "proposal_version": "v6_2026-10-01",
+  "evaluation_scope": "PLANNED_V6_PRODUCT_AND_HUMAN_EVALUATION",
+  "sample_plan": {
+    "event_count_target": 20,
+    "original_document_count_target": 60,
+    "versions_counted_separately": true,
+    "human_participant_target_range": [
+      3,
+      5
+    ]
+  },
+  "actual_samples": {
+    "event_count": null,
+    "source_document_count": null,
+    "version_sample_count": null,
+    "source_count": null,
+    "real_revision_count": null,
+    "synthetic_revision_count": null
+  },
+  "targets": {
+    "important_update_precision": 0.85,
+    "important_update_recall": 0.9,
+    "median_time_reduction_vs_A": 0.3,
+    "correctness_must_not_decrease": true
+  },
+  "engineering_policy_replay": {
+    "evaluation_scope": "SYNTHETIC_DETERMINISTIC_POLICY_REPLAY",
+    "receipt": null,
+    "results": null,
+    "not_evidence_of": [
+      "executed_A_B_C_methods",
+      "semantic_AI_ablation",
+      "human_task_time",
+      "real_source_coverage",
+      "deployment"
+    ]
+  },
+  "reopen_times": [],
+  "real_results": null,
+  "synthetic_results": null,
+  "historical_baseline_optional": {
+    "method": "frozen_previous_V2",
+    "commit": null,
+    "results": null,
+    "use": "Historical product comparison only; not B or the semantic-off arm."
+  }
 }

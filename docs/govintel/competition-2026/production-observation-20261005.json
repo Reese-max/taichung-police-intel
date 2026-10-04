@@ -1,0 +1,146 @@
+{
+  "health": {
+    "schema_version": 1,
+    "service": "govintel-query-gateway",
+    "server_version": "query-gateway-v1-workers",
+    "status": "ok",
+    "publication_freshness": "PARTIAL",
+    "publication_id": "CR-DEMO-20261004-EVENING-SCHEDULE",
+    "publication_hash": "1c9e8087121e513776dc1da0379af80615945f53dfaa68bb46641689de3471bd",
+    "query_coverage": {
+      "status": "PARTIAL",
+      "policy_version": 1,
+      "policy_hash": "3404809ff40f7647c44203329d4476b12b62e9ee64df24cd1f1f46cbda59caf4",
+      "capability_id": "publication_metadata",
+      "required_sources": [
+        "S-004",
+        "S-006",
+        "S-007",
+        "S-009",
+        "S-029"
+      ],
+      "missing_required_sources": [
+        "S-029"
+      ],
+      "stale_required_sources": [
+        "S-007",
+        "S-029"
+      ],
+      "can_state_bounded_no_match": false,
+      "coverage_limitations": [
+        "只代表 policy 中已啟用來源，不代表世界完整性。"
+      ],
+      "supported_capabilities": [
+        "publication_metadata",
+        "source_health",
+        "council_affairs"
+      ],
+      "covered_sources": [
+        "S-004",
+        "S-006",
+        "S-009"
+      ],
+      "collection_completeness": {
+        "S-004": "COMPLETE_WITH_ITEMS",
+        "S-006": "COMPLETE_ZERO",
+        "S-007": "COMPLETE_ZERO",
+        "S-009": "COMPLETE_ZERO",
+        "S-029": "PARTIAL"
+      },
+      "requested_scope": {}
+    },
+    "policy": {
+      "policy_version": 1,
+      "policy_hash": "3404809ff40f7647c44203329d4476b12b62e9ee64df24cd1f1f46cbda59caf4",
+      "catalog_hash": "95ae82270eaab6f6270d9c00c8122e9bcfafbaf0dd216dc575a5f0b99544c51a",
+      "active_source_ids": [
+        "S-004",
+        "S-006",
+        "S-007",
+        "S-009",
+        "S-029"
+      ]
+    },
+    "retention": {
+      "policy_version": 1,
+      "policy_hash": "aa2f3f22f49927c673866c8c3ebdea816150fe60b03822cde4ff0bd104f87034",
+      "public_projection": "METADATA_LINK_ONLY",
+      "full_text_allowed": false
+    },
+    "source_gaps": [
+      {
+        "source_id": null,
+        "reason": "INCOMPLETE_PUBLICATION"
+      },
+      {
+        "source_id": "S-007",
+        "reason": "STALE_SOURCE_DATA",
+        "freshness_status": "STALE"
+      },
+      {
+        "source_id": "S-029",
+        "reason": "SOURCE_INCOMPLETE",
+        "source_health": "FAILED"
+      },
+      {
+        "source_id": "S-029",
+        "reason": "STALE_SOURCE_DATA",
+        "freshness_status": "STALE"
+      }
+    ],
+    "read_only": true
+  },
+  "capabilities": {
+    "schema_version": 1,
+    "server_version": "query-gateway-v1-workers",
+    "read_only": true,
+    "capabilities": [
+      "search_evidence",
+      "get_current_brief",
+      "get_publication_receipt",
+      "get_source_health",
+      "validate_answer"
+    ],
+    "unavailable_capabilities": [
+      "search_events",
+      "get_event",
+      "compare_event_versions",
+      "query_statistics"
+    ],
+    "policy": {
+      "policy_version": 1,
+      "policy_hash": "3404809ff40f7647c44203329d4476b12b62e9ee64df24cd1f1f46cbda59caf4",
+      "catalog_hash": "95ae82270eaab6f6270d9c00c8122e9bcfafbaf0dd216dc575a5f0b99544c51a",
+      "active_source_ids": [
+        "S-004",
+        "S-006",
+        "S-007",
+        "S-009",
+        "S-029"
+      ]
+    },
+    "retention": {
+      "policy_version": 1,
+      "policy_hash": "aa2f3f22f49927c673866c8c3ebdea816150fe60b03822cde4ff0bd104f87034",
+      "public_projection": "METADATA_LINK_ONLY",
+      "full_text_allowed": false
+    }
+  },
+  "hashes": {
+    "public-intelligence-feed.json": "6d64af72e4f3ef00d3fbed3febb7edac025cc49bac03e7430d60e29e61b3e340",
+    "public-source-status.json": "8d8aeac7d699885b4fdd5168c2e19d65d05fcce57a242ccc15dcc4e3679402ee"
+  },
+  "observed_at": "2026-10-04T17:13:42.496003+00:00",
+  "scope": "DATED_ANONYMOUS_PRODUCTION_OBSERVATION_NOT_FEATURE_OR_HUMAN_ACCEPTANCE",
+  "observed_at_taipei": "2026-10-05T01:13:42.496003+08:00",
+  "deployed_code_sha": "562141e396c693e115b3fce10594c434c401a58e",
+  "workflow_run": "https://github.com/Reese-max/taichung-police-intel/actions/runs/37212963039",
+  "public_generation_generated_at": "2026-10-04T23:26:28+08:00",
+  "gateway_base_url": "https://govintel-query-gateway.irisx-tracker.workers.dev",
+  "release_manifest_http_status": 404,
+  "limitations": [
+    "Snapshot only; subsequent publications may differ.",
+    "The successful workflow verified five publication files; the hashes section records the two additional anonymous response files read in this observation.",
+    "Public query, browser tracking, release-bound contract, semantic AI and human evaluation candidates are not proven deployed by this observation."
+  ]
+}
