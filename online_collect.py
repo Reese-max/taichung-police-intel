@@ -265,13 +265,16 @@ def paginated_api(
         if payload.get("success") is not True or not isinstance(payload.get("data", {}).get("data"), list):
             raise ValueError(f"invalid API payload: {url}")
         data = payload["data"]
-        total_pages = int(data["totalPages"])
-        if total_pages > 100:
+        total_pages = data["totalPages"]
+        total_count = data["totalCount"]
+        if type(total_pages) is not int or not 0 <= total_pages <= 100:
             raise ValueError(f"API page guard exceeded: {total_pages}")
+        if type(total_count) is not int or total_count < 0:
+            raise ValueError(f"invalid API totalCount: {total_count}")
         records.extend(data["data"])
         page += 1
-    if records and len(records) != int(data["totalCount"]):
-        raise ValueError(f"API count mismatch: {len(records)} != {data['totalCount']}")
+    if len(records) != total_count:
+        raise ValueError(f"API count mismatch: {len(records)} != {total_count}")
     return records, responses
 
 
@@ -1720,7 +1723,10 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
                 "snapshot_item_count": previous.get("snapshot_item_count"),
                 "snapshot_count": None,
                 "manifest_sha256": None,
-                "data_as_of": previous.get("data_as_of"),
+                # The undated S-009 schema cannot validate a legacy observation
+                # clock even when today's fetch fails. Preserve LKG content,
+                # while removing that unsupported publication-time claim.
+                "data_as_of": None if source_id == "S-009" else previous.get("data_as_of"),
                 "last_checked_at": timestamp(now),
                 "last_success_at": previous.get("last_success_at"),
                 "next_update_at": next_at,
@@ -1760,6 +1766,7 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
                     lkg_item["source_health"] = "FAILED"
                     lkg_item["eligibility"] = "INELIGIBLE_SOURCE_FAILED"
                     lkg_item["freshness_status"] = freshness if freshness != "FRESH" else "VERY_STALE"
+                    lkg_item["data_as_of"] = record["data_as_of"]
                     lkg_item["fetched_at"] = fetched_at
                     feed_items.append(lkg_item)
 
