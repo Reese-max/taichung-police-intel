@@ -17,6 +17,10 @@ MAX_BYTES = 32 * 1024 * 1024
 EVENT_STORE_SCHEMA_VERSION = 1
 STATISTICS_STORE_SCHEMA_VERSION = 1
 EVENT_STATUSES = frozenset({"CONFIRMED", "CANDIDATE", "CONFLICT", "SPLIT_REQUIRED", "PARTIAL_LKG"})
+TRUST_TIERS = frozenset({"VERIFIED", "DISCOVERY_UNVERIFIED", "CONFLICT", "STALE"})
+VERIFIED_STATUSES = frozenset({
+    "VERIFIED", "VERIFIED_OFFICIAL", "OFFICIAL_RECONCILED", "DETERMINISTIC_PASS", "CONFIRMED_OFFICIAL",
+})
 
 
 def canonical(value: Any) -> bytes:
@@ -25,6 +29,34 @@ def canonical(value: Any) -> bytes:
 
 def digest(value: Any) -> str:
     return hashlib.sha256(value if isinstance(value, bytes) else canonical(value)).hexdigest()
+
+
+def event_trust_tier(event: dict[str, Any]) -> str:
+    """Derive the outward trust label from canonical event state.
+
+    Query projections must not collapse candidate, conflict, or last-known-good
+    events into the verified result set.  The fusion status is authoritative;
+    an explicit verification/freshness state is used for compatible older
+    PublicEvent payloads that do not have a fusion-specific status.  The mapping
+    fails closed: a non-empty verification_status that is not in the known
+    verified set projects as DISCOVERY_UNVERIFIED, never VERIFIED.
+    """
+    fusion_status = event.get("fusion_status")
+    verification_status = event.get("verification_status")
+    if fusion_status == "CONFLICT" or verification_status in {"CONFLICT", "CONFLICTING"}:
+        return "CONFLICT"
+    if (fusion_status == "PARTIAL_LKG"
+            or event.get("lkg") is True
+            or event.get("freshness_status") in {"STALE", "VERY_STALE"}
+            or verification_status in {"STALE", "VERY_STALE"}):
+        return "STALE"
+    if fusion_status in {"CANDIDATE", "SPLIT_REQUIRED"} or verification_status in {
+        "DISCOVERY_UNVERIFIED", "UNVERIFIED", "CANDIDATE", "OFFICIAL_CANDIDATE", "NO_OFFICIAL_MATCH"
+    }:
+        return "DISCOVERY_UNVERIFIED"
+    if verification_status is not None and verification_status not in VERIFIED_STATUSES:
+        return "DISCOVERY_UNVERIFIED"
+    return "VERIFIED"
 
 
 def _load_json(path: Path) -> Any:
@@ -453,6 +485,7 @@ def project_event(event: dict[str, Any]) -> dict[str, Any]:
         "tracked", "tracking_id", "changed", "changed_fields", "conflict_fields", "uncertain_fields", "created_at", "updated_at",
     )
     result = {key: event.get(key) for key in allowed if key in event}
+    result["trust_tier"] = event_trust_tier(event)
     result["documents"] = [_project_document(event["public_event_id"], link) for link in event["linked_document_versions"]]
     return result
 
@@ -479,7 +512,26 @@ def query_events(store: dict[str, Any], arguments: dict[str, Any]) -> dict[str, 
         cursor=arguments.get("cursor"),
         now=lambda row: (-_event_start(row).timestamp(), row["public_event_id"]),
     )
-    return {"query_generation_id": store["generation_id"], **page}
+    # Tier counts cover the whole matched set, not just the returned page: a zero
+    # discovery count alone must not read as "every match is verified".
+    return {
+        "query_generation_id": store["generation_id"],
+        **trust_tier_counts(matches),
+        **page,
+    }
+
+
+def trust_tier_counts(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Aggregate trust tiers over a result set, never over the returned page."""
+    return {
+        "trust_tier_counts": {
+            tier: sum(1 for row in rows if row["trust_tier"] == tier)
+            for tier in sorted(TRUST_TIERS)
+        },
+        "discovery_unverified_count": sum(1 for row in rows if row["trust_tier"] == "DISCOVERY_UNVERIFIED"),
+        "conflict_count": sum(1 for row in rows if row["trust_tier"] == "CONFLICT"),
+        "stale_count": sum(1 for row in rows if row["trust_tier"] == "STALE"),
+    }
 
 
 def get_event(store: dict[str, Any], event_id: str) -> dict[str, Any]:
@@ -527,6 +579,7 @@ def compare_event_versions(store: dict[str, Any], event_id: str, *, before_versi
         return {
             "comparison_status": "NO_COMPARABLE_VERSION_HISTORY",
             "public_event_id": event_id,
+            "trust_tier": event_trust_tier(event),
             "before": None,
             "after": None,
             "changed_fields": [],
@@ -544,6 +597,7 @@ def compare_event_versions(store: dict[str, Any], event_id: str, *, before_versi
     return {
         "comparison_status": "COMPARED",
         "public_event_id": event_id,
+        "trust_tier": event_trust_tier(event),
         "before": _project_version(before),
         "after": _project_version(after),
         "changed_fields": changed,

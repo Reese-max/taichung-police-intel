@@ -175,6 +175,40 @@ class QueryGatewayTests(unittest.TestCase):
         self.assertFalse(query["retention"]["full_text_allowed"])
         self.assertRegex(query["retention"]["policy_hash"], r"^[0-9a-f]{64}$")
 
+    def test_evidence_catalog_mirrors_the_projected_verification_status(self):
+        catalog = self.gateway._trusted_evidence_catalog(self.gateway.store, self.gateway.clock())
+        by_id = {row["evidence_id"]: row for row in catalog}
+        for item in self.gateway.store["items"]:
+            row = by_id.get(f"PUB-{item['canonical_id']}")
+            if row is None:
+                continue
+            # A stale or unknown-freshness publication item must not be handed to
+            # the answer gate as confirmed-official evidence.
+            self.assertEqual(row["verification_status"], item["verification_status"], item["canonical_id"])
+            if item["verification_status"] != "VERIFIED":
+                self.assertFalse(row["is_current"], item["canonical_id"])
+
+    def test_exact_id_lookup_is_shared_by_web_and_mcp(self):
+        canonical_id = self.gateway.store["items"][0]["canonical_id"]
+        arguments = {"canonical_id": canonical_id, "limit": 10}
+        query_status, query = self.request(
+            "POST", "/query", {"tool": "search_evidence", "arguments": arguments}
+        )
+        mcp_status, mcp = self.request(
+            "POST",
+            "/mcp",
+            {"jsonrpc": "2.0", "id": 7, "method": "tools/call",
+             "params": {"name": "search_evidence", "arguments": arguments}},
+        )
+        self.assertEqual(query_status, 200)
+        self.assertEqual(mcp_status, 200)
+        self.assertEqual([row["canonical_id"] for row in query["results"]], [canonical_id])
+        self.assertEqual(
+            [row["canonical_id"] for row in mcp["result"]["structuredContent"]["results"]],
+            [canonical_id],
+        )
+        self.assertEqual(query["query_coverage"]["requested_scope"]["canonical_id"], canonical_id)
+
     def test_saved_query_store_must_match_canonical_artifacts(self):
         snapshot = gateway_module.load_snapshot()
         with tempfile.TemporaryDirectory() as directory:

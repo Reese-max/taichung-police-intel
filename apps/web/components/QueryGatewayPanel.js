@@ -129,7 +129,7 @@ function QueryResult({ response, onFeedback, feedbackReady }) {
           {results.map((item) => (
             <li key={item.canonical_id}>
               <a href={item.official_url} target="_blank" rel="noreferrer">{item.title}</a>
-              <small>{item.source_id} · {item.freshness_status || "UNKNOWN"}</small>
+              <small>{item.source_id} · {item.verification_status || item.freshness_status || "UNKNOWN"}</small>
             </li>
           ))}
         </ul>

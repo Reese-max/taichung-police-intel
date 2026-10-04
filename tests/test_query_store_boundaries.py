@@ -145,7 +145,8 @@ class QueryBoundaryTests(unittest.TestCase):
                 qs.query_store(self.build(), limit=limit)
 
     def test_search_input_budget_and_generation_pin(self):
-        for kwargs in [{'text': 'a'*513}, {'text': ['bad']}, {'change_type': 'RANDOM'}, {'expected_generation': 'wrong'}]:
+        for kwargs in [{'text': 'a'*513}, {'text': ['bad']}, {'canonical_id': ''},
+                       {'change_type': 'RANDOM'}, {'expected_generation': 'wrong'}]:
             with self.subTest(kwargs=kwargs), self.assertRaises(ValueError):
                 qs.query_store(self.build(), **kwargs)
 
