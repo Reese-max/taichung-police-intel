@@ -1,0 +1,39 @@
+{
+  "_fixture_provenance": {
+    "official_url": "https://yishi.tccc.gov.tw/api/Proposal/FrontList?keywordList=%E8%AD%A6%E5%AF%9F%E5%B1%80&pageNumber=1&pageSize=1",
+    "observed_at": "2026-10-04T18:38:53+00:00",
+    "observed_body_sha256": "aac151fb05589360a0c17e77c1a03e6dc0294d7dbd3f0881c9b5df1f23dff203",
+    "transformation": "Preserve the observed record field names; replace identifiers and text with synthetic values and adjust pagination to a one-record test inventory. Official inventory totalCount was 108."
+  },
+  "success": true,
+  "message": "",
+  "data": {
+    "pageNumber": 1,
+    "pageSize": 1,
+    "totalPages": 1,
+    "totalCount": 1,
+    "data": [
+      {
+        "billAttribute": "",
+        "billAttributeSort": "",
+        "billId": "fixture-proposal-001",
+        "billNumber": "115-001",
+        "billType": "",
+        "billTypeSort": "",
+        "closureType": "",
+        "closureTypeSort": "",
+        "committee": "",
+        "execution": "",
+        "executionSort": "",
+        "jointSignatory": "",
+        "proposalRationale": "警察局公開提案測試",
+        "proposalRationaleSort": "",
+        "resolution": "",
+        "resolutionSort": "",
+        "seq": 1,
+        "session": "第4屆第8次定期會",
+        "sponsor": ""
+      }
+    ]
+  }
+}

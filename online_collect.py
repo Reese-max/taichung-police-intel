@@ -347,20 +347,18 @@ def collect_s009(session: requests.Session, start: date, end: date) -> dict:
                 "payload": payload,
             }
         )
-    # S-009 proposals have no date field; use the fetch timestamp as data_as_of
-    # since a successful API response with current-session items proves the source
-    # is alive and the data reflects the latest legislative state.
-    # window_completeness is COMPLETE_ZERO because the API successfully returned all
-    # police-related proposals — they just have no publishedAt to place in a date window.
+    # The official proposal schema has no verifiable publication date. A complete
+    # API inventory establishes availability, but cannot place nonempty proposals
+    # inside or outside this date window. Observation time belongs only in
+    # last_checked_at; it must not become a source publication date.
     return {
         "source_health": "PASS",
-        "window_completeness": "COMPLETE_ZERO",
+        "window_completeness": "PARTIAL" if items else "COMPLETE_ZERO",
         "window_item_count": 0,
         "snapshot_item_count": len(items),
         "items": items,
         "snapshots": responses,
         "manifest_sha256": canonical_sha256([item["content_sha256"] for item in items]),
-        "api_confirmed_at": timestamp(datetime.now(TZ)),
     }
 
 
@@ -1667,18 +1665,19 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
             collected_items = collected.get("items", [])
             raw_items_by_source[source_id] = collected_items
             dates = [item["published_at"] for item in collected_items if item["published_at"]]
-            # Use latest_record_date from S-007 probe or api_confirmed_at from S-009
-            # when no items have published_at in the collection window.
+            # An official S-007 record date may establish data time even when it
+            # falls outside this collection window. Local API observation time
+            # never establishes an official publication date.
             data_as_of = max(dates, default=None)
             if not data_as_of and collected.get("latest_record_date"):
                 data_as_of = collected["latest_record_date"]
-            if not data_as_of and collected.get("api_confirmed_at"):
-                data_as_of = collected["api_confirmed_at"]
             if not data_as_of:
                 # Undated successful content does not establish an official
                 # publication time. Keep last_checked_at as the observation
                 # clock, and do not carry a prior fabricated date forward.
-                if not collected_items:
+                # S-009 has no official date evidence, including for an empty
+                # inventory; discard legacy values made from the fetch clock.
+                if not collected_items and source_id != "S-009":
                     data_as_of = previous.get("data_as_of")
             manifest_changed = collected["manifest_sha256"] != previous.get("manifest_sha256")
             change_count = collected["window_item_count"] if manifest_changed else 0

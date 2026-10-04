@@ -38,6 +38,9 @@ class Response:
     def raise_for_status(self):
         return None
 
+    def json(self):
+        return json.loads(self.content)
+
 
 class Session:
     def __init__(self, responses):
@@ -212,6 +215,60 @@ class DownloadListDateTruthTests(unittest.TestCase):
         self.assertIn("WINDOW_PARTIAL", source["intelligence_gaps"])
         self.assertIn("NO_DATA_AS_OF", source["intelligence_gaps"])
         self.assertEqual(feed["items"][0]["eligibility"], "INELIGIBLE_PARTIAL")
+
+
+class ProposalDateTruthTests(unittest.TestCase):
+    def collect(self, *, empty=False):
+        import online_collect as oc
+
+        payload = json.loads((ROOT / "tests/fixtures/s009-undated-front-list.json").read_text())
+        payload.pop("_fixture_provenance")
+        if empty:
+            payload["data"].update(data=[], totalCount=0, totalPages=1)
+        session = Session([Response(oc.API_S009, content=json.dumps(payload).encode())])
+        result = oc.collect_s009(session, date(2026, 9, 29), date(2026, 10, 4))
+        self.assertEqual(len(session.calls), 1)
+        return result
+
+    def test_observed_undated_schema_cannot_prove_zero_items_in_date_window(self):
+        result = self.collect()
+        self.assertEqual(result["source_health"], "PASS")
+        self.assertEqual(result["snapshot_item_count"], 1)
+        self.assertEqual(result["window_item_count"], 0)
+        self.assertEqual(result["window_completeness"], "PARTIAL")
+        self.assertIsNone(result["items"][0]["published_at"])
+        self.assertNotIn("api_confirmed_at", result)
+
+    def test_publication_clears_legacy_fetch_date_and_preserves_unknown_date_gaps(self):
+        import online_collect as oc
+
+        for empty in (False, True):
+            with self.subTest(empty=empty), tempfile.TemporaryDirectory() as directory:
+                output = Path(directory) / "source-status.json"
+                output.write_text(json.dumps({
+                    "schema_version": 1, "mode": "COMPETITION_DEMO",
+                    "sources": [{"source_id": "S-009", "data_as_of": "2026-10-04T23:26:52+08:00"}],
+                }))
+                with mock.patch.object(oc, "P0_SOURCES", {"S-009": oc.P0_SOURCES["S-009"]}), mock.patch.object(
+                    oc, "collect_source", return_value=self.collect(empty=empty)
+                ), contextlib.redirect_stdout(io.StringIO()):
+                    state = oc.build_demo_status(output, "EVENING", date(2026, 10, 4), "manual")
+                source = state["sources"][0]
+                feed = json.loads((Path(directory) / "intelligence-feed.json").read_text())
+                self.assertIsNone(source["data_as_of"])
+                self.assertEqual(source["last_checked_at"], state["generated_at"])
+                self.assertEqual(source["freshness_status"], "NO_DATA")
+                self.assertEqual(source["source_health"], "PASS")
+                self.assertIn("NO_DATA_AS_OF", source["intelligence_gaps"])
+                if empty:
+                    self.assertEqual(source["window_completeness"], "COMPLETE_ZERO")
+                    self.assertEqual(feed["items"], [])
+                else:
+                    self.assertEqual(source["result"], "PARTIAL")
+                    self.assertEqual(state["latest_collection_run"]["status"], "PARTIAL")
+                    self.assertIn("WINDOW_PARTIAL", source["intelligence_gaps"])
+                    self.assertEqual(feed["items"][0]["eligibility"], "INELIGIBLE_PARTIAL")
+                    self.assertIsNone(feed["items"][0]["data_as_of"])
 
 
 class PopulationBackgroundTests(unittest.TestCase):
