@@ -701,3 +701,31 @@ test("validator errors fail closed and keep a truncated error detail", () => {
   assert.match(result.receipt.error_detail, /boom-internal-detail/);
   assert.equal(result.final_claims.length, 0);
 });
+
+// ── Evidence admission accounting ──────────────────────────────────────────────
+// readEvidence() rejects rows it cannot index (foreign schema_version, missing
+// id/source, unknown evidence_type) and the gate drops them with filter(Boolean).
+// A dropped row silently changes a verdict — a supported claim turns
+// UNSUPPORTED — while the receipt still reads as a full-publication check. The
+// receipt must therefore report how many records were actually indexed so a
+// gate host can fail closed instead of publishing a partial verification.
+
+test("receipt reports how many evidence records the validator actually indexed", () => {
+  const indexed = gateAnswer({ claims: [timeClaim()], evidence: [TRAFFIC_TIME, TRAFFIC_TIME_OTHER_SOURCE] });
+  assert.equal(indexed.receipt.indexed_evidence_count, 2);
+
+  const dropped = gateAnswer({
+    claims: [timeClaim()],
+    evidence: [TRAFFIC_TIME, { ...TRAFFIC_TIME_OTHER_SOURCE, schema_version: EVIDENCE_SCHEMA_VERSION + 1 }],
+  });
+  assert.equal(dropped.receipt.indexed_evidence_count, 1);
+  assert.deepEqual(dropped.receipt.evidence_ids, [TRAFFIC_TIME.evidence_id]);
+});
+
+test("a refused gate indexes no evidence and exposes no publication binding", () => {
+  const result = gateAnswer({ claims: [timeClaim()], evidence: [TRAFFIC_TIME, TRAFFIC_TIME] });
+  assert.equal(result.gate_status, "BLOCKED");
+  assert.equal(result.receipt.indexed_evidence_count, 0);
+  assert.equal(result.receipt.publication_hash, null);
+  assert.deepEqual(result.receipt.evidence_ids, []);
+});
