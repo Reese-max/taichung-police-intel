@@ -1,12 +1,13 @@
 import "./globals.css";
 import "./v2.css";
+import "./govintel.css";
 
-import V2DailyDashboard from "../components/V2DailyDashboard.js";
+import GovIntelFrame from "../components/GovIntelFrame.js";
 
 
 export const metadata = {
-  title: "GovIntel AI｜跨機關公共事件整合、異動辨識與交班支援平台",
-  description: "整合官方公開來源，辨識公共事件異動、保留證據與缺口，支援警政政策判讀及交班查證。",
+  title: "GovIntel AI－公共資訊查詢與個人化追蹤平台",
+  description: "查詢官方公開資訊，保存自己選擇的追蹤條件，核對公告變動、原文與資料涵蓋限制。",
 };
 
 export const viewport = {
@@ -17,11 +18,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="zh-Hant-TW">
       <body>
-        <V2DailyDashboard />
-        <details className="legacy-system-details">
-          <summary>資料來源、歷史監測介面與影音證據</summary>
-          <div className="legacy-system-content">{children}</div>
-        </details>
+        <GovIntelFrame>{children}</GovIntelFrame>
       </body>
     </html>
   );

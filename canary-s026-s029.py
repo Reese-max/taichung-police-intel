@@ -286,8 +286,10 @@ def parse_rdec_items(soup: BeautifulSoup, base_url: str) -> list[dict]:
     return list(items.values())
 
 
-def fetch_s029(session: requests.Session, start: date, end: date) -> dict:
+def fetch_s029(session: requests.Session, start: date, end: date, *, on_response=None) -> dict:
     index = get(session, S029_INDEX_URL, S029_HOSTS)
+    if on_response is not None:
+        on_response(index, "LIST")
     index_soup = BeautifulSoup(index.content, "html.parser")
     sessions = parse_session_links(index_soup, index.url)
     if not sessions:
@@ -296,6 +298,8 @@ def fetch_s029(session: requests.Session, start: date, end: date) -> dict:
 
     first_url = f"{latest['url']}?Page=1&PageSize=30&type="
     first = get(session, first_url, S029_HOSTS)
+    if on_response is not None:
+        on_response(first, "LIST")
     first_soup = BeautifulSoup(first.content, "html.parser")
     first_text = " ".join(first_soup.stripped_strings)
     count_match = re.search(r"共\s*([\d,]+)\s*筆資料.*?第\s*(\d+)\s*/\s*(\d+)\s*頁", first_text)
@@ -309,7 +313,10 @@ def fetch_s029(session: requests.Session, start: date, end: date) -> dict:
 
     pages = [first]
     for page in range(2, page_count + 1):
-        pages.append(get(session, f"{latest['url']}?Page={page}&PageSize=30&type=", S029_HOSTS))
+        response = get(session, f"{latest['url']}?Page={page}&PageSize=30&type=", S029_HOSTS)
+        pages.append(response)
+        if on_response is not None:
+            on_response(response, "LIST")
     items_by_url: dict[str, dict] = {}
     for response in pages:
         for item in parse_rdec_items(BeautifulSoup(response.content, "html.parser"), response.url):
@@ -326,6 +333,8 @@ def fetch_s029(session: requests.Session, start: date, end: date) -> dict:
     police_attachments = []
     for item in police_items:
         response = get(session, item["url"], S029_HOSTS, 120)
+        if on_response is not None:
+            on_response(response, "ATTACHMENT")
         if not response.content.startswith(b"%PDF-"):
             raise RuntimeError(f"警政專案附件不是 PDF：{item['url']}")
         police_attachments.append({

@@ -1,7 +1,10 @@
 import importlib.util
+import json
+import re
 from datetime import date, timedelta
 from pathlib import Path
 import unittest
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -11,8 +14,12 @@ module = importlib.util.module_from_spec(spec)
 assert spec and spec.loader
 spec.loader.exec_module(module)
 
+CATALOG = json.loads((ROOT / "docs" / "govintel" / "source-catalog.v2.json").read_text(encoding="utf-8"))
+PROMOTION_IDS = tuple(CATALOG["promotion_plan"])
+WORKFLOW = ROOT / ".github" / "workflows" / "candidate-source-observation.yml"
 
-def report(day: date, *, source_ids=("S-001", "S-031"), failed_count=0):
+
+def report(day: date, *, source_ids=PROMOTION_IDS, failed_count=0):
     rows = []
     for source_id in source_ids:
         rows.append({
@@ -59,11 +66,11 @@ class CandidateObservationWindowTests(unittest.TestCase):
         reports = [
             (f"{day}-{source_id}.json", report(day, source_ids=(source_id,)))
             for day in (start + timedelta(days=offset) for offset in range(7))
-            for source_id in ("S-001", "S-031")
+            for source_id in PROMOTION_IDS
         ]
         result = module.validate_reports(reports)
         self.assertEqual(result["status"], "PASS")
-        self.assertEqual(result["source_ids"], ["S-001", "S-031"])
+        self.assertEqual(result["source_ids"], sorted(PROMOTION_IDS))
         self.assertTrue(all(row["window_complete"] for row in result["sources"].values()))
 
     def test_failed_source_does_not_hide_healthy_source(self):
@@ -75,7 +82,7 @@ class CandidateObservationWindowTests(unittest.TestCase):
             )
             for offset in range(7)
             for day in (start + timedelta(days=offset),)
-            for source_id in ("S-001", "S-031")
+            for source_id in PROMOTION_IDS
         ]
         result = module.validate_reports(reports)
         self.assertEqual(result["status"], "BLOCKED")
@@ -99,6 +106,45 @@ class CandidateObservationWindowTests(unittest.TestCase):
         ])
         self.assertEqual(result["status"], "BLOCKED")
         self.assertTrue(any("source inventory changed" in reason for reason in result["reasons"]))
+
+    def test_unobserved_promotion_candidate_blocks_window(self):
+        start = date(2026, 9, 15)
+        observed = tuple(source_id for source_id in PROMOTION_IDS if source_id != "S-019")
+        result = module.validate_reports([
+            (f"{day}.json", report(day, source_ids=observed))
+            for day in (start + timedelta(days=offset) for offset in range(7))
+        ])
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertIn("S-019", result["sources"])
+        self.assertFalse(result["sources"]["S-019"]["window_complete"])
+        self.assertEqual(result["sources"]["S-019"]["valid_observed_days"], [])
+        self.assertTrue(
+            any("S-019" in reason and "valid observed days" in reason for reason in result["reasons"])
+        )
+
+    def test_empty_or_unknown_promotion_plan_fails_closed(self):
+        import tempfile
+
+        for plan in ([], ["S-999"]):
+            catalog = {"sources": CATALOG["sources"], "promotion_plan": plan}
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".json", encoding="utf-8", delete=False
+            ) as handle:
+                json.dump(catalog, handle)
+            try:
+                with mock.patch.object(module, "CATALOG", Path(handle.name)):
+                    with self.assertRaises(ValueError):
+                        module.promotion_source_ids()
+            finally:
+                Path(handle.name).unlink(missing_ok=True)
+
+    def test_observation_workflow_covers_every_promotion_candidate(self):
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        matrix = re.search(r"^\s*source:\s*\[([^\]]+)\]", workflow, re.M)
+        self.assertIsNotNone(matrix, "candidate observation workflow must declare a source matrix")
+        scheduled = {item.strip() for item in matrix.group(1).split(",") if item.strip()}
+        missing = sorted(set(PROMOTION_IDS) - scheduled)
+        self.assertEqual(missing, [], "daily candidate observation misses promotion sources")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,23 @@
+.pq-page { overflow-wrap: anywhere; }
+.pq-mode-select { margin: 1rem 0; }
+.pq-field { min-width: 0; }
+.pq-page input, .pq-page select { min-width: 0; max-width: 100%; box-sizing: border-box; }
+#pq-snapshot { display: block; width: 100%; margin-top: .5rem; }
+.pq-period legend { max-width: 100%; white-space: normal; }
+.pq-period { min-width: 0; border: 1px solid var(--border); border-radius: 8px; margin: 1rem 0; }
+.pq-page input:disabled, .pq-page select:disabled { opacity: .55; cursor: not-allowed; }
+.pq-page :focus-visible { outline: 3px solid #7dd3fc; outline-offset: 3px; }
+.pq-receipt { margin: 1rem 0; font-size: .85rem; }
+.pq-page .pq-event-card h2 { font-size: 1.2rem; line-height: 1.6; }
+.pq-page .pq-documents li small { display: block; }
+dialog.pq-drawer { margin: auto 0 auto auto; max-height: 90dvh; max-width: 100%; color: var(--text); padding: 0; }
+dialog.pq-drawer::backdrop { background: #000b; }
+dialog.pq-drawer:not([open]) { display: none; }
+.pq-drawer pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .85rem; }
+.pq-drawer-header button { flex-shrink: 0; }
+@media (max-width: 390px) {
+  .pq-page .pq-search-form { padding: 14px; }
+  .pq-page .pq-event-head { flex-wrap: wrap; }
+  .pq-page .pq-tabs { flex-wrap: wrap; }
+  .pq-page .pq-event-card { padding: 16px; }
+}

@@ -1,6 +1,8 @@
-# #20 發布修復：本輪邊界與下一步
+# Historical #20 publication recovery record
 
-基準：`e1d081bd04824c062c7ee99e7d74f9e478240743`。已知排程在資料 push 至受保護 main 被拒；不能為了展示關閉 PR／verify／分支保護。
+這是 2026-09-22 的 dated checkpoint，保留當時 protected-main failure 的根因與修復邊界。`publication-state` lifecycle 現已在 `main`；2026-10-04 真實蒐集、公開五檔 hash 與 Gateway 驗證已有成功證據。現在的資料缺口及 #20 尚未完成的驗收見 [CURRENT_STATUS.md](CURRENT_STATUS.md)，不得再引用本文下方「尚未合併」為現在的分支狀態。
+
+基準：`e1d081bd04824c062c7ee99e7d74f9e478240743`。當時已知排程在資料 push 至受保護 main 被拒；不能為了展示關閉 PR／verify／分支保護。
 
 ## 2026-09-22 external-state recheck
 
@@ -37,9 +39,9 @@
 4. 最終 `publication_outcome` 等待 build/deploy，指出各階段 success/failure/skipped/unknown；本地 full gate 在隔離 PostgreSQL service 下為 `VERIFY_OK required=102`。
 5. 前端以最舊的本輪核對時間與快照時間判斷逾期；16 小時是現行早晚更新的暫定 UI 年齡上限（12 小時間隔＋4 小時容忍），不是服務 SLA。背景統計的舊期別仍另外顯示，不混成抓取故障。
 
-## 正式環境仍未完成
+## Historical acceptance boundary
 
-**本地 protected-main 根因修正已完成，但尚未合併到 `main`，所以 #20 仍不能關閉。**遠端排程仍執行舊 workflow；人工取消、runner 損壞、連線中斷也可能讓 `always()` 無法取得產物，報告不得保證一定存在 artifact。正式關閉仍需有效 review／merge、晨晚自然 run、匿名公開 hash 驗證與 failure drill。
+**在這份 2026-09-22 record 中，本地 protected-main 根因修正尚未合併到 `main`，所以 #20 不能關閉。** 後續 main 已有新的 workflow receipts；這段仍只描述當時的 external-state boundary。#20 的目前完成條件與最新 evidence 以 [CURRENT_STATUS.md](./CURRENT_STATUS.md) 為準，不能沿用本頁舊 run 代替新證據。
 
 ## 下一個必要外部決策
 

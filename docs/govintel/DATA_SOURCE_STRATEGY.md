@@ -1,5 +1,7 @@
 # GovIntel AI｜資料來源優化策略
 
+> 本文是 2026-09-09 的來源架構規劃，表中建議頻率、canary PASS 與升級順序不是目前正式啟用或新鮮度證明。送件 v6 首期四類候選為 S-001／S-032／S-033／S-031；S-019 仍是其他候選。現行核准集合、D1／D2 缺口與每來源驗收界線見[資料來源矩陣](competition-2026/DATA_SOURCE_MATRIX.md)。沒有每日新增 100–200 筆的實測承諾。
+
 版本：v0.2  
 更新日：2026-09-09  
 目標：把現有「議會證據導覽」擴充成「跨機關公共事件整合、重要異動偵測與交班支援」所需的來源架構。
@@ -197,5 +199,7 @@ S-031 消防即時災情已接線為候選 adapter；它是高頻、短生命週
 - 來源故障時 last-known-good 保留。
 - 回查連結可匿名開啟。
 - 對外展示不含內部勤務、110 案件、個資或未公開資料。
+
+`promotion_plan` 中每個來源都必須在觀測窗口內逐日累積有效 canary receipt；`scripts/verify-candidate-observation-window.py` 會把「來源完全沒有出現在任何 receipt」視為未完成窗口（BLOCKED），而不是略過。每日觀測 workflow（`.github/workflows/candidate-source-observation.yml`）的 matrix 必須涵蓋 `promotion_plan` 全部來源（S-019、S-001、S-032、S-033、S-031），缺漏來源無法累積七日收據。
 
 機器可讀清冊：`docs/govintel/source-catalog.v2.json`。

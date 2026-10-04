@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "validation_scope": "READ_ONLY_BACKGROUND_SAMPLE_NOT_PRODUCTION_PROMOTION",
+  "observed_on": "2026-10-05",
+  "timezone": "Asia/Taipei",
+  "D1": {
+    "requested_period": "112Y12M",
+    "validation_status": "VERIFIED_HISTORICAL_BACKGROUND_SAMPLE",
+    "verified_sample_path": "segis-112Y12M-taichung.verified.json",
+    "production_active": false,
+    "fixed_csv_receipt": {
+      "http_status": 200,
+      "download_method": "官方固定期別查詢頁的 CSV 下載按鈕；未使用會更新期別的 JSON 開放服務。",
+      "zip_bytes": 9932,
+      "zip_sha256": "d2648b7ab2649b1257099937d246d9e0639c86614ac2ad1accd355c53882d870",
+      "csv_filename": "112年12月行政區人口統計_鄉鎮市區.csv",
+      "csv_bytes": 28502,
+      "raw_csv_sha256": "95500e06310098d4c194a26e4aeba00e7142d5c9e441a62fe18f71250d65496b",
+      "character_encoding": "UTF-8",
+      "download_endpoint": "https://segis.moi.gov.tw/FileDownload/Download.aspx"
+    },
+    "district_count": 29,
+    "alternate_json_service": {
+      "observed_periods": [
+        "114Y12M"
+      ],
+      "validation_status": "PERIOD_MISMATCH",
+      "query_page_receipt": {
+        "name": "d1-segis-query",
+        "requested_url": "https://segis.moi.gov.tw/STATCloud/QueryInterfaceView?COL=Tr2i5dY3GU8B0WZY2aNaKQ%253d%253d",
+        "observed_at": "2026-10-05T01:19:29.039764+08:00",
+        "http_status": 200,
+        "final_url": "https://segis.moi.gov.tw/STATCloud/QueryInterfaceView?COL=Tr2i5dY3GU8B0WZY2aNaKQ%253d%253d",
+        "bytes": 24380,
+        "sha256": "50074934982cc37080fa66c33339bbf0d52cd5cce197cfc7e5d7f13b193c5588",
+        "content_type": "text/html; charset=utf-8",
+        "location": null,
+        "seconds": 3.92
+      },
+      "resource_receipt": {
+        "name": "d1-open-json",
+        "requested_url": "https://segisws.moi.gov.tw/STATWSSTData/OpenService.asmx/GetAdminSTDataForOpenCode?oCode=BF3B727F423963563B5AF84EB798086251A1FBEE829C41DBF0767011744D917A2539094FCB65D41BDDE79C332EB9258D",
+        "observed_at": "2026-10-05T01:20:57.134081+08:00",
+        "http_status": 200,
+        "final_url": "https://segisws.moi.gov.tw/STATWSSTData/OpenService.asmx/GetAdminSTDataForOpenCode?oCode=BF3B727F423963563B5AF84EB798086251A1FBEE829C41DBF0767011744D917A2539094FCB65D41BDDE79C332EB9258D",
+        "bytes": 97524,
+        "sha256": "c7b331016226bb7ff93baf4f236f2156721171a562309a0a7beba6bd3498382f",
+        "content_type": "text/plain; charset=utf-8",
+        "location": null,
+        "seconds": 2.45
+      }
+    },
+    "terms_receipt": {
+      "name": "d1-terms",
+      "requested_url": "https://segis.moi.gov.tw/STATCloud/DataUseInfo",
+      "observed_at": "2026-10-05T01:20:26.064978+08:00",
+      "http_status": 200,
+      "final_url": "https://segis.moi.gov.tw/STATCloud/DataUseInfo",
+      "bytes": 21928,
+      "sha256": "9c8ad45331a54597980b6ef7b03ee2f7afb840d75e251dd2f3e9cd6e14a50ed0",
+      "content_type": "text/html; charset=utf-8",
+      "location": null,
+      "seconds": 0.87
+    },
+    "usage_limits": [
+      "人口與戶數為 2023 年 12 月歷史背景，不是目前人口或即時人流。",
+      "地區人口不等於活動出席人數或受影響人口。",
+      "行政區代碼與名稱可供背景關聯；人口資料不能推論機關管轄、可用警力或現場狀態。"
+    ]
+  },
+  "D2": {
+    "dataset_id": "5958",
+    "title": "各縣(市)警察(分)局暨所屬分駐(派出)所地址資料",
+    "metadata_sha256": "0c08d96a8613dc794780822e6ecb07c574916e27f2ddf1658ab0b44c56b74d7a",
+    "metadata_http_status": 200,
+    "metadata_modified_at": "2026-10-01 23:32:05",
+    "license_code": "1",
+    "cost": "free",
+    "declared_fields": [
+      "中文單位名稱",
+      "英文單位名稱",
+      "郵遞區號",
+      "地址",
+      "電話",
+      "POINT_X",
+      "POINT_Y"
+    ],
+    "declared_character_encoding": "UTF-8",
+    "resource_receipt": {
+      "name": "d2-5958-zip",
+      "requested_url": "https://www.tgos.tw/tgos/VirtualDir/Product/9927eb8a-efed-40c0-8bc4-83121ad6834a/1150930.zip",
+      "observed_at": "2026-10-05T01:20:26.938110+08:00",
+      "http_status": 403,
+      "final_url": "https://www.tgos.tw/tgos/VirtualDir/Product/9927eb8a-efed-40c0-8bc4-83121ad6834a/1150930.zip",
+      "bytes": 134,
+      "sha256": "c996c0469ef05ff6fdd1f7cefbc3f7e109bb21969de42fcf591498a828a7ad5f",
+      "content_type": "text/html; charset=UTF-8",
+      "location": null,
+      "seconds": 1.61
+    },
+    "validation_status": "RESOURCE_UNAVAILABLE",
+    "production_active": false,
+    "resource_rows": null,
+    "coordinate_reference_system": "UNKNOWN",
+    "coordinate_validation": "NOT_RUN",
+    "phone_address_validation": "NOT_RUN",
+    "usage_limits": [
+      "中繼資料取得不代表 CSV 實際內容已取得。",
+      "POINT_X／POINT_Y 欄位名不能證明 WGS84 或任一座標系統。",
+      "地址或位置鄰近不是管轄或即時可用警力。"
+    ]
+  }
+}

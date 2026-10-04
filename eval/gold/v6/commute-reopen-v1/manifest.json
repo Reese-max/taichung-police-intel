@@ -1,0 +1,119 @@
+{
+  "annotation_file": "annotations.json",
+  "arms": {
+    "A_v1": {
+      "execution_limitation": "未執行相同官方網站的真人查詢／回查。",
+      "execution_scope": "NOT_RUN",
+      "human_participants": "NOT_RUN",
+      "human_timing_status": "NOT_RUN",
+      "median_total_task_seconds": null,
+      "method_execution_status": "NOT_RUN",
+      "method_id": "A_v1_manual_same_sources_same_cutoff",
+      "note": "第一輪受試者尚未執行；沒有真人資料就沒有可比較結果。 未執行相同官方網站的真人查詢／回查。",
+      "results": null,
+      "status": "NOT_RUN"
+    },
+    "B_v6": {
+      "execution_limitation": "僅以 track_read_state=false 重播缺少已讀狀態的政策代理；未執行搜尋＋一般摘要方法。",
+      "execution_scope": "DETERMINISTIC_POLICY_PROXY",
+      "human_timing_status": "NOT_RUN",
+      "method_execution_status": "NOT_RUN",
+      "method_id": "B_v6_same_scope_search_generic_summary",
+      "note": "同範圍搜尋＋一般摘要，資料截止與指定回查時點一致。與 v1 模板的 B（same_new_workflow_without_semantic_AI）不是同一組。 僅以 track_read_state=false 重播缺少已讀狀態的政策代理；未執行搜尋＋一般摘要方法。",
+      "policy_overrides": {
+        "dedupe_repeat_fetches": true,
+        "formatting_is_substantive": false,
+        "mirror_is_independent_evidence": false,
+        "track_read_state": false
+      },
+      "results": null,
+      "status": "REPLAYED"
+    },
+    "C_RULES_ONLY": {
+      "execution_limitation": "只關閉 deterministic interval matching 的政策代理；未比較同介面的語意 AI on/off，因此不能證明 AI 增益。",
+      "execution_scope": "DETERMINISTIC_POLICY_PROXY",
+      "human_timing_status": "NOT_RUN",
+      "method_execution_status": "NOT_RUN",
+      "method_id": "C_RULES_ONLY_v6_rules_only_no_semantic",
+      "note": "保留 C 的介面、資料與站內提示規則，只關閉語意處理；不得與 B_v6 混為同組。 只關閉 deterministic interval matching 的政策代理；未比較同介面的語意 AI on/off，因此不能證明 AI 增益。",
+      "policy_overrides": {
+        "semantic_matching": false
+      },
+      "results": null,
+      "status": "REPLAYED"
+    },
+    "C_v6": {
+      "execution_limitation": "只執行 deterministic matching／hash／read-state 重播；未執行完整查詢與追蹤 UI、模型或真人任務。",
+      "execution_scope": "DETERMINISTIC_POLICY_PROXY",
+      "human_timing_status": "NOT_RUN",
+      "method_execution_status": "NOT_RUN",
+      "method_id": "C_v6_full_query_and_tracking",
+      "note": "完整 v6 查詢與追蹤。離線重播不呼叫任何模型。 只執行 deterministic matching／hash／read-state 重播；未執行完整查詢與追蹤 UI、模型或真人任務。",
+      "policy_overrides": {},
+      "results": null,
+      "status": "REPLAYED"
+    }
+  },
+  "case_file": "cases.jsonl",
+  "cost_file": "cost-ledger.json",
+  "coverage_limitations": [
+    "取得缺漏的開站時點（R4、R5）預期集合為空，因此 missed_while_source_gap 在本輪沒有可觀測案例；計數規則以單元測試驗證，實際缺口覆蓋留待第一輪真實來源。",
+    "唯一會產生漏報的 arm（PROBE_ONE_ALERT_PER_DOCUMENT）三筆漏報都是誤去重，因此 missed_by_matching_rule 與 missed_without_recorded_reason 在本輪同樣沒有可觀測案例。"
+  ],
+  "created_at": "2026-10-03",
+  "dataset_id": "govintel-gold-v6-commute-reopen-v1",
+  "dataset_type": "SYNTHETIC_SCENARIO_SEED",
+  "description": "v6 通勤道路重播情境：保存條件、關站、重開、延期、解除與取消。每個開站時點的預期集合為「當時已取得、符合啟用條件、未讀的實質更新」。全部為合成資料，不是生產準確率主張，也不是已執行真人測試的替代品。",
+  "development_reopen_ids": [
+    "R1",
+    "R2",
+    "R3"
+  ],
+  "evaluation_scope": "SYNTHETIC_DETERMINISTIC_POLICY_REPLAY",
+  "fingerprint": "govintel/v6/commute-reopen-replay-evaluation/v1",
+  "heldout_reopen_ids": [
+    "R4",
+    "R5",
+    "R6",
+    "R7",
+    "R8",
+    "R9"
+  ],
+  "label_policy": {
+    "disagreements_must_not_be_silently_dropped": true,
+    "human_review_required_for_real_documents": true,
+    "model_generated_labels_are_gold": false,
+    "synthetic_cases_must_be_marked": true
+  },
+  "method_version_note": "Historical v1 comparison definitions are archived at main@562141e396c693e115b3fce10594c434c401a58e:docs/govintel/competition-2026/evaluation-manifest.template.json; that immutable historical template defined B as the same workflow with semantic AI disabled. The current schema-2 template follows submitted v6: B is same-scope search plus general summary and the separate semantic-off arm preserves C interface/data/tracking/read rules. Those complete v6 methods remain NOT_RUN; this dataset only replays synthetic deterministic policy proxies and does not execute search-summary or semantic AI ablation.",
+  "observation_statuses": [
+    "NEW_UPDATES",
+    "NO_NEW_ITEMS",
+    "SOURCE_GAP",
+    "STALE_TRACKED_END"
+  ],
+  "planned_scale": {
+    "actual_definition": "actual_events = null（未宣告 event_id，事件數未量測，不能以文件數代替）；actual_source_documents = 非鏡像 document_id 去重；actual_sources = source_id 去重；actual_version_samples = 版本／取得樣本數，包含轉載、重複與排版樣本，不當成新增公告。",
+    "actual_events": null,
+    "actual_reopen_points": 9,
+    "actual_source_documents": 6,
+    "actual_sources": 2,
+    "actual_version_samples": 12,
+    "missing_samples_reason": "第一輪規模（20 事件／60 原始文件）尚未執行；只交付合成情境與明確分母，不為湊數納入重複或歷史資料。",
+    "planned_events": 20,
+    "planned_source_documents": 60
+  },
+  "scenario_file": "session.json",
+  "schema_version": 1,
+  "split_limitation": "主施工公告 DOC-ROAD-AB 的版本鏈橫跨兩組，因此無法滿足 issue #108 的「事件版本與轉載不跨 dev／holdout」要求；情境另有其他工程，但未宣告 event_id，不能宣稱事件數或事件層級切分已驗收。可檢查的性質只有兩組預期更新 ID 集合不相交。事件層級切分留待第一輪 20 事件／60 文件，狀態 NOT_RUN。",
+  "split_rule": "開發／保留集以開站時點切分；同一事件的不同版本不進同一個開站時點的預期集合。",
+  "targets": {
+    "correctness_not_lower_than_arm_a": true,
+    "median_total_time_reduction_vs_arm_a": 0.3,
+    "precision": 0.85,
+    "recall": 0.9
+  },
+  "task_types": [
+    "reopen_unread"
+  ]
+}

@@ -1,0 +1,259 @@
+{
+  "schema_version": 1,
+  "status": "PASS",
+  "execution_scope": "ACTUAL_BROWSER_FINITE_SYNTHETIC_UI_FLOW",
+  "generated_at": "2026-10-04T17:48:05.818Z",
+  "served_release_binding": {
+    "status": "PASS",
+    "served_code_sha": "3a06754a2428023bf316d8cb180f239f9c3b971d",
+    "release_id": "b9ea34d04868e4aabe7b965550705d8d6e39fa4e83db51c2a8b4113067a97ad3",
+    "evidence_level": "BUILD_ONLY",
+    "artifact_hashes": {
+      "feed": "f88408f49f444de0dd3a16fc864d96d9318eefc0c78f69e5d2923a9872f35121",
+      "status": "1876845d854d4387fccee398fefcdebb395a36d0343d7bd2690226dc7020c51b",
+      "brief": "3df565c29622ae729f0f053712f513eddacf6e014aeec227ddd664dd00b38448"
+    }
+  },
+  "browser": "Chromium",
+  "viewport_primary": {
+    "width": 1280,
+    "height": 900
+  },
+  "mobile_width": 375,
+  "checks": [
+    {
+      "id": "01-visible-navigation",
+      "status": "PASS",
+      "details": {
+        "routes_visible": [
+          "/",
+          "/public-query/",
+          "/tracking/",
+          "/sources/"
+        ]
+      }
+    },
+    {
+      "id": "02-save-query-condition",
+      "status": "PASS",
+      "details": {
+        "filters": {
+          "road": "測試路 A 至 B",
+          "time_from": "2026-10-05T09:00+08:00",
+          "time_to": "2026-10-07T17:00+08:00",
+          "daily_from": "09:00",
+          "daily_to": "17:00",
+          "time_semantics": "event_overlap"
+        },
+        "namespace": "demo:commute"
+      }
+    },
+    {
+      "id": "03-reopen-formatting-suppressed",
+      "status": "PASS",
+      "details": {
+        "snapshot": "R2",
+        "observed_unread_count": 0,
+        "scope": "same browser condition saved from R1"
+      }
+    },
+    {
+      "id": "04-extension-and-read",
+      "status": "PASS",
+      "details": {
+        "displayed_update_id": "UPD-005",
+        "observed_unread_before_read": 1,
+        "derived_tracked_end": "2026-10-09T09:00:00.000Z",
+        "original_filter_end": "2026-10-07T17:00+08:00"
+      }
+    },
+    {
+      "id": "05-read-persists-across-reopen",
+      "status": "PASS",
+      "details": {
+        "snapshot": "R3",
+        "observed_unread_count": 0,
+        "operation": "document reload restores saved IDs"
+      }
+    },
+    {
+      "id": "06-R4-gap-is-not-complete",
+      "status": "PASS",
+      "details": {
+        "snapshot": "R4",
+        "condition_remains_enabled": true,
+        "coverage": "explicit gap, no complete-zero inference"
+      }
+    },
+    {
+      "id": "06-R5-gap-is-not-complete",
+      "status": "PASS",
+      "details": {
+        "snapshot": "R5",
+        "condition_remains_enabled": true,
+        "coverage": "explicit gap, no complete-zero inference"
+      }
+    },
+    {
+      "id": "07-expiry-does-not-cancel",
+      "status": "PASS",
+      "details": {
+        "snapshot": "R6",
+        "condition_remains_enabled": true,
+        "derived_end_has_passed": true,
+        "scope": "does not assert Python observation-status equivalence"
+      }
+    },
+    {
+      "id": "08-explicit-lift-read-keeps-condition",
+      "status": "PASS",
+      "details": {
+        "displayed_update_id": "UPD-006",
+        "explicit_lift_visible": true,
+        "read_does_not_cancel_condition": true
+      }
+    },
+    {
+      "id": "09-user-cancel-stops-prompts",
+      "status": "PASS",
+      "details": {
+        "snapshot": "R9",
+        "observed_unread_count": 0,
+        "user_cancelled": true
+      }
+    },
+    {
+      "id": "10-namespace-isolation",
+      "status": "PASS",
+      "details": {
+        "saved_demo_state_retained": true,
+        "published_condition_count": 0
+      }
+    },
+    {
+      "id": "11-invalid-filter-range",
+      "status": "PASS",
+      "details": {
+        "reversed_range_rejected": true
+      }
+    },
+    {
+      "id": "12-no-match-does-not-claim-safety",
+      "status": "PASS",
+      "details": {
+        "finite_no_match": true,
+        "reality_and_safety_inference_rejected": true
+      }
+    },
+    {
+      "id": "13-query-R4-source-gap",
+      "status": "PASS",
+      "details": {
+        "snapshot": "R4",
+        "source_gap_label": "FAILED",
+        "cached_records_not_complete_source_success": true
+      }
+    },
+    {
+      "id": "13-query-R5-source-gap",
+      "status": "PASS",
+      "details": {
+        "snapshot": "R5",
+        "source_gap_label": "PARTIAL",
+        "cached_records_not_complete_source_success": true
+      }
+    },
+    {
+      "id": "14-replay-hash-mutation-refused",
+      "status": "PASS",
+      "details": {
+        "controlled_data_mutation_refused": true,
+        "demo_activation": "blocked"
+      }
+    },
+    {
+      "id": "15-storage-failure-no-success",
+      "status": "PASS",
+      "details": {
+        "controlled_quota_failure_visible": true,
+        "condition_saved": false
+      }
+    },
+    {
+      "id": "16-source-page-failure-not-zero",
+      "status": "PASS",
+      "details": {
+        "controlled_503_visible": true,
+        "source_state_not_reported_as_successful_zero": true
+      }
+    },
+    {
+      "id": "17-mobile-navigation-and-dialog",
+      "status": "PASS",
+      "details": {
+        "widths": [
+          {
+            "route": "/",
+            "viewport": 613,
+            "document": 613
+          },
+          {
+            "route": "/public-query/",
+            "viewport": 375,
+            "document": 375
+          },
+          {
+            "route": "/tracking/",
+            "viewport": 375,
+            "document": 375
+          },
+          {
+            "route": "/sources/",
+            "viewport": 375,
+            "document": 375
+          }
+        ],
+        "dialog_escape_closes": true,
+        "focus_returns_to_trigger": true
+      }
+    },
+    {
+      "id": "18-D1-fixed-period-values",
+      "status": "PASS",
+      "details": {
+        "district_code": "66000060",
+        "population": 235441,
+        "households": 94971,
+        "period": "2023-12",
+        "scope": "historical background sample, no comprehension or real-time effect claim"
+      }
+    },
+    {
+      "id": "19-D1-wrong-period-refused",
+      "status": "PASS",
+      "details": {
+        "controlled_mutation": "wrong-period",
+        "historical_value_display": "refused",
+        "observed_error": "UNKNOWN · D1 固定期別或來源收據無法驗證；未顯示人口資料"
+      }
+    },
+    {
+      "id": "19-D1-bad-hash-refused",
+      "status": "PASS",
+      "details": {
+        "controlled_mutation": "bad-hash",
+        "historical_value_display": "refused",
+        "observed_error": "UNKNOWN · D1 歷史資料 hash 不符，已拒絕使用"
+      }
+    }
+  ],
+  "check_count": 22,
+  "passed": 22,
+  "tested_code_sha": "3a06754a2428023bf316d8cb180f239f9c3b971d",
+  "limitations": [
+    "BUILD_ONLY loopback artifact at the tested code SHA; no public deployment verified.",
+    "Finite synthetic UI tasks and one official historical D1 sample, not held-out model or human-study results.",
+    "Canonical preserved snapshot remains dated and stale; successful checks do not establish source freshness.",
+    "This compact receipt omits raw browser traces, local state, screenshot paths and private participant or entrant data."
+  ]
+}

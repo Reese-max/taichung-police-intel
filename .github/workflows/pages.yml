@@ -3,14 +3,6 @@ name: Refresh and deploy competition demo
 on:
   push:
     branches: [main]
-    paths-ignore:
-      - "apps/web/public/data/source-status.json"
-      - "apps/web/public/data/intelligence-feed.json"
-      - "apps/web/public/data/intelligence-summary.json"
-      - "apps/web/public/data/feed-export.csv"
-      - "apps/web/public/data/v2-daily-brief.json"
-      - "state/v2-shadow-state.json"
-      - "state/v2-handoff-state.json"
   schedule:
     - cron: "30 22 * * *"
     - cron: "30 10 * * *"
@@ -208,6 +200,7 @@ jobs:
           PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
           NEXT_PUBLIC_BASE_PATH: ${{ steps.pages.outputs.base_path }}
           NEXT_PUBLIC_QUERY_GATEWAY_URL: ${{ vars.QUERY_GATEWAY_URL }}
+          NEXT_PUBLIC_RELEASE_CODE_SHA: ${{ github.sha }}
           GOVINTEL_PUBLICATION_WORKFLOW: "1"
 
       - name: Persist pending V1 and V2 state outside protected main
@@ -216,6 +209,9 @@ jobs:
           python -X utf8 scripts/publication-state-branch.py persist \
             --branch publication-state \
             --slot "${{ steps.slot.outputs.value }}"
+
+      - name: Bind the built publication to this release
+        run: node scripts/build-release-manifest.mjs --data-dir apps/web/out/data --code-sha "$GITHUB_SHA"
 
       - name: Upload Pages artifact
         id: pages_upload
@@ -231,6 +227,7 @@ jobs:
           name: publication-evidence-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             verification.log
+            apps/web/out/data/release.json
             apps/web/public/data/source-status.json
             apps/web/public/data/intelligence-feed.json
             apps/web/public/data/intelligence-summary.json
@@ -262,6 +259,8 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
+      - name: Record completed Pages deployment time
+        run: echo "DEPLOYED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
       - name: Verify public data bytes and acknowledge exact checkpoint
         id: acknowledge
         run: python -X utf8 scripts/publication-state-branch.py acknowledge
@@ -281,6 +280,7 @@ jobs:
         env:
           QUERY_GATEWAY_URL: ${{ vars.QUERY_GATEWAY_URL }}
           PUBLICATION_BASE_URL: ${{ steps.deployment.outputs.page_url }}
+          PAGES_DEPLOYMENT: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}
 
       - name: Retain production Query Gateway receipt
         if: always()
