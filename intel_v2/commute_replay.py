@@ -18,6 +18,7 @@ road, traffic condition or road safety.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass, fields as dataclass_fields, replace
 from datetime import datetime, time, timedelta
@@ -190,6 +191,18 @@ def scenario_hash(scenario: dict[str, Any]) -> str:
     return canonical_sha256(scenario)
 
 
+def code_provenance() -> dict[str, Any]:
+    """Fingerprint the actual matching, hashing, scoring and CLI source files."""
+
+    root = Path(__file__).resolve().parents[1]
+    names = (
+        "intel_v2/commute_replay.py", "intel_v2/semantics.py",
+        "scripts/evaluate-govintel.py", "scripts/replay-commute-reopen.py",
+    )
+    hashes = {name: hashlib.sha256((root / name).read_bytes()).hexdigest() for name in names}
+    return {"code_version": canonical_sha256(hashes), "code_files": hashes}
+
+
 def load_scenario(path: str | Path) -> dict[str, Any]:
     scenario = json.loads(Path(path).read_text(encoding="utf-8"))
     validate_scenario(scenario)
@@ -203,6 +216,11 @@ def policy_from_mapping(values: dict[str, Any] | None = None) -> ReplayPolicy:
     unknown = set(values) - known
     if unknown:
         raise ScenarioError(f"unknown replay policy fields: {sorted(unknown)}")
+    for name, value in values.items():
+        if name not in {"dedupe_scope", "policy_version"} and not isinstance(value, bool):
+            raise ScenarioError(f"replay policy {name} must be boolean")
+    if "policy_version" in values and (not isinstance(values["policy_version"], str) or not values["policy_version"]):
+        raise ScenarioError("replay policy_version must be non-empty string")
     policy = replace(DEFAULT_POLICY, **values)
     if policy.dedupe_scope not in DEDUPE_SCOPES:
         raise ScenarioError(f"unsupported dedupe_scope: {policy.dedupe_scope!r}")
@@ -262,7 +280,10 @@ def validate_scenario(scenario: dict[str, Any]) -> None:
             raise ScenarioError(f"condition tracked_end missing: {condition_id}")
         if not condition.get("saved_at"):
             raise ScenarioError(f"condition saved_at missing: {condition_id}")
-        _as_datetime(condition["tracked_from"], f"{condition_id} tracked_from")
+        tracked_from = _as_datetime(condition["tracked_from"], f"{condition_id} tracked_from")
+        tracked_end = _as_datetime(condition["tracked_end"], f"{condition_id} tracked_end")
+        if tracked_end < tracked_from:
+            raise ScenarioError(f"{condition_id} tracked_end precedes tracked_from")
         _as_datetime(condition["saved_at"], f"{condition_id} saved_at")
         if condition.get("cancelled_at"):
             _as_datetime(condition["cancelled_at"], f"{condition_id} cancelled_at")
@@ -284,6 +305,14 @@ def validate_scenario(scenario: dict[str, Any]) -> None:
         if update["content_sha256"] != normalized_payload_sha256(update["payload"], VOLATILE_FIELDS):
             raise ScenarioError(f"content_sha256 does not match payload: {update_id}")
         start, end = _update_interval(update)
+        update_daily = update["payload"].get("daily")
+        if update_daily is not None:
+            if not isinstance(update_daily, dict) or "start" not in update_daily or "end" not in update_daily:
+                raise ScenarioError(f"{update_id} daily band must contain start and end")
+            if _clock(update_daily["start"], f"{update_id} daily.start") >= _clock(
+                update_daily["end"], f"{update_id} daily.end"
+            ):
+                raise ScenarioError(f"{update_id} daily band must end after it starts")
         if start is not None and end is not None and end < start:
             # An unverifiable interval must stay an unknown, never a silent "not
             # relevant" verdict.
@@ -367,26 +396,37 @@ def intersects_tracked_band(
     band_start = _clock(condition["daily"]["start"], "daily.start")
     band_end = _clock(condition["daily"]["end"], "daily.end")
     tracked_from_at = _as_datetime(condition["tracked_from"], "tracked_from")
+    tracked_end = tracked_end or condition.get("tracked_end")
     tracked_end_at = _as_datetime(tracked_end, "tracked_end") if tracked_end else None
     # An update without an end date stays open. Searching only its start date would
-    # drop a multi-day closure that begins after the daily band, so the horizon is
-    # the later of the declared end and the tracked end, bounded so a far-future
-    # tracked end cannot turn the scan into an unbounded loop.
-    horizon = max(end or start, tracked_end_at or start)
-    if horizon - start > MAX_TRACKED_SPAN:
+    # drop a multi-day closure that begins after the daily band. Scan only the
+    # intersection with the tracked range, bounded so an open-ended window cannot
+    # turn into an unbounded loop.
+    horizon = min(end, tracked_end_at) if end and tracked_end_at else end or tracked_end_at or start
+    scan_start = max(start, tracked_from_at)
+    if horizon < scan_start:
+        return False
+    if horizon - scan_start > MAX_TRACKED_SPAN:
         raise ScenarioError(
             f"tracked window is longer than {MAX_TRACKED_SPAN.days} days: "
             f"{condition['condition_id']} tracked_end={tracked_end!r}"
         )
-    day = start.date()
-    last_day = horizon.date()
+    # Daily HH:MM belongs to the saved condition's timezone. Equivalent ISO
+    # timestamps in UTC must never change whether an update matches that band.
+    local_tz = tracked_from_at.tzinfo
+    update_daily = update["payload"].get("daily")
+    day = scan_start.astimezone(local_tz).date()
+    last_day = horizon.astimezone(local_tz).date()
     while day <= last_day:
-        window_start = datetime.combine(day, band_start, start.tzinfo)
-        window_end = datetime.combine(day, band_end, start.tzinfo)
+        window_start = datetime.combine(day, band_start, local_tz)
+        window_end = datetime.combine(day, band_end, local_tz)
         # Clip the daily band to the tracked range first; otherwise an update fully
         # outside the tracked range can be reported as matching an empty window.
         lower = window_start if tracked_from_at is None else max(window_start, tracked_from_at)
         upper = window_end if tracked_end_at is None else min(window_end, tracked_end_at)
+        if update_daily is not None:
+            lower = max(lower, datetime.combine(day, _clock(update_daily["start"], "update daily.start"), local_tz))
+            upper = min(upper, datetime.combine(day, _clock(update_daily["end"], "update daily.end"), local_tz))
         if lower <= upper and start <= upper and (end is None or lower <= end):
             return True
         day += timedelta(days=1)
@@ -442,14 +482,17 @@ def match_conditions(
         # Ablation: identity equality only, no interval reasoning at all.
         return tuple(matched), PROMPTED, tuple(cancelled)
     ends = tracked_end_by_condition or {}
-    verdicts = [
-        intersects_tracked_band(update, condition, ends.get(condition["condition_id"]))
+    verdicts = {
+        condition["condition_id"]: intersects_tracked_band(
+            update, condition, ends.get(condition["condition_id"])
+        )
         for condition in considered
         if condition["condition_id"] in matched
-    ]
-    if any(verdict is True for verdict in verdicts):
-        return tuple(matched), PROMPTED, tuple(cancelled)
-    if any(verdict is None for verdict in verdicts):
+    }
+    verified = tuple(sorted(condition_id for condition_id, verdict in verdicts.items() if verdict is True))
+    if verified:
+        return verified, PROMPTED, tuple(cancelled)
+    if any(verdict is None for verdict in verdicts.values()):
         return (), DATE_UNVERIFIED, tuple(cancelled)
     return (), OUTSIDE_TRACKED_WINDOW, tuple(cancelled)
 
@@ -876,6 +919,7 @@ def replay(scenario: dict[str, Any], policy: ReplayPolicy = DEFAULT_POLICY) -> d
             "last_reopened_at": reopen_points[-1]["reopened_at"] if reopen_points else None,
         },
         "versions": {
+            **code_provenance(),
             "policy_version": policy.policy_version,
             "parser_version": PARSER_VERSION,
             "model_version": SEMANTIC_MODEL_VERSION,
@@ -885,7 +929,10 @@ def replay(scenario: dict[str, Any], policy: ReplayPolicy = DEFAULT_POLICY) -> d
         "publication_receipt": {
             "acquired_update_ids": acquired_before_cutoff,
             "acquired_count": len(acquired_before_cutoff),
-            "collection_slots": [item["slot_id"] for item in scenario["collections"]],
+            "collection_slots": [
+                item["slot_id"] for item in scenario["collections"]
+                if _as_datetime(item["observed_at"], "observed_at") <= cutoff
+            ],
             "content_identity": [
                 {
                     "update_id": update["update_id"],
@@ -894,6 +941,7 @@ def replay(scenario: dict[str, Any], policy: ReplayPolicy = DEFAULT_POLICY) -> d
                     "content_identity_sha256": content_identity_sha256(update["payload"]),
                 }
                 for update in updates
+                if update["update_id"] in acquired_before_cutoff
             ],
         },
         "reopen_points": reopen_points,
@@ -905,7 +953,9 @@ def replay(scenario: dict[str, Any], policy: ReplayPolicy = DEFAULT_POLICY) -> d
         },
         "cost_scope": {
             "queries_completed": len(reopen_points),
-            "effective_updates": sum(1 for value in substance.values() if value[0]),
+            "effective_updates": sum(
+                1 for update_id in acquired_before_cutoff if substance[update_id][0]
+            ),
             "tracked_conditions": len(conditions),
             "model_requests": 0,
             "human_hours": None,

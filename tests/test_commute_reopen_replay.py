@@ -1162,7 +1162,7 @@ class CostLedgerTests(unittest.TestCase):
         planned = self.manifest["planned_scale"]
         self.assertEqual(planned["planned_events"], 20)
         self.assertEqual(planned["planned_source_documents"], 60)
-        self.assertLess(planned["actual_events"], planned["planned_events"])
+        self.assertIsNone(planned["actual_events"])
         self.assertLess(planned["actual_source_documents"], planned["planned_source_documents"])
         self.assertTrue(planned["missing_samples_reason"])
 
@@ -1172,10 +1172,13 @@ class CostLedgerTests(unittest.TestCase):
         documents = {
             update["document_id"] for update in scenario["updates"] if not update.get("upstream_update_id")
         }
-        self.assertEqual(planned["actual_events"], len(documents))
+        self.assertIsNone(planned["actual_events"])
+        self.assertFalse(any(update.get("event_id") for update in scenario["updates"]))
+        self.assertEqual(planned["actual_source_documents"], len(documents))
         self.assertEqual(
-            planned["actual_source_documents"], len({update["source_id"] for update in scenario["updates"]})
+            planned["actual_sources"], len({update["source_id"] for update in scenario["updates"]})
         )
+        self.assertEqual(planned["actual_version_samples"], len(scenario["updates"]))
         self.assertEqual(planned["actual_reopen_points"], len(scenario["reopen_points"]))
         self.assertIn("document_id", planned["actual_definition"])
 
@@ -1205,6 +1208,130 @@ class AnnotationTests(unittest.TestCase):
             self.annotations["split"]["development_reopen_ids"] + self.annotations["split"]["heldout_reopen_ids"],
             [case["case_id"] for case in cases],
         )
+
+
+class AcceptanceRegressionTests(unittest.TestCase):
+    def test_scoring_receipt_fingerprints_gold_and_target_definitions(self):
+        manifest, cases = gold_cases()
+        run = run_arm("C_v6")
+        fingerprints = run["receipt"]["evaluation_inputs"]
+        self.assertEqual(fingerprints["manifest_sha256"], replay.canonical_sha256(manifest))
+        self.assertEqual(fingerprints["cases_sha256"], replay.canonical_sha256(cases))
+        changed = json.loads(json.dumps(manifest))
+        changed["targets"]["precision"] = 0.95
+        rerun = rc.run_arm("C_v6", {}, scenario_copy(), changed, cases)
+        self.assertNotEqual(rerun["receipt"]["evaluation_inputs"]["manifest_sha256"],
+            fingerprints["manifest_sha256"])
+        self.assertEqual(rerun["receipt"]["data_hash"], run["receipt"]["data_hash"])
+
+    def test_string_policy_switch_cannot_silently_change_the_comparison_method(self):
+        with self.assertRaisesRegex(replay.ScenarioError, "must be boolean"):
+            replay.policy_from_mapping({"semantic_matching": "false"})
+        with self.assertRaisesRegex(replay.ScenarioError, "must be boolean"):
+            replay.policy_from_mapping({"track_read_state": 0})
+
+    def test_unannotated_multi_condition_rows_cannot_inflate_accuracy(self):
+        manifest, cases = gold_cases()
+        selected = json.loads(json.dumps(cases[:2]))
+        del selected[1]["expected"]["multi_condition_update_ids"]
+        report = ev.evaluate(manifest, selected, ev.perfect_predictions(selected))
+        self.assertEqual(report["reopen_unread"]["multi_condition_accuracy"], 1.0)
+
+    def test_road_restriction_must_overlap_the_saved_daily_time(self):
+        scenario = scenario_copy()
+        condition = {**scenario["conditions"][0], "daily": {"start": "18:00", "end": "20:00"}}
+        self.assertFalse(replay.intersects_tracked_band(scenario["updates"][0], condition,
+            condition["tracked_end"]))
+
+    def test_historical_open_update_matches_a_short_current_tracked_range(self):
+        scenario = scenario_copy()
+        update = {"payload": {**scenario["updates"][0]["payload"],
+            "effective_from": "2020-10-05T09:00:00+08:00", "effective_to": None}}
+        self.assertTrue(replay.intersects_tracked_band(update, scenario["conditions"][0],
+            scenario["conditions"][0]["tracked_end"]))
+
+    def test_invalid_tracked_end_is_rejected_before_matching(self):
+        scenario = scenario_copy()
+        scenario["conditions"][0]["tracked_end"] = "2026-10-04T17:00:00+08:00"
+        with self.assertRaisesRegex(replay.ScenarioError, "tracked_end precedes"):
+            replay.validate_scenario(scenario)
+
+    def test_proxy_metrics_cannot_be_confused_with_completed_comparison_methods(self):
+        run = run_arm("C_v6")
+        self.assertEqual(run["report"]["evaluation_scope"], "SYNTHETIC_DETERMINISTIC_POLICY_REPLAY")
+        pending = {row["arm"] for row in run["report"]["not_run"]
+            if row["scope"] == "full_comparison_method"}
+        self.assertEqual(pending, {"A_v1", "B_v6", "C_v6", "C_RULES_ONLY"})
+
+    def test_each_condition_must_pass_its_own_time_window(self):
+        scenario = scenario_copy()
+        condition = json.loads(json.dumps(scenario["conditions"][1]))
+        condition["tracked_from"] = "2026-10-20T09:00:00+08:00"
+        condition["tracked_end"] = "2026-10-22T17:00:00+08:00"
+        matched, reason, _ = replay.match_conditions(
+            scenario["updates"][0], [scenario["conditions"][0], condition],
+            replay._as_datetime("2026-10-05T10:00:00+08:00"), replay.DEFAULT_POLICY,
+            {item["condition_id"]: item["tracked_end"] for item in [scenario["conditions"][0], condition]},
+        )
+        self.assertEqual(matched, ("C-ROAD-AB",))
+        self.assertEqual(reason, replay.PROMPTED)
+
+    def test_nonmatching_condition_does_not_inflate_a_verified_condition_hit(self):
+        scenario = scenario_copy()
+        condition = dict(scenario["conditions"][1])
+        condition["tracked_from"] = "2026-10-20T09:00:00+08:00"
+        condition["tracked_end"] = "2026-10-22T17:00:00+08:00"
+        receipt = replay.replay({**scenario, "conditions": [scenario["conditions"][0], condition]})
+        self.assertEqual(receipt["reopen_points"][0]["multi_condition_update_ids"], [])
+        prompted = next(item for item in receipt["reopen_points"][0]["dispositions"]
+            if item["update_id"] == "UPD-001")
+        self.assertEqual(prompted["conditions"], ["C-ROAD-AB"])
+
+    def test_equivalent_utc_update_uses_the_conditions_local_daily_band(self):
+        scenario = scenario_copy()
+        update = {"payload": {**scenario["updates"][0]["payload"],
+            "effective_from": "2026-10-05T01:00:00+00:00",
+            "effective_to": "2026-10-05T02:00:00+00:00"}}
+        self.assertTrue(replay.intersects_tracked_band(update, scenario["conditions"][0],
+            scenario["conditions"][0]["tracked_end"]))
+
+    def test_replay_receipt_has_a_verifiable_code_fingerprint(self):
+        receipt = replay.replay(scenario_copy())
+        versions = receipt["versions"]
+        self.assertEqual(versions["code_version"], replay.canonical_sha256(versions["code_files"]))
+        self.assertIn("scripts/evaluate-govintel.py", versions["code_files"])
+        self.assertIn("intel_v2/commute_replay.py", versions["code_files"])
+        import hashlib
+        for name, digest in versions["code_files"].items():
+            self.assertEqual(digest, hashlib.sha256((ROOT / name).read_bytes()).hexdigest())
+
+    def test_missing_predictions_cannot_claim_that_targets_are_met(self):
+        manifest, cases = gold_cases()
+        predictions = ev.perfect_predictions(cases)
+        del predictions["R9"]
+        report = ev.evaluate(manifest, cases, predictions)
+        assessment = {item["target"]: item for item in report["target_assessment"]}
+        self.assertEqual(report["evaluation_status"], "INCOMPLETE_MISSING_PREDICTIONS")
+        self.assertLess(report["exact_case_match_rate"], 1.0)
+        for metric in ("precision", "recall"):
+            self.assertEqual(assessment[metric]["status"], "NOT_MEASURED")
+            self.assertIn("R9", assessment[metric]["reason"])
+        self.assertFalse(rc.perfect(report))
+
+    def test_cost_and_publication_scope_exclude_post_cutoff_inputs(self):
+        scenario = scenario_copy()
+        original = replay.replay(scenario)
+        future = json.loads(json.dumps(scenario["updates"][0]))
+        future.update(update_id="UPD-999", document_id="DOC-FUTURE",
+            acquired_at="2026-10-20T09:00:00+08:00", published_at="2026-10-20T09:00:00+08:00")
+        scenario["updates"].append(future)
+        scenario["collections"].append({"slot_id": "SLOT-FUTURE", "source_id": "S-SYN-ROAD",
+            "observed_at": "2026-10-20T09:00:00+08:00", "snapshot_complete": True,
+            "visible_update_ids": ["UPD-999"]})
+        receipt = replay.replay(scenario)
+        self.assertEqual(receipt["cost_scope"]["effective_updates"], original["cost_scope"]["effective_updates"])
+        self.assertNotIn("SLOT-FUTURE", receipt["publication_receipt"]["collection_slots"])
+        self.assertNotIn("UPD-999", [item["update_id"] for item in receipt["publication_receipt"]["content_identity"]])
 
 
 class V1RegressionTests(unittest.TestCase):

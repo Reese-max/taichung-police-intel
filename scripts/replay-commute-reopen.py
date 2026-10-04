@@ -109,6 +109,11 @@ def run_arm(
 ) -> dict[str, Any]:
     policy = replay_module.policy_from_mapping(overrides)
     receipt = replay_module.replay(scenario, policy)
+    receipt["evaluation_inputs"] = {
+        "manifest_sha256": replay_module.canonical_sha256(manifest),
+        "cases_sha256": replay_module.canonical_sha256(cases),
+        "evaluation_scope": manifest.get("evaluation_scope", manifest["dataset_type"]),
+    }
     rows = replay_module.prediction_rows(receipt)
     predictions = {row["case_id"]: row["prediction"] for row in rows}
     report = ev.evaluate(manifest, cases, predictions)
@@ -118,7 +123,9 @@ def run_arm(
 def perfect(report: dict[str, Any]) -> bool:
     metrics = report["reopen_unread"]
     return (
-        metrics["tp"] == metrics["expected_id_denominator"]
+        report["missing_prediction_count"] == 0
+        and report["evaluated_cases"] > 0
+        and metrics["tp"] == metrics["expected_id_denominator"]
         and metrics["fp"] == 0
         and metrics["fn"] == 0
         and metrics["precision"] == 1.0
@@ -165,9 +172,11 @@ def self_check() -> int:
         if not receipt.get(key):
             raise SystemExit(f"SELF_CHECK_FAIL receipt missing {key}")
     versions = receipt["versions"]
-    for key in ("policy_version", "parser_version", "model_version", "prompt_hash"):
+    for key in ("code_version", "code_files", "policy_version", "parser_version", "model_version", "prompt_hash"):
         if key not in versions:
             raise SystemExit(f"SELF_CHECK_FAIL receipt versions missing {key}")
+    if not receipt.get("evaluation_inputs"):
+        raise SystemExit("SELF_CHECK_FAIL receipt must fingerprint scoring inputs")
     if versions["model_version"] is not None or versions["prompt_hash"] is not None:
         raise SystemExit("SELF_CHECK_FAIL offline replay must not claim a model call")
     if receipt["cost_scope"]["model_requests"] != 0:

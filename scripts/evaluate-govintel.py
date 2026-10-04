@@ -290,7 +290,8 @@ def reopen_diagnostics(case: dict[str, Any], prediction: dict[str, Any]) -> dict
         # prediction: intersecting both sides would score a prediction that prompts
         # nothing as a perfect multi-condition match.
         "multi_condition_correct": int(
-            sorted(set(multi)) == sorted(set(expected.get("multi_condition_update_ids", [])))
+            "multi_condition_update_ids" in expected
+            and sorted(set(multi)) == sorted(set(expected["multi_condition_update_ids"]))
             and set(multi) <= predicted_ids
         ),
         "multi_condition_total": 1 if "multi_condition_update_ids" in expected else 0,
@@ -362,7 +363,9 @@ def aggregate_reopen(rows: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def target_assessment(manifest: dict[str, Any], metrics: dict[str, Any]) -> list[dict[str, Any]]:
+def target_assessment(
+    manifest: dict[str, Any], metrics: dict[str, Any], missing_prediction_ids: list[str] | None = None,
+) -> list[dict[str, Any]]:
     """Score the declared targets against the measured run, or record why not.
 
     A target whose comparison arm was never run is ``NOT_RUN``, never ``met`` and
@@ -375,6 +378,14 @@ def target_assessment(manifest: dict[str, Any], metrics: dict[str, Any]) -> list
     rows: list[dict[str, Any]] = []
     for name, target in sorted(targets.items()):
         row: dict[str, Any] = {"target": name, "target_value": target}
+        if name in {"precision", "recall"} and missing_prediction_ids:
+            row.update(
+                measured=None, status="NOT_MEASURED",
+                partial_measurement=metrics.get(name),
+                reason="incomplete evaluation; missing predictions: " + ", ".join(missing_prediction_ids),
+            )
+            rows.append(row)
+            continue
         if name == "precision":
             measured = metrics.get("precision")
             row["measured"] = measured
@@ -434,6 +445,12 @@ def not_run_arms(manifest: dict[str, Any]) -> list[dict[str, Any]]:
                     "status": "NOT_RUN",
                 }
             )
+        if arm.get("method_execution_status") == "NOT_RUN":
+            pending.append({
+                "arm": arm_id, "method_id": arm.get("method_id"),
+                "scope": "full_comparison_method", "status": "NOT_RUN",
+                "reason": arm.get("execution_limitation"),
+            })
     return pending
 
 
@@ -493,12 +510,17 @@ def evaluate(manifest: dict[str, Any], cases: list[dict[str, Any]], predictions:
         "schema_version": 1,
         "dataset_id": manifest["dataset_id"],
         "dataset_type": manifest["dataset_type"],
+        "evaluation_scope": manifest.get("evaluation_scope", manifest["dataset_type"]),
         "case_denominator": len(cases),
         "evaluated_cases": evaluated,
+        "evaluation_status": "INCOMPLETE_MISSING_PREDICTIONS" if missing else (
+            "COMPLETE" if cases else "NOT_RUN_NO_CASES"
+        ),
         "missing_prediction_count": len(missing),
         "missing_prediction_ids": missing,
         "exact_case_match_count": exact_case_matches,
-        "exact_case_match_rate": safe_ratio(exact_case_matches, evaluated),
+        "exact_case_match_rate": safe_ratio(exact_case_matches, len(cases)),
+        "evaluated_exact_case_match_rate": safe_ratio(exact_case_matches, evaluated),
         "event_pair": binary_metrics(event_pairs),
         "material_change": binary_metrics(change_pairs),
         "query_ids": set_metrics(query_expected, query_predicted),
@@ -515,7 +537,7 @@ def evaluate(manifest: dict[str, Any], cases: list[dict[str, Any]], predictions:
         "reopen_unread": aggregate_reopen(reopen_rows),
         "reopen_unread_rows": reopen_rows,
         "targets": manifest.get("targets"),
-        "target_assessment": target_assessment(manifest, aggregate_reopen(reopen_rows)),
+        "target_assessment": target_assessment(manifest, aggregate_reopen(reopen_rows), missing),
         "not_run": not_run_arms(manifest),
     }
 

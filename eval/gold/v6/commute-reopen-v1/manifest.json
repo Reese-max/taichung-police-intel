@@ -2,18 +2,24 @@
   "annotation_file": "annotations.json",
   "arms": {
     "A_v1": {
+      "execution_limitation": "未執行相同官方網站的真人查詢／回查。",
+      "execution_scope": "NOT_RUN",
       "human_participants": "NOT_RUN",
       "human_timing_status": "NOT_RUN",
       "median_total_task_seconds": null,
+      "method_execution_status": "NOT_RUN",
       "method_id": "A_v1_manual_same_sources_same_cutoff",
-      "note": "第一輪受試者尚未執行；沒有真人資料就沒有可比較結果。",
+      "note": "第一輪受試者尚未執行；沒有真人資料就沒有可比較結果。 未執行相同官方網站的真人查詢／回查。",
       "results": null,
       "status": "NOT_RUN"
     },
     "B_v6": {
+      "execution_limitation": "僅以 track_read_state=false 重播缺少已讀狀態的政策代理；未執行搜尋＋一般摘要方法。",
+      "execution_scope": "DETERMINISTIC_POLICY_PROXY",
       "human_timing_status": "NOT_RUN",
+      "method_execution_status": "NOT_RUN",
       "method_id": "B_v6_same_scope_search_generic_summary",
-      "note": "同範圍搜尋＋一般摘要，資料截止與指定回查時點一致。與 v1 模板的 B（same_new_workflow_without_semantic_AI）不是同一組。",
+      "note": "同範圍搜尋＋一般摘要，資料截止與指定回查時點一致。與 v1 模板的 B（same_new_workflow_without_semantic_AI）不是同一組。 僅以 track_read_state=false 重播缺少已讀狀態的政策代理；未執行搜尋＋一般摘要方法。",
       "policy_overrides": {
         "dedupe_repeat_fetches": true,
         "formatting_is_substantive": false,
@@ -24,9 +30,12 @@
       "status": "REPLAYED"
     },
     "C_RULES_ONLY": {
+      "execution_limitation": "只關閉 deterministic interval matching 的政策代理；未比較同介面的語意 AI on/off，因此不能證明 AI 增益。",
+      "execution_scope": "DETERMINISTIC_POLICY_PROXY",
       "human_timing_status": "NOT_RUN",
+      "method_execution_status": "NOT_RUN",
       "method_id": "C_RULES_ONLY_v6_rules_only_no_semantic",
-      "note": "保留 C 的介面、資料與站內提示規則，只關閉語意處理；不得與 B_v6 混為同組。",
+      "note": "保留 C 的介面、資料與站內提示規則，只關閉語意處理；不得與 B_v6 混為同組。 只關閉 deterministic interval matching 的政策代理；未比較同介面的語意 AI on/off，因此不能證明 AI 增益。",
       "policy_overrides": {
         "semantic_matching": false
       },
@@ -34,9 +43,12 @@
       "status": "REPLAYED"
     },
     "C_v6": {
+      "execution_limitation": "只執行 deterministic matching／hash／read-state 重播；未執行完整查詢與追蹤 UI、模型或真人任務。",
+      "execution_scope": "DETERMINISTIC_POLICY_PROXY",
       "human_timing_status": "NOT_RUN",
+      "method_execution_status": "NOT_RUN",
       "method_id": "C_v6_full_query_and_tracking",
-      "note": "完整 v6 查詢與追蹤。離線重播不呼叫任何模型。",
+      "note": "完整 v6 查詢與追蹤。離線重播不呼叫任何模型。 只執行 deterministic matching／hash／read-state 重播；未執行完整查詢與追蹤 UI、模型或真人任務。",
       "policy_overrides": {},
       "results": null,
       "status": "REPLAYED"
@@ -57,6 +69,7 @@
     "R2",
     "R3"
   ],
+  "evaluation_scope": "SYNTHETIC_DETERMINISTIC_POLICY_REPLAY",
   "fingerprint": "govintel/v6/commute-reopen-replay-evaluation/v1",
   "heldout_reopen_ids": [
     "R4",
@@ -80,17 +93,19 @@
     "STALE_TRACKED_END"
   ],
   "planned_scale": {
-    "actual_definition": "actual_events = 不含鏡像轉載的官方文件數（document_id 去重）；actual_source_documents = scenario 出現的來源 ID 數。",
-    "actual_events": 6,
+    "actual_definition": "actual_events = null（未宣告 event_id，事件數未量測，不能以文件數代替）；actual_source_documents = 非鏡像 document_id 去重；actual_sources = source_id 去重；actual_version_samples = 版本／取得樣本數，包含轉載、重複與排版樣本，不當成新增公告。",
+    "actual_events": null,
     "actual_reopen_points": 9,
-    "actual_source_documents": 2,
+    "actual_source_documents": 6,
+    "actual_sources": 2,
+    "actual_version_samples": 12,
     "missing_samples_reason": "第一輪規模（20 事件／60 原始文件）尚未執行；只交付合成情境與明確分母，不為湊數納入重複或歷史資料。",
     "planned_events": 20,
     "planned_source_documents": 60
   },
   "scenario_file": "session.json",
   "schema_version": 1,
-  "split_limitation": "本合成情境只有一個事件（測試路 A 至 B 的施工公告），它的版本鏈橫跨兩組，因此無法滿足 issue #108 的「事件版本與轉載不跨 dev／holdout」要求；可檢查的性質只有兩組的預期更新 ID 集合不相交。事件層級切分要等第一輪 20 事件／60 文件的資料，狀態保持 NOT_RUN。",
+  "split_limitation": "主施工公告 DOC-ROAD-AB 的版本鏈橫跨兩組，因此無法滿足 issue #108 的「事件版本與轉載不跨 dev／holdout」要求；情境另有其他工程，但未宣告 event_id，不能宣稱事件數或事件層級切分已驗收。可檢查的性質只有兩組預期更新 ID 集合不相交。事件層級切分留待第一輪 20 事件／60 文件，狀態 NOT_RUN。",
   "split_rule": "開發／保留集以開站時點切分；同一事件的不同版本不進同一個開站時點的預期集合。",
   "targets": {
     "correctness_not_lower_than_arm_a": true,

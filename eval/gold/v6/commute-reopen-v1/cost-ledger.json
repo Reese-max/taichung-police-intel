@@ -4,7 +4,7 @@
   "fingerprint": "govintel/v6/commute-reopen-replay-evaluation/v1",
   "notes": [
     "本輪為離線重播：不呼叫付費模型、不招募代辦、不外傳參與者資料，因此 model_request 與 human_hour 一律不是 0 成本宣稱，而是 NOT_APPLICABLE／NOT_RUN。",
-    "共同公告只處理一次：model_requests 與有效更新數、追蹤條件數無關，重播在 2 條追蹤條件與 5 筆有效更新下仍是 0 次模型請求。",
+    "共同公告只處理一次：本離線重播在 2 條追蹤條件與 9 筆實質更新、擴充至 5 條追蹤條件時均未呼叫模型；不代表已量測生產模型服務負荷。",
     "時間只覆蓋重播本身的機器執行時間；找資料、開原文、理解條件、核對與修正的人工時間尚未量測。",
     "effective_update 計的是實質更新筆數（9），不是每個開站時點的提示次數（6）；兩者都可在 receipt 的 cost_scope 與 counters 對照。"
   ],

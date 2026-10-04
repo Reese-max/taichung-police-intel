@@ -16,6 +16,10 @@ npm run replay:commute
 
 輸出 `COMMUTE_REOPEN_SELF_CHECK_OK` 與每個 arm 的分數。receipt 內含
 code/data/policy/parser/model/prompt 版本、資料 hash、重播時鐘與 publication receipt。
+`versions.code_files` 保存當前匹配、hash、CLI 與評分原始檔的 SHA-256；
+`code_version` 是這份對照表的 canonical hash，包含尚未提交的實際程式內容。
+評分 receipt 的 `evaluation_inputs` 另保存 manifest 與 gold cases 的 canonical SHA-256，
+因此改動標準答案或目標值也會留下可核對的不同 fingerprint。
 `--output <path>` 會寫出完整 receipt；`--predictions <path>` 會寫出可交給
 `scripts/evaluate-govintel.py` 的 prediction JSONL。
 
@@ -40,10 +44,16 @@ code/data/policy/parser/model/prompt 版本、資料 hash、重播時鐘與 publ
 | R9 | 10/10 08:30 | UPD-008、UPD-013 | NEW_UPDATES | 取消道路條件後停止該條件提示，原文仍可查；UPD-013 未公告結束時間但仍落在追蹤範圍 |
 
 每個開站時點的預期集合是「當時已取得、符合啟用條件、未讀的實質更新」。
-`沒有新項目 / 來源失聯 / 預定日期已到` 是四個不同的狀態，不合併。
+`有新更新 / 沒有新項目 / 來源失聯 / 預定日期已到` 是四個不同的狀態，不合併。
 資料消失、預定日期已到與取不到資料都**不會**自動解除條件；只有明文解除或使用者取消會。
 
 ## 公平比較：分開的方法組
+
+本輪的 `evaluation_scope` 是 `SYNTHETIC_DETERMINISTIC_POLICY_REPLAY`。
+表中的 REPLAYED 只代表離線政策代理，所有 arm 的完整比較方法都保持
+`method_execution_status = NOT_RUN`。B 只關閉已讀狀態，沒有實際執行搜尋＋一般摘要；
+C_RULES_ONLY 只關閉 deterministic interval matching，沒有做語意 AI on/off 比較。
+C 的 1.0 分數不能當成生產準確率或 AI 增益，也不能當成查詢／追蹤 UI 已完成的證據。
 
 | arm | method ID | 重播 | 人工時間 | 本輪結果 |
 | --- | --- | --- | --- | --- |
@@ -53,14 +63,14 @@ code/data/policy/parser/model/prompt 版本、資料 hash、重播時鐘與 publ
 | C_RULES_ONLY | `C_RULES_ONLY_v6_rules_only_no_semantic` | REPLAYED | NOT_RUN | precision 0.75（2 次誤報：範圍外、日期無法驗證） |
 
 arm 的 `policy_overrides` 寫在 manifest 裡，CLI 直接讀它執行；
-所以「公開的方法定義」與「實際量測的設定」不會各自漂移。
+所以公開的政策代理設定與實際重播不會各自漂移；它不代表完整方法已執行。
 `A_v1` 完全未執行，`B_v6` 只完成離線重播，兩者的人工時間都沒有測過。
 
 `B_v6`（同範圍搜尋＋一般摘要）與 v1 模板的 `B`（`same_new_workflow_without_semantic_AI`）
 **不是同一組**。v1 的定義與歷史結果在
 `docs/govintel/competition-2026/evaluation-manifest.template.json` 保持凍結，v6 以
-`v6_arms` 另立明確 method ID。`C_RULES_ONLY` 保留 C 的介面、資料與站內提示規則，
-只關閉語意處理，因此與 B 分開計算。
+`v6_arms` 另立明確 method ID。計畫中的 `C_RULES_ONLY` 要保留 C 的介面、資料與站內提示規則，
+只關閉語意處理；目前只有 interval matching 的離線政策代理，因此不能當作已完成 AI 消融。
 
 ## 評分口徑
 
@@ -82,6 +92,9 @@ arm 的 `policy_overrides` 寫在 manifest 裡，CLI 直接讀它執行；
   否則一個少報缺口的 harness 可以替自己的漏報開脫。
 - 來源取得缺漏（`source_acquisition_gap`）另列，不併入精確率／召回率分子分母。
 - 零分母為 `null`；缺口 reopen 的預期集合是空集合，因此取得缺漏不會變成漏報。
+- 缺少任何預測時，報告標為 `INCOMPLETE_MISSING_PREDICTIONS`，精確率／召回率目標
+  為 `NOT_MEASURED`；已提供案例的分數只列為 partial measurement。
+  `exact_case_match_rate` 以全部 gold 案例為分母，不能藉省略難例取得滿分。
 - 目標值（P≥85%、R≥90%、相對 A 中位總時間降低≥30%）寫在 manifest 的 `targets`，
   報告另外給 `target_assessment`：P、R 逐項標 `MET`／`UNMET` 並附實測值；
   需要 A 組才能比較的兩項標 `NOT_RUN` 並附原因，不會被寫成未達標。
@@ -107,14 +120,17 @@ arm 的 `policy_overrides` 寫在 manifest 裡，CLI 直接讀它執行；
 UPD-013 是一筆沒有 `effective_to` 的延長公告，起始時段落在每日 09:00–17:00 之外。
 匹配時先把每日時段裁切到追蹤範圍再判斷是否重疊，因此它不會因為「自己起始那天落在
 時段外」而被漏掉，也不會因為追蹤範圍已經裁掉那個時段而被誤報。
-追蹤範圍超過 400 天時直接拒絕重播，避免開放式區間變成無界掃描。
+更新與追蹤範圍的交集需掃描超過 400 天時直接拒絕重播，避免開放式區間變成無界掃描；
+很早開始、仍未公告結束的更新可以與短期追蹤條件匹配，不因公告起始日較舊而被拒絕。
 
 ## 切分限制
 
 開發／保留集以**開站時點**切分（R1–R3／R4–R9），可檢查的性質是兩組的預期更新 ID 集合不相交。
-本合成情境只有一個事件，它的版本鏈必然橫跨兩組，因此**無法**滿足 issue #108 的
+主施工公告的版本鏈橫跨兩組，因此**無法**滿足 issue #108 的
 「事件版本與轉載不跨 dev／holdout」要求；這一點寫在 manifest 的 `split_limitation`，
-不假裝已滿足。事件層級切分要等第一輪 20 事件／60 文件的資料。
+不假裝已滿足。情境也有其他工程，但未宣告 `event_id`；事件數保持 `null`，不能以
+6 份非鏡像文件冒充事件數。實際是 6 份文件、2 個來源、13 筆版本／取得樣本與 9 次開站；
+轉載、重複取回與排版樣本不當作新增公告。事件層級切分要等第一輪 20 事件／60 文件的資料。
 
 同樣地，manifest 的 `coverage_limitations` 記錄：取得缺漏的開站時點（R4、R5）預期集合為空，
 所以 `missed_while_source_gap` 在本輪沒有可觀測案例；唯一會產生漏報的 arm 三筆都是誤去重，
@@ -127,8 +143,8 @@ UPD-013 是一筆沒有 `effective_to` 的延長公告，起始時段落在每�
 模型輸出不得自任 gold；未解決爭議另列。複核由實作者本人做第二次，
 `review.review_type` 標為 `SELF_REVIEW_BY_IMPLEMENTER`、
 `independent_reviewer` 為 `null`、`independent_review` 為 `NOT_RUN` ——
-本輪沒有第三方複核，不能當成獨立標註。dev = R1–R3、holdout = R4–R9，同一事件版本與其
-轉載不跨組（以「被當成提示對象的更新 ID」檢查，兩組不相交）。
+本輪沒有第三方複核，不能當成獨立標註。dev = R1–R3、holdout = R4–R9；
+兩組預期提示的更新 ID 不相交，但同一公告版本鏈跨組，事件層級保留集仍未完成。
 
 ## 成本
 
@@ -138,6 +154,9 @@ UPD-013 是一筆沒有 `effective_to` 的延長公告，起始時段落在每�
 不是提示次數（6），兩者都可在 receipt 的 `cost_scope` 與 `counters` 對照。
 自檢另外把追蹤條件從 2 條增加到 5 條，`model_requests` 仍是 0
 —— 共同公告不會因使用者或條件數逐份重跑模型。
+publication receipt 的文件／collection 與實質更新成本分母只計資料截止以前取得的輸入，
+截止後的情境資料不計入當輪已取得樣本或成本。保存條件的每日時段依條件自己的時區判斷；
+同事件命中多條件時，每一條條件都要通過自己的日期／時段，不能沿用另一條的匹配結果。
 
 ## 原文可查
 
