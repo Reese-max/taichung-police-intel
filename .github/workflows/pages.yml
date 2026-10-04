@@ -248,6 +248,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     outputs:
+      pages_deploy: ${{ steps.deployment.outcome }}
       public_verify: ${{ steps.acknowledge.outcome }}
       query_verify: ${{ steps.query_verify.outcome }}
     steps:
@@ -308,6 +309,7 @@ jobs:
         env:
           BUILD_RESULT: ${{ needs.build.result }}
           DEPLOY_RESULT: ${{ needs.deploy.result }}
+          PAGES_DEPLOY: ${{ needs.deploy.outputs.pages_deploy }}
           RESTORE: ${{ needs.build.outputs.restore }}
           COLLECT: ${{ needs.build.outputs.collect }}
           V1: ${{ needs.build.outputs.v1 }}

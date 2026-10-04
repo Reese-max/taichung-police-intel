@@ -27,43 +27,48 @@ function withFixtureRelease(fetcher) {
   };
 }
 
-// The checked-in publication is an archived snapshot, so freshness assertions
-// need an equivalent snapshot whose own timestamps are current. Only the
-// clock-derived fields move; collection run, policy binding and item rows are
-// the canonical ones.
-function refreshedPublicationArtifacts(bytes) {
-  const stamp = new Date().toISOString();
-  const read = name => JSON.parse(bytes[name].toString("utf8"));
+// Positive freshness cases need a complete synthetic publication, independent
+// of restored production rows, failures and dates. Keep the approved policy and
+// exercise the real release/evidence gates; this fixture says nothing about the
+// current availability or freshness of the official sources.
+async function completePublicationFixture() {
+  const policyBytes = await readFile(new URL("source-policy.json", base));
+  const policy = JSON.parse(policyBytes.toString("utf8"));
+  const stamp = new Date(Date.now() - 1_000).toISOString();
+  const collectionRunId = "CR-TEST-COMPLETE-PUBLICATION";
   const encode = value => Buffer.from(JSON.stringify(value), "utf8");
-  const feed = read("intelligence-feed.json");
-  const status = read("source-status.json");
-  const brief = read("v2-daily-brief.json");
-  feed.generated_at = stamp;
-  status.generated_at = stamp;
-  status.latest_collection_run.finished_at = stamp;
-  brief.generated_at = stamp;
-  brief.source_status_generated_at = stamp;
-  status.sources = status.sources.map(source => ({
-    ...source,
-    source_health: "PASS",
-    window_completeness: "COMPLETE_WITH_ITEMS",
-    freshness_status: "FRESH",
-    last_checked_at: stamp,
-    last_success_at: stamp,
-  }));
+  const sourceId = policy.active_source_ids[0];
+  const feed = {
+    schema_version: 1, collection_run_id: collectionRunId, generated_at: stamp,
+    items: [1, 2].map(index => ({
+      stable_id: `WORKER-FIXTURE-${index}`, title: `測試官方標題 ${index}`,
+      source_id: sourceId, source_role: "PRIMARY_OFFICIAL",
+      official_url: `https://example.gov.tw/notices/${index}`,
+      published_at: stamp, data_as_of: stamp, fetched_at: stamp,
+      source_health: "PASS", window_completeness: "COMPLETE_WITH_ITEMS", freshness_status: "FRESH",
+      content_sha256: createHash("sha256").update(`worker-fixture-${index}`).digest("hex"),
+    })),
+  };
+  const status = {
+    schema_version: 1, generated_at: stamp,
+    latest_collection_run: { collection_run_id: collectionRunId, finished_at: stamp, status: "SUCCEEDED" },
+    sources: policy.active_source_ids.map(id => ({
+      source_id: id, source_name: `Synthetic fixture ${id}`, source_health: "PASS",
+      window_completeness: id === sourceId ? "COMPLETE_WITH_ITEMS" : "COMPLETE_ZERO",
+      result: "NO_NEW_ITEM", freshness_status: "FRESH", data_as_of: stamp,
+      last_checked_at: stamp, last_success_at: stamp,
+    })),
+  };
+  const brief = {
+    schema_version: 1, generated_at: stamp, source_status_generated_at: stamp,
+    source_collection_run_id: collectionRunId, publication_status: "READY", snapshot_complete: true,
+  };
   return {
     "intelligence-feed.json": encode(feed),
     "source-status.json": encode(status),
     "v2-daily-brief.json": encode(brief),
-    "source-policy.json": bytes["source-policy.json"],
+    "source-policy.json": policyBytes,
   };
-}
-
-async function readPublicationBytes() {
-  return Object.fromEntries(await Promise.all(
-    ["intelligence-feed.json", "source-status.json", "v2-daily-brief.json", "source-policy.json"]
-      .map(async name => [name, await readFile(new URL(name, base))]),
-  ));
 }
 
 function addFixtureItem(feed, item, { suffix, title, sourceRole, freshnessStatus, officialUrl }) {
@@ -103,7 +108,7 @@ test("Worker does not leak upstream failure details to clients", async () => {
 
 test("Worker query and MCP answer routes share a server-controlled evidence gate", async () => {
   const originalFetch = globalThis.fetch;
-  const bytes = await readPublicationBytes();
+  const bytes = await completePublicationFixture();
   const feed = JSON.parse(bytes["intelligence-feed.json"].toString("utf8"));
   const statusDoc = JSON.parse(bytes["source-status.json"].toString("utf8"));
   const brief = JSON.parse(bytes["v2-daily-brief.json"].toString("utf8"));
@@ -344,11 +349,7 @@ test("Worker rejects a cursor offset beyond the filtered result set", async () =
 test("Worker serves the last good snapshot when a rebuild fails", async () => {
   const originalFetch = globalThis.fetch;
   const originalNow = Date.now;
-  const bytes = Object.fromEntries(await Promise.all(
-    ["intelligence-feed.json", "source-status.json", "v2-daily-brief.json", "source-policy.json"]
-      .map(async name => [name, await readFile(new URL(name, base))]),
-  ));
-  const freshBytes = refreshedPublicationArtifacts(bytes);
+  const freshBytes = await completePublicationFixture();
   const query = async (instance, args) => {
     const response = await instance.fetch(new Request(endpoint, {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -496,12 +497,54 @@ test("Worker fails closed when a served publication body cannot be parsed", asyn
   }
 });
 
+test("Worker incomplete publication flags cannot admit current claims", async t => {
+  const originalFetch = globalThis.fetch;
+  try {
+    for (const flag of ["collection-status", "publication-status", "snapshot-incomplete"]) {
+      await t.test(flag, async () => {
+        const bytes = await completePublicationFixture();
+        const status = JSON.parse(bytes["source-status.json"].toString("utf8"));
+        const brief = JSON.parse(bytes["v2-daily-brief.json"].toString("utf8"));
+        if (flag === "collection-status") status.latest_collection_run.status = "PARTIAL";
+        if (flag === "publication-status") brief.publication_status = "PARTIAL";
+        if (flag === "snapshot-incomplete") brief.snapshot_complete = false;
+        bytes["source-status.json"] = Buffer.from(JSON.stringify(status), "utf8");
+        bytes["v2-daily-brief.json"] = Buffer.from(JSON.stringify(brief), "utf8");
+        const item = JSON.parse(bytes["intelligence-feed.json"].toString("utf8")).items[0];
+        globalThis.fetch = withFixtureRelease(async url => {
+          const name = new URL(url).pathname.split("/").at(-1);
+          return new Response(bytes[name], { status: 200, headers: { "Content-Type": "application/json" } });
+        });
+        const instance = (await import(`../../../workers/query-gateway/src/index.js?incomplete-${flag}`)).default;
+        const query = async (tool, args) => {
+          const response = await instance.fetch(new Request(endpoint, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ tool, arguments: args }),
+          }), env);
+          assert.equal(response.status, 200);
+          return response.json();
+        };
+        const empty = await query("search_evidence", { q: "zzzz-govintel-no-match-20261001", limit: 1 });
+        assert.equal(empty.freshness, "PARTIAL");
+        assert.ok(empty.source_gaps.some(gap => gap.reason === "INCOMPLETE_PUBLICATION"));
+        assert.equal(empty.answerable_no_match, false);
+        const answer = await query("validate_answer", { claims: [{
+          schema_version: 1, claim_id: "incomplete-current-title", text: item.title,
+          claim_type: "STATUS", temporal_scope: "CURRENT",
+          proposition: { subject: `publication:${item.stable_id}:title`, value: item.title },
+          cited_evidence_ids: [`PUB-${item.stable_id}`],
+        }] });
+        assert.equal(answer.final_claims[0].support_status, "STALE");
+      });
+    }
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("Worker treats a partially collected source as incomplete scope", async () => {
   const originalFetch = globalThis.fetch;
-  const bytes = Object.fromEntries(await Promise.all(
-    artifactNames.map(async name => [name, await readFile(new URL(name, base))]),
-  ));
-  const fresh = refreshedPublicationArtifacts(bytes);
+  const fresh = await completePublicationFixture();
   const status = JSON.parse(fresh["source-status.json"].toString("utf8"));
   // Healthy-looking except that the run itself reported a partial result.
   status.sources[0].result = "PARTIAL";
@@ -530,10 +573,7 @@ test("Worker treats a partially collected source as incomplete scope", async () 
 
 test("Worker inherits the source freshness for an item without its own", async () => {
   const originalFetch = globalThis.fetch;
-  const bytes = Object.fromEntries(await Promise.all(
-    artifactNames.map(async name => [name, await readFile(new URL(name, base))]),
-  ));
-  const fresh = refreshedPublicationArtifacts(bytes);
+  const fresh = await completePublicationFixture();
   const feed = JSON.parse(fresh["intelligence-feed.json"].toString("utf8"));
   const item = feed.items.find(row => row.stable_id);
   assert.ok(item, "fixture needs a feed item");
@@ -576,10 +616,7 @@ test("Worker inherits the source freshness for an item without its own", async (
 
 test("Worker never reports a stale publication item as current official evidence", async () => {
   const originalFetch = globalThis.fetch;
-  const bytes = Object.fromEntries(await Promise.all(
-    ["intelligence-feed.json", "source-status.json", "v2-daily-brief.json", "source-policy.json"]
-      .map(async name => [name, await readFile(new URL(name, base))]),
-  ));
+  const bytes = await completePublicationFixture();
   const call = async (instance, tool, args) => {
     const response = await instance.fetch(new Request(endpoint, {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -604,13 +641,14 @@ test("Worker never reports a stale publication item as current official evidence
 
     const gated = await call(instance, "validate_answer", {
       claims: [{
-        claim_id: "CLM-STALE", claim_type: "STATUS", temporal_scope: "CURRENT",
+        schema_version: 1, claim_id: "CLM-STALE", text: item.title,
+        claim_type: "STATUS", temporal_scope: "CURRENT",
         proposition: { subject: `publication:${item.stable_id}:title`, value: item.title },
         cited_evidence_ids: [`PUB-${item.stable_id}`],
       }],
     });
     assert.equal(gated.status, 200);
-    assert.notEqual(gated.body.final_claims[0].support_status, "SUPPORTED");
+    assert.equal(gated.body.final_claims[0].support_status, "STALE");
   } finally {
     globalThis.fetch = originalFetch;
   }

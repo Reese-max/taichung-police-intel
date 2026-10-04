@@ -10,7 +10,7 @@ import sys
 from typing import Mapping
 from urllib.parse import urlsplit
 
-PHASES = ("RESTORE", "COLLECT", "V1", "V2", "V2_VERIFY", "SCHEMA_DRIFT", "VERIFY", "PRESERVE", "PAGES_UPLOAD", "EVIDENCE", "PUBLIC_VERIFY", "QUERY_VERIFY")
+PHASES = ("RESTORE", "COLLECT", "V1", "V2", "V2_VERIFY", "SCHEMA_DRIFT", "VERIFY", "PRESERVE", "PAGES_UPLOAD", "EVIDENCE", "PAGES_DEPLOY", "PUBLIC_VERIFY", "QUERY_VERIFY")
 OUTCOMES = {"success", "failure", "cancelled", "skipped"}
 PHASE_TO_HEALTH = {
     "success": "SUCCESS",
@@ -24,6 +24,11 @@ PHASE_TO_HEALTH = {
 def phase_value(env: Mapping[str, str], key: str) -> str:
     value = env.get(key, "skipped" if key == "QUERY_VERIFY" else "")
     return value if value in OUTCOMES else "unknown"
+
+
+def pages_deploy_value(env: Mapping[str, str]) -> str:
+    """Use the Pages action outcome; older callers only reported the job result."""
+    return phase_value(env, "PAGES_DEPLOY" if "PAGES_DEPLOY" in env else "DEPLOY_RESULT")
 
 
 def load_system_health():
@@ -72,7 +77,7 @@ def runtime_health(env: Mapping[str, str], *, observed_at: str | None = None) ->
     else:
         validation_outcome, validation_error = "unknown", "CANONICAL_VALIDATION_INCOMPLETE"
 
-    deploy = phase_value(env, "DEPLOY_RESULT")
+    deploy = pages_deploy_value(env)
     public_verify = phase_value(env, "PUBLIC_VERIFY")
     query_verify = phase_value(env, "QUERY_VERIFY")
     stages = [
@@ -95,7 +100,8 @@ def runtime_health(env: Mapping[str, str], *, observed_at: str | None = None) ->
         "state_commit": state_commit,
         "schema_drift_overall": schema_overall or None,
         "public_data_verified": phase_value(env, "BUILD_RESULT") == "success" and deploy == "success" and public_verify == "success",
-        "phase_results": {key: phase_value(env, key) for key in PHASES},
+        "job_results": {key: phase_value(env, key) for key in ("BUILD_RESULT", "DEPLOY_RESULT")},
+        "phase_results": {key: deploy if key == "PAGES_DEPLOY" else phase_value(env, key) for key in PHASES},
     })
     return health
 
@@ -109,15 +115,20 @@ def write_runtime_health(env: Mapping[str, str], target: Path) -> dict:
 
 def report(env: Mapping[str, str]) -> tuple[str, int]:
     def outcome(key: str) -> str:
+        if key == "PAGES_DEPLOY":
+            return pages_deploy_value(env)
         value = env.get(key, "")
         return value if value in OUTCOMES else "unknown"
 
     build, deploy = outcome("BUILD_RESULT"), outcome("DEPLOY_RESULT")
-    passed = build == deploy == "success"
+    publication_passed = build == outcome("PAGES_DEPLOY") == "success"
     if "PUBLIC_VERIFY" in env and outcome("PUBLIC_VERIFY") != "success":
+        publication_passed = False
+    verified = publication_passed and outcome("PUBLIC_VERIFY") == "success"
+    passed = publication_passed and deploy == "success"
+    if "QUERY_VERIFY" in env and outcome("QUERY_VERIFY") != "success":
         passed = False
-    verified = passed and outcome("PUBLIC_VERIFY") == "success"
-    state = "PUBLIC_DATA_VERIFIED" if verified else "DEPLOY_ACTION_SUCCEEDED_UNVERIFIED_HTTP" if passed else "PUBLICATION_NOT_CONFIRMED"
+    state = "PUBLIC_DATA_VERIFIED" if verified else "DEPLOY_ACTION_SUCCEEDED_UNVERIFIED_HTTP" if publication_passed else "PUBLICATION_NOT_CONFIRMED"
     lines = ["## Publication outcome", f"State: `{state}`", "", "| Phase | Result |", "|---|---|",
              f"| build | {build} |", f"| deploy | {deploy} |"]
     lines.extend(f"| {key.lower()} | {outcome(key)} |" for key in PHASES)
@@ -131,8 +142,10 @@ def report(env: Mapping[str, str]) -> tuple[str, int]:
         lines.append("\nThe exact public data files passed anonymous HTTP/hash verification and checkpoint acknowledgement. This does not attest every frontend asset or upstream freshness.")
     else:
         lines.append("\nAction success alone is not anonymous HTTP/version/hash validation. No new published-state receipt is asserted here.")
-    if not passed:
+    if not publication_passed:
         lines.append("The current served version is unverified; do not report zero new events or assume deployment succeeded. Keep the last verified snapshot and its age visible.")
+    elif not passed:
+        lines.append("Public data verification is retained separately from downstream failures. The deploy job or Query Gateway did not complete successfully; the workflow remains failed.")
     return "\n".join(lines) + "\n", 0 if passed else 1
 
 
@@ -153,7 +166,10 @@ def main(argv=None) -> int:
             handle.write(text)
     print(text)
     if code:
-        print("::warning title=Publication not confirmed::Check build, preserve, artifact and deploy outcomes; this is not a zero-event result.")
+        if "State: `PUBLIC_DATA_VERIFIED`" in text:
+            print("::warning title=Publication workflow incomplete::Public data verification succeeded; inspect the deploy job and Query Gateway outcomes for downstream failure.")
+        else:
+            print("::warning title=Publication not confirmed::Check build, preserve, artifact and deploy outcomes; this is not a zero-event result.")
     return code
 
 

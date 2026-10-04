@@ -265,13 +265,16 @@ def paginated_api(
         if payload.get("success") is not True or not isinstance(payload.get("data", {}).get("data"), list):
             raise ValueError(f"invalid API payload: {url}")
         data = payload["data"]
-        total_pages = int(data["totalPages"])
-        if total_pages > 100:
+        total_pages = data["totalPages"]
+        total_count = data["totalCount"]
+        if type(total_pages) is not int or not 0 <= total_pages <= 100:
             raise ValueError(f"API page guard exceeded: {total_pages}")
+        if type(total_count) is not int or total_count < 0:
+            raise ValueError(f"invalid API totalCount: {total_count}")
         records.extend(data["data"])
         page += 1
-    if records and len(records) != int(data["totalCount"]):
-        raise ValueError(f"API count mismatch: {len(records)} != {data['totalCount']}")
+    if len(records) != total_count:
+        raise ValueError(f"API count mismatch: {len(records)} != {total_count}")
     return records, responses
 
 
@@ -347,20 +350,18 @@ def collect_s009(session: requests.Session, start: date, end: date) -> dict:
                 "payload": payload,
             }
         )
-    # S-009 proposals have no date field; use the fetch timestamp as data_as_of
-    # since a successful API response with current-session items proves the source
-    # is alive and the data reflects the latest legislative state.
-    # window_completeness is COMPLETE_ZERO because the API successfully returned all
-    # police-related proposals — they just have no publishedAt to place in a date window.
+    # The official proposal schema has no verifiable publication date. A complete
+    # API inventory establishes availability, but cannot place nonempty proposals
+    # inside or outside this date window. Observation time belongs only in
+    # last_checked_at; it must not become a source publication date.
     return {
         "source_health": "PASS",
-        "window_completeness": "COMPLETE_ZERO",
+        "window_completeness": "PARTIAL" if items else "COMPLETE_ZERO",
         "window_item_count": 0,
         "snapshot_item_count": len(items),
         "items": items,
         "snapshots": responses,
         "manifest_sha256": canonical_sha256([item["content_sha256"] for item in items]),
-        "api_confirmed_at": timestamp(datetime.now(TZ)),
     }
 
 
@@ -1667,18 +1668,19 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
             collected_items = collected.get("items", [])
             raw_items_by_source[source_id] = collected_items
             dates = [item["published_at"] for item in collected_items if item["published_at"]]
-            # Use latest_record_date from S-007 probe or api_confirmed_at from S-009
-            # when no items have published_at in the collection window.
+            # An official S-007 record date may establish data time even when it
+            # falls outside this collection window. Local API observation time
+            # never establishes an official publication date.
             data_as_of = max(dates, default=None)
             if not data_as_of and collected.get("latest_record_date"):
                 data_as_of = collected["latest_record_date"]
-            if not data_as_of and collected.get("api_confirmed_at"):
-                data_as_of = collected["api_confirmed_at"]
             if not data_as_of:
                 # Undated successful content does not establish an official
                 # publication time. Keep last_checked_at as the observation
                 # clock, and do not carry a prior fabricated date forward.
-                if not collected_items:
+                # S-009 has no official date evidence, including for an empty
+                # inventory; discard legacy values made from the fetch clock.
+                if not collected_items and source_id != "S-009":
                     data_as_of = previous.get("data_as_of")
             manifest_changed = collected["manifest_sha256"] != previous.get("manifest_sha256")
             change_count = collected["window_item_count"] if manifest_changed else 0
@@ -1721,7 +1723,10 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
                 "snapshot_item_count": previous.get("snapshot_item_count"),
                 "snapshot_count": None,
                 "manifest_sha256": None,
-                "data_as_of": previous.get("data_as_of"),
+                # The undated S-009 schema cannot validate a legacy observation
+                # clock even when today's fetch fails. Preserve LKG content,
+                # while removing that unsupported publication-time claim.
+                "data_as_of": None if source_id == "S-009" else previous.get("data_as_of"),
                 "last_checked_at": timestamp(now),
                 "last_success_at": previous.get("last_success_at"),
                 "next_update_at": next_at,
@@ -1761,6 +1766,7 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
                     lkg_item["source_health"] = "FAILED"
                     lkg_item["eligibility"] = "INELIGIBLE_SOURCE_FAILED"
                     lkg_item["freshness_status"] = freshness if freshness != "FRESH" else "VERY_STALE"
+                    lkg_item["data_as_of"] = record["data_as_of"]
                     lkg_item["fetched_at"] = fetched_at
                     feed_items.append(lkg_item)
 
