@@ -19,7 +19,8 @@ import {
   syncConditionTimeWindows,
   updateLocalCondition,
 } from "../lib/local-conditions.js";
-import { validateReplay } from "../lib/public-query.js";
+import { loadConditionDatasets } from "../lib/condition-datasets.js";
+import { safeHttpsUrl } from "../lib/public-query.js";
 import { assessPublication } from "../lib/publication-freshness.mjs";
 
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
@@ -36,10 +37,6 @@ function filtersFromForm(form) {
   return filters;
 }
 
-function safeUrl(value) {
-  try { return new URL(value).protocol === "https:" ? value : null; } catch { return null; }
-}
-
 function dateLabel(value) {
   if (!value) return "未提供";
   const date = new Date(value);
@@ -47,7 +44,7 @@ function dateLabel(value) {
 }
 
 function UpdateCard({ item, state, onRead }) {
-  const officialUrl = item.namespace === "demo:commute" ? null : safeUrl(item.official_url || item.primary_official_url || item.evidence?.[0]?.official_url);
+  const officialUrl = item.namespace === "demo:commute" ? null : safeHttpsUrl(item.official_url || item.primary_official_url || item.evidence?.[0]?.official_url);
   const comparison = item.comparison || item.material_diff || item.diff;
   const reasons = item.hit_condition_ids.map((id) => Object.entries(state.conditions[id]?.filters || {}).map(([key, value]) => `${key}：${Array.isArray(value) ? value.join("、") : value}`).join("；"));
   return (
@@ -101,17 +98,10 @@ export default function LocalConditionsPanel() {
 
   useEffect(() => {
     let cancelled = false;
-    const urls = ["v2-daily-brief", "intelligence-feed", "source-status", "public-query-replay"];
-    Promise.allSettled(urls.map(async (name) => {
-      const response = await fetch(`${BASE_PATH}/data/${name}.json`, { cache: "no-store" });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data = await response.json();
-      return name === "public-query-replay" ? validateReplay(data) : data;
-    })).then((results) => {
+    loadConditionDatasets(BASE_PATH).then(({ datasets: loaded, replayError }) => {
       if (cancelled) return;
-      setDatasets(Object.fromEntries(results.map((result, index) => [urls[index], result.status === "fulfilled" ? result.value : null])));
-      const replayResult = results[3];
-      if (replayResult.status === "rejected") setError(`合成重播未啟用：${replayResult.reason.message}`);
+      setDatasets(loaded);
+      if (replayError) setError(`合成重播未啟用：${replayError}`);
       setLoading(false);
     });
     return () => { cancelled = true; };
