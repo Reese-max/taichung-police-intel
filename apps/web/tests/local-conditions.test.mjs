@@ -5,6 +5,7 @@ import {
   addLocalCondition,
   clearLocalConditions,
   conditionDatasetStatus,
+  conditionDateGaps,
   cancelLocalCondition,
   emptyLocalConditions,
   getUnreadUpdates,
@@ -16,6 +17,7 @@ import {
   projectLocalConditions,
   saveLocalConditions,
   saveLocalConditionRequest,
+  syncConditionTimeWindows,
   updateLocalCondition,
   validateLocalConditions,
 } from "../lib/local-conditions.js";
@@ -370,4 +372,45 @@ test("reserved condition IDs and corrupt read indexes fail closed", () => {
   const state = markLocalRead(emptyLocalConditions(), "c1", "event-1", 1, T0);
   state.read_entries.wrong = state.read_entries["event-1#v1"];
   assert.throws(() => validateLocalConditions(state), /索引無法驗證/);
+});
+
+test("known open intervals overlap saved daily band; unknown official dates do not", () => {
+  const state = addLocalCondition(emptyLocalConditions(), { filters: { road: "A–B", time_from: "2026-10-05T09:00:00+08:00", time_to: "2026-10-09T17:00:00+08:00", daily_from: "09:00", daily_to: "17:00" } });
+  const open = { event_id: "open", road: "A–B", source_version: 1, change_type: "NEW", start_at: "2026-10-06T18:00:00+08:00", end_at: null };
+  assert.equal(projectLocalConditions(state, [open]).length, 1);
+  assert.equal(projectLocalConditions(state, [{ ...open, start_at: null }]).length, 0);
+  assert.equal(projectLocalConditions(state, [{ ...open, end_at: "2026-10-06T19:00:00+08:00" }]).length, 0);
+  const utc = { ...open, start_at: "2026-10-06T01:00:00Z", end_at: "2026-10-06T09:00:00Z" };
+  assert.equal(projectLocalConditions(state, [utc]).length, 1);
+  assert.equal(projectLocalConditions(state, [{ ...utc, daily: { start: "18:00", end: "19:00" } }]).length, 0);
+});
+
+test("verified extension preserves original filter but makes later explicit lift visible", () => {
+  const filters = { road: "A–B", time_from: "2026-10-05T09:00:00+08:00", time_to: "2026-10-07T17:00:00+08:00", daily_from: "09:00", daily_to: "17:00" };
+  const state = addLocalCondition(emptyLocalConditions(), { condition_id: "road", filters });
+  const extension = { event_id: "road-event", road: "A–B", source_version: 2, change_type: "DEADLINE_CHANGED", start_at: "2026-10-05T09:00:00+08:00", end_at: "2026-10-09T17:00:00+08:00", daily: { start: "09:00", end: "17:00" } };
+  const synced = syncConditionTimeWindows(state, [extension]);
+  assert.equal(synced.conditions.road.tracked_time_to, "2026-10-09T09:00:00.000Z");
+  assert.equal(synced.conditions.road.filters.time_to, filters.time_to);
+  const lifted = { ...extension, source_version: 3, change_type: "RELEASED", start_at: "2026-10-09T17:00:00+08:00", end_at: null };
+  assert.equal(getUnreadUpdates(synced, [lifted]).length, 1);
+  assert.equal(synced.conditions.road.enabled, true);
+  const format = syncConditionTimeWindows(state, [{ ...extension, materiality: "FORMAT_ONLY", content_sha256: "arbitrary" }]);
+  assert.equal(format.conditions.road.tracked_time_to, null);
+});
+
+test("jumping from initial publication to release replays verified version history for extension", () => {
+  const state = addLocalCondition(emptyLocalConditions(), { condition_id: "road", filters: { road: "A–B", time_from: "2026-10-05T09:00:00+08:00", time_to: "2026-10-07T17:00:00+08:00", daily_from: "09:00", daily_to: "17:00" } });
+  const item = { public_event_id: "public-road", road: "A–B", source_version: 3, start_at: "2026-10-09T17:00:00+08:00", end_at: null, daily: { start: "09:00", end: "17:00" }, event_status: "LIFTED", comparison: { materiality: "MATERIAL", changed_fields: ["status"], after: { fields: { status: "LIFTED" } } }, version_history: [{ fields: { effective_from: "2026-10-05T09:00:00+08:00", effective_to: "2026-10-07T17:00:00+08:00" } }, { fields: { effective_from: "2026-10-05T09:00:00+08:00", effective_to: "2026-10-09T17:00:00+08:00" } }] };
+  const synced = syncConditionTimeWindows(state, [item]);
+  assert.equal(getUnreadUpdates(synced, [item])[0].change_type, "RELEASED");
+});
+
+test("time-unknown matching documents remain an explicit gap and cannot claim a complete baseline", () => {
+  const state = addLocalCondition(emptyLocalConditions(), { condition_id: "road", filters: { road: "A–B", time_from: T0, time_to: T2 } });
+  const item = { event_id: "unknown", road: "A–B", source_version: 1, change_type: "NEW", start_at: null, end_at: null };
+  assert.equal(conditionDateGaps(state, [item]).length, 1);
+  const initialized = initializeConditionBaselines(state, [item], { generation: "g1", generated_at: T1, snapshot_complete: true });
+  assert.equal(initialized.conditions.road.baseline_complete, false);
+  assert.equal(initialized.last_successful_check, undefined);
 });

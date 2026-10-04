@@ -1,6 +1,6 @@
 export const CONDITION_STORAGE_KEY = "govintel.v2.conditions.v1";
 
-const ALLOWED_FILTER_KEYS = new Set(["source_id", "keywords", "district", "category", "road", "topic", "agency", "time_from", "time_to", "time_semantics"]);
+const ALLOWED_FILTER_KEYS = new Set(["source_id", "keywords", "district", "category", "road", "topic", "agency", "time_from", "time_to", "time_semantics", "daily_from", "daily_to"]);
 const MATERIAL_TYPES = new Set(["NEW", "REVISED", "STATUS_CHANGED", "DEADLINE_CHANGED", "CANCELLED", "RELEASED", "OFFICIAL_CANCELLED", "OFFICIAL_RELEASED"]);
 const RESERVED_IDS = new Set(["__proto__", "prototype", "constructor"]);
 
@@ -24,7 +24,7 @@ function materialItem(item) {
   if (["FORMAT_ONLY", "FORMATTING_ONLY", "PRESENTATION_ONLY", "UNCHANGED", "NON_MATERIAL"].includes(kind) || item.is_material === false) return false;
   return Boolean(item.material_change_id || (versionFor(item) && MATERIAL_TYPES.has(String(item.change_type || "").toUpperCase())));
 }
-function timeOf(value) { const parsed = new Date(value).getTime(); return Number.isFinite(parsed) ? parsed : null; }
+function timeOf(value) { if (value === null || value === undefined || value === "") return null; const parsed = new Date(value).getTime(); return Number.isFinite(parsed) ? parsed : null; }
 
 
 function copy(value) {
@@ -65,7 +65,40 @@ function normalizeFilters(filters) {
   if (normalized.time_semantics && normalized.time_semantics !== "event_overlap") throw new Error("僅支援事件時段重疊查詢");
   for (const key of ["time_from", "time_to"]) if (normalized[key] && timeOf(normalized[key]) === null) throw new Error(`${key} 時間格式無效`);
   if (normalized.time_from && normalized.time_to && timeOf(normalized.time_from) > timeOf(normalized.time_to)) throw new Error("開始時間不能晚於結束時間");
+  for (const key of ["daily_from", "daily_to"]) if (normalized[key] && !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(normalized[key])) throw new Error("每日時段需使用 HH:MM");
+  if (normalized.time_from && normalized.time_to && timeOf(normalized.time_to) - timeOf(normalized.time_from) > 3660 * 86400000) throw new Error("追蹤期間超過 10 年，請縮小查詢範圍");
+  if (Boolean(normalized.daily_from) !== Boolean(normalized.daily_to)) throw new Error("每日時段須同時指定開始與結束");
+  if (normalized.daily_from && normalized.daily_from >= normalized.daily_to) throw new Error("每日結束時段須晚於開始時段");
   return normalized;
+}
+
+function timeBandMatches(item, filters, trackedEnd = null) {
+  if (!filters.time_from && !filters.time_to && !filters.daily_from) return true;
+  const start = timeOf(item.event_start_at || item.event_time_start || item.effective_from || item.time_start || item.start_at);
+  const end = timeOf(item.event_end_at || item.event_time_end || item.effective_to || item.time_end || item.end_at);
+  if (start === null) return false; // Unknown official time never becomes an inferred interval.
+  const from = filters.time_from ? timeOf(filters.time_from) : start;
+  const to = trackedEnd ? timeOf(trackedEnd) : filters.time_to ? timeOf(filters.time_to) : end ?? start + 86400000;
+  const lower = Math.max(start, from);
+  const upper = Math.min(end ?? to, to);
+  if (lower > upper) return false;
+  const daily = item.daily || item.daily_schedule;
+  if (!filters.daily_from && !daily?.start) return true;
+  const minute = (clock) => { const [hour, min] = clock.split(":").map(Number); return (hour * 60 + min) * 60000; };
+  const bandStart = filters.daily_from ? minute(filters.daily_from) : 0;
+  const bandEnd = filters.daily_to ? minute(filters.daily_to) : 86400000;
+  const itemStart = daily?.start ? minute(daily.start) : 0;
+  const itemEnd = daily?.end ? minute(daily.end) : 86400000;
+  const offset = 8 * 3600000; // Daily bands are explicitly Taiwan time, also for ISO UTC input.
+  let day = Math.floor((lower + offset) / 86400000) * 86400000 - offset;
+  const last = Math.floor((upper + offset) / 86400000) * 86400000 - offset;
+  if (last - day > 3660 * 86400000) throw new Error("追蹤期間超過 10 年，請縮小查詢範圍");
+  for (; day <= last; day += 86400000) {
+    const bandLower = Math.max(lower, day + bandStart, day + itemStart);
+    const bandUpper = Math.min(upper, day + bandEnd, day + itemEnd);
+    if (bandLower <= bandUpper) return true;
+  }
+  return false;
 }
 
 function itemMatches(item, condition) {
@@ -85,13 +118,7 @@ function itemMatches(item, condition) {
   for (const [filter, fields] of [["road", [item.road, ...(item.road_names || []), ...(item.road_segments || []).map((s) => typeof s === "string" ? s : s.road_name)]], ["topic", [item.topic, ...(item.topic_ids || []), ...(item.topics || [])]], ["agency", [item.agency_id, ...(item.agency_ids || [])]]]) {
     if (filters[filter] && !fields.some((value) => typeof value === "string" && value.toLocaleLowerCase("zh-Hant").includes(filters[filter].toLocaleLowerCase("zh-Hant")))) return false;
   }
-  if (filters.time_from || filters.time_to) {
-    const start = timeOf(item.event_start_at || item.event_time_start || item.effective_from || item.time_start || item.start_at);
-    const end = timeOf(item.event_end_at || item.event_time_end || item.effective_to || item.time_end || item.end_at);
-    if (start === null || end === null) return false;
-    if (filters.time_from && end < timeOf(filters.time_from)) return false;
-    if (filters.time_to && start > timeOf(filters.time_to)) return false;
-  }
+  if (!timeBandMatches(item, filters, condition.tracked_time_to)) return false;
   return true;
 }
 
@@ -138,6 +165,7 @@ export function validateLocalConditions(value) {
     if (condition.condition_version !== undefined && (!Number.isInteger(condition.condition_version) || condition.condition_version < 1)) throw new Error("條件版本無效");
     if (condition.baseline_keys !== undefined && (!Array.isArray(condition.baseline_keys) || condition.baseline_keys.some((key) => typeof key !== "string"))) throw new Error("初始清單格式無效");
     if (condition.baseline_at) stamp(condition.baseline_at);
+    if (condition.tracked_time_to) stamp(condition.tracked_time_to);
     stamp(condition.created_at);
     stamp(condition.updated_at);
     if (condition.baseline_generation !== null && typeof condition.baseline_generation !== "string") {
@@ -208,6 +236,7 @@ export function addLocalCondition(state, condition, createdAt = new Date()) {
     baseline_keys: [],
     baseline_at: null,
     baseline_initialized: false,
+    tracked_time_to: null,
   };
   result.last_updated_at = at;
   return result;
@@ -228,6 +257,7 @@ export function updateLocalCondition(state, conditionId, updates, updatedAt = ne
     condition.baseline_keys = [];
     condition.baseline_at = null;
     condition.baseline_initialized = false;
+    condition.tracked_time_to = null;
   }
   condition.updated_at = at;
   result.last_updated_at = at;
@@ -254,8 +284,9 @@ export function matchPublishedItems(state, items, options = {}) {
       const material = materialItem(item);
       const initial = matched.every((condition) => condition.baseline_keys?.includes(key));
       const published = timeOf(item.official_published_at || item.published_at);
+      const observed = timeOf(item.comparison?.after?.published_at || item.detected_at || item.updated_at || item.published_at);
       const ended = timeOf(item.end_at || item.effective_to || item.event_end_at);
-      const historical = !material || (item.change_type === "NEW" && matched.every((condition) => condition.baseline_at && (published === null || published < timeOf(condition.baseline_at) || (ended !== null && ended < timeOf(condition.baseline_at)))));
+      const historical = !material || (observed !== null && matched.every((condition) => condition.baseline_at && observed < timeOf(condition.baseline_at))) || (item.change_type === "NEW" && matched.every((condition) => condition.baseline_at && (published === null || published < timeOf(condition.baseline_at) || (ended !== null && ended < timeOf(condition.baseline_at)))));
       entry = { ...item, event_id: eventIdFor(item), source_version: versionFor(item), change_key: scopedKey(namespace, key), namespace, hit_condition_ids: [], read: false, update_kind: initial ? "INITIAL" : historical ? "HISTORICAL" : "UPDATE" };
       seen.set(key, entry);
     }
@@ -329,16 +360,21 @@ export function initializeConditionBaselines(state, items, publication = {}, nam
     condition.baseline_generation = publication.source_collection_run_id || publication.collection_run_id || publication.generation || null;
     condition.baseline_at = publication.generated_at ? stamp(publication.generated_at) : condition.updated_at;
     condition.baseline_initialized = true;
-    condition.baseline_complete = publication.snapshot_complete === true;
+    condition.baseline_complete = publication.snapshot_complete === true && conditionDateGaps({ ...result, conditions: { [condition.condition_id]: condition } }, items, namespace).length === 0;
   }
-  if (publication.snapshot_complete === true) result.last_successful_check = { generation: publication.source_collection_run_id || publication.collection_run_id || publication.generation || null, checked_at: stamp(publication.generated_at || new Date()) };
+  if (publication.snapshot_complete === true && conditionDateGaps(result, items, namespace).length === 0) {
+    const checkpoint = { generation: publication.source_collection_run_id || publication.collection_run_id || publication.generation || null, checked_at: stamp(publication.generated_at || new Date()) };
+    result.last_successful_checks = { ...(result.last_successful_checks || {}), [namespace]: checkpoint };
+    if (namespace === "published") result.last_successful_check = checkpoint;
+  }
   return result;
 }
 
 export function saveLocalConditionRequest(request, items = [], publication = {}, storage = null) {
   const state = loadLocalConditions(storage);
   const added = addLocalCondition(state, request);
-  const initialized = initializeConditionBaselines(added, items, publication, namespaceFor(request));
+  const synced = syncConditionTimeWindows(added, items, namespaceFor(request));
+  const initialized = initializeConditionBaselines(synced, items, publication, namespaceFor(request));
   return saveLocalConditions(initialized, storage);
 }
 
@@ -401,4 +437,43 @@ export function normalizeConditionItem(item) {
     effective_from: item.effective_from || item.start_at,
     effective_to: item.effective_to || item.end_at,
   };
+}
+
+
+// An explicit verified deferral extends the observed watch window, never the user's
+// stored original query. Missing rows, elapsed deadlines, or arbitrary hashes do not.
+export function syncConditionTimeWindows(state, items, namespace = "published") {
+  const result = copy(validateLocalConditions(state));
+  for (const condition of Object.values(result.conditions)) {
+    if (!condition.enabled || namespaceFor(condition) !== namespace || !condition.filters.time_to) continue;
+    for (const raw of Array.isArray(items) ? items : []) {
+      const item = normalizeConditionItem(raw);
+      if (!item) continue;
+      const history = Array.isArray(item.version_history) ? item.version_history : [];
+      const candidates = history.map((version) => ({ ...item, effective_from: version.fields?.effective_from, effective_to: version.fields?.effective_to, start_at: version.fields?.effective_from, end_at: version.fields?.effective_to, event_start_at: null, event_end_at: null, daily: item.daily, change_type: "REVISED" }));
+      if (materialItem(item)) candidates.push(item);
+      for (const version of candidates) {
+        const end = timeOf(version.effective_to || version.end_at);
+        const current = timeOf(condition.tracked_time_to || condition.filters.time_to);
+        if (end !== null && end > current && itemMatches(version, condition)) condition.tracked_time_to = stamp(end);
+      }
+    }
+  }
+  return result;
+}
+
+
+export function conditionDateGaps(state, items, namespace = "published") {
+  const conditions = Object.values(validateLocalConditions(state).conditions).filter((condition) => condition.enabled && namespaceFor(condition) === namespace && (condition.filters.time_from || condition.filters.time_to || condition.filters.daily_from));
+  const result = new Map();
+  for (const raw of Array.isArray(items) ? items : []) {
+    const item = normalizeConditionItem(raw);
+    if (!item || timeOf(item.effective_from || item.start_at || item.event_start_at) !== null) continue;
+    const matched = conditions.filter((condition) => {
+      const { time_from, time_to, time_semantics, daily_from, daily_to, ...identityFilters } = condition.filters;
+      return itemMatches(item, { ...condition, filters: identityFilters, tracked_time_to: null });
+    });
+    if (matched.length) result.set(eventIdFor(item), { event_id: eventIdFor(item), title: item.headline, condition_ids: matched.map((condition) => condition.condition_id), reason: "官方生效時間未知，未納入時段判斷，不能推定無更新" });
+  }
+  return [...result.values()];
 }

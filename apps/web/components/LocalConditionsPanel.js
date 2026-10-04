@@ -8,6 +8,7 @@ import {
   clearLocalConditions,
   collectConditionItems,
   conditionDatasetStatus,
+  conditionDateGaps,
   emptyLocalConditions,
   exportLocalConditions,
   initializeConditionBaselines,
@@ -15,12 +16,14 @@ import {
   markDisplayedUpdatesRead,
   projectLocalConditions,
   saveLocalConditions,
+  syncConditionTimeWindows,
   updateLocalCondition,
 } from "../lib/local-conditions.js";
+import { validateReplay } from "../lib/public-query.js";
 import { assessPublication } from "../lib/publication-freshness.mjs";
 
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
-const EMPTY_FORM = { keywords: "", district: "", road: "", topic: "", category: "", source_id: "", agency: "", time_from: "", time_to: "" };
+const EMPTY_FORM = { keywords: "", district: "", road: "", topic: "", category: "", source_id: "", agency: "", time_from: "", time_to: "", daily_from: "", daily_to: "" };
 const LABELS = { NEW: "新收錄實質更新", REVISED: "實質修訂", STATUS_CHANGED: "官方狀態更正", DEADLINE_CHANGED: "時程更正", RELEASED: "官方明文解除", CANCELLED: "官方明文取消" };
 
 function filtersFromForm(form) {
@@ -102,10 +105,13 @@ export default function LocalConditionsPanel() {
     Promise.allSettled(urls.map(async (name) => {
       const response = await fetch(`${BASE_PATH}/data/${name}.json`, { cache: "no-store" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      return response.json();
+      const data = await response.json();
+      return name === "public-query-replay" ? validateReplay(data) : data;
     })).then((results) => {
       if (cancelled) return;
       setDatasets(Object.fromEntries(results.map((result, index) => [urls[index], result.status === "fulfilled" ? result.value : null])));
+      const replayResult = results[3];
+      if (replayResult.status === "rejected") setError(`合成重播未啟用：${replayResult.reason.message}`);
       setLoading(false);
     });
     return () => { cancelled = true; };
@@ -122,10 +128,11 @@ export default function LocalConditionsPanel() {
 
   useEffect(() => {
     if (!state || !storageReady || !dataReady) return;
-    const pending = Object.values(state.conditions).some((row) => row.enabled && (row.namespace || "published") === namespace && !row.baseline_initialized);
-    if (!pending) return;
     try {
-      const next = initializeConditionBaselines(loadLocalConditions(), items, publication, namespace);
+      const latest = loadLocalConditions();
+      const synced = syncConditionTimeWindows(latest, items, namespace);
+      const next = initializeConditionBaselines(synced, items, publication, namespace);
+      if (JSON.stringify(next) === JSON.stringify(latest)) return;
       saveLocalConditions(next); setState(next);
     } catch (failure) { setError(failure.message); }
   }, [state, storageReady, dataReady, items, namespace, snapshotId]);
@@ -133,6 +140,7 @@ export default function LocalConditionsPanel() {
   const activeState = state || emptyLocalConditions();
   const conditions = Object.values(activeState.conditions).filter((row) => (row.namespace || "published") === namespace);
   const matches = dataReady ? projectLocalConditions(activeState, items, { namespace }) : [];
+  const dateGaps = dataReady ? conditionDateGaps(activeState, items, namespace) : [];
   const unread = matches.filter((item) => item.update_kind === "UPDATE" && !item.read);
   const preview = useMemo(() => {
     try { return projectLocalConditions(addLocalCondition(emptyLocalConditions(), { filters: filtersFromForm(form), namespace }), items, { namespace }).length; } catch { return null; }
@@ -152,7 +160,7 @@ export default function LocalConditionsPanel() {
     if (!Object.keys(filters).length) { setError("請至少選擇一個追蹤條件。"); return; }
     if (persist((latest) => {
       const next = editingId ? updateLocalCondition(latest, editingId, { filters }) : addLocalCondition(latest, { filters, namespace });
-      return dataReady ? initializeConditionBaselines(next, items, publication, namespace) : next;
+      return dataReady ? initializeConditionBaselines(syncConditionTimeWindows(next, items, namespace), items, publication, namespace) : next;
     }, dataReady ? "已保存於此瀏覽器；目前已收錄資料列為初始清單。" : "已保存條件；待取得可核對的公開資料後建立初始清單。")) { setEditingId(null); setForm(EMPTY_FORM); }
   };
   const read = (displayed) => persist((latest) => markDisplayedUpdatesRead(latest, displayed), "已標記實際展示的更新為已讀；追蹤條件仍啟用，未改變官方事件狀態。");
@@ -173,14 +181,15 @@ export default function LocalConditionsPanel() {
       {namespace === "demo:commute" && <label className="lc-scope">重播資料截止<select value={snapshotId} onChange={(event) => setSnapshotId(event.target.value)}>{Object.entries(snapshots).map(([id, snapshot]) => <option key={id} value={id}>{id} · {dateLabel(snapshot.as_of)} · {snapshot.status}</option>)}</select><small>合成驗收資料；不代表真實官方事件或候選來源已啟用。</small></label>}
       <p className="lc-warning" role="status">{loading ? "正在載入共用快照，尚未完成比對。" : namespace === "demo:commute" ? `合成重播 ${snapshotId}；${publication.snapshot_complete ? "僅限此快照的已收錄範圍。" : "此快照有資料缺口，未推進為全部檢查。"}` : `${publishedStatus.reason} ${age.reason}`}</p>
       {namespace === "published" && publishedStatus.gaps.length > 0 && <ul className="lc-gaps">{publishedStatus.gaps.map((row) => <li key={row.source_id}>{row.source_id} · {row.source_name || "來源"}：{row.source_health}／{row.freshness_status} {(row.intelligence_gaps || []).join("、")}</li>)}</ul>}
+      {dateGaps.length > 0 && <p className="lc-warning" data-testid="condition-date-gaps" role="status">{dateGaps.length} 件條件匹配資料的官方生效時間未知，未納入時段判斷，不能推定無更新：{dateGaps.map((row) => row.title || row.event_id).join("、")}</p>}
       {error && <p className="lc-warning error" role="alert">{error}</p>}{notice && <p role="status">{notice}</p>}
       <form className="lc-form" onSubmit={save}>
         <h2>{editingId ? "修改追蹤條件" : "新增追蹤條件"}</h2><p>請只填地區、議題與道路等公共條件，不填精確住址、私人筆記或憑證。不同欄位需同時符合；多個關鍵字以逗號分隔，符合其中一個即可。</p>
-        {[["keywords", "關鍵字"], ["district", "地區 ID／地區"], ["road", "道路"], ["topic", "議題 ID／議題"], ["category", "事件類型"], ["source_id", "來源 ID（以逗號分隔）"], ["agency", "機關 ID"], ["time_from", "事件重疊時段：開始（含時區）"], ["time_to", "事件重疊時段：結束（含時區）"]].map(([key, label]) => <label key={key}>{label}<input name={key} value={form[key]} onChange={(event) => setForm({ ...form, [key]: event.target.value })} maxLength={300} /></label>)}
+        {[["keywords", "關鍵字"], ["district", "地區 ID／地區"], ["road", "道路"], ["topic", "議題 ID／議題"], ["category", "事件類型"], ["source_id", "來源 ID（以逗號分隔）"], ["agency", "機關 ID"], ["time_from", "事件重疊時段：開始（含時區）"], ["time_to", "事件重疊時段：結束（含時區）"], ["daily_from", "每日關注開始（HH:MM，臺灣時間）"], ["daily_to", "每日關注結束（HH:MM，臺灣時間）"]].map(([key, label]) => <label key={key}>{label}<input name={key} value={form[key]} onChange={(event) => setForm({ ...form, [key]: event.target.value })} maxLength={300} /></label>)}
         <p>目前已載入資料的預覽命中：{dataReady ? preview ?? "條件格式無效" : "資料未完整取得"}；預覽不代表完整監測。</p>
         <div className="lc-actions"><button type="submit" disabled={!storageReady}>{editingId ? "保存修改並建立新初始清單" : "保存條件"}</button>{editingId && <button type="button" onClick={() => { setEditingId(null); setForm(EMPTY_FORM); }}>取消修改</button>}</div>
       </form>
-      <section><h2>已保存條件 · {conditions.length}</h2>{conditions.length ? conditions.map((row) => <article className="lc-condition" key={row.condition_id}><strong>{row.enabled ? "啟用" : "已停用"} · 條件版本 {row.condition_version || 1}</strong><p>{Object.entries(row.filters).map(([key, value]) => `${key}：${Array.isArray(value) ? value.join("、") : value}`).join("；")}</p><small>{row.baseline_initialized ? `初始資料截止 ${dateLabel(row.baseline_at)}${row.baseline_complete ? "" : " · 僅涵蓋已取得資料"}` : "初始清單尚待可核對資料"}</small><div className="lc-actions"><button type="button" onClick={() => { setEditingId(row.condition_id); setForm(Object.fromEntries(Object.keys(EMPTY_FORM).map((key) => [key, Array.isArray(row.filters[key]) ? row.filters[key].join(", ") : row.filters[key] || ""]))); }}>修改</button><button type="button" onClick={() => persist((latest) => row.enabled ? cancelLocalCondition(latest, row.condition_id) : (dataReady ? initializeConditionBaselines(updateLocalCondition(latest, row.condition_id, { enabled: true }), items, publication, namespace) : updateLocalCondition(latest, row.condition_id, { enabled: true })), row.enabled ? "已停止此條件的提示，公開資料仍可查詢。" : "已重新啟用並建立初始清單。")}>{row.enabled ? "取消追蹤條件" : "重新啟用"}</button></div></article>) : <p>尚未保存此資料範圍的條件；可先從公開查詢加入。</p>}</section>
+      <section><h2>已保存條件 · {conditions.length}</h2>{conditions.length ? conditions.map((row) => <article className="lc-condition" key={row.condition_id}><strong>{row.enabled ? "啟用" : "已停用"} · 條件版本 {row.condition_version || 1}</strong><p>{Object.entries(row.filters).map(([key, value]) => `${key}：${Array.isArray(value) ? value.join("、") : value}`).join("；")}</p><small>{row.baseline_initialized ? `初始資料截止 ${dateLabel(row.baseline_at)}${row.baseline_complete ? "" : " · 僅涵蓋已取得資料"}` : "初始清單尚待可核對資料"}</small>{row.tracked_time_to && <p>已核對的延期追蹤至：{dateLabel(row.tracked_time_to)}；原始日期條件保留，截止不會自動解除。</p>}<div className="lc-actions"><button type="button" onClick={() => { setEditingId(row.condition_id); setForm(Object.fromEntries(Object.keys(EMPTY_FORM).map((key) => [key, Array.isArray(row.filters[key]) ? row.filters[key].join(", ") : row.filters[key] || ""]))); }}>修改</button><button type="button" onClick={() => persist((latest) => row.enabled ? cancelLocalCondition(latest, row.condition_id) : (dataReady ? initializeConditionBaselines(updateLocalCondition(latest, row.condition_id, { enabled: true }), items, publication, namespace) : updateLocalCondition(latest, row.condition_id, { enabled: true })), row.enabled ? "已停止此條件的提示，公開資料仍可查詢。" : "已重新啟用並建立初始清單。")}>{row.enabled ? "取消追蹤條件" : "重新啟用"}</button></div></article>) : <p>尚未保存此資料範圍的條件；可先從公開查詢加入。</p>}</section>
       <section><div className="lc-row"><h2>已收錄的未讀實質更新 · {unread.length}</h2><button type="button" disabled={!storageReady || !unread.length} onClick={() => read(unread)}>將目前展示的 {unread.length} 筆標為已讀</button></div>{unread.length ? unread.map((item) => <UpdateCard key={item.change_key} item={item} state={activeState} onRead={read} />) : <p>{dataReady ? "本次已載入資料中沒有未讀實質更新。仍須留意資料截止與來源缺口，不能推論現實沒有變化。" : "未取得可核對資料，尚未完成未讀比對；不是零筆更新。"}</p>}</section>
       <details><summary>初始、歷史與已讀資料 · {matches.length - unread.length}</summary>{matches.filter((item) => !unread.includes(item)).map((item) => <UpdateCard key={item.change_key} item={item} state={activeState} onRead={read} />)}</details>
       <footer className="lc-actions"><button type="button" onClick={exportState} disabled={!storageReady}>匯出本機紀錄 JSON</button><button type="button" onClick={() => { if (!window.confirm("清除這個瀏覽器的所有追蹤條件與已讀紀錄（含重播）？官方資料不會刪除。")) return; try { setState(clearLocalConditions()); setStorageReady(true); setError(""); setNotice("已清除本機追蹤與已讀紀錄。"); } catch (failure) { setError(failure.message); } }}>清除本機追蹤與已讀資料</button></footer>

@@ -26,3 +26,10 @@
 合成通勤重播使用 `demo:commute` scope，與 `published` 條件及已讀版本隔離。透過共用 `/data/public-query-replay.json` 展示版本、差異、每日時段與合成 locator；合成內容不冒用官方原文。`saveLocalConditionRequest` 作為公開查詢條件加入追蹤的共用保存 API；不建立追蹤網路服務。
 
 驗證：Node local-conditions 35/35 通過；Chromium 實機驗證初始清單、R3 實質修訂、v2 精確已讀、reload 保留、v3 明文解除後條件仍啟用、取消停止提示以及最小 local state，沒有 pageerror。共享瀏覽器完整驗收由整合分支提供；本地證據 `/workspace/scratch/tracking-browser-check.json` 僅為此次工作區執行紀錄。
+
+
+### 日期範圍負向驗收補強
+
+每日 `daily_from`／`daily_to` 以臺灣時間解釋，可與 ISO UTC 生效區間交集；已知開始、未提供結束的事件保持 open interval，未提供生效開始則列明文缺口。原始 `time_to` 不會被改寫；確有已發布實質版本的延期才保存另外的 `tracked_time_to`，讓原本 10/5–10/7 的道路条件仍能看到 10/9 的明文解除。跳過中間開站時，由已發布的 verified version history 重播先前延期，不因截止、消失、HTTP 失敗或 arbitrary hash 自动延期／解除。
+
+合成重播通過共用 `validateReplay` schema／SHA-256 gate 才顯示可選範圍；篡改 hash 的快照拒絕啟用。Node 39/39 通過；Chromium 已另外使用原始 10/5 09:00–10/7 17:00、每日 09:00–17:00 條件重驗 R3 v2、重開保留已讀、R7 明文解除與取消；篡改 replay hash 拒絕且範圍停用。這些是此有限合成序列的產品驗收，未宣稱 #108 全部 gold／live 系統驗收完成。
