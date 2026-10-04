@@ -3,6 +3,11 @@ from pathlib import Path
 from types import SimpleNamespace
 import unittest
 from datetime import date
+import contextlib
+import io
+import json
+import tempfile
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -138,6 +143,75 @@ class S029CollectorTests(unittest.TestCase):
         self.assertEqual(snap["requested_url"], self.INDEX)
         self.assertEqual(snap["final_url"], self.PDF)
 
+
+
+class DownloadListDateTruthTests(unittest.TestCase):
+    def collect(self, titles):
+        import online_collect as oc
+
+        source_url = oc.P0_SOURCES["S-006"][1]
+        listing = '<meta charset="utf-8">' + ''.join(
+            f'<div id="Fdownload_list"><div class="text02_1">{title}</div>'
+            f'<div class="text02_2"><a href="/media/order-{index}.pdf">附件</a></div></div>'
+            for index, title in enumerate(titles)
+        )
+        session = Session([
+            Response(source_url, content=listing.encode()),
+            *[Response(f'https://www.tccc.gov.tw/media/order-{index}.pdf', content=b'%PDF-1.7')
+              for index in range(len(titles))],
+        ])
+        return oc.collect_download_list(session, "S-006", date(2026, 9, 29), date(2026, 10, 4))
+
+    def test_undated_question_orders_are_partial_not_complete_zero(self):
+        result = self.collect(["臺中市議會第4屆第8次定期會委員會質詢順序表"])
+        self.assertEqual(result["source_health"], "PASS")
+        self.assertEqual(result["window_completeness"], "PARTIAL")
+        self.assertEqual(result["snapshot_item_count"], 1)
+        self.assertIsNone(result["items"][0]["published_at"])
+
+    def test_undated_entry_prevents_complete_window_claim_when_other_entry_is_dated(self):
+        result = self.collect([
+            "臺中市議會第4屆第8次定期會質詢順序表 115年9月30日",
+            "臺中市議會第4屆第8次定期會委員會質詢順序表",
+        ])
+        self.assertEqual(result["window_item_count"], 1)
+        self.assertEqual(result["window_completeness"], "PARTIAL")
+
+    def test_official_dates_still_establish_a_complete_window(self):
+        for title, completeness, count in [
+            ("臺中市議會第4屆第8次定期會質詢順序表 115年9月30日", "COMPLETE_WITH_ITEMS", 1),
+            ("臺中市議會第4屆第8次定期會質詢順序表 115年9月1日", "COMPLETE_ZERO", 0),
+        ]:
+            with self.subTest(title=title):
+                result = self.collect([title])
+                self.assertEqual(result["window_completeness"], completeness)
+                self.assertEqual(result["window_item_count"], count)
+
+    def test_publication_does_not_turn_undated_attachment_or_prior_fetch_clock_into_freshness(self):
+        import online_collect as oc
+
+        collected = self.collect(["臺中市議會第4屆第8次定期會委員會質詢順序表"])
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "source-status.json"
+            output.write_text(json.dumps({
+                "schema_version": 1, "mode": "COMPETITION_DEMO",
+                "sources": [{"source_id": "S-006", "data_as_of": "2026-10-04T23:26:28+08:00"}],
+            }))
+            with mock.patch.object(oc, "P0_SOURCES", {"S-006": oc.P0_SOURCES["S-006"]}), mock.patch.object(
+                oc, "collect_source", return_value=collected
+            ), contextlib.redirect_stdout(io.StringIO()):
+                state = oc.build_demo_status(output, "EVENING", date(2026, 10, 4), "manual")
+            source = state["sources"][0]
+            feed = json.loads((Path(directory) / "intelligence-feed.json").read_text())
+        self.assertIsNone(source["data_as_of"])
+        self.assertEqual(source["last_checked_at"], state["generated_at"])
+        self.assertEqual(source["freshness_status"], "NO_DATA")
+        self.assertEqual(source["source_health"], "PASS")
+        self.assertEqual(source["result"], "PARTIAL")
+        self.assertEqual(state["latest_collection_run"]["status"], "PARTIAL")
+        self.assertIn("WINDOW_PARTIAL", source["intelligence_gaps"])
+        self.assertIn("NO_DATA_AS_OF", source["intelligence_gaps"])
+        self.assertEqual(feed["items"][0]["eligibility"], "INELIGIBLE_PARTIAL")
 
 
 if __name__ == "__main__":

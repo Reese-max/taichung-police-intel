@@ -219,13 +219,13 @@ def collect_download_list(
 
     dated = [date.fromisoformat(item["published_at"][:10]) for item in items if item["published_at"]]
     window_items = [item for item in items if item["published_at"] and start <= date.fromisoformat(item["published_at"][:10]) <= end]
-    if window_items:
+    if len(dated) != len(items):
+        # An undated attachment cannot be placed outside the requested window.
+        # Successful retrieval is evidence of availability, not a zero count.
+        completeness = "PARTIAL"
+    elif window_items:
         completeness = "COMPLETE_WITH_ITEMS"
     elif dated and max(dated) < start:
-        completeness = "COMPLETE_ZERO"
-    elif not dated and items:
-        # Items exist but have no extractable dates (e.g. committee question-order lists).
-        # The source successfully returned content; treat as complete-zero in window terms.
         completeness = "COMPLETE_ZERO"
     else:
         completeness = "PARTIAL"
@@ -1675,11 +1675,10 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
             if not data_as_of and collected.get("api_confirmed_at"):
                 data_as_of = collected["api_confirmed_at"]
             if not data_as_of:
-                # For download-list sources (S-004/S-006) that have items but no
-                # dates in titles, use last_checked_at since content is confirmed present.
-                if collected_items and collected["source_health"] == "PASS":
-                    data_as_of = timestamp(now)
-                else:
+                # Undated successful content does not establish an official
+                # publication time. Keep last_checked_at as the observation
+                # clock, and do not carry a prior fabricated date forward.
+                if not collected_items:
                     data_as_of = previous.get("data_as_of")
             manifest_changed = collected["manifest_sha256"] != previous.get("manifest_sha256")
             change_count = collected["window_item_count"] if manifest_changed else 0
