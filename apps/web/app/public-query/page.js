@@ -3,15 +3,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   canonicalJson, normalizeQueryFilters, queryReplay, replayTrackingItems,
-  requestGateway, safeHttpsUrl, trackingFilters, validateReplay,
+  safeHttpsUrl, trackingFilters, validateReplay,
 } from "../../lib/public-query.js";
 import { saveLocalConditionRequest } from "../../lib/local-conditions.js";
+import { queryGateway } from "../../lib/query-release-client.js";
 import "./query.css";
 
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
 const GATEWAY = process.env.NEXT_PUBLIC_QUERY_GATEWAY_URL || "";
-const EMPTY = { q: "", district: "", category: "", road: "", time_from: "", time_to: "" };
-const FILTER_LABELS = { q: "關鍵字", district: "行政區", category: "議題／事件類型", road: "路段文字", time_from: "期間起點", time_to: "期間終點" };
+const EMPTY = { q: "", district: "", category: "", road: "", time_from: "", time_to: "", daily_from: "", daily_to: "" };
+const FILTER_LABELS = { q: "關鍵字", district: "行政區", category: "議題／事件類型", road: "路段文字", time_from: "期間起點", time_to: "期間終點", daily_from: "每日起點", daily_to: "每日終點" };
 const TYPE_LABELS = { traffic_control: "交通管制", large_event: "大型活動", police_announcement: "警政公告" };
 const STATUS_LABELS = {
   FAILED: "蒐集或查詢失敗", PARTIAL: "涵蓋不完整", STALE: "資料陳舊", UNKNOWN: "未知",
@@ -57,6 +58,7 @@ export default function PublicQueryPage() {
   const [saveError, setSaveError] = useState("");
   const dialog = useRef(null);
   const sequence = useRef(0);
+  const detailSequence = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -72,7 +74,7 @@ export default function PublicQueryPage() {
       if (value?.schema_version !== 1 || !Array.isArray(value.sources)) throw new Error("來源狀態格式無法驗證");
       if (!cancelled) setSourceStatus(value);
     }).catch((reason) => { if (!cancelled) setSourceError(reason.message); });
-    return () => { cancelled = true; sequence.current += 1; };
+    return () => { cancelled = true; sequence.current += 1; detailSequence.current += 1; };
   }, []);
 
   useEffect(() => {
@@ -90,8 +92,16 @@ export default function PublicQueryPage() {
   })();
 
   function changeMode(value) {
-    sequence.current += 1; setMode(value); setResults(null); setState("idle"); setError(null);
+    sequence.current += 1; detailSequence.current += 1; setMode(value); setResults(null); setState("idle"); setError(null);
     setDraft(EMPTY); setSaveNotice(""); setSaveError("");
+  }
+
+  function gateway(tool, args) {
+    if (!GATEWAY) throw Object.assign(new Error("未設定正式查詢服務"), { code: "CAPABILITY_NOT_AVAILABLE" });
+    return queryGateway(GATEWAY, tool, args, {
+      basePath: BASE_PATH, codeSha: process.env.NEXT_PUBLIC_RELEASE_CODE_SHA,
+      publicationGeneration: sourceStatus?.latest_collection_run?.collection_run_id,
+    });
   }
 
   async function handleSearch(cursor = null) {
@@ -104,9 +114,9 @@ export default function PublicQueryPage() {
         if (!bundle) throw new Error(replayError || "合成快照尚未載入");
         data = await queryReplay(bundle, submitted, { snapshot: snapshotId, cursor, limit: 20 });
       } else {
-        if (submitted.road) throw Object.assign(new Error("正式 Gateway 尚無路段精度；可改用標題關鍵字查詢，或選擇合成示例驗證流程。"), { code: "CAPABILITY_NOT_AVAILABLE" });
+        if (submitted.road || submitted.daily_from) throw Object.assign(new Error("正式 Gateway 尚無路段精度與每日時段條件；可改用標題關鍵字查詢，或選擇合成示例驗證流程。"), { code: "CAPABILITY_NOT_AVAILABLE" });
         const tool = mode === "published" ? "search_evidence" : "search_events";
-        data = await requestGateway(GATEWAY, tool, {
+        data = await gateway(tool, {
           ...submitted, limit: 20, ...(cursor ? { cursor, expected_generation: results.domain_query_generation_id || results.query_generation_id } : {}),
         });
         const rows = mode === "published" ? data.results : data.events;
@@ -127,24 +137,28 @@ export default function PublicQueryPage() {
   }
 
   async function handleGetEvent(event) {
+    const request = ++detailSequence.current;
     setDetailError(""); setComparison(null);
     if (mode === "replay") { setSelectedEvent(event); setComparison(event.comparison); }
     else {
       try {
-        const detail = await requestGateway(GATEWAY, "get_event", { event_id: event.public_event_id });
+        const detail = await gateway("get_event", { event_id: event.public_event_id });
+        if (request !== detailSequence.current) return;
         if (detail.publication_hash !== results.publication_hash || detail.query_generation_id !== results.query_generation_id) throw new Error("事件詳情與結果的世代不同，請重新查詢。");
         setSelectedEvent(detail.event);
-      } catch (reason) { setDetailError(reason.message); }
+      } catch (reason) { if (request === detailSequence.current) setDetailError(reason.message); }
     }
   }
 
   async function handleCompareVersions() {
+    const request = ++detailSequence.current;
     setDetailError("");
     try {
-      const data = await requestGateway(GATEWAY, "compare_event_versions", { event_id: selectedEvent.public_event_id });
+      const data = await gateway("compare_event_versions", { event_id: selectedEvent.public_event_id });
+      if (request !== detailSequence.current) return;
       if (data.publication_hash !== results.publication_hash || data.query_generation_id !== results.query_generation_id) throw new Error("版本比較與結果的世代不同，請重新查詢。");
       setComparison(data.comparison);
-    } catch (reason) { setDetailError(reason.message); }
+    } catch (reason) { if (request === detailSequence.current) setDetailError(reason.message); }
   }
 
   function handleAddToTracking() {
@@ -156,14 +170,14 @@ export default function PublicQueryPage() {
         source_id: event.source_id || event.independent_source_ids?.[0], source_version: event.source_version || 1,
       }));
       saveLocalConditionRequest({ filters: trackingFilters(results.submitted_filters), namespace: mode === "replay" ? "demo:commute" : "published" }, items, {
-        generation: results.query_generation_id, generated_at: results.data_as_of || results.queried_at,
+        generation: results.query_generation_id, generated_at: results.data_as_of || results.generated_at,
         snapshot_complete: mode === "replay" ? snapshot.snapshot_complete && !results.has_more : false,
       });
       setSaveNotice("已保存這次實際套用的條件；只保存在同一瀏覽器，重新開啟時核對更新。");
     } catch (reason) { setSaveError(reason.message); }
   }
 
-  function closeDetail() { dialog.current?.close(); setSelectedEvent(null); setComparison(null); }
+  function closeDetail() { detailSequence.current += 1; dialog.current?.close(); setSelectedEvent(null); setComparison(null); }
 
   return <main className="pq-page" aria-labelledby="pq-title">
     <header className="pq-header"><div><p className="pq-eyebrow">GovIntel AI · 免登入公開查詢</p><h1 id="pq-title">公共資訊查詢</h1>
@@ -182,6 +196,7 @@ export default function PublicQueryPage() {
       <div className="pq-field"><label htmlFor="pq-road">路段文字（不推論座標）</label><input id="pq-road" disabled={mode === "published"} value={draft.road} maxLength={512} onChange={(event) => setDraft({ ...draft, road: event.target.value })} placeholder="合成示例：測試路 A 至 B" aria-describedby="pq-road-note" /><small id="pq-road-note">相同路名的不同地區、日期分開顯示。</small></div>
     </div><fieldset className="pq-period" disabled={mode === "published"}><legend>適用期間：事件區間交集，Asia/Taipei（UTC+08:00）</legend><div className="pq-search-row">
       <div className="pq-field"><label htmlFor="pq-time-from">期間起點</label><input id="pq-time-from" type="datetime-local" value={draft.time_from} onChange={(event) => setDraft({ ...draft, time_from: event.target.value })} /></div><div className="pq-field"><label htmlFor="pq-time-to">期間終點</label><input id="pq-time-to" type="datetime-local" value={draft.time_to} onChange={(event) => setDraft({ ...draft, time_to: event.target.value })} /></div>
+      <div className="pq-field"><label htmlFor="pq-daily-from">每日起點（選填）</label><input id="pq-daily-from" type="time" value={draft.daily_from} onChange={(event) => setDraft({ ...draft, daily_from: event.target.value })} /></div><div className="pq-field"><label htmlFor="pq-daily-to">每日終點（選填）</label><input id="pq-daily-to" type="time" value={draft.daily_to} onChange={(event) => setDraft({ ...draft, daily_to: event.target.value })} /></div>
     </div></fieldset><div className="pq-actions"><button type="submit" className="pq-btn-primary" disabled={state === "loading" || (mode === "replay" && !bundle)}>查詢</button><button type="button" className="pq-btn-secondary" onClick={() => setDraft(EMPTY)}>重置編輯條件</button></div>{draftDirty && <p role="status">編輯條件尚未重新查詢；下方結果與「加入追蹤」沿用上次實際套用條件。</p>}</form>
 
     <nav className="pq-tabs" aria-label="查詢內容"><button type="button" aria-pressed={tab === "events"} className={tab === "events" ? "active" : ""} onClick={() => setTab("events")}>公共事件／原文結果</button><button type="button" aria-pressed={tab === "statistics"} className={tab === "statistics" ? "active" : ""} onClick={() => setTab("statistics")}>D1／D2 參考資料</button><button type="button" aria-pressed={tab === "sources"} className={tab === "sources" ? "active" : ""} onClick={() => setTab("sources")}>來源狀態</button></nav>
@@ -189,7 +204,7 @@ export default function PublicQueryPage() {
 
     {tab === "events" && <section className="pq-panel" aria-label="公共事件結果">{resultsCurrent ? <>
       <div className="pq-applied-filters" aria-label="目前實際套用的查詢條件"><strong>目前套用條件：</strong><ul>{Object.keys(results.submitted_filters).length ? Object.entries(results.submitted_filters).map(([key, value]) => <li key={key}><span>{FILTER_LABELS[key]}</span> <span>{TYPE_LABELS[value] || DISTRICTS[value] || value}</span></li>) : <li>不限定（只查本次資料涵蓋範圍）</li>}</ul><p>條件不會由模型暗中修改；事件模式期間採適用時間交集。</p></div>
-      <div className="pq-result-meta"><span>本次有限資料符合：{results.total_matches ?? results.result_count} 筆</span><span>本頁：{results.result_count} 筆</span><span>資料時間：{time(results.data_as_of || results.queried_at)}</span><span>狀態：{STATUS_LABELS[results.status] || results.freshness || "UNKNOWN"}</span></div>
+      <div className="pq-result-meta"><span>本次有限資料符合：{results.total_matches ?? results.result_count} 筆</span><span>本頁：{results.result_count} 筆</span><span>資料時間：{time(results.data_as_of || results.generated_at)}</span><span>狀態：{STATUS_LABELS[results.status] || results.freshness || "UNKNOWN"}</span></div>
       <details className="pq-receipt"><summary>查詢收據與重播依據</summary><p>查詢 ID：{results.query_id || "未提供"}</p><p>資料世代：{results.query_generation_id}</p><p>發布／快照 hash：{results.publication_hash}</p><p>模式：{results.query_mode === "replay" ? "SYNTHETIC_REPLAY · 規則投影" : "Gateway 公開資料"}</p></details>
       {results.query_coverage && <p className="pq-coverage">涵蓋狀態：{results.query_coverage.status} · 缺口：{results.query_coverage.missing_required_sources?.join("、") || "未提供"} · 過期：{results.query_coverage.stale_required_sources?.join("、") || "未提供"}</p>}{results.source_gaps?.length > 0 && <div className="pq-gaps" role="alert"><strong>涵蓋限制與待更新：</strong><ul>{results.source_gaps.map((gap, index) => <li key={index}>{gap.source_id} · {gap.status} · {gap.reason}</li>)}</ul></div>}
       <button type="button" className="pq-btn-tracking" onClick={handleAddToTracking}>將這組實際套用條件加入追蹤</button>{saveNotice && <p role="status">{saveNotice} <a href={`${BASE_PATH}/tracking/`}>開啟我的追蹤</a></p>}{saveError && <p role="alert">保存失敗，未顯示成功：{saveError}</p>}

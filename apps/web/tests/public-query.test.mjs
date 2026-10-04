@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
-  normalizeQueryFilters, queryReplay, replayTrackingItems, requestGateway,
+  normalizeQueryFilters, queryReplay, replayTrackingItems,
   safeHttpsUrl, trackingFilters, validateReplay,
 } from "../lib/public-query.js";
 
@@ -51,6 +51,8 @@ test("Taipei date inputs and tracking handoff retain submitted values without ti
   assert.equal(trackingFilters(filters).road, "測試路 A 至 B");
   assert.equal(trackingFilters(filters).time_semantics, "event_overlap");
   assert.throws(() => normalizeQueryFilters({ time_from: "2026-10-09T09:00", time_to: "2026-10-08T09:00" }), /不能早於/);
+  assert.throws(() => normalizeQueryFilters({ time_from: "2026-02-30T09:00" }), /格式/);
+  assert.throws(() => normalizeQueryFilters({ daily_from: "09:00" }), /同時/);
 });
 
 test("no matches, missing dates, failed sources and lost later revisions cannot establish safety", async () => {
@@ -76,12 +78,12 @@ test("links reject script/credential URLs and synthetic locations never claim of
   assert.equal(safeHttpsUrl("https://www.tccc.gov.tw/"), "https://www.tccc.gov.tw/");
 });
 
-test("live query calls the existing Gateway and keeps capability failures distinct from zero rows", async () => {
-  let called;
-  const fetcher = async (url, options) => {
-    called = { url, body: JSON.parse(options.body) };
-    return { ok: false, json: async () => ({ error: { code: "CAPABILITY_NOT_AVAILABLE", message: "no configured event store" } }) };
-  };
-  await assert.rejects(requestGateway("https://gateway.test/query", "search_events", { q: "施工" }, fetcher), (error) => error.code === "CAPABILITY_NOT_AVAILABLE");
-  assert.deepEqual(called.body, { tool: "search_events", arguments: { q: "施工" } });
+test("daily time band excludes off-hours and preserves exact tracking conditions", async () => {
+  const filters = normalizeQueryFilters({ road: "測試路 A 至 B", daily_from: "18:00", daily_to: "19:00" });
+  const none = await queryReplay(bundle, filters);
+  assert.equal(none.result_count, 0);
+  assert.equal(none.answerable_no_match, false);
+  const hit = await queryReplay(bundle, normalizeQueryFilters({ daily_from: "09:00", daily_to: "17:00" }));
+  assert.ok(hit.result_count > 0);
+  assert.equal(trackingFilters(filters).daily_from, "18:00");
 });

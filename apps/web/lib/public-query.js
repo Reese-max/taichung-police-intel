@@ -54,12 +54,22 @@ export function normalizeQueryFilters(draft) {
     // datetime-local has no timezone; the visible form explicitly uses Taipei.
     if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/.test(value)) throw new Error("查詢日期格式無法驗證");
     const timestamp = `${value}+08:00`;
-    if (Number.isNaN(Date.parse(timestamp))) throw new Error("查詢日期格式無法驗證");
+    const date = value.slice(0, 10);
+    const calendar = new Date(`${date}T00:00:00Z`);
+    if (Number.isNaN(Date.parse(timestamp)) || Number.isNaN(calendar.getTime()) || calendar.toISOString().slice(0, 10) !== date
+        || Number(value.slice(11, 13)) > 23 || Number(value.slice(14, 16)) > 59) throw new Error("查詢日期格式無法驗證");
     filters[key] = timestamp;
   }
   if (filters.time_from && filters.time_to && Date.parse(filters.time_to) < Date.parse(filters.time_from)) {
     throw new Error("結束時間不能早於起始時間");
   }
+  for (const key of ["daily_from", "daily_to"]) {
+    if (!draft[key]) continue;
+    if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(draft[key])) throw new Error("每日時段格式無法驗證");
+    filters[key] = draft[key];
+  }
+  if (Boolean(filters.daily_from) !== Boolean(filters.daily_to)) throw new Error("每日時段須同時指定起點與終點");
+  if (filters.daily_from && filters.daily_to <= filters.daily_from) throw new Error("每日終點須晚於起點；跨日條件請分開查詢");
   return filters;
 }
 
@@ -74,6 +84,7 @@ function matches(event, filters) {
   if ((filters.time_from || filters.time_to) && start === null && end === null) return false;
   if (filters.time_from && end !== null && end < Date.parse(filters.time_from)) return false;
   if (filters.time_to && start !== null && start > Date.parse(filters.time_to)) return false;
+  if (filters.daily_from && (!event.daily || event.daily.end <= filters.daily_from || event.daily.start >= filters.daily_to)) return false;
   return true;
 }
 
@@ -107,19 +118,6 @@ export async function queryReplay(bundle, filters, { snapshot: snapshotId = bund
     // This is a finite saved scenario; even complete fixture coverage cannot establish reality.
     answerable_no_match: false,
   };
-}
-
-export async function requestGateway(endpoint, tool, args, fetchImpl = fetch) {
-  if (!endpoint) throw Object.assign(new Error("未設定正式查詢服務"), { code: "CAPABILITY_NOT_AVAILABLE" });
-  const response = await fetchImpl(endpoint, {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ tool, arguments: args }), signal: AbortSignal.timeout(12000),
-  });
-  const payload = await response.json();
-  if (!response.ok || payload.error) throw Object.assign(new Error(payload.error?.message || `HTTP ${response.status}`), {
-    code: payload.error?.code || "FAILED",
-  });
-  return payload;
 }
 
 export function trackingFilters(filters) {
