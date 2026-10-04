@@ -161,6 +161,11 @@ class ReleaseVerificationTests(unittest.TestCase):
                 with self.assertRaises(RuntimeError):
                     module.verify("https://gateway.example", PUBLIC, client)
 
+    def test_pages_manifest_code_sha_must_match_the_workflow_commit(self):
+        client = PublicationClient()
+        with self.assertRaisesRegex(RuntimeError, "code SHA"):
+            module.verify("https://gateway.example", PUBLIC, client, expected_code_sha="f" * 40)
+
     def test_search_must_return_an_official_locator_from_the_bound_feed(self):
         client = PublicationClient()
         def mutate(route, document):
