@@ -128,3 +128,86 @@ jobs:
         run: |
           python -X utf8 -m unittest discover -s tests -p "test_publication_state_branch.py" -v
           echo "PUBLICATION_STATE_BRANCH_OK"
+
+  runtime-browser:
+    name: Verify current checkout with Chromium
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # Use an independent checkout: the regression job intentionally mutates
+      # publication fixtures, which cannot become this lane's build baseline.
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install Python dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            apps/web/package-lock.json
+
+      - name: Install locked browser tooling
+        run: npm ci --no-audit --no-fund
+
+      - name: Install matching Chromium and system libraries
+        run: node node_modules/playwright-core/cli.js install --with-deps chromium
+
+      - name: Require an unchanged checkout
+        run: |
+          python -X utf8 - <<'PY'
+          import subprocess
+          dirty = subprocess.check_output(["git", "status", "--porcelain"], text=True)
+          if dirty:
+              raise SystemExit("Runtime browser checkout must be clean:\n" + dirty)
+          PY
+
+      - name: Verify legacy and v6 browser flows on the same build
+        shell: bash
+        run: |
+          govintel_chromium_path="$(node -p "require('playwright-core').chromium.executablePath()")"
+          test -x "$govintel_chromium_path"
+          python -X utf8 scripts/verify-current-checkout.py \
+            --mode full \
+            --chrome-path "$govintel_chromium_path" \
+            --output "$RUNNER_TEMP/govintel-runtime-evidence"
+
+      - name: Preserve explicit status when setup prevented execution
+        if: ${{ always() }}
+        run: |
+          python -X utf8 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          output = Path(os.environ["RUNNER_TEMP"]) / "govintel-runtime-evidence" / "receipt.json"
+          if not output.exists():
+              output.parent.mkdir(parents=True, exist_ok=True)
+              output.write_text(json.dumps({
+                  "schema_version": 1,
+                  "status": "NOT_RUN",
+                  "code_sha": os.environ.get("GITHUB_SHA"),
+                  "execution_scope": "CURRENT_CHECKOUT_BROWSER_CI_SETUP",
+                  "reason": "CI setup or verifier startup failed before a runtime receipt was produced",
+                  "production_verified": False,
+                  "not_run": [{"id": "v6_browser_e2e", "status": "NOT_RUN"}],
+              }, indent=2) + "\n", encoding="utf-8")
+          PY
+
+      - name: Upload runtime receipts, logs and browser evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: govintel-current-checkout-browser-${{ github.sha }}
+          path: ${{ runner.temp }}/govintel-runtime-evidence
+          if-no-files-found: warn
+          retention-days: 14
