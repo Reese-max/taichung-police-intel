@@ -3,12 +3,6 @@ name: Deploy GovIntel Query Gateway Worker
 on:
   push:
     branches: [main]
-    paths:
-      - "workers/query-gateway/**"
-      - ".github/workflows/query-gateway-workers.yml"
-      - "apps/web/lib/answer-evidence-gate.js"
-      - "apps/web/lib/council-prep.js"
-      - "docs/govintel/source-catalog.v2.json"
   workflow_dispatch:
 
 permissions:
@@ -20,45 +14,23 @@ concurrency:
 
 jobs:
   deploy:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     env:
       HAS_CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Check whether deployed Worker inputs changed
-        id: scope
-        shell: bash
-        env:
-          BEFORE_SHA: ${{ github.event.before }}
-        run: |
-          deploy=true
-          if [[ "$GITHUB_EVENT_NAME" == "push" && "$BEFORE_SHA" =~ ^[0-9a-f]{40}$ ]] && git cat-file -e "$BEFORE_SHA^{commit}"; then
-            if git diff --quiet "$BEFORE_SHA" "$GITHUB_SHA" -- workers/query-gateway apps/web/lib/answer-evidence-gate.js apps/web/lib/council-prep.js; then
-              if old_active="$(git show "$BEFORE_SHA:docs/govintel/source-catalog.v2.json" | jq -cS '[.sources[] | select(.status == "PRODUCTION_ACTIVE")]')" && \
-                 new_active="$(jq -cS '[.sources[] | select(.status == "PRODUCTION_ACTIVE")]' docs/govintel/source-catalog.v2.json)"; then
-                if [[ "$old_active" == "$new_active" ]]; then deploy=false; fi
-              fi
-            fi
-          fi
-          echo "required=$deploy" >> "$GITHUB_OUTPUT"
-
-      - name: Candidate-only catalog change needs no Worker deployment
-        if: ${{ steps.scope.outputs.required == 'false' }}
-        run: echo 'The active source catalog and Worker inputs are unchanged.'
 
       - name: Require Cloudflare deployment credential
-        if: ${{ steps.scope.outputs.required == 'true' && env.HAS_CLOUDFLARE_API_TOKEN != 'true' }}
+        if: ${{ env.HAS_CLOUDFLARE_API_TOKEN != 'true' }}
         run: |
           echo '::error::CLOUDFLARE_API_TOKEN is unavailable; the Worker was not deployed.'
           exit 1
 
       - name: Deploy Worker
-        if: ${{ steps.scope.outputs.required == 'true' && env.HAS_CLOUDFLARE_API_TOKEN == 'true' }}
+        if: ${{ env.HAS_CLOUDFLARE_API_TOKEN == 'true' }}
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          command: deploy --config workers/query-gateway/wrangler.jsonc
+          command: deploy --config workers/query-gateway/wrangler.jsonc --tag ${{ github.sha }}

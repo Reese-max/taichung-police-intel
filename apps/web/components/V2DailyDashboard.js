@@ -806,7 +806,7 @@ export default function V2DailyDashboard() {
         )}
       </header>
 
-      <QueryGatewayPanel onFeedback={handleReviewFeedback} feedbackReady={Boolean(localReview)} />
+      <QueryGatewayPanel onFeedback={handleReviewFeedback} feedbackReady={Boolean(localReview)} publicationGeneration={generationMixed ? null : publication?.source_collection_run_id} />
       <PublicEventFusionDemo />
 
       {loadState === "loading" && (

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { FEEDBACK_REASONS } from "../lib/local-review.js";
+import { queryGateway } from "../lib/query-release-client.js";
 
 const ENDPOINT = process.env.NEXT_PUBLIC_QUERY_GATEWAY_URL || "/query";
 const FEEDBACK_REASON_LABELS = {
@@ -233,7 +234,7 @@ function QueryResult({ response, onFeedback, feedbackReady }) {
   );
 }
 
-export default function QueryGatewayPanel({ onFeedback, feedbackReady = false }) {
+export default function QueryGatewayPanel({ onFeedback, feedbackReady = false, publicationGeneration }) {
   const [query, setQuery] = useState("");
   const [response, setResponse] = useState(null);
   const [state, setState] = useState("idle");
@@ -243,13 +244,11 @@ export default function QueryGatewayPanel({ onFeedback, feedbackReady = false })
     setState("loading");
     setError("");
     try {
-      const result = await fetch(ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tool, arguments: argumentsValue }),
-      });
-      const payload = await result.json();
-      if (!result.ok || payload.error) throw new Error(payload.error?.message || `Gateway HTTP ${result.status}`);
+      const payload = await queryGateway(ENDPOINT, tool, argumentsValue, process.env.NEXT_PUBLIC_QUERY_GATEWAY_URL ? {
+        basePath: process.env.NEXT_PUBLIC_BASE_PATH || "",
+        codeSha: process.env.NEXT_PUBLIC_RELEASE_CODE_SHA,
+        publicationGeneration,
+      } : null);
       setResponse(payload);
       setState("ready");
     } catch (reason) {

@@ -2,14 +2,30 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import worker from "../../../workers/query-gateway/src/index.js";
+import worker, { buildSnapshot, createReleaseManifest } from "../../../workers/query-gateway/src/index.js";
 
 const base = new URL("../public/data/", import.meta.url);
 const origin = "https://reese-max.github.io/taichung-police-intel";
 const endpoint = "https://govintel-query-gateway.example/query";
 const mcpEndpoint = "https://govintel-query-gateway.example/mcp";
-const env = { PUBLIC_ORIGIN: origin, ALLOWED_ORIGINS: "https://reese-max.github.io" };
+const env = { PUBLIC_ORIGIN: origin, ALLOWED_ORIGINS: "https://reese-max.github.io", CF_VERSION_METADATA: { id: "test-worker", tag: "a".repeat(40) } };
 const artifactNames = ["intelligence-feed.json", "source-status.json", "v2-daily-brief.json", "source-policy.json"];
+
+
+// Extend each independently controlled publication fixture with its matching
+// release; the production Worker must never bypass release admission for tests.
+function withFixtureRelease(fetcher) {
+  return async (url, options) => {
+    if (!String(url).endsWith("/release.json")) return fetcher(url, options);
+    const snapshot = await buildSnapshot(env, async name => {
+      const response = await fetcher(`${origin}/data/${name}`, options);
+      if (!response.ok) throw new Error("fixture publication is unavailable");
+      const bytes = await response.arrayBuffer();
+      return { bytes, hash: createHash("sha256").update(new Uint8Array(bytes)).digest("hex") };
+    });
+    return Response.json(await createReleaseManifest(snapshot, env.CF_VERSION_METADATA.tag));
+  };
+}
 
 // The checked-in publication is an archived snapshot, so freshness assertions
 // need an equivalent snapshot whose own timestamps are current. Only the
@@ -138,14 +154,15 @@ test("Worker query and MCP answer routes share a server-controlled evidence gate
   bytes["intelligence-feed.json"] = Buffer.from(JSON.stringify(feed), "utf8");
   bytes["source-status.json"] = Buffer.from(JSON.stringify(statusDoc), "utf8");
   bytes["v2-daily-brief.json"] = Buffer.from(JSON.stringify(brief), "utf8");
-  globalThis.fetch = async url => {
+
+  globalThis.fetch = withFixtureRelease(async url => {
     const target = new URL(url);
     const name = target.pathname.split("/").at(-1);
     assert.equal(target.href, `${origin}/data/${name}`);
     const content = bytes[name];
     assert.ok(content, `unexpected publication artifact: ${target.pathname}`);
     return new Response(content, { status: 200, headers: { "Content-Type": "application/json" } });
-  };
+  });
   const query = async (tool, args) => {
     const response = await worker.fetch(new Request(endpoint, {
       method: "POST",
@@ -297,10 +314,10 @@ test("Worker rejects a cursor offset beyond the filtered result set", async () =
     ["intelligence-feed.json", "source-status.json", "v2-daily-brief.json", "source-policy.json"]
       .map(async name => [name, await readFile(new URL(name, base))]),
   ));
-  globalThis.fetch = async url => {
+  globalThis.fetch = withFixtureRelease(async url => {
     const name = new URL(url).pathname.split("/").at(-1);
     return new Response(bytes[name], { status: 200, headers: { "Content-Type": "application/json" } });
-  };
+  });
   const query = async (tool, args) => {
     const response = await worker.fetch(new Request(endpoint, {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -341,11 +358,11 @@ test("Worker serves the last good snapshot when a rebuild fails", async () => {
   try {
     const healthy = (await import("../../../workers/query-gateway/src/index.js?snapshot-fallback")).default;
     let upstreamCalls = 0;
-    globalThis.fetch = async url => {
+    globalThis.fetch = withFixtureRelease(async url => {
       upstreamCalls += 1;
       const name = new URL(url).pathname.split("/").at(-1);
       return new Response(freshBytes[name], { status: 200, headers: { "Content-Type": "application/json" } });
-    };
+    });
     const noMatchTerm = "zzzz-govintel-no-match-20261001";
     const first = await query(healthy, { q: noMatchTerm, limit: 1 });
     assert.equal(first.status, 200);
@@ -417,7 +434,7 @@ test("Worker fails closed instead of serving a superseded generation", async () 
   };
   try {
     const instance = (await import("../../../workers/query-gateway/src/index.js?integrity-fallback")).default;
-    globalThis.fetch = serve(bytes);
+    globalThis.fetch = withFixtureRelease(serve(bytes));
     const first = await query(instance, { limit: 1 });
     assert.equal(first.status, 200);
 
@@ -425,12 +442,12 @@ test("Worker fails closed instead of serving a superseded generation", async () 
     // failure, not an upstream outage: the previous generation must not answer.
     const brief = JSON.parse(bytes["v2-daily-brief.json"].toString("utf8"));
     brief.source_collection_run_id = `${brief.source_collection_run_id}-SUPERSEDED`;
-    globalThis.fetch = serve({ ...bytes, "v2-daily-brief.json": Buffer.from(JSON.stringify(brief), "utf8") });
+    globalThis.fetch = withFixtureRelease(serve({ ...bytes, "v2-daily-brief.json": Buffer.from(JSON.stringify(brief), "utf8") }));
     Date.now = () => originalNow() + 31_000;
     const rejected = await query(instance, { limit: 1 });
     assert.equal(rejected.status, 503);
-    assert.equal(rejected.body.error.code, "UPSTREAM_UNAVAILABLE");
-    assert.match(rejected.body.error.message, /cross-generation publication artifacts/);
+    assert.equal(rejected.body.error.code, "QUERY_TEMPORARILY_UNAVAILABLE");
+    assert.equal(rejected.body.error.message, "release binding is unavailable");
     assert.equal(rejected.body.query_generation_id, undefined);
   } finally {
     globalThis.fetch = originalFetch;
@@ -453,24 +470,24 @@ test("Worker fails closed when a served publication body cannot be parsed", asyn
   };
   try {
     const instance = (await import("../../../workers/query-gateway/src/index.js?corrupt-body")).default;
-    globalThis.fetch = async url => {
+    globalThis.fetch = withFixtureRelease(async url => {
       const name = new URL(url).pathname.split("/").at(-1);
       return new Response(bytes[name], { status: 200, headers: { "Content-Type": "application/json" } });
-    };
+    });
     const first = await query(instance, { limit: 1 });
     assert.equal(first.status, 200);
 
     // A served-but-unparseable artifact is a broken publication, not an outage:
     // the previous generation must not answer for it.
-    globalThis.fetch = async url => {
+    globalThis.fetch = withFixtureRelease(async url => {
       const name = new URL(url).pathname.split("/").at(-1);
       const content = name === "intelligence-feed.json" ? "not-json" : bytes[name];
       return new Response(content, { status: 200, headers: { "Content-Type": "application/json" } });
-    };
+    });
     Date.now = () => originalNow() + 31_000;
     const rejected = await query(instance, { limit: 1 });
     assert.equal(rejected.status, 503);
-    assert.equal(rejected.body.error.code, "UPSTREAM_UNAVAILABLE");
+    assert.equal(rejected.body.error.code, "QUERY_TEMPORARILY_UNAVAILABLE");
     assert.equal(rejected.body.query_generation_id, undefined);
   } finally {
     globalThis.fetch = originalFetch;
@@ -487,11 +504,11 @@ test("Worker treats a partially collected source as incomplete scope", async () 
   const status = JSON.parse(fresh["source-status.json"].toString("utf8"));
   // Healthy-looking except that the run itself reported a partial result.
   status.sources[0].result = "PARTIAL";
-  globalThis.fetch = async url => {
+  globalThis.fetch = withFixtureRelease(async url => {
     const name = new URL(url).pathname.split("/").at(-1);
     const content = name === "source-status.json" ? Buffer.from(JSON.stringify(status), "utf8") : fresh[name];
     return new Response(content, { status: 200, headers: { "Content-Type": "application/json" } });
-  };
+  });
   try {
     const instance = (await import("../../../workers/query-gateway/src/index.js?partial-result")).default;
     const response = await instance.fetch(new Request(endpoint, {
@@ -533,7 +550,7 @@ test("Worker inherits the source freshness for an item without its own", async (
     return { status: response.status, body: await response.json() };
   };
   try {
-    globalThis.fetch = serve({ ...fresh, "intelligence-feed.json": Buffer.from(JSON.stringify(feed), "utf8") });
+    globalThis.fetch = withFixtureRelease(serve({ ...fresh, "intelligence-feed.json": Buffer.from(JSON.stringify(feed), "utf8") }));
     const inherited = (await query(
       (await import("../../../workers/query-gateway/src/index.js?fresh-source")).default,
       { canonical_id: item.stable_id, limit: 1 },
@@ -541,11 +558,11 @@ test("Worker inherits the source freshness for an item without its own", async (
     assert.equal(inherited.results[0].verification_status, "VERIFIED");
 
     for (const source of staleStatus.sources) source.freshness_status = "STALE";
-    globalThis.fetch = serve({
+    globalThis.fetch = withFixtureRelease(serve({
       ...fresh,
       "intelligence-feed.json": Buffer.from(JSON.stringify(feed), "utf8"),
       "source-status.json": Buffer.from(JSON.stringify(staleStatus), "utf8"),
-    });
+    }));
     const fromStaleSource = (await query(
       (await import("../../../workers/query-gateway/src/index.js?stale-source")).default,
       { canonical_id: item.stable_id, limit: 1 },
@@ -574,11 +591,11 @@ test("Worker never reports a stale publication item as current official evidence
     const item = feed.items.find(row => row.stable_id && row.official_url?.startsWith("https://"));
     assert.ok(item, "fixture needs an official evidence locator");
     feed.items = feed.items.map(row => (row.stable_id === item.stable_id ? { ...row, freshness_status: "STALE" } : row));
-    globalThis.fetch = async url => {
+    globalThis.fetch = withFixtureRelease(async url => {
       const name = new URL(url).pathname.split("/").at(-1);
       const content = name === "intelligence-feed.json" ? Buffer.from(JSON.stringify(feed), "utf8") : bytes[name];
       return new Response(content, { status: 200, headers: { "Content-Type": "application/json" } });
-    };
+    });
     const instance = (await import("../../../workers/query-gateway/src/index.js?stale-evidence")).default;
     const exact = await call(instance, "search_evidence", { canonical_id: item.stable_id, limit: 5 });
     assert.equal(exact.body.result_count, 1);

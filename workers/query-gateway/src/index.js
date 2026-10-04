@@ -159,23 +159,23 @@ function validatePolicy(policy) {
 async function fetchArtifact(origin, name) {
   const url = `${origin.replace(/\/$/, "")}/data/${name}`;
   const response = await fetch(url, { cf: { cacheTtl: 30, cacheEverything: true } });
-  if (!response.ok) throw new Error(`publication artifact ${name} returned HTTP ${response.status}`);
+  if (!response.ok) {
+    if (name === "release.json" && response.status === 404) throw new SnapshotIntegrityError("release manifest is missing");
+    throw new Error(`publication artifact ${name} returned HTTP ${response.status}`);
+  }
   const bytes = await response.arrayBuffer();
   return { name, bytes, hash: await sha256(bytes) };
 }
 
-async function buildSnapshot(env) {
+export async function buildSnapshot(env, readArtifact = null) {
   const origin = env.PUBLIC_ORIGIN;
   if (!origin) throw new Error("PUBLIC_ORIGIN is not configured");
-  const fetched = await Promise.all([
-    fetchArtifact(origin, "intelligence-feed.json"),
-    fetchArtifact(origin, "source-status.json"),
-    fetchArtifact(origin, "v2-daily-brief.json"),
-    fetchArtifact(origin, "source-policy.json"),
-  ]);
-  // Everything past the fetch is an integrity question about the artifacts
-  // themselves.  Those failures must stay fail-closed instead of degrading to a
-  // previous generation that no longer describes the published run.
+  const fetched = await Promise.all(
+    ["intelligence-feed.json", "source-status.json", "v2-daily-brief.json", "source-policy.json"]
+      .map(async name => ({ name, ...(await (readArtifact ? readArtifact(name) : fetchArtifact(origin, name))) })),
+  );
+  // Served bytes are validated within the integrity boundary. Network failures
+  // alone may fall back to a previously verified publication.
   try {
     return await buildSnapshotFromArtifacts(fetched);
   } catch (error) {
@@ -188,8 +188,12 @@ async function buildSnapshotFromArtifacts(fetched) {
   // a broken publication rather than an outage, so it stays inside this boundary.
   const documents = {};
   for (const artifact of fetched) {
-    if (artifact.bytes.byteLength > 32 * 1024 * 1024) throw new Error(`publication artifact ${artifact.name} exceeds byte budget`);
-    documents[artifact.name] = { value: JSON.parse(new TextDecoder().decode(artifact.bytes)), hash: artifact.hash };
+    if (artifact.bytes !== undefined) {
+      if (artifact.bytes.byteLength > 32 * 1024 * 1024) throw new Error(`publication artifact ${artifact.name} exceeds byte budget`);
+      documents[artifact.name] = { value: JSON.parse(new TextDecoder().decode(artifact.bytes)), hash: artifact.hash };
+    } else {
+      documents[artifact.name] = { value: artifact.value, hash: artifact.hash };
+    }
   }
   const feedDoc = documents["intelligence-feed.json"];
   const statusDoc = documents["source-status.json"];
@@ -241,32 +245,81 @@ async function buildSnapshotFromArtifacts(fetched) {
     publication_status: brief.publication_status,
     snapshot_complete: brief.snapshot_complete,
   };
-  return { feed, status, brief, policy, policyBinding, capabilityDefinitions: makeCapabilities(policy), items, sources, generatedFrom, generationId };
+  const snapshot = { feed, status, brief, policy, policyBinding, capabilityDefinitions: makeCapabilities(policy), items, sources, generatedFrom, generationId };
+  // Bind the published catalog at publication time; live freshness still uses the server clock.
+  snapshot.evidenceCatalogHash = await sha256(canonicalJson(trustedEvidence(snapshot, parseInstant(brief.generated_at))));
+  return snapshot;
+}
+
+export async function createReleaseManifest(snapshot, codeSha, builtAt = isoNow()) {
+  if (typeof codeSha !== "string" || !/^[a-f0-9]{40}$/.test(codeSha)) throw new Error("release code SHA must be a full Git SHA");
+  if (!Number.isFinite(parseInstant(builtAt))) throw new Error("release built_at must include a timezone");
+  const publication = snapshot.generatedFrom;
+  const binding = {
+    code_sha: codeSha,
+    publication_generation: publication.collection_run_id,
+    publication_hash: publication.brief_sha256,
+    artifact_hashes: { feed: publication.feed_sha256, status: publication.status_sha256, brief: publication.brief_sha256 },
+    source_policy_hash: snapshot.policyBinding.policy_hash,
+    query_generation: snapshot.generationId,
+    evidence_catalog_hash: snapshot.evidenceCatalogHash,
+  };
+  return {
+    schema_version: 1, release_id: await sha256(canonicalJson(binding)), ...binding, built_at: builtAt,
+    worker_version: null, pages_deployment: null, deployed_at: null, anonymous_http_verified_at: null,
+    evidence_level: "BUILD_ONLY", production_verified: false,
+  };
+}
+
+async function buildBoundSnapshot(env) {
+  const [snapshot, artifact] = await Promise.all([
+    buildSnapshot(env),
+    fetchArtifact(env.PUBLIC_ORIGIN, "release.json"),
+  ]);
+  try {
+    if (artifact.bytes.byteLength > 64 * 1024) throw new Error("release exceeds byte budget");
+    const manifest = JSON.parse(new TextDecoder().decode(artifact.bytes));
+    const expected = await createReleaseManifest(snapshot, env.CF_VERSION_METADATA.tag, manifest?.built_at);
+    for (const [field, expectedValue] of Object.entries(expected)) {
+      if (canonicalJson(manifest?.[field]) !== canonicalJson(expectedValue)) throw new Error(`release ${field} mismatch`);
+    }
+    snapshot.release = { ...expected, worker_version: env.CF_VERSION_METADATA.id, evidence_level: "RUNTIME_BOUND" };
+    return snapshot;
+  } catch (error) {
+    throw new SnapshotIntegrityError("release binding mismatch");
+  }
 }
 
 async function getSnapshot(env) {
   const now = Date.now();
-  if (snapshotCache && snapshotCache.expiresAt > now) return snapshotCache.degraded || snapshotCache.value;
-  // Concurrent requests share one in-flight rebuild, so a failure degrades every
-  // waiter to the same last usable snapshot instead of racing the cache write.
-  if (!snapshotBuild) snapshotBuild = buildSnapshot(env).finally(() => { snapshotBuild = null; });
+  const version = env.CF_VERSION_METADATA;
+  if (!version?.id || !/^[a-f0-9]{40}$/.test(version?.tag ?? "")) {
+    throw new GatewayError("QUERY_TEMPORARILY_UNAVAILABLE", "release binding is unavailable", 503);
+  }
+  const key = JSON.stringify([env.PUBLIC_ORIGIN, version.tag, version.id]);
+  if (snapshotCache?.key === key && snapshotCache.expiresAt > now) return snapshotCache.degraded || snapshotCache.value;
+  if (!snapshotBuild || snapshotBuild.key !== key) {
+    const build = { key, value: buildBoundSnapshot(env) };
+    snapshotBuild = build;
+    build.value.finally(() => { if (snapshotBuild === build) snapshotBuild = null; }).catch(() => {});
+  }
   try {
-    const value = await snapshotBuild;
-    snapshotCache = { value, expiresAt: Date.now() + 30_000 };
+    const value = await snapshotBuild.value;
+    snapshotCache = { key, value, expiresAt: Date.now() + 30_000 };
     degradedSince = null;
     return value;
   } catch (error) {
-    // Inconsistent artifacts are an integrity failure: serving the previous
-    // generation would answer with data that no longer matches the publication.
-    if (error instanceof SnapshotIntegrityError || !snapshotCache) throw error;
-    // An unreachable upstream must not drop the last usable projection, but the
-    // response has to say so instead of reading as a successful fresh rebuild.
-    console.warn("query-gateway: index rebuild failed; serving last usable snapshot", String(error?.message || error));
+    // Inconsistent publication or release artifacts always fail closed, even
+    // when this Worker has a previously verified generation in its cache.
+    if (error instanceof SnapshotIntegrityError) {
+      throw new GatewayError("QUERY_TEMPORARILY_UNAVAILABLE", "release binding is unavailable", 503);
+    }
+    // A different deployment must never reuse another version's cache.
+    if (snapshotCache?.key !== key) throw error;
+    console.warn("query-gateway: index rebuild failed; serving last usable snapshot");
     degradedSince = degradedSince || new Date().toISOString();
     const degraded = { ...snapshotCache.value, degradedSince };
-    // Hold the degraded projection briefly instead of re-fetching every artifact
-    // on every request while the origin is down.
-    snapshotCache = { value: snapshotCache.value, degraded, expiresAt: Date.now() + DEGRADED_RETRY_MS };
+    snapshotCache = { key, value: snapshotCache.value, degraded, expiresAt: Date.now() + DEGRADED_RETRY_MS };
     return degraded;
   }
 }
@@ -402,14 +455,15 @@ const OFFICIAL_EVIDENCE_SOURCE_IDS = new Set(
     .map((row) => row.source_id),
 );
 
-function trustedEvidence(snapshot) {
-  const sourceStatus = Object.fromEntries(snapshot.sources.map((source) => [source.source_id, assessScope(snapshot, source.source_id).dataStatus]));
+function trustedEvidence(snapshot, now = Date.now()) {
+  const sourceStatus = Object.fromEntries(snapshot.sources.map((source) => [source.source_id, assessScope(snapshot, source.source_id, now).dataStatus]));
   return snapshot.items.filter((item) =>
     item.source_role === "PRIMARY_OFFICIAL" &&
     OFFICIAL_EVIDENCE_SOURCE_IDS.has(item.source_id) &&
     typeof item.official_url === "string" &&
     item.official_url.startsWith("https://"),
   ).map((item) => {
+
     const source = snapshot.sources.find((row) => row.source_id === item.source_id) || {};
     const freshnessValue = String(item.freshness_status || source.freshness_status || "UNKNOWN").toUpperCase();
     const current = sourceStatus[item.source_id] === "SNAPSHOT_RECENT" && source.source_health === "PASS" &&
@@ -471,6 +525,7 @@ function controlledText(entry) {
 
 function envelope(snapshot, tool, args, scope, payload, resultCount = 0, truncated = false, resultType = "publication_metadata") {
   return {
+    release: snapshot.release,
     schema_version: 1, query_id: crypto.randomUUID(), tool_name: tool, publication_id: snapshot.generatedFrom.collection_run_id,
     publication_hash: snapshot.generatedFrom.brief_sha256, query_generation_id: snapshot.generationId, generated_at: snapshot.brief.generated_at,
     queried_at: isoNow(), freshness: freshness(scope.dataStatus), verification_summary: verificationSummary(scope.dataStatus),
@@ -541,8 +596,8 @@ function mcpTools() {
 
 async function dispatchMcp(snapshot, request) {
   if (request?.jsonrpc !== "2.0" || !("id" in (request || {}))) throw new GatewayError("INVALID_JSON_RPC", "request must be JSON-RPC 2.0 with an id");
-  if (request.method === "initialize") return { jsonrpc: "2.0", id: request.id, result: { protocolVersion: MCP_PROTOCOL_VERSION, capabilities: { tools: { listChanged: false } }, serverInfo: { name: "govintel-query-gateway", version: SERVER_VERSION } } };
-  if (request.method === "tools/list") return { jsonrpc: "2.0", id: request.id, result: { tools: mcpTools() } };
+  if (request.method === "initialize") return { jsonrpc: "2.0", id: request.id, result: { protocolVersion: MCP_PROTOCOL_VERSION, capabilities: { tools: { listChanged: false } }, serverInfo: { name: "govintel-query-gateway", version: SERVER_VERSION }, release: snapshot.release } };
+  if (request.method === "tools/list") return { jsonrpc: "2.0", id: request.id, result: { tools: mcpTools(), release: snapshot.release } };
   if (request.method !== "tools/call" || !request.params || typeof request.params.name !== "string") throw new GatewayError("METHOD_NOT_FOUND", `unsupported MCP method: ${request.method}`, 404);
   try {
     const payload = await execute(snapshot, request.params.name, request.params.arguments);
@@ -592,13 +647,15 @@ export default {
       const snapshot = await getSnapshot(env);
       if (request.method === "GET" && url.pathname === "/health") {
         const scope = assessScope(snapshot);
-        return responseJson({ schema_version: 1, service: "govintel-query-gateway", server_version: SERVER_VERSION, status: snapshot.degradedSince ? "degraded" : "ok", publication_freshness: freshness(scope.dataStatus), publication_id: snapshot.generatedFrom.collection_run_id, publication_hash: snapshot.generatedFrom.brief_sha256, query_coverage: queryCoverage(snapshot, "publication_metadata"), policy: snapshot.policyBinding, retention: RETENTION_POLICY, source_gaps: scope.gaps, read_only: true }, 200, request, env);
+        return responseJson({ schema_version: 1, service: "govintel-query-gateway", server_version: SERVER_VERSION, status: snapshot.degradedSince ? "degraded" : "ok", release: snapshot.release, publication_freshness: freshness(scope.dataStatus), publication_id: snapshot.generatedFrom.collection_run_id, publication_hash: snapshot.generatedFrom.brief_sha256, query_coverage: queryCoverage(snapshot, "publication_metadata"), policy: snapshot.policyBinding, retention: RETENTION_POLICY, source_gaps: scope.gaps, read_only: true }, 200, request, env);
+
       }
-      if (request.method === "GET" && url.pathname === "/capabilities") return responseJson({ schema_version: 1, server_version: SERVER_VERSION, read_only: true, capabilities: ["search_evidence", "get_current_brief", "get_publication_receipt", "get_source_health", "validate_answer"], unavailable_capabilities: DOMAIN_CAPABILITIES, policy: snapshot.policyBinding, retention: RETENTION_POLICY }, 200, request, env);
+      if (request.method === "GET" && url.pathname === "/capabilities") return responseJson({ schema_version: 1, server_version: SERVER_VERSION, read_only: true, release: snapshot.release, capabilities: ["search_evidence", "get_current_brief", "get_publication_receipt", "get_source_health", "validate_answer"], unavailable_capabilities: DOMAIN_CAPABILITIES, policy: snapshot.policyBinding, retention: RETENTION_POLICY }, 200, request, env);
       if (request.method !== "POST" || !["/query", "/mcp"].includes(url.pathname)) return responseJson(jsonError("NOT_FOUND", "route not found"), 404, request, env);
       const bytes = await request.arrayBuffer();
       if (bytes.byteLength > MAX_REQUEST_BYTES) return responseJson(jsonError("REQUEST_TOO_LARGE", "request exceeds byte budget"), 413, request, env);
       const input = JSON.parse(new TextDecoder().decode(bytes));
+      if (input?.release_id !== undefined && input.release_id !== snapshot.release.release_id) throw new GatewayError("QUERY_TEMPORARILY_UNAVAILABLE", "Pages and Worker release mismatch; reload the publication", 503);
       if (url.pathname === "/query") return responseJson(await execute(snapshot, input?.tool, input?.arguments), 200, request, env);
       return responseJson(await dispatchMcp(snapshot, input), 200, request, env);
     } catch (error) {
