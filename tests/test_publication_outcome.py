@@ -14,6 +14,87 @@ spec.loader.exec_module(module)
 
 
 class OutcomeTests(unittest.TestCase):
+    def completed_publication_env(self, **overrides):
+        return {
+            "BUILD_RESULT": "success", "DEPLOY_RESULT": "success",
+            "COLLECT": "success", "SCHEMA_DRIFT": "success",
+            "V1": "success", "V2": "success", "V2_VERIFY": "success",
+            "VERIFY": "success", "PRESERVE": "success", "PAGES_UPLOAD": "success",
+            "PAGES_DEPLOY": "success", "PUBLIC_VERIFY": "success", "QUERY_VERIFY": "success",
+            **overrides,
+        }
+
+    def test_gateway_failure_retains_verified_publication_and_failed_workflow(self):
+        env = self.completed_publication_env(DEPLOY_RESULT="failure", QUERY_VERIFY="failure")
+        text, code = module.report(env)
+        receipt = module.runtime_health(env)
+        stages = {(row["lane"], row["stage"]): row for row in receipt["stages"]}
+        self.assertEqual(code, 1)
+        self.assertIn("State: `PUBLIC_DATA_VERIFIED`", text)
+        self.assertIn("| deploy | failure |", text)
+        self.assertIn("| pages_deploy | success |", text)
+        self.assertIn("| query_verify | failure |", text)
+        self.assertNotIn("The current served version is unverified", text)
+        self.assertTrue(receipt["public_data_verified"])
+        self.assertEqual(receipt["job_results"]["DEPLOY_RESULT"], "failure")
+        self.assertEqual(stages[("publication", "deployment")]["outcome"], "SUCCESS")
+        self.assertEqual(stages[("publication", "public_http_verification")]["outcome"], "SUCCESS")
+        self.assertEqual(receipt["lanes"]["publication"], "HEALTHY")
+        self.assertEqual(stages[("query", "mcp_web_query")]["outcome"], "FAILED")
+        self.assertEqual(receipt["lanes"]["query"], "BLOCKED")
+        self.assertEqual(receipt["overall"], "DEGRADED")
+
+    def test_failed_acknowledgement_cannot_confirm_successful_pages_action(self):
+        env = self.completed_publication_env(
+            DEPLOY_RESULT="failure", PUBLIC_VERIFY="failure", QUERY_VERIFY="skipped",
+        )
+        text, code = module.report(env)
+        receipt = module.runtime_health(env)
+        stages = {(row["lane"], row["stage"]): row for row in receipt["stages"]}
+        self.assertEqual(code, 1)
+        self.assertIn("State: `PUBLICATION_NOT_CONFIRMED`", text)
+        self.assertFalse(receipt["public_data_verified"])
+        self.assertEqual(stages[("publication", "deployment")]["outcome"], "SUCCESS")
+        self.assertEqual(stages[("publication", "public_http_verification")]["outcome"], "FAILED")
+        self.assertEqual(receipt["lanes"]["publication"], "BLOCKED")
+        self.assertEqual(receipt["overall"], "BLOCKED")
+
+    def test_explicit_pages_action_failure_never_falls_back_to_successful_job(self):
+        for outcome in ("failure", "cancelled", "skipped", "", "unexpected"):
+            with self.subTest(outcome=outcome):
+                env = self.completed_publication_env(PAGES_DEPLOY=outcome)
+                text, code = module.report(env)
+                self.assertEqual(code, 1)
+                self.assertIn("State: `PUBLICATION_NOT_CONFIRMED`", text)
+                self.assertFalse(module.runtime_health(env)["public_data_verified"])
+
+    def test_legacy_job_only_outcome_remains_the_deployment_fallback(self):
+        env = self.completed_publication_env()
+        del env["PAGES_DEPLOY"]
+        self.assertEqual(module.report(env)[1], 0)
+        self.assertTrue(module.runtime_health(env)["public_data_verified"])
+        env["DEPLOY_RESULT"] = "failure"
+        self.assertEqual(module.report(env)[1], 1)
+        self.assertFalse(module.runtime_health(env)["public_data_verified"])
+
+    def test_cli_retains_public_verification_while_gateway_failure_exits_failed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "health.json"
+            env = {**os.environ, **self.completed_publication_env(
+                DEPLOY_RESULT="failure", QUERY_VERIFY="failure",
+            )}
+            result = subprocess.run(
+                [sys.executable, str(ROOT / "scripts/publication-outcome.py"), "--health-output", str(output)],
+                env=env, capture_output=True, text=True, timeout=10, check=False,
+            )
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("State: `PUBLIC_DATA_VERIFIED`", result.stdout)
+            self.assertIn("::warning title=Publication workflow incomplete::", result.stdout)
+            self.assertNotIn("::warning title=Publication not confirmed::", result.stdout)
+            receipt = json.loads(output.read_text(encoding="utf-8"))
+            self.assertTrue(receipt["public_data_verified"])
+            self.assertEqual(receipt["overall"], "DEGRADED")
+
     def test_runtime_health_receipt_distinguishes_deploy_and_public_probe(self):
         env = {
             "BUILD_RESULT": "failure",
@@ -262,6 +343,9 @@ class OutcomeTests(unittest.TestCase):
         self.assertIn("EXPECTED_GENERATION: ${{ needs.build.outputs.generation_id }}", text)
         self.assertIn("PUBLICATION_BASE_URL: ${{ steps.deployment.outputs.page_url }}", text)
         self.assertIn("PUBLIC_VERIFY: ${{ needs.deploy.outputs.public_verify }}", text)
+        self.assertIn("pages_deploy: ${{ steps.deployment.outcome }}", text)
+        self.assertIn("PAGES_DEPLOY: ${{ needs.deploy.outputs.pages_deploy }}", text)
+        self.assertIn("DEPLOY_RESULT: ${{ needs.deploy.result }}", text)
         self.assertIn("GENERATION_ID: ${{ needs.build.outputs.generation_id }}", text)
         self.assertIn("STATE_COMMIT: ${{ needs.build.outputs.state_commit }}", text)
         self.assertIn("SCHEMA_DRIFT: ${{ needs.build.outputs.schema_drift }}", text)
