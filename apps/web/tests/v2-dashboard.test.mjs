@@ -81,14 +81,17 @@ test("daily publication never promotes CONFIRMED or UNCHANGED to Top 3", async (
   );
 });
 
-test("formal layout renders V2 before the collapsed legacy interface", async () => {
-  const source = await readFile(layoutUrl, "utf8");
+test("home frame keeps historical interface separate from public routes", async () => {
+  const layout = await readFile(layoutUrl, "utf8");
+  const source = await readFile(new URL("../components/GovIntelFrame.js", import.meta.url), "utf8");
   const dashboardIndex = source.indexOf("<V2DailyDashboard />");
   const legacyIndex = source.indexOf("legacy-system-details");
   const childrenIndex = source.indexOf("{children}");
   assert.ok(dashboardIndex >= 0, "V2 dashboard must be rendered");
   assert.ok(legacyIndex > dashboardIndex, "legacy interface must follow V2");
-  assert.ok(childrenIndex > legacyIndex, "legacy children must remain inside the collapsed section");
+  assert.ok(childrenIndex > legacyIndex, "historical home children remain inside the collapsed section");
+  assert.match(source, /\) : children}/, "other routes must be visible outside historical details");
+  assert.match(layout, /GovIntelFrame/);
   assert.match(source, /GovIntel AI/);
 });
 
