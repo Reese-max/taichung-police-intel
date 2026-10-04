@@ -41,13 +41,41 @@
       "results": null
     }
   },
-  "v6_arms_note": "v6 另立明確版本與 method ID；上方 arms 的 v1 定義與歷史結果保持凍結，不靜默改寫。v6 情境在 eval/gold/v6/commute-reopen-v1/，fingerprint govintel/v6/commute-reopen-replay-evaluation/v1。",
+  "v6_arms_note": "Schema 2 的 arms 是送件 v6 的規劃方法，完整方法執行與真人時間仍 NOT_RUN。下方 v6_arms 只標示獨立的合成 deterministic policy replay；不代表搜尋摘要或語意 AI 消融已執行。歷史 v1 定義與結果凍結在 eval/gold/v1/manifest.json，並非保留在本檔相同 arms keys。",
   "v6_dataset": "govintel-gold-v6-commute-reopen-v1",
   "v6_arms": {
-    "A_v1": {"method_id": "A_v1_manual_same_sources_same_cutoff", "status": "NOT_RUN", "human_timing_status": "NOT_RUN", "results": null},
-    "B_v6": {"method_id": "B_v6_same_scope_search_generic_summary", "status": "REPLAYED", "human_timing_status": "NOT_RUN", "results": null},
-    "C_v6": {"method_id": "C_v6_full_query_and_tracking", "status": "REPLAYED", "human_timing_status": "NOT_RUN", "results": null},
-    "C_RULES_ONLY": {"method_id": "C_RULES_ONLY_v6_rules_only_no_semantic", "status": "REPLAYED", "human_timing_status": "NOT_RUN", "results": null}
+    "A_v1": {
+      "method_id": "A_v1_manual_same_sources_same_cutoff",
+      "status": "NOT_RUN",
+      "human_timing_status": "NOT_RUN",
+      "results": null,
+      "method_execution_status": "NOT_RUN",
+      "evaluation_scope": "SYNTHETIC_DETERMINISTIC_POLICY_REPLAY"
+    },
+    "B_v6": {
+      "method_id": "B_v6_same_scope_search_generic_summary",
+      "status": "REPLAYED",
+      "human_timing_status": "NOT_RUN",
+      "results": null,
+      "method_execution_status": "NOT_RUN",
+      "evaluation_scope": "SYNTHETIC_DETERMINISTIC_POLICY_REPLAY"
+    },
+    "C_v6": {
+      "method_id": "C_v6_full_query_and_tracking",
+      "status": "REPLAYED",
+      "human_timing_status": "NOT_RUN",
+      "results": null,
+      "method_execution_status": "NOT_RUN",
+      "evaluation_scope": "SYNTHETIC_DETERMINISTIC_POLICY_REPLAY"
+    },
+    "C_RULES_ONLY": {
+      "method_id": "C_RULES_ONLY_v6_rules_only_no_semantic",
+      "status": "REPLAYED",
+      "human_timing_status": "NOT_RUN",
+      "results": null,
+      "method_execution_status": "NOT_RUN",
+      "evaluation_scope": "SYNTHETIC_DETERMINISTIC_POLICY_REPLAY"
+    }
   },
   "result_fields_required_per_arm": [
     "task_count",
@@ -157,5 +185,6 @@
     "commit": null,
     "results": null,
     "use": "Historical product comparison only; not B or the semantic-off arm."
-  }
+  },
+  "v6_arms_scope": "SYNTHETIC_DETERMINISTIC_POLICY_REPLAY"
 }

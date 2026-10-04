@@ -32,11 +32,15 @@ npm --prefix apps/web run dev
 
 本地`http://localhost:3000`展示此 checkout 的已驗收能力；v6 candidate 路徑為 `/public-query/`、`/tracking/`、`/sources/`，首頁主導覽提供入口，既有議會 dashboard 保留。確認它與 production 是不同版本，不把未部署 PR 寫成公開可用。公開[demo](https://reese-max.github.io/taichung-police-intel/)保留來源 health／gap 與官方影音 path。
 
+在 `/public-query/` 的 D1 卡片切換臺中 29 區，核對人口／戶數／行政區碼、**112 年 12 月（2023-12）**、官方來源、CSV hash 與取得收據。這是實際官方固定期別樣本，不是 synthetic 道路資料；仍為未 promotion 的歷史背景，不能拿 JSON service 的 114Y12M 或擷取日期當同一期／現況。D2 尚缺官方 resource bytes／CRS；不用模擬名錄補成已取得。
+
 讀[公開 source-status](https://reese-max.github.io/taichung-police-intel/data/source-status.json)的 generation、generated_at、source health、freshness／window 與 LKG。日期化成功證據是[37169331249](https://github.com/Reese-max/taichung-police-intel/actions/runs/37169331249)與[37212963039](https://github.com/Reese-max/taichung-police-intel/actions/runs/37212963039)；最新公開 readback 詳見[狀態頁](CURRENT_STATUS.md)。HTTP200 不能推出所有來源新鮮或世界沒有事件。
 
 ## v6 候選驗收
 
 [PR124 查詢](https://github.com/Reese-max/taichung-police-intel/pull/124)、[125 追蹤](https://github.com/Reese-max/taichung-police-intel/pull/125)、[126 評測](https://github.com/Reese-max/taichung-police-intel/pull/126)須各在固定 code SHA 重播。query→保存→重開站→工期延長→已讀→明文解除→取消為主流程；排版、轉載、失敗、過期、同名不同日與過度去重是負向情境。根據[ACCEPTANCE_CHECKLIST](ACCEPTANCE_CHECKLIST.md)記錄結果，不能因 PR 可合併或 unit pass 而自行宣稱已部署。
+
+本輪已本地整合並修正 release／詳情失效、每日時段與延期追蹤；最終整合測試／瀏覽器狀態見 [VERIFICATION](VERIFICATION.md)。合成道路用 09:00–17:00 每日時段，結束日 10/7→10/9，解除要另有 10/9 17:00 的明文；來源失敗、公告消失與到期均不可推算解除。
 
 ## 判讀成果
 

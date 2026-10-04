@@ -85,7 +85,7 @@
     "model_generated_labels_are_gold": false,
     "synthetic_cases_must_be_marked": true
   },
-  "method_version_note": "v1 模板 docs/govintel/competition-2026/evaluation-manifest.template.json 的 B 定義（same_new_workflow_without_semantic_AI）與歷史結果保持凍結；v6 的 B 以 B_v6 另立明確 method ID，不靜默改寫。",
+  "method_version_note": "Historical v1 comparison definitions are archived at main@562141e396c693e115b3fce10594c434c401a58e:docs/govintel/competition-2026/evaluation-manifest.template.json; that immutable historical template defined B as the same workflow with semantic AI disabled. The current schema-2 template follows submitted v6: B is same-scope search plus general summary and the separate semantic-off arm preserves C interface/data/tracking/read rules. Those complete v6 methods remain NOT_RUN; this dataset only replays synthetic deterministic policy proxies and does not execute search-summary or semantic AI ablation.",
   "observation_statuses": [
     "NEW_UPDATES",
     "NO_NEW_ITEMS",

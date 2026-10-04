@@ -21,7 +21,7 @@
 | 查詢完成時間 | 相對 A 中位耗時降低至少 30%，正確性不降低；包含開原文、理解條件與修正 | `NOT_RUN`／null |
 | 站內重要更新 | 每次指定開站時點「已取得、符合條件、未讀、實質」更新為分母；precision≥85%，recall≥90% | `NOT_RUN`／null |
 | 重複／誤列 | 已讀、純排版、同源轉載不多列重要提示；不同實質更正不被去重漏掉；取消後不提示 | `NOT_RUN`／null |
-| 資料與背景限制 | D1 固定 112/12 期別；D2 名稱／地址／電話／座標可核對；限制理解與欄位正確性 | `NOT_RUN`／null；D1/D2 尚未取得驗收 |
+| 資料與背景限制 | D1 固定 112/12 期別；D2 名稱／地址／電話／座標可核對；限制理解與欄位正確性 | 真人比較 `NOT_RUN`／null；D1 官方樣本／欄位已核對，本地 UI 已實作但未 promotion；D2 resource 403／CRS 未驗證 |
 | 來源取得缺漏 | 未取得來源／文件另報，不以已取得資料的高召回代表全網涵蓋 | 未完成 promotion；公開基線仍`PARTIAL` |
 | 成本 | 每查詢、有效更新、追蹤條件的 model／運算／儲存／人工成本；有模型時保存當時費率 | `NOT_RUN`／null |
 | 真人體驗 | 經同意匿名使用者同等難度任務／方法順序輪替，記錄時間、正確性、漏件與困難 | `NOT_RUN`／null；個人試用不是機關採用 |
@@ -43,3 +43,5 @@ python3 -X utf8 scripts/verify-source-policy-integration.py --self-check
 [Manifest template](evaluation-manifest.template.json)保持結果 null；每次研究填入 commit、data hash、split、cutoff、方法與工具版本、分母、失敗、時間與成本。若來源未通過，先交付明示 cutoff 的 offline query／tracking replay；不宣稱持續最新服務。
 
 原始同意書、participant 紀錄與個人追蹤保持私有；公開成果只放已核准的匿名彙總與合法 fixture。
+
+目前資料包是固定合成工程案例，不是已完成獨立事件保留集或實際模型品質研究。語意 AI／同介面消融與真人 A/B/C 必須實際執行後另留 receipt；D1 合法取得與 UI 可讀，不能代替使用者背景查詢耗時／限制理解的比較。

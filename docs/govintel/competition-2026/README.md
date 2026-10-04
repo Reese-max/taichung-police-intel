@@ -17,9 +17,10 @@
 ## 目前可說的結論
 
 - Oct 4 [run 37169331249](https://github.com/Reese-max/taichung-police-intel/actions/runs/37169331249)實際重新蒐集，五個公開檔案 hash 與 Gateway check 通過；稍後 [37212963039](https://github.com/Reese-max/taichung-police-intel/actions/runs/37212963039)也成功。
-- 資料仍為 `PARTIAL`，S-007 陳舊、S-029 失敗；候選來源尚未 promotion，没有每日新增 100–200 筆的證據。
+- 資料仍為 `PARTIAL`，S-007 陳舊、S-029 失敗；候選來源尚未 promotion，沒有每日新增 100–200 筆的證據。
 - v6 首期功能的 candidate／local acceptance、public deployment、真人成效各自驗收，不互相替代。
-- D1／D2 取得與用途驗收、語意 AI、實際人員 A／B／C 研究仍未由目前 receipts 證明。
+- D1 已取得指定 112Y12M 官方歷史 CSV，驗證 368 國內記錄、臺中 29 區，並整合本地背景查詢；未 promotion，真人任務效益未測。D2 官方 bytes 仍 403／CRS 未驗證，Twinkle 既有連線需重新認證。
+- 本地已驗證版本 `3a06754…`：完整 gate PASS、Web 406/406、runtime 26/26、v6 browser 22/22，served `BUILD_ONLY` release／三檔 hash 綁定。[VERIFICATION](VERIFICATION.md)保存 scope；v6 新功能正式部署仍待驗證。語意 AI、獨立事件保留集與經同意真人 A／B／C 仍未執行，不預填成功。
 - v6 與補件寄送完成；主辦受理／更名回覆仍未確認。
 
 ## 文件索引
@@ -33,8 +34,9 @@
 | 哪些來源、資料期別與限制？ | [DATA_SOURCE_MATRIX.md](DATA_SOURCE_MATRIX.md) |
 | 資料流與責任邊界？ | [ARCHITECTURE.md](ARCHITECTURE.md)、[LIMITATIONS_AND_SAFETY.md](LIMITATIONS_AND_SAFETY.md) |
 | 目標與成果是否混寫？ | [EVALUATION.md](EVALUATION.md)、[manifest template](evaluation-manifest.template.json) |
+| 哪些本輪驗證已完成、還缺什麼？ | [VERIFICATION.md](VERIFICATION.md)、[來源稽核](SOURCE_RELIABILITY_REVIEW_2026-10-05.md) |
 | 舊版本與本次新增？ | [OLD_VS_NEW.md](OLD_VS_NEW.md)、[Historical](../historical/README.md) |
 
 ## 歷史規劃與證據
 
-[GOVINTEL_PLAN.md](../GOVINTEL_PLAN.md)、[DATA_SOURCE_STRATEGY.md](../DATA_SOURCE_STRATEGY.md)保留原有技術規劃；首期定位與評測方法以送件 v6 對照為準。[PUBLICATION_RECOVERY.md](PUBLICATION_RECOVERY.md)與[VERIFICATION.md](VERIFICATION.md)是日期化歷史紀錄，不替代現在的 Actions／公開 receipts。Kiro deadline、影片與送件包位於 [Historical](../historical/README.md)。
+[GOVINTEL_PLAN.md](../GOVINTEL_PLAN.md)、[DATA_SOURCE_STRATEGY.md](../DATA_SOURCE_STRATEGY.md)保留原有技術規劃；首期定位與評測方法以送件 v6 對照為準。[PUBLICATION_RECOVERY.md](PUBLICATION_RECOVERY.md)保留歷史根因；[VERIFICATION.md](VERIFICATION.md)分開本輪整合與舊紀錄，不替代正式 Actions／公開 receipts。Kiro deadline、影片與送件包位於 [Historical](../historical/README.md)。

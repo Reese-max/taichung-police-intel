@@ -9,17 +9,18 @@
 - [ ] **v1→v2→v3**：結束日延長但每日時段／範圍不變；轉載／純排版不重複列重要提示；解除要明文；來源失敗／消失／到期不自動解除；取消後停止該條件提示。
 - [ ] **故障與版本**：LKG 與 freshness／coverage 分開；混合 generation 拒絕；來源變更不沿用已失效的答案；未受影響內容不任意改寫。
 - [ ] **評測 replay**：真實／合成分開；開發／保留集按事件切分；相同 cutoff／指定重開時點；答案人工標註；報命中、誤列、漏列、重複、拒答與分母，零分母 null。
-- [ ] **可重播交付**：乾淨 checkout、lockfile、完整工程 gate、瀏覽器主流程與失敗情境；不用付費模型才能重播離線基礎。
+- [x] **本地可重播交付**：已提交乾淨 `3a06754…`、lockfile、完整 gate、同 checkout runtime 26/26、實際 v6 browser 22/22、served BUILD_ONLY release／三檔 hash 綁定；[receipt](current-checkout-verification-20261005.json)。不用付費模型重播此離線工程範圍，不代表 production／真人成效。
 
 ## 不能由本地驗收自動勾選的項目
 
 - [ ] **部署**：實際 main SHA、產物、公開匿名 readback／hash 與 query／tracking 瀏覽器操作；當前 run 成功不涵蓋尚未部署的 PR 功能。
 - [ ] **四類來源 promotion**：S-001／S-032／S-033／S-031 逐項七個有效觀察日，加權利／欄位／完整性／敏感內容與 policy 核准；不自動因日數達標啟用。
-- [ ] **D1／D2**：固定期別人口、機關名錄原始檔與 hash、欄位／座標／授權／用途驗收；現有其他人口 dataset 不可代替 D1。
+- [x] **D1 官方固定樣本**：112Y12M 原生 CSV、368 國內記錄／臺中 29 區、數值／代碼／hash／來源與授權已核對，本地 query 背景 UI 已整合；本輪另驗正值、錯期別與 hash mutation。這一勾不代表 production promotion 或真人效益。
+- [ ] **D2 與背景用途**：D2 官方資源 403，未取得資料列／CRS；D1／D2 的真人查詢與限制理解比較未跑。現有其他人口 dataset 或 114Y12M service 不可代替 D1。
 - [ ] **AI**：固定模型／prompt／輸入輸出／成本、實際 provider receipt、錯誤／拒答與語意 off 消融；規則 replay 不是模型效果。
 - [ ] **真人**：經同意的人員任務、匿名原始紀錄私有保存、A/B/C 相同問題與回查時點；時間包含核對／修正；未跑不填 85%／90%／30% 達成。
 - [ ] **完整發布**：Oct 4 晨晚與公開 hash 已有成功 receipt；核對 #20 尚餘失敗／恢復條件，先在隔離流程演練，不刻意破壞 production。
-- [ ] **媒體介接**：Taiwan Intel live 交換、授權、14 日 shadow；media 與 official 分列，同源转載不增加獨立佐證。
+- [ ] **媒體介接**：Taiwan Intel live 交換、授權、14 日 shadow；media 與 official 分列，同源轉載不增加獨立佐證。
 - [ ] **主辦與權利**：受理／更名／資格／團隊與權利官方確認；寄出不等於受理，個人試用不等於機關採用。
 
 ## 可接受的縮小交付

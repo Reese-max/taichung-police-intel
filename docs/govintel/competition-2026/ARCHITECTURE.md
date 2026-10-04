@@ -37,7 +37,9 @@ PR124 query、125 tracking、126 replay 在驗收中。關閉網站時不提供�
 
 SourcePolicy、locatedfacts、角色 projection、ReviewInbox 與 PublicEvent fixture 已有受限核心。deterministic keyword 或時段規則不能冒充語意模型；AI 理解／抽取／融合／修訂須另有 provider、prompt、輸出、失敗及成本 receipt。
 
-D1 固定 112 年 12 月人口與 D2 警察機關名錄尚缺下載／欄位／座標／用途驗收。四類官方候選尚需有效觀察／完整性／權利與 promotion；媒體發現尚需 live／14 日 shadow。日期、未知與衝突保留，不從來源消失或預定日期推論解除。
+D1 已取得固定 112Y12M 官方 CSV，核對全國 368 記錄與臺中 29 區；本地 query UI 提供行政區選單、人口／戶數／代碼、來源與 hash。這是 `VERIFIED_HISTORICAL_BACKGROUND_SAMPLE`，未 promotion，不能用 114Y12M JSON service 或取得時鐘代替其歷史期別。D2 metadata 可取得，但官方 ZIP／native TGOS 403，資料列／CRS 未驗證。真人用途效益、語意 AI 與保留集品質另驗。
+
+四類官方候選及額外 S-019 尚需有效觀察／完整性／權利與 promotion；本地 workflow 補入 S-019 不會自動產生七日證據。媒體發現尚需 live／14 日 shadow。日期、未知與衝突保留，不從來源消失或預定日期推論解除。
 
 ## 控制與安全
 

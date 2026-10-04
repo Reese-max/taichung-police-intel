@@ -1,8 +1,43 @@
-# Historical verification record
+# GovIntel AI－驗證紀錄與未完成閘門
+
+## 2026-10-05 本地整合與來源查核
+
+部署基準仍為 `main@562141e`；本輪正式執行完整 gate／同 checkout runtime 的已提交、乾淨程式版本為 **`3a06754a2428023bf316d8cb180f239f9c3b971d`**。2026-10-05 01:47–01:48 Asia/Taipei 執行 loopback runtime；文件後續修訂不改寫這份 tested SHA。正式部署與其後匿名 readback 尚未完成，不能把 `BUILD_ONLY` release 當 production receipt。
+
+| 範圍 | 目前可留存的結論 | 不能由此宣稱 |
+|---|---|---|
+| 本地 query／tracking／sources | 已整合 candidate，入口為 `/public-query/`、`/tracking/`、`/sources/`；release mismatch、未知與來源失敗各自處理 | 已正式部署、跨裝置／關站推播、真實資料完整涵蓋 |
+| D1 固定期別官方取得 | [原始取得與驗證樣本](segis-112Y12M-taichung.verified.json)：112Y12M／2023-12，全國 368 記錄、臺中 29 區；本地 query 頁可選區查看人口／戶數與收據 | 目前人口、人潮、受影響人數或已實測任務價值 |
+| D2／Twinkle | [D2 metadata 200／官方 resource 403](background-source-observations-2026-10-05.json)，資料列／CRS 未驗證；Twinkle 既有連線需重新認證 | 已取得可用名錄、已驗證座標或同源取得路徑增加獨立證據 |
+| Source reliability | [日期化稽核與 focused checks](SOURCE_RELIABILITY_REVIEW_2026-10-05.md)；本地修正 proxy、request budget、無日期列表與 S-019 漏驗 | 外部來源已恢復、七個合格觀察日、已核准 promotion |
+| PostgreSQL migration | 已在 PostgreSQL 16 實際執行 `test_migration_applies_to_postgresql`，1/1 PASS；最終完整 gate 另提供 `TEST_DATABASE_URL` | 不能把資料庫 schema 通過當來源／UI／部署或真人驗收；既有無 DB 的 skipped 紀錄仍保留日期 |
+| 合成政策 replay | [v6 工程協定](EVALUATION.md)、[資料 manifest](../../../eval/gold/v6/commute-reopen-v1/manifest.json)；政策代理與完整方法執行分開 | 已跑 B 搜尋摘要、C 語意 AI、真人 A/B/C、獨立保留集品質 |
+| 實際 Chromium UI 觀察 | [2026-10-05 01:44 有限 UI receipt](browser-ui-observation-20261005.json)22/22 PASS：保存／重開／UPD-005 延長／已讀／UPD-006 明文解除／取消、錯誤／範圍／手機與 D1 正值／wrong-period／hash mutation | served release binding 為 `NOT_RUN`（該 loopback 的 release.json 404）；driver SHA 不是 server SHA，不能當最終同 checkout 或正式部署成功 |
+| 最終同 checkout runtime | [本輪 compact receipt](current-checkout-verification-20261005.json)：26/26 PASS、無未執行 runtime checks、code SHA／lockfile／publication generation 綁定；HTTP／STDIO、mixed-generation、失敗退回與 sabotage 均核對 | loopback 與 preserved snapshot 不能代表正式公開部署、即時來源或領域完整涵蓋 |
+| 嚴格同 checkout 瀏覽器 | [本輪 browser receipt](browser-verification-20261005.json)：既有 journey 13/13、v6 22/22；served code SHA=`3a06754…`、`BUILD_ONLY` release ID=`b9ea34d04868e4aabe7b965550705d8d6e39fa4e83db51c2a8b4113067a97ad3`、feed/status/brief 三檔 hash 綁定 PASS | 有限 UI 情境不是模型／真人／保留集效益；不能沿用較早未綁版本 observation 的 driver SHA |
+| 完整工程 gate | 同一 `3a06754…` 執行 `npm run check`：`VERIFY_OK mode=full required=126 specs=4 secrets=0`；Web 406/406、0 fail，PostgreSQL 16 actual migration 有執行 | Web bridge 與其 Python suites 不重複加成獨立產品／真人案例數；成功 gate 不等於資料新鮮 |
+
+道路合成序列固定為 10 月 5–7 日、每日 **09:00–17:00**；延長只把結束日從 **10/7 改為 10/9**；v3 明文解除時間為 **10/9 17:00**。事件期程、每日時段、觀測／發布時點各自保存，不能推算道路現場安全，也不能從到期／消失推論解除。
+
+瀏覽器操作可核對原文連結與官方影音導航，但「點得開連結／導覽正確」不等於來源回應 HTTP 200、內容新鮮或答案準確；匿名 HTTP／bytes、資料涵蓋與人工答案判定另驗。
+
+尚待完成：受保護流程 review／merge 與真實部署 readback、七日來源資格／promotion、release supersession audit、D2 取得／CRS、獨立事件保留集、實際語意 AI 與經同意真人 A/B/C。v6 的 85%／90%／30% 仍為目標；結果空白不填成功。主辦受理／更名仍待回覆。[驗收清單](ACCEPTANCE_CHECKLIST.md)逐項保存證據。
+
+重播本輪工程驗證：
+
+```bash
+# 完整 gate 的資料庫 integration lane 使用可用的 TEST_DATABASE_URL；不公開其值。
+npm run check
+python3 -X utf8 scripts/verify-current-checkout.py --mode full --output runtime-evidence/current-checkout/replay
+```
+
+命令在新的 checkout 會產生該版本自己的 receipt，不會自動變成上列固定 `3a06754…` 的證據。歷史保存快照與合成道路都保留日期／分類，latency、真人與模型指標仍 null／NOT_RUN。
+
+## 2026-09-16 歷史驗證紀錄
 
 日期：2026-09-16。基準 main：`e1d081bd04824c062c7ee99e7d74f9e478240743`。
 
-本頁保留當日 PR／candidate 的驗證邊界，不是目前 main、目前公開資料或本次 judge path 的最新 receipt。請以 [CURRENT_STATUS.md](./CURRENT_STATUS.md) 和其 dated Actions link 為現況。
+以下保留當日 PR／candidate 的驗證邊界，不是目前 main、目前公開資料或本次 judge path 的最新 receipt。請以本頁上方與 [CURRENT_STATUS.md](./CURRENT_STATUS.md) 的日期化證據為準。
 
 ## 證據取得與變更邊界
 

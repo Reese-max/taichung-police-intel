@@ -15,7 +15,8 @@ The [2026 GovIntel competition entry](./docs/govintel/competition-2026/README.md
 | Public query, browser-only tracking and v6 evaluation workflow | `IMPLEMENTED_NOT_PRODUCTION` | [PR #124](https://github.com/Reese-max/taichung-police-intel/pull/124), [#125](https://github.com/Reese-max/taichung-police-intel/pull/125), [#126](https://github.com/Reese-max/taichung-police-intel/pull/126) are acceptance candidates; a PR or local pass is not deployment. |
 | Police／traffic／city／fire source expansion | `CANDIDATE_CANARY` | Four independently observed candidates: S-001／S-032／S-033／S-031. Active policy still contains only the five baseline sources. |
 | Located facts, handoff, Review Inbox and PublicEvent fixture | `IMPLEMENTED_NOT_PRODUCTION` | Replayable core; PublicEvent remains `FIXTURE_ONLY`, without production fusion or multi-user approval. |
-| D1 population, D2 police-directory query, semantic AI, external notifications and cross-device accounts | `DESIGN_ONLY` | Requirements exist; downloaded/accepted D1／D2, model quality and human benefit are not established. |
+| D1 fixed-period population query | `IMPLEMENTED_NOT_PRODUCTION` | Official 112Y12M／2023-12 CSV verified: 368 national records, all 29 Taichung districts; local query UI provides the historical sample. It is unpromoted background, not current population or measured task benefit. |
+| D2 police-directory query, semantic AI, external notifications and cross-device accounts | `DESIGN_ONLY` | D2 metadata is available but official TGOS resource bytes return 403; coordinates and records remain unverified. Model quality and human benefit have not been measured. |
 | Complete publication acceptance and source promotion | `BLOCKED` | Successful dated runs do not replace missing [#20](https://github.com/Reese-max/taichung-police-intel/issues/20) failure/recovery evidence or source promotion reviews. |
 
 **Dated evidence:** [run 37169331249](https://github.com/Reese-max/taichung-police-intel/actions/runs/37169331249), started 2026-10-04 10:22 Asia/Taipei, performed collection and passed publication/hash/Gateway verification. [Run 37212963039](https://github.com/Reese-max/taichung-police-intel/actions/runs/37212963039) also succeeded later that day. S-007 was stale and S-029 failed in the reviewed snapshot; no evidence supports 100–200 new items per day. Read the live receipt's own date before using it. Proposal v6 and the supplement are complete; organizer acceptance and the proposed name change remain unverified.
@@ -26,7 +27,7 @@ Release manifest、Pages／Worker／Query 版本核對與 #62 完整驗收狀態
 
 1. Read the [current status and claim/evidence table](./docs/govintel/competition-2026/CURRENT_STATUS.md).
 2. Follow the [3–5 minute judge path](./docs/govintel/competition-2026/JUDGE_PATH.md) using the current build and `FIXTURE_ONLY` receipts.
-3. Open the local or [public demo](https://reese-max.github.io/taichung-police-intel/), inspect source health／gaps, open the evidence drawer, search `警察局`, and seek the official video timestamp.
+3. In the integrated local candidate, open `/public-query/`, `/tracking/` and `/sources/`; query the synthetic road, inspect its revisions, save conditions and reopen the same browser. The query page also exposes D1's fixed 2023-12 district background. The [public demo](https://reese-max.github.io/taichung-police-intel/) remains the dated production baseline until a new deployment is verified.
 4. Read the [old-vs-new delta](./docs/govintel/competition-2026/OLD_VS_NEW.md), [evaluation results boundary](./docs/govintel/competition-2026/EVALUATION.md), and [limitations／safety](./docs/govintel/competition-2026/LIMITATIONS_AND_SAFETY.md).
 
 ## Historical boundary
@@ -50,6 +51,8 @@ The public baseline preserves council preparation and evidence navigation. Plan 
 - An evidence drawer with official HLS playback, searchable transcript segments, and word-level timestamp navigation.
 - A Traditional Chinese / English toggle covering the primary journey while preserving the official Chinese transcript as labelled navigation text.
 - A static-export deployment path that needs no paid database or application server.
+
+The integrated v6 candidate adds public-query, same-browser tracking and a verified D1 historical-background selector. Local implementation and source verification do not establish production deployment, held-out accuracy, semantic-AI benefit or human task time. Current receipts and pending gates are listed in [Verification](./docs/govintel/competition-2026/VERIFICATION.md) and the [source reliability review](./docs/govintel/competition-2026/SOURCE_RELIABILITY_REVIEW_2026-10-05.md).
 
 ## Architecture
 

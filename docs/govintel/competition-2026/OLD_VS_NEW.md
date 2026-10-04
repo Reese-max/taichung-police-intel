@@ -10,7 +10,7 @@
 | 版本 | identity、hash、LKG、source status 與異動核心 | 未讀重要更正、純排版去重、明文解除、取消條件；合成道路 v1/v2/v3 與真實 sample 分開。 |
 | 追蹤 | local-first handoff／ReviewInbox | 同一瀏覽器條件與已讀，開站／刷新比對；無關站 push 或跨裝置帳號。handoff／研究匯出列後續。 |
 | AI | fixture／規則與 locatedfacts／fusion 核心 | 語意查詢／抽取／修訂規劃；keyword 與 deterministic replay 不是 model 結果，尚缺 AI 驗收。 |
-| 背景 | 候選人口／法規／統計／機關清冊 | D1 固定 112/12 期、D2dataset5958 需要取得與驗收；不能推現況人流或管轄。 |
+| 背景 | 候選人口／法規／統計／機關清冊 | D1 112Y12M 官方 CSV 已核對／本地臺中 29 區背景選單已實作，未 promotion；D2 dataset5958 metadata 可取得但 resource 403，CRS 未驗證。不能推現況人流或管轄。 |
 | 評測 | 舊 A/B0/B/C 技術計畫與工程 receipts | v6 A 官方人工、B 同 scope 搜尋摘要、C 產品、同介面 semantic-off；真人與模型執行仍 NOT_RUN，fixture policy 另外報。 |
 | 發布 | 歷史 protected-main 推送失敗 | publication-state 已合併；Oct4 collection／五檔 hash／Gateway 通過，但 PARTIAL 資料、來源 promotion 與#20 剩餘 failure/recovery 另驗。 |
 

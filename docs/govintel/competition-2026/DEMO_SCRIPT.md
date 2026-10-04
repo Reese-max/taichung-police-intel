@@ -44,7 +44,9 @@ v3 另有 10 月 9 日 17:00 起解除的明文；讀取後不重複提示該次
 
 展示[最新日期化 receipt](CURRENT_STATUS.md)與[驗收清單](ACCEPTANCE_CHECKLIST.md)。Oct4 production collection、五檔 hash／Gateway 通過，但仍`PARTIAL`，S-007 陳舊／S-029 失敗，四類候選未正式啟用。
 
-D1／D2 與語意 AI／真人比較仍未驗收；若無真實數據，85%／90%／30% 只說目標。工程 fixture 的命中與用時不能當真人或 AI 效益。補件寄送完成，主辦受理／更名仍未確認。
+在 query 的 D1 卡片切換臺中 29 區，核對 112 年 12 月（2023-12）人口／戶數、原始 CSV hash 與官方來源；這是已核對歷史樣本，未 promotion，不能算現況人口／人潮。D2 官方 resource 403，不能以未核對名錄或座標補畫成功。
+
+語意 AI、獨立保留集與真人比較仍未完成；85%／90%／30% 只說目標。工程 fixture 的命中與用時不能當真人或 AI 效益。最終整合驗收狀態看 [VERIFICATION](VERIFICATION.md)；補件寄送完成，主辦受理／更名仍未確認。
 
 ## 既有基礎與故障備援
 

@@ -24,16 +24,18 @@
 | S-033 市政 | 同上；[市政新聞 83551](https://data.gov.tw/dataset/83551) | `CANDIDATE_CANARY`；83551 與同源市政公告不增加獨立佐證。 |
 | S-031 消防 | 同上 | `CANDIDATE_CANARY`；短生命週期 snapshot 附觀測時間／涵蓋；消失不等於解除，列數不等於完整事件數。 |
 
-獨立每日 workflow 矩陣是 S-001／S-032／S-033／S-031，**不是加上 S-019 的五類首期來源**。七個有效觀察日只驗證窗口；完整性、權利／敏感內容、可回查版本、核准 promotion 與公開 readback 另需通過。S-019 市政會議及其他 catalog 候選維持未啟用。沒有每日新增 100–200 筆的證據。
+部署基準 `main@562141e` 的獨立每日 workflow 觀察 S-001／S-032／S-033／S-031，漏了 catalog promotion-plan 的 S-019。本地整合已補入 S-019，驗證器要求五個計畫來源各有有效觀察日，避免從未出現在 receipt 的來源被漏驗；這沒有製造七日證據，也沒有把 v6 首期四類改成五類。完整性、權利／敏感內容、版本、核准 promotion 與公開 readback 另需通過。S-019 及四類候選均未啟用，沒有每日新增 100–200 筆的證據。
 
 ## v6 指定背景資料
 
 | 資料 | 送件／現況 | 驗收與限制 |
 |---|---|---|
-| D1 [SEGIS](https://segis.moi.gov.tw/STATCloud/Index)112 年 12 月鄉鎮市區人口／戶數 | `DESIGN_ONLY`；送件時未下載，目前未留取得／用途驗收 receipt | 固定期別、行政區碼、數值、授權與 hash；不是目前人口、人潮或影響人數。CTX-POP103703 與其他人口 dataset 不能冒充 D1。 |
-| D2 [dataset5958](https://data.gov.tw/dataset/5958)警察機關地址名錄 | `DESIGN_ONLY`；送件時未下載，目前未留取得／座標驗收 receipt | 名稱、地址、電話與座標參考系統核對；標「機關參考，管轄另行確認」，不推論管轄／派遣／警力。 |
+| D1 [SEGIS](https://segis.moi.gov.tw/STATCloud/Index)112 年 12 月鄉鎮市區人口／戶數 | `IMPLEMENTED_NOT_PRODUCTION`；送件時未下載，本輪已取得固定 CSV、[驗證樣本](segis-112Y12M-taichung.verified.json)及本地 UI | 全國 368 記錄／臺中 29 區，代碼、人口／戶數、合計與 hash 已核對；`production_active=false`。不是目前人口、人潮或影響人數，真人用途效益未測。 |
+| D2 [dataset5958](https://data.gov.tw/dataset/5958)警察機關地址名錄 | `DESIGN_ONLY`；metadata 200，官方 TGOS ZIP／原生頁面 403，資料列未取得 | [receipt](background-source-observations-2026-10-05.json)保留失敗；POINT_X/Y 不足以證明 CRS。地址／電話／座標內容未驗證，不能推論管轄／派遣／警力。 |
 | S-026／S-028／其他 reference | catalog 與既有 canary／fixture | 各來源另需驗收，不因列名而變 production，背景資料不作即時事件。 |
 | Taiwan Intel 媒體 | [discovery replay](../../../scripts/discovery-adapter.py)、[設計](../issue-27-discovery-adapter.md) | 固定 fixture 可重播；正式 live 與 14 日 shadow 尚需證據。72 小時、200 項、256KB 為交換上限，非每日新增。 |
 | Twinkle | [混合策略](../TWINKLE_HYBRID_SOURCES.md)、[overlay](../twinkle-source-overlay.v1.json) | `DESIGN_ONLY`；與 direct-official 是取得路徑，不算兩個原始佐證。不是 v6 首期必備 runtime。 |
 
 每筆結果保留官方 URL、文件版本／hash、發布／觀測／適用時間與未知欄位。健康、過期、部分涵蓋、來源失敗與有效零筆各自呈現；資料取得限制不得被高 fixture 分數掩蓋。
+
+D1 由官方固定期別頁的原生 CSV 下載流程取得；同頁 JSON open service 回傳的是 **114Y12M**，不是 112Y12M，未用它覆寫歷史樣本。原始 CSV SHA256 `95500e06310098d4c194a26e4aeba00e7142d5c9e441a62fe18f71250d65496b`；變更聲明與授權／來源均在樣本。其他人口 dataset 也不能替代本期。D2 的原生瀏覽器與合法官方 referrer 仍未恢復存取，兩個 Twinkle 既有連線需重新認證；這些失敗不會被當成成功取得。

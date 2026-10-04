@@ -11,8 +11,8 @@
 | p3 測試道路 v1 原公告、v2 延長、v3 明文解除 | [展示腳本](DEMO_SCRIPT.md)、待驗收候選及固定 replay | 10/7→10/9 只變結束日，9:00–17:00 與 A–B 範圍不變；排版／轉載不多列重要提示；日期到期、來源失敗或消失不能推論解除。全部明示合成。 |
 | p4 AI 理解查詢、抽取時間與範圍、候選融合、修訂判讀 | 既有 [located facts](../../../intel_v2/located_facts.py)、[fusion](../../../scripts/public-event-fusion.py)核心 | deterministic／keyword／fixture 不是已完成 semantic AI；模型、prompt、資料 hash、失敗與成本須另留 receipt。目前沒有 provider quality 或 AI 增益證據。 |
 | p4 查詢快取依來源版本待更新／重算 | 版本／hash 基礎、待驗收 query candidate | 源版本改變時不得沿用錯誤舊摘要；未受影響內容不任意改寫，歷史補抓不是今日新增。 |
-| p5 D1 112 年 12 月鄉鎮市區人口／戶數 | [SEGIS](https://segis.moi.gov.tw/STATCloud/Index)；v6 送件時尚未下載 | 須取得固定期別、代碼／欄位／引用與用途驗收；現有 CTX-POP 不是同一資料版本。不能估計現況人口、人潮或受影響人數。 |
-| p5 D2 各縣市警察機關地址 dataset 5958 | [官方 dataset](https://data.gov.tw/dataset/5958)；送件時尚未下載 | 名稱、地址、電話、座標／參考系統須核對；顯示「機關參考，管轄另行確認」。鄰近不能推論管轄或可用警力。 |
+| p5 D1 112 年 12 月鄉鎮市區人口／戶數 | v6 送件時尚未下載；本輪已由官方固定期別 CSV 取得[樣本](segis-112Y12M-taichung.verified.json)，並提供 `/public-query/` 的臺中 29 區選單 | 全國 368 記錄、數值／代碼／hash 已核對；`production_active=false`，真人用途效益未測。JSON service 回傳 114Y12M，未冒充指定期別；不能估計現況人口／人潮。 |
+| p5 D2 各縣市警察機關地址 dataset 5958 | 送件時尚未下載；本輪 metadata 200，但官方 TGOS ZIP／原生頁面 403，[receipt](background-source-observations-2026-10-05.json) | 資料列、電話／地址、座標／CRS 尚未核對。POINT_X/Y 不能證明座標系統；顯示「機關參考，管轄另行確認」，鄰近不能推論管轄或警力。 |
 | p1、p5、p9 臺中警政／交通／市政／消防四類候選 | [矩陣](DATA_SOURCE_MATRIX.md)、[獨立觀察](../../../.github/workflows/candidate-source-observation.yml) | S-001／S-032／S-033／S-031 尚未 active；各自七個有效觀察日、完整性／權利／失敗驗收與核准 promotion。83551 與同源市政資料只算一個來源。 |
 | p5–6 Taiwan Intel 待查媒體發現層 | [discovery adapter](../../../scripts/discovery-adapter.py)、[設計](../issue-27-discovery-adapter.md) | 固定 fixture 可 replay，未證明正式 live 介接；十四日影子觀察另驗。72 小時／200 項／256KB 是交換上限，不是每日新增量。 |
 | p7–8 人工標註與 A／B／C 比較 | [PR #126](https://github.com/Reese-max/taichung-police-intel/pull/126)、[協定](EVALUATION.md)、[template](evaluation-manifest.template.json) | A 官方人工；B 同範圍搜尋加一般摘要；C 完整產品；同介面語意 AI off 消融另列。事件切分／同 cutoff，真人與合成分開；結果仍 `NOT_RUN`。 |

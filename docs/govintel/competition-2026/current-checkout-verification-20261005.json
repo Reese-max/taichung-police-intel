@@ -1,0 +1,239 @@
+{
+  "schema_version": 1,
+  "kind": "GOVINTEL_CURRENT_CHECKOUT_CANDIDATE_RECEIPT",
+  "candidate_id": "rc-3a06754a2428-20261004T174734Z",
+  "code_sha": "3a06754a2428023bf316d8cb180f239f9c3b971d",
+  "dependency_lock_hash": "d701668d36d09b126175a39ff529bf4cea1c28118f002c4a297b07b5585e7769",
+  "started_at": "2026-10-04T17:47:34.148135+00:00",
+  "verified_at": "2026-10-04T17:48:06.053302+00:00",
+  "status": "PASS",
+  "test_mode": "CURRENT_CHECKOUT_LOOPBACK_HTTP",
+  "worktree_dirty": false,
+  "production_verified": false,
+  "not_run": [],
+  "publication": {
+    "brief_sha256": "3df565c29622ae729f0f053712f513eddacf6e014aeec227ddd664dd00b38448",
+    "collection_run_id": "CR-DEMO-20260911-MORNING-SCHEDULE",
+    "feed_sha256": "f88408f49f444de0dd3a16fc864d96d9318eefc0c78f69e5d2923a9872f35121",
+    "generated_at": "2026-09-11T08:23:26+08:00",
+    "publication_status": "READY",
+    "snapshot_complete": true,
+    "snapshot_label": "PRESERVED_SNAPSHOT_NOT_LIVE",
+    "status_sha256": "1876845d854d4387fccee398fefcdebb395a36d0343d7bd2690226dc7020c51b"
+  },
+  "source_policy": {
+    "active_source_ids": [
+      "S-004",
+      "S-006",
+      "S-007",
+      "S-009",
+      "S-029"
+    ],
+    "catalog_hash": "95ae82270eaab6f6270d9c00c8122e9bcfafbaf0dd216dc575a5f0b99544c51a",
+    "policy_hash": "3404809ff40f7647c44203329d4476b12b62e9ee64df24cd1f1f46cbda59caf4",
+    "policy_version": 1
+  },
+  "limitations": [
+    "Loopback HTTP deployment only; no public Pages deployment verified",
+    "Checked-in preserved snapshot, not live data; external source failures do not affect this run",
+    "Capabilities listed under unavailable_capabilities are CAPABILITY_NOT_AVAILABLE in this candidate",
+    "No credentials are read or persisted"
+  ],
+  "checks": [
+    {
+      "detail": "query_store/system_health/source_policy imported from this checkout",
+      "id": "modules_loaded_from_checkout",
+      "status": "PASS"
+    },
+    {
+      "detail": "generation=7acadcfb6639… policy=v1",
+      "id": "candidate_context",
+      "status": "PASS"
+    },
+    {
+      "detail": "scripts/verify-publication-bundle.py exit=0",
+      "id": "publication_verifier:verify-publication-bundle",
+      "status": "PASS"
+    },
+    {
+      "detail": "scripts/verify-v2-publication.py exit=0",
+      "id": "publication_verifier:verify-v2-publication",
+      "status": "PASS"
+    },
+    {
+      "detail": "next build exit=0, out/index.html present",
+      "id": "web_build",
+      "status": "PASS"
+    },
+    {
+      "detail": "release=b9ea34d04868e4aabe7b965550705d8d6e39fa4e83db51c2a8b4113067a97ad3 evidence=BUILD_ONLY; no production deployment claim",
+      "id": "build_only_release",
+      "status": "PASS"
+    },
+    {
+      "detail": "GET / -> 200",
+      "id": "http_static_index",
+      "status": "PASS"
+    },
+    {
+      "detail": "GET /data/intelligence-feed.json -> 200, sha256 matches",
+      "id": "http_canonical_bytes_match",
+      "status": "PASS"
+    },
+    {
+      "detail": "GET /api/version -> 200, generation matches",
+      "id": "http_version_generation",
+      "status": "PASS"
+    },
+    {
+      "detail": "served generation matches built candidate",
+      "expected_generation": "7acadcfb6639c5f4367382f60e2be46c3bafc7a3a845ac7b306476c58d4089cd",
+      "id": "served_store_consistency",
+      "served_generation": "7acadcfb6639c5f4367382f60e2be46c3bafc7a3a845ac7b306476c58d4089cd",
+      "status": "PASS"
+    },
+    {
+      "detail": "GET /api/query?q=S-004&limit=3 -> 200, 1 results",
+      "id": "http_query_same_generation_bounded",
+      "status": "PASS"
+    },
+    {
+      "capability": "read_only_mcp",
+      "detail": "POST /mcp tools=5, POST /query receipt=200, hashes=match",
+      "id": "http_read_only_mcp_publication_receipt",
+      "status": "PASS"
+    },
+    {
+      "capability": "read_only_mcp",
+      "detail": "STDIO initialize/tools/list/tools/call tools=5, stderr=empty, hashes=match",
+      "id": "stdio_read_only_mcp_lifecycle",
+      "status": "PASS",
+      "transport": "stdio"
+    },
+    {
+      "detail": "expected_generation=<foreign> -> 409",
+      "id": "negative_foreign_generation_refused",
+      "negative_case": "old_generation_refused",
+      "status": "PASS"
+    },
+    {
+      "detail": "GET /api/query?source_id=S-999 -> 200 data_status=SOURCE_NOT_AVAILABLE",
+      "id": "negative_source_unavailable_distinct",
+      "negative_case": "capability_or_source_unavailable_distinct",
+      "status": "PASS"
+    },
+    {
+      "detail": "data_status=STALE (expected STALE), not collapsed into 'no events'",
+      "id": "distinguishable_data_status",
+      "negative_case": "stale_or_partial_not_no_events",
+      "status": "PASS"
+    },
+    {
+      "detail": "limit=0 -> 400, limit=500 -> 400",
+      "id": "http_query_bounds_enforced",
+      "status": "PASS"
+    },
+    {
+      "detail": "GET /api/capability?id=traffic_events -> 200 CAPABILITY_NOT_AVAILABLE",
+      "id": "capability_not_available_typed",
+      "negative_case": "capability_not_available",
+      "status": "PASS"
+    },
+    {
+      "detail": "GET /api/health -> 200 lanes={'discovery': 'UNKNOWN', 'publication': 'STALE', 'query': 'UNKNOWN'}",
+      "id": "http_health_lanes",
+      "status": "PASS"
+    },
+    {
+      "detail": "loopback health keeps formal deployment/public HTTP UNKNOWN",
+      "id": "negative_loopback_not_public_deployment",
+      "negative_case": "loopback_not_production_receipt",
+      "status": "PASS"
+    },
+    {
+      "detail": "cutover -> pinned query 409, archive HTTP 200",
+      "id": "negative_mixed_generation_refused_history_kept",
+      "negative_case": "mixed_generation_atomic_refusal",
+      "status": "PASS"
+    },
+    {
+      "detail": "post-cutover served generation detected as FAIL",
+      "id": "negative_http_200_wrong_generation_detected",
+      "negative_case": "http_200_wrong_version_not_publish",
+      "status": "PASS"
+    },
+    {
+      "detail": "query -> 503, static -> 200, feed -> 200, query lane=BLOCKED",
+      "id": "negative_query_down_static_readable",
+      "negative_case": "query_down_static_publication_readable",
+      "status": "PASS"
+    },
+    {
+      "detail": "13/13 browser assertions",
+      "id": "browser_e2e",
+      "status": "PASS"
+    },
+    {
+      "detail": "22/22 actual v6 browser checks; BUILD_ONLY",
+      "execution_scope": "ACTUAL_BROWSER_FINITE_SYNTHETIC_UI_FLOW",
+      "id": "v6_browser_e2e",
+      "release_id": "b9ea34d04868e4aabe7b965550705d8d6e39fa4e83db51c2a8b4113067a97ad3",
+      "served_code_sha": "3a06754a2428023bf316d8cb180f239f9c3b971d",
+      "status": "PASS"
+    },
+    {
+      "detail": "sabotaged copy exit=1, inner receipt=FAIL, failed checks=['modules_loaded_from_checkout']",
+      "expected": "FAIL",
+      "id": "sabotage_detection",
+      "observed": "FAIL",
+      "sabotaged_module": "scripts/query-store.py",
+      "status": "PASS"
+    }
+  ],
+  "check_count": 26,
+  "passed": 26,
+  "health_summary": {
+    "overall": "STALE",
+    "lanes": {
+      "discovery": "UNKNOWN",
+      "publication": "STALE",
+      "query": "UNKNOWN"
+    },
+    "production_verified": false
+  },
+  "browser_summary": {
+    "legacy": {
+      "status": "PASS",
+      "assertions": 13
+    },
+    "v6": {
+      "status": "PASS",
+      "checks": 22,
+      "served_release_binding": {
+        "status": "PASS",
+        "served_code_sha": "3a06754a2428023bf316d8cb180f239f9c3b971d",
+        "release_id": "b9ea34d04868e4aabe7b965550705d8d6e39fa4e83db51c2a8b4113067a97ad3",
+        "evidence_level": "BUILD_ONLY",
+        "artifact_hashes": {
+          "feed": "f88408f49f444de0dd3a16fc864d96d9318eefc0c78f69e5d2923a9872f35121",
+          "status": "1876845d854d4387fccee398fefcdebb395a36d0343d7bd2690226dc7020c51b",
+          "brief": "3df565c29622ae729f0f053712f513eddacf6e014aeec227ddd664dd00b38448"
+        }
+      }
+    }
+  },
+  "full_gate": {
+    "command": "npm run check",
+    "status": "PASS",
+    "tested_code_sha": "3a06754a2428023bf316d8cb180f239f9c3b971d",
+    "final_line": "VERIFY_OK mode=full required=126 specs=4 secrets=0",
+    "web_tests": {
+      "pass": 406,
+      "fail": 0
+    },
+    "postgresql_major_version": 16,
+    "actual_migration_included": true,
+    "test_database_url_configured": true,
+    "counts_not_summed_with_embedded_Python_suites": true
+  }
+}
