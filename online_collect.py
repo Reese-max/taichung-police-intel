@@ -103,7 +103,7 @@ def get(
 def snapshot(response: requests.Response, purpose: str) -> dict:
     return {
         "purpose": purpose,
-        "requested_url": response.request.url,
+        "requested_url": getattr(response, "_govintel_requested_url", response.request.url),
         "final_url": response.url,
         "http_status": response.status_code,
         "content_type": response.headers.get("content-type") or "application/octet-stream",
@@ -375,14 +375,14 @@ def load_canary_module():
 
 
 def collect_s029(session: requests.Session, start: date, end: date) -> dict:
-    source = load_canary_module().fetch_s029(session, start, end)
-    urls = [(source["index"]["requested_url"], "LIST")]
-    urls.extend((page["requested_url"], "LIST") for page in source["latest_session"]["list_pages"])
-    urls.extend((item["url"], "ATTACHMENT") for item in source["police_attachments"])
-    responses = [
-        snapshot(get(session, url, source_id="S-029", timeout=120), purpose)
-        for url, purpose in urls
-    ]
+    # Preserve the bytes already validated by the canary. Fetching each URL a
+    # second time both doubles the official traffic and can make the stored
+    # snapshot disagree with the attachment hash in this observation.
+    responses = []
+    source = load_canary_module().fetch_s029(
+        session, start, end,
+        on_response=lambda response, purpose: responses.append(snapshot(response, purpose)),
+    )
     items = []
     for item in source["police_attachments"]:
         payload = {key: item[key] for key in sorted(item)}
