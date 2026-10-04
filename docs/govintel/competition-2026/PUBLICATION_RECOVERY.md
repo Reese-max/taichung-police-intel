@@ -1,6 +1,6 @@
 # Historical #20 publication recovery record
 
-這是 2026-09-22 的 dated checkpoint，保留當時 protected-main failure 的根因與修復邊界。它不是目前 production receipt；現況以 [CURRENT_STATUS.md](./CURRENT_STATUS.md) 與最新 [scheduled run](https://github.com/Reese-max/taichung-police-intel/actions/runs/36952506907) 為準。
+這是 2026-09-22 的 dated checkpoint，保留當時 protected-main failure 的根因與修復邊界。`publication-state` lifecycle 現已在 `main`；2026-10-04 真實蒐集、公開五檔 hash 與 Gateway 驗證已有成功證據。現在的資料缺口及 #20 尚未完成的驗收見 [CURRENT_STATUS.md](CURRENT_STATUS.md)，不得再引用本文下方「尚未合併」為現在的分支狀態。
 
 基準：`e1d081bd04824c062c7ee99e7d74f9e478240743`。當時已知排程在資料 push 至受保護 main 被拒；不能為了展示關閉 PR／verify／分支保護。
 

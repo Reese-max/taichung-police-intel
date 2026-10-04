@@ -1,34 +1,38 @@
-# GovIntel AI｜評估計畫與結果
+# GovIntel AI－v6 評測協定與結果界線
 
-查核日：2026-10-02。這是評估 protocol 與目前結果邊界，不是成效報告。尚未實測的數字不填入結果欄；`evaluation-manifest.template.json` 的 `status` 保持 `NOT_RUN`，結果欄保持 `null`。
+2026-10-05 更新。以送件 v6 p7–9 為準；9 月舊計畫中的 A／B0／B／C 定義保留作歷史，不混用在本次比較。結果仍為 `NOT_RUN`，目標尚無實測達成證據。
 
-## 比較設計
+## 方法與分組
 
-所有方法使用相同資料 cutoff、事件切分、可取得來源與任務條件：
+- **A 官方人工**：直接查各官方網站，自行記錄條件與回查更新。
+- **B 搜尋加一般摘要**：相同來源與問題範圍，使用搜尋及一般摘要，不故意弱化基線。
+- **C 完整 GovIntel**：公開查詢、原文依據、個人條件、版本與站內更新。
+- **C_semantic_off 消融**：保留 C 的介面、資料、追蹤與已讀規則，只關閉語意處理。C 對此組才可解釋語意 AI 的額外貢獻；B 與 C 比較整體產品流程。
 
-- **A：人工基線**，承辦人直接查相同官方資料並完成交班。
-- **B0：舊 V2 原型**，固定舊 commit，用來量產品差異；不可冒充只差模型的消融組。
-- **B：同一新版工作流程、關閉 semantic AI**，保留相同來源、版本、UI 與規則。
-- **C：完整 GovIntel**，啟用受控候選抽取／關聯／修訂判讀。
-- **C−AI：語意能力消融**，只在規則、來源、版本與 UI 不變時使用。
-- **C−D：移除選定 background dataset**，對應既有 template 的 `C_minus_D` 欄位；它衡量背景資料是否真的改善任務，不等同 AI 消融。
+所有方法固定同一問題、可取得資料、資訊截止與回查／重開站時點。B 的摘要工具、模型與 prompt、C 的版本需記錄；若尚無語意 AI 實作，C_semantic_off 不可冒充已完成 AI 比較。可另保存 frozen V2 作歷史工程基準，但不充當 B 或消融組。
 
-先以約 20 個事件、60 份原始文件建立開發與保留集；同事件的版本、轉載與未來文件不得跨集或洩漏到歷史重播。兩位標註者先建立標準答案，分歧保留裁決紀錄；模型自評不能取代人工答案。
+第一輪**規劃**約 20 個事件／60 份原始文件，各版另計，真人**規劃**3–5 位經同意使用者。真實修訂、合成道路序列與 fixture 工程結果分開報。按事件分開開發與保留集，同事件版本、轉載不跨集，歷史 replay 不使用截止後文件。人工讀原文與差異建立答案；分歧保留裁決，未解決案例另列，不由模型裁定。
 
-## 目標與結果
+## 指標與分母
 
-| 指標 | 計畫目標／定義 | 目前結果 |
+| 指標 | 目標／計數方式 | 目前結果 |
 |---|---|---|
-| 重要異動 precision／recall | 事前定義時間、地點、範圍、狀態等影響交班的變更；暫定 precision ≥ 0.85、recall ≥ 0.90 | `NOT_RUN`；無 TP／FP／FN 分母。 |
-| 事件配對 | false merge、missed merge 與 event precision／recall／F1；暫定 F1 ≥ 0.90 | `NOT_RUN`；fixture 不是標註集。 |
-| 引用支持 | 重要主張是否由正確 document version／evidence locator 支持；unsupported claim、abstention 分開報 | `NOT_RUN`；沒有支持率或零錯誤證明。 |
-| 任務效率 | 從閱讀到可交付，包含人工核對與修正；比較 A、B、C，不把拒答當成功 | `NOT_RUN`；沒有真人 participant 或分鐘數。 |
-| 漏件／誤提醒 | 重要漏件不增加；分別列 false alert、missed change、conflict 與 unknown | `NOT_RUN`。 |
-| 內政背景增益 | 比較含／不含背景資料的查找時間、欄位正確率與限制理解 | `NOT_RUN`；歷史統計不等於即時人流。 |
-| 成本／延遲 | 分列 provider、token、運算、儲存、人力；官方修改時間未知不計假延遲 | `NOT_RUN`；不預設免費或 SLA。 |
-| 真人使用／採用 | 取得同意後以匿名 participant code、受控任務與方法順序記錄 | `NOT_RUN`；不宣稱機關採用、得獎或全臺泛化。 |
+| 有來源查詢正確性 | 答對、答錯、未回答、原文支持與可回答比例；不得有無依據／矛盾斷言 | `NOT_RUN`／null |
+| 查詢完成時間 | 相對 A 中位耗時降低至少 30%，正確性不降低；包含開原文、理解條件與修正 | `NOT_RUN`／null |
+| 站內重要更新 | 每次指定開站時點「已取得、符合條件、未讀、實質」更新為分母；precision≥85%，recall≥90% | `NOT_RUN`／null |
+| 重複／誤列 | 已讀、純排版、同源轉載不多列重要提示；不同實質更正不被去重漏掉；取消後不提示 | `NOT_RUN`／null |
+| 資料與背景限制 | D1 固定 112/12 期別；D2 名稱／地址／電話／座標可核對；限制理解與欄位正確性 | `NOT_RUN`／null；D1/D2 尚未取得驗收 |
+| 來源取得缺漏 | 未取得來源／文件另報，不以已取得資料的高召回代表全網涵蓋 | 未完成 promotion；公開基線仍`PARTIAL` |
+| 成本 | 每查詢、有效更新、追蹤條件的 model／運算／儲存／人工成本；有模型時保存當時費率 | `NOT_RUN`／null |
+| 真人體驗 | 經同意匿名使用者同等難度任務／方法順序輪替，記錄時間、正確性、漏件與困難 | `NOT_RUN`／null；個人試用不是機關採用 |
 
-## 可重播的工程證據（不是產品結果）
+解除需明文；資料消失、日期到期與來源失敗不可當解除。首期不評估推播投遞。零分母寫 null／無可評估案例，不能填 100%。真實與合成不混算，小樣本無錯誤不意味永久可靠。
+
+## 工程與真人結果各自留證
+
+[PR #126](https://github.com/Reese-max/taichung-police-intel/pull/126)是候選工具，CI、自我檢查、合成更新精確率或固定資料 replay 只能證明該 fixture／contract。真人 A/B/C 耗時、模型 quality、source coverage 與 public deployment 須另外的 receipt。
+
+該候選的工程範圍為 `SYNTHETIC_DETERMINISTIC_POLICY_REPLAY`：6 份來源文件、2 個來源、13 個版本樣本，未提供事件 ID，因此事件數為 null。固定案例的 6 TP 是規則代理指標；候選中切換已讀規則或 deterministic interval matching，並沒有實際執行 B 的搜尋加一般摘要，也沒有 C 的語意 AI 關閉消融。四組 v6 方法執行狀態均維持 `NOT_RUN`；沒有 UI、真人、真實資料或模型成效可由此推出。
 
 ```bash
 npm run check
@@ -36,14 +40,6 @@ python3 -X utf8 scripts/public-event-fusion.py --self-check
 python3 -X utf8 scripts/verify-source-policy-integration.py --self-check
 ```
 
-這些命令證明程式契約、fixture 或離線核心可執行；不能轉述為真人成效、live provider accuracy、source coverage 或 deployment freshness。每次正式評估另需保存 commit、dataset manifest hash、information cutoff、測試命令與退出碼、分母、失敗案例及時間。
+[Manifest template](evaluation-manifest.template.json)保持結果 null；每次研究填入 commit、data hash、split、cutoff、方法與工具版本、分母、失敗、時間與成本。若來源未通過，先交付明示 cutoff 的 offline query／tracking replay；不宣稱持續最新服務。
 
-## 結果填寫規則
-
-- 零分母填「不可評估」或 `null`，不填 100%。
-- 目標與 observed result 分欄；目標達成前不能寫成結果。
-- 歷史／合成／預先生成資料要標記 fixture；不把預錄操作說成即時服務。
-- 原始 participant data、consent、私人回饋、credentials 與內部勤務資料留在私有受控位置，不提交公開 repo。
-- 只有通過 evidence／safety／release gate 的資料才可進公開成果包。
-
-Template：[evaluation-manifest.template.json](./evaluation-manifest.template.json)。產品流程、安全邊界與樣本限制詳見 [GOVINTEL_PLAN.md](../GOVINTEL_PLAN.md)。
+原始同意書、participant 紀錄與個人追蹤保持私有；公開成果只放已核准的匿名彙總與合法 fixture。

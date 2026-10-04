@@ -1,22 +1,24 @@
-# GovIntel AI｜跨機關公共事件整合、異動辨識與交班支援平台
+# GovIntel AI－公共資訊查詢與個人化追蹤平台
 
-**Current product name:** GovIntel AI. The former `Taichung Police Public Intelligence` name and its Kiro competition package are historical provenance, not the current product status.
+**Current proposal:** GovIntel AI－公共資訊查詢與個人化追蹤平台 (plan v6, 2026-10-01). The former `Taichung Police Public Intelligence` name and its Kiro competition package are historical provenance.
 
-**Core JTBD:** help a police policy or handoff worker find what changed across public official notices, return to the source, and decide which prior brief needs review. The current public path uses five official Taichung council／government sources, exposes source health and gaps, and links evidence back to official council video timestamps.
+**First-phase task:** help people query public notices, save their chosen area, topic, road or keywords in the same browser, and see supported changes when reopening the site. The deployed baseline remains the five-source Taichung council／government evidence journey. Public query and personal tracking changes require separate acceptance and deployment evidence.
 
-## Current GovIntel state (2026-10-02)
+## Current GovIntel state (2026-10-05)
 
 The [2026 GovIntel competition entry](./docs/govintel/competition-2026/README.md) is the canonical judge path. The [current status page](./docs/govintel/competition-2026/CURRENT_STATUS.md) records the complete claim/evidence table and fixed state semantics.
 
 | Current claim | Fixed status | Evidence boundary |
 |---|---|---|
-| Five-source publication baseline and council evidence journey | `PRODUCTION_ACTIVE` | [source policy](./docs/govintel/source-policy.approved.json), [public source status](https://reese-max.github.io/taichung-police-intel/data/source-status.json), and [latest scheduled run](https://github.com/Reese-max/taichung-police-intel/actions/runs/36952506907). The latest public snapshot is `PARTIAL`, not globally fresh. |
-| Source Policy, official document replay, Query Gateway, local-first handoff and PublicEvent fixture | `IMPLEMENTED_NOT_PRODUCTION` | Self-checks and checked-in fixtures are replayable; they do not prove live multi-agency service, multi-user approval, or adoption. |
-| News／city／traffic／fire source expansion | `CANDIDATE_CANARY` | [PR #16](https://github.com/Reese-max/taichung-police-intel/pull/16) and [Issue #22](https://github.com/Reese-max/taichung-police-intel/issues/22); Open PR／Issue is not production evidence. |
-| Twinkle hybrid, latest-information loop, full persistent tracking and production event fusion | `DESIGN_ONLY` | Strategy／issue／fixture boundaries are listed in the [competition docs](./docs/govintel/competition-2026/README.md). |
-| Complete scheduled-publication acceptance | `BLOCKED` | [Issue #20](https://github.com/Reese-max/taichung-police-intel/issues/20) remains open; the successful latest run does not replace its missing acceptance evidence. |
+| Five-source publication and council evidence journey | `PRODUCTION_ACTIVE` | [active policy](./docs/govintel/source-policy.approved.json), [public data](https://reese-max.github.io/taichung-police-intel/data/source-status.json), [Oct 4 collection run](https://github.com/Reese-max/taichung-police-intel/actions/runs/37169331249). Collection, five public-file hashes and Gateway checks passed; data remains `PARTIAL`. |
+| Bounded deployed Query Gateway | `PRODUCTION_ACTIVE` | The dated production verifier checks the published generation; it does not prove semantic answers, full event coverage or v6 query UX acceptance. |
+| Public query, browser-only tracking and v6 evaluation workflow | `IMPLEMENTED_NOT_PRODUCTION` | [PR #124](https://github.com/Reese-max/taichung-police-intel/pull/124), [#125](https://github.com/Reese-max/taichung-police-intel/pull/125), [#126](https://github.com/Reese-max/taichung-police-intel/pull/126) are acceptance candidates; a PR or local pass is not deployment. |
+| Police／traffic／city／fire source expansion | `CANDIDATE_CANARY` | Four independently observed candidates: S-001／S-032／S-033／S-031. Active policy still contains only the five baseline sources. |
+| Located facts, handoff, Review Inbox and PublicEvent fixture | `IMPLEMENTED_NOT_PRODUCTION` | Replayable core; PublicEvent remains `FIXTURE_ONLY`, without production fusion or multi-user approval. |
+| D1 population, D2 police-directory query, semantic AI, external notifications and cross-device accounts | `DESIGN_ONLY` | Requirements exist; downloaded/accepted D1／D2, model quality and human benefit are not established. |
+| Complete publication acceptance and source promotion | `BLOCKED` | Successful dated runs do not replace missing [#20](https://github.com/Reese-max/taichung-police-intel/issues/20) failure/recovery evidence or source promotion reviews. |
 
-**Latest dated evidence:** [workflow run 36952506907](https://github.com/Reese-max/taichung-police-intel/actions/runs/36952506907) succeeded for `main@562141e` on 2026-10-02. The anonymous public source receipt reported `generated_at=2026-10-02T09:46:41+08:00`, `CR-DEMO-20261002-MORNING-SCHEDULE`, overall `PARTIAL`, and one failed source. This is a time-bound snapshot, not a human evaluation, eligibility decision, submission receipt, or full source-coverage claim.
+**Dated evidence:** [run 37169331249](https://github.com/Reese-max/taichung-police-intel/actions/runs/37169331249), started 2026-10-04 10:22 Asia/Taipei, performed collection and passed publication/hash/Gateway verification. [Run 37212963039](https://github.com/Reese-max/taichung-police-intel/actions/runs/37212963039) also succeeded later that day. S-007 was stale and S-029 failed in the reviewed snapshot; no evidence supports 100–200 new items per day. Read the live receipt's own date before using it. Proposal v6 and the supplement are complete; organizer acceptance and the proposed name change remain unverified.
 
 ## Quick judge path
 
@@ -31,9 +33,9 @@ The old Kiro submission draft, 2026-08 deadline, prototype demo script／checkli
 
 ## Problem and users
 
-Police policy and council-liaison staff must monitor scattered official pages, proposals, reports, meeting records, and videos. Finding what changed can take one to two hours, and a summary without a source locator is difficult to trust under questioning.
+People following a road, activity or local issue need to find scattered notices and check whether dates, scope or status changed. A saved query should make later changes easier to inspect without treating repeated notices as independent events. This need remains a hypothesis awaiting consented user tasks; no measured time-saving claim is made.
 
-The current public baseline focuses on preparing for a council question; the 2026 GovIntel addition extends the same evidence discipline toward cross-agency public-event changes and handoff review. It uses public information only and excludes internal duty data, emergency dispatch, 110 calls, case-level criminal data, personal data, and operational command functions.
+The public baseline preserves council preparation and evidence navigation. Plan v6 puts public query and personal tracking first; handoff, research exports and multi-user collaboration are later extensions. First-phase tracking stays in the same browser and updates only on opening or refreshing the site. It has no background push or cross-device account. The product uses approved public information and excludes internal duty data, 110 calls, case-level criminal data and operational command.
 
 ## What works
 
@@ -186,7 +188,7 @@ The read-only Taiwan Intel Dashboard discovery consumer is replayable with `pyth
 - a push to `main` restores the durable publication checkpoint, then builds and deploys the reviewed snapshot;
 - `30 22 * * *` UTC refreshes the morning slot at 06:30 Asia/Taipei;
 - `30 10 * * *` UTC refreshes the evening slot at 18:30 Asia/Taipei;
-- the current candidate workflow persists the generated V1/V2 checkpoint to the dedicated `publication-state` branch, never directly to protected `main`, then deploys the same verified static artifact;
+- the merged workflow persists the generated V1/V2 checkpoint to the dedicated `publication-state` branch, never directly to protected `main`, then deploys the same verified static artifact;
 - manual dispatch can refresh either slot.
 
 The `publication-state` checkpoint lifecycle is now part of `main`; deployment

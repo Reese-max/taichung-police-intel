@@ -6,9 +6,11 @@
 
 - **資料不是全世界。** Active source policy 只有五個 S-004／S-006／S-007／S-009／S-029；來源健康不等於問題領域完整覆蓋。
 - **新鮮度不是健康。** 成功連線的來源仍可能 `STALE`；`PARTIAL`、`FAILED`、`UNKNOWN`、valid zero-result 與 `NO_DATA_AS_OF` 要分開看。LKG 保護可讀性，但不把舊資料變 current。
-- **#20 尚未全收斂。** 最新 scheduled run 可成功 build／deploy，但 Issue #20 的完整晨晚、失敗演練與匿名版本／hash acceptance 仍是 `BLOCKED`；CI success 不是完整 production receipt。
+- **#20 尚未全收斂。** Oct 4 已有晨／晚自然排程、部署與匿名版本／hash 成功證據；剩餘失敗／恢復演練需逐項留證。不能繼續稱流程尚未合併，也不能用成功 run 取代失敗路徑驗收。
 - **候選不是 production。** Open PR、Issue、catalog entry、一次 canary、fixture 或設定檔不能升級 source status。候選 promotion 需要完整性、權利、敏感資料、重播與 current publication evidence。
 - **事件融合是受限核心。** `public-event-demo.json` 是 `FIXTURE_ONLY`；它不證明 live multi-agency coverage、event accuracy、背景資料效益或正式交班服務。
+- **首期追蹤是同瀏覽器功能。** 保存使用者明確選擇的條件與已讀版本；開站／刷新才比對，不含關站推播、跨裝置帳號或敏感身分側寫。清除瀏覽器資料可能失去本機清單。查詢／追蹤 PR 仍須各自的瀏覽器與部署驗收。
+- **D1／D2 與語意 AI 尚缺驗收。** 固定 112 年 12 月人口與 dataset 5958 名錄須取得、核對欄位／座標與用途；其他人口檔不能取代 D1。keyword 與規則 fixture 不能冒充模型抽取或 AI 增益。
 - **評估尚未執行。** Precision、recall、F1、任務時間、真人使用、採用、得獎與資格結果不預填。`evaluation-manifest.template.json` 的 result 欄保持 null。
 - **歷史資料有界。** 2026-08 Kiro package、舊 deadline、舊 demo video 與 Kiro credits 是 prior prototype evidence，集中在 [Historical](../historical/README.md)，不代表目前版本或本次官方規則。
 - **權利與資格未由 repo 推定。** 當屆主辦公告、報名回執、團隊資格、資料／軟體授權與使用同意需另以官方原件／私有紀錄核對。

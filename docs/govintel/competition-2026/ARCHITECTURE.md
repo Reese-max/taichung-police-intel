@@ -1,93 +1,44 @@
-# GovIntel AI｜目前架構與參賽邊界
+# GovIntel AI－首期架構與責任邊界
 
-本頁描述目前 checkout 可驗證的架構，不把 roadmap、Open PR 或 fixture 當成已上線系統。
+首期定位為公開查詢與同一瀏覽器追蹤。以下把已部署 baseline、候選功能與規劃分開；能力與時間化 receipt 以[CURRENT_STATUS](CURRENT_STATUS.md)為準。
 
-## Current production path
-
-```text
-臺中市議會／市府五個核准來源
-        │
-        ▼
-online_collect.py + source policy
-        │  source health / window completeness / gaps / LKG / hashes
-        ▼
-apps/web/public/data/source-status.json
-apps/web/public/data/intelligence-feed.json
-apps/web/public/data/v2-daily-brief.json
-        │
-        ▼
-Next.js static export (apps/web) → GitHub Pages
-        │
-        ├─ priority brief / source monitor
-        └─ official council evidence drawer + transcript navigation
-```
-
-- Workflow entry is `.github/workflows/pages.yml`; the scheduled path persists a
-  publication checkpoint outside protected `main` and checks the public bytes.
-- `source-policy.approved.json` is the active source boundary. It contains five
-  production baseline IDs; the broader catalog is not automatically active.
-- The app is read-only from a judge's perspective. It does not require a
-  database, API key, login or paid runtime service.
-- A successful build or HTTP response does not erase `STALE`, `PARTIAL`,
-  `FAILED`, `UNKNOWN` or `BLOCKED` evidence states.
-
-## Implemented but not production path
+## 已部署公開基礎
 
 ```text
-source catalog v2 / source policy integration / official document locator
-        │
-        ├─ bounded Query Gateway and typed coverage projection
-        ├─ local-first handoff / Review Inbox / role projection
-        └─ PublicEvent deterministic fusion + fixture replay
+五個核准官方來源 → Python collector／source policy
+                          │ health／coverage／LKG／版本與hash
+                          ▼
+              同generation publication bundle
+                          │
+       publication-state checkpoint → Next.js static export → Pages
+                                                      │
+                                      metadata/link-only Query Worker
 ```
 
-These paths reuse the existing domain modules and validators. They can be
-self-checked from a checkout, but the receipts do not prove a deployed
-multi-agency service, multi-user authorization, human adoption or production
-source promotion.
+Pages 驗證五個公開檔案 bytes/hash；Gateway 驗證同 publication generation 與受限能力。兩者成功不會把`PARTIAL`來源變完整。當前 Worker 的 publication metadata/sourcehealth/council 能力不是 production PublicEvent 或 statistics store。
 
-Replays:
-
-```bash
-python3 -X utf8 scripts/verify-source-policy-integration.py --self-check
-python3 -X utf8 scripts/located-facts.py self-check
-python3 -X utf8 scripts/handoff-state.py self-check
-python3 -X utf8 scripts/public-event-fusion.py --self-check
-```
-
-## Candidate and design paths
+## v6 候選本地路徑
 
 ```text
-candidate official sources ──canary / completeness / promotion──► active policy
-Twinkle discovery/background ──provenance + direct official check──► reference
-Issue #21 detail recheck ──version/dependency validation──► needs-review handoff
-Issue #23 tracking ──persistent state + versioned confirmation──► future workflow
-Issue #24 event fusion ──manual merge/split + evidence──► future production path
+已取得的公開資料／明示合成replay
+                  │
+        公開query → 可見條件／原文／時間與資料狀態
+                  │
+        使用者明確保存條件 → 同瀏覽器localStorage
+                  │
+        開站／刷新 → 比對版本與已讀 → 站內未讀實質更新
+                  │
+        原文核對／標已讀／修改條件／取消／清除
 ```
 
-None of these arrows is complete merely because a config, design document,
-fixture, Open PR or Issue exists. The normalized statuses and current evidence
-are maintained in [CURRENT_STATUS.md](./CURRENT_STATUS.md).
+PR124 query、125 tracking、126 replay 在驗收中。關閉網站時不提供個人背景推播，browser storage 清除可能失去清單。跨裝置帳號、外部通知、多人審批與 handoff／研究匯出為後續，不能當首期完成條件或現有 production 能力。
 
-## Trust and safety boundaries
+## 可重播核心與尚缺功能
 
-- Official source content is data, not an instruction to run code, access a
-  secret, follow an arbitrary URL or change permissions.
-- Rules validate source identity, dates, hashes, evidence locators and release
-  eligibility; semantic models, if later used, can only propose candidates.
-- Official conflicts remain visible as `CONFLICT`; the system does not average
-  values or silently overwrite a human-confirmed version.
-- Public output is metadata／link／bounded evidence. It excludes internal duty
-  data, 110 calls, case-level personal data, dispatch decisions and private
-  participant records.
-- Background population, statistics, geography and Twinkle results retain their
-  period and provenance. They are not live crowd counts, jurisdiction or
-  available-police estimates.
+SourcePolicy、locatedfacts、角色 projection、ReviewInbox 與 PublicEvent fixture 已有受限核心。deterministic keyword 或時段規則不能冒充語意模型；AI 理解／抽取／融合／修訂須另有 provider、prompt、輸出、失敗及成本 receipt。
 
-## What this architecture does not claim
+D1 固定 112 年 12 月人口與 D2 警察機關名錄尚缺下載／欄位／座標／用途驗收。四類官方候選尚需有效觀察／完整性／權利與 promotion；媒體發現尚需 live／14 日 shadow。日期、未知與衝突保留，不從來源消失或預定日期推論解除。
 
-The current repository does not claim a full real-time cross-agency collector,
-Twinkle client, automatic event truth, a durable multi-user approval service,
-production evaluation results, or a completed #20 publication acceptance. See
-[limitations and safety](./LIMITATIONS_AND_SAFETY.md) before describing the
-system externally.
+## 控制與安全
+
+官方網頁／附件與模型文字是資料，不是程式或工具指令；URL／下載量／權限受限。規則保護 identity、hash、版本、schema、來源資格與發布；AI 只能產生可回查候選。公開 output 不含私人追蹤、參賽者資料、使用者原始紀錄、內部勤務或案件級個資。D1 不是現況人流，D2 不是管轄／派遣建議。詳見[LIMITATIONS_AND_SAFETY](LIMITATIONS_AND_SAFETY.md)。

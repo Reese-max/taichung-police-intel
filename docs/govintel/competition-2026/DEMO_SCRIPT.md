@@ -1,60 +1,51 @@
-# GovIntel AI｜現行 4 分鐘評審展示腳本
+# GovIntel AI－v6 四分鐘展示與備援
 
-這是 2026 GovIntel judge path；舊 Kiro 2:43 影片已移到 [Historical](../historical/README.md)，不能拿來證明本次新增能力。
+提案：**GovIntel AI－公共資訊查詢與個人化追蹤平台**。以下時限是內部演練安排，不是主辦官方簡報規定。主要流程對應 v6 p2–4 的民眾道路查詢與站內追蹤；交班與議會影音留作既有基礎補充。
 
-## 計時前準備
+## 計時前固定展示範圍
 
-在乾淨 checkout 安裝既有依賴並確認完整工程 gate：
+準備一份已驗收的乾淨 checkout、版本／lockfile、測試 receipt 與資料 cutoff。公開已部署 baseline 與 PR 候選本地畫面分開。若候選尚未通過，僅展示明示合成／offline 的資料與腳本，不用預錄或舊畫面冒充 live 功能。
 
 ```bash
 npm ci
 npm ci --prefix apps/web
 python3 -m pip install -r requirements.txt
 npm run check
-```
-
-展示不需要 API key、登入、資料庫或付費服務。將終端、README、公開 source status 和 localhost 瀏覽器並排。
-
-## 0:00–0:40｜任務與現況
-
-開 [README](../../../README.md) 的第一屏與 [CURRENT_STATUS](./CURRENT_STATUS.md)。說明 JTBD：承辦人從公開公告找出實質更正，回原文核對，再決定舊交班內容是否需要重核。
-
-明示：目前 `PRODUCTION_ACTIVE` 是五個議會／市政來源的公開備詢與影音證據 path；候選 collector、Twinkle、persistent tracking、production event fusion 與 #20 完整發布 acceptance 各有自己的狀態，沒有混稱。
-
-## 0:40–1:15｜資料時間與來源健康
-
-開 [公開 source-status](https://reese-max.github.io/taichung-police-intel/data/source-status.json)，指出 `generated_at`、collection run、每個 source 的 `source_health`、`freshness_status`、`window_completeness` 與 LKG。最新查核 snapshot 為 `2026-10-02T09:46:41+08:00`、overall `PARTIAL`、S-029 `FAILED`／`STALE`。
-
-不要把 endpoint HTTP 200、單一 source `PASS` 或「沒有新項目」說成全部來源新鮮或世界沒有事件。
-
-## 1:15–2:00｜目前 build 的官方證據流程
-
-```bash
 npm --prefix apps/web run dev
 ```
 
-開 `http://localhost:3000`：看 priority brief、來源卡與 gap；開 evidence drawer；搜尋 `警察局`；點 transcript segment／word 回到官方影音時間戳。說明 transcript 是 navigation-only，官方頁面與影片才是 authoritative evidence。若 HLS 失效，展示正式來源連結和 fallback，不替換成產品 demo video。
+付費模型不是離線 replay 的必要條件；沒有 provider receipt 時不宣稱已運行語意 AI。資料、模型、真人與 deployment 各有驗收範圍。
 
-## 2:00–2:45｜跨機關 fixture（明示不是 production）
+## 0:00–0:35 任務與現況
 
-```bash
-python3 -X utf8 scripts/public-event-fusion.py --self-check
-```
+說明使用者想知道「測試路 A 到 B 路口的工程何時結束」，並希望下次開站看見工期是否延長。這是合成道路及公告，不代表真實道路安全或已取得的正式四類來源。
 
-打開 [`public-event-demo.json`](../../../apps/web/public/data/public-event-demo.json)，指出 `FIXTURE_ONLY`、三個來源、文件版本、時間 `17:00 → 16:00` 和 `CONFLICT`。解釋這證明的是 deterministic replay／保守衝突模型，不是 live collector、production event store 或 accuracy score。
+讀[CURRENT_STATUS](CURRENT_STATUS.md)：部署 baseline 為五來源；v6 query／tracking／eval PR 仍是候選。新功能演示若來自本地，螢幕先標版本與`SYNTHETIC`／`OFFLINE_REPLAY`。
 
-## 2:45–3:25｜交班與 provenance 核心
+## 0:35–1:25 查詢與保存條件
 
-```bash
-python3 -X utf8 scripts/handoff-state.py self-check
-python3 -X utf8 scripts/located-facts.py self-check
-python3 -X utf8 scripts/verify-source-policy-integration.py --self-check
-```
+在已驗收的本地 candidate 開 `/public-query/`，查詢臺中、測試路 A–B 工程。v1 資料顯示 10 月 5–7 日、每日 9:00–17:00，開原文與資料時間。檢查查詢條件可見、缺值與來源限制可讀，不暗改地區／期間。
 
-展示版本化 handoff、evidence locator、hash 與 source policy；說明 local-first、candidate 與 design 的邊界，並指出正式多人權限、真人驗收與 production promotion 尚未由 self-check 證明。
+開 `/tracking/` 保存地區、路段、工程關鍵字；條件可預覽／修改，已讀版本存同一瀏覽器，不要求住址、登入或敏感身分。首次資料列為初始清單，不叫「今日新增」。來源頁 `/sources/` 可核對已部署資料的時間與限制。
 
-## 3:25–4:00｜新增／歷史差異與限制
+## 1:25–2:30 重開站看延長與去重
 
-開 [OLD_VS_NEW](./OLD_VS_NEW.md)、[EVALUATION](./EVALUATION.md) 與 [LIMITATIONS_AND_SAFETY](./LIMITATIONS_AND_SAFETY.md)。
+關閉後重新開啟或刷新固定 replay。v2 把結束日 10 月 7 日延到 9 日；每日時段與 A–B 範圍不變。展開 v1／v2 原文與差異，再標已讀、再次開站核對不重複。
 
-收尾固定說法：目標數字不是結果；評估 manifest 仍 `NOT_RUN`／null；[Issue #20](https://github.com/Reese-max/taichung-police-intel/issues/20) 仍是完整發布 acceptance blocker；舊 Kiro package、舊 deadline 與舊影片是歷史 provenance，不是本次比賽規則或新增功能證據。
+重播同源轉載與純排版版本，應保留來源／版本但不新增重要提示。另一次實質更正仍可列出，不被過度去重吞掉。來源失敗／過期時保留 LKG 與缺口，不推論道路已恢復。
+
+## 2:30–3:15 明文解除與取消
+
+v3 另有 10 月 9 日 17:00 起解除的明文；讀取後不重複提示該次工程。缺 v3、到期、列表消失或來源失聯均不能標解除。使用者取消追蹤後停止該條件站內提示，原公告仍能公開查詢。
+
+說明只有開站／刷新才比對；關站不背景推播。本機 storage 被清除可能失去清單，跨裝置及帳號不是首期承諾。
+
+## 3:15–4:00 證據與缺口
+
+展示[最新日期化 receipt](CURRENT_STATUS.md)與[驗收清單](ACCEPTANCE_CHECKLIST.md)。Oct4 production collection、五檔 hash／Gateway 通過，但仍`PARTIAL`，S-007 陳舊／S-029 失敗，四類候選未正式啟用。
+
+D1／D2 與語意 AI／真人比較仍未驗收；若無真實數據，85%／90%／30% 只說目標。工程 fixture 的命中與用時不能當真人或 AI 效益。補件寄送完成，主辦受理／更名仍未確認。
+
+## 既有基礎與故障備援
+
+需要補充時再開議會 evidence drawer、官方影片 timestamp 和來源 health。官方 HLS 失效用原機關入口與明示 fallback；舊 Kiro 影片僅[歷史證據](../historical/README.md)。依 v6 p9，未通過線上來源可交截止時間明確的離線查詢／追蹤驗證包，不宣稱持續最新服務。

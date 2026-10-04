@@ -1,53 +1,49 @@
-# GovIntel AI｜現行實作與證據狀態
+# GovIntel AI－現行實作與證據狀態
 
-查核日：**2026-10-02**。程式基準：`main@562141e396c693e115b3fce10594c434c401a58e`。
-本頁是評審入口的狀態真相；每次狀態更新都應重新填入查核日期、版本與證據，不把舊 receipt 重新標成 current。
+文件更新：2026-10-05（Asia/Taipei）。已部署程式基準：`main@562141e396c693e115b3fce10594c434c401a58e`；下列 PR 是另行驗收的候選，不能把其功能算入這份 production 基準。公開資料會隨排程更新，引用前須讀取 receipt 本身的時間、版本與 hash。
 
-## 固定狀態語意
+提案名稱固定為 **GovIntel AI－公共資訊查詢與個人化追蹤平台**。v6 修訂日為 2026-10-01，首期服務民眾與公開資訊研究／業務人員；公開查詢、同一瀏覽器追蹤與可重播驗證包是主交付。交班、研究匯出與多人協作不是首期主流程。
 
-能力表只使用以下五種狀態：
+## 狀態語意
 
-- `PRODUCTION_ACTIVE`：目前公開產品／發布路徑正在使用的能力；不代表每次資料都新鮮或完整。
-- `IMPLEMENTED_NOT_PRODUCTION`：程式、fixture 或離線 receipt 可重播，但尚未證明正式公開服務、promotion 或真人使用。
-- `CANDIDATE_CANARY`：候選來源或流程正在觀測／等待 promotion；Open PR 不是 production 證據。
-- `DESIGN_ONLY`：有設計、規格或評估方法，尚未宣稱可用。
-- `BLOCKED`：有明確阻塞條件；在證據補齊前不得說已完成。
+- `PRODUCTION_ACTIVE`：已在目前公開發布路徑使用；不保證每次資料完整、新鮮或涵蓋所有事件。
+- `IMPLEMENTED_NOT_PRODUCTION`：程式、fixture 或本地 receipt 可重播；正式部署、資料 promotion 與真人驗收須另有證據。
+- `CANDIDATE_CANARY`：候選來源正在觀察，未進入核准 production 集合。
+- `DESIGN_ONLY`：規劃、規格或評測方法存在，尚無可用性證明。
+- `BLOCKED`：明確驗收缺口未解決。
 
-`NOT_RUN`、`UNVERIFIED`、`STALE`、`PARTIAL` 等字樣只描述某一份評估或資料 receipt，不是能力狀態，不能取代上面五種狀態。
-
-## 能力狀態
-
-| 能力 | 固定狀態 | 評審可重播／核對的證據 | 不可由此推出的結論 |
-|---|---|---|---|
-| 五個議會／市政來源的 publication baseline（S-004、S-006、S-007、S-009、S-029） | `PRODUCTION_ACTIVE` | [核准 source policy](../source-policy.approved.json)、[source-status contract](../../../scripts/source-status-contract.mjs)、[目前公開資料](https://reese-max.github.io/taichung-police-intel/data/source-status.json) | `PASS` 不等於新鮮、完整或涵蓋所有公共事件。 |
-| Council brief、來源健康／缺口、官方影音與 transcript navigation | `PRODUCTION_ACTIVE` | [現行 Web app](../../../apps/web/app/page.js)、[current-checkout verifier](../../../scripts/verify-current-checkout.py)、[公開 demo](https://reese-max.github.io/taichung-police-intel/) | transcript 是導航文字，不是人工核准的逐字證據；影片播放受官方 CDN 狀態影響。 |
-| Source Policy、query coverage、官方文件定位、受限 Query Gateway、角色排序、local-first handoff、Review Inbox | `IMPLEMENTED_NOT_PRODUCTION` | [Source Policy integration](../issue-49-source-policy-integration.md)、[official document replay](../issue-48-official-document-replay.md)、[runtime boundaries](../issue-30-runtime-boundaries.md)、[handoff flow](../issue-23-handoff-flow.md) 與各自 self-check | 尚未因此宣稱正式跨機關部署、多人簽核、機關採用或 production domain-store coverage。 |
-| PublicEvent 事件融合 | `IMPLEMENTED_NOT_PRODUCTION` | [fixture-only JSON](../../../apps/web/public/data/public-event-demo.json)、`python -X utf8 scripts/public-event-fusion.py --self-check`、[Issue #24 design](../issue-24-public-event-fusion.md) | fixture 的三個來源、衝突與時間更正不是 live collector 或準確率結果。 |
-| 新聞／市政／交通／消防候選 collector（S-001、S-019、S-031、S-032、S-033） | `CANDIDATE_CANARY` | [source catalog v2](../source-catalog.v2.json)、[PR #16](https://github.com/Reese-max/taichung-police-intel/pull/16)、[Issue #22](https://github.com/Reese-max/taichung-police-intel/issues/22) | Open PR、list adapter、單次觀察或 fixture 都不等於 promotion 或正式 Pages source。 |
-| Twinkle + direct official hybrid、latest-information loop、完整跨機關即時覆蓋 | `DESIGN_ONLY` | [Twinkle strategy](../TWINKLE_HYBRID_SOURCES.md)、[source strategy](../DATA_SOURCE_STRATEGY.md)、[Issue #21](https://github.com/Reese-max/taichung-police-intel/issues/21) | 沒有把設計文件寫成已存在的 Twinkle client、完整正文複查或即時 SLA。 |
-| 完整跨日 persistent tracking／版本化交班 acceptance | `DESIGN_ONLY` | [Issue #23 design](../issue-23-handoff-flow.md)、local-first handoff 的離線 self-check | local replay 不能代替正式持久服務、權限、通知或真人驗收。 |
-| Production event fusion、背景資料單一路徑 promotion | `DESIGN_ONLY` | [Issue #24 design](../issue-24-public-event-fusion.md)、[NPA source matrix](../issue-28-npa-source-matrix.md) | PublicEvent fixture 不能宣稱 live multi-agency fusion 或背景資料效益。 |
-| 排程發布的完整晨／晚、失敗演練與匿名版本／hash 完成定義 | `BLOCKED` | [Issue #20](https://github.com/Reese-max/taichung-police-intel/issues/20)、[latest scheduled run 36952506907](https://github.com/Reese-max/taichung-police-intel/actions/runs/36952506907) | 這次 run 成功不等於 #20 全部 acceptance 已完成；仍須補齊 issue 定義的證據。 |
+`PARTIAL`、`STALE`、`FAILED`、`NOT_RUN`、`UNVERIFIED` 描述資料或評測 receipt，不能直接替代能力狀態。
 
 ## Claim / evidence table
 
-| Claim | Status | Evidence |
+| 能力／主張 | 狀態 | 可核對的證據與限制 |
 |---|---|---|
-| 五個原始來源 publication | `PRODUCTION_ACTIVE` — production baseline | [source policy](../source-policy.approved.json)、[public source status](https://reese-max.github.io/taichung-police-intel/data/source-status.json)、[latest scheduled run](https://github.com/Reese-max/taichung-police-intel/actions/runs/36952506907) |
-| 新聞／市政／交通 collector | `CANDIDATE_CANARY` — open PR / candidate | [PR #16](https://github.com/Reese-max/taichung-police-intel/pull/16) 與追蹤 promotion 缺口的 [Issue #22](https://github.com/Reese-max/taichung-police-intel/issues/22) |
-| Twinkle hybrid | `DESIGN_ONLY` — design/config | [TWINKLE_HYBRID_SOURCES.md](../TWINKLE_HYBRID_SOURCES.md)、[twinkle-source-overlay.v1.json](../twinkle-source-overlay.v1.json) |
-| latest-information loop | `DESIGN_ONLY` — design / issue | [Issue #21](https://github.com/Reese-max/taichung-police-intel/issues/21)、[detail-recheck design](../issue-21-detail-recheck.md) |
-| persistent tracking | `DESIGN_ONLY` — planned / issue | [Issue #23](https://github.com/Reese-max/taichung-police-intel/issues/23)、[handoff design](../issue-23-handoff-flow.md) |
-| production event fusion | `DESIGN_ONLY` — planned / issue | [Issue #24](https://github.com/Reese-max/taichung-police-intel/issues/24)、fixture boundary in [public-event-demo.json](../../../apps/web/public/data/public-event-demo.json) |
-| scheduled publishing | `BLOCKED` — #20 + latest Actions evidence | [Issue #20](https://github.com/Reese-max/taichung-police-intel/issues/20)、[run 36952506907](https://github.com/Reese-max/taichung-police-intel/actions/runs/36952506907) |
+| 五個來源 publication baseline、來源健康與官方影音導覽 | `PRODUCTION_ACTIVE` | [核准 policy](../source-policy.approved.json)：S-004／S-006／S-007／S-009／S-029。[公開 source status](https://reese-max.github.io/taichung-police-intel/data/source-status.json)仍須逐項讀取日期、完整性與 LKG。 |
+| 受限 production Query Gateway | `PRODUCTION_ACTIVE` | [production verifier](../../../scripts/verify-query-gateway-production.py)與 Oct 4 run 的 Gateway check；只證明 generation 綁定、受限查詢與失敗處理，不證明語意 AI、v6 查詢 UX 或 domain-store 全域涵蓋。 |
+| v6 公開查詢原型 | `IMPLEMENTED_NOT_PRODUCTION` | [PR #124](https://github.com/Reese-max/taichung-police-intel/pull/124)待固定版本驗收；結果須附原文、時間與資料限制，PR 存在不等於公開部署。 |
+| v6 個人追蹤／重開站更新 | `IMPLEMENTED_NOT_PRODUCTION` | [PR #125](https://github.com/Reese-max/taichung-police-intel/pull/125)待瀏覽器重開、已讀、取消、純排版與解除情境驗收；同一瀏覽器本機保存，不含背景推播、跨裝置帳號。 |
+| v6 可重播評測工具 | `IMPLEMENTED_NOT_PRODUCTION` | [PR #126](https://github.com/Reese-max/taichung-police-intel/pull/126)待驗收。[評測協定](EVALUATION.md)與空白 [manifest](evaluation-manifest.template.json)不代表已測到產品／真人成效。 |
+| Source Policy、located facts、角色排序、local-first handoff、Review Inbox | `IMPLEMENTED_NOT_PRODUCTION` | [#49](../issue-49-source-policy-integration.md)、[#48](../issue-48-official-document-replay.md)、[#23](../issue-23-handoff-flow.md)及 self-check；不是正式多人簽核或機關採用。 |
+| PublicEvent 融合 | `IMPLEMENTED_NOT_PRODUCTION` | [JSON](../../../apps/web/public/data/public-event-demo.json)明示 `FIXTURE_ONLY`；三份測試文件與衝突不是真實即時事件或準確率。 |
+| 四類首期候選 S-001／S-032／S-033／S-031 | `CANDIDATE_CANARY` | [獨立觀察 workflow](../../../.github/workflows/candidate-source-observation.yml)、[窗口驗證器](../../../scripts/verify-candidate-observation-window.py)；七個有效觀察日也不能自動取代權利、完整性、敏感內容與 promotion review。 |
+| S-019、其他 reference／Twinkle／Taiwan Intel 擴充 | `CANDIDATE_CANARY`／`DESIGN_ONLY` | [來源矩陣](DATA_SOURCE_MATRIX.md)；S-019 不在首期四類觀察矩陣。媒體是待查線索，正式介接須另有十四日影子觀察。 |
+| D1 人口、D2 警察機關查詢、語意 AI | `DESIGN_ONLY` | v6 指定 D1 112 年 12 月、D2 dataset 5958；尚無已下載／欄位／座標／用途驗收。deterministic keyword 與 fixture 不能冒充模型抽取或 AI 效益。 |
+| 真人試用、A／B／C 效益、採用 | `DESIGN_ONLY` | 結果 `NOT_RUN`／null；約 20 事件／60 文件、3–5 位使用者與 85%／90%／30% 都是規劃。 |
+| #20 完整排程／failure-recovery 驗收 | `BLOCKED` | [Issue #20](https://github.com/Reese-max/taichung-police-intel/issues/20)的未完成條件須逐項留證；不能把整條已成功發布流程繼續稱為未合併，也不能用單次成功取代全部 failure drill。 |
 
-## Latest dated evidence
+## 已有的日期化 production 證據
 
-- The latest scheduled workflow checked during this update was [run 36952506907](https://github.com/Reese-max/taichung-police-intel/actions/runs/36952506907), `success`, `head=562141e`, created `2026-10-02T01:46:06Z` and completed `2026-10-02T02:16:21Z`.
-- The anonymous public `source-status.json` read during this update reported `generated_at=2026-10-02T09:46:41+08:00`, collection run `CR-DEMO-20261002-MORNING-SCHEDULE`, overall `PARTIAL`, five sources and one `FAILED` source. S-004 and S-007 were `STALE`; S-006 and S-009 were `FRESH`; S-029 was `FAILED`/`STALE`.
-- The same public read proves reachability and a time-bound snapshot, not complete freshness, full source coverage, a human evaluation, eligibility, or a submission receipt.
-- The checked-in [`apps/web/public/data/source-status.json`](../../../apps/web/public/data/source-status.json) is an older `2026-09-11` snapshot. Do not compare it with the public endpoint as if it were the latest deployment.
+- [Run 37169331249](https://github.com/Reese-max/taichung-police-intel/actions/runs/37169331249)，2026-10-04 10:22 Asia/Taipei 開始，執行了實際蒐集，五個公開檔案 hash 與 Gateway 檢查通過。
+- 同日稍後的 [run 37212963039](https://github.com/Reese-max/taichung-police-intel/actions/runs/37212963039)也通過部署、五檔公開 bytes/hash 與 legacy Gateway 檢查。2026-10-05 01:13 Asia/Taipei 的匿名觀察對應 `CR-DEMO-20261004-EVENING-SCHEDULE`，`generated_at=2026-10-04T23:26:28+08:00`，publication hash 為 `1c9e8087121e513776dc1da0379af80615945f53dfaa68bb46641689de3471bd`。這些是各自 generation 的證據，不把較早快照寫成永遠的 latest。
+- 本輪已核對的來源缺口仍為 `PARTIAL`：S-007 陳舊、S-029 蒐集失敗。失敗與 LKG 不能解讀成零事件或來源解除。
+- 核准 active set 仍只有五個來源；沒有四類候選已啟用、全臺完整涵蓋或每日新增 100–200 筆的證據。
+- `publication-state` lifecycle 已在 main；[PUBLICATION_RECOVERY.md](PUBLICATION_RECOVERY.md)的 9 月「尚未 merge」記錄屬歷史根因，不是目前合併狀態。
+- [Gateway health](https://govintel-query-gateway.irisx-tracker.workers.dev/health)在上述觀察為 HTTP 200，coverage `PARTIAL`、missing S-029、stale S-007／S-029。`search_events`、`get_event`、`compare_event_versions`、`query_statistics` 未提供；`data/release.json` 回傳 404，release-bound [PR #103](https://github.com/Reese-max/taichung-police-intel/pull/103)仍是候選，不能宣稱已具完整 release contract。完整安全快照見[production observation](production-observation-20261005.json)。
 
-## Evidence update rule
+## 送件與外部確認
 
-When a source, feature, deployment, evaluation, or competition claim changes, update this page and the linked receipt together. Keep the old receipt dated and labelled historical; never promote a design file, Issue, Open PR, CI pass, HTTP 200, or fixture to a production claim by wording alone.
+v6 已完成；補件已於 2026-10-01 22:00 Asia/Taipei 寄出。已寄出不等於主辦已受理或已同意更名；目前沒有受理／更名回覆證據。官方資格、團隊真實分工、權利與提交格式須由官方原件及私有紀錄核對。公開 repo 不收錄參賽者個資、收件人、信件識別碼、原始信件或私人附件。
+
+## 更新規則
+
+功能改為 `PRODUCTION_ACTIVE` 前，須綁定已合併 code SHA、部署產物、匿名 readback 與該功能的真實瀏覽器／runtime 操作。本地驗收通過只可提升本地驗收狀態；資料、模型、真人與主辦結果各自留證，不能互相代替。未完成項目見 [ACCEPTANCE_CHECKLIST.md](ACCEPTANCE_CHECKLIST.md)。
