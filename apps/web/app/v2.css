@@ -27,7 +27,7 @@
   text-transform: uppercase;
 }
 
-.v2-hero h1 {
+.v2-hero h1, .v2-hero h2 {
   margin: 0;
   font-size: clamp(2rem, 6vw, 4.2rem);
   line-height: 1.03;

@@ -768,8 +768,8 @@ export default function V2DailyDashboard() {
     <main className="v2-home" id="v2-daily-intelligence">
       <header className="v2-hero">
         <div>
-          <p className="v2-eyebrow">公開來源 · 政策與議會追蹤</p>
-          <h1>臺中警政每日情資</h1>
+          <p className="v2-eyebrow">已取得的公開來源 · 保留原文與資料限制</p>
+          <h2>官方公告與資料概覽</h2>
           <p className="v2-hero-copy">
             只呈現本期真正新增、修正、狀態或時程變更；既有資料留在歷史區，不冒充今日情報。
           </p>
@@ -781,7 +781,7 @@ export default function V2DailyDashboard() {
             <small>Asia/Taipei</small>
             {profileViews.length > 1 && (
               <label className="v2-profile-selector" htmlFor="v2-profile-select">
-                <span>工作角色</span>
+                <span>排序視角</span>
                 <select
                   id="v2-profile-select"
                   data-testid="role-profile-selector"
