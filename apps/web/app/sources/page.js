@@ -28,6 +28,7 @@ export default function SourcesPage() {
   const [now, setNow] = useState(null);
   useEffect(() => {
     const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(new DOMException("來源狀態載入逾時，請稍後重新整理。", "TimeoutError")), 10000);
     setNow(Date.now());
     fetch(STATUS_URL, { cache: "no-store", signal: controller.signal })
       .then(response => {
@@ -35,11 +36,16 @@ export default function SourcesPage() {
         return response.json();
       })
       .then(data => {
-        if (!Array.isArray(data.sources) || !data.sources.length) throw new Error("來源狀態缺少可核對紀錄。");
+        if (!data || !Array.isArray(data.sources) || !data.sources.length ||
+            data.sources.some(source => !source || typeof source.source_id !== "string" || !source.source_id) ||
+            new Set(data.sources.map(source => source.source_id)).size !== data.sources.length) {
+          throw new Error("來源狀態缺少可核對紀錄。");
+        }
         setStatus(data);
       })
-      .catch(reason => { if (reason.name !== "AbortError") setError(reason.message); });
-    return () => controller.abort();
+      .catch(reason => { if (reason.name !== "AbortError") setError(reason.message); })
+      .finally(() => clearTimeout(timer));
+    return () => { clearTimeout(timer); controller.abort(); };
   }, []);
   const generated = Date.parse(status?.generated_at || "");
   const snapshotOld = now !== null && Number.isFinite(generated) && now - generated > 16 * 60 * 60 * 1000;
@@ -69,7 +75,7 @@ export default function SourcesPage() {
                     <div><dt>官方資料截至</dt><dd>{dateLabel(source.data_as_of)}</dd></div>
                   </dl>
                   {["STALE", "VERY_STALE"].includes(source.freshness_status) && <p>官方資料日期較舊，不能解讀為目前沒有事件。</p>}
-                  {source.source_health !== "PASS" && <p>本次來源未完整取得；已保存資料可供回查，不能据此推定公告已解除或移除。</p>}
+                  {source.source_health !== "PASS" && <p>本次來源未完整取得；已保存資料可供回查，不能據此推定公告已解除或移除。</p>}
                   {officialUrl && <a href={officialUrl} target="_blank" rel="noreferrer">開啟官方來源 ↗</a>}
                 </article>
               );
