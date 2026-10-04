@@ -1,0 +1,561 @@
+{
+  "collections": [
+    {
+      "observed_at": "2026-10-05T10:00:00+08:00",
+      "slot_id": "SLOT-1",
+      "snapshot_complete": true,
+      "source_id": "S-SYN-ROAD",
+      "visible_update_ids": [
+        "UPD-001"
+      ]
+    },
+    {
+      "observed_at": "2026-10-06T17:20:00+08:00",
+      "slot_id": "SLOT-2",
+      "snapshot_complete": true,
+      "source_id": "S-SYN-ROAD",
+      "visible_update_ids": [
+        "UPD-001",
+        "UPD-003",
+        "UPD-004"
+      ]
+    },
+    {
+      "observed_at": "2026-10-07T09:00:00+08:00",
+      "slot_id": "SLOT-3",
+      "snapshot_complete": true,
+      "source_id": "S-SYN-ROAD",
+      "visible_update_ids": [
+        "UPD-001",
+        "UPD-003",
+        "UPD-004"
+      ]
+    },
+    {
+      "observed_at": "2026-10-08T08:50:00+08:00",
+      "slot_id": "SLOT-4",
+      "snapshot_complete": true,
+      "source_id": "S-SYN-ROAD",
+      "visible_update_ids": [
+        "UPD-001",
+        "UPD-003",
+        "UPD-004",
+        "UPD-005",
+        "UPD-010",
+        "UPD-011"
+      ]
+    },
+    {
+      "observed_at": "2026-10-08T18:10:00+08:00",
+      "slot_id": "SLOT-5",
+      "snapshot_complete": false,
+      "source_id": "S-SYN-ROAD",
+      "unreachable_source_ids": [
+        "S-SYN-ROAD"
+      ],
+      "visible_update_ids": []
+    },
+    {
+      "observed_at": "2026-10-09T09:10:00+08:00",
+      "partial_source_ids": [
+        "S-SYN-FIRE"
+      ],
+      "slot_id": "SLOT-6",
+      "snapshot_complete": false,
+      "source_id": "S-SYN-FIRE",
+      "visible_update_ids": []
+    },
+    {
+      "observed_at": "2026-10-09T09:15:00+08:00",
+      "slot_id": "SLOT-7",
+      "snapshot_complete": true,
+      "source_id": "S-SYN-ROAD",
+      "visible_update_ids": [
+        "UPD-001",
+        "UPD-003",
+        "UPD-004",
+        "UPD-010",
+        "UPD-011"
+      ]
+    },
+    {
+      "observed_at": "2026-10-09T09:30:00+08:00",
+      "slot_id": "SLOT-8",
+      "snapshot_complete": true,
+      "source_id": "S-SYN-FIRE",
+      "visible_update_ids": []
+    },
+    {
+      "observed_at": "2026-10-09T17:10:00+08:00",
+      "slot_id": "SLOT-9",
+      "snapshot_complete": true,
+      "source_id": "S-SYN-ROAD",
+      "visible_update_ids": [
+        "UPD-001",
+        "UPD-003",
+        "UPD-004",
+        "UPD-005",
+        "UPD-010",
+        "UPD-011"
+      ]
+    },
+    {
+      "observed_at": "2026-10-09T17:40:00+08:00",
+      "slot_id": "SLOT-10",
+      "snapshot_complete": true,
+      "source_id": "S-SYN-ROAD",
+      "visible_update_ids": [
+        "UPD-001",
+        "UPD-003",
+        "UPD-004",
+        "UPD-005",
+        "UPD-006",
+        "UPD-007",
+        "UPD-010",
+        "UPD-011"
+      ]
+    },
+    {
+      "observed_at": "2026-10-10T08:30:00+08:00",
+      "slot_id": "SLOT-11",
+      "snapshot_complete": true,
+      "source_id": "S-SYN-ROAD",
+      "visible_update_ids": [
+        "UPD-001",
+        "UPD-003",
+        "UPD-004",
+        "UPD-005",
+        "UPD-006",
+        "UPD-007",
+        "UPD-008",
+        "UPD-010",
+        "UPD-011",
+        "UPD-012",
+        "UPD-013"
+      ]
+    }
+  ],
+  "conditions": [
+    {
+      "cancelled_at": "2026-10-09T18:30:00+08:00",
+      "condition_id": "C-ROAD-AB",
+      "daily": {
+        "end": "17:00",
+        "start": "09:00"
+      },
+      "kind": "ROAD_CONDITION",
+      "road": "測試路 A 至 B",
+      "saved_at": "2026-10-05T09:30:00+08:00",
+      "saved_by": "synthetic-commuter-01",
+      "tracked_end": "2026-10-07T17:00:00+08:00",
+      "tracked_from": "2026-10-05T09:00:00+08:00"
+    },
+    {
+      "cancelled_at": null,
+      "condition_id": "C-DISTRICT-XITUN",
+      "daily": {
+        "end": "17:00",
+        "start": "09:00"
+      },
+      "district": "西屯區（合成）",
+      "kind": "DISTRICT_CONDITION",
+      "saved_at": "2026-10-05T09:40:00+08:00",
+      "saved_by": "synthetic-commuter-01",
+      "tracked_end": "2026-10-14T17:00:00+08:00",
+      "tracked_from": "2026-10-05T09:00:00+08:00"
+    }
+  ],
+  "data_cutoff": "2026-10-10T09:00:00+08:00",
+  "fingerprint": "govintel/v6/commute-reopen-replay-evaluation/v1",
+  "notice": "合成資料：測試路 A 至 B／測試路 C 至 D，不代表任何真實路況或道路安全。",
+  "reopen_points": [
+    {
+      "note": "v1 施工，公開查詢後保存條件",
+      "reopen_id": "R1",
+      "reopened_at": "2026-10-05T10:00:00+08:00"
+    },
+    {
+      "note": "同源轉載、重複取回、純排版版本：不增加重要提示",
+      "reopen_id": "R2",
+      "reopened_at": "2026-10-06T17:20:00+08:00"
+    },
+    {
+      "note": "v2 延期：只改結束日；顯示 before/after 與原文",
+      "reopen_id": "R3",
+      "reopened_at": "2026-10-08T08:50:00+08:00"
+    },
+    {
+      "note": "S-SYN-ROAD 連線失敗負向情境",
+      "reopen_id": "R4",
+      "reopened_at": "2026-10-08T18:10:00+08:00"
+    },
+    {
+      "note": "S-SYN-FIRE PARTIAL，且 S-SYN-ROAD 恢復後的完整擷取缺少已取得的延期公告",
+      "reopen_id": "R5",
+      "reopened_at": "2026-10-09T09:20:00+08:00"
+    },
+    {
+      "note": "預定日期已到：不自動解除",
+      "reopen_id": "R6",
+      "reopened_at": "2026-10-09T17:10:00+08:00"
+    },
+    {
+      "note": "v3 明文解除",
+      "reopen_id": "R7",
+      "reopened_at": "2026-10-09T17:40:00+08:00"
+    },
+    {
+      "note": "另一工程仍可見",
+      "reopen_id": "R8",
+      "reopened_at": "2026-10-09T18:00:00+08:00"
+    },
+    {
+      "note": "取消條件後停止提示",
+      "reopen_id": "R9",
+      "reopened_at": "2026-10-10T08:30:00+08:00"
+    }
+  ],
+  "road_under_test": "測試路 A 至 B",
+  "scenario_id": "commute-road-reopen-2026-10",
+  "schema_version": 1,
+  "source_id_note": "S-SYN-* 是本情境的合成來源代號，不是來源目錄中的任何真實來源；origin 欄描述的是角色，不是真實發布者。",
+  "synthetic": true,
+  "updates": [
+    {
+      "acquired_at": "2026-10-05T09:20:00+08:00",
+      "content_sha256": "9b09d0becf886b6e5516c8ba8bcb31de9e8f6d9b78c5d001da69eea938fb10b9",
+      "document_id": "DOC-ROAD-AB",
+      "origin": "OFFICIAL",
+      "payload": {
+        "daily": {
+          "end": "17:00",
+          "start": "09:00"
+        },
+        "district": "西屯區（合成）",
+        "effective_from": "2026-10-05T09:00:00+08:00",
+        "effective_to": "2026-10-07T17:00:00+08:00",
+        "layout": {
+          "columns": 4,
+          "template": "table-v1"
+        },
+        "punctuation_style": "fullwidth",
+        "road": "測試路 A 至 B",
+        "status": "IN_PROGRESS",
+        "text": "【合成測試】測試路 A 至 B 路口施工：每日 09:00 至 17:00 分時段管制。"
+      },
+      "published_at": "2026-10-05T09:20:00+08:00",
+      "rights": "SYNTHETIC_NO_REAL_ROAD",
+      "source_id": "S-SYN-ROAD",
+      "update_id": "UPD-001",
+      "upstream_update_id": null
+    },
+    {
+      "acquired_at": "2026-10-06T17:15:00+08:00",
+      "content_sha256": "9b09d0becf886b6e5516c8ba8bcb31de9e8f6d9b78c5d001da69eea938fb10b9",
+      "document_id": "DOC-ROAD-AB-MIRROR",
+      "origin": "MIRROR",
+      "payload": {
+        "daily": {
+          "end": "17:00",
+          "start": "09:00"
+        },
+        "district": "西屯區（合成）",
+        "effective_from": "2026-10-05T09:00:00+08:00",
+        "effective_to": "2026-10-07T17:00:00+08:00",
+        "layout": {
+          "columns": 4,
+          "template": "table-v1"
+        },
+        "punctuation_style": "fullwidth",
+        "road": "測試路 A 至 B",
+        "status": "IN_PROGRESS",
+        "text": "【合成測試】測試路 A 至 B 路口施工：每日 09:00 至 17:00 分時段管制。"
+      },
+      "published_at": "2026-10-06T17:15:00+08:00",
+      "rights": "SYNTHETIC_NO_REAL_ROAD",
+      "source_id": "S-SYN-MIRROR",
+      "update_id": "UPD-002",
+      "upstream_update_id": "UPD-001"
+    },
+    {
+      "acquired_at": "2026-10-06T17:12:00+08:00",
+      "content_sha256": "9b09d0becf886b6e5516c8ba8bcb31de9e8f6d9b78c5d001da69eea938fb10b9",
+      "document_id": "DOC-ROAD-AB",
+      "origin": "OFFICIAL",
+      "payload": {
+        "daily": {
+          "end": "17:00",
+          "start": "09:00"
+        },
+        "district": "西屯區（合成）",
+        "effective_from": "2026-10-05T09:00:00+08:00",
+        "effective_to": "2026-10-07T17:00:00+08:00",
+        "layout": {
+          "columns": 4,
+          "template": "table-v1"
+        },
+        "punctuation_style": "fullwidth",
+        "road": "測試路 A 至 B",
+        "status": "IN_PROGRESS",
+        "text": "【合成測試】測試路 A 至 B 路口施工：每日 09:00 至 17:00 分時段管制。"
+      },
+      "published_at": "2026-10-06T17:12:00+08:00",
+      "rights": "SYNTHETIC_NO_REAL_ROAD",
+      "source_id": "S-SYN-ROAD",
+      "update_id": "UPD-003",
+      "upstream_update_id": null
+    },
+    {
+      "acquired_at": "2026-10-06T17:10:00+08:00",
+      "content_sha256": "29b5fd5133a5ec7dfa38eb8584b53b0e5aa2fd8279c6900ba2be1523ea3f9dde",
+      "document_id": "DOC-ROAD-AB",
+      "origin": "OFFICIAL",
+      "payload": {
+        "daily": {
+          "end": "17:00",
+          "start": "09:00"
+        },
+        "district": "西屯區（合成）",
+        "effective_from": "2026-10-05T09:00:00+08:00",
+        "effective_to": "2026-10-07T17:00:00+08:00",
+        "layout": {
+          "columns": 6,
+          "template": "table-v2"
+        },
+        "punctuation_style": "halfwidth",
+        "road": "測試路 A 至 B",
+        "status": "IN_PROGRESS",
+        "text": "【合成測試】測試路 A 至 B 路口施工：每日 09:00 至 17:00 分時段管制。"
+      },
+      "published_at": "2026-10-06T17:10:00+08:00",
+      "rights": "SYNTHETIC_NO_REAL_ROAD",
+      "source_id": "S-SYN-ROAD",
+      "update_id": "UPD-004",
+      "upstream_update_id": null
+    },
+    {
+      "acquired_at": "2026-10-08T08:40:00+08:00",
+      "content_sha256": "6092c003da48a7d07216f862c9c23ec1f9c11d1e363bcc5c8218d48f6c9fc532",
+      "document_id": "DOC-ROAD-AB",
+      "origin": "OFFICIAL",
+      "payload": {
+        "daily": {
+          "end": "17:00",
+          "start": "09:00"
+        },
+        "district": "西屯區（合成）",
+        "effective_from": "2026-10-05T09:00:00+08:00",
+        "effective_to": "2026-10-09T17:00:00+08:00",
+        "layout": {
+          "columns": 4,
+          "template": "table-v1"
+        },
+        "punctuation_style": "fullwidth",
+        "road": "測試路 A 至 B",
+        "status": "IN_PROGRESS",
+        "text": "【合成測試】測試路 A 至 B 路口施工延期：改為至 10/9 17:00，每日 09:00 至 17:00 分時段管制。"
+      },
+      "published_at": "2026-10-08T08:40:00+08:00",
+      "rights": "SYNTHETIC_NO_REAL_ROAD",
+      "source_id": "S-SYN-ROAD",
+      "update_id": "UPD-005",
+      "upstream_update_id": null
+    },
+    {
+      "acquired_at": "2026-10-08T08:42:00+08:00",
+      "content_sha256": "a6def24957ce6437cf015c00af638c38666403262c94ead2d9c9ccc449b7ef90",
+      "document_id": "DOC-ROAD-AB-FUTURE",
+      "origin": "OFFICIAL",
+      "payload": {
+        "daily": {
+          "end": "17:00",
+          "start": "09:00"
+        },
+        "district": "北屯區（合成）",
+        "effective_from": "2026-10-20T09:00:00+08:00",
+        "effective_to": "2026-10-22T17:00:00+08:00",
+        "layout": {
+          "columns": 4,
+          "template": "table-v1"
+        },
+        "punctuation_style": "fullwidth",
+        "road": "測試路 A 至 B",
+        "status": "IN_PROGRESS",
+        "text": "【合成測試】測試路 A 至 B 另一工程：10/20 至 10/22 每日 09:00 至 17:00 分時段管制。"
+      },
+      "published_at": "2026-10-08T08:42:00+08:00",
+      "rights": "SYNTHETIC_NO_REAL_ROAD",
+      "source_id": "S-SYN-ROAD",
+      "update_id": "UPD-010",
+      "upstream_update_id": null
+    },
+    {
+      "acquired_at": "2026-10-08T08:45:00+08:00",
+      "content_sha256": "7c38846de945df97c9b96b40c29907f57a20dc18c4580af1f096d14668fd1ff0",
+      "document_id": "DOC-ROAD-AB-UNDATED",
+      "origin": "OFFICIAL",
+      "payload": {
+        "daily": {
+          "end": "17:00",
+          "start": "09:00"
+        },
+        "district": "北屯區（合成）",
+        "effective_from": null,
+        "effective_to": null,
+        "layout": {
+          "columns": 4,
+          "template": "table-v1"
+        },
+        "punctuation_style": "fullwidth",
+        "road": "測試路 A 至 B",
+        "status": "IN_PROGRESS",
+        "text": "【合成測試】測試路 A 至 B 施工調整，官方未提供可驗證生效日期。"
+      },
+      "published_at": "2026-10-08T08:45:00+08:00",
+      "rights": "SYNTHETIC_NO_REAL_ROAD",
+      "source_id": "S-SYN-ROAD",
+      "update_id": "UPD-011",
+      "upstream_update_id": null
+    },
+    {
+      "acquired_at": "2026-10-09T17:30:00+08:00",
+      "content_sha256": "dfa5a2047547aa0b36735fe7672f1a52b4d5b4380db9c945986d497efd31f97a",
+      "document_id": "DOC-ROAD-AB",
+      "origin": "OFFICIAL",
+      "payload": {
+        "daily": {
+          "end": "17:00",
+          "start": "09:00"
+        },
+        "district": "西屯區（合成）",
+        "effective_from": "2026-10-09T17:00:00+08:00",
+        "effective_to": null,
+        "layout": {
+          "columns": 4,
+          "template": "table-v1"
+        },
+        "punctuation_style": "fullwidth",
+        "road": "測試路 A 至 B",
+        "status": "LIFTED",
+        "text": "【合成測試】測試路 A 至 B 路口施工：自 10/9 17:00 起解除管制。"
+      },
+      "published_at": "2026-10-09T17:30:00+08:00",
+      "rights": "SYNTHETIC_NO_REAL_ROAD",
+      "source_id": "S-SYN-ROAD",
+      "update_id": "UPD-006",
+      "upstream_update_id": null
+    },
+    {
+      "acquired_at": "2026-10-09T17:45:00+08:00",
+      "content_sha256": "7298bdab55e769ea86a424dd3dd5d117e0b14d830d3b823a652c5b008923d3d5",
+      "document_id": "DOC-ROAD-CD",
+      "origin": "OFFICIAL",
+      "payload": {
+        "daily": {
+          "end": "17:00",
+          "start": "09:00"
+        },
+        "district": "西屯區（合成）",
+        "effective_from": "2026-10-10T09:00:00+08:00",
+        "effective_to": "2026-10-12T17:00:00+08:00",
+        "layout": {
+          "columns": 4,
+          "template": "table-v1"
+        },
+        "punctuation_style": "fullwidth",
+        "road": "測試路 C 至 D",
+        "status": "IN_PROGRESS",
+        "text": "【合成測試】測試路 C 至 D 另一工程：10/10 至 10/12 每日 09:00 至 17:00 分時段管制。"
+      },
+      "published_at": "2026-10-09T17:45:00+08:00",
+      "rights": "SYNTHETIC_NO_REAL_ROAD",
+      "source_id": "S-SYN-ROAD",
+      "update_id": "UPD-007",
+      "upstream_update_id": null
+    },
+    {
+      "acquired_at": "2026-10-10T08:10:00+08:00",
+      "content_sha256": "390f2c14a27f998fcab840b00defcb1d4c2cfe104897c29d8ba1f53f2aec0c5e",
+      "document_id": "DOC-ROAD-CD",
+      "origin": "OFFICIAL",
+      "payload": {
+        "daily": {
+          "end": "17:00",
+          "start": "09:00"
+        },
+        "district": "西屯區（合成）",
+        "effective_from": "2026-10-10T09:00:00+08:00",
+        "effective_to": "2026-10-14T17:00:00+08:00",
+        "layout": {
+          "columns": 4,
+          "template": "table-v1"
+        },
+        "punctuation_style": "fullwidth",
+        "road": "測試路 C 至 D",
+        "status": "IN_PROGRESS",
+        "text": "【合成測試】測試路 C 至 D 另一工程更正：管制延長至 10/14 17:00。"
+      },
+      "published_at": "2026-10-10T08:10:00+08:00",
+      "rights": "SYNTHETIC_NO_REAL_ROAD",
+      "source_id": "S-SYN-ROAD",
+      "update_id": "UPD-008",
+      "upstream_update_id": null
+    },
+    {
+      "acquired_at": "2026-10-10T08:20:00+08:00",
+      "content_sha256": "d466a6b67bf722a233e4fb50da67e79159c247b16629545e7ebb115bcfe9bb86",
+      "document_id": "DOC-ROAD-AB-1008-BACKFILL",
+      "origin": "OFFICIAL",
+      "payload": {
+        "daily": {
+          "end": "17:00",
+          "start": "09:00"
+        },
+        "district": "北屯區（合成）",
+        "effective_from": "2026-10-08T09:00:00+08:00",
+        "effective_to": "2026-10-08T17:00:00+08:00",
+        "layout": {
+          "columns": 4,
+          "template": "table-v1"
+        },
+        "punctuation_style": "fullwidth",
+        "road": "測試路 A 至 B",
+        "status": "IN_PROGRESS",
+        "text": "【合成測試】測試路 A 至 B 10/8 施工調整（歷史補抓）：每日 09:00 至 17:00 分時段管制。"
+      },
+      "published_at": "2026-10-10T08:20:00+08:00",
+      "rights": "SYNTHETIC_NO_REAL_ROAD",
+      "source_id": "S-SYN-ROAD",
+      "update_id": "UPD-012",
+      "upstream_update_id": null
+    },
+    {
+      "acquired_at": "2026-10-10T08:25:00+08:00",
+      "content_sha256": "d7d8a4d20263a016ce0725be353ab9e6e5636f5f042d8b6da9b57062f00f2caa",
+      "document_id": "DOC-ROAD-CD-OPEN",
+      "origin": "OFFICIAL",
+      "payload": {
+        "daily": {
+          "end": "17:00",
+          "start": "09:00"
+        },
+        "district": "西屯區（合成）",
+        "effective_from": "2026-10-12T18:00:00+08:00",
+        "effective_to": null,
+        "layout": {
+          "columns": 4,
+          "template": "table-v1"
+        },
+        "punctuation_style": "fullwidth",
+        "road": "測試路 C 至 D",
+        "status": "IN_PROGRESS",
+        "text": "【合成測試】測試路 C 至 D 另一工程延長管制，自 10/12 18:00 起實施，結束時間另行公告。"
+      },
+      "published_at": "2026-10-10T08:25:00+08:00",
+      "rights": "SYNTHETIC_NO_REAL_ROAD",
+      "source_id": "S-SYN-ROAD",
+      "update_id": "UPD-013",
+      "upstream_update_id": null
+    }
+  ]
+}
