@@ -7,6 +7,13 @@ includes main `366a457817104b0c6b5a03ea5ca893e4b9e6a4db` and the narrow public
 projection repair. Runtime source hashes in each receipt identify the measured
 files independently of this subsequently added script and documentation.
 
+The three frozen SDK JSON files remain unchanged after publication. Their
+original diagnostic omitted store/policy file hashes because it used incorrect
+module paths; the complete source commit/tree still pins those files. The
+[supplemental exact-file hashes](issue-15-mcp-runtime-file-hashes-2026-10-05.json)
+record the actual gateway/store/policy/projection paths and original receipt
+digests. The diagnostic now requires those actual paths.
+
 This is a public research/evidence interface. It is not a police operational
 system. No production endpoint, source promotion, human usability improvement,
 OAuth implementation, provider call, or private data access is claimed.

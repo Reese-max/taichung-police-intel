@@ -213,9 +213,11 @@ def main() -> None:
         source = Path(owned)
         with tarfile.open(fileobj=io.BytesIO(archive)) as bundle:
             bundle.extractall(source, filter="data")
-        runtime_files = ["scripts/query-gateway.py", "scripts/query-gateway-stdio.py", "intel_v2/query_store.py",
-                         "intel_v2/source_policy.py", "intel_v2/public_brief.py"]
-        runtime_hashes = {name: sha256(source / name) for name in runtime_files if (source / name).exists()}
+        runtime_files = ["scripts/query-gateway.py", "scripts/query-gateway-stdio.py",
+                         "scripts/query-store.py", "scripts/source-policy.py"]
+        if (source / "intel_v2/public_brief.py").exists():
+            runtime_files.append("intel_v2/public_brief.py")  # Absent only in the pre-repair red source.
+        runtime_hashes = {name: sha256(source / name) for name in runtime_files}
         rows = anyio.run(probe, source, args.mode)
     receipt = {"schema_version": 1, "repository": "Reese-max/taichung-police-intel", "issue": 15,
                "mode": args.mode, "source_commit": commit, "source_tree": tree,
