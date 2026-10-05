@@ -24,11 +24,13 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from intel_v2 import query_domain
+from intel_v2 import conversation, query_domain
 from intel_v2.located_facts import validate_document_url
 
 QUERY_STORE_PATH = ROOT / "scripts" / "query-store.py"
 RETENTION_POLICY_PATH = ROOT / "scripts" / "retention-policy.py"
+ENTITY_REGISTRY_PATH = ROOT / "scripts" / "entity-registry.py"
+ENTITY_REGISTRY_DATA = ROOT / "config" / "entity-registry.v1.json"
 ANSWER_GATE_RUNNER = ROOT / "scripts" / "answer-gate-runner.mjs"
 MAX_REQUEST_BYTES = 64 * 1024
 MAX_RESPONSE_BYTES = 256 * 1024
@@ -53,6 +55,11 @@ if _retention_policy_spec is None or _retention_policy_spec.loader is None:
 retention_policy_module = importlib.util.module_from_spec(_retention_policy_spec)
 _retention_policy_spec.loader.exec_module(retention_policy_module)
 RETENTION_POLICY = retention_policy_module.compile_policy()
+_entity_registry_spec = importlib.util.spec_from_file_location("govintel_entity_registry", ENTITY_REGISTRY_PATH)
+if _entity_registry_spec is None or _entity_registry_spec.loader is None:
+    raise RuntimeError("entity registry module is unavailable")
+entity_registry_module = importlib.util.module_from_spec(_entity_registry_spec)
+_entity_registry_spec.loader.exec_module(entity_registry_module)
 
 CAPABILITIES = (
     "search_evidence",
@@ -60,6 +67,7 @@ CAPABILITIES = (
     "get_publication_receipt",
     "get_source_health",
     "validate_answer",
+    "chat_turn",
 )
 UNIMPLEMENTED = frozenset({
     "search_events",
@@ -119,6 +127,20 @@ MCP_TOOLS = [
             "properties": {
                 "claims": {"type": "array", "maxItems": 32, "items": {"type": "object"}},
                 "expected_generation": {"type": "string", "maxLength": 128},
+            },
+        },
+        "annotations": {"readOnlyHint": True, "openWorldHint": False, "destructiveHint": False},
+    },
+    {
+        "name": "chat_turn",
+        "description": "Resolve one conversational turn into a typed read-only query, run it through the same primitives, and return the resolved request, answer sections, and updated minimal context.",
+        "inputSchema": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "text": {"type": "string", "maxLength": 512},
+                "quick_action": {"type": "string", "maxLength": 64},
+                "context": {"type": "object"},
             },
         },
         "annotations": {"readOnlyHint": True, "openWorldHint": False, "destructiveHint": False},
@@ -940,6 +962,7 @@ class QueryGateway:
             "get_publication_receipt": set(),
             "get_source_health": {"source_id"},
             "validate_answer": {"claims", "expected_generation"},
+            "chat_turn": {"text", "quick_action", "context"},
             **DOMAIN_TOOL_ARGUMENTS,
         }.get(tool)
         if allowed is None:
@@ -1079,9 +1102,89 @@ class QueryGateway:
             result_count=result["result_count"], truncated=result["truncated"], result_type="statistics",
         )
 
+    def _entity_index(self) -> dict[str, list[dict[str, Any]]]:
+        cached = getattr(self, "_entity_index_cache", None)
+        if cached is not None:
+            return cached
+        try:
+            registry = entity_registry_module.load_registry(ENTITY_REGISTRY_DATA)
+            index = {
+                kind: [
+                    {"entity_id": entity["entity_id"], "canonical_label": entity["canonical_label"],
+                     "aliases": list(entity.get("aliases") or [])}
+                    for entity in registry["entities"] if entity["kind"] == kind
+                ]
+                for kind in ("location", "agency")
+            }
+        except (OSError, ValueError, KeyError):
+            index = {"location": [], "agency": []}
+        self._entity_index_cache = index
+        return index
+
+    def _execute_chat(self, args: dict[str, Any], now: datetime) -> dict[str, Any]:
+        text = self._require_string(args, "text", max_length=conversation.MAX_TEXT_LENGTH)
+        quick_action = self._require_string(args, "quick_action", max_length=64)
+        if text is None and quick_action is None:
+            raise GatewayError("INVALID_ARGUMENTS", "chat_turn requires text or quick_action")
+        if quick_action is not None:
+            action = conversation.quick_action(quick_action)
+            if action is None:
+                raise GatewayError("INVALID_ARGUMENTS", "unknown quick_action")
+            if text is None:
+                text = action["text"]
+        try:
+            context = conversation.validate_context(args.get("context"))
+            index = self._entity_index()
+            plan = conversation.plan_turn(
+                text=text,
+                context=context,
+                now=now,
+                location_entities=index["location"],
+                agency_entities=index["agency"],
+                event_store=self.event_store,
+                statistics_store=self.statistics_store,
+            )
+        except ValueError as error:
+            raise GatewayError("INVALID_ARGUMENTS", str(error)) from error
+        envelope = None
+        error = None
+        request = plan.get("request")
+        if request is not None:
+            try:
+                envelope = self.execute(request["tool"], request["arguments"])
+            except GatewayError as gateway_error:
+                if gateway_error.code not in {"CAPABILITY_NOT_AVAILABLE", "EVENT_NOT_FOUND", "EVENT_VERSION_NOT_FOUND"}:
+                    raise
+                error = {"code": gateway_error.code, "message": gateway_error.message}
+        chat = conversation.render_answer(
+            plan=plan,
+            envelope=envelope,
+            error=error,
+            context=context,
+            fallback_publication_hash=self.store["generated_from"]["brief_sha256"],
+        )
+        if envelope is not None:
+            # The chat-level envelope reuses the resolved query's own scope so
+            # freshness and gaps cannot disagree between layers.
+            scope = {
+                "data_status": {"RECENT": "SNAPSHOT_RECENT"}.get(envelope["freshness"], envelope["freshness"]),
+                "source_gaps": envelope["source_gaps"],
+                "query_coverage": envelope["query_coverage"],
+                "queried_at": envelope["queried_at"],
+            }
+        else:
+            scope = self._scope(now=now, capability_id="publication_metadata")
+        return self._envelope(
+            "chat_turn", args, scope,
+            {"chat": chat},
+            result_type="conversation",
+        )
+
     def execute(self, tool: str, arguments: Any = None) -> dict[str, Any]:
         args = self._arguments(tool, arguments)
         now = _now(self.clock())
+        if tool == "chat_turn":
+            return self._execute_chat(args, now)
         if tool in {"search_events", "get_event", "compare_event_versions"}:
             return self._execute_domain(tool, args, now)
         if tool == "query_statistics":
@@ -1217,6 +1320,12 @@ class QueryGateway:
             "read_only": True,
             "capabilities": available,
             "unavailable_capabilities": sorted(set(UNIMPLEMENTED) - set(available)),
+            "conversation": {
+                "schema_version": conversation.CHAT_SCHEMA_VERSION,
+                "parser_version": conversation.PARSER_VERSION,
+                "quick_actions": conversation.quick_actions(),
+                "context_keys": sorted(conversation.CONTEXT_KEYS),
+            },
             "policy": self.store["policy"],
             "retention": {
                 "policy_version": RETENTION_POLICY["policy_version"],

@@ -173,5 +173,283 @@ class QueryGatewayDomainTests(unittest.TestCase):
             gateway.execute("get_event", {"event_id": "PE-DOMAIN-1"})
 
 
+def chat_event(event_id="PE-CHAT-1", district="location:tc-xitun", *, fusion="CONFIRMED",
+               start="2026-09-26T10:00:00+08:00", end="2026-09-26T18:00:00+08:00"):
+    row = {
+        "schema_version": 1,
+        "public_event_id": event_id,
+        "event_type": "traffic_control",
+        "canonical_title": f"大型活動交通管制 {event_id}",
+        "event_date": "2026-09-26",
+        "start_at": start,
+        "end_at": end,
+        "district_id": district,
+        "location_candidates": [district],
+        "location_ids": [district],
+        "agency_ids": ["agency:tc-police"],
+        "independent_source_ids": ["S-001", "S-032"],
+        "fusion_status": fusion,
+        "source_state": "CURRENT",
+        "tracked": True,
+        "changed": True,
+        "linked_document_versions": [{
+            "document_id": f"doc-{event_id}",
+            "document_version_id": f"{event_id}:v2",
+            "source_id": "S-001",
+            "official_url": f"https://police.example/events/{event_id}",
+            "evidence_id": f"EV-{event_id}",
+        }],
+    }
+    if event_id == "PE-CHAT-1":
+        row["version_history"] = [
+            {
+                "document_version_id": "PE-CHAT-1:v1",
+                "observed_at": "2026-09-24T09:00:00+08:00",
+                "published_at": "2026-09-24T08:00:00+08:00",
+                "effective_at": "2026-09-26T17:00:00+08:00",
+                "fields": {"control_start": "2026-09-26T17:00:00+08:00", "road": "測試路"},
+            },
+            {
+                "document_version_id": "PE-CHAT-1:v2",
+                "observed_at": "2026-09-25T09:00:00+08:00",
+                "published_at": "2026-09-25T08:00:00+08:00",
+                "effective_at": "2026-09-26T16:00:00+08:00",
+                "fields": {"control_start": "2026-09-26T16:00:00+08:00", "road": "測試路"},
+                "changed_fields": ["control_start"],
+            },
+        ]
+    return row
+
+
+def chat_statistics():
+    rows = []
+    for period, value, provisional in (("2026-07", 10, False), ("2026-08", 12, False), ("2026-09", 9, True)):
+        rows.append({
+            "statistic_id": f"STAT-FRAUD-{period}",
+            "dataset_id": "NPA-FRAUD",
+            "source_id": "S-028",
+            "metric": "fraud_reports",
+            "period": period,
+            "value": value,
+            "unit": "件",
+            "geography": "臺中市",
+            "provisional": provisional,
+            "updated_at": "2026-09-21T00:00:00+08:00",
+            "official_url": f"https://data.example/statistics/fraud-{period}",
+        })
+    rows.append({
+        "statistic_id": "STAT-FRAUD-NATIONAL",
+        "dataset_id": "NPA-FRAUD",
+        "source_id": "S-028",
+        "metric": "fraud_reports",
+        "period": "2026-09",
+        "value": 1000,
+        "unit": "件",
+        "geography": "全國",
+        "provisional": True,
+        "updated_at": "2026-09-21T00:00:00+08:00",
+        "official_url": "https://data.example/statistics/fraud-national",
+    })
+    return rows
+
+
+class QueryGatewayConversationTests(unittest.TestCase):
+    """Issue #29 — conversational query surface over the shared Query Gateway."""
+
+    def build(self, events=None, statistics=None):
+        snapshot = gateway_module.load_snapshot()
+        snapshot["event_store"] = gateway_module.query_domain.build_event_store(
+            events if events is not None else [chat_event(), chat_event("PE-CHAT-2", "location:tc-nantun")])
+        snapshot["statistics_store"] = gateway_module.query_domain.build_statistics_store(
+            statistics if statistics is not None else chat_statistics())
+        return gateway_module.QueryGateway(
+            snapshot=snapshot,
+            clock=lambda: datetime(2026, 9, 21, 9, 0, tzinfo=timezone.utc),
+        )
+
+    def assert_chat_error(self, gateway, arguments, code):
+        with self.assertRaises(gateway_module.GatewayError) as raised:
+            gateway.execute("chat_turn", arguments)
+        self.assertEqual(raised.exception.code, code)
+
+    def test_chat_turn_requires_text_or_quick_action(self):
+        gateway = self.build()
+        self.assert_chat_error(gateway, {}, "INVALID_ARGUMENTS")
+        self.assert_chat_error(gateway, {"text": "  "}, "INVALID_ARGUMENTS")
+        self.assert_chat_error(gateway, {"text": "今天有什麼事件", "injected": True}, "INVALID_ARGUMENTS")
+
+    def test_multi_turn_narrow_detail_compare_evidence_keeps_event_identity(self):
+        gateway = self.build()
+        turn = gateway.execute("chat_turn", {"text": "這週末臺中有哪些活動？"})
+        chat = turn["chat"]
+        self.assertEqual(chat["schema_version"], 1)
+        self.assertEqual(chat["intent"], "search_events")
+        request = chat["resolved_request"]
+        self.assertEqual(request["schema_version"], 1)
+        self.assertEqual(request["tool"], "search_events")
+        self.assertEqual(request["arguments"]["time_from"], "2026-09-26")
+        self.assertEqual(request["arguments"]["time_to"], "2026-09-27")
+        self.assertEqual(request["arguments"]["time_zone"], "Asia/Taipei")
+        self.assertEqual(sorted(chat["context"]["last_result_event_ids"]), ["PE-CHAT-1", "PE-CHAT-2"])
+        self.assertEqual(chat["context"]["selected_time_window"]["time_from"], "2026-09-26")
+
+        narrowed = gateway.execute("chat_turn", {"text": "只看西屯", "context": chat["context"]})
+        narrowed_chat = narrowed["chat"]
+        narrowed_args = narrowed_chat["resolved_request"]["arguments"]
+        self.assertEqual(narrowed_chat["intent"], "search_events")
+        self.assertEqual(narrowed_args["district"], "location:tc-xitun")
+        self.assertEqual(narrowed_args["time_from"], "2026-09-26")
+        self.assertEqual(narrowed_args["time_to"], "2026-09-27")
+        self.assertEqual(narrowed_chat["context"]["last_result_event_ids"], ["PE-CHAT-1"])
+        self.assertEqual(narrowed_chat["context"]["selected_region"], "location:tc-xitun")
+
+        detail = gateway.execute("chat_turn", {"text": "第一件有交通管制嗎？", "context": narrowed_chat["context"]})
+        detail_chat = detail["chat"]
+        self.assertEqual(detail_chat["intent"], "get_event")
+        self.assertEqual(detail_chat["resolved_request"]["arguments"], {"event_id": "PE-CHAT-1"})
+        self.assertEqual(detail_chat["context"]["selected_event_id"], "PE-CHAT-1")
+
+        compared = gateway.execute("chat_turn", {"text": "跟昨天比有沒有改？", "context": detail_chat["context"]})
+        compared_chat = compared["chat"]
+        self.assertEqual(compared_chat["intent"], "compare_event_versions")
+        self.assertEqual(compared_chat["resolved_request"]["arguments"]["event_id"], "PE-CHAT-1")
+        self.assertEqual(compared_chat["comparison"]["changed_fields"], ["control_start"])
+        self.assertEqual(compared_chat["comparison"]["source_document_versions"], ["PE-CHAT-1:v1", "PE-CHAT-1:v2"])
+        self.assertEqual(compared_chat["comparison"]["observed_at"]["before"], "2026-09-24T09:00:00+08:00")
+        self.assertEqual(compared_chat["comparison"]["observed_at"]["after"], "2026-09-25T09:00:00+08:00")
+
+        evidence = gateway.execute("chat_turn", {"text": "把官方證據給我", "context": compared_chat["context"]})
+        evidence_chat = evidence["chat"]
+        self.assertEqual(evidence_chat["resolved_request"]["tool"], "get_event")
+        self.assertEqual(evidence_chat["resolved_request"]["arguments"]["event_id"], "PE-CHAT-1")
+        self.assertTrue(evidence_chat["evidence_links"])
+        link = evidence_chat["evidence_links"][0]
+        self.assertTrue(link["official_url"].startswith("https://"))
+        self.assertEqual(link["evidence_id"], "EV-PE-CHAT-1")
+        self.assertEqual(link["event_id"], "PE-CHAT-1")
+
+    def test_chat_and_mcp_share_one_gateway_and_resolution(self):
+        gateway = self.build()
+        tool_names = [tool["name"] for tool in gateway.mcp_tools()]
+        self.assertIn("chat_turn", tool_names)
+        web = gateway.execute("chat_turn", {"text": "只看西屯"})
+        mcp = gateway_module.dispatch_mcp(gateway, {
+            "jsonrpc": "2.0", "id": 9, "method": "tools/call",
+            "params": {"name": "chat_turn", "arguments": {"text": "只看西屯"}},
+        })
+        mcp_chat = mcp["result"]["structuredContent"]["chat"]
+        self.assertEqual(
+            web["chat"]["resolved_request"]["arguments"],
+            mcp_chat["resolved_request"]["arguments"],
+        )
+        self.assertEqual(web["chat"]["event_ids"], mcp_chat["event_ids"])
+        self.assertEqual(web["publication_hash"], mcp["result"]["structuredContent"]["publication_hash"])
+
+    def test_source_failure_is_not_rewritten_as_no_events(self):
+        gateway = self.build()
+        chat = gateway.execute("chat_turn", {"text": "今天有沒有交通事件？"})["chat"]
+        self.assertEqual(chat["resolved_request"]["tool"], "search_events")
+        self.assertEqual(chat["no_match"]["status"], "UNBOUNDED_NO_MATCH")
+        self.assertTrue(chat["gaps"])
+        self.assertNotIn("沒有事件", "".join(chat["lines"]))
+        health = gateway.execute("chat_turn", {"text": "為什麼今天沒有資料？"})["chat"]
+        self.assertEqual(health["resolved_request"]["tool"], "get_source_health")
+        self.assertTrue(health["sources"])
+
+    def test_discovery_candidates_stay_out_of_verified_section(self):
+        gateway = self.build(events=[
+            chat_event(),
+            chat_event("PE-CHAT-3", "location:tc-xitun", fusion="CANDIDATE"),
+        ])
+        chat = gateway.execute("chat_turn", {"text": "這週末有哪些活動？"})["chat"]
+        self.assertEqual([row["public_event_id"] for row in chat["verified"]], ["PE-CHAT-1"])
+        self.assertEqual([row["public_event_id"] for row in chat["unverified"]], ["PE-CHAT-3"])
+        self.assertEqual(chat["trust"]["discovery_unverified_count"], 1)
+
+    def test_statistics_returns_period_unit_geography_and_provisional(self):
+        gateway = self.build()
+        chat = gateway.execute("chat_turn", {"text": "臺中詐欺最近三個月趨勢"})["chat"]
+        self.assertEqual(chat["resolved_request"]["tool"], "query_statistics")
+        args = chat["resolved_request"]["arguments"]
+        self.assertEqual(args["metric"], "fraud_reports")
+        self.assertEqual(args["geography"], "臺中市")
+        self.assertEqual(args["period_from"], "2026-07")
+        self.assertEqual(args["period_to"], "2026-09")
+        geographies = {row["geography"] for row in chat["statistics"]}
+        self.assertEqual(geographies, {"臺中市"})
+        self.assertEqual({row["period"] for row in chat["statistics"]}, {"2026-07", "2026-08", "2026-09"})
+        self.assertTrue(all(row["unit"] == "件" for row in chat["statistics"]))
+        provisional = {row["period"]: row["provisional"] for row in chat["statistics"]}
+        self.assertEqual(provisional, {"2026-07": False, "2026-08": False, "2026-09": True})
+        self.assertTrue(all(row["official_url"].startswith("https://") for row in chat["statistics"]))
+
+    def test_clarification_never_executes_a_query(self):
+        gateway = self.build()
+        chat = gateway.execute("chat_turn", {"text": "你好，今天天氣好嗎"})["chat"]
+        self.assertEqual(chat["intent"], "clarify")
+        self.assertEqual(chat["status"], "CLARIFICATION_NEEDED")
+        self.assertIsNone(chat["resolved_request"])
+        self.assertTrue(chat["quick_action_hints"])
+
+    def test_missing_selected_event_gives_clarification_not_guessed_context(self):
+        gateway = self.build()
+        chat = gateway.execute("chat_turn", {"text": "跟昨天比有沒有改？"})["chat"]
+        self.assertEqual(chat["status"], "CLARIFICATION_NEEDED")
+        self.assertIsNone(chat["resolved_request"])
+        stale = gateway.execute("chat_turn", {
+            "text": "跟昨天比有沒有改？",
+            "context": {"schema_version": 1, "selected_event_id": "PE-GONE"},
+        })["chat"]
+        self.assertEqual(stale["status"], "NOT_FOUND")
+        self.assertIsNone(stale["context"].get("selected_event_id"))
+
+    def test_context_is_bounded_validated_and_never_executes_tools(self):
+        gateway = self.build()
+        self.assert_chat_error(gateway, {"text": "查事件", "context": "not-an-object"}, "INVALID_ARGUMENTS")
+        self.assert_chat_error(gateway, {"text": "查事件", "context": {"selected_event_id": 42}}, "INVALID_ARGUMENTS")
+        self.assert_chat_error(gateway, {
+            "text": "查事件",
+            "context": {"last_result_event_ids": [f"PE-{index}" for index in range(200)]},
+        }, "INVALID_ARGUMENTS")
+        chat = gateway.execute("chat_turn", {
+            "text": "只看西屯",
+            "context": {
+                "schema_version": 99,
+                "selected_event_id": "PE-CHAT-2",
+                "selected_region": "location:tc-nantun",
+                "last_result_event_ids": ["PE-CHAT-2"],
+                "tool": "drop_all_tables",
+                "arguments": {"sql": "DELETE FROM public_events"},
+            },
+        })["chat"]
+        self.assertEqual(chat["resolved_request"]["tool"], "search_events")
+        self.assertNotIn("sql", chat["resolved_request"]["arguments"].values())
+        self.assertEqual(chat["context"]["schema_version"], 1)
+        self.assertNotIn("tool", chat["context"])
+        self.assertNotIn("arguments", chat["context"])
+        self.assertNotIn("messages", chat["context"])
+        self.assertNotIn("text", chat["context"])
+
+    def test_chat_envelope_carries_publication_hash_and_receipt(self):
+        gateway = self.build()
+        result = gateway.execute("chat_turn", {"text": "這週末有哪些活動？"})
+        self.assertTrue(result["publication_hash"])
+        self.assertTrue(result["query_id"])
+        self.assertTrue(result["receipt"]["arguments_sha256"])
+        self.assertEqual(result["result_type"], "conversation")
+        chat = result["chat"]
+        self.assertTrue(chat["publication_hash"])
+        self.assertTrue(chat["query_receipt"]["arguments_sha256"])
+        self.assertTrue(chat["evidence_links"] or chat["verified"] or chat["unverified"])
+
+    def test_capabilities_and_worker_style_unavailable_reporting(self):
+        gateway = self.build()
+        capabilities = gateway.capabilities()
+        self.assertIn("chat_turn", capabilities["capabilities"])
+        self.assertTrue(capabilities["read_only"])
+        self.assertIn("conversation", capabilities)
+        self.assertTrue(capabilities["conversation"]["quick_actions"])
+
+
 if __name__ == "__main__":
     unittest.main()

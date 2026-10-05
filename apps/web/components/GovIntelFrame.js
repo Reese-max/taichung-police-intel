@@ -7,6 +7,7 @@ import V2DailyDashboard from "./V2DailyDashboard.js";
 const destinations = [
   ["/", "概覽"],
   ["/public-query/", "公開查詢"],
+  ["/ask/", "Ask GovIntel"],
   ["/tracking/", "我的追蹤"],
   ["/sources/", "來源狀態"],
 ];
