@@ -29,6 +29,7 @@ if str(ROOT) not in sys.path:
 
 from intel_v2 import query_domain
 from intel_v2.located_facts import validate_document_url
+from intel_v2.public_brief import project_public_brief, project_public_source
 
 QUERY_STORE_PATH = ROOT / "scripts" / "query-store.py"
 RETENTION_POLICY_PATH = ROOT / "scripts" / "retention-policy.py"
@@ -755,12 +756,10 @@ def _verification_summary(data_status: str) -> str:
 
 
 def _public_source(row: dict[str, Any]) -> dict[str, Any]:
-    fields = (
-        "source_id", "source_name", "source_url", "source_health", "window_completeness",
-        "result", "freshness_status", "data_as_of", "last_checked_at", "last_success_at",
-        "intelligence_gaps", "current_source_run_id", "manifest_sha256",
-    )
-    return {key: row.get(key) for key in fields if key in row}
+    try:
+        return project_public_source(row)
+    except ValueError as error:
+        raise GatewayError("PUBLIC_PROJECTION_INVALID", "canonical source violates public projection schema", 503) from error
 
 
 class QueryGateway:
@@ -1282,12 +1281,10 @@ class QueryGateway:
             )
         if tool == "get_current_brief":
             scope = self._scope(now=now, capability_id="publication_metadata")
-            allowed = (
-                "schema_version", "mode", "generator_version", "generated_at", "source_collection_run_id",
-                "source_status_generated_at", "publication_status", "snapshot_complete", "status_message",
-                "overview", "priority_items", "tracking_items", "other_changes", "source_health",
-            )
-            brief = {key: self.brief.get(key) for key in allowed}
+            try:
+                brief = project_public_brief(self.brief)
+            except ValueError as error:
+                raise GatewayError("PUBLIC_PROJECTION_INVALID", "canonical brief violates public projection schema", 503) from error
             return self._envelope(
                 tool,
                 args,

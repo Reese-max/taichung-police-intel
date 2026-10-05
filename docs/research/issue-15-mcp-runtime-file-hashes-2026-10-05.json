@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "verification_type": "Supplemental static exact-source runtime digest; original SDK observations remain immutable",
+  "source_commit": "4a010e52ff8c8ccbbac85e3ebdcd11c7a386fb4f",
+  "source_tree": "6f10be8a605ec2759f5d35fbcb626a952058362f",
+  "runtime_file_sha256": {
+    "scripts/query-gateway.py": "d0ee59aeb9e2f40145e3a4132f01d05e455c8175df1921abc38830424cc3e56e",
+    "scripts/query-gateway-stdio.py": "84ea4becff4d4114a9194201de0d9d22eae696fa399361f383359434c0e2624f",
+    "scripts/query-store.py": "af1daacfef5d0cc2e8fb7c8b733b23e31bf81bf9ae5bc56984062d898ced4f74",
+    "scripts/source-policy.py": "e2baf60b9270c5a758a3cb4b51fa3c0438595dba1e5dd3ce69e9d221af2cf0eb",
+    "intel_v2/public_brief.py": "93ab37a4a1b3ba753ca1a92d32a26928108f4fc35db09c45e7267ca8638399dc"
+  },
+  "frozen_sdk_receipt_sha256": {
+    "issue-15-mcp-sdk-seven-journeys-2026-10-05.json": "a4ff61a27893a550fff0c9e5b30e2080c65e126a68bdf675b78c900779e489e4",
+    "issue-15-mcp-sdk-private-red-2026-10-05.json": "095cc63ef438843b934ccc513b716ec782573f526c9b05133948e199d429350a",
+    "issue-15-mcp-sdk-private-green-2026-10-05.json": "f93b71353b45fead23cc6475a2fae0f60d945c3afde6e3c6aa03e6fea5b66196"
+  },
+  "observed_utc": "2026-10-05T06:05:10.346772+00:00",
+  "reason": "Original optional diagnostic listed nonexistent intel_v2/query_store.py and intel_v2/source_policy.py, silently omitting those two hashes. Full committed source/tree still identified the complete original archive. Corrected diagnostic now pins required actual scripts/query-store.py and scripts/source-policy.py without optional omission.",
+  "final_product_files_match_measured_runtime": true,
+  "result": "PASS"
+}

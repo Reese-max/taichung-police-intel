@@ -45,6 +45,7 @@ const required = [
   "intel_v2/review.py",
   "intel_v2/located_facts.py",
   "intel_v2/query_domain.py",
+  "intel_v2/public_brief.py",
   "intel_v2/detail_recheck.py",
   "intel_v2/detail_recheck_http.py",
   "intel_v2/discovery_adapter.py",

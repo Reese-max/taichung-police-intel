@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "repository": "Reese-max/taichung-police-intel",
+  "issue": 15,
+  "mode": "private-red",
+  "source_commit": "366a457817104b0c6b5a03ea5ca893e4b9e6a4db",
+  "source_tree": "dae5d1517824dd28b2b5701f55beb60913d561d0",
+  "runtime_file_sha256": {
+    "scripts/query-gateway.py": "aad1ce93bbc36b71d5b4dde98a3d7b53a77896d0486e65e2098187eeecae519b",
+    "scripts/query-gateway-stdio.py": "84ea4becff4d4114a9194201de0d9d22eae696fa399361f383359434c0e2624f"
+  },
+  "client": "Official Python MCP SDK",
+  "client_version": "1.30.0",
+  "transport": "STDIO",
+  "observed_utc": "2026-10-05T05:54:37.813355+00:00",
+  "fixture_scope": "Owned temporary git archive with synthetic public metadata; live checkout unmodified",
+  "network_requirement": "Run inside a network-disabled sandbox; probe performs no provider calls",
+  "cases": [
+    {
+      "case": "brief_nested_private_field",
+      "protocol_version": "2025-06-18",
+      "artifact_hashes": {
+        "feed": "0b186ce2d6e4ef691872cdfe30d7ae18193537db5630715134cf2b66adffd668",
+        "status": "3f36ec5b2c67321aa46d3593df6e1ccdf6e8cdb0ecbafc79b8565914922b159b",
+        "brief": "6b2ce1d4844af71b9db367d9df0fd96bcfbe4dca9b85da283ae0b59e68293355"
+      },
+      "result": {
+        "isError": false,
+        "error": null,
+        "private_marker_returned": true,
+        "fixture": "Synthetic canary only; no real private data"
+      }
+    },
+    {
+      "case": "source_gap_nested_private_field",
+      "protocol_version": "2025-06-18",
+      "artifact_hashes": {
+        "feed": "0b186ce2d6e4ef691872cdfe30d7ae18193537db5630715134cf2b66adffd668",
+        "status": "4d3e574a1d5e4f1625162140f96c097dc7d98a8b4c6fd4835602835c1785da54",
+        "brief": "a5534f67a02110d37bc1357e9dc9baaa887138926c17a847285dbabbeaac4aaa"
+      },
+      "result": {
+        "isError": false,
+        "error": null,
+        "private_marker_returned": true,
+        "fixture": "Synthetic canary only; no real private data"
+      }
+    }
+  ],
+  "limitations": [
+    "Default five read-only metadata tools only",
+    "Head change is exercised by fresh-server restart, not live hot reload",
+    "No real-source promotion, production host, OAuth or human usability claim"
+  ],
+  "result": "CONFIRMED_RED_MAIN_NESTED_FIELD_LEAK",
+  "isolation_observed": "bwrap --unshare-net --ro-bind / / --tmpfs /tmp; only diagnostic receipt directory writable"
+}
