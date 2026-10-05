@@ -13,6 +13,14 @@ const knownGood = {
 const sourceStatus = JSON.parse(await readFile(new URL("../public/data/source-status.json", import.meta.url), "utf8"));
 
 const policy = JSON.parse(await readFile(new URL("../public/data/source-policy.json", import.meta.url), "utf8"));
+const officialRevision = JSON.parse(await readFile(new URL("../../../tests/fixtures/date-provenance/s006-official-revision-metadata.json", import.meta.url), "utf8"));
+
+function sourceStatusWithOfficialRevision() {
+  const candidate = structuredClone(sourceStatus);
+  const {record_origin: _audit, ...metadata} = officialRevision;
+  Object.assign(candidate.sources.find(row => row.source_id === "S-006"), structuredClone(metadata));
+  return candidate;
+}
 
 function failedSource() {
   return {
@@ -29,6 +37,31 @@ function failedSource() {
 
 test("checked-in public source status has a validated source snapshot", () => {
   assert.equal(validateSourceStatus(sourceStatus, policy), sourceStatus);
+});
+
+test("fresh official revision validates against the compact public schema1 policy", () => {
+  const candidate = sourceStatusWithOfficialRevision();
+  const before = structuredClone(candidate);
+  assert.equal(policy.schema_version, 1);
+  assert.equal(policy.active_sources, undefined);
+  assert.equal(validateSourceStatus(candidate, policy), candidate);
+  assert.deepEqual(candidate, before);
+});
+
+test("compact policy revision validation rejects unapproved documents and mismatched policy bindings", () => {
+  for (const url of ["https://unapproved.example.test/fixture.pdf", "https://www.tccc.gov.tw/fixture.doc", "https://user:secret@www.tccc.gov.tw/fixture.pdf"]) {
+    const candidate = sourceStatusWithOfficialRevision();
+    const source = candidate.sources.find(row => row.source_id === "S-006");
+    source.data_as_of_evidence.official_url = url;
+    source.source_url = url;
+    assert.throws(() => validateSourceStatus(candidate, policy), /official date evidence origin/, url);
+  }
+  for (const key of ["policy_hash", "catalog_hash", "policy_version"]) {
+    const candidatePolicy = {...policy, [key]: key === "policy_version" ? policy[key] + 1 : "0".repeat(64)};
+    assert.throws(() => validateSourceStatus(sourceStatusWithOfficialRevision(), candidatePolicy), /official date evidence origin/, key);
+  }
+  const poisonedPolicy = {...policy, active_sources: [{source_id: "S-006", entrypoint: "https://unapproved.example.test/fixture.pdf"}]};
+  assert.equal(validateSourceStatus(sourceStatusWithOfficialRevision(), poisonedPolicy).sources.length, sourceStatus.sources.length);
 });
 
 test("public source status requires a non-empty, identified snapshot", () => {

@@ -1,4 +1,5 @@
 import { projectSourceDates } from "./publication-dates.js";
+import approvedSourcePolicy from "../../../docs/govintel/source-policy.approved.json" with { type: "json" };
 
 const TAIPEI_OFFSET_MS = 8 * 60 * 60 * 1000;
 const STALE_STATUSES = new Set(["STALE", "VERY_STALE"]);
@@ -110,7 +111,13 @@ export function validateSourceStatus(data, policy) {
         throw new Error(`來源狀態時間無法驗證：${source.source_id}`);
       }
     }
-    const policySource = policy.active_sources?.find(row => row.source_id === source.source_id);
+    // The public schema1 policy intentionally omits source rows. Its binding
+    // must match the repository-approved snapshot before using those origins.
+    const boundLegacyPolicy = policy.schema_version === 1 && approvedSourcePolicy.schema_version === 1
+      && ["policy_version", "policy_hash", "catalog_hash"].every(key => policy[key] === approvedSourcePolicy[key])
+      && JSON.stringify([...expected].sort()) === JSON.stringify(approvedSourcePolicy.active_source_ids);
+    const sourceRows = policy.schema_version === 2 ? policy.active_sources : boundLegacyPolicy ? approvedSourcePolicy.active_sources : [];
+    const policySource = sourceRows?.find(row => row.source_id === source.source_id);
     const approvedOrigins = policySource?.approved_origins || (policySource?.entrypoint ? [new URL(policySource.entrypoint).origin] : []);
     projectSourceDates(source, approvedOrigins);
     ids.add(source.source_id);
