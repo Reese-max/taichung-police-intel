@@ -142,6 +142,45 @@ class PublicationStateBranchTests(unittest.TestCase):
         self.assertFalse(module.persist(self.work, "publication-state", "102", "1", "evening"))
         self.assertEqual(self.head(), after)
 
+    def test_rejected_state_push_preserves_last_known_good_and_generated_evidence(self):
+        main_before = self.head("main")
+        state_before = self.head("publication-state")
+        baseline_bundle = module.read_working_bundle(self.work)
+        module.write_receipt(self.work, state_before, baseline_bundle)
+        self.write_bundle(self.work, "collected-but-not-persisted")
+        real_git = module.git
+        rejected_pushes = []
+
+        def reject_push(repo, *args):
+            if args and args[0] == "push":
+                rejected_pushes.append(args)
+                raise subprocess.CalledProcessError(
+                    1, ["git", *args], stderr=b"simulated protected ref rejection"
+                )
+            return real_git(repo, *args)
+
+        with (
+            mock.patch.object(module, "fetch_state_branch", return_value=state_before),
+            mock.patch.object(module, "read_checkpoint", return_value=(baseline_bundle, None, False)),
+            mock.patch.object(module, "git", side_effect=reject_push),
+        ):
+            with self.assertRaises(subprocess.CalledProcessError):
+                module.persist(self.work, "publication-state", "103", "1", "morning")
+
+        self.assertEqual(len(rejected_pushes), 1)
+        self.assertEqual(rejected_pushes[0][:2], ("push", "origin"))
+        self.assertRegex(
+            rejected_pushes[0][2],
+            r"\A[0-9a-f]{40}:refs/heads/publication-state\Z",
+        )
+        self.assertEqual(self.head("main"), main_before)
+        self.assertEqual(self.head("publication-state"), state_before)
+        self.assertTrue(
+            (self.work / module.STATE_PATHS[0]).read_text(encoding="utf-8").startswith(
+                "collected-but-not-persisted:"
+            )
+        )
+
     def test_persist_fails_closed_when_state_bundle_is_incomplete(self):
         module.restore(self.work, "publication-state")
         (self.work / module.STATE_PATHS[-1]).unlink()

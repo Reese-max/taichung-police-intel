@@ -289,12 +289,52 @@ class OutcomeTests(unittest.TestCase):
         self.assertIn("| preserve | failure |", text)
         self.assertIn("PUBLICATION_NOT_CONFIRMED", text)
 
+    def test_rejected_publication_push_keeps_uploaded_evidence_without_claiming_success(self):
+        url = "https://github.com/Reese-max/taichung-police-intel/actions/runs/123/artifacts/456"
+        text, code = module.report({
+            "BUILD_RESULT": "failure",
+            "DEPLOY_RESULT": "skipped",
+            "PRESERVE": "failure",
+            "PAGES_UPLOAD": "skipped",
+            "EVIDENCE": "success",
+            "EVIDENCE_URL": url,
+        })
+        self.assertEqual(code, 1)
+        self.assertIn("| preserve | failure |", text)
+        self.assertIn("| deploy | skipped |", text)
+        self.assertIn(url, text)
+        self.assertIn("PUBLICATION_NOT_CONFIRMED", text)
+        self.assertIn("do not report zero new events", text)
+        self.assertNotIn("PUBLIC_DATA_VERIFIED", text)
+
     def test_upload_and_deploy_failures(self):
         for env in [
             {"BUILD_RESULT": "failure", "DEPLOY_RESULT": "skipped", "PAGES_UPLOAD": "failure"},
             {"BUILD_RESULT": "success", "DEPLOY_RESULT": "failure"},
         ]:
             self.assertEqual(module.report(env)[1], 1)
+
+        upload_text, upload_code = module.report({
+            "BUILD_RESULT": "failure", "DEPLOY_RESULT": "skipped",
+            "PAGES_UPLOAD": "failure", "EVIDENCE": "failure",
+        })
+        self.assertEqual(upload_code, 1)
+        self.assertIn("| pages_upload | failure |", upload_text)
+        self.assertIn("| deploy | skipped |", upload_text)
+        self.assertIn("No successful evidence-upload receipt is available", upload_text)
+        self.assertNotIn("Retained evidence:", upload_text)
+
+        deploy_text, deploy_code = module.report({
+            "BUILD_RESULT": "success", "DEPLOY_RESULT": "failure",
+            "PAGES_UPLOAD": "success", "EVIDENCE": "success",
+            "EVIDENCE_URL": "https://github.com/Reese-max/taichung-police-intel/actions/runs/124/artifacts/457",
+            "PUBLIC_VERIFY": "skipped",
+        })
+        self.assertEqual(deploy_code, 1)
+        self.assertIn("| deploy | failure |", deploy_text)
+        self.assertIn("| public_verify | skipped |", deploy_text)
+        self.assertIn("PUBLICATION_NOT_CONFIRMED", deploy_text)
+        self.assertNotIn("PUBLIC_DATA_VERIFIED", deploy_text)
 
     def test_cancellation_and_unknown_are_not_success(self):
         for state in ["cancelled", "skipped", "", "unexpected"]:

@@ -191,6 +191,25 @@ def run_canary(collector, sources, now, *, session_factory=BoundedSession):
             if record["source_health"] not in ("PASS", "DEGRADED") or record["detail_fetch_count"] > 1:
                 raise ValueError("collector violated the bounded candidate contract")
         except Exception as error:
+            import requests
+
+            transport_failed = isinstance(error, (requests.RequestException, ConnectionError, TimeoutError))
+            response = getattr(error, "response", None)
+            status = getattr(response, "status_code", None)
+            failure_contract = {
+                "status": "SOURCE_UNAVAILABLE" if transport_failed else "CONTENT_SHAPE_UNKNOWN",
+                "reasons": [
+                    f"HTTP_{status}" if status is not None else
+                    "COLLECTOR_TRANSPORT_FAILED" if transport_failed else
+                    "COLLECTOR_DID_NOT_RETURN_VERIFIABLE_SNAPSHOT"
+                ],
+                "review_required": True,
+            }
+            # A failed fetch has no schema sample. Retain a real schema result
+            # if collection reached that check, instead of replacing its drift
+            # details with a generic parser-unknown diagnosis.
+            if transport_failed or "schema_contract" not in record:
+                record["schema_contract"] = failure_contract
             record.update({
                 "source_health": "FAILED",
                 "collector_window_claim": "PARTIAL",
@@ -201,11 +220,6 @@ def run_canary(collector, sources, now, *, session_factory=BoundedSession):
                 "manifest_sha256": None,
                 "error_type": type(error).__name__,
                 "error_message": str(error).strip()[:256],
-                "schema_contract": {
-                    "status": "CONTENT_SHAPE_UNKNOWN",
-                    "reasons": ["COLLECTOR_DID_NOT_RETURN_VERIFIABLE_SNAPSHOT"],
-                    "review_required": False,
-                },
             })
         finally:
             record["http_calls"] = session.calls

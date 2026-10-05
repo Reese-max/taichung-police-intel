@@ -859,7 +859,9 @@ class QueryGateway:
                 "verification_status": item["verification_status"],
                 "freshness": freshness,
                 "is_current": current,
-                "published_at": item.get("published_at") or item.get("data_as_of") or item.get("fetched_at"),
+                "published_at": item.get("published_at"),
+                "observed_at": item.get("fetched_at"),
+                **{key: item[key] for key in ("document_revision_at", "date_basis") if item.get(key) is not None},
                 "assertions": [
                     {"subject": f"publication:{canonical_id}:title", "value": item["title"]},
                     {"subject": f"publication:{canonical_id}:source_id", "value": item["source_id"]},

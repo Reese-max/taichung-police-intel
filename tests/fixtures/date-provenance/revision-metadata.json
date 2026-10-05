@@ -1,0 +1,48 @@
+{
+  "fixture_only": true,
+  "item": {
+    "stable_id": "FICTIONAL-REVISION-METADATA",
+    "title": "FICTIONAL_OFFICIAL_REVISION",
+    "source_id": "S-006",
+    "source_role": "PRIMARY_OFFICIAL",
+    "official_url": "https://www.tccc.gov.tw/fictional-offline/revision.doc",
+    "published_at": null,
+    "document_revision_at": "2026-08-27T00:00:00+08:00",
+    "date_basis": "OFFICIAL_DOCUMENT_REVISION_DATE",
+    "date_evidence": {
+      "date_basis": "OFFICIAL_DOCUMENT_REVISION_DATE",
+      "document_revision_at": "2026-08-27T00:00:00+08:00",
+      "official_url": "https://www.tccc.gov.tw/fictional-offline/revision.pdf",
+      "content_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "page_number": 1,
+      "excerpt": "FICTIONAL_PRIVATE_HEADER"
+    },
+    "data_as_of": "2026-08-27T00:00:00+08:00",
+    "fetched_at": "2026-10-05T09:00:00+08:00",
+    "content_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "evidence_count": 1,
+    "source_health": "PASS",
+    "window_completeness": "PARTIAL",
+    "freshness_status": "STALE"
+  },
+  "source": {
+    "source_id": "S-006",
+    "source_name": "FICTIONAL_SOURCE",
+    "source_health": "PASS",
+    "window_completeness": "PARTIAL",
+    "result": "PARTIAL",
+    "freshness_status": "STALE",
+    "last_checked_at": "2026-10-05T09:00:00+08:00",
+    "data_as_of": "2026-08-27T00:00:00+08:00",
+    "data_as_of_basis": "OFFICIAL_DOCUMENT_REVISION_DATE",
+    "data_as_of_evidence": {
+      "date_basis": "OFFICIAL_DOCUMENT_REVISION_DATE",
+      "document_revision_at": "2026-08-27T00:00:00+08:00",
+      "official_url": "https://www.tccc.gov.tw/fictional-offline/revision.pdf",
+      "content_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "page_number": 1,
+      "excerpt": "FICTIONAL_PRIVATE_HEADER"
+    },
+    "data_as_of_scope": "LATEST_EVIDENCED_DOCUMENT_VERSION"
+  }
+}

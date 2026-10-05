@@ -18,6 +18,7 @@ from pathlib import Path
 import psycopg
 import requests
 from bs4 import BeautifulSoup
+from pypdf import PdfReader
 from psycopg.rows import dict_row
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -62,6 +63,9 @@ def http_session() -> requests.Session:
         backoff_factor=1,
         status_forcelist=(429, 500, 502, 503, 504),
         allowed_methods=("GET",),
+        # Return the final response after the bounded retry budget. Otherwise
+        # urllib3 hides an upstream 503 inside a retry-exhaustion exception.
+        raise_on_status=False,
     )
     session = requests.Session()
     session.headers.update({"User-Agent": USER_AGENT, "Accept-Language": "zh-TW,zh;q=0.9"})
@@ -77,6 +81,7 @@ def get(
     **kwargs,
 ) -> requests.Response:
     """Fetch one catalog-bound URL without following an unapproved redirect."""
+    requested_url = url
     timeout = kwargs.pop("timeout", 60)
     for _ in range(MAX_REDIRECTS + 1):
         if source_id:
@@ -98,8 +103,18 @@ def get(
             url = urllib.parse.urljoin(url, location)
             continue
         response.raise_for_status()
+        response._govintel_requested_url = requested_url
         return response
     raise ValueError("redirect budget exhausted")
+
+
+def source_failure_code(error: Exception) -> str:
+    """Preserve a received HTTP status separately from connection failures."""
+    response = getattr(error, "response", None)
+    status = getattr(response, "status_code", None)
+    if isinstance(status, int) and not isinstance(status, bool) and 100 <= status <= 599:
+        return f"HTTP_{status}"
+    return type(error).__name__.upper()[:64]
 
 
 def snapshot(response: requests.Response, purpose: str) -> dict:
@@ -158,6 +173,67 @@ def published_at(value: str | date | None) -> str | None:
     return timestamp(datetime.combine(parsed, datetime.min.time(), TZ))
 
 
+def official_record_timestamp(value: str) -> str:
+    """Interpret a naive council clock in Taipei; preserve an explicit offset."""
+    parsed = datetime.fromisoformat(value)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=TZ)
+    return timestamp(parsed.astimezone(TZ))
+
+
+def attachment_revision_evidence(body: bytes, url: str) -> dict | None:
+    """Read an explicitly labelled revision date from an already fetched PDF.
+
+    A meeting date, PDF metadata date, filename, and HTTP timestamp are not
+    publication evidence. A malformed, oversized or unlabelled document stays
+    undated; successful attachment retrieval remains an availability fact.
+    """
+    if not body.startswith(b"%PDF-") or len(body) > 8 * 1024 * 1024:
+        return None
+    try:
+        reader = PdfReader(io.BytesIO(body), strict=True)
+        if reader.is_encrypted or not reader.pages:
+            return None
+        text = reader.pages[0].extract_text(extraction_mode="layout") or ""
+    except Exception:
+        return None
+    if len(text) > 64 * 1024:
+        return None
+    # Match a date with its explicit revision label on the same line. In
+    # particular, dates in the question-order grid cannot establish this date.
+    date_pattern = r"(?<!\d)(?:\d{4}|\d{2,3})[^\S\n]*[-/.年][^\S\n]*\d{1,2}[^\S\n]*[-/.月][^\S\n]*\d{1,2}[^\S\n]*日?(?!\d)"
+    patterns = (
+        rf"({date_pattern})[^\S\n]*(?:第[^\S\n]*\d+[^\S\n]*次[^\S\n]*)?(?:修正|修訂|更新)",
+        rf"(?:修正|修訂|更新)(?:日期|時間)?[^\S\n]*[:：]?[^\S\n]*({date_pattern})",
+    )
+    matches = []
+    for pattern in patterns:
+        for match in re.finditer(pattern, text):
+            revision_date = roc_date(match.group(1))
+            if revision_date:
+                matches.append((revision_date, match.group(0)))
+    if not matches:
+        return None
+    revision_date, excerpt = max(matches, key=lambda value: value[0])
+    return {
+        "date_basis": "OFFICIAL_DOCUMENT_REVISION_DATE",
+        "document_revision_at": published_at(revision_date),
+        "official_url": url,
+        "content_sha256": canonical_bytes_sha256(body),
+        "page_number": 1,
+        "excerpt": excerpt,
+    }
+
+
+def public_date_evidence(evidence: dict) -> dict:
+    """Expose date provenance metadata; keep document excerpts in raw evidence."""
+    return {
+        key: evidence[key]
+        for key in ("date_basis", "document_revision_at", "official_url", "content_sha256", "page_number")
+        if key in evidence
+    }
+
+
 def parse_download_entries(html: bytes, base_url: str) -> list[dict]:
     soup = BeautifulSoup(html, "html.parser")
     entries = []
@@ -195,6 +271,7 @@ def collect_download_list(
     items = []
     for entry in entries:
         attachments = []
+        revision_evidence = []
         for url in entry["attachment_urls"]:
             response = get(session, url, source_id=source_id, timeout=120)
             responses.append(snapshot(response, "ATTACHMENT"))
@@ -206,21 +283,37 @@ def collect_download_list(
                     "content_sha256": canonical_bytes_sha256(response.content),
                 }
             )
+            if source_id == "S-006":
+                evidence = attachment_revision_evidence(response.content, response.url)
+                if evidence:
+                    revision_evidence.append(evidence)
         item_date = roc_date(entry["title"])
         payload = {"title": entry["title"], "attachments": attachments}
         stable_path = urllib.parse.urlparse(entry["attachment_urls"][0]).path
-        items.append(
-            {
-                "stable_key": Path(stable_path).stem,
-                "source_url": attachments[0]["url"],
-                "published_at": published_at(item_date),
-                "content_sha256": canonical_sha256(payload),
-                "payload": payload,
-            }
-        )
+        item = {
+            "stable_key": Path(stable_path).stem,
+            "source_url": attachments[0]["url"],
+            "published_at": published_at(item_date),
+            "content_sha256": canonical_sha256(payload),
+            "payload": payload,
+        }
+        if revision_evidence:
+            evidence = max(revision_evidence, key=lambda value: value["document_revision_at"])
+            item.update(
+                document_revision_at=evidence["document_revision_at"],
+                date_basis=evidence["date_basis"],
+                date_evidence=evidence,
+            )
+        items.append(item)
 
-    dated = [date.fromisoformat(item["published_at"][:10]) for item in items if item["published_at"]]
-    window_items = [item for item in items if item["published_at"] and start <= date.fromisoformat(item["published_at"][:10]) <= end]
+    # A version's explicit revision date supports version-window coverage and
+    # data_as_of; it never becomes the document's first publication time.
+    item_times = [item.get("document_revision_at") or item["published_at"] for item in items]
+    dated = [date.fromisoformat(value[:10]) for value in item_times if value]
+    window_items = [
+        item for item, value in zip(items, item_times)
+        if value and start <= date.fromisoformat(value[:10]) <= end
+    ]
     if len(dated) != len(items):
         # An undated attachment cannot be placed outside the requested window.
         # Successful retrieval is evidence of availability, not a zero count.
@@ -296,30 +389,33 @@ def collect_s007(session: requests.Session, start: date, end: date) -> dict:
             {
                 "stable_key": f"{record['proceedingsId']}:{identity}",
                 "source_url": f"https://yishi.tccc.gov.tw/meeting-records/{record['proceedingsId']}",
-                "published_at": timestamp(datetime.fromisoformat(record["date"]).replace(tzinfo=TZ)),
+                "published_at": official_record_timestamp(record["date"]),
+                "date_basis": "OFFICIAL_API_RECORD_DATE",
                 "content_sha256": canonical_sha256(payload),
                 "payload": payload,
             }
         )
 
-    # Fetch the latest record date without date filter for accurate data_as_of.
-    # This tells us when the most recent meeting record was published, even if
-    # it's outside the current collection window.
+    # A bounded unfiltered page supplies the latest *observed* official record
+    # date even when the window is empty. Do not assume its first row is sorted
+    # newest-first, or turn this sample into a complete-inventory claim.
     latest_date_str = None
     try:
         probe_resp = get(
             session,
             API_S007,
             source_id="S-007",
-            params={"keywordList": "警察局", "pageNumber": 1, "pageSize": 1},
+            params={"keywordList": "警察局", "pageNumber": 1, "pageSize": 20},
             timeout=30,
         )
         responses.append(snapshot(probe_resp, "PROBE_LATEST"))
         probe_data = probe_resp.json()
-        if probe_data.get("success") and probe_data["data"]["data"]:
-            raw_date = probe_data["data"]["data"][0].get("date")
-            if raw_date:
-                latest_date_str = timestamp(datetime.fromisoformat(raw_date).replace(tzinfo=TZ))
+        if probe_data.get("success") is True and isinstance(probe_data.get("data", {}).get("data"), list):
+            observed_dates = [
+                official_record_timestamp(record["date"])
+                for record in probe_data["data"]["data"] if record.get("date")
+            ]
+            latest_date_str = max(observed_dates, default=None)
     except Exception:
         pass  # Non-fatal; we still have the window results
 
@@ -332,6 +428,7 @@ def collect_s007(session: requests.Session, start: date, end: date) -> dict:
         "snapshots": responses,
         "manifest_sha256": canonical_sha256([item["content_sha256"] for item in items]),
         "latest_record_date": latest_date_str,
+        "latest_record_date_scope": "OBSERVED_API_PAGE" if latest_date_str else None,
     }
 
 
@@ -446,7 +543,16 @@ def get_news_listing(session: requests.Session, source_id: str) -> requests.Resp
     config = NEWS_LIST_SOURCES[source_id]
     try:
         return get(session, config["list_url"], source_id=source_id)
-    except (ConnectionError, requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+    except (ConnectionError, requests.exceptions.ConnectionError, requests.exceptions.Timeout, requests.exceptions.HTTPError) as error:
+        # The bounded candidate transport returns a real HTTP error instead of
+        # an adapter retry exception. Only transient failures may use the
+        # catalog-bound alternate list; access denials must fail closed.
+        if isinstance(error, requests.exceptions.SSLError):
+            raise
+        if isinstance(error, requests.exceptions.HTTPError):
+            status = error.response.status_code if error.response is not None else None
+            if status not in (429, 500, 502, 503, 504):
+                raise
         fallback_url = config.get("fallback_list_url")
         if not fallback_url:
             raise
@@ -1182,7 +1288,7 @@ def save_failure(
         (
             source_run_id, collection_run_id, source_id, attempted_at, completed_at,
             window_start, window_end, prior_success(connection, source_id),
-            type(error).__name__.upper()[:64], str(error)[:1000],
+            source_failure_code(error), str(error)[:1000],
         ),
     )
 
@@ -1420,7 +1526,7 @@ def project_feed_item(
     if isinstance(item.get("payload"), dict):
         committee = item["payload"].get("committee", "") or ""
 
-    return {
+    projected = {
         "stable_id": stable_id,
         "source_id": source_id,
         "source_name": source_name,
@@ -1442,6 +1548,12 @@ def project_feed_item(
         "content_sha256": item["content_sha256"],
         "committee": committee,
     }
+    for key in ("document_revision_at", "date_basis"):
+        if key in item:
+            projected[key] = item[key]
+    if isinstance(item.get("date_evidence"), dict):
+        projected["date_evidence"] = public_date_evidence(item["date_evidence"])
+    return projected
 
 
 def generate_intelligence_summary(
@@ -1664,18 +1776,52 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
         source_run_id = f"SR-DEMO-{slot_date:%Y%m%d}-{slot}-{source_id[2:]}"
         previous = prior_sources.get(source_id, {})
         previous_lkg = previous.get("last_known_good")
+        retained_data_as_of = previous.get("data_as_of")
+        retained_date_metadata = {
+            key: previous[key]
+            for key in ("data_as_of_basis", "data_as_of_evidence", "data_as_of_scope")
+            if key in previous
+        }
+        if source_id == "S-009" or (
+            source_id == "S-006" and previous.get("data_as_of_basis") not in {
+                "OFFICIAL_DOCUMENT_REVISION_DATE", "OFFICIAL_LIST_TITLE_DATE",
+            }
+        ):
+            # A legacy fetch clock is not rescued by a failed or empty fetch.
+            retained_data_as_of = None
+            retained_date_metadata = {}
+        date_metadata = dict(retained_date_metadata)
         collected_items = []
         try:
             collected = collect_source(session, source_id, window_start.date(), window_end.date())
             collected_items = collected.get("items", [])
             raw_items_by_source[source_id] = collected_items
-            dates = [item["published_at"] for item in collected_items if item["published_at"]]
+            dated_items = [
+                (item.get("document_revision_at") or item.get("published_at"), item)
+                for item in collected_items
+                if item.get("document_revision_at") or item.get("published_at")
+            ]
+            latest_item_time, latest_item = max(dated_items, key=lambda value: value[0], default=(None, None))
             # An official S-007 record date may establish data time even when it
             # falls outside this collection window. Local API observation time
             # never establishes an official publication date.
-            data_as_of = max(dates, default=None)
-            if not data_as_of and collected.get("latest_record_date"):
+            data_as_of = latest_item_time
+            date_metadata = {}
+            if latest_item and source_id == "S-006":
+                date_metadata["data_as_of_basis"] = latest_item.get("date_basis", "OFFICIAL_LIST_TITLE_DATE")
+                date_metadata["data_as_of_scope"] = "LATEST_EVIDENCED_DOCUMENT_VERSION"
+                if latest_item.get("date_evidence"):
+                    date_metadata["data_as_of_evidence"] = latest_item["date_evidence"]
+            if latest_item and source_id == "S-007":
+                date_metadata = {"data_as_of_basis": "OFFICIAL_API_RECORD_DATE", "data_as_of_scope": "COLLECTION_WINDOW"}
+            if collected.get("latest_record_date") and (
+                not data_as_of or collected["latest_record_date"] > data_as_of
+            ):
                 data_as_of = collected["latest_record_date"]
+                date_metadata = {
+                    "data_as_of_basis": "OFFICIAL_API_RECORD_DATE",
+                    "data_as_of_scope": collected.get("latest_record_date_scope", "OBSERVED_API_PAGE"),
+                }
             if not data_as_of:
                 # Undated successful content does not establish an official
                 # publication time. Keep last_checked_at as the observation
@@ -1683,7 +1829,8 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
                 # S-009 has no official date evidence, including for an empty
                 # inventory; discard legacy values made from the fetch clock.
                 if not collected_items and source_id != "S-009":
-                    data_as_of = previous.get("data_as_of")
+                    data_as_of = retained_data_as_of
+                    date_metadata = dict(retained_date_metadata)
             manifest_changed = collected["manifest_sha256"] != previous.get("manifest_sha256")
             change_count = collected["window_item_count"] if manifest_changed else 0
             result = result_for(collected["window_completeness"], change_count)
@@ -1728,13 +1875,16 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
                 # The undated S-009 schema cannot validate a legacy observation
                 # clock even when today's fetch fails. Preserve LKG content,
                 # while removing that unsupported publication-time claim.
-                "data_as_of": None if source_id == "S-009" else previous.get("data_as_of"),
+                "data_as_of": retained_data_as_of,
                 "last_checked_at": timestamp(now),
                 "last_success_at": previous.get("last_success_at"),
                 "next_update_at": next_at,
                 "last_known_good": previous_lkg,
-                "error_code": type(error).__name__.upper()[:64],
+                "error_code": source_failure_code(error),
             }
+        if isinstance(date_metadata.get("data_as_of_evidence"), dict):
+            date_metadata["data_as_of_evidence"] = public_date_evidence(date_metadata["data_as_of_evidence"])
+        record.update(date_metadata)
         freshness = freshness_status(record["data_as_of"], now, *SOURCE_FRESHNESS_POLICY.get(source_id, (13, 24)))
         record["freshness_status"] = freshness
         record["last_known_good_age"] = last_known_good_age(record["last_known_good"], now)
@@ -1771,6 +1921,8 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
                     lkg_item["freshness_status"] = freshness if freshness != "FRESH" else "VERY_STALE"
                     lkg_item["data_as_of"] = record["data_as_of"]
                     lkg_item["fetched_at"] = fetched_at
+                    if isinstance(lkg_item.get("date_evidence"), dict):
+                        lkg_item["date_evidence"] = public_date_evidence(lkg_item["date_evidence"])
                     feed_items.append(lkg_item)
 
         # Source summary for feed

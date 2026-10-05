@@ -63,6 +63,33 @@ class V2PublicationContractTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "canonical item differs"):
             VERIFY.validate_profile_view_consistency([first, second])
 
+    def test_profile_views_share_source_health_and_gap_state(self):
+        tracked = event(
+            event_id=None,
+            tracking_id="TRACK-WATCH-1",
+            source_health="STALE",
+            source_freshness="VERY_STALE",
+            source_gaps=["freshness"],
+        )
+        first = view(event())
+        second = view(event())
+        first["tracking_items"] = [tracked]
+        second["tracking_items"] = [dict(tracked)]
+        VERIFY.validate_profile_view_consistency([first, second])
+        for field, altered in (
+            ("source_health", "PASS"),
+            ("source_freshness", "RECENT"),
+            ("source_gaps", []),
+        ):
+            second["tracking_items"] = [{**tracked, field: altered}]
+            with self.assertRaisesRegex(ValueError, "canonical item differs"):
+                VERIFY.validate_profile_view_consistency([first, second])
+        second["tracking_items"] = [
+            {key: value for key, value in tracked.items() if key != "source_gaps"}
+        ]
+        with self.assertRaisesRegex(ValueError, "canonical item differs"):
+            VERIFY.validate_profile_view_consistency([first, second])
+
 
 if __name__ == "__main__":
     unittest.main()

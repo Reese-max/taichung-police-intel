@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { lastKnownGoodAgeLabel } from "../../lib/source-status.js";
+import { sourceDateLabel } from "../../lib/publication-dates.js";
 
 const STATUS_URL = `${process.env.NEXT_PUBLIC_BASE_PATH || ""}/data/source-status.json`;
 const HEALTH = { PASS: "成功取得", FAILED: "取得失敗", UNKNOWN: "尚無可核對結果" };
@@ -75,7 +76,7 @@ export default function SourcesPage() {
                     <div><dt>最後檢查</dt><dd>{dateLabel(source.last_checked_at)}</dd></div>
                      <div><dt>最後成功取得</dt><dd>{dateLabel(source.last_success_at)}</dd></div>
                      <div><dt>最後已知成功快照距今</dt><dd>{lastKnownGoodAgeLabel(source.last_known_good, now)}</dd></div>
-                    <div><dt>官方資料截至</dt><dd>{dateLabel(source.data_as_of)}</dd></div>
+                    <div><dt>{sourceDateLabel(source)}</dt><dd>{dateLabel(source.data_as_of)}</dd></div>
                   </dl>
                   {["STALE", "VERY_STALE"].includes(source.freshness_status) && <p>官方資料日期較舊，不能解讀為目前沒有事件。</p>}
                   {source.source_health !== "PASS" && <p>本次來源未完整取得；已保存資料可供回查，不能據此推定公告已解除或移除。</p>}

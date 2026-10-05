@@ -1,3 +1,5 @@
+import { projectSourceDates } from "./publication-dates.js";
+
 const TAIPEI_OFFSET_MS = 8 * 60 * 60 * 1000;
 const STALE_STATUSES = new Set(["STALE", "VERY_STALE"]);
 const SOURCE_HEALTH = new Set(["PASS", "DEGRADED", "FAILED", "QUARANTINED", "NOT_RUN"]);
@@ -108,6 +110,9 @@ export function validateSourceStatus(data, policy) {
         throw new Error(`來源狀態時間無法驗證：${source.source_id}`);
       }
     }
+    const policySource = policy.active_sources?.find(row => row.source_id === source.source_id);
+    const approvedOrigins = policySource?.approved_origins || (policySource?.entrypoint ? [new URL(policySource.entrypoint).origin] : []);
+    projectSourceDates(source, approvedOrigins);
     ids.add(source.source_id);
   }
   if (ids.size !== expected.length || expected.some((id) => !ids.has(id))) throw new Error("來源狀態未涵蓋完整來源政策");

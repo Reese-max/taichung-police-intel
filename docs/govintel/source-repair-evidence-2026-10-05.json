@@ -1,0 +1,292 @@
+{
+  "schema_version": 1,
+  "scope": "BOUNDED_OFFICIAL_SOURCE_DIAGNOSIS_AND_LOCAL_REPAIR_VALIDATION",
+  "production_release_verification": "Consult the current public release.json and GitHub Actions publication receipts; these observations are not a deployment receipt.",
+  "s006": {
+    "started_at": "2026-10-05T14:21:41.874840+00:00",
+    "verified_at": "2026-10-05T14:22:14.120458+00:00",
+    "method": "Normal approved official URLs through existing proxy and TLS; revision parser uses the same attachment response bytes, no extra detail requests.",
+    "source_id": "S-006",
+    "source_health": "PASS",
+    "window_completeness": "PARTIAL",
+    "snapshot_item_count": 7,
+    "window_item_count": 0,
+    "snapshot_count": 15,
+    "manifest_sha256": "6f6c76f0be306ca3ad99448bc8d73bed704c04a1a67fa8346f52e7769fc7c997",
+    "items": [
+      {
+        "stable_key": "17851628782860(1)",
+        "published_at": null,
+        "document_revision_at": "2026-08-20T00:00:00+08:00",
+        "date_basis": "OFFICIAL_DOCUMENT_REVISION_DATE",
+        "date_evidence": {
+          "date_basis": "OFFICIAL_DOCUMENT_REVISION_DATE",
+          "document_revision_at": "2026-08-20T00:00:00+08:00",
+          "official_url": "https://www.tccc.gov.tw/pic/DocCouncil/17851628782860(2).pdf",
+          "content_sha256": "887453b5f9b86bfc71d4f27fdc4cf047b3671ad9f217ae2d0e835449cafb9350",
+          "page_number": 1
+        }
+      },
+      {
+        "stable_key": "17882754682859(1)",
+        "published_at": null,
+        "document_revision_at": "2026-09-01T00:00:00+08:00",
+        "date_basis": "OFFICIAL_DOCUMENT_REVISION_DATE",
+        "date_evidence": {
+          "date_basis": "OFFICIAL_DOCUMENT_REVISION_DATE",
+          "document_revision_at": "2026-09-01T00:00:00+08:00",
+          "official_url": "https://www.tccc.gov.tw/pic/DocCouncil/17882754682859(2).pdf",
+          "content_sha256": "f21ecb06c6fe0153fbaad287d7192e85445b58f5a24e7ec343df1432a6b32cdf",
+          "page_number": 1
+        }
+      },
+      {
+        "stable_key": "17851627092858(1)",
+        "published_at": null,
+        "document_revision_at": "2026-08-27T00:00:00+08:00",
+        "date_basis": "OFFICIAL_DOCUMENT_REVISION_DATE",
+        "date_evidence": {
+          "date_basis": "OFFICIAL_DOCUMENT_REVISION_DATE",
+          "document_revision_at": "2026-08-27T00:00:00+08:00",
+          "official_url": "https://www.tccc.gov.tw/pic/DocCouncil/17851627092858(2).pdf",
+          "content_sha256": "6b0a3dcfbbc12eb8fa581d04283490a3cde8b4d5d180a660b18d0845eed9ef9e",
+          "page_number": 1
+        }
+      },
+      {
+        "stable_key": "17851626392857(1)",
+        "published_at": null,
+        "document_revision_at": null,
+        "date_basis": null
+      },
+      {
+        "stable_key": "17851625432855(1)",
+        "published_at": null,
+        "document_revision_at": null,
+        "date_basis": null
+      },
+      {
+        "stable_key": "17851624952854(1)",
+        "published_at": null,
+        "document_revision_at": null,
+        "date_basis": null
+      },
+      {
+        "stable_key": "17894846552853(1)",
+        "published_at": null,
+        "document_revision_at": null,
+        "date_basis": null
+      }
+    ],
+    "date_coverage_qualifier": "The parser did not establish an explicit first-page revision date. The live process retained hash metadata but not those four PDF bodies; no claim that the official PDFs are intrinsically undated. No repeat attachment fetch was made.",
+    "data_as_of_scope": "LATEST_EVIDENCED_DOCUMENT_VERSION",
+    "snapshot_evidence": [
+      {
+        "purpose": "LIST",
+        "requested_url": "https://www.tccc.gov.tw/wb_download13.asp?uno=&cno=50",
+        "final_url": "https://www.tccc.gov.tw/wb_download13.asp?uno=&cno=50",
+        "http_status": 200,
+        "content_sha256": "5cc9d72ea085de5d414564d746aad6799ce164411b3136c844a5694b3b3b9bab"
+      },
+      {
+        "purpose": "ATTACHMENT",
+        "requested_url": "https://www.tccc.gov.tw/pic/DocCouncil/17851628782860(1).doc",
+        "final_url": "https://www.tccc.gov.tw/pic/DocCouncil/17851628782860(1).doc",
+        "http_status": 200,
+        "content_sha256": "11b0ac562c64ffcdd9e281c6901b061ffd329d31503b2132dc6914dd1f98f801"
+      },
+      {
+        "purpose": "ATTACHMENT",
+        "requested_url": "https://www.tccc.gov.tw/pic/DocCouncil/17851628782860(2).pdf",
+        "final_url": "https://www.tccc.gov.tw/pic/DocCouncil/17851628782860(2).pdf",
+        "http_status": 200,
+        "content_sha256": "887453b5f9b86bfc71d4f27fdc4cf047b3671ad9f217ae2d0e835449cafb9350"
+      },
+      {
+        "purpose": "ATTACHMENT",
+        "requested_url": "https://www.tccc.gov.tw/pic/DocCouncil/17882754682859(1).doc",
+        "final_url": "https://www.tccc.gov.tw/pic/DocCouncil/17882754682859(1).doc",
+        "http_status": 200,
+        "content_sha256": "41ee8f9d08198b48cd19de5f38410d56b33770acb3ecc3fe782fd51e08d3d151"
+      },
+      {
+        "purpose": "ATTACHMENT",
+        "requested_url": "https://www.tccc.gov.tw/pic/DocCouncil/17882754682859(2).pdf",
+        "final_url": "https://www.tccc.gov.tw/pic/DocCouncil/17882754682859(2).pdf",
+        "http_status": 200,
+        "content_sha256": "f21ecb06c6fe0153fbaad287d7192e85445b58f5a24e7ec343df1432a6b32cdf"
+      },
+      {
+        "purpose": "ATTACHMENT",
+        "requested_url": "https://www.tccc.gov.tw/pic/DocCouncil/17851627092858(1).doc",
+        "final_url": "https://www.tccc.gov.tw/pic/DocCouncil/17851627092858(1).doc",
+        "http_status": 200,
+        "content_sha256": "02398dd6786436d17bb5a74fb0f8e67766df86e1ae18a48d2c4e01b79a408e45"
+      },
+      {
+        "purpose": "ATTACHMENT",
+        "requested_url": "https://www.tccc.gov.tw/pic/DocCouncil/17851627092858(2).pdf",
+        "final_url": "https://www.tccc.gov.tw/pic/DocCouncil/17851627092858(2).pdf",
+        "http_status": 200,
+        "content_sha256": "6b0a3dcfbbc12eb8fa581d04283490a3cde8b4d5d180a660b18d0845eed9ef9e"
+      },
+      {
+        "purpose": "ATTACHMENT",
+        "requested_url": "https://www.tccc.gov.tw/pic/DocCouncil/17851626392857(1).doc",
+        "final_url": "https://www.tccc.gov.tw/pic/DocCouncil/17851626392857(1).doc",
+        "http_status": 200,
+        "content_sha256": "7e3a875a0df01eca8342e1e946fa2d2d8b2ade0343e51dc085293770344dc40a"
+      },
+      {
+        "purpose": "ATTACHMENT",
+        "requested_url": "https://www.tccc.gov.tw/pic/DocCouncil/17851626392857(2).pdf",
+        "final_url": "https://www.tccc.gov.tw/pic/DocCouncil/17851626392857(2).pdf",
+        "http_status": 200,
+        "content_sha256": "9f30a27f0193f74ca4d472b975c97a01d81361f9ad34b5ffd02a6496dbb36c42"
+      },
+      {
+        "purpose": "ATTACHMENT",
+        "requested_url": "https://www.tccc.gov.tw/pic/DocCouncil/17851625432855(1).doc",
+        "final_url": "https://www.tccc.gov.tw/pic/DocCouncil/17851625432855(1).doc",
+        "http_status": 200,
+        "content_sha256": "b7e117d3118be1a1bdc234b82467bc5e7b5482d1feb7ac60b245d74a9a9c52df"
+      },
+      {
+        "purpose": "ATTACHMENT",
+        "requested_url": "https://www.tccc.gov.tw/pic/DocCouncil/17851625432855(2).pdf",
+        "final_url": "https://www.tccc.gov.tw/pic/DocCouncil/17851625432855(2).pdf",
+        "http_status": 200,
+        "content_sha256": "cf619605938f0c4a696831dfa707fb23a8c07600b4b7cd5917ab790fcea2f685"
+      },
+      {
+        "purpose": "ATTACHMENT",
+        "requested_url": "https://www.tccc.gov.tw/pic/DocCouncil/17851624952854(1).docx",
+        "final_url": "https://www.tccc.gov.tw/pic/DocCouncil/17851624952854(1).docx",
+        "http_status": 200,
+        "content_sha256": "ae01e73cecc4d06405716e594db6e82a50202070a4b361abc2f6f50d2f83c00f"
+      },
+      {
+        "purpose": "ATTACHMENT",
+        "requested_url": "https://www.tccc.gov.tw/pic/DocCouncil/17851624952854(2).pdf",
+        "final_url": "https://www.tccc.gov.tw/pic/DocCouncil/17851624952854(2).pdf",
+        "http_status": 200,
+        "content_sha256": "5c143505b81d3269f63e7c25df6e196abedb8712bb271eb9708ddfb0e0ba752a"
+      },
+      {
+        "purpose": "ATTACHMENT",
+        "requested_url": "https://www.tccc.gov.tw/pic/DocCouncil/17894846552853(1).doc",
+        "final_url": "https://www.tccc.gov.tw/pic/DocCouncil/17894846552853(1).doc",
+        "http_status": 200,
+        "content_sha256": "39f7746e9b8b158a4cb6ef57ec1200b1b66b8e14f03c47c5b904b7a7b28c53b7"
+      },
+      {
+        "purpose": "ATTACHMENT",
+        "requested_url": "https://www.tccc.gov.tw/pic/DocCouncil/17894846552853(2).pdf",
+        "final_url": "https://www.tccc.gov.tw/pic/DocCouncil/17894846552853(2).pdf",
+        "http_status": 200,
+        "content_sha256": "e1cf0e51eed6cad5fd6ade83dc63cdeef83ca91d4809d1e4de4801e3f000a5be"
+      }
+    ]
+  },
+  "s007": {
+    "observed_official_record_date": "2026-05-27T01:12:00+08:00",
+    "first_page_records_observed": 20,
+    "official_newer_range": [
+      "2026-05-28",
+      "2026-10-05"
+    ],
+    "official_newer_total_count": 0,
+    "freshness_status": "STALE under unchanged 90/180-day policy",
+    "fixed": [
+      "Explicit ISO offsets preserve their instant while converting to Taipei",
+      "Bounded 20-record probe uses max observed rather than assuming first row is latest",
+      "Source data date is scoped to observed records, not complete unfiltered inventory"
+    ]
+  },
+  "s009": {
+    "status": "OFFICIAL_DATE_STILL_UNKNOWN",
+    "front_list_sample": 1,
+    "detail_sample": 1,
+    "detail_http_status": 200,
+    "detail_attachments": 0,
+    "reason": "Both observed official FrontList record and one matching public FrontDetail record have no verifiable publication field. Do not infer a date from fetch clock, session number or unrelated meeting calendar."
+  },
+  "transport": {
+    "recorded_at": "2026-10-05T14:19:41.481142+00:00",
+    "validation_scope": "BOUNDED_LIVE_DIAGNOSIS_NOT_SOURCE_RECOVERY",
+    "request_timeouts_seconds": {
+      "connect": 8,
+      "read": 15
+    },
+    "inherited_proxy_and_ca": true,
+    "tls_verification": true,
+    "catalog_changed": false,
+    "source_recovery_verified": false,
+    "notes": [
+      "Six low-volume requests completed; no bypass or unverified source replacement.",
+      "recorded_at is receipt creation time, not an official content or publication date.",
+      "The managed-environment HTTP 503 does not establish the cause of a different GitHub runner ConnectionError."
+    ],
+    "observations": [
+      {
+        "source_id": "S-029",
+        "requested_url": "https://www.rdec.taichung.gov.tw/12047/12142/12145",
+        "http_status": 503,
+        "response_bytes": 91,
+        "raw_sha256": "2f85832e31ca57711e6107af6b142363351ae516adb71c69afc643fac26be7f6",
+        "elapsed_seconds": 5.67
+      },
+      {
+        "source_id": "S-019",
+        "requested_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186",
+        "http_status": 503,
+        "response_bytes": 91,
+        "raw_sha256": "2f85832e31ca57711e6107af6b142363351ae516adb71c69afc643fac26be7f6",
+        "elapsed_seconds": 5.36
+      },
+      {
+        "source_id": "S-001",
+        "requested_url": "https://www.police.taichung.gov.tw/ch/home.jsp?id=1&parentpath=0&mcustomize=news_list.jsp",
+        "http_status": 503,
+        "response_bytes": 91,
+        "raw_sha256": "2f85832e31ca57711e6107af6b142363351ae516adb71c69afc643fac26be7f6",
+        "elapsed_seconds": 6.55
+      },
+      {
+        "source_id": "S-001",
+        "requested_url": "https://www.police.taichung.gov.tw/ch/home.jsp?id=1",
+        "http_status": 503,
+        "response_bytes": 91,
+        "raw_sha256": "2f85832e31ca57711e6107af6b142363351ae516adb71c69afc643fac26be7f6",
+        "elapsed_seconds": 6.1
+      },
+      {
+        "source_id": "S-019 / S-029 origin",
+        "requested_url": "https://www.rdec.taichung.gov.tw/",
+        "http_status": 503,
+        "response_bytes": 91,
+        "raw_sha256": "2f85832e31ca57711e6107af6b142363351ae516adb71c69afc643fac26be7f6",
+        "elapsed_seconds": 5.55
+      },
+      {
+        "source_id": "S-019",
+        "requested_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186/",
+        "http_status": 503,
+        "response_bytes": 91,
+        "raw_sha256": "2f85832e31ca57711e6107af6b142363351ae516adb71c69afc643fac26be7f6",
+        "elapsed_seconds": 5.63
+      }
+    ]
+  },
+  "validation": {
+    "source_date_transport_and_lkg_tests": {
+      "status": "PASS",
+      "count": 78
+    },
+    "guard_and_release_byte_tests": {
+      "status": "PASS",
+      "count": 115
+    }
+  },
+  "rights_boundary": "Only metadata links, dates, page numbers and hashes. No document body, PDF, excerpts, credentials or personal records."
+}
