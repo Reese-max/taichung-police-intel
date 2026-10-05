@@ -205,6 +205,19 @@ class ReleaseVerificationTests(unittest.TestCase):
         config = json.loads((ROOT / "workers/query-gateway/wrangler.jsonc").read_text())
         self.assertEqual(config["version_metadata"]["binding"], "CF_VERSION_METADATA")
 
+    def test_worker_activation_waits_for_the_serialized_pages_build(self):
+        pages = (ROOT / ".github/workflows/pages.yml").read_text(encoding="utf-8")
+        worker = (ROOT / ".github/workflows/query-gateway-workers.yml").read_text(encoding="utf-8")
+        self.assertIn("  workflow_call:", worker)
+        self.assertNotIn("  push:", worker)
+        self.assertNotIn("  workflow_dispatch:", worker)
+        self.assertIn("  worker:\n    needs: build\n    uses: ./.github/workflows/query-gateway-workers.yml\n    secrets: inherit", pages)
+        self.assertIn("    needs: [build, worker]", pages)
+        self.assertIn("    needs: [build, worker, deploy]", pages)
+        self.assertIn("WORKER_DEPLOY: ${{ needs.worker.result }}", pages)
+        self.assertIn("group: competition-demo-pages\n  cancel-in-progress: false", pages)
+        self.assertNotIn("group: competition-demo-pages", worker)
+
 
 if __name__ == "__main__":
     unittest.main()
