@@ -1,4 +1,4 @@
-// Offline research foundation only. Not imported by a route or provider adapter.
+// Permission-gated research foundation. Only the server document adapter instantiates stores.
 // Trusted server configuration must be kept separate from the two closed request
 // schemas below. Hashes bind evidence; they do not confer rights or authenticity.
 export const DOCUMENT_EVIDENCE_VERSION = "document-evidence/1";
@@ -150,9 +150,9 @@ export async function createDocumentEvidenceStore({ sourcePolicy, formalAdmissio
     source.approved_origins.forEach(checkedOrigin); sources.set(source.source_id, source);
   }
   if (new Set(policy.active_source_ids).size !== sources.size) fail("INVALID_SOURCE_POLICY");
-  shape(permission, ["schema_version", "policy_id", "policy_version", "policy_hash", "source_policy_hash", "governance_hash", "reviewed_at", "expires_at", "sources", "approved_documents"], "INVALID_PERMISSION_CONTRACT");
+  shape(permission, ["schema_version", "policy_id", "policy_version", "policy_hash", "source_policy_hash", "governance_hash", "reviewed_at", "expires_at", "sources", "approved_documents", ...(permission.schema_version === 2 ? ["transmission_policy"] : [])], "INVALID_PERMISSION_CONTRACT");
   id(permission.policy_id, "INVALID_PERMISSION_CONTRACT");
-  if (permission.schema_version !== 1 || !Number.isSafeInteger(permission.policy_version) || permission.policy_version < 1 || permission.source_policy_hash !== policyHash || permission.governance_hash !== governance.governance_hash) fail("PERMISSION_BINDING_MISMATCH");
+  if (![1, 2].includes(permission.schema_version) || !Number.isSafeInteger(permission.policy_version) || permission.policy_version < 1 || permission.source_policy_hash !== policyHash || permission.governance_hash !== governance.governance_hash) fail("PERMISSION_BINDING_MISMATCH");
   const { policy_hash: permissionHash, ...permissionCore } = permission;
   if (permissionHash !== expectedPermissionsHash || await digest(permissionCore) !== permissionHash) fail("PERMISSION_HASH_MISMATCH");
   if (!Array.isArray(permission.sources) || permission.sources.length > L.documents || !Array.isArray(permission.approved_documents) || permission.approved_documents.length > L.documents) fail("PERMISSION_TOO_LARGE");
@@ -160,13 +160,21 @@ export async function createDocumentEvidenceStore({ sourcePolicy, formalAdmissio
   for (const row of permission.sources) {
     shape(row, ["source_id", "status", "rights_status", "review_required", "review_id", "reviewed_at", "full_text_allowed", "excerpt_allowed", "derived_usage_allowed", "model_transmission_allowed"], "INVALID_PERMISSION_CONTRACT");
     id(row.source_id, "INVALID_PERMISSION_CONTRACT"); id(row.review_id, "INVALID_PERMISSION_CONTRACT");
-    if (!sources.has(row.source_id) || rights.has(row.source_id) || row.status !== "APPROVED" || !["VERIFIED_DOCUMENT_PERMISSION", "OPEN_DATA_LICENSED"].includes(row.rights_status) || row.review_required !== false || row.full_text_allowed !== true || row.excerpt_allowed !== true || row.derived_usage_allowed !== true || row.model_transmission_allowed !== false) fail("DOCUMENT_RIGHTS_BLOCKED");
+    if (!sources.has(row.source_id) || rights.has(row.source_id) || row.status !== "APPROVED" || !["VERIFIED_DOCUMENT_PERMISSION", "OPEN_DATA_LICENSED"].includes(row.rights_status) || row.review_required !== false || row.full_text_allowed !== true || row.excerpt_allowed !== true || row.derived_usage_allowed !== true || row.model_transmission_allowed !== (permission.schema_version === 2)) fail("DOCUMENT_RIGHTS_BLOCKED");
     rights.set(row.source_id, row);
   }
+  const transmission = permission.schema_version === 2 ? permission.transmission_policy : null;
+  if (transmission) {
+    shape(transmission, ["provider", "endpoint", "model", "purpose", "review_required", "review_id", "reviewed_at", "public_nonpersonal_confirmed", "approved_document_bindings"], "INVALID_TRANSMISSION_PERMISSION");
+    id(transmission.review_id, "INVALID_TRANSMISSION_PERMISSION");
+    if (transmission.provider !== "MiniMax" || transmission.endpoint !== "https://api.minimax.io/v1/chat/completions" || transmission.model !== "MiniMax-M2.7" || transmission.purpose !== "GOVINTEL_DOCUMENT_SYNTHESIS_AND_CRITIQUE" || transmission.review_required !== false || transmission.public_nonpersonal_confirmed !== true || !Array.isArray(transmission.approved_document_bindings) || transmission.approved_document_bindings.length > L.documents || new Set(transmission.approved_document_bindings).size !== transmission.approved_document_bindings.length) fail("MODEL_TRANSMISSION_NOT_APPROVED");
+    transmission.approved_document_bindings.forEach(value => hash(value, "INVALID_TRANSMISSION_PERMISSION"));
+  } else if (permission.schema_version === 2) fail("MODEL_TRANSMISSION_NOT_APPROVED");
   function readTime() {
     const value = clock(), now = instant(value), reviewed = instant(permission.reviewed_at), expires = instant(permission.expires_at);
     if (!Number.isFinite(now)) fail("INVALID_SERVER_TIME");
     if (!Number.isFinite(reviewed) || !Number.isFinite(expires) || reviewed > now || reviewed >= expires || expires <= now || [...rights.values()].some(row => !Number.isFinite(instant(row.reviewed_at)) || instant(row.reviewed_at) > reviewed)) fail("PERMISSION_EXPIRED_OR_UNREVIEWED");
+    if (transmission && (!Number.isFinite(instant(transmission.reviewed_at)) || instant(transmission.reviewed_at) > reviewed)) fail("PERMISSION_EXPIRED_OR_UNREVIEWED");
     return { value, now };
   }
   readTime();
@@ -230,7 +238,7 @@ export async function createDocumentEvidenceStore({ sourcePolicy, formalAdmissio
     for (const { passage } of ranked) {
       if (passages.length >= L.passages) { truncated = true; break; }
       // Reserve ample fixed overhead and gap metadata within the total envelope.
-      if (bytes(JSON.stringify({ passages: [...passages, passage], gaps })) > L.contextBytes - 2048) { truncated = true; break; }
+      if (bytes(JSON.stringify({ passages: [...passages, passage], gaps })) > L.contextBytes - 5120) { truncated = true; break; }
       passages.push(passage);
     }
     if (truncated) gaps.push({ code: "RETRIEVAL_TRUNCATED" });
@@ -242,6 +250,7 @@ export async function createDocumentEvidenceStore({ sourcePolicy, formalAdmissio
       limitation: EXTRACTIVE_LIMITATION, gaps, passages };
     const result = freeze({ ...core, generation_id: `DOCGEN-${await digest(core)}` });
     if (bytes(JSON.stringify(result)) > L.contextBytes) fail("CONTEXT_LIMIT_EXCEEDED");
+    readTime();
     issued.set(result, { now, passages: new Map(passages.map(row => [row.passage_id, row])) });
     return result;
   }
@@ -275,7 +284,15 @@ export async function createDocumentEvidenceStore({ sourcePolicy, formalAdmissio
       source_health: "NOT_ASSESSED", window_completeness: "UNKNOWN", limitation: EXTRACTIVE_LIMITATION, gaps: retrieval.gaps, excerpts };
     const result = freeze({ ...core, compilation_sha256: await digest(core) });
     if (bytes(JSON.stringify(result)) > L.contextBytes) fail("CONTEXT_LIMIT_EXCEEDED");
+    readTime();
     return result;
   }
-  return Object.freeze({ retrieve, compileDraft, corpus_sha256: corpusHash, document_count: supplied.size, chunk_count: chunks.length });
+  function assertModelTransmissionAllowed(retrieval) {
+    const context = issued.get(retrieval), { now } = readTime();
+    if (!context || now < context.now || now - context.now > L.generationAgeMs) fail("UNKNOWN_OR_EXPIRED_GENERATION");
+    if (!transmission || !retrieval.passages.length || retrieval.passages.some(row => !transmission.approved_document_bindings.includes(row.citation.document_binding_sha256))) fail("MODEL_TRANSMISSION_NOT_APPROVED");
+    return freeze({ provider: transmission.provider, endpoint: transmission.endpoint, model: transmission.model, purpose: transmission.purpose,
+      permission_policy_hash: permissionHash, document_binding_sha256s: [...new Set(retrieval.passages.map(row => row.citation.document_binding_sha256))] });
+  }
+  return Object.freeze({ retrieve, compileDraft, assertModelTransmissionAllowed, assertPermissionsCurrent: () => { readTime(); }, corpus_sha256: corpusHash, document_count: supplied.size, chunk_count: chunks.length });
 }

@@ -1,3 +1,4 @@
+import { executeDocumentResearch } from "./document-research.js";
 import { parseResearchInput, researchProviderState, researchTerms, selectResearchSources, ResearchError, readBoundedJson } from "./research.js";
 import { gateAnswer } from "../../../apps/web/lib/answer-evidence-gate.js";
 import { projectPublicBrief, projectPublicSource } from "./public-brief.js";
@@ -695,11 +696,18 @@ async function execute(snapshot, tool, rawArgs = {}) {
   return { ...envelope(snapshot, tool, args, scope, { gate_status: gate.gate_status, answer: gate.answer, final_claims: gate.final_claims, evidence_ids: gate.receipt.evidence_ids || [], answer_evidence_receipt: gate.receipt }, gate.final_claims?.length || 0, false, "answer_evidence"), receipt: { ...envelope(snapshot, tool, args, scope, {}, gate.final_claims?.length || 0).receipt, arguments_sha256: argumentsHash } };
 }
 
-// Research reads only the same server-owned metadata index as search_evidence.
-// No model prose or caller-provided evidence can cross the formal answer gate.
+// Metadata uses the unchanged formal answer gate. Optional document research
+// uses separately pinned server evidence and never enters that formal gate.
 export async function executeResearch(snapshot, rawInput, env, request, fetchImpl = fetch) {
   const input = parseResearchInput(rawInput);
   const scope = assessScope(snapshot);
+  const state = researchProviderState(env);
+  const base = { schema_version: 1, mode: input.mode, release: snapshot.release, status: "METADATA_ONLY", reason_code: null,
+    provider: { name: "MiniMax", state }, question: input.question, answer: [], sources: [],
+    source_gaps: scope.gaps, query_generation_id: snapshot.generationId, data_status: scope.dataStatus,
+    coverage_limitation: "僅檢索核准快照的標題、議會欄位及來源代碼，不是全文研究；引用僅支持索引記載，不證明標題中的事件事實。零結果不表示現實中沒有事件。" };
+  if (snapshot.formalAdmission?.status !== "ADMITTED") return { ...base, reason_code: "RIGHTS_BLOCKED", ...(input.mode !== "metadata" ? { provider_transmission_attempted: false } : {}) };
+  if (input.mode !== "metadata") return executeDocumentResearch(snapshot, input, env, request, base, fetchImpl);
   const terms = researchTerms(input);
   const candidates = new Map();
   for (const term of terms) {
@@ -713,13 +721,7 @@ export async function executeResearch(snapshot, rawInput, env, request, fetchImp
   const source = row => ({ evidence_id: `PUB-${row.canonical_id}`, source_id: row.source_id,
     title: row.title, official_url: row.official_url, published_at: row.published_at,
     data_as_of: row.data_as_of, fetched_at: row.fetched_at });
-  const state = researchProviderState(env);
-  const result = { schema_version: 1, release: snapshot.release, status: "METADATA_ONLY", reason_code: null,
-    provider: { name: "MiniMax", state }, question: input.question, answer: [], sources: rows.map(source),
-    source_gaps: scope.gaps, query_generation_id: snapshot.generationId, data_status: scope.dataStatus,
-    coverage_limitation: "僅檢索核准快照的標題、議會欄位及來源代碼，不是全文研究；引用僅支持索引記載，不證明標題中的事件事實。零結果不表示現實中沒有事件。",
-  };
-  if (snapshot.formalAdmission?.status !== "ADMITTED") return { ...result, reason_code: "RIGHTS_BLOCKED" };
+  const result = { ...base, sources: rows.map(source) };
   if (!rows.length) return { ...result, reason_code: "NO_MATCH" };
   if (state !== "READY") return { ...result, reason_code: state };
   const trusted = new Set(trustedEvidence(snapshot).filter(row => row.is_current).map(row => row.evidence_id));

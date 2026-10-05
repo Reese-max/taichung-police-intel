@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "dataset_id": "govintel-research-gold-v1",
+  "dataset_type": "SYNTHETIC_OFFLINE_INTEGRATION_REGRESSION",
+  "created_at": "2026-10-05",
+  "case_file": "cases.jsonl",
+  "case_count": 45,
+  "runner": "node --test apps/web/tests/research-gold.test.mjs",
+  "system_under_test": "executeResearch with isolated compiled governance, server-owned fictional document grants, mocked MiniMax producer and critic",
+  "network_calls_allowed": false,
+  "model_calls_allowed": false,
+  "semantic_quality_claim": false,
+  "label_policy": {
+    "model_generated_labels_are_gold": false,
+    "synthetic_cases_must_be_marked": true,
+    "human_labelled_holdout_required_for_accuracy_claims": true
+  },
+  "limitations": [
+    "These cases check implementation invariants and explicit mocked verdict handling, not model accuracy.",
+    "Exact quotes, offsets, hashes and immutable bindings establish citation integrity, not semantic truth.",
+    "SYNTHESIS_DRAFT is AI_REVIEWED_NOT_FORMALLY_VERIFIED and cannot assert current facts or zero events.",
+    "Fictional rights and transmission grants are isolated server test fixtures; repository-approved policies are not altered."
+  ],
+  "categories": [
+    "approved_passages",
+    "bounds",
+    "exact_citations",
+    "manifest",
+    "mode_isolation",
+    "no_evidence",
+    "prompt_injection",
+    "provider",
+    "rights",
+    "semantic_critic",
+    "temporal",
+    "transmission"
+  ]
+}

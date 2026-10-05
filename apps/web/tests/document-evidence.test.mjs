@@ -331,9 +331,9 @@ test("prompt injection remains quoted data; retrieval and compilation perform no
   } finally { globalThis.fetch = oldFetch; }
 });
 
-test("the module remains unconnected to the production gateway and metadata provider", async () => {
-  for (const file of ["index.js", "research.js"]) {
-    const source = await readFile(new URL(`../../../workers/query-gateway/src/${file}`, import.meta.url), "utf8");
-    assert.doesNotMatch(source, /(?:from\s+["'][^"']*document-evidence|import\s*\([^)]*document-evidence)/);
-  }
+test("the evidence module contains no provider/network calls; only the explicit server bridge imports it", async () => {
+  const evidence = await readFile(new URL("../../../workers/query-gateway/src/document-evidence.js", import.meta.url), "utf8");
+  assert.doesNotMatch(evidence, /\bfetch\s*\(/);
+  const provider = await readFile(new URL("../../../workers/query-gateway/src/research.js", import.meta.url), "utf8");
+  assert.doesNotMatch(provider, /from\s+["'][^"']*document-evidence/);
 });
