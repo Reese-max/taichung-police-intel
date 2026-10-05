@@ -1663,3 +1663,46 @@
   .pq-event-card,
   .pq-drawer { transition: none; }
 }
+
+/* ── Discovery radar: external event discovery layer (read-only) ──────────── */
+.v2-discovery {
+  margin: 22px 0;
+  padding: 20px;
+  background: rgba(15, 25, 35, 0.6);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+}
+.v2-discovery.error { color: #fecaca; border-color: rgba(239, 68, 68, 0.35); }
+.v2-discovery-upstream {
+  padding: 10px 12px;
+  margin: 0 0 14px;
+  border-radius: 8px;
+  background: rgba(245, 158, 11, 0.1);
+  color: #fcd34d;
+  font-size: 0.82rem;
+}
+.v2-discovery-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.v2-discovery-confirmed,
+.v2-discovery-pending { display: grid; gap: 10px; align-content: start; }
+.v2-discovery h3 { margin: 0 0 4px; font-size: 0.95rem; }
+.v2-discovery-confirmed h3 { color: #86efac; }
+.v2-discovery-pending h3 { color: #fcd34d; }
+.v2-discovery-row {
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  border-radius: 9px;
+  display: grid;
+  gap: 6px;
+}
+.v2-discovery-row strong { font-size: 0.88rem; }
+.v2-discovery-row small,
+.v2-discovery-counts { color: var(--text-muted); font-size: 0.72rem; }
+.v2-discovery-row a { color: #93c5fd; font-size: 0.75rem; }
+.v2-discovery-row p { margin: 0; color: #cbd5e1; font-size: 0.8rem; }
+.v2-discovery-evidence { color: #bfdbfe; font: 600 0.72rem/1.5 var(--mono); overflow-wrap: anywhere; }
+.v2-discovery-counts { margin: 14px 0 0; }
+
+@media (max-width: 720px) {
+  .v2-discovery-grid { grid-template-columns: 1fr; }
+}

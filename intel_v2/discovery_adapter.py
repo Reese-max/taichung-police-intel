@@ -272,6 +272,7 @@ def verify_candidate(
         return result
     result["verification_status"] = "VERIFIED_OFFICIAL"
     result["verification_reason"] = "SERVER_CONTROLLED_OFFICIAL_MATCH"
+    result["official_urls"] = sorted({str(doc["official_url"]) for doc in matched if doc.get("official_url")})
     result["matched_existing"] = any(doc.get("public_event_id") or doc.get("existing_public_event_id") for doc in matched)
     result["public_event_ids"] = sorted({str(doc.get("public_event_id") or doc.get("existing_public_event_id")) for doc in matched if doc.get("public_event_id") or doc.get("existing_public_event_id")})
     result["canonical_write"] = False
@@ -334,7 +335,7 @@ def ingest_feed(
         candidate["change_class"] = change
         if old is not None and change != "MATERIAL_DISCOVERY_CHANGE":
             candidate["verification_status"] = old.get("verification_status", candidate["verification_status"])
-            for key in ("verification_sources_checked", "official_document_versions", "matched_existing", "independent_source_count", "public_event_ids", "verification_reason", "verification_blocked_reason"):
+            for key in ("verification_sources_checked", "official_document_versions", "official_urls", "matched_existing", "independent_source_count", "public_event_ids", "verification_reason", "verification_blocked_reason"):
                 if key in old:
                     candidate[key] = old[key]
             if change == "PRESENTATION_ONLY":
@@ -380,6 +381,7 @@ def ingest_feed(
         "govintel_publication_id": None,
         "govintel_publication_hash": None,
         "replayed": False,
+        "feed_item_count": len(validated["items"]),
     }
     all_candidates = dict(previous_candidates)
     for candidate in candidates:

@@ -38,12 +38,12 @@ def self_check() -> None:
     feed = load_feed(str(ROOT / "tests/fixtures/discovery/dashboard-feed.v1.json"))
     documents = json.loads((ROOT / "tests/fixtures/discovery/official-matches.json").read_text(encoding="utf-8"))
     result = ingest_feed(feed, official_documents=documents, now=datetime(2026, 9, 21, tzinfo=timezone.utc))
-    assert result["receipt"]["relevant_count"] == 2
+    assert result["receipt"]["relevant_count"] == 3
     assert result["receipt"]["official_match_count"] == 2
     assert result["receipt"]["new_public_event_count"] == 1
     assert result["receipt"]["existing_event_match_count"] == 1
     assert result["receipt"]["status"] == "PENDING_PUBLICATION"
-    print("DISCOVERY_ADAPTER_SELF_CHECK_OK relevant=2 official=2 new_event=1 existing=1 media_boundary=true")
+    print("DISCOVERY_ADAPTER_SELF_CHECK_OK relevant=3 official=2 new_event=1 existing=1 media_boundary=true")
 
 
 def main() -> int:

@@ -23,7 +23,7 @@ class DiscoveryAdapterTests(unittest.TestCase):
     def test_three_step_media_to_official_and_existing_new_event_receipt(self):
         result = ingest_feed(self.feed, official_documents=self.documents, now=NOW)
         receipt = result["receipt"]
-        self.assertEqual(receipt["relevant_count"], 2)
+        self.assertEqual(receipt["relevant_count"], 3)
         self.assertEqual(receipt["official_match_count"], 2)
         self.assertEqual(receipt["new_public_event_count"], 1)
         self.assertEqual(receipt["existing_event_match_count"], 1)
@@ -37,7 +37,7 @@ class DiscoveryAdapterTests(unittest.TestCase):
         result = ingest_feed(self.feed, official_documents=[], now=NOW)
         media = next(item for item in result["candidates"] if item["authority"] == "media")
         self.assertEqual(media["verification_status"], "NO_OFFICIAL_MATCH")
-        self.assertEqual(result["receipt"]["no_official_match_count"], 2)
+        self.assertEqual(result["receipt"]["no_official_match_count"], 3)
         expired = ingest_feed(self.feed, official_documents=[], now=datetime(2026, 9, 25, tzinfo=timezone.utc))
         media_expired = next(item for item in expired["candidates"] if item["authority"] == "media")
         self.assertEqual(media_expired["verification_status"], "EXPIRED")

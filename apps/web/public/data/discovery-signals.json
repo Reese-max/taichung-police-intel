@@ -1,0 +1,95 @@
+{
+  "confirmed": [
+    {
+      "authority": "media",
+      "candidate_id": "gd-1111111111111111",
+      "canonical_write": false,
+      "category": "交通",
+      "discovered_at": "2026-09-20T10:05:00Z",
+      "event_time": "2026-09-20T10:00:00Z",
+      "headline": "臺中市道路管制公告線索",
+      "matched_existing": false,
+      "official_document_versions": [
+        "DOCV-OFFICIAL-ROAD-1"
+      ],
+      "official_urls": [
+        "https://www.traffic.taichung.gov.tw/news/road-1"
+      ],
+      "public_event_ids": [],
+      "publisher": "Example Media",
+      "region": "臺中市",
+      "verification_reason": "SERVER_CONTROLLED_OFFICIAL_MATCH",
+      "verification_status": "VERIFIED_OFFICIAL"
+    },
+    {
+      "authority": "official",
+      "candidate_id": "gd-2222222222222222",
+      "canonical_write": false,
+      "category": "災防",
+      "discovered_at": "2026-09-20T09:02:00Z",
+      "event_time": "2026-09-20T09:00:00Z",
+      "headline": "臺中市消防公開災情",
+      "matched_existing": true,
+      "official_document_versions": [
+        "DOCV-OFFICIAL-FIRE-1"
+      ],
+      "official_urls": [
+        "https://fire.example.test/incident-1"
+      ],
+      "public_event_ids": [
+        "PUB-EXISTING-1"
+      ],
+      "publisher": "臺中市政府消防局",
+      "region": "臺中市",
+      "verification_reason": "SERVER_CONTROLLED_OFFICIAL_MATCH",
+      "verification_status": "VERIFIED_OFFICIAL"
+    }
+  ],
+  "counts": {
+    "canonical_change_count": 1,
+    "confirmed_count": 2,
+    "conflict_count": 0,
+    "existing_event_match_count": 1,
+    "expired_count": 0,
+    "feed_item_count": 4,
+    "new_public_event_count": 1,
+    "no_official_match_count": 1,
+    "pending_shown": 1,
+    "pending_total": 1,
+    "relevant_count": 3,
+    "truncated": false
+  },
+  "generated_at": "2026-09-21T00:00:00Z",
+  "kind": "GOVINTEL_DISCOVERY_SIGNALS",
+  "limits": {
+    "pending_max": 5
+  },
+  "pending": [
+    {
+      "authority": "media",
+      "candidate_id": "gd-4444444444444444",
+      "canonical_write": false,
+      "category": "反詐",
+      "discovered_at": "2026-09-20T07:03:00Z",
+      "event_time": "2026-09-20T07:00:00Z",
+      "expires_at": "2026-09-23T07:03:00Z",
+      "headline": "臺中市反詐宣導活動線索",
+      "note": "尚未找到官方確認",
+      "publisher": "Example Media",
+      "region": "臺中市",
+      "verification_status": "NO_OFFICIAL_MATCH"
+    }
+  ],
+  "production_verified": false,
+  "schema_version": 1,
+  "status": "FIXTURE_ONLY",
+  "upstream": {
+    "content_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "current": true,
+    "feed_id": "taiwan-intel-dashboard:govintel-discovery",
+    "generated_at": "2026-09-21T00:00:00Z",
+    "generation_id": "gdf-4d6370d87214d0ac1130b20c",
+    "operating_state": "ACTIVE",
+    "signal_mode": "CURRENT"
+  }
+}

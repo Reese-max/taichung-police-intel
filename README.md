@@ -187,7 +187,7 @@ The catalog-derived source policy has a cross-consumer receipt: `python scripts/
 
 Official document conversion is bounded by `intel_v2/located_facts.py` and `scripts/located-facts.py`: approved catalog origin → immutable raw/text hashes → HTML text-range or JSON Pointer locator → `FACT_CANDIDATE` / `NEEDS_REVIEW` fact and evidence projections. A locator/hash mismatch fails closed; the adapter does not promote candidates to verified truth or infer missing dates.
 The live HTML/JSON replay receipt is [official-document-receipt.v1.json](./docs/govintel/official-document-receipt.v1.json); it records hashes and review status, not deployment or human approval.
-The read-only Taiwan Intel Dashboard discovery consumer is replayable with `python scripts/discovery-adapter.py self-check`; media remains unverified until a server-controlled official match, and it never writes canonical events.
+The read-only Taiwan Intel Dashboard discovery consumer is replayable with `python scripts/discovery-adapter.py self-check`; media remains unverified until a server-controlled official match, and it never writes canonical events. `intel_v2/discovery_projection.py` projects each ingest into the bounded [discovery-signals.json](./apps/web/public/data/discovery-signals.json) payload rendered by the read-only `DiscoverySignalsPanel`: official-evidence-confirmed rows (document versions required) are visually separated from the "待官方確認" pending list, which is capped at five entries, drops TTL-expired candidates, and never uses confirmation wording. Non-`ACTIVE` upstream states surface as replay-only/canary-only/gap banners and can never publish as a live signal; `python scripts/discovery-signals.py self-check` covers the contract.
 
 ## Public deployment
 
