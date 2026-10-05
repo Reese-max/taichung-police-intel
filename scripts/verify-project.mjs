@@ -336,6 +336,7 @@ if (["quick", "full"].includes(mode) && !failures.length) {
       ["feedback-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_feedback.py", "-v"]],
       ["feedback-self-check", ["-X", "utf8", "scripts/feedback.py", "self-check"]],
       ["source-policy-integration-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_source_policy_integration.py", "-v"]],
+      ["source-policy-replay-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_source_policy_replay.py", "-v"]],
       ["source-policy-integration-self-check", ["-X", "utf8", "scripts/verify-source-policy-integration.py", "--self-check"]],
       ["migration-replay-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_migration_replay.py", "-v"]],
       ["migration-replay-self-check", ["-X", "utf8", "scripts/migration_replay.py", "self-check"]],

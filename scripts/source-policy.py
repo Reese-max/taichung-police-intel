@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import tempfile
 from typing import Any, Callable
 from urllib.parse import urlsplit
@@ -19,6 +20,7 @@ from urllib.parse import urlsplit
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CATALOG = ROOT / "docs/govintel/source-catalog.v2.json"
 APPROVED_POLICY = ROOT / "docs/govintel/source-policy.approved.json"
+APPROVED_HISTORY = ROOT / "docs/govintel/source-policy-history"
 SCHEMA_VERSION = 1
 VALID_STATUSES = {"PRODUCTION_ACTIVE", "AUDITED_EXISTING", "VERIFIED_CANDIDATE", "REFERENCE_ONLY"}
 VALID_ROLES = {"PRIMARY_EVENT", "PRIMARY_REFERENCE", "ENRICHMENT", "DISCOVERY_ONLY"}
@@ -294,6 +296,31 @@ def assess_query(policy: dict[str, Any], capability_id: str, source_states: dict
     # A recomputed self-hash is not authorization to change required sources.
     if policy != load_current_policy():
         raise ValueError("policy differs from the approved catalog-bound snapshot")
+    return _assess_query(policy, capability_id, source_states)
+
+
+def load_approved_history(policy_hash: str) -> dict[str, Any]:
+    """Read an archived, reviewed snapshot; never accept a caller-supplied policy.
+
+    Repository review is the approval boundary, as for APPROVED_POLICY. The filename
+    and self-hash check integrity only. Historical snapshots cannot activate sources.
+    """
+    if not isinstance(policy_hash, str) or re.fullmatch(r"[a-f0-9]{64}", policy_hash) is None:
+        raise ValueError("historical policy selector must be a lowercase SHA-256")
+    policy = json.loads((APPROVED_HISTORY / f"{policy_hash}.json").read_text(encoding="utf-8"))
+    validate_policy(policy)
+    if policy["policy_hash"] != policy_hash:
+        raise ValueError("historical policy hash does not match its archive name")
+    return policy
+
+
+def assess_historical_query(policy_hash: str, capability_id: str,
+                            source_states: dict[str, dict[str, Any]] | None = None) -> dict[str, Any]:
+    return _assess_query(load_approved_history(policy_hash), capability_id, source_states)
+
+
+def _assess_query(policy: dict[str, Any], capability_id: str,
+                  source_states: dict[str, dict[str, Any]] | None) -> dict[str, Any]:
     capability = next((row for row in policy["capabilities"] if row["capability_id"] == capability_id), None)
     if capability is None or not capability["supported"]:
         return {

@@ -6,6 +6,10 @@ import copy
 import importlib.util
 import json
 from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tempfile
 from typing import Any
 
 
@@ -30,6 +34,141 @@ def binding(policy: dict[str, Any]) -> dict[str, Any]:
         "catalog_hash": policy["catalog_hash"],
         "active_source_ids": sorted(policy["active_source_ids"]),
     }
+
+
+def check_promoted_fixture(old_store: dict[str, Any], old_result: dict[str, Any], as_of: str) -> dict[str, Any]:
+    """Run real consumers in a temporary checkout with an explicitly approved fixture."""
+    source_policy = load_module("promoted_fixture_policy", "scripts/source-policy.py")
+    query_store = load_module("promoted_fixture_store", "scripts/query-store.py")
+    query_gateway = load_module("promoted_fixture_gateway", "scripts/query-gateway.py")
+    system_health = load_module("promoted_fixture_health", "scripts/system-health.py")
+    publication = load_module("promoted_fixture_publication", "scripts/verify-publication-bundle.py")
+    collect = load_module("promoted_fixture_collector", "collect.py")
+    online = load_module("promoted_fixture_online", "online_collect.py")
+    current = source_policy.load_current_policy()
+    expected = binding(current)
+    feed, _ = query_store.load_json(query_store.DEFAULT_FEED)
+    status, _ = query_store.load_json(query_store.DEFAULT_STATUS)
+    brief, _ = query_store.load_json(query_store.DEFAULT_BRIEF)
+    store = query_store.build_from_paths(query_store.DEFAULT_FEED, query_store.DEFAULT_STATUS, query_store.DEFAULT_BRIEF)
+    gateway = query_gateway.QueryGateway(snapshot={"store": store, "status": status, "brief": brief},
+                                         clock=lambda: query_store.instant(as_of))
+    health = system_health.load_current()
+    ui = json.loads((ROOT / "apps/web/public/data/source-policy.json").read_text(encoding="utf-8"))
+    projections = {"query_store": store["policy"], "query_gateway": gateway.execute("get_source_health", {})["policy"],
+                   "system_health": health["policy"], "ui": binding(ui)}
+    if any(value != expected for value in projections.values()):
+        raise ValueError("promoted fixture consumer policy binding mismatch")
+    for name, source_ids in (("collector", set(collect.P0_SOURCES)), ("online_collector", set(online.SOURCE_ROWS)),
+                             ("publication_validator", publication.load_expected_sources())):
+        if source_ids != set(current["active_source_ids"]):
+            raise ValueError(f"promoted fixture {name} source set mismatch")
+    if publication.main() != 0:
+        raise ValueError("promoted fixture publication bundle rejected")
+    ui_check = subprocess.run([
+        "node", "--input-type=module", "-e",
+        "import {readFileSync} from 'node:fs'; import {validateSourceStatus} from './apps/web/lib/source-status.js';"
+        "const read=(n)=>JSON.parse(readFileSync('apps/web/public/data/'+n));"
+        "const p=read('source-policy.json'); const s=validateSourceStatus(read('source-status.json'),p);"
+        "if(!p.capabilities.find(c=>c.capability_id==='traffic_events')?.supported)throw Error('traffic unsupported');"
+        "console.log(JSON.stringify({policy_hash:p.policy_hash,active:s.sources.length}));",
+    ], cwd=ROOT, text=True, capture_output=True, check=True)
+    if json.loads(ui_check.stdout)["policy_hash"] != current["policy_hash"]:
+        raise ValueError("promoted fixture UI policy mismatch")
+    clock = query_store.instant(as_of)
+    zero = query_store.query_store(store, now=clock, capability_id="traffic_events")
+    if not zero["answerable_no_match"] or zero["query_coverage"]["status"] != "COVERED_BOUNDED_SCOPE":
+        raise ValueError("supported complete scheduled-traffic zero was not bounded")
+    if not zero["query_coverage"]["coverage_limitations"] or "not all real-world events" not in zero["answer_scope"]:
+        raise ValueError("zero lost its bounded-snapshot limitations")
+    gap_results = {}
+    for label, mutation, expected_status in (
+        ("FAILED", {"source_health": "FAILED", "result": "FAILED"}, "PARTIAL"),
+        ("PARTIAL", {"window_completeness": "PARTIAL", "result": "PARTIAL"}, "PARTIAL"),
+        ("STALE", {"freshness_status": "STALE"}, "STALE"),
+    ):
+        changed = copy.deepcopy(store)
+        next(row for row in changed["sources"] if row["source_id"] == "S-032").update(mutation)
+        changed["projection_sha256"] = query_store.sha256_bytes(query_store.canonical_json(
+            {key: value for key, value in changed.items() if key != "projection_sha256"}))
+        result = query_store.query_store(changed, now=clock, source_id="S-004", capability_id="traffic_events")
+        coverage = result["query_coverage"]
+        if coverage["status"] != expected_status or coverage["can_state_bounded_no_match"] or result["answerable_no_match"]:
+            raise ValueError(f"required traffic source gap hidden by source filter: {label}")
+        if "S-032" not in coverage.get("missing_required_sources", []) + coverage.get("stale_required_sources", []):
+            raise ValueError(f"required traffic source gap missing: {label}")
+        gap_results[label] = coverage["status"]
+    try:
+        query_store.query_store(old_store, now=clock)
+    except ValueError as error:
+        if "policy mismatch" not in str(error):
+            raise
+    else:
+        raise ValueError("live query accepted historical policy after transition")
+    replay = query_store.replay_query_store(old_store, policy_hash=old_store["policy"]["policy_hash"],
+                                          as_of=as_of, text="議事", limit=2)
+    if replay["result"] != old_result or replay["may_answer_current"] or not replay["read_only"]:
+        raise ValueError("old publication replay changed result or became current")
+    if store["generation_id"] == old_store["generation_id"]:
+        raise ValueError("policy transition did not change query generation")
+    return {"consumer_count": 7, "policy_hash": current["policy_hash"], "active": len(current["active_source_ids"]),
+            "new_generation": store["generation_id"], "old_generation": old_store["generation_id"],
+            "historical_replay_equal": True, "live_old_policy_rejected": True, "bounded_traffic_zero": True,
+            "required_source_gaps": gap_results, "provider_calls": 0, "source_promotion": "isolated fixture only"}
+
+
+def run_promoted_fixture(catalog, current, old_store, query_store) -> dict[str, Any]:
+    with tempfile.TemporaryDirectory(prefix="govintel-policy-transition-") as directory:
+        fixture = Path(directory)
+        for relative in ("docs/govintel", "scripts", "intel_v2", "apps/web/public/data"):
+            shutil.copytree(ROOT / relative, fixture / relative, ignore=shutil.ignore_patterns("__pycache__"))
+        for relative in ("collect.py", "online_collect.py", "apps/web/package.json", "apps/web/lib/source-status.js"):
+            destination = fixture / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(ROOT / relative, destination)
+        promoted_catalog = copy.deepcopy(catalog)
+        candidate = next(row for row in promoted_catalog["sources"] if row["source_id"] == "S-032")
+        candidate["status"] = "PRODUCTION_ACTIVE"
+        policy_module = load_module("fixture_transition_compiler", "scripts/source-policy.py")
+        promoted = policy_module.compile_policy(promoted_catalog, previous=current, promotions=[{
+            "source_id": "S-032", "receipt_id": "integration:explicit-fixture-approval", "reason": "isolated offline fixture only",
+        }])
+        def write(relative, value):
+            (fixture / relative).write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8")
+        write("docs/govintel/source-catalog.v2.json", promoted_catalog)
+        write("docs/govintel/source-policy.approved.json", promoted)
+        write("apps/web/public/data/source-policy.json", promoted)
+        feed, _ = query_store.load_json(query_store.DEFAULT_FEED)
+        status, _ = query_store.load_json(query_store.DEFAULT_STATUS)
+        brief, _ = query_store.load_json(query_store.DEFAULT_BRIEF)
+        clock = query_store.instant(feed["generated_at"])
+        old_result = query_store.query_store(old_store, now=clock, text="議事", limit=2)
+        feed["items"] = []
+        feed["source_summary"] = {source_id: {"item_count": 0} for source_id in promoted["active_source_ids"]}
+        extra = copy.deepcopy(status["sources"][0])
+        extra.update(source_id="S-032", source_name=candidate["name"], source_url=candidate["entrypoint"])
+        status["sources"].append(extra)
+        status["latest_collection_run"]["status"] = "SUCCEEDED"
+        for row in status["sources"]:
+            row.update(source_health="PASS", window_completeness="COMPLETE_ZERO", result="NO_NEW_ITEM",
+                       freshness_status="FRESH", last_checked_at=feed["generated_at"], last_success_at=feed["generated_at"])
+        brief.update(publication_status="READY", snapshot_complete=True)
+        summary = {"schema_version": 1, "generated_at": feed["generated_at"], "collection_run_id": feed["collection_run_id"],
+                   "total_items": 0, "eligible_items": 0, "source_breakdown": [{"source_id": source_id, "item_count": 0}
+                   for source_id in promoted["active_source_ids"]]}
+        for name, value in (("intelligence-feed", feed), ("source-status", status), ("v2-daily-brief", brief),
+                            ("intelligence-summary", summary)):
+            write(f"apps/web/public/data/{name}.json", value)
+        (fixture / "apps/web/public/data/feed-export.csv").write_text("stable_id\n", encoding="utf-8")
+        write("old-store.json", old_store)
+        write("old-result.json", old_result)
+        completed = subprocess.run([sys.executable, "scripts/verify-source-policy-integration.py", "--fixture-check",
+                                    "--old-store", "old-store.json", "--old-result", "old-result.json",
+                                    "--as-of", clock.isoformat()], cwd=fixture, text=True, capture_output=True, check=True)
+        result = json.loads(completed.stdout.splitlines()[-1])
+        if result["policy_hash"] != promoted["policy_hash"]:
+            raise ValueError("executed fixture policy differs from compiled candidate")
+        return result
 
 
 def run_checks() -> dict[str, Any]:
@@ -122,6 +261,8 @@ def run_checks() -> dict[str, Any]:
     if unsupported["status"] != "CAPABILITY_NOT_AVAILABLE" or unsupported["can_state_bounded_no_match"]:
         raise ValueError("unsupported capability was presented as a bounded empty result")
 
+    fixture_transition = run_promoted_fixture(catalog, current, old_store, query_store)
+
     return {
         "active": len(current["active_source_ids"]),
         "policy_version": current["policy_version"],
@@ -133,6 +274,7 @@ def run_checks() -> dict[str, Any]:
         "partial_gap_preserved": True,
         "unsupported_explicit": True,
         "query_coverage_bound": True,
+        "fixture_transition": fixture_transition,
     }
 
 
@@ -144,7 +286,9 @@ def self_check() -> None:
         f"version={result['policy_version']} promoted={result['promoted_policy_version']} "
         f"old_replay=true mixed_rejected={result['mixed_policy_rejected']} "
         f"partial_gap={result['partial_gap_preserved']} unsupported={result['unsupported_explicit']} "
-        f"query_coverage={result['query_coverage_bound']}"
+        f"query_coverage={result['query_coverage_bound']} "
+        f"promoted_fixture_consumers={result['fixture_transition']['consumer_count']} "
+        f"historical_replay_after_transition={result['fixture_transition']['historical_replay_equal']}"
     )
 
 
@@ -153,7 +297,18 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--self-check", action="store_true")
+    parser.add_argument("--fixture-check", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--old-store", type=Path)
+    parser.add_argument("--old-result", type=Path)
+    parser.add_argument("--as-of")
     args = parser.parse_args()
-    if not args.self_check:
+    if args.fixture_check:
+        if not all((args.old_store, args.old_result, args.as_of)):
+            raise SystemExit("fixture check requires old store, result and as-of clock")
+        result = check_promoted_fixture(json.loads(args.old_store.read_text(encoding="utf-8")),
+                                       json.loads(args.old_result.read_text(encoding="utf-8")), args.as_of)
+        print(json.dumps(result, sort_keys=True))
+    elif not args.self_check:
         raise SystemExit("--self-check is required")
-    self_check()
+    else:
+        self_check()

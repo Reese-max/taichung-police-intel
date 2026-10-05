@@ -204,6 +204,10 @@ def build_store(feed: dict[str, Any], status: dict[str, Any], brief: dict[str, A
 
 
 def validate_store(store):
+    _validate_store(store, load_current_policy())
+
+
+def _validate_store(store, approved_policy):
     if not isinstance(store, dict) or store.get("schema_version") != SCHEMA_VERSION or store.get("projection_version") != PROJECTION_VERSION:
         raise ValueError("unsupported query store; rebuild from canonical artifacts")
     supplied = store.get("projection_sha256")
@@ -212,16 +216,25 @@ def validate_store(store):
         raise ValueError("query projection hash mismatch")
     if not isinstance(store.get("items"), list) or not isinstance(store.get("sources"), list):
         raise ValueError("query store arrays missing")
-    current_policy = load_current_policy()
     expected_policy = {
-        "policy_version": current_policy["policy_version"],
-        "policy_hash": current_policy["policy_hash"],
-        "catalog_hash": current_policy["catalog_hash"],
-        "active_source_ids": sorted(current_policy["active_source_ids"]),
+        "policy_version": approved_policy["policy_version"],
+        "policy_hash": approved_policy["policy_hash"],
+        "catalog_hash": approved_policy["catalog_hash"],
+        "active_source_ids": sorted(approved_policy["active_source_ids"]),
     }
     if store.get("policy") != expected_policy:
         raise ValueError("query store source policy mismatch; rebuild from canonical artifacts")
-    expected_sources = frozenset(current_policy["active_source_ids"])
+    generated = store.get("generated_from")
+    if not isinstance(generated, dict) or generated.get("policy_hash") != approved_policy["policy_hash"]:
+        raise ValueError("query store generated policy binding mismatch")
+    hashes = {key: generated.get(f"{key}_sha256") for key in ("feed", "status", "brief")}
+    if any(not isinstance(value, str) or not HASH.fullmatch(value) for value in hashes.values()):
+        raise ValueError("query store generation binding has invalid artifact hashes")
+    material = {"schema_version": SCHEMA_VERSION, "projection_version": PROJECTION_VERSION,
+                "artifact_hashes": hashes, "policy": expected_policy}
+    if store.get("generation_id") != sha256_bytes(canonical_json(material)):
+        raise ValueError("query store generation binding mismatch")
+    expected_sources = frozenset(approved_policy["active_source_ids"])
     if {s.get("source_id") for s in store["sources"]} != expected_sources or len(store["sources"]) != len(expected_sources):
         raise ValueError("query store source coverage mismatch")
     if len(store["items"]) > MAX_ROWS:
@@ -297,10 +310,16 @@ def assess_scope(store, source_id, now):
 
 
 def query_coverage(store, capability_id, *, requested_scope=None):
+    return _query_coverage(store, capability_id, policy=load_current_policy(), requested_scope=requested_scope)
+
+
+def _query_coverage(store, capability_id, *, policy, requested_scope=None, historical_policy_hash=None):
     policy_module = load_policy_module()
-    policy = policy_module.load_current_policy()
     states = {source["source_id"]: source for source in store["sources"]}
-    coverage = policy_module.assess_query(policy, capability_id, states)
+    if historical_policy_hash is None:
+        coverage = policy_module.assess_query(policy, capability_id, states)
+    else:
+        coverage = policy_module.assess_historical_query(historical_policy_hash, capability_id, states)
     required = set(coverage.get("required_sources", []))
     missing = set(coverage.get("missing_required_sources", []))
     stale = set(coverage.get("stale_required_sources", []))
@@ -323,7 +342,25 @@ def query_coverage(store, capability_id, *, requested_scope=None):
 def query_store(store: dict[str, Any], *, text=None, canonical_id=None, source_id=None, change_type=None,
                 limit=20, cursor=None, expected_generation=None, now=None,
                 capability_id="publication_metadata") -> dict[str, Any]:
-    validate_store(store)
+    return _query_store(store, policy=load_current_policy(), text=text, canonical_id=canonical_id,
+                        source_id=source_id, change_type=change_type, limit=limit, cursor=cursor,
+                        expected_generation=expected_generation, now=now, capability_id=capability_id)
+
+
+def replay_query_store(store: dict[str, Any], *, policy_hash: str, as_of: str, **query) -> dict[str, Any]:
+    """Explicit offline replay; the live query API remains current-policy-only."""
+    if "now" in query:
+        raise ValueError("historical replay uses the explicit as_of clock")
+    policy = load_policy_module().load_approved_history(policy_hash)
+    result = _query_store(store, policy=policy, historical_policy_hash=policy_hash, now=instant(as_of), **query)
+    return {"mode": "APPROVED_HISTORICAL_REPLAY", "read_only": True, "may_answer_current": False,
+            "historical_policy_hash": policy_hash, "as_of": result["queried_at"], "result": result}
+
+
+def _query_store(store: dict[str, Any], *, policy, historical_policy_hash=None, text=None, canonical_id=None,
+                 source_id=None, change_type=None, limit=20, cursor=None, expected_generation=None, now=None,
+                 capability_id="publication_metadata") -> dict[str, Any]:
+    _validate_store(store, policy)
     if type(limit) is not int or not 1 <= limit <= 100:
         raise ValueError("limit must be an integer between 1 and 100")
     for name, value, length in (("text", text, 512), ("canonical_id", canonical_id, 256),
@@ -384,9 +421,11 @@ def query_store(store: dict[str, Any], *, text=None, canonical_id=None, source_i
         next_cursor = base64.urlsafe_b64encode(canonical_json({"generation": store["generation_id"],
                     "filters": filter_hash, "offset": offset + len(results)})).decode()
     assessment, gaps = assess_scope(store, source_id, now)
-    coverage = query_coverage(
+    coverage = _query_coverage(
         store,
         capability_id,
+        policy=policy,
+        historical_policy_hash=historical_policy_hash,
         requested_scope={
             key: value
             for key, value in {
@@ -406,7 +445,7 @@ def query_store(store: dict[str, Any], *, text=None, canonical_id=None, source_i
         "query_coverage": coverage,
         "data_status": assessment, "source_gaps": gaps,
         "source_status": [s for s in store["sources"] if not source_id or s["source_id"] == source_id],
-        "answerable_no_match": total == 0 and not gaps,
+        "answerable_no_match": total == 0 and not gaps and coverage["can_state_bounded_no_match"],
         "answer_scope": "Matching publication metadata in this indexed snapshot; not all real-world events.",
         "queried_at": now.isoformat(), "search_scope": "TITLE_COMMITTEE_SOURCE_ID_ONLY",
         "total_matches": total, "result_count": len(results), "offset": offset,
@@ -421,15 +460,19 @@ def parse_args():
     build = sub.add_parser("build")
     for name, default in (("feed", DEFAULT_FEED), ("status", DEFAULT_STATUS), ("brief", DEFAULT_BRIEF), ("output", DEFAULT_OUTPUT)):
         build.add_argument(f"--{name}", type=Path, default=default)
-    query = sub.add_parser("query")
-    query.add_argument("--store", type=Path, default=DEFAULT_OUTPUT)
-    query.add_argument("--q")
-    query.add_argument("--canonical-id")
-    query.add_argument("--source-id")
-    query.add_argument("--change-type")
-    query.add_argument("--limit", type=int, default=20)
-    query.add_argument("--cursor")
-    query.add_argument("--expected-generation")
+    for name in ("query", "replay"):
+        query = sub.add_parser(name)
+        query.add_argument("--store", type=Path, default=DEFAULT_OUTPUT)
+        query.add_argument("--q")
+        query.add_argument("--canonical-id")
+        query.add_argument("--source-id")
+        query.add_argument("--change-type")
+        query.add_argument("--limit", type=int, default=20)
+        query.add_argument("--cursor")
+        query.add_argument("--expected-generation")
+        if name == "replay":
+            query.add_argument("--policy-hash", required=True)
+            query.add_argument("--as-of", required=True, help="Historical timezone-aware query clock")
     sub.add_parser("self-check")
     return parser.parse_args()
 
@@ -451,10 +494,13 @@ def main():
         store = build_from_paths(args.feed, args.status, args.brief)
         atomic_write_json(args.output, store)
         print(f"QUERY_STORE_BUILT generation={store['generation_id']} items={len(store['items'])} output={args.output}")
-    elif args.command == "query":
+    elif args.command in ("query", "replay"):
         store, _ = load_json(args.store)
-        result = query_store(store, text=args.q, canonical_id=args.canonical_id, source_id=args.source_id, change_type=args.change_type,
-                             limit=args.limit, cursor=args.cursor, expected_generation=args.expected_generation)
+        query = {"text": args.q, "canonical_id": args.canonical_id, "source_id": args.source_id,
+                 "change_type": args.change_type, "limit": args.limit, "cursor": args.cursor,
+                 "expected_generation": args.expected_generation}
+        result = (replay_query_store(store, policy_hash=args.policy_hash, as_of=args.as_of, **query)
+                  if args.command == "replay" else query_store(store, **query))
         print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
     else:
         self_check()

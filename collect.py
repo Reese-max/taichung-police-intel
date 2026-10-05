@@ -25,10 +25,7 @@ def load_production_sources() -> dict[str, tuple[str, str]]:
         raise RuntimeError("source policy module is unavailable")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    active = [
-        row for row in module.load_catalog()["sources"]
-        if row["status"] == "PRODUCTION_ACTIVE"
-    ]
+    active = module.load_current_policy()["active_sources"]
     return {
         row["source_id"]: (row["name"], row["entrypoint"])
         for row in sorted(active, key=lambda row: row["source_id"])

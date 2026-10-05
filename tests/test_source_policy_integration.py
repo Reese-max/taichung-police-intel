@@ -32,6 +32,15 @@ class SourcePolicyIntegrationTests(unittest.TestCase):
         self.assertTrue(result["unsupported_explicit"])
         self.assertTrue(result["query_coverage_bound"])
         self.assertEqual(result["promoted_policy_version"], result["policy_version"] + 1)
+        fixture = result["fixture_transition"]
+        self.assertEqual(fixture["consumer_count"], 7)
+        self.assertEqual(fixture["active"], result["active"] + 1)
+        self.assertNotEqual(fixture["new_generation"], fixture["old_generation"])
+        self.assertTrue(fixture["historical_replay_equal"])
+        self.assertTrue(fixture["live_old_policy_rejected"])
+        self.assertTrue(fixture["bounded_traffic_zero"])
+        self.assertEqual(fixture["required_source_gaps"], {"FAILED": "PARTIAL", "PARTIAL": "PARTIAL", "STALE": "STALE"})
+        self.assertEqual(fixture["provider_calls"], 0)
 
 
 if __name__ == "__main__":
