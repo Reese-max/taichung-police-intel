@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { FEEDBACK_REASONS } from "../lib/local-review.js";
 import { queryGateway } from "../lib/query-release-client.js";
-import { validateControlledAnswer } from "../lib/controlled-answer-client.js";
+import { validateControlledAnswer, runControlledAnswerPipeline } from "../lib/controlled-answer-client.js";
 
 const ENDPOINT = process.env.NEXT_PUBLIC_QUERY_GATEWAY_URL || "/query";
 const FEEDBACK_REASON_LABELS = {
@@ -88,14 +88,14 @@ function GatewayFeedbackForm({ response, targetType, onFeedback, disabled }) {
   );
 }
 
-function QueryResult({ response, onFeedback, feedbackReady, releaseContext }) {
+function QueryResult({ response, onFeedback, feedbackReady, releaseContext, controlledAnswer }) {
   const results = Array.isArray(response.results) ? response.results : [];
   const sources = Array.isArray(response.sources) ? response.sources : [];
   const brief = response.brief;
   const publicationReceipt = response.publication_receipt;
   const coverage = response.query_coverage;
-  const [answerState, setAnswerState] = useState("idle");
-  const [answerResponse, setAnswerResponse] = useState(null);
+  const [answerState, setAnswerState] = useState(controlledAnswer ? "ready" : "idle");
+  const [answerResponse, setAnswerResponse] = useState(controlledAnswer || null);
   const [answerError, setAnswerError] = useState("");
 
   async function validateResults() {
@@ -163,12 +163,12 @@ function QueryResult({ response, onFeedback, feedbackReady, releaseContext }) {
       {results.length > 0 && response.result_type === "publication_metadata" && (
         <section className="v2-query-answer-gate" aria-label="受控回答核對">
           <button type="button" onClick={validateResults} disabled={answerState === "loading"}>
-            {answerState === "loading" ? "正在核對回答……" : "核對受控回答"}
+            {answerState === "loading" ? "正在核對回答……" : "重新核對索引摘要"}
           </button>
           {answerState === "error" && <p className="v2-query-message error" role="alert">{answerError}</p>}
           {answerResponse && answerState === "ready" && (
             <div data-testid="answer-evidence-result">
-              <p>{answerResponse.gate_status === "PASS" ? "回答已由官方證據核對。" : "回答已核對，但僅能保留有證據的內容。"}</p>
+              <p>{answerResponse.gate_status === "PASS" ? "索引摘要已逐句核對。" : "索引摘要已核對；未核對或過期的內容不作為目前事實。"}</p>
               {answerResponse.answer?.map((text, index) => <p key={`${text}-${index}`}>{text}</p>)}
               <small className="v2-query-receipt">validator: {answerResponse.answer_evidence_receipt?.validator_version}</small>
               <small className="v2-query-receipt">answer evidence: {answerResponse.answer_evidence_receipt?.evidence_ids?.join(", ") || "none"}</small>
@@ -214,6 +214,7 @@ function QueryResult({ response, onFeedback, feedbackReady, releaseContext }) {
 export default function QueryGatewayPanel({ onFeedback, feedbackReady = false, publicationGeneration }) {
   const [query, setQuery] = useState("");
   const [response, setResponse] = useState(null);
+  const [controlledAnswer, setControlledAnswer] = useState(null);
   const [state, setState] = useState("idle");
   const [error, setError] = useState("");
   const releaseContext = process.env.NEXT_PUBLIC_QUERY_GATEWAY_URL ? {
@@ -225,9 +226,15 @@ export default function QueryGatewayPanel({ onFeedback, feedbackReady = false, p
   async function run(tool, argumentsValue) {
     setState("loading");
     setError("");
+    setControlledAnswer(null);
     try {
-      const payload = await queryGateway(ENDPOINT, tool, argumentsValue, releaseContext);
-      setResponse(payload);
+      if (tool === "search_evidence") {
+        const completed = await runControlledAnswerPipeline(ENDPOINT, argumentsValue, releaseContext);
+        setResponse(completed.response);
+        setControlledAnswer(completed.answer);
+      } else {
+        setResponse(await queryGateway(ENDPOINT, tool, argumentsValue, releaseContext));
+      }
       setState("ready");
     } catch (reason) {
       setResponse(null);
@@ -274,7 +281,7 @@ export default function QueryGatewayPanel({ onFeedback, feedbackReady = false, p
       {state === "loading" && <p className="v2-query-message" role="status">正在核對公開快照……</p>}
       {state === "error" && <p className="v2-query-message error" role="alert">{error}</p>}
       {state === "ready" && response && (
-        <QueryResult key={response.query_id} response={response} onFeedback={onFeedback} feedbackReady={feedbackReady} releaseContext={releaseContext} />
+        <QueryResult key={response.query_id} response={response} onFeedback={onFeedback} feedbackReady={feedbackReady} releaseContext={releaseContext} controlledAnswer={controlledAnswer} />
       )}
     </section>
   );

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import { validateControlledAnswer } from "../lib/controlled-answer-client.js";
 
@@ -11,7 +12,13 @@ const query = {
 };
 const answer = {
   release, query_generation_id: query.query_generation_id, publication_hash: query.publication_hash,
-  gate_status: "PASS", answer: ["已核對官方公告"], answer_evidence_receipt: { validator_version: "answer-evidence-gate/3" },
+  gate_status: "PASS", answer: ["已核對官方公告"], answer_evidence_receipt: {
+    schema_version: 1, validator_version: "answer-evidence-gate/3", renderer_version: "controlled-answer-renderer/1",
+    gate_status: "PASS", publication_hash: query.publication_hash,
+    answer_sha256: createHash("sha256").update(JSON.stringify(["已核對官方公告"])).digest("hex"),
+    claim_ids: ["publication-official-62"], claims: [{ claim_id: "publication-official-62", claim_type: "STATUS",
+      original_text: "官方公告", support_status: "SUPPORTED", propositions: [{ subject: "publication:official-62:title", value: "官方公告" }] }],
+  },
 };
 
 test("controlled answers pin the displayed query generation and the current release", async t => {
