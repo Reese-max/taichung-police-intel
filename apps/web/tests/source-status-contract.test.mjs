@@ -12,6 +12,8 @@ const knownGood = {
 };
 const sourceStatus = JSON.parse(await readFile(new URL("../public/data/source-status.json", import.meta.url), "utf8"));
 
+const policy = JSON.parse(await readFile(new URL("../public/data/source-policy.json", import.meta.url), "utf8"));
+
 function failedSource() {
   return {
     source_id: "S-029",
@@ -26,18 +28,18 @@ function failedSource() {
 }
 
 test("checked-in public source status has a validated source snapshot", () => {
-  assert.equal(validateSourceStatus(sourceStatus), sourceStatus);
+  assert.equal(validateSourceStatus(sourceStatus, policy), sourceStatus);
 });
 
 test("public source status requires a non-empty, identified snapshot", () => {
   assert.throws(() => validateSourceStatus({ schema_version: 1, sources: [] }), /來源狀態/);
-  assert.throws(() => validateSourceStatus({ schema_version: 1, generated_at: "2026-09-11T00:00:00+08:00", sources: [{}] }), /source_id/);
+  assert.throws(() => validateSourceStatus({ ...sourceStatus, sources: [{}] }, policy), /source_id/);
   const duplicate = structuredClone(sourceStatus);
   duplicate.sources.push({ ...duplicate.sources[0] });
-  assert.throws(() => validateSourceStatus(duplicate), /source_id/);
+  assert.throws(() => validateSourceStatus(duplicate, policy), /source_id/);
   const malformed = structuredClone(sourceStatus);
   malformed.sources[0].intelligence_gaps = { status: "FAILED" };
-  assert.throws(() => validateSourceStatus(malformed), /無法驗證/);
+  assert.throws(() => validateSourceStatus(malformed, policy), /無法驗證/);
 });
 
 test("failed S-029 fetch retains LKG without inventing a current manifest", () => {
@@ -105,4 +107,53 @@ test("feed failure must agree with source status", () => {
     change_type: "LKG",
     eligibility: "INELIGIBLE_SOURCE_FAILED",
   }, new Set()), ["feed:S-029-item:failed-source-not-lkg"]);
+});
+
+
+test("source snapshot requires its gateway collection run", () => {
+  const missing = structuredClone(sourceStatus);delete missing.latest_collection_run;
+  assert.throws(() => validateSourceStatus(missing, policy), /來源狀態/);
+});
+
+test("source snapshot timestamps require explicit timezone and real calendar date", () => {
+  for (const value of ["2026-09-11", "Fri, 11 Sep 2026 00:00:00 GMT", "2026-02-30T00:00:00+08:00", "2026-09-11T00:00:00"]) {
+    const malformed = structuredClone(sourceStatus);malformed.generated_at=value;
+    assert.throws(() => validateSourceStatus(malformed, policy), /來源狀態/, value);
+  }
+});
+
+test("source snapshot covers exactly the active source policy", () => {
+  for (const replacement of [sourceStatus.sources.slice(0,1), sourceStatus.sources.slice(1), sourceStatus.sources.map((row,index)=>index ? row : {...row,source_id:"S-999"})]) {
+    const malformed = {...sourceStatus,sources:replacement};
+    assert.throws(() => validateSourceStatus(malformed, policy), /來源狀態/);
+  }
+});
+
+test("source snapshot rejects unsupported producer state values", () => {
+  for (const [field,value] of [["source_health","PASSED"],["result","SUCCESS"],["window_completeness","COMPLETE"],["freshness_status","CURRENT"]]) {
+    const malformed = structuredClone(sourceStatus);malformed.sources[0][field]=value;
+    assert.throws(() => validateSourceStatus(malformed, policy), /來源狀態/, field);
+  }
+});
+
+test("source snapshot must be the public competition projection", () => {
+  assert.throws(() => validateSourceStatus({...sourceStatus,mode:"INTERNAL"}, policy), /來源狀態/);
+});
+
+
+test("source snapshot validates all displayed timestamp fields without mutating valid payload", () => {
+  for (const field of ["data_as_of","last_checked_at","last_success_at","next_update_at"]) {
+    const malformed=structuredClone(sourceStatus);malformed.sources[0][field]="2026-02-30T00:00:00+08:00";
+    assert.throws(()=>validateSourceStatus(malformed,policy),/來源狀態/,field);
+  }
+  const leap=structuredClone(sourceStatus);leap.generated_at="2028-02-29T12:34:56.123456Z";
+  const before=structuredClone(leap);assert.equal(validateSourceStatus(leap,policy),leap);assert.deepEqual(leap,before);
+  const failed=structuredClone(sourceStatus);Object.assign(failed.sources[0],{source_health:"FAILED",result:"FAILED",window_completeness:"PARTIAL",freshness_status:"NO_DATA",data_as_of:null,last_success_at:null});
+  assert.equal(validateSourceStatus(failed,policy),failed);
+});
+
+test("missing or malformed active source policy fails closed", () => {
+  for (const invalid of [undefined, {schema_version:1,active_source_ids:[]}, {...policy,active_source_ids:[policy.active_source_ids[0],policy.active_source_ids[0]]}]) {
+    assert.throws(()=>validateSourceStatus(sourceStatus,invalid),/來源狀態/);
+  }
 });

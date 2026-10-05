@@ -72,7 +72,8 @@ export default function PublicQueryPage() {
     load("public-query-replay.json").then(validateReplay).then((value) => {
       if (!cancelled) setBundle(value);
     }).catch((reason) => { if (!cancelled) setReplayError(reason.message); });
-    load("source-status.json").then(validateSourceStatus).then((value) => {
+    Promise.all([load("source-status.json"), load("source-policy.json")])
+      .then(([status, policy]) => validateSourceStatus(status, policy)).then((value) => {
       if (!cancelled) setSourceStatus(value);
     }).catch((reason) => { if (!cancelled) setSourceError(reason.message); });
     return () => { cancelled = true; sequence.current += 1; detailSequence.current += 1; };
