@@ -7,6 +7,7 @@ import {
 } from "../../lib/public-query.js";
 import { saveLocalConditionRequest } from "../../lib/local-conditions.js";
 import { queryGateway } from "../../lib/query-release-client.js";
+import { validateSourceStatus } from "../../lib/source-status.js";
 import PopulationBackground from "../../components/PopulationBackground.js";
 import "./query.css";
 
@@ -71,8 +72,8 @@ export default function PublicQueryPage() {
     load("public-query-replay.json").then(validateReplay).then((value) => {
       if (!cancelled) setBundle(value);
     }).catch((reason) => { if (!cancelled) setReplayError(reason.message); });
-    load("source-status.json").then((value) => {
-      if (value?.schema_version !== 1 || !Array.isArray(value.sources)) throw new Error("來源狀態格式無法驗證");
+    Promise.all([load("source-status.json"), load("source-policy.json")])
+      .then(([status, policy]) => validateSourceStatus(status, policy)).then((value) => {
       if (!cancelled) setSourceStatus(value);
     }).catch((reason) => { if (!cancelled) setSourceError(reason.message); });
     return () => { cancelled = true; sequence.current += 1; detailSequence.current += 1; };

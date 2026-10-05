@@ -1,5 +1,63 @@
 const TAIPEI_OFFSET_MS = 8 * 60 * 60 * 1000;
 const STALE_STATUSES = new Set(["STALE", "VERY_STALE"]);
+const SOURCE_HEALTH = new Set(["PASS", "DEGRADED", "FAILED", "QUARANTINED", "NOT_RUN"]);
+const SOURCE_RESULT = new Set(["NEW_ITEMS", "NO_NEW_ITEM", "PARTIAL", "FAILED", "NOT_RUN"]);
+const WINDOW_COMPLETENESS = new Set(["COMPLETE_WITH_ITEMS", "COMPLETE_ZERO", "PARTIAL", "NOT_RUN"]);
+const FRESHNESS = new Set(["FRESH", "STALE", "VERY_STALE", "NO_DATA"]);
+
+function validIso(value) {
+  if (typeof value !== "string") return false;
+  const match = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,6})?(?:Z|([+-])(\d{2}):(\d{2}))$/.exec(value);
+  if (!match || Number(match[2]) > 23 || Number(match[3]) > 59 || Number(match[4]) > 59
+      || (match[5] && (Number(match[6]) > 23 || Number(match[7]) > 59))) return false;
+  const calendar = Date.parse(`${match[1]}T00:00:00Z`);
+  return Number.isFinite(calendar) && new Date(calendar).toISOString().slice(0, 10) === match[1]
+    && Number.isFinite(Date.parse(value));
+}
+
+function validOptionalString(value) {
+  return value === undefined || value === null || typeof value === "string";
+}
+
+export function validateSourceStatus(data, policy) {
+  if (!data || data.schema_version !== 1 || !Array.isArray(data.sources) || data.sources.length === 0
+      || data.mode !== "COMPETITION_DEMO"
+      || !validIso(data.generated_at)) throw new Error("來源狀態快照格式無法驗證");
+  const expected = policy?.active_source_ids;
+  if (policy?.schema_version !== 1 || !Array.isArray(expected) || !expected.length
+      || expected.some((id) => typeof id !== "string" || !id.trim() || id !== id.trim())
+      || new Set(expected).size !== expected.length) throw new Error("來源狀態來源政策無法驗證");
+  const ids = new Set();
+  for (const source of data.sources) {
+    if (!source || typeof source.source_id !== "string" || !source.source_id.trim() || ids.has(source.source_id)) {
+      throw new Error(`來源狀態 source_id 無法驗證：${source?.source_id || "unknown"}`);
+    }
+    if (typeof source.source_name !== "string" || !source.source_name.trim()
+        || !validOptionalString(source.source_url)
+        || !SOURCE_HEALTH.has(source.source_health)
+        || !SOURCE_RESULT.has(source.result)
+        || !WINDOW_COMPLETENESS.has(source.window_completeness)
+        || !FRESHNESS.has(source.freshness_status)
+        || !validOptionalString(source.data_as_of)
+        || (source.data_as_of !== undefined && source.data_as_of !== null && !validIso(source.data_as_of))
+        || (source.intelligence_gaps !== undefined && (!Array.isArray(source.intelligence_gaps)
+          || source.intelligence_gaps.some((gap) => typeof gap !== "string")))) {
+      throw new Error(`來源狀態資料無法驗證：${source.source_id}`);
+    }
+    for (const field of ["last_checked_at", "last_success_at", "next_update_at"]) {
+      if (source[field] !== undefined && source[field] !== null && !validIso(source[field])) {
+        throw new Error(`來源狀態時間無法驗證：${source.source_id}`);
+      }
+    }
+    ids.add(source.source_id);
+  }
+  if (ids.size !== expected.length || expected.some((id) => !ids.has(id))) throw new Error("來源狀態未涵蓋完整來源政策");
+  if (data.next_update_at !== undefined && !validIso(data.next_update_at)) throw new Error("來源狀態下一次更新時間無法驗證");
+  if (!data.latest_collection_run
+      || typeof data.latest_collection_run.collection_run_id !== "string"
+      || !data.latest_collection_run.collection_run_id.trim()) throw new Error("來源狀態收集世代無法驗證");
+  return data;
+}
 
 export function isHealthyStaleSource(source) {
   return source?.source_health === "PASS"
