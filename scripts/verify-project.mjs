@@ -341,6 +341,7 @@ if (["quick", "full"].includes(mode) && !failures.length) {
       ["migration-replay-self-check", ["-X", "utf8", "scripts/migration_replay.py", "self-check"]],
       ["system-health-receipt", ["-X", "utf8", "scripts/system-health.py", "--output", "apps/web/public/data/system-health.json"]],
       ["query-gateway-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_query_gateway.py", "-v"]],
+      ["query-generation-fallback-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_query_generation_fallback.py", "-v"]],
       ["release-verification-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_release_verification.py", "-v"]],
       ["query-domain-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_query_domain.py", "-v"]],
       ["query-gateway-domain-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_query_gateway_domain.py", "-v"]],
