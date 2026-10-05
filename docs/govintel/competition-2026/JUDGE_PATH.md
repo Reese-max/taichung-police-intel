@@ -1,6 +1,6 @@
 # GovIntel AI－評審重播入口
 
-先讀[CURRENT_STATUS](CURRENT_STATUS.md)；v6 產品路徑與說法依[DEMO_SCRIPT](DEMO_SCRIPT.md)。下列命令重播已存在的工程核心，不取代查詢／追蹤 PR 的固定 head、瀏覽器操作、正式部署或真人驗收。
+先讀[CURRENT_STATUS](CURRENT_STATUS.md)；v6 產品路徑與說法依[DEMO_SCRIPT](DEMO_SCRIPT.md)。下列命令重播已存在的工程核心；完整版本與瀏覽器驗證可執行 `python3 -X utf8 scripts/verify-current-checkout.py --mode full --output /tmp/govintel-current-checkout`，保留產生的 code SHA、鎖檔雜湊與 receipt。這些工程結果不取代正式部署或真人驗收。
 
 ## 環境與完整 gate
 
@@ -36,9 +36,9 @@ npm --prefix apps/web run dev
 
 讀[公開 source-status](https://reese-max.github.io/taichung-police-intel/data/source-status.json)的 generation、generated_at、source health、freshness／window 與 LKG。日期化成功證據是[37169331249](https://github.com/Reese-max/taichung-police-intel/actions/runs/37169331249)與[37212963039](https://github.com/Reese-max/taichung-police-intel/actions/runs/37212963039)；最新公開 readback 詳見[狀態頁](CURRENT_STATUS.md)。HTTP200 不能推出所有來源新鮮或世界沒有事件。
 
-## v6 候選驗收
+## v6 已合併程式與獨立驗收
 
-[PR124 查詢](https://github.com/Reese-max/taichung-police-intel/pull/124)、[125 追蹤](https://github.com/Reese-max/taichung-police-intel/pull/125)、[126 評測](https://github.com/Reese-max/taichung-police-intel/pull/126)須各在固定 code SHA 重播。query→保存→重開站→工期延長→已讀→明文解除→取消為主流程；排版、轉載、失敗、過期、同名不同日與過度去重是負向情境。根據[ACCEPTANCE_CHECKLIST](ACCEPTANCE_CHECKLIST.md)記錄結果，不能因 PR 可合併或 unit pass 而自行宣稱已部署。
+[PR124 查詢](https://github.com/Reese-max/taichung-police-intel/pull/124)、[125 追蹤](https://github.com/Reese-max/taichung-police-intel/pull/125)、[126 評測](https://github.com/Reese-max/taichung-police-intel/pull/126)已合併，須在目前 checkout 的固定 code SHA 重播。query→保存→重開站→工期延長→已讀→明文解除→取消為主流程；排版、轉載、失敗、過期、同名不同日與過度去重是負向情境。根據[ACCEPTANCE_CHECKLIST](ACCEPTANCE_CHECKLIST.md)記錄結果，不能因 source merge 或 unit pass 而自行宣稱已部署。
 
 本輪已本地整合並修正 release／詳情失效、每日時段與延期追蹤；最終整合測試／瀏覽器狀態見 [VERIFICATION](VERIFICATION.md)。合成道路用 09:00–17:00 每日時段，結束日 10/7→10/9，解除要另有 10/9 17:00 的明文；來源失敗、公告消失與到期均不可推算解除。
 

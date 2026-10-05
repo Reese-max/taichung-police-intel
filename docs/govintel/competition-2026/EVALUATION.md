@@ -30,7 +30,7 @@
 
 ## 工程與真人結果各自留證
 
-[PR #126](https://github.com/Reese-max/taichung-police-intel/pull/126)是候選工具，CI、自我檢查、合成更新精確率或固定資料 replay 只能證明該 fixture／contract。真人 A/B/C 耗時、模型 quality、source coverage 與 public deployment 須另外的 receipt。
+[PR #126](https://github.com/Reese-max/taichung-police-intel/pull/126)是已合併的評測工具；CI、自我檢查、合成更新精確率或固定資料 replay 只能證明該 fixture／contract。真人 A/B/C 耗時、模型 quality、source coverage 與 public deployment 須另外的 receipt。
 
 該候選的工程範圍為 `SYNTHETIC_DETERMINISTIC_POLICY_REPLAY`：6 份來源文件、2 個來源、13 個版本樣本，未提供事件 ID，因此事件數為 null。固定案例的 6 TP 是規則代理指標；候選中切換已讀規則或 deterministic interval matching，並沒有實際執行 B 的搜尋加一般摘要，也沒有 C 的語意 AI 關閉消融。四組 v6 方法執行狀態均維持 `NOT_RUN`；沒有 UI、真人、真實資料或模型成效可由此推出。
 

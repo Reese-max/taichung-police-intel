@@ -1,0 +1,154 @@
+{
+  "checked_at": "2026-10-05T14:18:00.783342+00:00",
+  "scope": "Read-only public HTTPS GET, status/size/hash and public-source metadata only; no provider/write/deploy/forms submission",
+  "requests": [
+    {
+      "url": "https://data.gov.tw/dataset/5958",
+      "status": 200,
+      "bytes": 525981,
+      "body_sha256": "beee4d72bbfc762cf22260a0e6d8a5016a8877f488ef3beb3a95c123b20ccd68",
+      "body_saved": false,
+      "final_url": "https://data.gov.tw/dataset/5958"
+    },
+    {
+      "url": "https://data.gov.tw/dataset/83551",
+      "status": 200,
+      "bytes": 526892,
+      "body_sha256": "7ef6b4a3c1579d12c70c61352b12397291a2645b55a0ebb84e85c491a42a43ad",
+      "body_saved": false,
+      "final_url": "https://data.gov.tw/dataset/83551"
+    },
+    {
+      "url": "https://forms.gle/xBLjk9nKMqbi2zie9",
+      "status": 200,
+      "bytes": 81534,
+      "body_sha256": "c07e53a926f2864c86c70d8d49344e2be8f4610d585752273c1a569eae366beb",
+      "body_saved": false,
+      "final_url": "https://docs.google.com/forms/d/e/1FAIpQLScxLqZXALGZss9ZLYOzVMlPBS2jBEAQ_0L9HvbsTnjaACHgaQ/closedform"
+    },
+    {
+      "url": "https://govintel-query-gateway.irisx-tracker.workers.dev/health",
+      "status": 200,
+      "bytes": 3779,
+      "body_sha256": "2fa4ff2bb1dac6dbe6616a2d29c84deaf1b346b62d8a10f84aa5255620f55d64",
+      "body_saved": false,
+      "final_url": "https://govintel-query-gateway.irisx-tracker.workers.dev/health"
+    },
+    {
+      "url": "https://reese-max.github.io/taichung-police-intel/",
+      "status": 200,
+      "bytes": 13717,
+      "body_sha256": "f289af86139982bb33936ef3fdbb8e04f7e6a1fe7d13eaf806750a77ad096688",
+      "body_saved": false,
+      "final_url": "https://reese-max.github.io/taichung-police-intel/"
+    },
+    {
+      "url": "https://reese-max.github.io/taichung-police-intel/data/source-status.json",
+      "status": 200,
+      "bytes": 6167,
+      "body_sha256": "12b7f647e93c4ebddad254046ed73a5c137d8dccce7c8e17d23c9119b2c0a90b",
+      "body_saved": false,
+      "final_url": "https://reese-max.github.io/taichung-police-intel/data/source-status.json",
+      "public_metadata": {
+        "generated_at": "2026-10-05T09:08:39+08:00",
+        "collection_run_id": null,
+        "source_health": null,
+        "window_completeness": null,
+        "publication_state": null
+      },
+      "sources": [
+        {
+          "source_id": "S-004",
+          "source_health": "PASS",
+          "freshness": null,
+          "last_checked_at": "2026-10-05T09:08:39+08:00",
+          "data_as_of": "2026-10-02T00:00:00+08:00"
+        },
+        {
+          "source_id": "S-006",
+          "source_health": "PASS",
+          "freshness": null,
+          "last_checked_at": "2026-10-05T09:08:39+08:00",
+          "data_as_of": null
+        },
+        {
+          "source_id": "S-007",
+          "source_health": "PASS",
+          "freshness": null,
+          "last_checked_at": "2026-10-05T09:08:39+08:00",
+          "data_as_of": "2026-05-27T01:12:00+08:00"
+        },
+        {
+          "source_id": "S-009",
+          "source_health": "PASS",
+          "freshness": null,
+          "last_checked_at": "2026-10-05T09:08:39+08:00",
+          "data_as_of": null
+        },
+        {
+          "source_id": "S-029",
+          "source_health": "FAILED",
+          "freshness": null,
+          "last_checked_at": "2026-10-05T09:08:39+08:00",
+          "data_as_of": "2026-07-24T00:00:00+08:00"
+        }
+      ]
+    },
+    {
+      "url": "https://segis.moi.gov.tw/STATCloud/Index",
+      "status": 200,
+      "bytes": 30440,
+      "body_sha256": "bdfec7c4621c92db7a4c815661a5f9cea0e8a6f19f057ded0220b85b03d8ec5d",
+      "body_saved": false,
+      "final_url": "https://segis.moi.gov.tw/STATCloud/Index"
+    },
+    {
+      "url": "https://www.rdec.taichung.gov.tw/12047/12142/12145",
+      "status": 503,
+      "bytes": 91,
+      "body_sha256": "2f85832e31ca57711e6107af6b142363351ae516adb71c69afc643fac26be7f6",
+      "body_saved": false,
+      "final_url": "https://www.rdec.taichung.gov.tw/12047/12142/12145"
+    },
+    {
+      "url": "https://www.tccc.gov.tw/",
+      "status": 200,
+      "bytes": 28805,
+      "body_sha256": "f4151ca47bc4eb8feae991543925e19708f658c328611996a776a7ae7d29f1c9",
+      "body_saved": false,
+      "final_url": "https://www.tccc.gov.tw/"
+    },
+    {
+      "url": "https://www.tccc.gov.tw/wb_download13.asp?uno=&cno=49",
+      "status": 200,
+      "bytes": 9609,
+      "body_sha256": "7e10061eec13b1d7ab78f809573c07aadb2d0be0fe725c525f815b6936768bcf",
+      "body_saved": false,
+      "final_url": "https://www.tccc.gov.tw/wb_download13.asp?uno=&cno=49"
+    },
+    {
+      "url": "https://www.tccc.gov.tw/wb_download13.asp?uno=&cno=50",
+      "status": 200,
+      "bytes": 12122,
+      "body_sha256": "5cc9d72ea085de5d414564d746aad6799ce164411b3136c844a5694b3b3b9bab",
+      "body_saved": false,
+      "final_url": "https://www.tccc.gov.tw/wb_download13.asp?uno=&cno=50"
+    },
+    {
+      "url": "https://yishi.tccc.gov.tw/api/ProceedingsBackWeb/FrontList",
+      "status": 400,
+      "bytes": 145,
+      "body_sha256": "72af97a143a204c8a8720964e177177f22c25028f2237e5151ad42fdcf04b721",
+      "body_saved": false,
+      "final_url": "https://yishi.tccc.gov.tw/api/ProceedingsBackWeb/FrontList"
+    },
+    {
+      "url": "https://yishi.tccc.gov.tw/api/Proposal/FrontList",
+      "status": 400,
+      "bytes": 145,
+      "body_sha256": "72af97a143a204c8a8720964e177177f22c25028f2237e5151ad42fdcf04b721",
+      "body_saved": false,
+      "final_url": "https://yishi.tccc.gov.tw/api/Proposal/FrontList"
+    }
+  ]
+}

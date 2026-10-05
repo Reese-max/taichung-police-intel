@@ -8,11 +8,13 @@
 
 The [2026 GovIntel competition entry](./docs/govintel/competition-2026/README.md) is the canonical judge path. The [current status page](./docs/govintel/competition-2026/CURRENT_STATUS.md) records the complete claim/evidence table and fixed state semantics.
 
+The [Oct 5 document readback](./docs/govintel/competition-2026/DOCUMENT_READBACK_20261005.md) records link checks and corrections to merged-source claims. Remaining data acquisition, complete demonstration and human acceptance requirements in Issue #25 stay open.
+
 | Current claim | Fixed status | Evidence boundary |
 |---|---|---|
 | Five-source publication and council evidence journey | `PRODUCTION_ACTIVE` | [active policy](./docs/govintel/source-policy.approved.json), [public data](https://reese-max.github.io/taichung-police-intel/data/source-status.json), [Oct 4 collection run](https://github.com/Reese-max/taichung-police-intel/actions/runs/37169331249). Collection, five public-file hashes and Gateway checks passed; data remains `PARTIAL`. |
 | Bounded deployed Query Gateway | `PRODUCTION_ACTIVE` | The dated production verifier checks the published generation; it does not prove semantic answers, full event coverage or v6 query UX acceptance. |
-| Public query, browser-only tracking and v6 evaluation workflow | `IMPLEMENTED_NOT_PRODUCTION` | [PR #124](https://github.com/Reese-max/taichung-police-intel/pull/124), [#125](https://github.com/Reese-max/taichung-police-intel/pull/125), [#126](https://github.com/Reese-max/taichung-police-intel/pull/126) are acceptance candidates; a PR or local pass is not deployment. |
+| Public query, browser-only tracking and v6 evaluation workflow | `IMPLEMENTED_NOT_PRODUCTION` | [PR #124](https://github.com/Reese-max/taichung-police-intel/pull/124), [#125](https://github.com/Reese-max/taichung-police-intel/pull/125), [#126](https://github.com/Reese-max/taichung-police-intel/pull/126) are merged source changes. Local acceptance, public deployment and human evaluation require their own receipts; a merge is not deployment. |
 | Police／traffic／city／fire source expansion | `CANDIDATE_CANARY` | Four independently observed candidates: S-001／S-032／S-033／S-031. Active policy still contains only the five baseline sources. |
 | Located facts, handoff, Review Inbox and PublicEvent fixture | `IMPLEMENTED_NOT_PRODUCTION` | Replayable core; PublicEvent remains `FIXTURE_ONLY`, without production fusion or multi-user approval. |
 | D1 fixed-period population query | `IMPLEMENTED_NOT_PRODUCTION` | Official 112Y12M／2023-12 CSV verified: 368 national records, all 29 Taichung districts; local query UI provides the historical sample. It is unpromoted background, not current population or measured task benefit. |

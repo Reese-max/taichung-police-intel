@@ -20,7 +20,7 @@ npm --prefix apps/web run dev
 
 說明使用者想知道「測試路 A 到 B 路口的工程何時結束」，並希望下次開站看見工期是否延長。這是合成道路及公告，不代表真實道路安全或已取得的正式四類來源。
 
-讀[CURRENT_STATUS](CURRENT_STATUS.md)：部署 baseline 為五來源；v6 query／tracking／eval PR 仍是候選。新功能演示若來自本地，螢幕先標版本與`SYNTHETIC`／`OFFLINE_REPLAY`。
+讀[CURRENT_STATUS](CURRENT_STATUS.md)：核准 baseline 為五來源；v6 query／tracking／eval PR 已合併到 main，公開部署與真人成效仍待各自驗收。新功能演示若來自本地，螢幕先標版本與`SYNTHETIC`／`OFFLINE_REPLAY`。
 
 ## 0:35–1:25 查詢與保存條件
 
