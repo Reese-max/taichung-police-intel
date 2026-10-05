@@ -136,7 +136,8 @@ def run_promoted_fixture(catalog, current, old_store, query_store) -> dict[str, 
         fixture = Path(directory)
         for relative in ("docs/govintel", "scripts", "intel_v2", "apps/web/public/data"):
             shutil.copytree(ROOT / relative, fixture / relative, ignore=shutil.ignore_patterns("__pycache__"))
-        for relative in ("collect.py", "online_collect.py", "apps/web/package.json", "apps/web/lib/source-status.js"):
+        for relative in ("collect.py", "online_collect.py", "apps/web/package.json", "apps/web/lib/source-status.js",
+                         "apps/web/lib/publication-dates.js"):
             destination = fixture / relative
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(ROOT / relative, destination)
