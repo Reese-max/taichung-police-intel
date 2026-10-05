@@ -1,0 +1,125 @@
+{
+  "artifact_type": "NON_EFFECTIVE_NATIONAL_SOURCE_CANDIDATE_PLAN",
+  "effective": false,
+  "human_reviewer": null,
+  "code_ref": "edb7148c9565c7d59ac222689c35bff41376d1cb",
+  "allocated_source_id": "S-038",
+  "id_basis": "No S-038 in complete edb7148 source-catalog (existing highest numeric ID S-037). Recheck latest catalog at future integration.",
+  "catalog_status_reason": "REFERENCE_ONLY is the supported conservative inactive status; no fixture/canary verification or human approval invented.",
+  "proposed_row": {
+    "source_id": "S-038",
+    "name": "警政署全國警政新聞開放資料",
+    "authority": "內政部警政署（資料集發布機關；各筆發布單位保留deptName）",
+    "role": "PRIMARY_REFERENCE",
+    "priority": 2,
+    "status": "REFERENCE_ONLY",
+    "entrypoint": "https://data.gov.tw/dataset/7505",
+    "list_endpoint": "https://opdadm.moi.gov.tw/api/v1/no-auth/resource/api/dataset/00F7F1C4-2AC0-461C-B060-A6FCD3FF6E45/resource/0C059012-34C5-40B1-80AD-CC9389827CA3/download",
+    "transport": "Official CSV dataset; optional Chinese description row before header",
+    "cadence_class": "UNKNOWN",
+    "collection_rule": "DRAFT: bounded historical baseline first; never label first import NEW. Subsequent bounded delta observations only after adapter, terms, freshness and promotion review. No cadence or geographic completeness claim.",
+    "evidence_rule": "Keep dataset/resource IDs, requested and final official URL, immutable raw hash, per-row serialNo, deptName, postDate and record content hash internally; public projection remains reviewed metadata/link only.",
+    "notes": "DRAFT_ONLY_UNENABLED. User requested 2026-10-05. OGDL-1.0 reported for dataset7505; no human approval. Does not replace S-001 or establish complete Taichung coverage."
+  },
+  "rights_status": "UNKNOWN",
+  "review_required": true,
+  "full_text_allowed": false,
+  "excerpt_allowed": false,
+  "evidence_ids": [
+    "E-009",
+    "E-013",
+    "E-014"
+  ],
+  "reported_snapshot": {
+    "rows": 999,
+    "extra_chinese_description_rows": 1,
+    "columns": [
+      "serialNo",
+      "stitle",
+      "deptName",
+      "postDate",
+      "content"
+    ],
+    "oldest_post_date": "2021-03-24",
+    "newest_post_date": "2026-09-11",
+    "taichung_publisher_matches_reported": 0,
+    "source_bytes_sha256": null,
+    "independently_reverified_here": false
+  },
+  "field_plan": {
+    "internal_only": [
+      "content",
+      "serialNo",
+      "deptName",
+      "postDate",
+      "content_sha256",
+      "dataset_id",
+      "resource_id",
+      "requested_url",
+      "final_url",
+      "fetched_at"
+    ],
+    "eligible_for_reviewed_public_projection": [
+      "source_id",
+      "source_name",
+      "title",
+      "official_url",
+      "published_at",
+      "fetched_at",
+      "freshness_status",
+      "content_sha256"
+    ],
+    "exclude_until_separate_review": [
+      "full_text",
+      "excerpt",
+      "images",
+      "attachments",
+      "contact_names",
+      "phone_numbers",
+      "personal_data"
+    ],
+    "publisher_identity": "dataset publisher and record deptName are distinct; never infer local publisher from body mentions."
+  },
+  "baseline_semantics": {
+    "first_import": "HISTORICAL_BASELINE",
+    "first_import_is_new": false,
+    "absent_in_later_snapshot": "UNKNOWN_NOT_RETRACTION",
+    "postDate_means": "publication date, not incident date",
+    "first_seen_means": "observation time, not publication time"
+  },
+  "dedup_plan": {
+    "within_dataset": "dataset/resource + serialNo with canonical content hash; changed same-ID payload produces version candidate, not a new world event",
+    "cross_source": "Use official original ID/URL + exact normalized content hash when available; preserve every publisher/source/license lineage; title similarity alone cannot merge.",
+    "origin_attribution": "S033 reposts/city RSS/agency originals are not independent corroboration; dedup does not invent authority."
+  },
+  "promotion_plan": {
+    "activated": false,
+    "promotion_receipt": null,
+    "independent_observed_days": 0,
+    "coverage_status": "UNKNOWN",
+    "freshness_rule_status": "UNKNOWN",
+    "geographic_scope_status": "UNKNOWN",
+    "update_frequency": "UNKNOWN",
+    "requires": [
+      "Actual bounded CSV sample and raw hash",
+      "description-row/header handling and UTF8/BOM encoding test",
+      "stable ID and strict postDate validation",
+      "pagination/truncation/completeness verification for 999-row snapshot",
+      "explicit dataset/resource origin and redirect/byte/time budget review",
+      "source-specific terms/field/retention review",
+      "controlled freshness and valid-time semantics",
+      "candidate observation and promotion receipts",
+      "first activation baseline gate"
+    ]
+  },
+  "origin_review": {
+    "dataset_origin": "https://data.gov.tw",
+    "download_origin": "https://opdadm.moi.gov.tw",
+    "download_origin_approval": "UNKNOWN",
+    "note": "Dataset page and CSV download have different official origins. Requested/final URLs, redirects and applicable resource permission still require review."
+  },
+  "research_ref": "edb7148c9565c7d59ac222689c35bff41376d1cb",
+  "integration_base_ref": "edb7148c9565c7d59ac222689c35bff41376d1cb",
+  "draft_schema_version": 1,
+  "proposed_rights_class": "OFFICIAL_METADATA_LINK"
+}
