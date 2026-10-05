@@ -14,6 +14,27 @@ spec.loader.exec_module(module)
 
 
 class OutcomeTests(unittest.TestCase):
+    def test_failed_worker_deployment_prevents_publication_success(self):
+        env = self.completed_publication_env(
+            WORKER_DEPLOY="failure", DEPLOY_RESULT="skipped",
+            PAGES_DEPLOY="skipped", PUBLIC_VERIFY="skipped", QUERY_VERIFY="skipped",
+        )
+        text, code = module.report(env)
+        receipt = module.runtime_health(env)
+        self.assertEqual(code, 1)
+        self.assertIn("| worker_deploy | failure |", text)
+        self.assertIn("State: `PUBLICATION_NOT_CONFIRMED`", text)
+        self.assertFalse(receipt["public_data_verified"])
+        self.assertEqual(receipt["phase_results"]["WORKER_DEPLOY"], "failure")
+        self.assertEqual(receipt["lanes"]["query"], "BLOCKED")
+
+    def test_worker_outcome_cannot_be_hidden_by_other_successes(self):
+        for outcome in ("failure", "cancelled", "skipped", "", "unexpected"):
+            with self.subTest(outcome=outcome):
+                env = self.completed_publication_env(WORKER_DEPLOY=outcome)
+                self.assertEqual(module.report(env)[1], 1)
+        self.assertEqual(module.report(self.completed_publication_env(WORKER_DEPLOY="success"))[1], 0)
+
     def completed_publication_env(self, **overrides):
         return {
             "BUILD_RESULT": "success", "DEPLOY_RESULT": "success",
@@ -319,7 +340,7 @@ class OutcomeTests(unittest.TestCase):
         persist_block = text[text.index("id: preserve"):text.index(pages_upload)]
         self.assertNotIn("if:", restore_block)
         self.assertNotIn("if:", persist_block)
-        self.assertIn("needs: [build, deploy]", text)
+        self.assertIn("needs: [build, worker, deploy]", text)
         self.assertIn("if: always()", text[text.index("publication_outcome:"):])
         self.assertIn("python scripts/publication-outcome.py", text)
         self.assertIn("--health-output runtime-evidence/publication-health.json", text)

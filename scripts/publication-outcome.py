@@ -10,7 +10,7 @@ import sys
 from typing import Mapping
 from urllib.parse import urlsplit
 
-PHASES = ("RESTORE", "COLLECT", "V1", "V2", "V2_VERIFY", "SCHEMA_DRIFT", "VERIFY", "PRESERVE", "PAGES_UPLOAD", "EVIDENCE", "PAGES_DEPLOY", "PUBLIC_VERIFY", "QUERY_VERIFY")
+PHASES = ("RESTORE", "COLLECT", "V1", "V2", "V2_VERIFY", "SCHEMA_DRIFT", "VERIFY", "PRESERVE", "PAGES_UPLOAD", "EVIDENCE", "WORKER_DEPLOY", "PAGES_DEPLOY", "PUBLIC_VERIFY", "QUERY_VERIFY")
 OUTCOMES = {"success", "failure", "cancelled", "skipped"}
 PHASE_TO_HEALTH = {
     "success": "SUCCESS",
@@ -90,6 +90,10 @@ def runtime_health(env: Mapping[str, str], *, observed_at: str | None = None) ->
         stage("query", "mcp_web_query", query_verify,
               "QUERY_RUNTIME_NOT_VERIFIED" if query_verify != "success" else None),
     ]
+    if "WORKER_DEPLOY" in env:
+        worker = phase_value(env, "WORKER_DEPLOY")
+        stages.append(stage("query", "worker_deployment", worker,
+                            "WORKER_DEPLOYMENT_NOT_VERIFIED" if worker != "success" else None))
     health = load_system_health().build_health(stages)
     health.update({
         "kind": "GOVINTEL_RUNTIME_HEALTH_RECEIPT",
@@ -126,6 +130,8 @@ def report(env: Mapping[str, str]) -> tuple[str, int]:
         publication_passed = False
     verified = publication_passed and outcome("PUBLIC_VERIFY") == "success"
     passed = publication_passed and deploy == "success"
+    if "WORKER_DEPLOY" in env and outcome("WORKER_DEPLOY") != "success":
+        passed = False
     if "QUERY_VERIFY" in env and outcome("QUERY_VERIFY") != "success":
         passed = False
     state = "PUBLIC_DATA_VERIFIED" if verified else "DEPLOY_ACTION_SUCCEEDED_UNVERIFIED_HTTP" if publication_passed else "PUBLICATION_NOT_CONFIRMED"
