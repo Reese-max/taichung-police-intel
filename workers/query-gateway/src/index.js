@@ -1,5 +1,8 @@
 import { gateAnswer } from "../../../apps/web/lib/answer-evidence-gate.js";
+import { projectPublicBrief, projectPublicSource } from "./public-brief.js";
 import sourceCatalog from "../../../docs/govintel/source-catalog.v2.json" with { type: "json" };
+import approvedSourcePolicy from "../../../docs/govintel/source-policy.approved.json" with { type: "json" };
+import retentionMatrix from "../../../docs/govintel/retention-rights-policy.v1.json" with { type: "json" };
 
 const MAX_REQUEST_BYTES = 64 * 1024;
 const MAX_RESPONSE_BYTES = 256 * 1024;
@@ -14,6 +17,11 @@ const RETENTION_POLICY = {
   public_projection: PUBLIC_PROJECTION,
   full_text_allowed: false,
 };
+function retentionPolicy(snapshot) {
+  if (snapshot.policy.schema_version !== 2) return RETENTION_POLICY;
+  const ref = snapshot.policy.governance_binding.retention_policy;
+  return {...RETENTION_POLICY, policy_version: ref.policy_version, policy_hash: ref.policy_hash};
+}
 const MAX_RATE = 60;
 const DEGRADED_RETRY_MS = 5_000;
 const rateWindows = new Map();
@@ -91,6 +99,8 @@ function projectFeedItem(item, feedHash, sourceFreshness = null) {
   for (const key of ["published_at", "data_as_of", "fetched_at"]) {
     if (item[key] !== null && item[key] !== undefined && !Number.isFinite(parseInstant(item[key]))) throw new Error(`invalid ${key}`);
   }
+  if (item.change_type != null && (typeof item.change_type !== "string" || !["NEW", "REVISED", "STATUS_CHANGED", "DEADLINE_CHANGED", "CONFIRMED", "UNCHANGED", "LKG", "REMOVED"].includes(item.change_type))) throw new Error("invalid projected change_type");
+  if (item.freshness_status != null && (typeof item.freshness_status !== "string" || !["FRESH", "RECENT", "STALE", "VERY_STALE", "UNKNOWN", "NO_DATA"].includes(item.freshness_status.toUpperCase()))) throw new Error("invalid projected freshness_status");
   // An item without its own freshness inherits the source row's, which is the same
   // effective freshness the evidence catalog and answer gate use.
   const freshness = String(item.freshness_status || sourceFreshness || "UNKNOWN").toUpperCase();
@@ -124,6 +134,18 @@ function projectFeedItem(item, feedHash, sourceFreshness = null) {
 
 function projectSource(source, statusHash) {
   if (!source || typeof source.source_id !== "string" || typeof source.source_name !== "string") throw new Error("invalid source row");
+  const enums = {
+    source_health: ["PASS", "DEGRADED", "FAILED", "QUARANTINED", "NOT_RUN", "UNKNOWN"],
+    window_completeness: ["COMPLETE_WITH_ITEMS", "COMPLETE_ZERO", "PARTIAL", "NOT_RUN", "UNKNOWN"],
+    result: ["NEW_ITEMS", "NO_NEW_ITEM", "PARTIAL", "FAILED", "NOT_RUN", "UNKNOWN"],
+    freshness_status: ["FRESH", "RECENT", "STALE", "VERY_STALE", "UNKNOWN", "NO_DATA"],
+  };
+  for (const key of [...Object.keys(enums), "last_checked_at", "data_as_of"]) {
+    const value = source[key];
+    if (value != null && typeof value !== "string") throw new Error(`source field ${key} must be a scalar string or null`);
+    if (Object.hasOwn(enums, key) && value != null && !enums[key].includes(value.toUpperCase())) throw new Error(`source field ${key} has an unsupported enum`);
+    if (["last_checked_at", "data_as_of"].includes(key) && value != null && !Number.isFinite(parseInstant(value))) throw new Error(`source timestamp ${key} is invalid`);
+  }
   return {
     source_id: source.source_id,
     name: source.source_name,
@@ -147,13 +169,58 @@ function makeCapabilities(policy) {
   }));
 }
 
-function validatePolicy(policy) {
-  if (!policy || policy.schema_version !== 1 || !Array.isArray(policy.active_source_ids) || !policy.active_source_ids.length) throw new Error("invalid source policy");
+async function validatePolicy(policy) {
+  if (!policy || ![1, 2].includes(policy.schema_version) || !Array.isArray(policy.active_source_ids) || !policy.active_source_ids.length) throw new Error("invalid source policy");
   const ids = [...policy.active_source_ids].sort();
   if (JSON.stringify(ids) !== JSON.stringify(policy.active_source_ids) || new Set(ids).size !== ids.length) throw new Error("source policy IDs must be sorted and unique");
   if (sourceCatalog.sources.filter((row) => ids.includes(row.source_id) && row.status === "PRODUCTION_ACTIVE").length !== ids.length) throw new Error("source policy does not match catalog");
   assertHash(policy.policy_hash, "policy_hash");
   assertHash(policy.catalog_hash, "catalog_hash");
+  if (policy.schema_version === 2) {
+    if (canonicalJson(policy) !== canonicalJson(approvedSourcePolicy)) throw new Error("governed policy is not the repository-approved snapshot");
+    const { policy_hash: _hash, ...core } = policy;
+    if (await sha256(canonicalJson(core)) !== policy.policy_hash) throw new Error("governed policy self-hash mismatch");
+    const retentionCore = { schema_version: retentionMatrix.schema_version, policy_version: retentionMatrix.policy_version,
+      updated_at: retentionMatrix.updated_at, retention_windows: retentionMatrix.retention_windows,
+      classes: retentionMatrix.classes, source_classes: retentionMatrix.source_classes,
+      prohibited_public_fields: [...retentionMatrix.prohibited_public_fields].sort() };
+    if (await sha256(canonicalJson(retentionCore)) !== policy.governance_binding?.retention_policy?.policy_hash) throw new Error("governed rights matrix binding mismatch");
+  }
+}
+
+function formalAdmission(policy) {
+  if (policy.schema_version !== 2) return { status: "UNKNOWN", reason: "APPROVED_GOVERNANCE_MISSING", governance_hash: null,
+    blocked_sources: policy.active_source_ids, per_source: Object.fromEntries(policy.active_source_ids.map(id => [id, "APPROVED_GOVERNANCE_MISSING"])) };
+  const prohibited = new Set(policy.governance_binding.prohibited_public_fields);
+  const perSource = {};
+  for (const row of policy.active_sources) {
+    const rights = row.rights_retention_public_policy_refs;
+    if (!["VERIFIED_METADATA_PERMISSION", "OPEN_DATA_LICENSED"].includes(rights.rights_status) || rights.review_required !== false) perSource[row.source_id] = "RIGHTS_UNKNOWN_OR_UNREVIEWED";
+    else if (rights.full_text_allowed || rights.excerpt_allowed || rights.public_fields.some(field => prohibited.has(field))) perSource[row.source_id] = "PUBLIC_FIELDS_PROHIBITED";
+  }
+  return { status: Object.keys(perSource).length ? "RIGHTS_BLOCKED" : "ADMITTED", reason: null,
+    governance_hash: policy.governance_binding.governance_hash, blocked_sources: Object.keys(perSource).sort(), per_source: perSource };
+}
+
+function briefAdmission(policy, brief) {
+  const summary = policy.governance_binding?.derived_summary_policy;
+  if (!summary || summary.review_required !== false || !["PROJECT_CONTROLLED", "VERIFIED_METADATA_PERMISSION", "OPEN_DATA_LICENSED"].includes(summary.rights_status)
+      || summary.public_projection !== "EVIDENCE_BOUND_SUMMARY_ONLY") return false;
+  const fields = new Set(summary.public_fields);
+  function allowed(value) {
+    if (Array.isArray(value)) return value.every(allowed);
+    if (value && typeof value === "object") return Object.entries(value).every(([key, child]) => fields.has(key) && allowed(child));
+    return true;
+  }
+  if (!allowed(brief)) return false;
+  const sources = new Map(policy.active_sources.map(row => [row.source_id, row]));
+  for (const key of ["priority_items", "tracking_items", "other_changes"]) for (const row of brief[key] || []) {
+    const source = sources.get(row.source_id);
+    if (!source || source.rights_retention_public_policy_refs.public_projection !== "EVIDENCE_BOUND_SUMMARY_ONLY") return false;
+    try { if (!source.approved_origins.includes(new URL(row.official_url).origin)) return false; }
+    catch { return false; }
+  }
+  return true;
 }
 
 async function fetchArtifact(origin, name) {
@@ -204,7 +271,13 @@ async function buildSnapshotFromArtifacts(fetched) {
   const brief = briefDoc.value;
   const policy = policyDoc.value;
   if (![feed, status, brief].every((value) => value?.schema_version === 1)) throw new Error("unsupported publication schema");
-  validatePolicy(policy);
+  await validatePolicy(policy);
+  if (policy.schema_version === 2) {
+    const expected = { policy_version: policy.policy_version, policy_hash: policy.policy_hash, catalog_hash: policy.catalog_hash,
+      active_source_ids: policy.active_source_ids, governance_hash: policy.governance_binding.governance_hash,
+      retention_policy_hash: policy.governance_binding.retention_policy.policy_hash };
+    if ([feed, status, brief].some(value => canonicalJson(value.source_policy) !== canonicalJson(expected))) throw new Error("canonical artifact governed policy binding mismatch");
+  }
   const run = feed.collection_run_id;
   if (!run || run !== status.latest_collection_run?.collection_run_id || run !== brief.source_collection_run_id ||
       feed.generated_at !== status.generated_at || status.generated_at !== brief.source_status_generated_at) {
@@ -213,24 +286,36 @@ async function buildSnapshotFromArtifacts(fetched) {
   for (const value of [feed.generated_at, status.generated_at, brief.generated_at]) {
     if (!Number.isFinite(parseInstant(value))) throw new Error("publication timestamp is invalid");
   }
+  if ([status.latest_collection_run.status, brief.publication_status].some(value => value != null && typeof value !== "string")) throw new Error("publication status fields must be scalar strings or null");
+  if (brief.snapshot_complete != null && typeof brief.snapshot_complete !== "boolean") throw new Error("publication snapshot_complete must be boolean or null");
   if (!Array.isArray(feed.items) || feed.items.length > 10000 || !Array.isArray(status.sources)) throw new Error("publication arrays are invalid");
   // Only object rows contribute a freshness fallback; malformed rows are still rejected below.
   const sourceFreshness = new Map(status.sources.filter((source) => source && typeof source === "object")
     .map((source) => [source.source_id, String(source.freshness_status || "UNKNOWN").toUpperCase()]));
-  const items = feed.items.map((item) => projectFeedItem(item, feedDoc.hash, sourceFreshness.get(item.source_id) || null)).sort((a, b) => a.canonical_id.localeCompare(b.canonical_id));
+  let items = feed.items.map((item) => projectFeedItem(item, feedDoc.hash, sourceFreshness.get(item.source_id) || null)).sort((a, b) => a.canonical_id.localeCompare(b.canonical_id));
   if (new Set(items.map((item) => item.canonical_id)).size !== items.length) throw new Error("duplicate canonical_id");
   const sources = status.sources.map((source) => projectSource(source, statusDoc.hash)).sort((a, b) => a.source_id.localeCompare(b.source_id));
   const active = [...policy.active_source_ids].sort();
   if (JSON.stringify(sources.map((source) => source.source_id)) !== JSON.stringify(active)) throw new Error("source coverage does not match policy");
   if (items.some((item) => !active.includes(item.source_id))) throw new Error("feed references an unapproved source");
+  const admission = formalAdmission(policy);
+  items = items.filter(item => !admission.blocked_sources.includes(item.source_id));
+  if (policy.schema_version === 2) {
+    const bySource = new Map(policy.active_sources.map(row => [row.source_id, row]));
+    if (items.some(item => item.official_url && !bySource.get(item.source_id).approved_origins.includes(new URL(item.official_url).origin))) throw new Error("formal query item origin is not approved for its source");
+    const systemFields = new Set(["record_type", "canonical_id", "source_role", "trust_tier", "verification_status", "canonical_ref"]);
+    items = items.map(item => Object.fromEntries(Object.entries(item).filter(([key]) => systemFields.has(key) || bySource.get(item.source_id).rights_retention_public_policy_refs.public_fields.includes(key))));
+  }
   const policyBinding = {
     policy_version: policy.policy_version,
     policy_hash: policy.policy_hash,
     catalog_hash: policy.catalog_hash,
     active_source_ids: active,
+    ...(policy.schema_version === 2 ? {governance_hash: policy.governance_binding.governance_hash,
+      retention_policy_hash: policy.governance_binding.retention_policy.policy_hash} : {}),
   };
   const artifactHashes = { feed: feedDoc.hash, status: statusDoc.hash, brief: briefDoc.hash };
-  const material = { schema_version: 2, projection_version: "publication-metadata-v3", artifact_hashes: artifactHashes, policy: policyBinding };
+  const material = { schema_version: 2, projection_version: "publication-metadata-v4-governance", artifact_hashes: artifactHashes, policy: policyBinding, formal_admission: admission };
   const generationId = await sha256(canonicalJson(material));
   const generatedFrom = {
     collection_run_id: run,
@@ -245,7 +330,7 @@ async function buildSnapshotFromArtifacts(fetched) {
     publication_status: brief.publication_status,
     snapshot_complete: brief.snapshot_complete,
   };
-  const snapshot = { feed, status, brief, policy, policyBinding, capabilityDefinitions: makeCapabilities(policy), items, sources, generatedFrom, generationId };
+  const snapshot = { feed, status, brief, policy, policyBinding, formalAdmission: admission, capabilityDefinitions: makeCapabilities(policy), items, sources, generatedFrom, generationId };
   // Bind the published catalog at publication time; live freshness still uses the server clock.
   snapshot.evidenceCatalogHash = await sha256(canonicalJson(trustedEvidence(snapshot, parseInstant(brief.generated_at))));
   return snapshot;
@@ -393,15 +478,20 @@ function queryCoverage(snapshot, capabilityId, requestedScope = {}) {
   // A projection served after a failed rebuild cannot license a bounded
   // no-match statement, even while its sources still look current.
   const degraded = Boolean(snapshot.degradedSince);
-  const status = uniqueMissing.length || degraded ? "PARTIAL" : uniqueStale.length ? "STALE" : "COVERED_BOUNDED_SCOPE";
+  const collectionStatus = uniqueMissing.length || degraded ? "PARTIAL" : uniqueStale.length ? "STALE" : "COVERED_BOUNDED_SCOPE";
+  const rightsBlocked = capabilityId === "source_health" ? [] : required.filter(id => snapshot.formalAdmission.blocked_sources.includes(id));
+  const status = rightsBlocked.length ? snapshot.formalAdmission.status : collectionStatus;
   return {
     status, policy_version: snapshot.policyBinding.policy_version, policy_hash: snapshot.policyBinding.policy_hash, capability_id: capabilityId,
     required_sources: required, missing_required_sources: uniqueMissing, stale_required_sources: uniqueStale,
+    ...(capabilityId !== "source_health" ? { formal_admission: snapshot.formalAdmission, rights_blocked_sources: rightsBlocked, collection_coverage_status: collectionStatus } : {}),
     can_state_bounded_no_match: status === "COVERED_BOUNDED_SCOPE",
-    coverage_limitations: degraded
+    coverage_limitations: rightsBlocked.length ? [definition.coverage_limitation, "來源治理／公開權利尚未核准，不能從正式查詢零結果推論沒有事件。"] : degraded
       ? [definition.coverage_limitation, "查詢索引上一次重建失敗，本次回應使用上一個可用 generation，不能據此回答目前沒有相關事件。"]
       : [definition.coverage_limitation],
-    supported_capabilities: supportedCapabilities, covered_sources: required.filter((sourceId) => !uniqueMissing.includes(sourceId) && !uniqueStale.includes(sourceId)),
+    supported_capabilities: supportedCapabilities, covered_sources: required.filter((sourceId) => !uniqueMissing.includes(sourceId) && !uniqueStale.includes(sourceId) && !rightsBlocked.includes(sourceId)),
+    ...(capabilityId !== "source_health" ? {collection_covered_sources: required.filter(id => !uniqueMissing.includes(id) && !uniqueStale.includes(id)),
+      formally_admitted_sources: required.filter(id => !uniqueMissing.includes(id) && !uniqueStale.includes(id) && !rightsBlocked.includes(id))} : {}),
     collection_completeness: Object.fromEntries(required.map((sourceId) => [sourceId, sourceMap.get(sourceId)?.window_completeness]).filter(([, value]) => value !== undefined)),
     requested_scope: requestedScope,
   };
@@ -445,7 +535,7 @@ async function queryStore(snapshot, { q: text = null, canonical_id: canonicalId 
     )),
     data_status: scope.dataStatus, source_gaps: scope.gaps,
     source_status: snapshot.sources.filter((source) => !sourceId || source.source_id === sourceId),
-    answerable_no_match: selected.length === 0 && scope.gaps.length === 0,
+    answerable_no_match: selected.length === 0 && scope.gaps.length === 0 && queryCoverage(snapshot, "publication_metadata").can_state_bounded_no_match,
     answer_scope: "Matching publication metadata in this indexed snapshot; not all real-world events.",
     queried_at: isoNow(), search_scope: "TITLE_COMMITTEE_SOURCE_ID_ONLY", total_matches: selected.length,
     result_count: result.length, offset, truncated: selected.length > result.length, has_more: offset + result.length < selected.length,
@@ -454,8 +544,8 @@ async function queryStore(snapshot, { q: text = null, canonical_id: canonicalId 
 }
 
 function publicSource(row) {
-  const fields = ["source_id", "source_name", "source_url", "source_health", "window_completeness", "result", "freshness_status", "data_as_of", "last_checked_at", "last_success_at", "intelligence_gaps", "current_source_run_id", "manifest_sha256"];
-  return Object.fromEntries(fields.filter((key) => key in row).map((key) => [key, row[key]]));
+  try { return projectPublicSource(row); }
+  catch { throw new GatewayError("PUBLIC_PROJECTION_INVALID", "canonical source violates public projection schema", 503); }
 }
 
 const OFFICIAL_EVIDENCE_SOURCE_IDS = new Set(
@@ -495,6 +585,8 @@ function trustedEvidence(snapshot, now = Date.now()) {
 }
 
 export async function validateAnswer(snapshot, claims, gate = gateAnswer) {
+  if (snapshot.formalAdmission?.status !== "ADMITTED") throw new GatewayError("RIGHTS_BLOCKED", "Current formal answer evidence lacks approved governance or publication rights", 503);
+  if (claims.some(claim => /^publication:.*:(?:title|source_id)$/.test(String(claim?.proposition?.subject || "").normalize("NFC").replace(/\s+/g, "")) && claim.claim_type !== "STATUS")) throw new GatewayError("INVALID_ARGUMENTS", "Publication metadata cannot authorize other factual claim types");
   const evidence = trustedEvidence(snapshot);
   const publicationHash = snapshot.generatedFrom.brief_sha256;
   const evidenceCatalogHash = await sha256(canonicalJson(evidence));
@@ -540,7 +632,7 @@ function envelope(snapshot, tool, args, scope, payload, resultCount = 0, truncat
     publication_hash: snapshot.generatedFrom.brief_sha256, query_generation_id: snapshot.generationId, generated_at: snapshot.brief.generated_at,
     queried_at: isoNow(), freshness: freshness(scope.dataStatus), verification_summary: verificationSummary(scope.dataStatus),
     event_ids: [], evidence_ids: [], source_gaps: scope.gaps, query_coverage: scope.coverage,
-    discovery_unverified_count: 0, truncated, policy: snapshot.policyBinding, retention: RETENTION_POLICY, result_type: resultType,
+    discovery_unverified_count: 0, truncated, policy: snapshot.policyBinding, retention: retentionPolicy(snapshot), result_type: resultType,
     receipt: { schema_version: 1, tool_name: tool, arguments_sha256: null, publication_hash: snapshot.generatedFrom.brief_sha256, query_generation_id: snapshot.generationId, result_count: resultCount, truncated, server_version: SERVER_VERSION, issued_at: isoNow() },
     ...payload,
   };
@@ -566,8 +658,11 @@ async function execute(snapshot, tool, rawArgs = {}) {
   const scope = { ...scopeRaw, coverage: queryCoverage(snapshot, tool === "get_source_health" ? "source_health" : "publication_metadata", args.source_id ? { source_id: args.source_id } : {}) };
   const argumentsHash = await sha256(canonicalJson(args));
   if (tool === "get_current_brief") {
-    const allowedBrief = ["schema_version", "mode", "generator_version", "generated_at", "source_collection_run_id", "source_status_generated_at", "publication_status", "snapshot_complete", "status_message", "overview", "priority_items", "tracking_items", "other_changes", "source_health"];
-    const brief = Object.fromEntries(allowedBrief.filter((key) => key in snapshot.brief).map((key) => [key, snapshot.brief[key]]));
+    if (snapshot.formalAdmission.status !== "ADMITTED") throw new GatewayError("RIGHTS_BLOCKED", "Current formal brief lacks approved governance or publication rights", 503);
+    let brief;
+    try { brief = projectPublicBrief(snapshot.brief); }
+    catch { throw new GatewayError("PUBLIC_PROJECTION_INVALID", "canonical brief violates public projection schema", 503); }
+    if (!briefAdmission(snapshot.policy, brief)) throw new GatewayError("RIGHTS_BLOCKED", "Current derived brief lacks reviewed summary fields and source permissions", 503);
     return { ...envelope(snapshot, tool, args, scope, { current_as_of_server_clock: scope.dataStatus === "SNAPSHOT_RECENT", brief }, 1), receipt: { ...envelope(snapshot, tool, args, scope, {}, 1).receipt, arguments_sha256: argumentsHash } };
   }
   if (tool === "get_publication_receipt") {
@@ -577,7 +672,10 @@ async function execute(snapshot, tool, rawArgs = {}) {
   }
   if (tool === "get_source_health") {
     const selected = snapshot.status.sources.filter((row) => !args.source_id || row.source_id === args.source_id).map(publicSource);
-    return { ...envelope(snapshot, tool, args, scope, { sources: selected }, selected.length), receipt: { ...envelope(snapshot, tool, args, scope, {}, selected.length).receipt, arguments_sha256: argumentsHash } };
+    const sourceRights = selected.map(row => { const rights = retentionMatrix.classes[retentionMatrix.source_classes[row.source_id]];
+      return {source_id: row.source_id, rights_status: rights.rights_status, review_required: rights.review_required}; });
+    return { ...envelope(snapshot, tool, args, scope, { sources: selected, source_rights: sourceRights,
+      formal_admission: snapshot.formalAdmission }, selected.length), receipt: { ...envelope(snapshot, tool, args, scope, {}, selected.length).receipt, arguments_sha256: argumentsHash } };
   }
   if (!Array.isArray(args.claims) || args.claims.length < 1 || args.claims.length > 32 || (args.claims.some((claim) => !claim || typeof claim !== "object" || Object.keys(claim).some((key) => !["schema_version", "claim_id", "text", "claim_type", "temporal_scope", "proposition", "cited_evidence_ids"].includes(key))))) throw new GatewayError("INVALID_ARGUMENTS", "validate_answer requires 1 to 32 structured claims");
   if (args.expected_generation && args.expected_generation !== snapshot.generationId) throw new GatewayError("INVALID_ARGUMENTS", "query generation mismatch; retry against the requested snapshot");
@@ -657,10 +755,10 @@ export default {
       const snapshot = await getSnapshot(env);
       if (request.method === "GET" && url.pathname === "/health") {
         const scope = assessScope(snapshot);
-        return responseJson({ schema_version: 1, service: "govintel-query-gateway", server_version: SERVER_VERSION, status: snapshot.degradedSince ? "degraded" : "ok", release: snapshot.release, publication_freshness: freshness(scope.dataStatus), publication_id: snapshot.generatedFrom.collection_run_id, publication_hash: snapshot.generatedFrom.brief_sha256, query_coverage: queryCoverage(snapshot, "publication_metadata"), policy: snapshot.policyBinding, retention: RETENTION_POLICY, source_gaps: scope.gaps, read_only: true }, 200, request, env);
+        return responseJson({ schema_version: 1, service: "govintel-query-gateway", server_version: SERVER_VERSION, status: snapshot.degradedSince ? "degraded" : "ok", release: snapshot.release, publication_freshness: freshness(scope.dataStatus), publication_id: snapshot.generatedFrom.collection_run_id, publication_hash: snapshot.generatedFrom.brief_sha256, query_coverage: queryCoverage(snapshot, "publication_metadata"), policy: snapshot.policyBinding, retention: retentionPolicy(snapshot), source_gaps: scope.gaps, read_only: true }, 200, request, env);
 
       }
-      if (request.method === "GET" && url.pathname === "/capabilities") return responseJson({ schema_version: 1, server_version: SERVER_VERSION, read_only: true, release: snapshot.release, capabilities: ["search_evidence", "get_current_brief", "get_publication_receipt", "get_source_health", "validate_answer"], unavailable_capabilities: DOMAIN_CAPABILITIES, policy: snapshot.policyBinding, retention: RETENTION_POLICY }, 200, request, env);
+      if (request.method === "GET" && url.pathname === "/capabilities") return responseJson({ schema_version: 1, server_version: SERVER_VERSION, read_only: true, release: snapshot.release, capabilities: ["search_evidence", "get_current_brief", "get_publication_receipt", "get_source_health", "validate_answer"], unavailable_capabilities: DOMAIN_CAPABILITIES, policy: snapshot.policyBinding, retention: retentionPolicy(snapshot) }, 200, request, env);
       if (request.method !== "POST" || !["/query", "/mcp"].includes(url.pathname)) return responseJson(jsonError("NOT_FOUND", "route not found"), 404, request, env);
       const bytes = await request.arrayBuffer();
       if (bytes.byteLength > MAX_REQUEST_BYTES) return responseJson(jsonError("REQUEST_TOO_LARGE", "request exceeds byte budget"), 413, request, env);

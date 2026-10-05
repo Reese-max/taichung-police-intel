@@ -1,8 +1,8 @@
 """Actual persisted-generation restart/HTTP regressions for issue #30."""
-import importlib.util
 import json
 import os
 from pathlib import Path
+import shutil
 import stat
 import subprocess
 import sys
@@ -12,24 +12,37 @@ from unittest import mock
 import unittest
 from urllib.request import Request, urlopen
 
+from governed_policy_fixture import make_governed_policy_fixture, load_fixture_module
+
 ROOT = Path(__file__).resolve().parents[1]
-spec = importlib.util.spec_from_file_location('generation_gateway_test', ROOT / 'scripts/query-gateway.py')
-g = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(g)
+g = None  # Each test imports the current runtime from its isolated governed fixture.
 
 
 class GenerationFallbackTests(unittest.TestCase):
     def setUp(self):
+        global g
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
-        self.root = Path(self.tmp.name)
+        temporary = Path(self.tmp.name)
+        self.fixture = make_governed_policy_fixture(
+            temporary / 'governed', source_root=ROOT, rights_reviewed=True, brief_reviewed=True,
+        )
+        g = load_fixture_module(self.fixture, 'generation_gateway_test', 'scripts/query-gateway.py')
+        # The subprocess uses this same copied current runtime and policy, rather
+        # than the real repository's unreviewed legacy publication.
+        shutil.copyfile(ROOT / 'scripts/query-gateway-stdio.py',
+                        self.fixture['root'] / 'scripts/query-gateway-stdio.py')
+        self.root = temporary / 'cache-inputs'
+        self.root.mkdir()
         self.cache = self.root / 'last-good.json'
         self.paths = {}
+        self.initial_bytes = {}
         for name in ('FEED', 'STATUS', 'BRIEF'):
             original = getattr(g.qs, 'DEFAULT_' + name)
             path = self.root / original.name
             path.write_bytes(original.read_bytes())
             self.paths[name] = path
+            self.initial_bytes[name] = original.read_bytes()
             patch = mock.patch.object(g.qs, 'DEFAULT_' + name, path)
             patch.start()
             self.addCleanup(patch.stop)
@@ -97,6 +110,9 @@ class GenerationFallbackTests(unittest.TestCase):
 
     def test_valid_next_generation_atomically_recovers_and_is_replayable(self):
         first = self.load()
+        self.assertEqual(self.fixture['policy']['schema_version'], 2)
+        self.assertEqual(first['store']['counts']['publication_items'], 2)
+        self.assertEqual(first['store']['formal_admission']['status'], 'ADMITTED')
         self.advance()
         next_snapshot = self.load()
         self.assertNotEqual(first['store']['generation_id'], next_snapshot['store']['generation_id'])
@@ -147,7 +163,7 @@ class GenerationFallbackTests(unittest.TestCase):
     def test_real_stdio_process_restart_preserves_cache_and_marks_failure(self):
         cache = self.root / 'stdio-cache.json'
         request = {'jsonrpc': '2.0', 'id': 1, 'method': 'tools/call', 'params': {'name': 'search_evidence', 'arguments': {'limit': 1}}}
-        command = [sys.executable, str(ROOT / 'scripts/query-gateway-stdio.py'), '--last-good-snapshot', str(cache)]
+        command = [sys.executable, str(self.fixture['root'] / 'scripts/query-gateway-stdio.py'), '--last-good-snapshot', str(cache)]
         first = subprocess.run(command, input=json.dumps(request) + '\n', text=True, capture_output=True, timeout=10)
         self.assertEqual(first.returncode, 0, first.stderr)
         old = json.loads(first.stdout)['result']['structuredContent']
@@ -166,9 +182,8 @@ class GenerationFallbackTests(unittest.TestCase):
         with self.assertRaises((ValueError, OSError)):
             self.load()
         # A good cache remains hash-bound, even when an attacker re-seals the wrapper.
-        self.paths['FEED'].write_bytes((ROOT / 'apps/web/public/data/intelligence-feed.json').read_bytes())
-        for name in ('STATUS', 'BRIEF'):
-            self.paths[name].write_bytes((ROOT / 'apps/web/public/data' / self.paths[name].name).read_bytes())
+        for name in ('FEED', 'STATUS', 'BRIEF'):
+            self.paths[name].write_bytes(self.initial_bytes[name])
         self.load()
         cache = json.loads(self.cache.read_text())
         cache['snapshot']['store']['items'][0]['title'] = 'forged title'

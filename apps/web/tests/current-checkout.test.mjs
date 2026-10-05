@@ -37,6 +37,24 @@ test("current-checkout runtime contract passes", {
   assert.match(result.stderr, /OK/);
 });
 
+test("actual current unreviewed policy has no VERIFIED rows or answerable zero", () => {
+  const source = `import importlib.util,json,pathlib
+root=pathlib.Path.cwd()
+p=root/'scripts/verify-current-checkout.py'
+spec=importlib.util.spec_from_file_location('current_governance_bridge',p)
+module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+modules=module.load_checkout_modules(root)
+ctx=module.build_candidate_context(root,modules)
+result=modules['query_store'].query_store(ctx['store'],text='NO-FICTIONAL-MATCH')
+print(json.dumps({'policy_schema':ctx['policy']['schema_version'],'admission':ctx['formal_admission']['status'],
+ 'rows':ctx['store']['counts']['publication_items'],'health_sources':len(ctx['store']['sources']),
+ 'answerable_no_match':result['answerable_no_match'],'bounded_zero':result['query_coverage']['can_state_bounded_no_match']}))`;
+  const result = spawnSync(python(), ["-B", "-c", source], { cwd: repo, encoding: "utf8", timeout: 30000 });
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout), { policy_schema: 1, admission: "UNKNOWN", rows: 0,
+    health_sources: 5, answerable_no_match: false, bounded_zero: false });
+});
+
 test("dashboard refuses mixed publication generations", async () => {
   const source = await readFile(component, "utf8");
   assert.match(source, /samePublicationGeneration/);

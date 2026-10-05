@@ -29,14 +29,14 @@ const policy = JSON.parse(execFileSync(python, ["-X", "utf8", "scripts/source-po
   cwd: repoRoot,
   encoding: "utf8",
 }));
-if (policy.schema_version !== 1 || !Number.isInteger(policy.policy_version) ||
+if (![1, 2].includes(policy.schema_version) || !Number.isInteger(policy.policy_version) ||
     !/^[0-9a-f]{64}$/.test(policy.policy_hash || "") ||
     !/^[0-9a-f]{64}$/.test(policy.catalog_hash || "") ||
     JSON.stringify(policy.active_source_ids) !== JSON.stringify(activeSourceIds)) {
   throw new Error("compiled source policy does not match the catalog projection");
 }
 
-const projection = {
+const projection = policy.schema_version === 2 ? policy : {
   schema_version: 1,
   catalog_schema_version: catalog.schema_version,
   catalog_updated_at: catalog.updated_at,

@@ -28,12 +28,16 @@ def load_module(name: str, relative: str):
 
 
 def binding(policy: dict[str, Any]) -> dict[str, Any]:
-    return {
+    result = {
         "policy_version": policy["policy_version"],
         "policy_hash": policy["policy_hash"],
         "catalog_hash": policy["catalog_hash"],
         "active_source_ids": sorted(policy["active_source_ids"]),
     }
+    if policy.get("schema_version") == 2 or "governance_hash" in policy:
+        result.update(governance_hash=policy.get("governance_hash") or policy["governance_binding"]["governance_hash"],
+                      retention_policy_hash=policy.get("retention_policy_hash") or policy["governance_binding"]["retention_policy"]["policy_hash"])
+    return result
 
 
 def check_promoted_fixture(old_store: dict[str, Any], old_result: dict[str, Any], as_of: str) -> dict[str, Any]:
@@ -51,7 +55,11 @@ def check_promoted_fixture(old_store: dict[str, Any], old_result: dict[str, Any]
     status, _ = query_store.load_json(query_store.DEFAULT_STATUS)
     brief, _ = query_store.load_json(query_store.DEFAULT_BRIEF)
     store = query_store.build_from_paths(query_store.DEFAULT_FEED, query_store.DEFAULT_STATUS, query_store.DEFAULT_BRIEF)
-    gateway = query_gateway.QueryGateway(snapshot={"store": store, "status": status, "brief": brief},
+    canonical_artifacts = {name: path.read_bytes() for name, path in (
+        ("feed", query_store.DEFAULT_FEED), ("status", query_store.DEFAULT_STATUS),
+        ("brief", query_store.DEFAULT_BRIEF))}
+    gateway = query_gateway.QueryGateway(snapshot={"store": store, "status": status, "brief": brief,
+                                                  "canonical_artifacts": canonical_artifacts},
                                          clock=lambda: query_store.instant(as_of))
     health = system_health.load_current()
     ui = json.loads((ROOT / "apps/web/public/data/source-policy.json").read_text(encoding="utf-8"))
@@ -76,7 +84,8 @@ def check_promoted_fixture(old_store: dict[str, Any], old_result: dict[str, Any]
     if json.loads(ui_check.stdout)["policy_hash"] != current["policy_hash"]:
         raise ValueError("promoted fixture UI policy mismatch")
     clock = query_store.instant(as_of)
-    zero = query_store.query_store(store, now=clock, capability_id="traffic_events")
+    zero = query_store.query_store(store, now=clock, capability_id="traffic_events",
+                                   canonical_artifacts=canonical_artifacts)
     if not zero["answerable_no_match"] or zero["query_coverage"]["status"] != "COVERED_BOUNDED_SCOPE":
         raise ValueError("supported complete scheduled-traffic zero was not bounded")
     if not zero["query_coverage"]["coverage_limitations"] or "not all real-world events" not in zero["answer_scope"]:
@@ -87,11 +96,16 @@ def check_promoted_fixture(old_store: dict[str, Any], old_result: dict[str, Any]
         ("PARTIAL", {"window_completeness": "PARTIAL", "result": "PARTIAL"}, "PARTIAL"),
         ("STALE", {"freshness_status": "STALE"}, "STALE"),
     ):
-        changed = copy.deepcopy(store)
-        next(row for row in changed["sources"] if row["source_id"] == "S-032").update(mutation)
-        changed["projection_sha256"] = query_store.sha256_bytes(query_store.canonical_json(
-            {key: value for key, value in changed.items() if key != "projection_sha256"}))
-        result = query_store.query_store(changed, now=clock, source_id="S-004", capability_id="traffic_events")
+        # Preserve the gap control as a genuine canonical publication change,
+        # then derive its whole projection and hashes with the real producer.
+        changed_status = copy.deepcopy(status)
+        next(row for row in changed_status["sources"] if row["source_id"] == "S-032").update(mutation)
+        changed_artifacts = {**canonical_artifacts,
+            "status": json.dumps(changed_status, ensure_ascii=False, indent=2).encode("utf-8") + b"\n"}
+        changed_hashes = {name: query_store.sha256_bytes(raw) for name, raw in changed_artifacts.items()}
+        changed = query_store.build_store(feed, changed_status, brief, changed_hashes)
+        result = query_store.query_store(changed, now=clock, source_id="S-004", capability_id="traffic_events",
+                                         canonical_artifacts=changed_artifacts)
         coverage = result["query_coverage"]
         if coverage["status"] != expected_status or coverage["can_state_bounded_no_match"] or result["answerable_no_match"]:
             raise ValueError(f"required traffic source gap hidden by source filter: {label}")
@@ -101,7 +115,7 @@ def check_promoted_fixture(old_store: dict[str, Any], old_result: dict[str, Any]
     try:
         query_store.query_store(old_store, now=clock)
     except ValueError as error:
-        if "policy mismatch" not in str(error):
+        if "policy mismatch" not in str(error) and "legacy query store" not in str(error):
             raise
     else:
         raise ValueError("live query accepted historical policy after transition")
@@ -129,8 +143,17 @@ def run_promoted_fixture(catalog, current, old_store, query_store) -> dict[str, 
         promoted_catalog = copy.deepcopy(catalog)
         candidate = next(row for row in promoted_catalog["sources"] if row["source_id"] == "S-032")
         candidate["status"] = "PRODUCTION_ACTIVE"
-        policy_module = load_module("fixture_transition_compiler", "scripts/source-policy.py")
-        promoted = policy_module.compile_policy(promoted_catalog, previous=current, promotions=[{
+        # Fictional review exists only in this temporary checkout. A source
+        # promotion receipt does not establish real publication rights.
+        matrix_path = fixture / "docs/govintel/retention-rights-policy.v1.json"
+        matrix = json.loads(matrix_path.read_text(encoding="utf-8"))
+        matrix["classes"]["OFFICIAL_METADATA_LINK"].update(rights_status="VERIFIED_METADATA_PERMISSION", review_required=False)
+        matrix_path.write_text(json.dumps(matrix, ensure_ascii=False), encoding="utf-8")
+        (fixture / "docs/govintel/source-catalog.v2.json").write_text(json.dumps(promoted_catalog, ensure_ascii=False), encoding="utf-8")
+        spec = importlib.util.spec_from_file_location("fixture_transition_compiler", fixture / "scripts/source-policy.py")
+        policy_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(policy_module)
+        promoted = policy_module.compile_governed_policy(promoted_catalog, previous=current, promotions=[{
             "source_id": "S-032", "receipt_id": "integration:explicit-fixture-approval", "reason": "isolated offline fixture only",
         }])
         def write(relative, value):
@@ -142,7 +165,10 @@ def run_promoted_fixture(catalog, current, old_store, query_store) -> dict[str, 
         status, _ = query_store.load_json(query_store.DEFAULT_STATUS)
         brief, _ = query_store.load_json(query_store.DEFAULT_BRIEF)
         clock = query_store.instant(feed["generated_at"])
-        old_result = query_store.query_store(old_store, now=clock, text="議事", limit=2)
+        old_result = query_store.replay_query_store(old_store, policy_hash=old_store["policy"]["policy_hash"],
+                                                  as_of=clock.isoformat(), text="議事", limit=2)["result"]
+        if old_result["result_count"] == 0:
+            raise ValueError("historical baseline must retain original nonempty publication rows")
         feed["items"] = []
         feed["source_summary"] = {source_id: {"item_count": 0} for source_id in promoted["active_source_ids"]}
         extra = copy.deepcopy(status["sources"][0])
@@ -158,6 +184,7 @@ def run_promoted_fixture(catalog, current, old_store, query_store) -> dict[str, 
                    for source_id in promoted["active_source_ids"]]}
         for name, value in (("intelligence-feed", feed), ("source-status", status), ("v2-daily-brief", brief),
                             ("intelligence-summary", summary)):
+            value["source_policy"] = binding(promoted)
             write(f"apps/web/public/data/{name}.json", value)
         (fixture / "apps/web/public/data/feed-export.csv").write_text("stable_id\n", encoding="utf-8")
         write("old-store.json", old_store)
@@ -255,13 +282,18 @@ def run_checks() -> dict[str, Any]:
     }
     missing = states.pop(current["active_source_ids"][0])
     partial = source_policy.assess_query(current, "publication_metadata", states)
-    if partial["status"] != "PARTIAL" or current["active_source_ids"][0] not in partial["missing_required_sources"]:
+    if partial.get("collection_coverage_status", partial["status"]) != "PARTIAL" or current["active_source_ids"][0] not in partial["missing_required_sources"]:
         raise ValueError(f"required source gap was hidden: {missing}")
     unsupported = source_policy.assess_query(current, "traffic_events", states)
     if unsupported["status"] != "CAPABILITY_NOT_AVAILABLE" or unsupported["can_state_bounded_no_match"]:
         raise ValueError("unsupported capability was presented as a bounded empty result")
 
-    fixture_transition = run_promoted_fixture(catalog, current, old_store, query_store)
+    if query["result_count"] != 0 or query["query_coverage"]["status"] != "UNKNOWN" or query["answerable_no_match"]:
+        raise ValueError("legacy current policy incorrectly admits formal public rows")
+    original_store = json.loads((ROOT / "tests/fixtures/source-policy/publication-metadata-v3.json").read_text(encoding="utf-8"))
+    if len(original_store["items"]) != 118:
+        raise ValueError("original historical publication was discarded")
+    fixture_transition = run_promoted_fixture(catalog, current, original_store, query_store)
 
     return {
         "active": len(current["active_source_ids"]),

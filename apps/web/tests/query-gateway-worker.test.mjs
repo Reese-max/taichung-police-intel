@@ -1,15 +1,99 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import test from "node:test";
-import worker, { buildSnapshot, createReleaseManifest } from "../../../workers/query-gateway/src/index.js";
+import test, { after } from "node:test";
+import { createGovernedPolicyFixture } from "./governed-policy-fixture.mjs";
+const governedFixture = await createGovernedPolicyFixture();
+after(() => governedFixture.cleanup());
+const { default: worker, buildSnapshot, createReleaseManifest } = await governedFixture.loadWorker("suite");
 
-const base = new URL("../public/data/", import.meta.url);
+const base = governedFixture.publicRoot;
 const origin = "https://reese-max.github.io/taichung-police-intel";
 const endpoint = "https://govintel-query-gateway.example/query";
 const mcpEndpoint = "https://govintel-query-gateway.example/mcp";
 const env = { PUBLIC_ORIGIN: origin, ALLOWED_ORIGINS: "https://reese-max.github.io", CF_VERSION_METADATA: { id: "test-worker", tag: "a".repeat(40) } };
 const artifactNames = ["intelligence-feed.json", "source-status.json", "v2-daily-brief.json", "source-policy.json"];
+
+test("Worker refuses canonical nested source-health payloads before returning gaps", async () => {
+  const originalFetch = globalThis.fetch;
+  for (const field of [null, "source_health", "window_completeness", "result", "freshness_status", "last_checked_at", "data_as_of"]) {
+    const fixture = await createGovernedPolicyFixture();
+    try {
+      const module = await fixture.loadWorker(`source-scalar-${field}`);
+      const bytes = await fixture.publication();
+      if (field) {
+        const status = JSON.parse(bytes["source-status.json"]);
+        status.sources[0][field] = { body: "SYNTHETIC_SOURCE_PRIVATE_MARKER" };
+        bytes["source-status.json"] = Buffer.from(JSON.stringify(status));
+      }
+      const build = () => module.buildSnapshot(env, async artifact => ({bytes: bytes[artifact],
+        hash: createHash("sha256").update(bytes[artifact]).digest("hex")}));
+      if (field) await assert.rejects(build, /source.*(scalar|field|timestamp)/);
+      else assert.equal((await build()).sources.length, 5);
+      globalThis.fetch = async url => {
+        const name = String(url).split("/").at(-1);
+        if (name === "release.json") {
+          const snapshot = await module.buildSnapshot(env, async artifact => ({bytes: bytes[artifact],
+            hash: createHash("sha256").update(bytes[artifact]).digest("hex")}));
+          return Response.json(await module.createReleaseManifest(snapshot, env.CF_VERSION_METADATA.tag));
+        }
+        return new Response(bytes[name], {status: bytes[name] ? 200 : 404});
+      };
+      const response = await module.default.fetch(new Request(endpoint, {method: "POST",
+        headers: {"Content-Type": "application/json"}, body: JSON.stringify({tool: "get_source_health", arguments: {}})}), env);
+      const result = await response.json();
+      assert.equal(response.status, field ? 503 : 200, field || "lawful health positive");
+      assert.equal(JSON.stringify(result).includes("SYNTHETIC_SOURCE_PRIVATE_MARKER"), false);
+      if (!field) assert.equal(result.sources.length, 5);
+    } finally { globalThis.fetch = originalFetch; await fixture.cleanup(); }
+  }
+});
+
+test("Worker distinguishes metadata permission from separately reviewed closed derived briefs", async () => {
+  const originalFetch = globalThis.fetch;
+  for (const variant of ["metadata-only", "reviewed", "unpromoted", "origin", "nested-private", "scalar-object", "toString", "constructor", "__proto__"]) {
+    const fixture = await createGovernedPolicyFixture({ briefReviewed: variant !== "metadata-only" });
+    try {
+      const module = await fixture.loadWorker(`derived-${variant}`);
+      const bytes = await fixture.publication();
+      const brief = JSON.parse(bytes["v2-daily-brief.json"]);
+      const row = {source_id: fixture.policy.active_source_ids[0], headline: "FICTIONAL_SUMMARY_ONLY",
+        official_url: fixture.officialUrl("/fictional-summary")};
+      if (variant === "unpromoted") row.source_id = "S-032";
+      if (variant === "origin") row.official_url = "https://unapproved.example.test/fictional";
+      if (variant === "nested-private") row.private_case = "PRIVATE_SYNTHETIC_MARKER";
+      if (variant === "scalar-object") row.headline = {source_id: "hidden"};
+      if (["toString", "constructor", "__proto__"].includes(variant)) {
+        const value = variant === "__proto__" ? {toString: "PRIVATE_SYNTHETIC_MARKER"} : "PRIVATE_SYNTHETIC_MARKER";
+        row.profile_relevance = JSON.parse(JSON.stringify(Object.fromEntries([[variant, value]])));
+      }
+      brief.priority_items = [row];
+      bytes["v2-daily-brief.json"] = Buffer.from(JSON.stringify(brief));
+      globalThis.fetch = async url => {
+        const name = String(url).split("/").at(-1);
+        if (name === "release.json") {
+          const snapshot = await module.buildSnapshot(env, async artifact => ({bytes: bytes[artifact],
+            hash: createHash("sha256").update(bytes[artifact]).digest("hex")}));
+          return Response.json(await module.createReleaseManifest(snapshot, env.CF_VERSION_METADATA.tag));
+        }
+        return new Response(bytes[name], {status: bytes[name] ? 200 : 404});
+      };
+      const response = await module.default.fetch(new Request(endpoint, {method: "POST",
+        headers: {"Content-Type": "application/json"}, body: JSON.stringify({tool: "get_current_brief", arguments: {}})}), env);
+      const result = await response.json();
+      if (variant === "reviewed") {
+        assert.equal(response.status, 200);
+        assert.equal(result.retention.policy_hash, fixture.binding.retention_policy_hash);
+        assert.deepEqual(result.brief.priority_items, [row]);
+      } else {
+        assert.equal(response.status, 503, variant);
+        assert.equal(result.error.code, ["nested-private", "scalar-object", "toString", "constructor", "__proto__"].includes(variant) ? "PUBLIC_PROJECTION_INVALID" : "RIGHTS_BLOCKED", variant);
+        assert.equal(JSON.stringify(result).includes("PRIVATE_SYNTHETIC_MARKER"), false);
+        assert.equal("brief" in result, false);
+      }
+    } finally { globalThis.fetch = originalFetch; await fixture.cleanup(); }
+  }
+});
 
 
 // Extend each independently controlled publication fixture with its matching
@@ -28,7 +112,7 @@ function withFixtureRelease(fetcher) {
 }
 
 // Positive freshness cases need a complete synthetic publication, independent
-// of restored production rows, failures and dates. Keep the approved policy and
+// of restored production rows, failures and dates. Use fictional reviewed temp policy and
 // exercise the real release/evidence gates; this fixture says nothing about the
 // current availability or freshness of the official sources.
 async function completePublicationFixture() {
@@ -39,18 +123,18 @@ async function completePublicationFixture() {
   const encode = value => Buffer.from(JSON.stringify(value), "utf8");
   const sourceId = policy.active_source_ids[0];
   const feed = {
-    schema_version: 1, collection_run_id: collectionRunId, generated_at: stamp,
+    schema_version: 1, source_policy: governedFixture.binding, collection_run_id: collectionRunId, generated_at: stamp,
     items: [1, 2].map(index => ({
       stable_id: `WORKER-FIXTURE-${index}`, title: `測試官方標題 ${index}`,
       source_id: sourceId, source_role: "PRIMARY_OFFICIAL",
-      official_url: `https://example.gov.tw/notices/${index}`,
+      official_url: governedFixture.officialUrl(`/fictional-governance/notices/${index}`, sourceId),
       published_at: stamp, data_as_of: stamp, fetched_at: stamp,
       source_health: "PASS", window_completeness: "COMPLETE_WITH_ITEMS", freshness_status: "FRESH",
       content_sha256: createHash("sha256").update(`worker-fixture-${index}`).digest("hex"),
     })),
   };
   const status = {
-    schema_version: 1, generated_at: stamp,
+    schema_version: 1, source_policy: governedFixture.binding, generated_at: stamp,
     latest_collection_run: { collection_run_id: collectionRunId, finished_at: stamp, status: "SUCCEEDED" },
     sources: policy.active_source_ids.map(id => ({
       source_id: id, source_name: `Synthetic fixture ${id}`, source_health: "PASS",
@@ -60,7 +144,7 @@ async function completePublicationFixture() {
     })),
   };
   const brief = {
-    schema_version: 1, generated_at: stamp, source_status_generated_at: stamp,
+    schema_version: 1, source_policy: governedFixture.binding, generated_at: stamp, source_status_generated_at: stamp,
     source_collection_run_id: collectionRunId, publication_status: "READY", snapshot_complete: true,
   };
   return {
@@ -103,6 +187,89 @@ test("Worker does not leak upstream failure details to clients", async () => {
     assert.doesNotMatch(JSON.stringify(body), /intelligence-feed\.json|HTTP 500|upstream exploded/);
   } finally {
     globalThis.fetch = originalFetch;
+  }
+});
+
+test("fictional reviewed schema2 uses the exact39 public fields and source origins", async () => {
+  const values = await completePublicationFixture();
+  const feed = JSON.parse(values["intelligence-feed.json"]);
+  for (const row of feed.items) Object.assign(row, { committee: "FICTIONAL_COMMITTEE", next_milestone: "FICTIONAL_MILESTONE",
+    private_notes: "FICTIONAL_PRIVATE", full_text: "FICTIONAL_BODY" });
+  values["intelligence-feed.json"] = Buffer.from(JSON.stringify(feed));
+  const read = async name => ({ bytes: values[name], hash: createHash("sha256").update(values[name]).digest("hex") });
+  const snapshot = await buildSnapshot(env, read);
+  assert.equal(snapshot.formalAdmission.status, "ADMITTED");
+  assert.equal(snapshot.items.length, 2);
+  const system = new Set(["record_type", "canonical_id", "source_role", "trust_tier", "verification_status", "canonical_ref"]);
+  for (const item of snapshot.items) {
+    const source = governedFixture.policy.active_sources.find(row => row.source_id === item.source_id);
+    assert.ok(source.approved_origins.includes(new URL(item.official_url).origin));
+    assert.ok(Object.keys(item).every(key => system.has(key) || source.rights_retention_public_policy_refs.public_fields.includes(key)));
+    for (const key of ["committee", "next_milestone", "private_notes", "full_text"]) assert.equal(Object.hasOwn(item, key), false, key);
+  }
+  assert.doesNotMatch(JSON.stringify(snapshot.items), /FICTIONAL_PRIVATE|FICTIONAL_BODY/);
+  feed.items[0].official_url = "https://unapproved.example.test/fictional";
+  values["intelligence-feed.json"] = Buffer.from(JSON.stringify(feed));
+  await assert.rejects(buildSnapshot(env, read), /origin is not approved/);
+});
+
+test("served schema2 cannot self-authorize different public fields or a mixed governance binding", async () => {
+  const values = await completePublicationFixture();
+  const policy = JSON.parse(values["source-policy.json"]);
+  policy.active_sources[0].rights_retention_public_policy_refs.public_fields.push("committee");
+  const { policy_hash: _old, ...core } = policy;
+  const canonical = value => Array.isArray(value) ? `[${value.map(canonical).join(",")}]` :
+    value && typeof value === "object" ? `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${canonical(value[key])}`).join(",")}}` : JSON.stringify(value);
+  policy.policy_hash = createHash("sha256").update(canonical(core)).digest("hex");
+  values["source-policy.json"] = Buffer.from(JSON.stringify(policy));
+  const read = async name => ({ bytes: values[name], hash: createHash("sha256").update(values[name]).digest("hex") });
+  await assert.rejects(buildSnapshot(env, read), /not the repository-approved snapshot/);
+  values["source-policy.json"] = await readFile(new URL("source-policy.json", base));
+  const status = JSON.parse(values["source-status.json"]);
+  status.source_policy.governance_hash = "0".repeat(64);
+  values["source-status.json"] = Buffer.from(JSON.stringify(status));
+  await assert.rejects(buildSnapshot(env, read), /governed policy binding mismatch/);
+});
+
+test("current legacy1 and unknown-rights2 keep health but refuse CURRENT formal answers", async () => {
+  for (const kind of ["legacy1", "unknown2"]) {
+    const fixture = await createGovernedPolicyFixture({ rightsReviewed: false });
+    try {
+      const values = await fixture.publication();
+      let module = await fixture.loadWorker(`rights-denied-${kind}`);
+      if (kind === "legacy1") {
+        values["source-policy.json"] = await readFile(new URL("../../../docs/govintel/source-policy.approved.json", import.meta.url));
+        module = await import("../../../workers/query-gateway/src/index.js?actual-legacy-refusal");
+      }
+      const snapshot = await module.buildSnapshot(env, async name => ({ bytes: values[name], hash: createHash("sha256").update(values[name]).digest("hex") }));
+      assert.equal(snapshot.items.length, 0, kind);
+      assert.equal(snapshot.sources.length, 5, kind);
+      assert.equal(snapshot.formalAdmission.status, kind === "legacy1" ? "UNKNOWN" : "RIGHTS_BLOCKED");
+      const release = await module.createReleaseManifest(snapshot, env.CF_VERSION_METADATA.tag);
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = async url => String(url).endsWith("/release.json") ? Response.json(release) : new Response(values[String(url).split("/").at(-1)]);
+      try {
+        const call = async (tool, args) => {
+          const response = await module.default.fetch(new Request(endpoint, { method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ tool, arguments: args }) }), env);
+          return { status: response.status, body: await response.json() };
+        };
+        const empty = await call("search_evidence", { q: "NO-FICTIONAL-MATCH" });
+        assert.equal(empty.status, 200);
+        assert.deepEqual(empty.body.results, []);
+        assert.equal(empty.body.answerable_no_match, false);
+        assert.equal(empty.body.query_coverage.can_state_bounded_no_match, false);
+        const health = await call("get_source_health", {});
+        assert.equal(health.status, 200);
+        assert.equal(health.body.sources.length, 5);
+        for (const tool of ["get_current_brief", "validate_answer"]) {
+          const denied = await call(tool, tool === "validate_answer" ? { claims: [{ schema_version: 1, claim_id: "fictional-denied", text: "fictional",
+            claim_type: "STATUS", temporal_scope: "CURRENT", proposition: { subject: "publication:WORKER-FIXTURE-1:title", value: "fictional" } }] } : {});
+          assert.equal(denied.status, 503);
+          assert.equal(denied.body.error.code, "RIGHTS_BLOCKED");
+        }
+      } finally { globalThis.fetch = originalFetch; }
+    } finally { await fixture.cleanup(); }
   }
 });
 
@@ -149,7 +316,7 @@ test("Worker query and MCP answer routes share a server-controlled evidence gate
     title: "媒體影片聲稱目前封路",
     sourceRole: "DISCOVERY_UNVERIFIED",
     freshnessStatus: "FRESH",
-    officialUrl: "https://media.example.test/watch/issue-32",
+    officialUrl: governedFixture.officialUrl("/fictional-governance/discovery/issue-32"),
   });
   const unmarkedItem = addFixtureItem(feed, item, {
     suffix: "UNMARKED",
@@ -358,7 +525,7 @@ test("Worker serves the last good snapshot when a rebuild fails", async () => {
     return { status: response.status, body: await response.json() };
   };
   try {
-    const healthy = (await import("../../../workers/query-gateway/src/index.js?snapshot-fallback")).default;
+    const healthy = (await governedFixture.loadWorker("snapshot-fallback")).default;
     let upstreamCalls = 0;
     globalThis.fetch = withFixtureRelease(async url => {
       upstreamCalls += 1;
@@ -406,7 +573,7 @@ test("Worker serves the last good snapshot when a rebuild fails", async () => {
     assert.equal(health.status, 200);
     assert.equal(healthBody.status, "degraded");
 
-    const cold = (await import("../../../workers/query-gateway/src/index.js?snapshot-cold-failure")).default;
+    const cold = (await governedFixture.loadWorker("snapshot-cold-failure")).default;
     const unavailable = await query(cold, { limit: 1 });
     assert.equal(unavailable.status, 503);
     assert.equal(unavailable.body.error.code, "UPSTREAM_UNAVAILABLE");
@@ -435,7 +602,7 @@ test("Worker fails closed instead of serving a superseded generation", async () 
     return { status: response.status, body: await response.json() };
   };
   try {
-    const instance = (await import("../../../workers/query-gateway/src/index.js?integrity-fallback")).default;
+    const instance = (await governedFixture.loadWorker("integrity-fallback")).default;
     globalThis.fetch = withFixtureRelease(serve(bytes));
     const first = await query(instance, { limit: 1 });
     assert.equal(first.status, 200);
@@ -471,7 +638,7 @@ test("Worker fails closed when a served publication body cannot be parsed", asyn
     return { status: response.status, body: await response.json() };
   };
   try {
-    const instance = (await import("../../../workers/query-gateway/src/index.js?corrupt-body")).default;
+    const instance = (await governedFixture.loadWorker("corrupt-body")).default;
     globalThis.fetch = withFixtureRelease(async url => {
       const name = new URL(url).pathname.split("/").at(-1);
       return new Response(bytes[name], { status: 200, headers: { "Content-Type": "application/json" } });
@@ -515,7 +682,7 @@ test("Worker incomplete publication flags cannot admit current claims", async t 
           const name = new URL(url).pathname.split("/").at(-1);
           return new Response(bytes[name], { status: 200, headers: { "Content-Type": "application/json" } });
         });
-        const instance = (await import(`../../../workers/query-gateway/src/index.js?incomplete-${flag}`)).default;
+        const instance = (await governedFixture.loadWorker(`incomplete-${flag}`)).default;
         const query = async (tool, args) => {
           const response = await instance.fetch(new Request(endpoint, {
             method: "POST", headers: { "Content-Type": "application/json" },
@@ -554,7 +721,7 @@ test("Worker treats a partially collected source as incomplete scope", async () 
     return new Response(content, { status: 200, headers: { "Content-Type": "application/json" } });
   });
   try {
-    const instance = (await import("../../../workers/query-gateway/src/index.js?partial-result")).default;
+    const instance = (await governedFixture.loadWorker("partial-result")).default;
     const response = await instance.fetch(new Request(endpoint, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ tool: "search_evidence", arguments: { q: "zzzz-govintel-no-match-20261001", limit: 1 } }),
@@ -593,7 +760,7 @@ test("Worker inherits the source freshness for an item without its own", async (
   try {
     globalThis.fetch = withFixtureRelease(serve({ ...fresh, "intelligence-feed.json": Buffer.from(JSON.stringify(feed), "utf8") }));
     const inherited = (await query(
-      (await import("../../../workers/query-gateway/src/index.js?fresh-source")).default,
+      (await governedFixture.loadWorker("fresh-source")).default,
       { canonical_id: item.stable_id, limit: 1 },
     )).body;
     assert.equal(inherited.results[0].verification_status, "VERIFIED");
@@ -605,7 +772,7 @@ test("Worker inherits the source freshness for an item without its own", async (
       "source-status.json": Buffer.from(JSON.stringify(staleStatus), "utf8"),
     }));
     const fromStaleSource = (await query(
-      (await import("../../../workers/query-gateway/src/index.js?stale-source")).default,
+      (await governedFixture.loadWorker("stale-source")).default,
       { canonical_id: item.stable_id, limit: 1 },
     )).body;
     assert.equal(fromStaleSource.results[0].verification_status, "STALE");
@@ -634,7 +801,7 @@ test("Worker never reports a stale publication item as current official evidence
       const content = name === "intelligence-feed.json" ? Buffer.from(JSON.stringify(feed), "utf8") : bytes[name];
       return new Response(content, { status: 200, headers: { "Content-Type": "application/json" } });
     });
-    const instance = (await import("../../../workers/query-gateway/src/index.js?stale-evidence")).default;
+    const instance = (await governedFixture.loadWorker("stale-evidence")).default;
     const exact = await call(instance, "search_evidence", { canonical_id: item.stable_id, limit: 5 });
     assert.equal(exact.body.result_count, 1);
     assert.equal(exact.body.results[0].verification_status, "STALE");
@@ -658,29 +825,13 @@ test("Worker answer gate host fails closed on a refused or partially indexed val
   // The Worker is the deployed Web/MCP gate host; it must refuse a verdict the
   // validator never actually reached instead of stamping the publication hash
   // onto it and returning a normal 200 answer_evidence envelope.
-  const { validateAnswer } = await import("../../../workers/query-gateway/src/index.js");
-  const snapshot = {
-    brief: { generated_at: "2026-09-21T09:00:00Z" },
-    generatedFrom: { brief_sha256: "f".repeat(64) },
-    sources: [{
-      source_id: "S-009",
-      source_health: "PASS",
-      window_completeness: "COMPLETE_WITH_ITEMS",
-      freshness_status: "FRESH",
-      last_checked_at: "2026-09-21T08:00:00Z",
-    }],
-    items: [{
-      canonical_id: "ITEM-1",
-      stable_id: "ITEM-1",
-      title: "交通管制提前至 16:00",
-      source_id: "S-009",
-      source_role: "PRIMARY_OFFICIAL",
-      official_url: "https://example.gov.tw/traffic/notice-1",
-      content_sha256: "e".repeat(64),
-      trust_tier: "CANONICAL_PUBLICATION",
-      published_at: "2026-09-21T07:00:00Z",
-    }],
-  };
+  const { validateAnswer } = await governedFixture.loadWorker("validator-refusal");
+  const bytes = await completePublicationFixture();
+  const feed = JSON.parse(bytes["intelligence-feed.json"]);
+  feed.items = feed.items.slice(0, 1);
+  bytes["intelligence-feed.json"] = Buffer.from(JSON.stringify(feed));
+  const snapshot = await buildSnapshot(env, async name => ({ bytes: bytes[name],
+    hash: createHash("sha256").update(bytes[name]).digest("hex") }));
   const claim = {
     schema_version: 1,
     claim_id: "traffic-time",

@@ -11,6 +11,8 @@ import urllib.error
 import urllib.request
 from unittest.mock import patch
 
+from governed_policy_fixture import make_governed_policy_fixture
+
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "verify-current-checkout.py"
 spec = importlib.util.spec_from_file_location("verify_current_checkout", SCRIPT)
@@ -44,6 +46,20 @@ def unlink_after_http_release(path, attempts=100):
             if attempt == attempts - 1:
                 raise
             time.sleep(0.01)
+
+
+def governed_context(*, brief_reviewed=False):
+    """Actual copied checkout modules with explicitly fictional permission only."""
+    temporary = tempfile.TemporaryDirectory(prefix="current-checkout-fictional-rights-")
+    fixture = make_governed_policy_fixture(temporary.name, source_root=ROOT, brief_reviewed=brief_reviewed)
+    for relative in ("scripts/system-health.py", "scripts/query-gateway-stdio.py", "intel_v2/review.py"):
+        target = fixture["root"] / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / relative, target)
+    modules = vc.load_checkout_modules(fixture["root"])
+    ctx = vc.build_candidate_context(fixture["root"], modules)
+    ctx["fictional_rights_review"] = fixture["fixture_rights_review"]
+    return temporary, modules, ctx
 
 
 class V6BrowserBindingTests(unittest.TestCase):
@@ -236,7 +252,11 @@ class CandidateContextTests(unittest.TestCase):
         self.assertRegex(policy["policy_hash"], r"^[0-9a-f]{64}$")
 
     def test_store_generation_binds_all_canonical_hashes(self):
-        store = self.ctx["store"]
+        temporary, _, reviewed = governed_context()
+        self.addCleanup(temporary.cleanup)
+        self.assertEqual(reviewed["formal_admission"]["status"], "ADMITTED")
+        self.assertEqual(reviewed["fictional_rights_review"], "FICTIONAL_OFFLINE_ONLY")
+        store = reviewed["store"]
         generated = store["generated_from"]
         for key in ("feed", "status", "brief"):
             self.assertRegex(generated[f"{key}_sha256"], r"^[0-9a-f]{64}$")
@@ -257,19 +277,43 @@ class CandidateContextTests(unittest.TestCase):
 
 
 class ServerTests(unittest.TestCase):
+    def canonical_artifacts(self):
+        return self.modules["query_store"].canonical_artifacts_from_paths(
+            self.serve_dir / "data/intelligence-feed.json", self.serve_dir / "data/source-status.json",
+            self.serve_dir / "data/v2-daily-brief.json")
+
     @classmethod
     def setUpClass(cls):
-        cls.modules = vc.load_checkout_modules(ROOT)
-        cls.ctx = vc.build_candidate_context(ROOT, cls.modules)
+        cls.fixture_tmp, cls.modules, cls.ctx = governed_context(brief_reviewed=True)
         cls.tmp = tempfile.TemporaryDirectory()
         cls.serve_dir = vc.prepare_serve_dir(cls.ctx, Path(cls.tmp.name) / "site")
         cls.server, cls.base = vc.start_server(cls.ctx, cls.serve_dir, port=0)
+        cls.ctx.update(serve_dir=cls.serve_dir, server=cls.server)
 
     @classmethod
     def tearDownClass(cls):
         cls.server.shutdown()
         cls.server.server_close()
         cls.tmp.cleanup()
+        cls.fixture_tmp.cleanup()
+
+    def test_fictional_governed_http_contract_keeps_all_negative_checks(self):
+        self.assertEqual(self.ctx["formal_admission"]["status"], "ADMITTED")
+        checks = vc.run_http_checks(self.ctx, self.base)
+        self.assertTrue(checks)
+        self.assertTrue(all(row["status"] == "PASS" for row in checks), checks)
+        ids = {row["id"] for row in checks}
+        self.assertTrue(vc.QUERY_INDEX_CHECK_IDS.issubset(ids))
+        self.assertIn("http_query_governance_disposition", ids)
+        self.assertIn("http_current_formal_authority", ids)
+        self.assertIn("stdio_read_only_mcp_lifecycle", ids)
+
+    def test_independently_reviewed_brief_has_actual_closed_http_positive(self):
+        self.assertIs(self.ctx.get("brief_admission"), True)
+        status, doc = vc.http_post_json(self.base + "/query", {"tool": "get_current_brief", "arguments": {}})
+        self.assertEqual(status, 200)
+        projection = self.modules["public_brief"].project_public_brief(self.ctx["artifacts"]["brief"])
+        self.assertEqual(doc["brief"], projection)
 
     def test_static_page_and_feed_served(self):
         status, body = http_get(self.base + "/")
@@ -316,6 +360,29 @@ class ServerTests(unittest.TestCase):
     def test_stale_snapshot_is_not_reported_as_no_events(self):
         qs = self.modules["query_store"]
         from datetime import datetime, timezone
+        original_store = self.ctx["store"]
+        stale_status = json.loads(json.dumps(self.ctx["artifacts"]["status"]))
+        for source in stale_status["sources"]:
+            source["freshness_status"] = "STALE"
+        stale_hashes = {**self.ctx["hashes"], "status": vc.sha256_bytes(vc.canonical_json(stale_status))}
+        status_file = self.serve_dir / "data/source-status.json"
+        previous_status_bytes = status_file.read_bytes()
+        status_file.write_bytes(vc.canonical_json(stale_status))
+        self.addCleanup(status_file.write_bytes, previous_status_bytes)
+        previous_hashes = self.ctx["hashes"]
+        previous_status = self.ctx["artifacts"]["status"]
+        self.ctx["hashes"] = stale_hashes
+        self.ctx["artifacts"]["status"] = stale_status
+        self.addCleanup(self.ctx.__setitem__, "hashes", previous_hashes)
+        self.addCleanup(self.ctx["artifacts"].__setitem__, "status", previous_status)
+        self.assertEqual(vc.sha256_bytes(status_file.read_bytes()), stale_hashes["status"])
+        stale_store = qs.build_store(self.ctx["artifacts"]["feed"], stale_status, self.ctx["artifacts"]["brief"], stale_hashes)
+        served = self.serve_dir / "data/query-store.json"
+        before = served.read_bytes()
+        qs.atomic_write_json(served, stale_store, canonical_artifacts=self.canonical_artifacts())
+        self.addCleanup(served.write_bytes, before)
+        self.ctx["store"] = stale_store
+        self.addCleanup(self.ctx.__setitem__, "store", original_store)
         expected_status, expected_gaps = qs.assess_scope(self.ctx["store"], None, datetime.now(timezone.utc))
         status, doc = http_json(self.base + "/api/query?q=")
         self.assertEqual(status, 200)
@@ -335,19 +402,22 @@ class ServerTests(unittest.TestCase):
         qs = self.modules["query_store"]
         feed = dict(self.ctx["artifacts"]["feed"])
         feed["items"] = feed["items"][:-1]
-        mutated = qs.build_store(feed, self.ctx["artifacts"]["status"], self.ctx["artifacts"]["brief"],
-                                 {"feed": "f" * 64, "status": self.ctx["hashes"]["status"],
-                                  "brief": self.ctx["hashes"]["brief"]})
+        captured = self.canonical_artifacts()
+        alternative = dict(captured, feed=vc.canonical_json(feed))
+        mutated = qs.build_from_canonical_artifacts(alternative)
         self.assertNotEqual(mutated["generation_id"], self.ctx["store"]["generation_id"])
         served = self.serve_dir / "data" / "query-store.json"
         original = served.read_bytes()
+        feed_file = self.serve_dir / "data/intelligence-feed.json"
         try:
-            qs.atomic_write_json(served, mutated)
+            feed_file.write_bytes(alternative["feed"])
+            qs.atomic_write_json(served, mutated, canonical_artifacts=alternative)
             status, doc = http_json(self.base + "/api/version")
             self.assertEqual(doc["generation_id"], mutated["generation_id"])
             check = vc.check_served_store_consistency(self.ctx, self.base)
             self.assertEqual(check["status"], "FAIL")
         finally:
+            feed_file.write_bytes(captured["feed"])
             served.write_bytes(original)
         check = vc.check_served_store_consistency(self.ctx, self.base)
         self.assertEqual(check["status"], "PASS")
@@ -357,15 +427,17 @@ class ServerTests(unittest.TestCase):
         old_generation = self.ctx["store"]["generation_id"]
         feed = dict(self.ctx["artifacts"]["feed"])
         feed["items"] = feed["items"][:-1]
-        mutated = qs.build_store(feed, self.ctx["artifacts"]["status"], self.ctx["artifacts"]["brief"],
-                                 {"feed": "f" * 64, "status": self.ctx["hashes"]["status"],
-                                  "brief": self.ctx["hashes"]["brief"]})
+        captured = self.canonical_artifacts()
+        alternative = dict(captured, feed=vc.canonical_json(feed))
+        mutated = qs.build_from_canonical_artifacts(alternative)
         archive = self.serve_dir / "data" / "query-store.archive.json"
         store_file = self.serve_dir / "data" / "query-store.json"
         original = store_file.read_bytes()
+        feed_file = self.serve_dir / "data/intelligence-feed.json"
         try:
             shutil.copy2(store_file, archive)
-            qs.atomic_write_json(store_file, mutated)
+            feed_file.write_bytes(alternative["feed"])
+            qs.atomic_write_json(store_file, mutated, canonical_artifacts=alternative)
             status, doc = http_json(self.base + "/api/query?expected_generation=" + old_generation)
             self.assertEqual(status, 409)
             self.assertEqual(doc["code"], "GENERATION_MISMATCH")
@@ -373,6 +445,7 @@ class ServerTests(unittest.TestCase):
             self.assertEqual(status, 200)
             self.assertEqual(json.loads(body)["generation_id"], old_generation)
         finally:
+            feed_file.write_bytes(captured["feed"])
             store_file.write_bytes(original)
             unlink_after_http_release(archive)
 
@@ -401,6 +474,55 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(stages[("publication", "deployment")]["outcome"], "UNKNOWN")
         self.assertEqual(stages[("publication", "public_http_verification")]["outcome"], "UNKNOWN")
         self.assertNotEqual(health["lanes"]["publication"], "HEALTHY")
+
+
+class CurrentUnreviewedGovernanceTests(unittest.TestCase):
+    def test_actual_current_policy_refuses_formal_rows_and_bounded_zero(self):
+        modules = vc.load_checkout_modules(ROOT)
+        ctx = vc.build_candidate_context(ROOT, modules)
+        self.assertEqual(ctx["policy"]["schema_version"], 1)
+        self.assertEqual(ctx["formal_admission"]["status"], "UNKNOWN")
+        self.assertEqual(ctx["store"]["items"], [])
+        self.assertEqual(len(ctx["store"]["sources"]), 5)
+        with tempfile.TemporaryDirectory() as tmp:
+            serve = vc.prepare_serve_dir(ctx, Path(tmp))
+            server, base = vc.start_server(ctx, serve)
+            try:
+                status, doc = http_json(base + "/api/query?q=NO-SYNTHETIC-MATCH")
+                self.assertEqual(status, 200)
+                self.assertEqual(doc["result_count"], 0)
+                self.assertFalse(doc["answerable_no_match"])
+                self.assertFalse(doc["query_coverage"]["can_state_bounded_no_match"])
+                status, doc = vc.http_post_json(base + "/query", {"tool": "get_current_brief", "arguments": {}})
+                self.assertEqual(status, 503)
+                self.assertEqual(doc["error"]["code"], "RIGHTS_BLOCKED")
+                status, doc = vc.http_post_json(base + "/query", {"tool": "get_source_health", "arguments": {}})
+                self.assertEqual(status, 200)
+                self.assertEqual(len(doc["sources"]), 5)
+            finally:
+                server.shutdown(); server.server_close()
+
+    def test_metadata_review_alone_does_not_authorize_a_derived_brief(self):
+        temporary, modules, ctx = governed_context()
+        try:
+            self.assertEqual(ctx["formal_admission"]["status"], "ADMITTED")
+            self.assertGreater(ctx["store"]["counts"]["publication_items"], 0)
+            self.assertIs(ctx.get("brief_admission"), False)
+            with tempfile.TemporaryDirectory() as tmp:
+                serve = vc.prepare_serve_dir(ctx, Path(tmp))
+                server, base = vc.start_server(ctx, serve)
+                try:
+                    ctx.update(serve_dir=serve, server=server)
+                    status, doc = vc.http_post_json(base + "/query", {"tool": "get_current_brief", "arguments": {}})
+                    self.assertEqual(status, 503)
+                    self.assertEqual(doc["error"]["code"], "RIGHTS_BLOCKED")
+                    checks = vc.run_http_checks(ctx, base)
+                    self.assertTrue(all(row["status"] == "PASS" for row in checks), checks)
+                    self.assertTrue(vc.QUERY_INDEX_CHECK_IDS.issubset({row["id"] for row in checks}))
+                finally:
+                    server.shutdown(); server.server_close()
+        finally:
+            temporary.cleanup()
 
 
 class ReceiptGuardTests(unittest.TestCase):

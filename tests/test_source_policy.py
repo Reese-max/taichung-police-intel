@@ -138,12 +138,15 @@ class SourcePolicyTests(unittest.TestCase):
 
     def test_runtime_cannot_make_policy_green_by_dropping_source(self):
         capability = sp.assess_query(self.baseline, "publication_metadata", self.good_states())
-        self.assertEqual(capability["status"], "COVERED_BOUNDED_SCOPE")
+        self.assertEqual(capability["collection_coverage_status"], "COVERED_BOUNDED_SCOPE")
+        self.assertEqual(capability["status"], "UNKNOWN")
+        self.assertFalse(capability["can_state_bounded_no_match"])
         states = self.good_states()
         removed = self.baseline["active_source_ids"][0]
         states.pop(removed)
         degraded = sp.assess_query(self.baseline, "publication_metadata", states)
-        self.assertEqual(degraded["status"], "PARTIAL")
+        self.assertEqual(degraded["collection_coverage_status"], "PARTIAL")
+        self.assertEqual(degraded["status"], "UNKNOWN")
         self.assertIn(removed, degraded["missing_required_sources"])
         self.assertFalse(degraded["can_state_bounded_no_match"])
 
@@ -152,7 +155,8 @@ class SourcePolicyTests(unittest.TestCase):
         target = self.baseline["active_source_ids"][0]
         states[target]["result"] = "PARTIAL"
         result = sp.assess_query(self.baseline, "publication_metadata", states)
-        self.assertEqual(result["status"], "PARTIAL")
+        self.assertEqual(result["collection_coverage_status"], "PARTIAL")
+        self.assertEqual(result["status"], "UNKNOWN")
         self.assertIn(target, result["missing_required_sources"])
         self.assertFalse(result["can_state_bounded_no_match"])
 
@@ -176,12 +180,14 @@ class SourcePolicyTests(unittest.TestCase):
         states[target]["window_completeness"] = "PARTIAL"
         states[target]["freshness"] = "STALE"
         partial = sp.assess_query(self.baseline, "publication_metadata", states)
-        self.assertEqual(partial["status"], "PARTIAL")
+        self.assertEqual(partial["collection_coverage_status"], "PARTIAL")
+        self.assertEqual(partial["status"], "UNKNOWN")
         self.assertIn(target, partial["missing_required_sources"])
         self.assertIn(target, partial["stale_required_sources"])
         states[target]["window_completeness"] = "COMPLETE_WITH_ITEMS"
         stale = sp.assess_query(self.baseline, "publication_metadata", states)
-        self.assertEqual(stale["status"], "STALE")
+        self.assertEqual(stale["collection_coverage_status"], "STALE")
+        self.assertEqual(stale["status"], "UNKNOWN")
         self.assertFalse(stale["can_state_bounded_no_match"])
 
     def test_very_stale_no_data_and_missing_freshness_fail_closed(self):
@@ -195,7 +201,8 @@ class SourcePolicyTests(unittest.TestCase):
                     states[target]["freshness_status"] = freshness
                     states[target].pop("freshness")
                 result = sp.assess_query(self.baseline, "publication_metadata", states)
-                self.assertEqual(result["status"], "STALE" if freshness == "VERY_STALE" else "PARTIAL")
+                self.assertEqual(result["collection_coverage_status"], "STALE" if freshness == "VERY_STALE" else "PARTIAL")
+                self.assertEqual(result["status"], "UNKNOWN")
                 self.assertFalse(result["can_state_bounded_no_match"])
                 if freshness == "VERY_STALE":
                     self.assertIn(target, result["stale_required_sources"])
@@ -211,7 +218,8 @@ class SourcePolicyTests(unittest.TestCase):
 
     def test_policy_only_without_runtime_states_cannot_assert_no_match(self):
         result = sp.assess_query(self.baseline, "publication_metadata")
-        self.assertEqual(result["status"], "POLICY_ONLY")
+        self.assertEqual(result["collection_coverage_status"], "POLICY_ONLY")
+        self.assertEqual(result["status"], "UNKNOWN")
         self.assertFalse(result["can_state_bounded_no_match"])
         self.assertEqual(result["missing_required_sources"], self.baseline["active_source_ids"])
 

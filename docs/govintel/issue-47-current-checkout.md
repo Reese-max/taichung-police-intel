@@ -80,3 +80,23 @@ field remains `false` by design.
 No merge, deployment, production write, or issue closure was performed. #20 still
 requires normal review/merge, scheduled MORNING/EVENING runs, and anonymous
 public hash verification.
+
+## Current source-governance boundary (2026-10-05)
+
+The current approved schema-1 snapshot has no reviewed governance, so the current
+formal query projection contains zero items with admission `UNKNOWN`. Zero rows
+do not authorize a bounded no-match answer, and current brief/answer requests
+fail `RIGHTS_BLOCKED`; read-only provenance and five source-health rows remain
+available. The candidate manifest and verifier receipt expose the exact admission.
+A successful check of this refusal does not claim live rights or production approval.
+
+Positive runtime tests compile schema 2 with the actual compiler in a separate
+temporary root copied from the tested checkout. Only that copy receives explicitly
+fictional metadata permission, with the exact #39 whitelist, source-bound URLs and
+matching feed/status/brief governance hashes. They retain the original nonempty
+query, stale-status, mixed-generation, static-byte, MCP, sabotage, browser-binding
+and no-false-zero assertions. No clock change promotes an unreviewed source.
+The historical #118/PR #46 pinned replay and its recorded receipts remain separate.
+Dirty tracked worktrees still fail the candidate receipt even when individual
+checks pass. Focused contract success does not replace the full build/browser
+lanes, deployment verification or a real source-rights review.

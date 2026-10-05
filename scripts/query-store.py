@@ -21,13 +21,20 @@ DEFAULT_STATUS = ROOT / "apps/web/public/data/source-status.json"
 DEFAULT_BRIEF = ROOT / "apps/web/public/data/v2-daily-brief.json"
 DEFAULT_OUTPUT = ROOT / "apps/web/public/data/query-store.json"
 SCHEMA_VERSION = 2
-PROJECTION_VERSION = "publication-metadata-v3"
+PROJECTION_VERSION = "publication-metadata-v4-governance"
+LEGACY_PROJECTION_VERSION = "publication-metadata-v3"
 SOURCE_POLICY = ROOT / "scripts/source-policy.py"
 MAX_BYTES = 32 * 1024 * 1024
 MAX_ROWS = 10000
 MAX_AGE_SECONDS = 16 * 60 * 60
 HASH = re.compile(r"[a-f0-9]{64}\Z")
 CHANGES = frozenset(("NEW", "REVISED", "STATUS_CHANGED", "DEADLINE_CHANGED", "CONFIRMED", "UNCHANGED", "LKG", "REMOVED"))
+SOURCE_VALUES = {
+    "source_health": {"PASS", "DEGRADED", "FAILED", "QUARANTINED", "NOT_RUN", "UNKNOWN"},
+    "window_completeness": {"COMPLETE_WITH_ITEMS", "COMPLETE_ZERO", "PARTIAL", "NOT_RUN", "UNKNOWN"},
+    "result": {"NEW_ITEMS", "NO_NEW_ITEM", "PARTIAL", "FAILED", "NOT_RUN", "UNKNOWN"},
+    "freshness_status": {"FRESH", "RECENT", "STALE", "VERY_STALE", "UNKNOWN", "NO_DATA"},
+}
 
 
 def load_policy_module():
@@ -97,6 +104,11 @@ def project_feed_item(item: dict[str, Any], feed_hash: str, *, source_freshness:
     for key in ("published_at", "data_as_of", "fetched_at"):
         if item.get(key) is not None:
             instant(item[key])
+    if item.get("change_type") is not None and (not isinstance(item["change_type"], str) or item["change_type"] not in CHANGES):
+        raise ValueError("invalid projected change_type")
+    if item.get("freshness_status") is not None and (not isinstance(item["freshness_status"], str)
+            or item["freshness_status"].upper() not in {"FRESH", "RECENT", "STALE", "VERY_STALE", "UNKNOWN", "NO_DATA"}):
+        raise ValueError("invalid projected freshness_status")
     # An item without its own freshness inherits the source row's, which is the same
     # effective freshness the evidence catalog and answer gate use.
     freshness = str(item.get("freshness_status") or (source_freshness or {}).get(source_id) or "UNKNOWN").upper()
@@ -128,12 +140,24 @@ def project_source(source: dict[str, Any], status_hash: str) -> dict[str, Any]:
         raise ValueError("source status row missing source_id")
     if not name:
         raise ValueError(f"source status row missing source_name: {sid}")
+    _validate_source_scalars(source)
     return {
         "source_id": sid, "name": name,
         **{key: source.get(key) for key in ("source_health", "window_completeness", "result",
                                           "last_checked_at", "data_as_of", "freshness_status")},
         "canonical_ref": {"artifact": "source-status.json", "artifact_sha256": status_hash, "source_id": sid},
     }
+
+
+def _validate_source_scalars(source):
+    for key in (*SOURCE_VALUES, "last_checked_at", "data_as_of"):
+        value = source.get(key)
+        if value is not None and not isinstance(value, str):
+            raise ValueError(f"source field {key} must be a scalar string or null")
+        if key in SOURCE_VALUES and value is not None and value.upper() not in SOURCE_VALUES[key]:
+            raise ValueError(f"source field {key} has an unsupported enum")
+        if key in {"last_checked_at", "data_as_of"} and value is not None:
+            instant(value)
 
 
 def build_store(feed: dict[str, Any], status: dict[str, Any], brief: dict[str, Any], hashes: dict[str, str],
@@ -154,7 +178,16 @@ def build_store(feed: dict[str, Any], status: dict[str, Any], brief: dict[str, A
         raise ValueError("cross-generation publication artifacts")
     for d in (feed, status, brief):
         instant(d.get("generated_at"))
+    if any(value is not None and not isinstance(value, str)
+           for value in (status_run.get("status"), brief.get("publication_status"))):
+        raise ValueError("publication status fields must be scalar strings or null")
+    if brief.get("snapshot_complete") is not None and type(brief["snapshot_complete"]) is not bool:
+        raise ValueError("publication snapshot_complete must be boolean or null")
     policy = load_current_policy() if policy is None else policy
+    if policy["schema_version"] == 2:
+        expected = load_policy_module().policy_binding(policy)
+        if any(value.get("source_policy") != expected for value in (feed, status, brief)):
+            raise ValueError("canonical artifact governed policy binding mismatch")
     active_source_ids = frozenset(policy["active_source_ids"])
     rows, sources = feed.get("items"), status.get("sources")
     if not isinstance(rows, list) or not isinstance(sources, list) or len(rows) > MAX_ROWS:
@@ -176,19 +209,28 @@ def build_store(feed: dict[str, Any], status: dict[str, Any], brief: dict[str, A
         raise ValueError("source coverage must match the approved P0 set exactly")
     if any(row["source_id"] not in source_ids for row in projected):
         raise ValueError("feed references unknown source")
-    policy_binding = {
-        "policy_version": policy["policy_version"],
-        "policy_hash": policy["policy_hash"],
-        "catalog_hash": policy["catalog_hash"],
-        "active_source_ids": sorted(active_source_ids),
-    }
+    policy_module = load_policy_module()
+    formal = policy_module.formal_admission(policy)
+    blocked = set(formal["blocked_sources"])
+    projected = [row for row in projected if row["source_id"] not in blocked]
+    if policy["schema_version"] == 2:
+        by_source = {row["source_id"]: row for row in policy["active_sources"]}
+        for row in projected:
+            if row.get("official_url") and f"https://{urlsplit(row['official_url']).netloc}" not in by_source[row["source_id"]]["approved_origins"]:
+                raise ValueError("formal query item origin is not approved for its source")
+        system_fields = {"record_type", "canonical_id", "source_role", "trust_tier", "verification_status", "canonical_ref"}
+        projected = [{key: value for key, value in row.items()
+                      if key in system_fields or key in by_source[row["source_id"]]["rights_retention_public_policy_refs"]["public_fields"]}
+                     for row in projected]
+    policy_binding = policy_module.policy_binding(policy)
     material = {"schema_version": SCHEMA_VERSION, "projection_version": PROJECTION_VERSION,
-                "artifact_hashes": hashes, "policy": policy_binding}
+                "artifact_hashes": hashes, "policy": policy_binding, "formal_admission": formal}
     store = {
         "schema_version": SCHEMA_VERSION, "projection_version": PROJECTION_VERSION,
         "generation_id": sha256_bytes(canonical_json(material)),
         "capabilities": ["publication_metadata", "source_health"],
         "policy": policy_binding,
+        "formal_admission": formal,
         "generated_from": {"collection_run_id": run,
                            "feed_generated_at": feed["generated_at"], "status_generated_at": status["generated_at"],
                            "brief_generated_at": brief["generated_at"],
@@ -199,39 +241,157 @@ def build_store(feed: dict[str, Any], status: dict[str, Any], brief: dict[str, A
         "counts": {"publication_items": len(projected), "sources": len(source_rows)},
         "items": projected, "sources": source_rows,
     }
+    _validate_current_projection(store, policy, formal, hashes)
     store["projection_sha256"] = sha256_bytes(canonical_json(store))
     return store
 
 
-def validate_store(store):
-    _validate_store(store, load_current_policy())
+def canonical_artifacts_from_paths(feed_path=None, status_path=None, brief_path=None):
+    paths = {"feed": feed_path or DEFAULT_FEED, "status": status_path or DEFAULT_STATUS,
+             "brief": brief_path or DEFAULT_BRIEF}
+    artifacts = {}
+    for name, path in paths.items():
+        if path.stat().st_size > MAX_BYTES:
+            raise ValueError("canonical artifact exceeds byte limit")
+        artifacts[name] = path.read_bytes()
+    return artifacts
 
 
-def _validate_store(store, approved_policy):
-    if not isinstance(store, dict) or store.get("schema_version") != SCHEMA_VERSION or store.get("projection_version") != PROJECTION_VERSION:
+def build_from_canonical_artifacts(artifacts, *, policy=None):
+    """Derive a projection from exact captured bytes, never an unchecked trust flag."""
+    if not isinstance(artifacts, dict) or set(artifacts) != {"feed", "status", "brief"}:
+        raise ValueError("exact canonical feed/status/brief artifact bundle required")
+    documents, hashes = {}, {}
+    for name, value in artifacts.items():
+        if not isinstance(value, (str, bytes)):
+            raise ValueError("canonical artifact must be UTF8 bytes or text")
+        raw = value.encode("utf-8") if isinstance(value, str) else value
+        if len(raw) > MAX_BYTES:
+            raise ValueError("canonical artifact exceeds byte limit")
+        documents[name] = json.loads(raw.decode("utf-8"))
+        hashes[name] = sha256_bytes(raw)
+    return build_store(documents["feed"], documents["status"], documents["brief"], hashes, policy=policy)
+
+
+def _validate_canonical_binding(store, policy, artifacts):
+    artifacts = canonical_artifacts_from_paths() if artifacts is None else artifacts
+    if store != build_from_canonical_artifacts(artifacts, policy=policy):
+        raise ValueError("query store does not match canonical publication artifacts")
+
+
+def validate_store(store, *, canonical_artifacts=None):
+    policy = load_current_policy()
+    _validate_store(store, policy)
+    _validate_canonical_binding(store, policy, canonical_artifacts)
+
+
+def _validate_current_projection(store, approved_policy, formal, hashes):
+    """A self-recomputed projection hash cannot authorize rows or public fields."""
+    source_fields = {"source_id", "name", "source_health", "window_completeness", "result",
+                     "last_checked_at", "data_as_of", "freshness_status", "canonical_ref"}
+    sources = {}
+    for row in store["sources"]:
+        if not isinstance(row, dict) or set(row) != source_fields:
+            raise ValueError("query source health projection has unsupported fields")
+        sid = row.get("source_id")
+        if not _string(sid) or sid not in approved_policy["active_source_ids"] or sid in sources:
+            raise ValueError("query source health identity is not approved")
+        if not _string(row.get("name")) or any(value is not None and not isinstance(value, str)
+                for key, value in row.items() if key != "canonical_ref"):
+            raise ValueError("query source health fields must be strings or null")
+        expected_ref = {"artifact": "source-status.json", "artifact_sha256": hashes["status"], "source_id": sid}
+        if row["canonical_ref"] != expected_ref:
+            raise ValueError("query source health canonical reference mismatch")
+        _validate_source_scalars(row)
+        sources[sid] = row
+
+    active = {row["source_id"]: row for row in approved_policy["active_sources"]}
+    system_fields = {"record_type", "canonical_id", "source_role", "trust_tier", "verification_status", "canonical_ref"}
+    projection_fields = system_fields | {"title", "source_id", "official_url", "published_at", "data_as_of",
+        "fetched_at", "change_type", "freshness_status", "source_health", "window_completeness",
+        "committee", "next_milestone", "evidence_count", "content_sha256"}
+    required = system_fields | {"title", "source_id", "content_sha256"}
+    identities = set()
+    for row in store["items"]:
+        if not isinstance(row, dict):
+            raise ValueError("query publication row must be an object")
+        sid = row.get("source_id")
+        if not _string(sid) or sid not in active:
+            raise ValueError("query publication source is not approved and active")
+        if sid in formal["blocked_sources"]:
+            raise ValueError("query store publishes a rights-blocked source")
+        rights = active[sid]["rights_retention_public_policy_refs"]
+        allowed = projection_fields & (system_fields | set(rights["public_fields"]))
+        if not required <= set(row) or not set(row) <= allowed:
+            raise ValueError("query publication projection has unsupported public fields")
+        if any(value is not None and not isinstance(value, str)
+               for key, value in row.items() if key not in {"canonical_ref", "evidence_count"}):
+            raise ValueError("query publication fields must be strings or null")
+        stable_id, title, content_hash = row["canonical_id"], row["title"], row["content_sha256"]
+        if (not _string(stable_id) or len(stable_id) > 256 or stable_id in identities
+                or not _string(title) or len(title) > 2000 or not isinstance(content_hash, str)
+                or not HASH.fullmatch(content_hash) or row["record_type"] != "publication_item"
+                or row["trust_tier"] != "CANONICAL_PUBLICATION" or row["verification_status"] not in {"VERIFIED", "STALE"}):
+            raise ValueError("invalid query publication identity or provenance")
+        identities.add(stable_id)
+        if "evidence_count" in row and (type(row["evidence_count"]) is not int or row["evidence_count"] < 0):
+            raise ValueError("invalid query publication evidence_count")
+        for key in ("published_at", "data_as_of", "fetched_at"):
+            if row.get(key) is not None:
+                instant(row[key])
+        if row.get("change_type") is not None and row["change_type"] not in CHANGES:
+            raise ValueError("invalid query publication change_type")
+        if row.get("freshness_status") is not None and row["freshness_status"].upper() not in {"FRESH", "RECENT", "STALE", "VERY_STALE", "UNKNOWN", "NO_DATA"}:
+            raise ValueError("invalid query publication freshness_status")
+        expected_ref = {"artifact": "intelligence-feed.json", "artifact_sha256": hashes["feed"],
+            "stable_id": stable_id, "document_version_id": f"DOCV-{content_hash[:20].upper()}", "evidence_id": f"PUB-{stable_id}"}
+        if row["canonical_ref"] != expected_ref:
+            raise ValueError("query publication canonical reference mismatch")
+        if row.get("official_url") is not None:
+            parsed = urlsplit(row["official_url"])
+            if (parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password
+                    or f"https://{parsed.netloc}" not in active[sid]["approved_origins"]):
+                raise ValueError("query publication origin is not approved for its source")
+    if store.get("counts") != {"publication_items": len(store["items"]), "sources": len(store["sources"])}:
+        raise ValueError("query projection counts mismatch")
+
+
+def _validate_store(store, approved_policy, *, historical=False):
+    if not isinstance(store, dict) or store.get("schema_version") != SCHEMA_VERSION or store.get("projection_version") not in {PROJECTION_VERSION, LEGACY_PROJECTION_VERSION}:
         raise ValueError("unsupported query store; rebuild from canonical artifacts")
+    legacy = store["projection_version"] == LEGACY_PROJECTION_VERSION
+    if legacy and not historical:
+        raise ValueError("legacy query store lacks current formal governance; rebuild from canonical artifacts")
     supplied = store.get("projection_sha256")
     actual = sha256_bytes(canonical_json({k: v for k, v in store.items() if k != "projection_sha256"}))
     if supplied != actual:
         raise ValueError("query projection hash mismatch")
     if not isinstance(store.get("items"), list) or not isinstance(store.get("sources"), list):
         raise ValueError("query store arrays missing")
-    expected_policy = {
-        "policy_version": approved_policy["policy_version"],
-        "policy_hash": approved_policy["policy_hash"],
-        "catalog_hash": approved_policy["catalog_hash"],
-        "active_source_ids": sorted(approved_policy["active_source_ids"]),
-    }
+    policy_module = load_policy_module()
+    expected_policy = policy_module.policy_binding(approved_policy)
     if store.get("policy") != expected_policy:
         raise ValueError("query store source policy mismatch; rebuild from canonical artifacts")
     generated = store.get("generated_from")
     if not isinstance(generated, dict) or generated.get("policy_hash") != approved_policy["policy_hash"]:
         raise ValueError("query store generated policy binding mismatch")
+    if not legacy:
+        if any(value is not None and not isinstance(value, str)
+               for value in (generated.get("collection_status"), generated.get("publication_status"))):
+            raise ValueError("query generated status fields must be scalar strings or null")
+        if generated.get("snapshot_complete") is not None and type(generated["snapshot_complete"]) is not bool:
+            raise ValueError("query generated snapshot_complete must be boolean or null")
     hashes = {key: generated.get(f"{key}_sha256") for key in ("feed", "status", "brief")}
     if any(not isinstance(value, str) or not HASH.fullmatch(value) for value in hashes.values()):
         raise ValueError("query store generation binding has invalid artifact hashes")
-    material = {"schema_version": SCHEMA_VERSION, "projection_version": PROJECTION_VERSION,
+    material = {"schema_version": SCHEMA_VERSION, "projection_version": store["projection_version"],
                 "artifact_hashes": hashes, "policy": expected_policy}
+    if not legacy:
+        formal = policy_module.formal_admission(approved_policy)
+        if store.get("formal_admission") != formal:
+            raise ValueError("query formal governance admission binding mismatch")
+        _validate_current_projection(store, approved_policy, formal, hashes)
+        material["formal_admission"] = formal
     if store.get("generation_id") != sha256_bytes(canonical_json(material)):
         raise ValueError("query store generation binding mismatch")
     expected_sources = frozenset(approved_policy["active_source_ids"])
@@ -242,14 +402,11 @@ def _validate_store(store, approved_policy):
 
 
 def build_from_paths(feed_path: Path, status_path: Path, brief_path: Path) -> dict[str, Any]:
-    feed, feed_hash = load_json(feed_path)
-    status, status_hash = load_json(status_path)
-    brief, brief_hash = load_json(brief_path)
-    return build_store(feed, status, brief, {"feed": feed_hash, "status": status_hash, "brief": brief_hash})
+    return build_from_canonical_artifacts(canonical_artifacts_from_paths(feed_path, status_path, brief_path))
 
 
-def atomic_write_json(path: Path, value: Any) -> None:
-    validate_store(value)
+def atomic_write_json(path: Path, value: Any, *, canonical_artifacts=None) -> None:
+    validate_store(value, canonical_artifacts=canonical_artifacts)
     payload = canonical_json(value) + b"\n"
     if len(payload) > MAX_BYTES:
         raise ValueError("query store byte budget exceeded")
@@ -309,7 +466,8 @@ def assess_scope(store, source_id, now):
     return ("STALE" if gaps else "SNAPSHOT_RECENT"), gaps
 
 
-def query_coverage(store, capability_id, *, requested_scope=None):
+def query_coverage(store, capability_id, *, requested_scope=None, canonical_artifacts=None):
+    validate_store(store, canonical_artifacts=canonical_artifacts)
     return _query_coverage(store, capability_id, policy=load_current_policy(), requested_scope=requested_scope)
 
 
@@ -324,6 +482,11 @@ def _query_coverage(store, capability_id, *, policy, requested_scope=None, histo
     missing = set(coverage.get("missing_required_sources", []))
     stale = set(coverage.get("stale_required_sources", []))
     covered = sorted(required - missing - stale)
+    collection_covered = covered
+    if "formal_admission" in coverage:
+        covered = sorted(set(covered) - set(coverage.get("rights_blocked_sources", [])))
+        coverage["collection_covered_sources"] = collection_covered
+        coverage["formally_admitted_sources"] = covered
     coverage.update({
         "supported_capabilities": [
             row["capability_id"] for row in policy["capabilities"] if row["supported"]
@@ -341,10 +504,11 @@ def _query_coverage(store, capability_id, *, policy, requested_scope=None, histo
 
 def query_store(store: dict[str, Any], *, text=None, canonical_id=None, source_id=None, change_type=None,
                 limit=20, cursor=None, expected_generation=None, now=None,
-                capability_id="publication_metadata") -> dict[str, Any]:
+                capability_id="publication_metadata", canonical_artifacts=None) -> dict[str, Any]:
     return _query_store(store, policy=load_current_policy(), text=text, canonical_id=canonical_id,
                         source_id=source_id, change_type=change_type, limit=limit, cursor=cursor,
-                        expected_generation=expected_generation, now=now, capability_id=capability_id)
+                        expected_generation=expected_generation, now=now, capability_id=capability_id,
+                        canonical_artifacts=canonical_artifacts)
 
 
 def replay_query_store(store: dict[str, Any], *, policy_hash: str, as_of: str, **query) -> dict[str, Any]:
@@ -359,8 +523,10 @@ def replay_query_store(store: dict[str, Any], *, policy_hash: str, as_of: str, *
 
 def _query_store(store: dict[str, Any], *, policy, historical_policy_hash=None, text=None, canonical_id=None,
                  source_id=None, change_type=None, limit=20, cursor=None, expected_generation=None, now=None,
-                 capability_id="publication_metadata") -> dict[str, Any]:
-    _validate_store(store, policy)
+                 capability_id="publication_metadata", canonical_artifacts=None) -> dict[str, Any]:
+    _validate_store(store, policy, historical=historical_policy_hash is not None)
+    if historical_policy_hash is None:
+        _validate_canonical_binding(store, policy, canonical_artifacts)
     if type(limit) is not int or not 1 <= limit <= 100:
         raise ValueError("limit must be an integer between 1 and 100")
     for name, value, length in (("text", text, 512), ("canonical_id", canonical_id, 256),
@@ -400,7 +566,7 @@ def _query_store(store: dict[str, Any], *, policy, historical_policy_hash=None, 
             continue
         if source_id and row["source_id"] != source_id:
             continue
-        if change_type and row["change_type"] != change_type:
+        if change_type and row.get("change_type") != change_type:
             continue
         haystack = " ".join(str(row.get(k) or "") for k in ("title", "committee", "source_id", "canonical_id")).casefold()
         if needle and needle not in haystack:
@@ -470,6 +636,10 @@ def parse_args():
         query.add_argument("--limit", type=int, default=20)
         query.add_argument("--cursor")
         query.add_argument("--expected-generation")
+        if name == "query":
+            for artifact, default in (("feed", DEFAULT_FEED), ("status", DEFAULT_STATUS), ("brief", DEFAULT_BRIEF)):
+                query.add_argument(f"--{artifact}", type=Path, default=default,
+                                   help="Exact canonical publication artifact used to derive this current index")
         if name == "replay":
             query.add_argument("--policy-hash", required=True)
             query.add_argument("--as-of", required=True, help="Historical timezone-aware query clock")
@@ -491,8 +661,9 @@ def self_check():
 def main():
     args = parse_args()
     if args.command == "build":
-        store = build_from_paths(args.feed, args.status, args.brief)
-        atomic_write_json(args.output, store)
+        artifacts = canonical_artifacts_from_paths(args.feed, args.status, args.brief)
+        store = build_from_canonical_artifacts(artifacts)
+        atomic_write_json(args.output, store, canonical_artifacts=artifacts)
         print(f"QUERY_STORE_BUILT generation={store['generation_id']} items={len(store['items'])} output={args.output}")
     elif args.command in ("query", "replay"):
         store, _ = load_json(args.store)
@@ -500,7 +671,8 @@ def main():
                  "change_type": args.change_type, "limit": args.limit, "cursor": args.cursor,
                  "expected_generation": args.expected_generation}
         result = (replay_query_store(store, policy_hash=args.policy_hash, as_of=args.as_of, **query)
-                  if args.command == "replay" else query_store(store, **query))
+                  if args.command == "replay" else query_store(store, **query,
+                      canonical_artifacts=canonical_artifacts_from_paths(args.feed, args.status, args.brief)))
         print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
     else:
         self_check()

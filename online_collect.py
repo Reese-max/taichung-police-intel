@@ -26,6 +26,7 @@ from collect import (
     P0_SOURCES,
     ROOT,
     SOURCE_FRESHNESS_POLICY,
+    SOURCE_POLICY_BINDING,
     TZ,
     canonical_sha256,
     freshness_status,
@@ -1783,10 +1784,12 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
     collection_run_id = f"CR-DEMO-{slot_date:%Y%m%d}-{slot}-{trigger.upper()}"
     state = {
         "schema_version": 1,
+        "source_policy": SOURCE_POLICY_BINDING,
         "mode": "COMPETITION_DEMO",
         "generated_at": timestamp(now),
         "next_update_at": next_at,
         "latest_collection_run": {
+            "source_policy": SOURCE_POLICY_BINDING,
             "collection_run_id": collection_run_id,
             "slot_date": slot_date.isoformat(),
             "slot": slot,
@@ -1809,6 +1812,7 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
             deduped_items.append(item)
 
     feed_state = {
+        "source_policy": SOURCE_POLICY_BINDING,
         "schema_version": 1,
         "generated_at": timestamp(now),
         "collection_run_id": collection_run_id,
@@ -1823,6 +1827,7 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
     # Generate intelligence summary
     summary_output = output.parent / "intelligence-summary.json"
     summary_data = generate_intelligence_summary(deduped_items, collection_run_id, now, source_status)
+    summary_data["source_policy"] = SOURCE_POLICY_BINDING
     save_state(summary_output, summary_data)
     print(f"SUMMARY_OK topics={len(summary_data['key_topics'])} output={summary_output}")
 

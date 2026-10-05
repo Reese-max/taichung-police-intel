@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { buildSnapshot, createReleaseManifest } from "../../../workers/query-gateway/src/index.js";
+import { createGovernedPolicyFixture } from "./governed-policy-fixture.mjs";
 import { runControlledAnswerPipeline } from "../lib/controlled-answer-client.js";
 
 const origin = "https://publication.example.test";
@@ -14,8 +14,10 @@ let fixtureNumber = 0;
 async function actualWorkerFixture(t, title = "官方索引標題") {
   // Each independently constructed publication must get a fresh actual Worker
   // cache, rather than reusing a release from another fixture's timestamp.
-  const { default: worker } = await import(`../../../workers/query-gateway/src/index.js?draftFixture=${++fixtureNumber}`);
-  const policyBytes = await readFile(new URL("../public/data/source-policy.json", import.meta.url));
+  const fixture = await createGovernedPolicyFixture();
+  t.after(() => fixture.cleanup());
+  const { default: worker, buildSnapshot, createReleaseManifest } = await fixture.loadWorker(`draftFixture${++fixtureNumber}`);
+  const policyBytes = await readFile(new URL("source-policy.json", fixture.publicRoot));
   const policy = JSON.parse(policyBytes);
   const stamp = new Date(Date.now() - 1000).toISOString();
   const run = "CR-OFFLINE-DRAFT-PIPELINE";
@@ -23,16 +25,16 @@ async function actualWorkerFixture(t, title = "官方索引標題") {
   const encode = value => Buffer.from(JSON.stringify(value));
   const values = {
     "source-policy.json": policyBytes,
-    "intelligence-feed.json": encode({ schema_version: 1, collection_run_id: run, generated_at: stamp,
+    "intelligence-feed.json": encode({ schema_version: 1, source_policy: fixture.binding, collection_run_id: run, generated_at: stamp,
       items: [{ stable_id: "DRAFT-OFFICIAL", title, source_id: sourceId, source_role: "PRIMARY_OFFICIAL",
-        official_url: "https://example.gov.tw/offline-notice", published_at: stamp, data_as_of: stamp, fetched_at: stamp,
+        official_url: fixture.officialUrl("/fictional-governance/offline-notice", sourceId), published_at: stamp, data_as_of: stamp, fetched_at: stamp,
         freshness_status: "FRESH", content_sha256: "b".repeat(64) }] }),
-    "source-status.json": encode({ schema_version: 1, generated_at: stamp,
+    "source-status.json": encode({ schema_version: 1, source_policy: fixture.binding, generated_at: stamp,
       latest_collection_run: { collection_run_id: run, status: "SUCCEEDED" },
       sources: policy.active_source_ids.map(id => ({ source_id: id, source_name: `Offline fixture ${id}`,
         source_health: "PASS", window_completeness: "COMPLETE_WITH_ITEMS", result: "NEW_ITEMS",
         freshness_status: "FRESH", last_checked_at: stamp, data_as_of: stamp })) }),
-    "v2-daily-brief.json": encode({ schema_version: 1, generated_at: stamp, source_status_generated_at: stamp,
+    "v2-daily-brief.json": encode({ schema_version: 1, source_policy: fixture.binding, generated_at: stamp, source_status_generated_at: stamp,
       source_collection_run_id: run, publication_status: "READY", snapshot_complete: true }),
   };
   const readArtifact = async name => ({ bytes: values[name], hash: createHash("sha256").update(values[name]).digest("hex") });

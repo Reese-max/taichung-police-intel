@@ -576,6 +576,7 @@ def shadow_brief(
     priority_items = [
         {
             "event_id": event.event_id,
+            "source_id": event.source_id,
             "change_type": event.change_type,
             "headline": event.title,
             "what_changed": event.wording,
@@ -592,6 +593,7 @@ def shadow_brief(
         "mode": "V2_SHADOW",
         "generated_at": observed,
         "source_collection_run_id": feed.get("collection_run_id"),
+        **({"source_policy": feed["source_policy"]} if "source_policy" in feed else {}),
         "baseline_established_at": state.get("baseline_established_at"),
         "overview": {
             "current_change_count": len(publishable),

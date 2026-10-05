@@ -10,6 +10,7 @@ from unittest import mock
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 import unittest
+from governed_policy_fixture import make_governed_policy_fixture, load_fixture_module, bind_checked_in_publication
 from pathlib import Path
 
 from intel_v2.located_facts import acquire_document, build_bundle, confirm_facts
@@ -23,6 +24,15 @@ spec.loader.exec_module(gateway_module)
 
 
 class QueryGatewayTests(unittest.TestCase):
+    @staticmethod
+    def bind_snapshot(snapshot):
+        captured = dict(snapshot["canonical_artifacts"])
+        for name in ("status", "brief"):
+            captured[name] = gateway_module.qs.canonical_json(snapshot[name]).decode("utf-8")
+        snapshot["canonical_artifacts"] = captured
+        snapshot["store"] = gateway_module.qs.build_from_canonical_artifacts(captured)
+        return snapshot
+
     @staticmethod
     def located_bundle(status="CONFIRMED_OFFICIAL", source_id="S-028",
                        source_url="https://data.gov.tw/api/v2/rest/dataset/88147"):
@@ -125,6 +135,11 @@ class QueryGatewayTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        global gateway_module
+        cls.fixture_directory = tempfile.TemporaryDirectory(prefix="fictional-gateway-permissions-")
+        cls.fixture = bind_checked_in_publication(make_governed_policy_fixture(
+            cls.fixture_directory.name, domain_source_ids=("S-028",), brief_reviewed=True))
+        gateway_module = load_fixture_module(cls.fixture, "fictional_gateway_permissions", "scripts/query-gateway.py")
         clock = lambda: datetime(2026, 9, 11, 9, 0, tzinfo=timezone.utc)
         cls.gateway = gateway_module.QueryGateway(clock=clock)
         cls.server = gateway_module.build_server("127.0.0.1", 0, cls.gateway, "http://allowed.example")
@@ -137,6 +152,7 @@ class QueryGatewayTests(unittest.TestCase):
         cls.server.shutdown()
         cls.server.server_close()
         cls.thread.join(timeout=5)
+        cls.fixture_directory.cleanup()
 
     @classmethod
     def request(cls, method, path, payload=None, headers=None):
@@ -453,9 +469,14 @@ class QueryGatewayTests(unittest.TestCase):
             "canonical_id": "ISSUE32-DISCOVERY",
             "title": "媒體影片聲稱目前封路",
             "source_role": "DISCOVERY_UNVERIFIED",
-            "official_url": "https://media.example.test/watch/issue-32",
+            "official_url": original["official_url"],
         }
-        snapshot["store"]["items"] = [official, discovery]
+        feed = json.loads(snapshot["canonical_artifacts"]["feed"])
+        canonical = dict(feed["items"][0], source_role="PRIMARY_OFFICIAL")
+        feed["items"] = [canonical, dict(canonical, stable_id=discovery["canonical_id"], title=discovery["title"],
+                                        source_role=discovery["source_role"])]
+        snapshot["canonical_artifacts"]["feed"] = gateway_module.qs.canonical_json(feed).decode("utf-8")
+        snapshot["store"] = gateway_module.qs.build_from_canonical_artifacts(snapshot["canonical_artifacts"])
         gateway = gateway_module.QueryGateway(
             snapshot=snapshot,
             clock=lambda: datetime(2026, 9, 11, 9, 0, tzinfo=timezone.utc),
@@ -474,12 +495,12 @@ class QueryGatewayTests(unittest.TestCase):
             "source_role": "PRIMARY_OFFICIAL",
         }
         snapshot["store"]["items"] = [official, forged]
-        gateway = gateway_module.QueryGateway(
-            snapshot=snapshot,
-            clock=lambda: datetime(2026, 9, 11, 9, 0, tzinfo=timezone.utc),
-        )
-        catalog = gateway._trusted_evidence_catalog(gateway.store, gateway.clock())
+        # Classification cannot promote a context source even before the outer
+        # canonical reader refuses this forged, unbound internal snapshot.
+        catalog = self.gateway._trusted_evidence_catalog(snapshot["store"], self.gateway.clock())
         self.assertEqual([row["evidence_id"] for row in catalog], [f"PUB-{official['canonical_id']}"])
+        with self.assertRaises(ValueError):
+            gateway_module.QueryGateway(snapshot=snapshot)
 
     def test_answer_gate_runner_computes_catalog_hash_from_supplied_evidence(self):
         node = shutil.which("node")
@@ -898,6 +919,7 @@ class QueryGatewayTests(unittest.TestCase):
             with self.subTest(mutation=mutate):
                 candidate = json.loads(json.dumps(snapshot))
                 mutate(candidate["brief"])
+                self.bind_snapshot(candidate)
                 response = gateway_module.dispatch_mcp(gateway_module.QueryGateway(candidate), {
                     "jsonrpc": "2.0", "id": 15, "method": "tools/call",
                     "params": {"name": "get_current_brief", "arguments": {}},
@@ -932,6 +954,7 @@ class QueryGatewayTests(unittest.TestCase):
         rows = rank_items(rows, profile, observed_at=t1)
         snapshot = gateway_module.load_snapshot()
         snapshot["brief"]["tracking_items"] = rows
+        self.bind_snapshot(snapshot)
         result = gateway_module.QueryGateway(snapshot).execute("get_current_brief", {})
         self.assertEqual(result["brief"]["tracking_items"], rows)
         self.assertEqual(result["brief"]["source_health"], snapshot["brief"]["source_health"])
@@ -941,6 +964,7 @@ class QueryGatewayTests(unittest.TestCase):
     def test_source_gap_nested_private_objects_fail_closed_in_mcp(self):
         snapshot = gateway_module.load_snapshot()
         snapshot["status"]["sources"][0]["intelligence_gaps"] = [{"private_case": "SYNTHETIC_PRIVATE_MARKER"}]
+        self.bind_snapshot(snapshot)
         response = gateway_module.dispatch_mcp(gateway_module.QueryGateway(snapshot), {
             "jsonrpc": "2.0", "id": 15, "method": "tools/call",
             "params": {"name": "get_source_health", "arguments": {}},
