@@ -26,7 +26,7 @@ function runPython(args) {
 test("gold evaluation unit suite passes", () => {
   const result = runPython(["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_gold_evaluator.py", "-v"]);
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-  assert.match(result.stderr, /Ran 10 tests/);
+  assert.match(result.stderr, /Ran 31 tests/);
   assert.match(result.stderr, /OK/);
 });
 
