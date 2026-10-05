@@ -234,7 +234,8 @@ def upsert(state: dict[str, Any] | None, candidate: dict[str, Any], *, observed_
         existing["priority_reason"] = value["priority_reason"]
         existing["entity_ids"] = value["entity_ids"] or existing["entity_ids"]
         existing["updated_at"] = stamp
-        action = "REOPENED" if existing["status"] in TERMINAL_STATUSES else "RECLASSIFIED" if reason_changed and not evidence_changed else "UPDATED"
+        decision_superseded = evidence_changed and existing.get("decision") is not None
+        action = "REOPENED" if existing["status"] in TERMINAL_STATUSES or decision_superseded else "RECLASSIFIED" if reason_changed and not evidence_changed else "UPDATED"
         if action == "REOPENED":
             existing["status"] = "OPEN"
             existing["assignment"] = {"state": "UNASSIGNED", "assignee_ref": None, "claimed_at": None}
