@@ -1,0 +1,18 @@
+{
+  "data_as_of": "2026-09-01T00:00:00+08:00",
+  "data_as_of_basis": "OFFICIAL_DOCUMENT_REVISION_DATE",
+  "data_as_of_evidence": {
+    "content_sha256": "f21ecb06c6fe0153fbaad287d7192e85445b58f5a24e7ec343df1432a6b32cdf",
+    "date_basis": "OFFICIAL_DOCUMENT_REVISION_DATE",
+    "document_revision_at": "2026-09-01T00:00:00+08:00",
+    "official_url": "https://www.tccc.gov.tw/pic/DocCouncil/17882754682859(2).pdf",
+    "page_number": 1
+  },
+  "data_as_of_scope": "LATEST_EVIDENCED_DOCUMENT_VERSION",
+  "record_origin": {
+    "source_id": "S-006",
+    "collection_run_id": "CR-DEMO-20261005-EVENING-MANUAL",
+    "workflow_run_id": "37333972582",
+    "contains_document_text": false
+  }
+}
