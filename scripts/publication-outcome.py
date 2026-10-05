@@ -41,6 +41,19 @@ def load_system_health():
     return module
 
 
+def query_readiness(env: Mapping[str, str]) -> tuple[str | None, bool]:
+    if "QUERY_READINESS" not in env:
+        return None, False  # Older reports did not retain a formal admission result.
+    readiness = env.get("QUERY_READINESS")
+    production = env.get("QUERY_PRODUCTION_VERIFIED")
+    if phase_value(env, "QUERY_VERIFY") == "success":
+        if readiness == "RIGHTS_BLOCKED" and production == "false":
+            return readiness, False
+        if readiness == "EVIDENCE_LOCATOR_VERIFIED" and production == "true":
+            return readiness, True
+    return "VERIFICATION_FAILED", False
+
+
 def runtime_health(env: Mapping[str, str], *, observed_at: str | None = None) -> dict:
     """Build a receipt from workflow outcomes without inventing phase timestamps."""
     observed_at = observed_at or datetime.now(timezone.utc).isoformat()
@@ -94,6 +107,12 @@ def runtime_health(env: Mapping[str, str], *, observed_at: str | None = None) ->
         worker = phase_value(env, "WORKER_DEPLOY")
         stages.append(stage("query", "worker_deployment", worker,
                             "WORKER_DEPLOYMENT_NOT_VERIFIED" if worker != "success" else None))
+    readiness, production_verified = query_readiness(env)
+    if readiness is not None:
+        formal = {"lane": "query", "stage": "formal_query_admission", "outcome": "SUCCESS" if production_verified else "UNKNOWN"}
+        if not production_verified:
+            formal["error_class"] = "RIGHTS_BLOCKED" if readiness == "RIGHTS_BLOCKED" else "QUERY_READINESS_NOT_VERIFIED"
+        stages.append(formal)
     health = load_system_health().build_health(stages)
     health.update({
         "kind": "GOVINTEL_RUNTIME_HEALTH_RECEIPT",
@@ -103,6 +122,9 @@ def runtime_health(env: Mapping[str, str], *, observed_at: str | None = None) ->
         "generation_id": generation_id,
         "state_commit": state_commit,
         "schema_drift_overall": schema_overall or None,
+        "query_readiness": readiness,
+        "production_verified": production_verified,
+        "query_deployment_verified": query_verify == "success" and readiness in {"RIGHTS_BLOCKED", "EVIDENCE_LOCATOR_VERIFIED"},
         "public_data_verified": phase_value(env, "BUILD_RESULT") == "success" and deploy == "success" and public_verify == "success",
         "job_results": {key: phase_value(env, key) for key in ("BUILD_RESULT", "DEPLOY_RESULT")},
         "phase_results": {key: deploy if key == "PAGES_DEPLOY" else phase_value(env, key) for key in PHASES},
@@ -134,10 +156,19 @@ def report(env: Mapping[str, str]) -> tuple[str, int]:
         passed = False
     if "QUERY_VERIFY" in env and outcome("QUERY_VERIFY") != "success":
         passed = False
+    readiness, production_verified = query_readiness(env)
+    if readiness == "VERIFICATION_FAILED":
+        passed = False
     state = "PUBLIC_DATA_VERIFIED" if verified else "DEPLOY_ACTION_SUCCEEDED_UNVERIFIED_HTTP" if publication_passed else "PUBLICATION_NOT_CONFIRMED"
     lines = ["## Publication outcome", f"State: `{state}`", "", "| Phase | Result |", "|---|---|",
              f"| build | {build} |", f"| deploy | {deploy} |"]
     lines.extend(f"| {key.lower()} | {outcome(key)} |" for key in PHASES)
+    if readiness is not None:
+        lines.append(f"\nQuery readiness: `{readiness}`; `production_verified={str(production_verified).lower()}`.")
+        if readiness == "RIGHTS_BLOCKED":
+            lines.append("The deployment and release binding passed, but formal queries remain rights-blocked. Zero returned evidence does not mean no events; source rights and freshness still require attention.")
+        elif readiness == "VERIFICATION_FAILED":
+            lines.append("No consistent formal query readiness receipt is available; step success cannot establish data admission.")
     url = env.get("EVIDENCE_URL", "")
     parts = urlsplit(url)
     if outcome("EVIDENCE") == "success" and parts.scheme == "https" and parts.hostname == "github.com" and "/actions/runs/" in parts.path and "/artifacts/" in parts.path and not parts.query and not parts.fragment:
