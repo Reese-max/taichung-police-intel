@@ -185,6 +185,47 @@ class OutcomeTests(unittest.TestCase):
         self.assertEqual(stages[("query", "mcp_web_query")]["outcome"], "SUCCESS")
         self.assertEqual(receipt["lanes"]["query"], "HEALTHY")
 
+    def test_rights_blocked_operational_success_keeps_formal_query_attention(self):
+        env = self.completed_publication_env(QUERY_READINESS="RIGHTS_BLOCKED", QUERY_PRODUCTION_VERIFIED="false")
+        text, code = module.report(env)
+        receipt = module.runtime_health(env)
+        stages = {(row["lane"], row["stage"]): row for row in receipt["stages"]}
+        self.assertEqual(code, 0)
+        self.assertTrue(receipt["public_data_verified"])
+        self.assertTrue(receipt["query_deployment_verified"])
+        self.assertIs(receipt["production_verified"], False)
+        self.assertEqual(receipt["query_readiness"], "RIGHTS_BLOCKED")
+        self.assertEqual(stages[("query", "mcp_web_query")]["outcome"], "SUCCESS")
+        self.assertEqual(stages[("query", "formal_query_admission")]["outcome"], "UNKNOWN")
+        self.assertNotEqual(receipt["lanes"]["query"], "HEALTHY")
+        self.assertEqual(receipt["overall"], "DEGRADED")
+        self.assertIn("formal_query_admission", json.dumps(receipt["operator_summary"]))
+        self.assertIn("Zero returned evidence does not mean no events", text)
+        self.assertIn("production_verified=false", text)
+
+    def test_formal_query_readiness_requires_consistent_step_and_receipt_fields(self):
+        for readiness, production in (("", ""), ("UNKNOWN", "false"), ("RIGHTS_BLOCKED", "true"),
+                ("EVIDENCE_LOCATOR_VERIFIED", "false")):
+            with self.subTest(readiness=readiness, production=production):
+                env = self.completed_publication_env(QUERY_READINESS=readiness, QUERY_PRODUCTION_VERIFIED=production)
+                self.assertEqual(module.report(env)[1], 1)
+                receipt = module.runtime_health(env)
+                self.assertIs(receipt["production_verified"], False)
+                self.assertFalse(receipt["query_deployment_verified"])
+                self.assertNotEqual(receipt["lanes"]["query"], "HEALTHY")
+        env = self.completed_publication_env(QUERY_READINESS="EVIDENCE_LOCATOR_VERIFIED", QUERY_PRODUCTION_VERIFIED="true")
+        self.assertEqual(module.report(env)[1], 0)
+        self.assertTrue(module.runtime_health(env)["production_verified"])
+        self.assertEqual(module.runtime_health(env)["lanes"]["query"], "HEALTHY")
+
+    def test_pages_retains_query_readiness_without_changing_operational_outcome(self):
+        pages = (ROOT / ".github/workflows/pages.yml").read_text()
+        self.assertIn("query_readiness: ${{ steps.query_verify.outputs.query_readiness }}", pages)
+        self.assertIn("query_production_verified: ${{ steps.query_verify.outputs.production_verified }}", pages)
+        self.assertIn("QUERY_READINESS: ${{ needs.deploy.outputs.query_readiness }}", pages)
+        self.assertIn("QUERY_PRODUCTION_VERIFIED: ${{ needs.deploy.outputs.query_production_verified }}", pages)
+        self.assertIn("QUERY_VERIFY: ${{ needs.deploy.outputs.query_verify }}", pages)
+
     def test_runtime_health_uses_schema_receipt_over_step_success(self):
         env = {
             "BUILD_RESULT": "success",

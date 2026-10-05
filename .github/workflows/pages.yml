@@ -256,6 +256,8 @@ jobs:
       pages_deploy: ${{ steps.deployment.outcome }}
       public_verify: ${{ steps.acknowledge.outcome }}
       query_verify: ${{ steps.query_verify.outcome }}
+      query_readiness: ${{ steps.query_verify.outputs.query_readiness }}
+      query_production_verified: ${{ steps.query_verify.outputs.production_verified }}
     steps:
       - name: Checkout reviewed code for public verification
         uses: actions/checkout@v7
@@ -330,6 +332,8 @@ jobs:
           EVIDENCE_URL: ${{ needs.build.outputs.evidence_url }}
           PUBLIC_VERIFY: ${{ needs.deploy.outputs.public_verify }}
           QUERY_VERIFY: ${{ needs.deploy.outputs.query_verify }}
+          QUERY_READINESS: ${{ needs.deploy.outputs.query_readiness }}
+          QUERY_PRODUCTION_VERIFIED: ${{ needs.deploy.outputs.query_production_verified }}
           GENERATION_ID: ${{ needs.build.outputs.generation_id }}
           STATE_COMMIT: ${{ needs.build.outputs.state_commit }}
         run: python scripts/publication-outcome.py --health-output runtime-evidence/publication-health.json

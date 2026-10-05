@@ -22,6 +22,7 @@ Web 的 `query-release-client.js` 對外部 Gateway 先以 `cache: "no-store"` �
 | `RUNTIME_BOUND` | Worker 已核對 canonical publication，附實際 Worker version | `false` |
 | `LOCAL_TEST` | verifier 使用注入的測試 client，即使輸入部署 metadata 也仍屬本地 | `false` |
 | `ANONYMOUS_HTTP_ONLY` | 實際匿名 HTTP 核對通過，但缺正式部署 metadata | `false` |
+| `DEPLOYMENT_BOUND_RIGHTS_BLOCKED` | 實際匿名 HTTP 與部署 metadata 綁定通過，但 formal admission 仍為 UNKNOWN，沒有可公開的正式 evidence | `false` |
 | `PRODUCTION` | 實際匿名 HTTP、Pages workflow attempt、部署完成後觀測時間與預期 code SHA 均齊備並通過核對 | `true` |
 | `VERIFICATION_FAILED` | 公開驗證失敗，覆寫同一 output 的舊 PASS receipt | `false` |
 
@@ -56,7 +57,15 @@ python -X utf8 scripts/verify-query-gateway-production.py \
   --output runtime-evidence/query-gateway-receipt.json
 ```
 
-Verifier 核對匿名 Pages manifest／artifact bytes、Worker `/health`、`/capabilities`、`/query` 及 `/mcp`，並要求一筆 query 結果的官方 HTTPS `.gov.tw` locator 與 bound feed 一致。它不代替真人打開官方頁、確認內容、操作 Web 或 mobile 的驗收。
+Verifier 核對匿名 Pages manifest／artifact bytes、Worker `/health`、`/capabilities`、`/query` 及 `/mcp`。governed policy 分支必須與 verifier 所在 repository 的核准 snapshot 完全相同，且 formal admission 為 ADMITTED；此分支仍要求一筆 query 結果的官方 HTTPS `.gov.tw` locator 與 bound feed 一致；legacy policy 1 分支只接受與 repo 核准 snapshot 完全綁定的 UNKNOWN／APPROVED_GOVERNANCE_MISSING 拒絕結果。它不代替真人打開官方頁、確認內容、操作 Web 或 mobile 的驗收。
+
+`deployment_verified` 是新增的部署完整性欄位：只有實際匿名 HTTP、既有 Pages workflow attempt、部署時間、預期 code SHA 與所有 release/hash/query/MCP 核對通過才為 `true`。CLI 以此欄位決定 operational exit code，成功標記為 `DEPLOYMENT_QUERY_RECEIPT_OK`。注入 client 不會取得此欄位或 production 驗證。
+
+權限拒絕分支必須保留所有 active source identities、完整 per-source blockers、health/gaps、HTTP/MCP 一致的正式零結果、false bounded-no-match，以及 brief/answer 的明確 `RIGHTS_BLOCKED` 拒絕。一般空陣列、錯誤的 blocker/reason、混用 generation、遺失 source health、錯誤 HTTP failure 或帶有 evidence 的權限拒絕均失敗；其他尚未建立 oracle 的 empty/policy 分支也失敗。通過部署檢查時 `query_readiness=RIGHTS_BLOCKED`、`production_verified=false`、official locator 欄位為 `null`，不得升格來源權利或把零結果說成沒有事件。
+
+驗證器會用同一 repo 的實際 Query Store builder、coverage 與 scope 函式，從公開的 feed/status/brief 原始 bytes 和核准 policy 重新計算 query generation、missing/stale sources、collection coverage、source gaps 和 freshness；回應之間互相一致不能代替 canonical 核對。查詢的 server clock 必須落在這次 HTTP 驗證區間內（最多五秒 clock skew），且與 receipt issued time 相符；scope 與 envelope 記錄間僅允許一秒邊界差異。`/health` 沒有 server timestamp，使用該次請求的前後觀測時間核對；不改寫原始資料時間。MCP 成功回應必須只有一段 JSON object 文字，並與 structuredContent 完全一致（包括型別且禁止 non-finite values）；文字藏有額外 evidence 或缺口不符均失敗。
+
+Pages 保留完整 query receipt，並只傳遞 readiness/production 欄位到 publication outcome。`QUERY_VERIFY=success` 表示 operational binding 通過；遇到 `RIGHTS_BLOCKED`，runtime health 另外保留 `formal_query_admission=UNKNOWN`，query lane 不會變成 HEALTHY，摘要仍提示權限與資料就緒缺口。這些欄位不代表整張 #49 或 #62 完成，也不啟用 proposed policy 2。
 
 Production verifier 拒絕 loopback／private IP 與 `.local`／`.localhost` Gateway，部署 URL 必須指向本 repo 的 workflow attempt，並要求 `built_at <= deployed_at <= 驗證時間`。這些是來源與格式檢查，不是獨立的部署簽章。
 
