@@ -1,6 +1,6 @@
 # GovIntel AI－現行實作與證據狀態
 
-文件更新：2026-10-05（Asia/Taipei）。已部署程式基準：`main@562141e396c693e115b3fce10594c434c401a58e`；下列 PR 是另行驗收的候選，不能把其功能算入這份 production 基準。公開資料會隨排程更新，引用前須讀取 receipt 本身的時間、版本與 hash。
+文件更新：2026-10-05（Asia/Taipei）。下方歷史 production 觀察綁定 `main@562141e396c693e115b3fce10594c434c401a58e`，不是永久的 latest 宣稱。PR #103／#124／#125／#126 已合併到 main；已合併程式、本地驗收與公開部署仍須各自留證，不把新功能算進較早 production receipt。公開資料會隨排程更新，引用前須讀取 receipt 本身的時間、版本與 hash。
 
 本輪本地整合已包含公開查詢、追蹤、來源頁、固定 D1 背景與 release-aware fail-closed 修正。**已驗證程式版本 `3a06754a2428023bf316d8cb180f239f9c3b971d`：完整 gate PASS，Web 406/406、同 checkout runtime 26/26、既有 browser 13/13／v6 browser 22/22。** Served `BUILD_ONLY` release 綁定該 code SHA 與三檔 hash；這些是本地工程驗收，沒有正式部署、AI／真人成效或來源 promotion。詳細界線見 [VERIFICATION.md](VERIFICATION.md)。
 
@@ -41,7 +41,7 @@
 - 本輪已核對的來源缺口仍為 `PARTIAL`：S-007 陳舊、S-029 蒐集失敗。失敗與 LKG 不能解讀成零事件或來源解除。
 - 核准 active set 仍只有五個來源；沒有四類候選已啟用、全臺完整涵蓋或每日新增 100–200 筆的證據。
 - `publication-state` lifecycle 已在 main；[PUBLICATION_RECOVERY.md](PUBLICATION_RECOVERY.md)的 9 月「尚未 merge」記錄屬歷史根因，不是目前合併狀態。
-- [Gateway health](https://govintel-query-gateway.irisx-tracker.workers.dev/health)在上述觀察為 HTTP 200，coverage `PARTIAL`、missing S-029、stale S-007／S-029。`search_events`、`get_event`、`compare_event_versions`、`query_statistics` 未提供；`data/release.json` 回傳 404，release-bound [PR #103](https://github.com/Reese-max/taichung-police-intel/pull/103)仍是候選，不能宣稱已具完整 release contract。完整安全快照見[production observation](production-observation-20261005.json)。
+- [Gateway health](https://govintel-query-gateway.irisx-tracker.workers.dev/health)在上述觀察為 HTTP 200，coverage `PARTIAL`、missing S-029、stale S-007／S-029。當時 `search_events`、`get_event`、`compare_event_versions`、`query_statistics` 未提供，`data/release.json` 回傳 404；release-bound [PR #103](https://github.com/Reese-max/taichung-police-intel/pull/103)現已合併，但不能把後續 source merge 當成該歷史觀察已具完整 release contract。完整安全快照見[production observation](production-observation-20261005.json)。
 - [本輪來源稽核](SOURCE_RELIABILITY_REVIEW_2026-10-05.md)另發現 S-006 公開快照把擷取時鐘推成 `FRESH`／`COMPLETE_ZERO`。本地已修正無日期／混合日期列表為 `PARTIAL`、未知內容日期；修正尚未部署，不能把舊公開數值視為已更正。S-029 的 bounded 官方 index GET 仍 503，尚無恢復證據。
 
 ## 送件與外部確認

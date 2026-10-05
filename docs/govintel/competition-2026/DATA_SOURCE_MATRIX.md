@@ -8,12 +8,14 @@
 |---|---|---|
 | S-004 | [臺中市議會議事日程](https://www.tccc.gov.tw/wb_download13.asp?uno=&cno=49) | `PRODUCTION_ACTIVE`；health、日期窗口與 freshness 分開。 |
 | S-006 | [臺中市議會質詢順序](https://www.tccc.gov.tw/wb_download13.asp?uno=&cno=50) | `PRODUCTION_ACTIVE`；單源結果不能代表所有公共公告。 |
-| S-007 | [議事錄 API](https://yishi.tccc.gov.tw/api/ProceedingsBackWeb/FrontList) | `PRODUCTION_ACTIVE`；本輪 receipt 為`STALE`，不因 HTTP 成功改成新鮮。 |
-| S-009 | [各項提案 API](https://yishi.tccc.gov.tw/api/Proposal/FrontList) | `PRODUCTION_ACTIVE`；保留缺日期、窗口與查詢範圍限制。 |
+| S-007 | [議事錄 API](https://yishi.tccc.gov.tw/api/ProceedingsBackWeb/FrontList) | `PRODUCTION_ACTIVE`；這是需參數的 API endpoint，直接無參數 GET 回 400，不是可點開的文件；參數化 collector receipt 為`STALE`，不因 HTTP 成功改成新鮮。 |
+| S-009 | [各項提案 API](https://yishi.tccc.gov.tw/api/Proposal/FrontList) | `PRODUCTION_ACTIVE`；這是需參數的 API endpoint，直接無參數 GET 回 400；保留缺日期、窗口與查詢範圍限制。 |
 | S-029 | [市府議會專案報告](https://www.rdec.taichung.gov.tw/12047/12142/12145) | `PRODUCTION_ACTIVE`；本輪`FAILED`／`STALE`，LKG 不是最新內容，不能宣稱零新事件。 |
 | S-010 | [市議會官方影音](https://www.tccc.gov.tw/) | 既有 evidence navigation，不是第六個定期 collector；transcript 只作導航。 |
 
 五來源的 publication 仍`PARTIAL`。2026-10-05 01:13 Asia/Taipei 的公開觀察對應 generation `CR-DEMO-20261004-EVENING-SCHEDULE`，generated `2026-10-04T23:26:28+08:00`。這是時間化快照，不是完整涵蓋證明。
+
+2026-10-05 22:18 Asia/Taipei 的只讀連結核對：上述議會首頁／日程／順序與兩個 data.gov.tw dataset 入口為 HTTP 200；S-029 官方報告 index 為 503，故保留 `FAILED`／LKG 缺口，不移除其原始官方 URL 或換來源冒充恢復。API 無參數 400 不等於 collector 已失效；需依其正確請求與資料 receipt 分別判斷。
 
 ## v6 首期四類候選
 

@@ -18,6 +18,10 @@ video, and the original council-evidence path. Those facts remain historical
 receipts only. Do not use them to infer current eligibility, current
 production freshness, current feature status, or a completed submission.
 
+The archived submission-form link was checked read-only on 2026-10-05:
+it redirects to Google's `closedform` page. It is preserved as historical
+provenance, not an open form or a route for the current MOI competition.
+
 For the current product and judge path, start at
 [GovIntel 2026 competition entry](../competition-2026/README.md).
 
