@@ -38,6 +38,7 @@ from collect import (
 )
 from intel_v2.detail_recheck import classify_observation
 from intel_v2.detail_recheck_http import recheck_detail
+from intel_v2.lkg_age import last_known_good_age
 from intel_v2.located_facts import validate_document_url
 
 
@@ -1736,6 +1737,7 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
             }
         freshness = freshness_status(record["data_as_of"], now, *SOURCE_FRESHNESS_POLICY.get(source_id, (13, 24)))
         record["freshness_status"] = freshness
+        record["last_known_good_age"] = last_known_good_age(record["last_known_good"], now)
         record["intelligence_gaps"] = gap_reasons(record, record["last_known_good"], freshness)
         if freshness == "NO_DATA":
             record["intelligence_gaps"].append("NO_DATA_AS_OF")

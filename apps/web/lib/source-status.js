@@ -19,6 +19,50 @@ function validOptionalString(value) {
   return value === undefined || value === null || typeof value === "string";
 }
 
+export function lastKnownGoodAge(lastKnownGood, observedNow) {
+  const result = { status: "UNKNOWN", age_hours: null, observed_at: null, completed_at: null, reason: null };
+  const observed = observedNow instanceof Date ? observedNow.getTime()
+    : typeof observedNow === "number" ? observedNow : NaN;
+  const observedDate = new Date(observed);
+  if (!Number.isSafeInteger(observed) || !Number.isFinite(observedDate.getTime())
+      || observedDate.getUTCFullYear() < 1 || observedDate.getUTCFullYear() > 9999) {
+    return { ...result, reason: "INVALID_OBSERVED_AT" };
+  }
+  result.observed_at = observedDate.toISOString();
+  if (!lastKnownGood || typeof lastKnownGood !== "object" || Array.isArray(lastKnownGood)) {
+    return { ...result, reason: "NO_LAST_KNOWN_GOOD" };
+  }
+  const completed = lastKnownGood.completed_at;
+  if (completed === undefined || completed === null || completed === "") {
+    return { ...result, reason: "MISSING_COMPLETED_AT" };
+  }
+  if (!validIso(completed) || completed.startsWith("0000-")) return { ...result, reason: "INVALID_COMPLETED_AT" };
+  const completedDate = new Date(completed);
+  if (completedDate.getUTCFullYear() < 1 || completedDate.getUTCFullYear() > 9999) {
+    return { ...result, reason: "INVALID_COMPLETED_AT" };
+  }
+  result.completed_at = completed;
+  // Date.parse retains only milliseconds. Python completion clocks can carry
+  // six fractional digits, so compare their remaining microseconds as well.
+  const fraction = /\.(\d{1,6})(?:Z|[+-]\d{2}:\d{2})$/.exec(completed)?.[1] || "";
+  const submillisecond = BigInt(fraction.padEnd(6, "0").slice(3));
+  const completedMicroseconds = BigInt(Date.parse(completed)) * 1000n + submillisecond;
+  const elapsedMicroseconds = BigInt(observed) * 1000n - completedMicroseconds;
+  if (elapsedMicroseconds < 0n) return { ...result, reason: "FUTURE_COMPLETED_AT" };
+  const ageHours = Number(elapsedMicroseconds) / 3_600_000_000;
+  return { ...result, status: "KNOWN", age_hours: ageHours };
+}
+
+export function lastKnownGoodAgeLabel(lastKnownGood, observedNow) {
+  const age = lastKnownGoodAge(lastKnownGood, observedNow);
+  if (age.status !== "KNOWN") {
+    if (age.reason === "FUTURE_COMPLETED_AT") return "未知（快照完成時間晚於本次檢視時間）";
+    return "未知（尚無有效的成功快照完成時間或檢視時間）";
+  }
+  if (age.age_hours > 0 && age.age_hours < 0.1) return "不到 0.1 小時";
+  return `${Number(age.age_hours.toFixed(1))} 小時`;
+}
+
 export function validateSourceStatus(data, policy) {
   if (!data || data.schema_version !== 1 || !Array.isArray(data.sources) || data.sources.length === 0
       || data.mode !== "COMPETITION_DEMO"
@@ -107,6 +151,14 @@ export function nextUpdateAt(now = new Date()) {
 export function buildSourceStatus(row, now = new Date()) {
   const dataAsOf = iso(row.data_as_of);
   const freshness = freshnessStatus(dataAsOf, now);
+  const lkgCompleted = row.lkg_completed_at instanceof Date
+    ? Number.isFinite(row.lkg_completed_at.getTime()) ? row.lkg_completed_at.toISOString() : null
+    : validIso(row.lkg_completed_at) && !row.lkg_completed_at.startsWith("0000-") ? row.lkg_completed_at : null;
+  const lastKnownGood = row.lkg_source_run_id ? {
+    source_run_id: row.lkg_source_run_id,
+    completed_at: lkgCompleted,
+    manifest_sha256: row.lkg_manifest_sha256,
+  } : null;
   const gaps = [];
   if (!row.source_run_id) gaps.push("NO_COLLECTION_RUN");
   if (["FAILED", "QUARANTINED"].includes(row.source_health)) gaps.push("SOURCE_FAILED");
@@ -126,13 +178,10 @@ export function buildSourceStatus(row, now = new Date()) {
     freshness_status: freshness,
     data_as_of: dataAsOf,
     last_checked_at: iso(row.completed_at),
-    last_success_at: iso(row.lkg_completed_at),
+    last_success_at: iso(lkgCompleted),
     next_update_at: nextUpdateAt(now),
-    last_known_good: row.lkg_source_run_id ? {
-      source_run_id: row.lkg_source_run_id,
-      completed_at: iso(row.lkg_completed_at),
-      manifest_sha256: row.lkg_manifest_sha256,
-    } : null,
+    last_known_good: lastKnownGood,
+    last_known_good_age: lastKnownGoodAge(lastKnownGood, now),
     intelligence_gaps: gaps,
   };
 }

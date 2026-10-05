@@ -11,6 +11,8 @@ from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from intel_v2.lkg_age import last_known_good_age
+
 
 ROOT = Path(__file__).resolve().parent
 TZ = ZoneInfo("Asia/Taipei")
@@ -297,6 +299,7 @@ def run_slot(
                     "source_url": fixture["source_url"],
                     "data_as_of": fixture["capture_time"],
                     "last_success_at": observed_at,
+                    "completed_at": observed_at,
                     "manifest_sha256": fixture["manifest_sha256"],
                     "snapshot_ref": fixture["snapshot_ref"],
                     "snapshot_item_count": fixture["snapshot_item_count"],
@@ -331,6 +334,7 @@ def run_slot(
             "last_checked_at": observed_at,
             "next_update_at": next_update(slot_date, slot),
             "last_known_good": lkg,
+            "last_known_good_age": last_known_good_age(lkg, now),
             "intelligence_gaps": gap_reasons(source_run, lkg, freshness),
         }
         run_records.append(source_run)
