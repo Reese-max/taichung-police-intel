@@ -61,7 +61,8 @@ _BRIEF = {
 _SOURCE = {
     **_scalars("source_id source_name source_url source_health window_completeness result "
                "freshness_status data_as_of last_checked_at last_success_at "
-               "current_source_run_id manifest_sha256"),
+               "current_source_run_id manifest_sha256 data_as_of_basis data_as_of_scope"),
+    "data_as_of_evidence": _scalars("date_basis document_revision_at official_url content_sha256 page_number"),
     "intelligence_gaps": [None],
 }
 

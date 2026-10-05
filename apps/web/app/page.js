@@ -16,6 +16,7 @@ import {
 } from "../lib/homepage-data.js";
 import { buildHomepageResponse } from "../lib/homepage-eligibility.js";
 import { isHealthyStaleSource } from "../lib/source-status.js";
+import { publicationDate, sourceDateLabel } from "../lib/publication-dates.js";
 
 // ── Relative time helper ──────────────────────────────────────────────────────
 function relativeTime(iso, lang) {
@@ -99,6 +100,9 @@ function projectFeedToHomepageCandidates(feed) {
       title: item.title,
       title_zh: item.title_zh || item.title,
       published_at: item.published_at,
+      document_revision_at: item.document_revision_at,
+      date_basis: item.date_basis,
+      date_evidence: item.date_evidence,
       fetched_at: item.fetched_at,
       data_as_of: item.data_as_of,
       change_type: item.change_type,
@@ -664,10 +668,10 @@ export default function Home() {
                           <span className="score-label">{item.item_value_score}</span>
                         </div>
                         <p className="feed-card-detail">
-                          {item.published_at
-                            ? `${lang === "en" ? "Source date" : "來源日期"}：${new Date(item.published_at).toLocaleDateString(lang === "en" ? "en-GB" : "zh-TW")}`
+                          {publicationDate(item, lang).value
+                            ? `${publicationDate(item, lang).label}：${new Date(publicationDate(item, lang).value).toLocaleDateString(lang === "en" ? "en-GB" : "zh-TW", { timeZone: "Asia/Taipei" })}`
                             : item.data_as_of
-                              ? `${lang === "en" ? "Source date" : "來源日期"}：${new Date(item.data_as_of).toLocaleDateString(lang === "en" ? "en-GB" : "zh-TW")}`
+                              ? `${lang === "en" ? "Data as of" : "資料截至"}：${new Date(item.data_as_of).toLocaleDateString(lang === "en" ? "en-GB" : "zh-TW", { timeZone: "Asia/Taipei" })}`
                               : (lang === "en" ? "No source date" : "無來源日期")}
                           {item.fetched_at && (
                             <> · {lang === "en" ? "Confirmed" : "確認時間"}：{new Date(item.fetched_at).toLocaleString(lang === "en" ? "en-GB" : "zh-TW", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</>
@@ -733,7 +737,7 @@ export default function Home() {
                     </small>
                   )}
                   <small>
-                    {t.source_data_as_of}
+                    {sourceDateLabel(source, lang)}：
                     {source.data_as_of
                       ? new Date(source.data_as_of).toLocaleDateString(lang === "en" ? "en-GB" : "zh-TW")
                       : t.source_no_date}

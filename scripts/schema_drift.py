@@ -892,6 +892,7 @@ def _live_session():
         backoff_factor=1,
         status_forcelist=(429, 500, 502, 503, 504),
         allowed_methods=("GET",),
+        raise_on_status=False,
     )
     session = requests.Session()
     session.headers.update({
@@ -976,7 +977,7 @@ def _response_observation(source_id: str, response, resource_id: str | None = No
         "content_type": response.headers.get("content-type", ""),
         "resource_id": resource_id,
         "observed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "requested_url": getattr(request, "url", None) or response.url,
+        "requested_url": getattr(response, "_govintel_requested_url", None) or getattr(request, "url", None) or response.url,
         "final_url": response.url,
     }
 
@@ -986,7 +987,7 @@ def _failed_observation(source_id: str, error: Exception) -> dict[str, Any]:
     reason = f"LIVE_FETCH_{type(error).__name__.upper()}"
     if response is not None:
         observation = _response_observation(source_id, response)
-        observation["error_reason"] = reason
+        observation["error_reason"] = f"HTTP_{response.status_code}"
         return observation
     return {
         "source_id": source_id,
@@ -1006,12 +1007,22 @@ def _failed_observation(source_id: str, error: Exception) -> dict[str, Any]:
 def live_observations(*, session=None, fetch_source=None) -> list[dict[str, Any]]:
     session = session or _live_session()
     fetch_source = fetch_source or _fetch_live_source
+    # A retrying Requests adapter owns the transient retry budget. The outer
+    # retry remains useful for injected/retry-free transports, without doubling
+    # a production adapter's attempts or turning an HTTP failure into no status.
+    import requests
+
+    attempts = 2
+    if isinstance(session, requests.Session) and any(
+        adapter.max_retries.total not in (0, False) for adapter in session.adapters.values()
+    ):
+        attempts = 1
     observations = []
     for source_id in CONTRACTS:
         started_at = time.monotonic()
         print(f"SCHEMA_DRIFT_SOURCE_START source={source_id}", flush=True)
         error = None
-        for attempt in range(2):
+        for attempt in range(attempts):
             try:
                 response, resource_id = fetch_source(session, source_id)
                 observations.append(_response_observation(source_id, response, resource_id))
@@ -1020,7 +1031,7 @@ def live_observations(*, session=None, fetch_source=None) -> list[dict[str, Any]
             except Exception as caught:
                 error = caught
                 error_name = type(caught).__name__.upper()
-                if attempt == 0 and any(marker in error_name for marker in ("CONNECTION", "TIMEOUT", "PROXY")):
+                if attempt < attempts - 1 and any(marker in error_name for marker in ("CONNECTION", "TIMEOUT", "PROXY")):
                     time.sleep(1)
                     continue
                 break

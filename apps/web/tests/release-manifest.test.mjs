@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { copyFile, mkdtemp, readFile, rm } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,7 +10,6 @@ import { createGovernedPolicyFixture } from "./governed-policy-fixture.mjs";
 
 const governed = await createGovernedPolicyFixture({ rightsReviewed: true });
 after(() => governed.cleanup());
-const data = governed.publicRoot;
 const gateway = await governed.loadWorker("release-builder");
 const origin = "https://reese-max.github.io/taichung-police-intel";
 const codeSha = "a".repeat(40);
@@ -42,6 +41,32 @@ async function withWorker(t, bytes) {
   };
 }
 
+async function cliFixture() {
+  const directory = await mkdtemp(join(tmpdir(), "govintel-release-"));
+  try {
+    const dataDirectory = join(directory, "data");
+    const output = join(directory, "release.json");
+    const bytes = await governed.publication();
+    await mkdir(dataDirectory);
+    await Promise.all(Object.entries(bytes).map(([name, value]) => writeFile(join(dataDirectory, name), value)));
+    const script = join(governed.repoRoot, "scripts/build-release-manifest.mjs");
+    // Resolve the unchanged CLI against this fixture's fictional approved policy.
+    await copyFile(fileURLToPath(new URL("../../../scripts/build-release-manifest.mjs", import.meta.url)), script);
+    return {
+      bytes, dataDirectory,
+      async build() {
+        execFileSync(process.execPath, [script,
+          "--data-dir", dataDirectory, "--output", output, "--code-sha", codeSha], { encoding: "utf8" });
+        return JSON.parse(await readFile(output, "utf8"));
+      },
+      cleanup: () => rm(directory, { recursive: true, force: true }),
+    };
+  } catch (error) {
+    await rm(directory, { recursive: true, force: true });
+    throw error;
+  }
+}
+
 test("release builder reuses the canonical snapshot and never claims deployment", async () => {
   const { snapshot, release } = await fixture();
   assert.equal(snapshot.policy.schema_version, 2);
@@ -65,20 +90,104 @@ test("release builder reuses the canonical snapshot and never claims deployment"
 });
 
 test("release CLI produces a manifest without modifying canonical input", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "govintel-release-"));
+  const cli = await cliFixture();
   try {
-    const output = join(directory, "release.json");
-    const script = join(governed.repoRoot, "scripts/build-release-manifest.mjs");
-    // Copy the actual CLI unchanged so its runtime resolves this fixture's
-    // approved compiler output, never the real unreviewed rights snapshot.
-    await copyFile(fileURLToPath(new URL("../../../scripts/build-release-manifest.mjs", import.meta.url)), script);
-    execFileSync(process.execPath, [script,
-      "--data-dir", fileURLToPath(data), "--output", output, "--code-sha", codeSha], { encoding: "utf8" });
-    const result = JSON.parse(await readFile(output, "utf8"));
+    const before = Object.fromEntries(await Promise.all(Object.keys(cli.bytes)
+      .map(async name => [name, await readFile(join(cli.dataDirectory, name))])));
+    const result = await cli.build();
     assert.equal(result.release_id, (await fixture()).release.release_id);
     assert.equal(result.production_verified, false);
+    assert.equal(result.evidence_level, "BUILD_ONLY");
+    for (const [name, bytes] of Object.entries(before)) {
+      assert.deepEqual(await readFile(join(cli.dataDirectory, name)), bytes, `${name} input bytes changed`);
+    }
+  } finally {
+    await cli.cleanup();
+  }
+});
+
+test("canonical artifact bytes survive Git checkout with either autocrlf setting", async () => {
+  const root = fileURLToPath(new URL("../../../", import.meta.url));
+  const directory = await mkdtemp(join(tmpdir(), "govintel-release-checkout-"));
+  try {
+    const repository = join(directory, "repository");
+    const emptyAttributes = join(directory, "empty-attributes");
+    await mkdir(repository);
+    await writeFile(emptyAttributes, "");
+    const git = args => execFileSync("git", ["-c", `core.attributesFile=${emptyAttributes}`, ...args], {
+      cwd: repository, env: { ...process.env, GIT_ATTR_NOSYSTEM: "1" },
+    });
+    git(["init", "--quiet"]);
+    // Exercise the actual repository rules without external attributes or an old release fixture.
+    await copyFile(join(root, ".gitattributes"), join(repository, ".gitattributes"));
+    const publication = Object.fromEntries(Object.entries(await governed.publication())
+      .map(([name, bytes]) => [name, Buffer.from(bytes.toString("utf8").replaceAll("\r\n", "\n"))]));
+    const paths = Object.keys(publication).map(name => `apps/web/public/data/${name}`);
+    await mkdir(join(repository, "apps/web/public/data"), { recursive: true });
+    await Promise.all(Object.entries(publication)
+      .map(([name, bytes]) => writeFile(join(repository, "apps/web/public/data", name), bytes)));
+    git(["-c", "core.autocrlf=false", "add", "--", ".gitattributes", ...paths]);
+    const expected = new Map(paths.map(path => [path, git(["show", `:${path}`])]));
+    for (const [name, bytes] of Object.entries(publication)) {
+      assert.deepEqual(expected.get(`apps/web/public/data/${name}`), bytes, `${name} index bytes changed`);
+    }
+    for (const autocrlf of ["true", "false"]) {
+      const checkout = join(directory, autocrlf);
+      await mkdir(checkout);
+      git(["-c", `core.autocrlf=${autocrlf}`, "checkout-index",
+        `--prefix=${checkout.replaceAll("\\", "/")}/`, "--", ...paths]);
+      for (const path of paths) {
+        const bytes = await readFile(join(checkout, path));
+        assert.deepEqual(bytes, expected.get(path), `${path} bytes differ with core.autocrlf=${autocrlf}`);
+        assert.equal(bytes.includes(Buffer.from("\r\n")), false, `${path} must retain LF bytes`);
+      }
+    }
+    // Without the rules, this same Git checkout must exercise CRLF conversion.
+    await writeFile(join(repository, ".gitattributes"), "");
+    git(["-c", "core.autocrlf=false", "add", "--", ".gitattributes"]);
+    const negative = join(directory, "without-attributes");
+    await mkdir(negative);
+    git(["-c", "core.autocrlf=true", "checkout-index",
+      `--prefix=${negative.replaceAll("\\", "/")}/`, "--", paths[0]]);
+    assert.equal((await readFile(join(negative, paths[0]))).includes(Buffer.from("\r\n")), true,
+      "the negative control must convert LF bytes when the attributes are absent");
   } finally {
     await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("release CLI and Worker bind raw bytes even when publication JSON is unchanged", async t => {
+  for (const [name, field] of [["intelligence-feed.json", "feed"], ["source-status.json", "status"],
+    ["v2-daily-brief.json", "brief"]]) {
+    await t.test(name, async child => {
+      const cli = await cliFixture();
+      try {
+        const original = await cli.build();
+        const baseline = await withWorker(child, { ...cli.bytes, "release.json": JSON.stringify(original) });
+        assert.equal((await baseline("/health")).status, 200);
+        const changedBytes = Buffer.concat([cli.bytes[name], Buffer.from("\n")]);
+        assert.deepEqual(JSON.parse(changedBytes), JSON.parse(cli.bytes[name]), "only raw whitespace changes");
+        await writeFile(join(cli.dataDirectory, name), changedBytes);
+        const changed = { ...cli.bytes, [name]: changedBytes, "release.json": JSON.stringify(original) };
+        const rejected = await withWorker(child, changed);
+        const rejectedResponse = await rejected("/query", { tool: "search_evidence", arguments: {} });
+        assert.equal(rejectedResponse.status, 503);
+        assert.equal(rejectedResponse.body.error.code, "QUERY_TEMPORARILY_UNAVAILABLE");
+        assert.equal(rejectedResponse.body.results, undefined);
+        const rebuilt = await cli.build();
+        assert.equal(rebuilt.artifact_hashes[field], createHash("sha256").update(changedBytes).digest("hex"));
+        assert.notEqual(rebuilt.artifact_hashes[field], original.artifact_hashes[field]);
+        assert.notEqual(rebuilt.release_id, original.release_id);
+        assert.equal(rebuilt.production_verified, false);
+        assert.equal(rebuilt.evidence_level, "BUILD_ONLY");
+        const accepted = await withWorker(child, { ...changed, "release.json": JSON.stringify(rebuilt) });
+        const acceptedResponse = await accepted("/query", { tool: "search_evidence", arguments: {} });
+        assert.equal(acceptedResponse.status, 200);
+        assert.equal(acceptedResponse.body.release.release_id, rebuilt.release_id);
+      } finally {
+        await cli.cleanup();
+      }
+    });
   }
 });
 

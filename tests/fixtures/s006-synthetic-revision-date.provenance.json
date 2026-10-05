@@ -1,0 +1,7 @@
+{
+  "fixture_sha256": "7f3465374fcd4f504453a0f8897182855a9fb179bbb2845576ce03397f6b7e07",
+  "fixture_type": "SYNTHETIC_MINIMAL_UNICODE_PDF",
+  "official_reference_url": "https://www.tccc.gov.tw/pic/DocCouncil/17851627092858(2).pdf",
+  "observed_official_body_sha256": "6b0a3dcfbbc12eb8fa581d04283490a3cde8b4d5d180a660b18d0845eed9ef9e",
+  "transformation": "Generate a minimal Unicode PDF from date metadata: revision-date label and a distinct synthetic meeting-date line. No original PDF bytes, schedule, names or document text are included. The real official PDF remains in private scratch evidence."
+}

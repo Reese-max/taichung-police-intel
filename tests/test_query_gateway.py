@@ -584,6 +584,73 @@ class QueryGatewayTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "not approved and HTTPS"):
             gateway_module.QueryGateway(snapshot=snapshot)
 
+    def test_located_facts_from_demoted_source_stop_feeding_the_gate(self):
+        snapshot = gateway_module.load_snapshot()
+        bundle = self.located_bundle()
+        snapshot["located_facts"] = bundle
+        gateway = gateway_module.QueryGateway(
+            snapshot=snapshot,
+            clock=lambda: datetime(2026, 9, 21, 9, 0, tzinfo=timezone.utc),
+        )
+        evidence_id = bundle["evidence_catalog"][0]["evidence_id"]
+        claim = {
+            "claim_type": "STATUS",
+            "text": "確認事實",
+            "temporal_scope": "HISTORICAL",
+            "proposition": {
+                "subject": f"{bundle['facts'][0]['subject_id']}:{bundle['facts'][0]['predicate']}",
+                "value": bundle["facts"][0]["normalized_value"],
+            },
+            "cited_evidence_ids": [evidence_id],
+        }
+        supported = gateway.execute("validate_answer", {"claims": [claim]})
+        self.assertEqual(supported["final_claims"][0]["support_status"], "SUPPORTED")
+        self.assertIn(evidence_id, supported["answer_evidence_receipt"]["evidence_ids"])
+
+        # If the source catalog is updated to demote the bundle's source, its
+        # facts must stop feeding the gate even though the bundle passed
+        # admission at construction time.
+        demoted = gateway_module.official_evidence_source_ids() - {"S-028"}
+        with mock.patch.object(
+            gateway_module, "official_evidence_source_ids", return_value=demoted
+        ):
+            result = gateway.execute("validate_answer", {"claims": [claim]})
+        self.assertEqual(result["final_claims"][0]["support_status"], "UNSUPPORTED")
+        self.assertNotIn(evidence_id, result["answer_evidence_receipt"]["evidence_ids"])
+
+    def test_non_portable_evidence_scalar_fails_closed(self):
+        snapshot = gateway_module.load_snapshot()
+        snapshot["located_facts"] = self.located_bundle()
+        gateway = gateway_module.QueryGateway(
+            snapshot=snapshot,
+            clock=lambda: datetime(2026, 9, 21, 9, 0, tzinfo=timezone.utc),
+        )
+        gateway.located_facts["facts"][0]["normalized_value"] = 1.5
+        with self.assertRaises(gateway_module.GatewayError) as caught:
+            gateway.execute("validate_answer", {"claims": [{"claim_type": "OTHER", "text": "觸發閘門"}]})
+        self.assertEqual(caught.exception.code, "GATE_FAILED")
+        self.assertIn("non-portable", caught.exception.message)
+        self.assertEqual(caught.exception.status, 503)
+
+    def test_confirmed_evidence_with_unknown_fact_fails_closed(self):
+        snapshot = gateway_module.load_snapshot()
+        snapshot["located_facts"] = self.located_bundle()
+        gateway = gateway_module.QueryGateway(
+            snapshot=snapshot,
+            clock=lambda: datetime(2026, 9, 21, 9, 0, tzinfo=timezone.utc),
+        )
+        rogue = dict(
+            gateway.located_facts["evidence_catalog"][0],
+            evidence_id="EVID-ORPHAN",
+            fact_id="FACT-NOT-IN-BUNDLE",
+        )
+        gateway.located_facts["evidence_catalog"].append(rogue)
+        with self.assertRaises(gateway_module.GatewayError) as caught:
+            gateway.execute("validate_answer", {"claims": [{"claim_type": "OTHER", "text": "觸發閘門"}]})
+        self.assertEqual(caught.exception.code, "GATE_FAILED")
+        self.assertEqual(caught.exception.status, 503)
+        self.assertIn("unknown fact", caught.exception.message)
+
     def test_gate_receipt_rejects_unrecognized_validator_version(self):
         gateway = gateway_module.QueryGateway(
             clock=lambda: datetime(2026, 9, 11, 9, 0, tzinfo=timezone.utc),

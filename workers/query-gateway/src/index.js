@@ -1,5 +1,6 @@
 import { gateAnswer } from "../../../apps/web/lib/answer-evidence-gate.js";
 import { projectPublicBrief, projectPublicSource } from "./public-brief.js";
+import { projectPublicationDates, projectSourceDates } from "../../../apps/web/lib/publication-dates.js";
 import sourceCatalog from "../../../docs/govintel/source-catalog.v2.json" with { type: "json" };
 import approvedSourcePolicy from "../../../docs/govintel/source-policy.approved.json" with { type: "json" };
 import retentionMatrix from "../../../docs/govintel/retention-rights-policy.v1.json" with { type: "json" };
@@ -87,6 +88,11 @@ function assertHash(value, name) {
   if (typeof value !== "string" || !/^[a-f0-9]{64}$/.test(value)) throw new Error(`${name} must be a SHA-256 hex digest`);
 }
 
+function approvedDateOrigins(sourceId) {
+  const row = sourceCatalog.sources.find(source => source.source_id === sourceId);
+  return row ? [new URL(row.entrypoint).origin] : [];
+}
+
 function projectFeedItem(item, feedHash, sourceFreshness = null) {
   if (!item || typeof item !== "object" || typeof item.stable_id !== "string" || typeof item.title !== "string" || typeof item.source_id !== "string") {
     throw new Error("invalid feed row");
@@ -114,6 +120,7 @@ function projectFeedItem(item, feedHash, sourceFreshness = null) {
     published_at: item.published_at ?? null,
     data_as_of: item.data_as_of ?? null,
     fetched_at: item.fetched_at ?? null,
+    ...projectPublicationDates(item, approvedDateOrigins(item.source_id)),
     change_type: item.change_type ?? null,
     freshness_status: item.freshness_status ?? null,
     source_health: item.source_health ?? null,
@@ -155,6 +162,7 @@ function projectSource(source, statusHash) {
     last_checked_at: source.last_checked_at ?? null,
     data_as_of: source.data_as_of ?? null,
     freshness_status: source.freshness_status ?? null,
+    ...projectSourceDates(source, approvedDateOrigins(source.source_id)),
     canonical_ref: { artifact: "source-status.json", artifact_sha256: statusHash, source_id: source.source_id },
   };
 }
@@ -575,7 +583,10 @@ function trustedEvidence(snapshot, now = Date.now()) {
       schema_version: 1, evidence_id: `PUB-${item.canonical_id}`, evidence_type: "WRITTEN_OFFICIAL", source_id: item.source_id,
       locator: `${item.official_url}#publication:${item.canonical_id}`, document_version: item.content_sha256, content_sha256: item.content_sha256,
       trust_tier: item.trust_tier, verification_status: item.verification_status, freshness: freshnessValue, is_current: current,
-      published_at: item.published_at || item.data_as_of || item.fetched_at,
+      published_at: item.published_at ?? null,
+      observed_at: item.fetched_at ?? null,
+      ...(item.document_revision_at != null ? { document_revision_at: item.document_revision_at } : {}),
+      ...(item.date_basis != null ? { date_basis: item.date_basis } : {}),
       assertions: [
         { subject: `publication:${item.canonical_id}:title`, value: item.title },
         { subject: `publication:${item.canonical_id}:source_id`, value: item.source_id },

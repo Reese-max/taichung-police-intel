@@ -83,7 +83,14 @@ def get(
     timeout: int = 60,
 ) -> requests.Response:
     last_error: requests.RequestException | None = None
-    for attempt in range(3):
+    # The production session already retries transient failures in its adapter.
+    # Keep one retry owner so S-029 does not multiply two three-attempt budgets.
+    attempts = 3
+    if isinstance(session, requests.Session):
+        retry = session.get_adapter(url).max_retries
+        if retry.total not in (0, False):
+            attempts = 1
+    for attempt in range(attempts):
         current_url = url
         try:
             for _ in range(MAX_REDIRECTS + 1):
@@ -106,7 +113,7 @@ def get(
         except requests.RequestException as exc:
             last_error = exc
             status = exc.response.status_code if exc.response is not None else None
-            if attempt == 2 or (status is not None and status != 429 and status < 500):
+            if attempt == attempts - 1 or (status is not None and status != 429 and status < 500):
                 raise
             time.sleep(attempt + 1)
     raise RuntimeError(f"取得失敗：{url}：{last_error}")

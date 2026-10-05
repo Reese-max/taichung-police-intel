@@ -35,6 +35,9 @@ SOURCE_VALUES = {
     "result": {"NEW_ITEMS", "NO_NEW_ITEM", "PARTIAL", "FAILED", "NOT_RUN", "UNKNOWN"},
     "freshness_status": {"FRESH", "RECENT", "STALE", "VERY_STALE", "UNKNOWN", "NO_DATA"},
 }
+REVISION_DATE_BASIS = "OFFICIAL_DOCUMENT_REVISION_DATE"
+DATE_BASES = {REVISION_DATE_BASIS, "OFFICIAL_LIST_TITLE_DATE", "OFFICIAL_API_RECORD_DATE"}
+DATE_EVIDENCE_FIELDS = {"date_basis", "document_revision_at", "official_url", "content_sha256", "page_number"}
 
 
 def load_policy_module():
@@ -82,6 +85,80 @@ def instant(value):
     return stamp.astimezone(timezone.utc)
 
 
+def _approved_date_origins(source_id):
+    catalog = load_policy_module().load_catalog()
+    row = next((row for row in catalog["sources"] if row["source_id"] == source_id), None)
+    return {f"https://{urlsplit(row['entrypoint']).netloc}"} if row else set()
+
+
+def _official_date_instant(value):
+    pattern = r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})"
+    if not isinstance(value, str) or not re.fullmatch(pattern, value):
+        raise ValueError("invalid official date timestamp")
+    if value[-1] != "Z" and (int(value[-5:-3]) > 23 or int(value[-2:]) > 59):
+        raise ValueError("invalid official date timestamp")
+    return instant(value)
+
+
+def _project_date_evidence(evidence, expected_date, source_id):
+    if (not isinstance(evidence, dict) or not DATE_EVIDENCE_FIELDS <= set(evidence)
+            or set(evidence) - (DATE_EVIDENCE_FIELDS | {"excerpt"})):
+        raise ValueError("invalid official date evidence fields")
+    if evidence["date_basis"] != REVISION_DATE_BASIS or _official_date_instant(evidence["document_revision_at"]) != _official_date_instant(expected_date):
+        raise ValueError("official date evidence does not match its revision date")
+    url = evidence["official_url"]
+    if not isinstance(url, str):
+        raise ValueError("invalid official date evidence URL")
+    parsed = urlsplit(url)
+    if (parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password
+            or f"https://{parsed.netloc}" not in _approved_date_origins(source_id)
+            or not parsed.path.lower().endswith(".pdf")):
+        raise ValueError("official date evidence origin or document is not approved")
+    if (not isinstance(evidence["content_sha256"], str) or not HASH.fullmatch(evidence["content_sha256"])
+            or type(evidence["page_number"]) is not int or evidence["page_number"] < 1
+            or ("excerpt" in evidence and not isinstance(evidence["excerpt"], str))):
+        raise ValueError("invalid official date evidence hash or page")
+    # Header text remains in private collection evidence, never the public query.
+    return {key: evidence[key] for key in sorted(DATE_EVIDENCE_FIELDS)}
+
+
+def _project_publication_dates(item):
+    basis, revision, evidence = (item.get(key) for key in ("date_basis", "document_revision_at", "date_evidence"))
+    if basis is None and revision is None and evidence is None:
+        return {}
+    if not isinstance(basis, str) or basis not in DATE_BASES:
+        raise ValueError("invalid official date basis")
+    if basis != REVISION_DATE_BASIS:
+        if revision is not None or evidence is not None:
+            raise ValueError("official revision metadata requires a revision basis")
+        _official_date_instant(item.get("published_at"))
+        return {"date_basis": basis}
+    _official_date_instant(revision)
+    return {"document_revision_at": revision, "date_basis": basis,
+            "date_evidence": _project_date_evidence(evidence, revision, item["source_id"])}
+
+
+def _project_source_dates(source):
+    basis, evidence, scope = (source.get(key) for key in ("data_as_of_basis", "data_as_of_evidence", "data_as_of_scope"))
+    if basis is None and evidence is None and scope is None:
+        return {}
+    if not isinstance(basis, str) or basis not in DATE_BASES:
+        raise ValueError("invalid source official date basis")
+    _official_date_instant(source.get("data_as_of"))
+    result = {"data_as_of_basis": basis}
+    if basis == REVISION_DATE_BASIS:
+        result["data_as_of_evidence"] = _project_date_evidence(evidence, source["data_as_of"], source["source_id"])
+    elif evidence is not None:
+        raise ValueError("source revision evidence requires a revision basis")
+    if scope is not None:
+        scopes = ({"LATEST_EVIDENCED_DOCUMENT_VERSION"} if basis in {REVISION_DATE_BASIS, "OFFICIAL_LIST_TITLE_DATE"} else
+                  {"COLLECTION_WINDOW", "OBSERVED_API_PAGE"} if basis == "OFFICIAL_API_RECORD_DATE" else set())
+        if not isinstance(scope, str) or scope not in scopes:
+            raise ValueError("invalid source official date scope")
+        result["data_as_of_scope"] = scope
+    return result
+
+
 def project_feed_item(item: dict[str, Any], feed_hash: str, *, source_freshness: dict[str, str] | None = None) -> dict[str, Any]:
     if not isinstance(item, dict):
         raise ValueError("invalid feed row; refusing silent omission")
@@ -117,6 +194,7 @@ def project_feed_item(item: dict[str, Any], feed_hash: str, *, source_freshness:
         "source_id": source_id, "source_role": _string(item.get("source_role")), "official_url": official_url,
         **{key: item.get(key) for key in ("published_at", "data_as_of", "fetched_at", "change_type",
                                           "freshness_status", "source_health", "window_completeness")},
+        **_project_publication_dates(item),
         "committee": str(item.get("committee") or ""),
         "next_milestone": item.get("next_milestone"),
         "evidence_count": count, "content_sha256": content_hash,
@@ -145,6 +223,7 @@ def project_source(source: dict[str, Any], status_hash: str) -> dict[str, Any]:
         "source_id": sid, "name": name,
         **{key: source.get(key) for key in ("source_health", "window_completeness", "result",
                                           "last_checked_at", "data_as_of", "freshness_status")},
+        **_project_source_dates(source),
         "canonical_ref": {"artifact": "source-status.json", "artifact_sha256": status_hash, "source_id": sid},
     }
 
@@ -289,25 +368,29 @@ def _validate_current_projection(store, approved_policy, formal, hashes):
     """A self-recomputed projection hash cannot authorize rows or public fields."""
     source_fields = {"source_id", "name", "source_health", "window_completeness", "result",
                      "last_checked_at", "data_as_of", "freshness_status", "canonical_ref"}
+    source_date_fields = {"data_as_of_basis", "data_as_of_evidence", "data_as_of_scope"}
     sources = {}
     for row in store["sources"]:
-        if not isinstance(row, dict) or set(row) != source_fields:
+        if not isinstance(row, dict) or not source_fields <= set(row) or not set(row) <= source_fields | source_date_fields:
             raise ValueError("query source health projection has unsupported fields")
         sid = row.get("source_id")
         if not _string(sid) or sid not in approved_policy["active_source_ids"] or sid in sources:
             raise ValueError("query source health identity is not approved")
         if not _string(row.get("name")) or any(value is not None and not isinstance(value, str)
-                for key, value in row.items() if key != "canonical_ref"):
+                for key, value in row.items() if key not in {"canonical_ref", "data_as_of_evidence"}):
             raise ValueError("query source health fields must be strings or null")
         expected_ref = {"artifact": "source-status.json", "artifact_sha256": hashes["status"], "source_id": sid}
         if row["canonical_ref"] != expected_ref:
             raise ValueError("query source health canonical reference mismatch")
         _validate_source_scalars(row)
+        if {key: row[key] for key in source_date_fields if key in row} != _project_source_dates(row):
+            raise ValueError("query source official date metadata is not closed")
         sources[sid] = row
 
     active = {row["source_id"]: row for row in approved_policy["active_sources"]}
     system_fields = {"record_type", "canonical_id", "source_role", "trust_tier", "verification_status", "canonical_ref"}
     projection_fields = system_fields | {"title", "source_id", "official_url", "published_at", "data_as_of",
+        "document_revision_at", "date_basis", "date_evidence",
         "fetched_at", "change_type", "freshness_status", "source_health", "window_completeness",
         "committee", "next_milestone", "evidence_count", "content_sha256"}
     required = system_fields | {"title", "source_id", "content_sha256"}
@@ -325,7 +408,7 @@ def _validate_current_projection(store, approved_policy, formal, hashes):
         if not required <= set(row) or not set(row) <= allowed:
             raise ValueError("query publication projection has unsupported public fields")
         if any(value is not None and not isinstance(value, str)
-               for key, value in row.items() if key not in {"canonical_ref", "evidence_count"}):
+               for key, value in row.items() if key not in {"canonical_ref", "evidence_count", "date_evidence"}):
             raise ValueError("query publication fields must be strings or null")
         stable_id, title, content_hash = row["canonical_id"], row["title"], row["content_sha256"]
         if (not _string(stable_id) or len(stable_id) > 256 or stable_id in identities
@@ -339,6 +422,8 @@ def _validate_current_projection(store, approved_policy, formal, hashes):
         for key in ("published_at", "data_as_of", "fetched_at"):
             if row.get(key) is not None:
                 instant(row[key])
+        if {key: row[key] for key in ("document_revision_at", "date_basis", "date_evidence") if key in row} != _project_publication_dates(row):
+            raise ValueError("query publication official date metadata is not closed")
         if row.get("change_type") is not None and row["change_type"] not in CHANGES:
             raise ValueError("invalid query publication change_type")
         if row.get("freshness_status") is not None and row["freshness_status"].upper() not in {"FRESH", "RECENT", "STALE", "VERY_STALE", "UNKNOWN", "NO_DATA"}:
