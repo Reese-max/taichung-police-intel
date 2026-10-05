@@ -5,6 +5,7 @@ from io import BytesIO
 import importlib.util
 import json
 import os
+import re
 import shutil
 from pathlib import Path
 import sys
@@ -19,6 +20,15 @@ spec = importlib.util.spec_from_file_location("production_query", Path(os.enviro
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 PUBLIC = "https://reese-max.github.io/taichung-police-intel"
+
+
+def shadow_json_key(text, key, canary):
+    """Insert a discarded first value without assuming the lawful value or spacing."""
+    return re.subn(
+        r'("' + re.escape(key) + r'"\s*:\s*)',
+        lambda match: json.dumps(key) + ": " + json.dumps(canary) + ", " + match.group(0),
+        text, count=1,
+    )
 
 
 class PublicationClient:
@@ -519,14 +529,33 @@ class ReleaseVerificationTests(unittest.TestCase):
                 def mutate(route, document):
                     if route != "mcp_search_evidence": return
                     text = document["result"]["content"][0]["text"]
-                    if kind == "evidence":
-                        text = text.replace('"results": []', '"results": [{"canonical_id": "FICTIONAL_PRIVATE_CANARY"}], "results": []', 1)
-                    else:
-                        text = text.replace('"missing_required_sources": []', '"missing_required_sources": ["S-999"], "missing_required_sources": []', 1)
-                    document["result"]["content"][0]["text"] = text
+                    key = "results" if kind == "evidence" else "missing_required_sources"
+                    canary = [{"canonical_id": "FICTIONAL_PRIVATE_CANARY"}] if kind == "evidence" else ["S-999"]
+                    changed, replacements = shadow_json_key(text, key, canary)
+                    self.assertEqual(replacements, 1, "The duplicate-key negative input must actually be injected")
+                    self.assertNotEqual(changed, text)
+                    self.assertEqual(json.loads(changed), document["result"]["structuredContent"])
+                    document["result"]["content"][0]["text"] = changed
                 client.mutate = mutate
                 with self.assertRaisesRegex(RuntimeError, "MCP"):
                     native_module.verify("https://gateway.example", PUBLIC, client)
+
+    def test_duplicate_diagnostic_injection_handles_all_list_values_and_json_spacing(self):
+        for missing in ([], ["S-006"], ["S-006", "S-009", "S-029"]):
+            for formatting in ({}, {"separators": (",", ":")}, {"indent": 2}):
+                with self.subTest(missing=missing, formatting=formatting):
+                    structured = {"results": [], "query_coverage": {"missing_required_sources": missing}}
+                    text = json.dumps(structured, **formatting)
+                    document = {"result": {"isError": False, "structuredContent": structured,
+                        "content": [{"type": "text", "text": text}]}}
+                    self.assertEqual(native_module.mcp_content(document), structured)
+                    changed, replacements = shadow_json_key(text, "missing_required_sources", ["S-999"])
+                    self.assertEqual(replacements, 1)
+                    self.assertNotEqual(changed, text)
+                    self.assertEqual(json.loads(changed), structured)
+                    document["result"]["content"][0]["text"] = changed
+                    with self.assertRaisesRegex(RuntimeError, "MCP"):
+                        native_module.mcp_content(document)
 
     def test_workflows_generate_manifest_after_build_and_stamp_worker_code(self):
         pages = (ROOT / ".github/workflows/pages.yml").read_text(encoding="utf-8")
