@@ -926,6 +926,63 @@ class SchemaDriftTests(unittest.TestCase):
             self.assertEqual(s001["last_known_good"]["observed_schema_fingerprint"], good["observed_schema_fingerprint"])
             self.assertEqual(json.loads(state_path.read_text(encoding="utf-8")), state)
 
+    def preserved_live_run(self, observation):
+        good = drift.observe(
+            drift.CONTRACTS["S-007"], json.dumps(API), content_type="application/json",
+            observed_at="2026-10-05T10:00:00+00:00",
+        )
+        state = drift.update_state(drift.empty_state(), good)
+        prior = dict(good, observed_at="2026-10-05T10:01:00+00:00")
+        state = drift.update_state(state, prior)
+        # Noncanonical whitespace makes byte preservation stronger than merely
+        # comparing decoded objects after a rewrite.
+        raw_state = ("\n" + json.dumps(state, ensure_ascii=False, indent=3) + "\n").replace("\n", "\r\n").encode("utf-8")
+        with tempfile.TemporaryDirectory() as directory:
+            state_path = Path(directory) / "state.json"
+            output_path = Path(directory) / "receipt.json"
+            state_path.write_bytes(raw_state)
+            output_path.write_text('{"overall":"OLD_RECEIPT"}', encoding="utf-8")
+            with mock.patch.object(drift, "live_observations", return_value=[observation]) as live, mock.patch.object(
+                drift, "_write_state", side_effect=AssertionError("preserved state must not be written")
+            ):
+                self.assertEqual(drift.main([
+                    "--live", "--preserve-state", "--state", str(state_path), "--output", str(output_path),
+                ]), 0)
+            live.assert_called_once_with()
+            self.assertEqual(state_path.read_bytes(), raw_state)
+            self.assertEqual(json.loads(state_path.read_bytes()), state)
+            receipt = json.loads(output_path.read_text(encoding="utf-8"))
+        source = next(row for row in receipt["sources"] if row["source_id"] == "S-007")
+        self.assertEqual(source["observed_at"], observation["observed_at"])
+        self.assertEqual(source["history_count"], len(state["sources"]["S-007"]["history"]) + 1)
+        return source, state, receipt
+
+    def test_preserve_state_live_success_emits_fresh_sample_without_advancing_checkpoint(self):
+        fresh_api = copy.deepcopy(API)
+        fresh_api["data"]["data"][0]["date"] = "2026-09-11T00:00:00"
+        observation = {
+            "source_id": "S-007", "body": json.dumps(fresh_api).encode("utf-8"),
+            "http_status": 200, "content_type": "application/json",
+            "observed_at": "2026-10-05T11:00:00+00:00",
+        }
+        source, state, _ = self.preserved_live_run(observation)
+        self.assertEqual(source["status"], "NO_DRIFT")
+        expected = drift.observe(drift.CONTRACTS["S-007"], observation["body"], content_type="application/json")
+        self.assertEqual(source["sample_sha256"], expected["sample_sha256"])
+        self.assertNotEqual(source["sample_sha256"], state["sources"]["S-007"]["last_known_good"]["sample_sha256"])
+        self.assertEqual(source["last_known_good"]["sample_sha256"], source["sample_sha256"])
+
+    def test_preserve_state_live_failure_emits_outage_and_keeps_prior_lkg(self):
+        observation = drift._failed_observation("S-007", ConnectionError("current live source unavailable"))
+        observation["observed_at"] = "2026-10-05T11:01:00+00:00"
+        source, state, receipt = self.preserved_live_run(observation)
+        self.assertEqual(source["status"], "SOURCE_UNAVAILABLE")
+        self.assertEqual(source["reasons"], ["LIVE_FETCH_CONNECTIONERROR"])
+        self.assertEqual(source["http_status"], 0)
+        self.assertEqual(source["window_completeness"], "PARTIAL")
+        self.assertEqual(source["last_known_good"], state["sources"]["S-007"]["last_known_good"])
+        self.assertEqual(receipt["overall"], "BLOCKED")
+
     def test_live_catalog_sources_use_bound_collector_transport(self):
         response = SimpleNamespace(content=b"sample", status_code=200, headers={}, url="https://official.test/source")
         with mock.patch("online_collect.get", return_value=response) as bounded_get:
