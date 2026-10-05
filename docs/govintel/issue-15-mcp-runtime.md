@@ -1,5 +1,9 @@
 # Issue #15 — STDIO MCP runtime evidence
 
+The subsequent [2026-10-05 official-SDK isolated replay](../research/issue-15-mcp-sdk-runtime-2026-10-05.md)
+adds seven compatible-client journeys and actual nested private-field red/green
+receipts. The dated probes below remain historical evidence.
+
 ## 2026-09-22 current-checkout probe
 
 At checkout `c9a8be520107437b1260566457cde9f8fb7da561`, a read-only

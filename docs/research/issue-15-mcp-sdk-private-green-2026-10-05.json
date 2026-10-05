@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "repository": "Reese-max/taichung-police-intel",
+  "issue": 15,
+  "mode": "private-green",
+  "source_commit": "4a010e52ff8c8ccbbac85e3ebdcd11c7a386fb4f",
+  "source_tree": "6f10be8a605ec2759f5d35fbcb626a952058362f",
+  "runtime_file_sha256": {
+    "scripts/query-gateway.py": "d0ee59aeb9e2f40145e3a4132f01d05e455c8175df1921abc38830424cc3e56e",
+    "scripts/query-gateway-stdio.py": "84ea4becff4d4114a9194201de0d9d22eae696fa399361f383359434c0e2624f",
+    "intel_v2/public_brief.py": "93ab37a4a1b3ba753ca1a92d32a26928108f4fc35db09c45e7267ca8638399dc"
+  },
+  "client": "Official Python MCP SDK",
+  "client_version": "1.30.0",
+  "transport": "STDIO",
+  "observed_utc": "2026-10-05T05:54:37.807984+00:00",
+  "fixture_scope": "Owned temporary git archive with synthetic public metadata; live checkout unmodified",
+  "network_requirement": "Run inside a network-disabled sandbox; probe performs no provider calls",
+  "cases": [
+    {
+      "case": "brief_nested_private_field",
+      "protocol_version": "2025-06-18",
+      "artifact_hashes": {
+        "feed": "03bfd48d3e7077c2dd105aec539aac7257da353782761fc13a63a29b02d37b9b",
+        "status": "289828c2d6dea146e7d24453cfe4c9ce8ecbcf11261e31ebf658ec503f12a48b",
+        "brief": "4d4cfc6e14f4b1043c7b2288eac1fd15b6196136b46038904056d409a71a06e6"
+      },
+      "result": {
+        "isError": true,
+        "error": {
+          "code": "PUBLIC_PROJECTION_INVALID",
+          "message": "canonical brief violates public projection schema"
+        },
+        "private_marker_returned": false,
+        "fixture": "Synthetic canary only; no real private data"
+      }
+    },
+    {
+      "case": "source_gap_nested_private_field",
+      "protocol_version": "2025-06-18",
+      "artifact_hashes": {
+        "feed": "03bfd48d3e7077c2dd105aec539aac7257da353782761fc13a63a29b02d37b9b",
+        "status": "553ed0e4e7e7f4ae04be9bed310d5de4587c3dd136cd7129f66ae468982359e4",
+        "brief": "30534d26e2d45e7d34503c1329b3a0341d6af57d0e9d43c84b3b02653703968c"
+      },
+      "result": {
+        "isError": true,
+        "error": {
+          "code": "PUBLIC_PROJECTION_INVALID",
+          "message": "canonical source violates public projection schema"
+        },
+        "private_marker_returned": false,
+        "fixture": "Synthetic canary only; no real private data"
+      }
+    }
+  ],
+  "limitations": [
+    "Default five read-only metadata tools only",
+    "Head change is exercised by fresh-server restart, not live hot reload",
+    "No real-source promotion, production host, OAuth or human usability claim"
+  ],
+  "result": "PASS",
+  "isolation_observed": "bwrap --unshare-net --ro-bind / / --tmpfs /tmp; only diagnostic receipt directory writable"
+}

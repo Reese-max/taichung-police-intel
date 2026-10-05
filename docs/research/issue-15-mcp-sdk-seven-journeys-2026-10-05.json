@@ -1,0 +1,259 @@
+{
+  "schema_version": 1,
+  "repository": "Reese-max/taichung-police-intel",
+  "issue": 15,
+  "mode": "journeys",
+  "source_commit": "4a010e52ff8c8ccbbac85e3ebdcd11c7a386fb4f",
+  "source_tree": "6f10be8a605ec2759f5d35fbcb626a952058362f",
+  "runtime_file_sha256": {
+    "scripts/query-gateway.py": "d0ee59aeb9e2f40145e3a4132f01d05e455c8175df1921abc38830424cc3e56e",
+    "scripts/query-gateway-stdio.py": "84ea4becff4d4114a9194201de0d9d22eae696fa399361f383359434c0e2624f",
+    "intel_v2/public_brief.py": "93ab37a4a1b3ba753ca1a92d32a26928108f4fc35db09c45e7267ca8638399dc"
+  },
+  "client": "Official Python MCP SDK",
+  "client_version": "1.30.0",
+  "transport": "STDIO",
+  "observed_utc": "2026-10-05T05:56:46.607458+00:00",
+  "fixture_scope": "Owned temporary git archive with synthetic public metadata; live checkout unmodified",
+  "network_requirement": "Run inside a network-disabled sandbox; probe performs no provider calls",
+  "cases": [
+    {
+      "case": "sdk_full_brief_search_evidence_health_receipt_journey",
+      "protocol_version": "2025-06-18",
+      "artifact_hashes": {
+        "feed": "d154357ea208550d2c55b1b76a2ea7258c2dcf55d4595d83a8a8ef007c03d8b4",
+        "status": "5616060bdc6f08f2a2a0ad6a1d3316b0d2d66a4cfaa7d90ae2fde4ef7334939a",
+        "brief": "c8cf991f1d70d5a80abee3334b1c8aa6b7767f4d16312b84e8765d8dc742b2a0"
+      },
+      "result": {
+        "tool_names": [
+          "search_evidence",
+          "get_current_brief",
+          "get_publication_receipt",
+          "get_source_health",
+          "validate_answer"
+        ],
+        "publication_hash": "c8cf991f1d70d5a80abee3334b1c8aa6b7767f4d16312b84e8765d8dc742b2a0",
+        "generation": "26d31116d89bc021ca0a9c334688e11878b1d910b6a3b62e17a12b031dd60263",
+        "freshness": "RECENT",
+        "current": true,
+        "deterministic_projection": true,
+        "exact_official_locator": "https://www.tccc.gov.tw/pic/DocCouncil/17851655792861(1).doc",
+        "canonical_ref": {
+          "artifact": "intelligence-feed.json",
+          "artifact_sha256": "d154357ea208550d2c55b1b76a2ea7258c2dcf55d4595d83a8a8ef007c03d8b4",
+          "stable_id": "FEED-S-004-83885734c6aa2963",
+          "document_version_id": "DOCV-18E2745A002BBC0962A1",
+          "evidence_id": "PUB-FEED-S-004-83885734c6aa2963"
+        },
+        "pagination_truncation": true,
+        "malicious_argument_and_overlimit_rejections": 4
+      }
+    },
+    {
+      "case": "sdk_client_visible_FAILED",
+      "protocol_version": "2025-06-18",
+      "artifact_hashes": {
+        "feed": "d154357ea208550d2c55b1b76a2ea7258c2dcf55d4595d83a8a8ef007c03d8b4",
+        "status": "70562cf2cc97e7248ea5aa494e4d8fc254d581a19997545c8a5bce0b9ea2ad19",
+        "brief": "c8cf991f1d70d5a80abee3334b1c8aa6b7767f4d16312b84e8765d8dc742b2a0"
+      },
+      "result": {
+        "source_state": "FAILED",
+        "client_source": {
+          "source_id": "S-004",
+          "source_name": "臺中市議會議事日程",
+          "source_url": "https://www.tccc.gov.tw/wb_download13.asp?uno=&cno=49",
+          "source_health": "FAIL",
+          "window_completeness": "FAILED",
+          "result": "FAILED",
+          "freshness_status": "FRESH",
+          "data_as_of": "2026-10-05T05:56:45.977612+00:00",
+          "last_checked_at": "2026-10-05T05:56:45.977612+00:00",
+          "last_success_at": "2026-10-05T05:56:45.977612+00:00",
+          "current_source_run_id": "SR-DEMO-20260911-MORNING-004",
+          "manifest_sha256": "fdb63cdc18095db80ee071041b1be90c679d215e5d5f969c3f9ad444233bd281",
+          "intelligence_gaps": []
+        },
+        "freshness": "PARTIAL",
+        "client_source_gaps": [
+          {
+            "source_id": "S-004",
+            "reason": "SOURCE_INCOMPLETE",
+            "source_health": "FAIL"
+          }
+        ],
+        "answerable_no_match": false,
+        "can_state_bounded_no_match": false
+      }
+    },
+    {
+      "case": "sdk_client_visible_PARTIAL",
+      "protocol_version": "2025-06-18",
+      "artifact_hashes": {
+        "feed": "d154357ea208550d2c55b1b76a2ea7258c2dcf55d4595d83a8a8ef007c03d8b4",
+        "status": "334263d10ae035e3e6fb7e32b444ed7f954ee93e6f152c706339e10d94bd60bd",
+        "brief": "c8cf991f1d70d5a80abee3334b1c8aa6b7767f4d16312b84e8765d8dc742b2a0"
+      },
+      "result": {
+        "source_state": "PARTIAL",
+        "client_source": {
+          "source_id": "S-004",
+          "source_name": "臺中市議會議事日程",
+          "source_url": "https://www.tccc.gov.tw/wb_download13.asp?uno=&cno=49",
+          "source_health": "WARN",
+          "window_completeness": "PARTIAL",
+          "result": "PARTIAL",
+          "freshness_status": "FRESH",
+          "data_as_of": "2026-10-05T05:56:45.977612+00:00",
+          "last_checked_at": "2026-10-05T05:56:45.977612+00:00",
+          "last_success_at": "2026-10-05T05:56:45.977612+00:00",
+          "current_source_run_id": "SR-DEMO-20260911-MORNING-004",
+          "manifest_sha256": "fdb63cdc18095db80ee071041b1be90c679d215e5d5f969c3f9ad444233bd281",
+          "intelligence_gaps": []
+        },
+        "freshness": "PARTIAL",
+        "client_source_gaps": [
+          {
+            "source_id": "S-004",
+            "reason": "SOURCE_INCOMPLETE",
+            "source_health": "WARN"
+          }
+        ],
+        "answerable_no_match": false,
+        "can_state_bounded_no_match": false
+      }
+    },
+    {
+      "case": "sdk_client_visible_CONFLICT",
+      "protocol_version": "2025-06-18",
+      "artifact_hashes": {
+        "feed": "d154357ea208550d2c55b1b76a2ea7258c2dcf55d4595d83a8a8ef007c03d8b4",
+        "status": "b6bb3a1ed83880ac2b47e31134a2e35c5659a61ce02af9d830ddcbe378c51449",
+        "brief": "c8cf991f1d70d5a80abee3334b1c8aa6b7767f4d16312b84e8765d8dc742b2a0"
+      },
+      "result": {
+        "source_state": "CONFLICT",
+        "client_source": {
+          "source_id": "S-004",
+          "source_name": "臺中市議會議事日程",
+          "source_url": "https://www.tccc.gov.tw/wb_download13.asp?uno=&cno=49",
+          "source_health": "FAIL",
+          "window_completeness": "PARTIAL",
+          "result": "CONFLICT",
+          "freshness_status": "FRESH",
+          "data_as_of": "2026-10-05T05:56:45.977612+00:00",
+          "last_checked_at": "2026-10-05T05:56:45.977612+00:00",
+          "last_success_at": "2026-10-05T05:56:45.977612+00:00",
+          "current_source_run_id": "SR-DEMO-20260911-MORNING-004",
+          "manifest_sha256": "fdb63cdc18095db80ee071041b1be90c679d215e5d5f969c3f9ad444233bd281",
+          "intelligence_gaps": []
+        },
+        "freshness": "PARTIAL",
+        "client_source_gaps": [
+          {
+            "source_id": "S-004",
+            "reason": "SOURCE_INCOMPLETE",
+            "source_health": "FAIL"
+          }
+        ],
+        "answerable_no_match": false,
+        "can_state_bounded_no_match": false
+      }
+    },
+    {
+      "case": "sdk_client_visible_STALE",
+      "protocol_version": "2025-06-18",
+      "artifact_hashes": {
+        "feed": "d154357ea208550d2c55b1b76a2ea7258c2dcf55d4595d83a8a8ef007c03d8b4",
+        "status": "5b25cbd4527a67944fe70c370681d5b3172fed41849a81a3208c25777d659421",
+        "brief": "c8cf991f1d70d5a80abee3334b1c8aa6b7767f4d16312b84e8765d8dc742b2a0"
+      },
+      "result": {
+        "source_state": "STALE",
+        "client_source": {
+          "source_id": "S-004",
+          "source_name": "臺中市議會議事日程",
+          "source_url": "https://www.tccc.gov.tw/wb_download13.asp?uno=&cno=49",
+          "source_health": "PASS",
+          "window_completeness": "COMPLETE_WITH_ITEMS",
+          "result": "NEW_ITEMS",
+          "freshness_status": "STALE",
+          "data_as_of": "2026-10-05T05:56:45.977612+00:00",
+          "last_checked_at": "2026-10-05T05:56:45.977612+00:00",
+          "last_success_at": "2026-10-05T05:56:45.977612+00:00",
+          "current_source_run_id": "SR-DEMO-20260911-MORNING-004",
+          "manifest_sha256": "fdb63cdc18095db80ee071041b1be90c679d215e5d5f969c3f9ad444233bd281",
+          "intelligence_gaps": []
+        },
+        "freshness": "STALE",
+        "client_source_gaps": [
+          {
+            "source_id": "S-004",
+            "reason": "STALE_SOURCE_DATA",
+            "freshness_status": "STALE"
+          }
+        ],
+        "answerable_no_match": false,
+        "can_state_bounded_no_match": false
+      }
+    },
+    {
+      "case": "sdk_client_source_not_available",
+      "protocol_version": "2025-06-18",
+      "artifact_hashes": {
+        "feed": "d154357ea208550d2c55b1b76a2ea7258c2dcf55d4595d83a8a8ef007c03d8b4",
+        "status": "5616060bdc6f08f2a2a0ad6a1d3316b0d2d66a4cfaa7d90ae2fde4ef7334939a",
+        "brief": "c8cf991f1d70d5a80abee3334b1c8aa6b7767f4d16312b84e8765d8dc742b2a0"
+      },
+      "result": {
+        "freshness": "UNKNOWN",
+        "source_gaps": [
+          {
+            "source_id": "S-NOT-IN-APPROVED-SNAPSHOT",
+            "reason": "NOT_IN_APPROVED_SNAPSHOT"
+          }
+        ],
+        "verification_summary": "指定來源不在核准快照，不能把結果解讀成沒有資料。",
+        "answerable_no_match": false
+      }
+    },
+    {
+      "case": "sdk_publication_head_switch",
+      "protocol_version": "2025-06-18",
+      "artifact_hashes": {
+        "feed": "d154357ea208550d2c55b1b76a2ea7258c2dcf55d4595d83a8a8ef007c03d8b4",
+        "status": "5616060bdc6f08f2a2a0ad6a1d3316b0d2d66a4cfaa7d90ae2fde4ef7334939a",
+        "brief": "4ae7e6e95f8404a96a3e22ba79b2af58f2189986b7ff6f644791828918ae79d2"
+      },
+      "result": {
+        "old_publication_hash": "c8cf991f1d70d5a80abee3334b1c8aa6b7767f4d16312b84e8765d8dc742b2a0",
+        "new_publication_hash": "4ae7e6e95f8404a96a3e22ba79b2af58f2189986b7ff6f644791828918ae79d2",
+        "old_generation": "26d31116d89bc021ca0a9c334688e11878b1d910b6a3b62e17a12b031dd60263",
+        "new_generation": "aa5f520b424ea3ff9952b30f7c6fd27330bd408bd4cfc3e9e74dd71c7537263d",
+        "old_expected_generation_rejected": {
+          "isError": true,
+          "error": {
+            "code": "INVALID_ARGUMENTS",
+            "message": "query generation mismatch; retry against the requested snapshot"
+          }
+        },
+        "old_cursor_rejected": {
+          "isError": true,
+          "error": {
+            "code": "INVALID_ARGUMENTS",
+            "message": "invalid cursor: generation/filter/offset mismatch"
+          }
+        },
+        "scope": "Fresh server restart; no hot-reload or deployed-host claim"
+      }
+    }
+  ],
+  "limitations": [
+    "Default five read-only metadata tools only",
+    "Head change is exercised by fresh-server restart, not live hot reload",
+    "No real-source promotion, production host, OAuth or human usability claim"
+  ],
+  "result": "PASS",
+  "isolation_observed": "bwrap --unshare-net --ro-bind / / --tmpfs /tmp; only diagnostic receipt directory writable"
+}

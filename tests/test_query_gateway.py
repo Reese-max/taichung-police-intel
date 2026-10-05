@@ -881,6 +881,74 @@ class QueryGatewayTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "evidence must link exactly"):
             gateway_module.QueryGateway(snapshot=snapshot)
 
+    def test_brief_nested_private_fields_fail_closed_in_mcp(self):
+        snapshot = gateway_module.load_snapshot()
+        mutations = (
+            lambda brief: brief["source_health"].update(private_operational_note="SYNTHETIC_PRIVATE_MARKER"),
+            lambda brief: brief["overview"].update(private_case="SYNTHETIC_PRIVATE_MARKER"),
+            lambda brief: brief["source_health"].update(status={"private_case": "SYNTHETIC_PRIVATE_MARKER"}),
+            lambda brief: brief.update(priority_items=[{"headline": "public", "private_case": "SYNTHETIC_PRIVATE_MARKER"}]),
+            lambda brief: brief.update(priority_items=[{"changed_fields": [{"private_case": "SYNTHETIC_PRIVATE_MARKER"}]}]),
+            lambda brief: brief.update(priority_items=[{"profile_relevance": {"private_case": "SYNTHETIC_PRIVATE_MARKER"}}]),
+            lambda brief: brief.update(tracking_items=[{"invalidation": {"before": {"private_case": "SYNTHETIC_PRIVATE_MARKER"}}}]),
+            lambda brief: brief.update(tracking_items=[{"invalidation": {"after": {"attachments": [{"attachment_id": "public", "private_case": "SYNTHETIC_PRIVATE_MARKER"}]}}}]),
+            lambda brief: brief.update(tracking_items=[{"invalidation": {"affected_claims": [{"claim_id": "public", "private_case": "SYNTHETIC_PRIVATE_MARKER"}]}}]),
+        )
+        for mutate in mutations:
+            with self.subTest(mutation=mutate):
+                candidate = json.loads(json.dumps(snapshot))
+                mutate(candidate["brief"])
+                response = gateway_module.dispatch_mcp(gateway_module.QueryGateway(candidate), {
+                    "jsonrpc": "2.0", "id": 15, "method": "tools/call",
+                    "params": {"name": "get_current_brief", "arguments": {}},
+                })["result"]
+                self.assertTrue(response["isError"])
+                self.assertEqual(json.loads(response["content"][0]["text"])["error"]["code"], "PUBLIC_PROJECTION_INVALID")
+                self.assertNotIn("SYNTHETIC_PRIVATE_MARKER", json.dumps(response))
+                self.assertNotIn("structuredContent", response)
+
+    def test_brief_projection_preserves_actual_tracked_version_and_role_provenance(self):
+        from intel_v2.handoff import add_watch, confirm_handoff, empty_state, sync_with_publication, tracking_projection
+        from intel_v2.role_profiles import load_catalog, rank_items
+
+        before = {"identity": "S-004:sdk-fixture", "source_id": "S-004", "stable_key": "sdk-fixture",
+                  "title": "Synthetic public fixture", "official_url": "https://www.tccc.gov.tw/fixture",
+                  "version_no": 1, "normalized_sha256": "a" * 64, "date_status": "UNVERIFIED_DATE"}
+        after = {**before, "version_no": 2, "normalized_sha256": "b" * 64}
+        t0, t1 = "2026-09-01T09:00:00+08:00", "2026-09-02T09:00:00+08:00"
+        state, _, _ = add_watch(empty_state(), before, created_at=t0)
+        state, _ = confirm_handoff(state, current_items={before["identity"]: before},
+                                  publication={"collection_run_id": "SYNTHETIC-A"}, generated_at=t0, confirmed_at=t0)
+        event = {"event_id": "SYNTHETIC-EVT", "identity": before["identity"], "change_type": "REVISED",
+                 "detected_at": t1, "before_version": 1, "after_version": 2,
+                 "changed_fields": ["payload.title"], "publishable": True, "official_url": before["official_url"]}
+        state = sync_with_publication(state, previous_items={before["identity"]: before},
+                                      current_items={after["identity"]: after}, events=[event],
+                                      observed_at=t1, collection_run_id="SYNTHETIC-B")
+        rows, _ = tracking_projection(state, current_items={after["identity"]: after}, events=[event],
+                                     source_status={"sources": [{"source_id": "S-004", "source_health": "UNKNOWN",
+                                                                "freshness_status": "UNKNOWN", "intelligence_gaps": ["NOT_RUN"]}]})
+        profile = load_catalog(ROOT / "docs/govintel/role-profiles.v1.json")["profiles"]["general"]
+        rows = rank_items(rows, profile, observed_at=t1)
+        snapshot = gateway_module.load_snapshot()
+        snapshot["brief"]["tracking_items"] = rows
+        result = gateway_module.QueryGateway(snapshot).execute("get_current_brief", {})
+        self.assertEqual(result["brief"]["tracking_items"], rows)
+        self.assertEqual(result["brief"]["source_health"], snapshot["brief"]["source_health"])
+        self.assertEqual(rows[0]["source_health"], "UNKNOWN")
+        self.assertTrue(rows[0]["invalidation"]["affected_claims"])
+
+    def test_source_gap_nested_private_objects_fail_closed_in_mcp(self):
+        snapshot = gateway_module.load_snapshot()
+        snapshot["status"]["sources"][0]["intelligence_gaps"] = [{"private_case": "SYNTHETIC_PRIVATE_MARKER"}]
+        response = gateway_module.dispatch_mcp(gateway_module.QueryGateway(snapshot), {
+            "jsonrpc": "2.0", "id": 15, "method": "tools/call",
+            "params": {"name": "get_source_health", "arguments": {}},
+        })["result"]
+        self.assertTrue(response["isError"])
+        self.assertEqual(json.loads(response["content"][0]["text"])["error"]["code"], "PUBLIC_PROJECTION_INVALID")
+        self.assertNotIn("SYNTHETIC_PRIVATE_MARKER", json.dumps(response))
+
 
 if __name__ == "__main__":
     unittest.main()

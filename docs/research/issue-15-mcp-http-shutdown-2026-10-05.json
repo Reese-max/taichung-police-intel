@@ -1,0 +1,35 @@
+{
+  "result": "PASS",
+  "candidate_source_commit": "6eb4d74b51152e9e5585ca9394404a9226206e08",
+  "candidate_tree": "4adcf9a35e011637d3c1974bbc304e23f881e32f",
+  "observed_utc": "2026-10-05T05:45:49.719313+00:00",
+  "actual_http_rate_boundary": {
+    "successful_requests": 2,
+    "third_http_status": 429,
+    "error": {
+      "code": "RATE_LIMITED",
+      "message": "request rate limit exceeded"
+    }
+  },
+  "mcp_stopped": true,
+  "static_index_sha256": "ff6ab34ea5cfee9e4f48f5d05633cb935a40120f18d87a1dbd3925caa3aca795",
+  "static_artifacts": [
+    {
+      "artifact": "intelligence-feed.json",
+      "sha256": "f88408f49f444de0dd3a16fc864d96d9318eefc0c78f69e5d2923a9872f35121",
+      "static_readback_after_mcp_shutdown": true
+    },
+    {
+      "artifact": "source-status.json",
+      "sha256": "1876845d854d4387fccee398fefcdebb395a36d0343d7bd2690226dc7020c51b",
+      "static_readback_after_mcp_shutdown": true
+    },
+    {
+      "artifact": "v2-daily-brief.json",
+      "sha256": "3df565c29622ae729f0f053712f513eddacf6e014aeec227ddd664dd00b38448",
+      "static_readback_after_mcp_shutdown": true
+    }
+  ],
+  "network": "bwrap --unshare-net; loopback only, providers0",
+  "deployment_claim": false
+}
