@@ -1,0 +1,50 @@
+{
+  "artifact_type": "NON_EFFECTIVE_RESEARCH_CONTEXT",
+  "effective": false,
+  "research_ref": "edb7148c9565c7d59ac222689c35bff41376d1cb",
+  "integration_base_ref": "edb7148c9565c7d59ac222689c35bff41376d1cb",
+  "date": "2026-10-05",
+  "repository": "Reese-max/taichung-police-intel",
+  "scope": [
+    "S-001",
+    "S-004",
+    "S-006",
+    "S-007",
+    "S-009",
+    "S-029",
+    "S-031",
+    "S-032",
+    "S-033"
+  ],
+  "national_candidate": "S-038",
+  "id_allocation_status": "UNUSED_AT_INTEGRATION_BASE_NOT_RESERVED",
+  "terms_bytes_available": false,
+  "terms_bytes_sha256": null,
+  "terms_summary_provenance": "RELAYED_RESEARCH_SUMMARIES",
+  "limitations": [
+    "No saved original official terms or dataset bytes/hash",
+    "No human approval",
+    "No candidate activation or formal policy change",
+    "No live source/coverage/promotion validation",
+    "No S-038 collector implementation",
+    "No daily-update or complete local-police coverage claim"
+  ],
+  "integration_concurrency_check": {
+    "main_ref": "edb7148c9565c7d59ac222689c35bff41376d1cb",
+    "source_related_open_prs": [
+      104,
+      112,
+      116,
+      123
+    ],
+    "npa_pr116_changes_catalog": false,
+    "npa_pr116_mentions_S038": false
+  },
+  "public_repository_references": [
+    {
+      "repository_path": "docs/govintel/source-catalog.v2.json",
+      "ref": "edb7148c9565c7d59ac222689c35bff41376d1cb",
+      "url": "https://github.com/Reese-max/taichung-police-intel/blob/edb7148c9565c7d59ac222689c35bff41376d1cb/docs/govintel/source-catalog.v2.json"
+    }
+  ]
+}

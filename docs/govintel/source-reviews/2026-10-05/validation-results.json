@@ -1,0 +1,44 @@
+{
+  "artifact_type": "NON_EFFECTIVE_PUBLIC_REVIEW_VALIDATION",
+  "effective": false,
+  "research_ref": "edb7148c9565c7d59ac222689c35bff41376d1cb",
+  "integration_base_ref": "edb7148c9565c7d59ac222689c35bff41376d1cb",
+  "result": "PASS",
+  "passed_offline_checks": 37,
+  "review_scope": [
+    "S-001",
+    "S-004",
+    "S-006",
+    "S-007",
+    "S-009",
+    "S-029",
+    "S-031",
+    "S-032",
+    "S-033"
+  ],
+  "public_checks": {
+    "review_records": 9,
+    "evidence_references": 15,
+    "source_rights": "UNKNOWN",
+    "human_approval": "PENDING",
+    "S038": "UNENABLED_PLAN_ONLY",
+    "private_identifiers_and_credentials": "ABSENT",
+    "raw_operational_or_personal_records": "ABSENT",
+    "local_document_links": "PASS",
+    "existing_files_unchanged": "PASS"
+  },
+  "existing_project_gates": {
+    "gate0": "PASS",
+    "specs": "PASS",
+    "full_ci": "PENDING_FINAL_COMMIT"
+  },
+  "limitations": [
+    "Offline checks only",
+    "Official terms and dataset original bytes/hash unavailable",
+    "No human approval",
+    "No source activation",
+    "No live coverage or freshness proof",
+    "No S-038 collector implementation",
+    "Deployment and website verification assessed separately"
+  ]
+}
