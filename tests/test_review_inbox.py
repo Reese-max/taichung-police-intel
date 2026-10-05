@@ -58,6 +58,21 @@ class ReviewInboxTests(unittest.TestCase):
         self.assertEqual(len(stored["evidence_history"]), 1)
         self.assertEqual(stored["audit"][-1]["action"], "REOPENED")
 
+    def test_new_version_reopens_keep_watching_and_preserves_prior_receipts(self):
+        state, item, _ = upsert(empty_state(), candidate(), observed_at=STAMP)
+        state = decide(state, item["review_id"], "keep-watching", reviewer_ref="operator-1", decided_at=STAMP)
+        original = copy.deepcopy(state)
+        state = reconcile(state, [candidate(version=2)], observed_at=STAMP)
+        validate_state(state)
+        stored = state["items"][item["review_id"]]
+        self.assertEqual(stored["status"], "OPEN")
+        self.assertIsNone(stored["decision"])
+        self.assertEqual(stored["audit"][-1]["action"], "REOPENED")
+        self.assertEqual(stored["audit"][1]["payload"]["version_receipt"]["source_version"], 1)
+        self.assertEqual(stored["evidence_history"][0]["source_version"], 1)
+        self.assertEqual(original["items"][item["review_id"]]["decision"]["version_receipt"]["source_version"], 1)
+        validate_state(reconcile(state, [candidate(version=3)], observed_at=STAMP))
+
     def test_new_reason_reclassifies_existing_fingerprint(self):
         state, item, _ = upsert(empty_state(), candidate("PARTIAL_SOURCE"), observed_at=STAMP)
         state = reconcile(state, [candidate("STALE_SOURCE")], observed_at=STAMP)
