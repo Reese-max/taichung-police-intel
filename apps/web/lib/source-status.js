@@ -1,6 +1,43 @@
 const TAIPEI_OFFSET_MS = 8 * 60 * 60 * 1000;
 const STALE_STATUSES = new Set(["STALE", "VERY_STALE"]);
 
+function validIso(value) {
+  return typeof value === "string" && !Number.isNaN(Date.parse(value));
+}
+
+function validOptionalString(value) {
+  return value === undefined || value === null || typeof value === "string";
+}
+
+export function validateSourceStatus(data) {
+  if (!data || data.schema_version !== 1 || !Array.isArray(data.sources) || data.sources.length === 0
+      || !validIso(data.generated_at)) throw new Error("來源狀態快照格式無法驗證");
+  const ids = new Set();
+  for (const source of data.sources) {
+    if (!source || typeof source.source_id !== "string" || !source.source_id.trim() || ids.has(source.source_id)) {
+      throw new Error(`來源狀態 source_id 無法驗證：${source?.source_id || "unknown"}`);
+    }
+    if (typeof source.source_name !== "string" || !source.source_name.trim()
+        || !validOptionalString(source.source_url)
+        || !validOptionalString(source.source_health)
+        || !validOptionalString(source.result)
+        || !validOptionalString(source.window_completeness)
+        || !validOptionalString(source.freshness_status)
+        || !validOptionalString(source.data_as_of)
+        || (source.data_as_of !== undefined && source.data_as_of !== null && !validIso(source.data_as_of))
+        || (source.intelligence_gaps !== undefined && (!Array.isArray(source.intelligence_gaps)
+          || source.intelligence_gaps.some((gap) => typeof gap !== "string")))) {
+      throw new Error(`來源狀態資料無法驗證：${source.source_id}`);
+    }
+    ids.add(source.source_id);
+  }
+  if (data.next_update_at !== undefined && !validIso(data.next_update_at)) throw new Error("來源狀態下一次更新時間無法驗證");
+  if (data.latest_collection_run !== undefined && (!data.latest_collection_run
+      || typeof data.latest_collection_run.collection_run_id !== "string"
+      || !data.latest_collection_run.collection_run_id.trim())) throw new Error("來源狀態收集世代無法驗證");
+  return data;
+}
+
 export function isHealthyStaleSource(source) {
   return source?.source_health === "PASS"
     && source?.result === "NO_NEW_ITEM"

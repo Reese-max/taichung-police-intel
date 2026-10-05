@@ -1,13 +1,16 @@
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import assert from "node:assert/strict";
 
 import { failedSourceFeedFailures, sourceManifestFailures } from "../../../scripts/source-status-contract.mjs";
+import { validateSourceStatus } from "../lib/source-status.js";
 
 const hash = "a".repeat(64);
 const knownGood = {
   source_run_id: "SR-DEMO-20260924-EVENING-029",
   manifest_sha256: hash,
 };
+const sourceStatus = JSON.parse(await readFile(new URL("../public/data/source-status.json", import.meta.url), "utf8"));
 
 function failedSource() {
   return {
@@ -21,6 +24,21 @@ function failedSource() {
     last_known_good: knownGood,
   };
 }
+
+test("checked-in public source status has a validated source snapshot", () => {
+  assert.equal(validateSourceStatus(sourceStatus), sourceStatus);
+});
+
+test("public source status requires a non-empty, identified snapshot", () => {
+  assert.throws(() => validateSourceStatus({ schema_version: 1, sources: [] }), /來源狀態/);
+  assert.throws(() => validateSourceStatus({ schema_version: 1, generated_at: "2026-09-11T00:00:00+08:00", sources: [{}] }), /source_id/);
+  const duplicate = structuredClone(sourceStatus);
+  duplicate.sources.push({ ...duplicate.sources[0] });
+  assert.throws(() => validateSourceStatus(duplicate), /source_id/);
+  const malformed = structuredClone(sourceStatus);
+  malformed.sources[0].intelligence_gaps = { status: "FAILED" };
+  assert.throws(() => validateSourceStatus(malformed), /無法驗證/);
+});
 
 test("failed S-029 fetch retains LKG without inventing a current manifest", () => {
   assert.deepEqual(sourceManifestFailures(failedSource()), []);

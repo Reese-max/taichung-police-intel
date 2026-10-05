@@ -45,6 +45,7 @@ The public baseline preserves council preparation and evidence navigation. Plan 
 - A focused council-preparation brief for a police policy user.
 - Five baseline official-source adapters with isolated failure handling.
 - Source health kept separate from date-window completeness.
+- Public source-status snapshots require a non-empty, identified source set; malformed or empty snapshots fail closed as `UNKNOWN` instead of rendering a blank status view.
 - Intelligence-gap reasons instead of silently turning collection failure into zero results.
 - Last-known-good retained when a later source fetch fails.
 - Official URLs, collection time, data-as-of time, raw snapshot count, and SHA-256 manifest.
