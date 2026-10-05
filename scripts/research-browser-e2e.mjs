@@ -34,6 +34,7 @@ try {
   page.on("pageerror", error => errors.push(error.message));
   await page.route("**/*", async route => {
     const req = route.request(); const url = new URL(req.url());
+    if (url.origin !== origin) throw new Error(`Unexpected external request: ${url.origin}`);
     if (url.pathname === "/data/release.json") return route.fulfill({ json: release });
     if (url.pathname === "/research" && req.method() === "POST") {
       const input = req.postDataJSON(); calls.push(input); requestObserved?.();
@@ -46,7 +47,6 @@ try {
       return route.fulfill({ json: payload }).catch(() => {});
     }
     // Keep the QA completely offline, including unexpected third-party assets.
-    if (url.origin !== origin) throw new Error(`Unexpected external request: ${url.origin}`);
     return route.continue();
   });
   await page.goto(`${origin}/research/`);
@@ -64,6 +64,7 @@ try {
   assert.deepEqual(calls[1].history, [{ role: "user", content: "交通管制" }]);
   assert.equal(await page.locator(".research-dates").last().getByText("未提供", { exact: true }).count(), 1);
   checks.push("follow-up user context, source citation, separate dates and gaps");
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: resolve(output, "research-desktop.png"), fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
@@ -75,7 +76,9 @@ try {
   await page.getByRole("button", { name: "停止等待", exact: true }).waitFor();
   await page.waitForFunction(() => document.querySelector(".research-pending"));
   // Wait until transport actually started so cancellation exercises an in-flight request.
-  await inFlight; requestObserved = null;
+  let startTimer;
+  try { await Promise.race([inFlight, new Promise((_, reject) => { startTimer = setTimeout(() => reject(new Error("Research transport did not start within 10 seconds")), 10000); })]); }
+  finally { clearTimeout(startTimer); requestObserved = null; }
   assert.equal(calls.length, 3); await page.getByRole("button", { name: "停止等待", exact: true }).click();
   await page.getByText(/已停止等待，未顯示本次回答/).waitFor();
   await page.getByRole("button", { name: "開始新對話", exact: true }).click();

@@ -18,7 +18,7 @@ All gates must be satisfied before any provider request:
 2. `RESEARCH_ENABLED` must explicitly be `true`. The checked-in Wrangler default is `false`.
 3. The owner must enter `MINIMAX_API_KEY` directly into the Worker secret facility through a secure handoff. Do not put a real key in chat, files, tests, frontend variables or Git. This patch contains no credential. Previously exposed keys should be replaced by their owner.
 4. The owner must separately review the intended MiniMax plan, deployment audience and spending limit before `MINIMAX_BILLING_REVIEWED=true`. No automatic provider/model, plan, endpoint or billing fallback exists.
-5. A trusted `RESEARCH_ADMISSION` service binding must be implemented, reviewed and wired before activation. It receives only an access assertion plus `{operation,provider,model,max_completion_tokens,max_input_tokens}`. It must verify the assertion cryptographically, enforce the authorized audience, and atomically reserve one call within an owner-approved global budget. It returns `{allowed:true}` only after these checks. Missing, denied or malformed admission fails closed. This MVP intentionally does not deploy that service or treat a browser checkbox, Origin, or rate-limit counter as authentication/budget control.
+5. The service in `workers/research-admission/` implements the trusted `RESEARCH_ADMISSION` contract with cryptographic Access verification and atomic global/per-user budget reservations. It must still be reviewed, configured and wired before activation. It receives only an access assertion plus `{operation,provider,model,max_completion_tokens,max_input_tokens}`. It must verify the assertion cryptographically, enforce the authorized audience, and atomically reserve one call within an owner-approved global budget. It returns `{allowed:true}` only after these checks. Missing, denied or malformed admission fails closed. This patch does not deploy that service or treat a browser checkbox, Origin, or rate-limit counter as authentication/budget control. The browser Access/session route also remains to be configured; see `research-admission.md`.
 
 Enabling a key alone is insufficient. Public multi-user hosting and live validation remain unapproved/unverified. The existing gateway's local rate counter is not an accurate cross-region spending budget.
 
@@ -39,3 +39,11 @@ New provider fixtures are explicitly fictional and synthetic. They do not demons
 Run `node --test apps/web/tests/research-worker.test.mjs apps/web/tests/research-client.test.mjs` plus the unchanged project gates. `tests/governed_policy_fixture.py` only copies the new Worker import into its isolated offline fixture; no fictional permission is promoted into repository governance.
 
 For browser QA, mock the research/release endpoint with clearly marked offline data. Test mobile and desktop, invalid/missing release, blocked rights, metadata dates and gaps, malformed payload, unsupported/invented citation, cancel/reset/unmount/repeated submit, and ensure no provider request occurs.
+
+## Additional offline foundations
+
+- `document-evidence.md`: pinned server-only permissions, bounded full-text passage retrieval and exact cross-document excerpt compilation. Not imported into the live route. This is extractive research, not independently verified semantic synthesis.
+- `research-admission.md`: actual JWT verification and atomic call/token/estimated-spend reservations, with 27 adversarial offline tests and disabled owner-configured deployment example.
+- `s038-candidate/README.md`: candidate-only national police news CSV parser and hash-only historical baseline. It is not registered, scheduled or exported to the public feed.
+- `research-integration-plan.md`: proposed consolidation with pending PR #148 and preservation of current governance versus #123. Those branches have not been merged or overwritten.
+- `scripts/research-browser-e2e.mjs`: dedicated Chromium CI for consent, follow-ups, citations, dates, gaps, mobile layout, duplicate submission, cancel/reset, stale results and navigation. It uses synthetic responses only and never calls MiniMax.
