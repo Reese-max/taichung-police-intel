@@ -19,13 +19,21 @@ S029_FIXTURE = "source-live-canary-s026-s029-2026-08-14.json"
 SOURCE_POLICY = ROOT / "scripts" / "source-policy.py"
 
 
-def load_production_sources() -> dict[str, tuple[str, str]]:
+def load_production_policy():
     spec = importlib.util.spec_from_file_location("collect_source_policy", SOURCE_POLICY)
     if spec is None or spec.loader is None:
         raise RuntimeError("source policy module is unavailable")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    active = module.load_current_policy()["active_sources"]
+    return module, module.load_current_policy()
+
+
+_policy_module, PRODUCTION_POLICY = load_production_policy()
+SOURCE_POLICY_BINDING = _policy_module.policy_binding(PRODUCTION_POLICY)
+
+
+def load_production_sources() -> dict[str, tuple[str, str]]:
+    active = PRODUCTION_POLICY["active_sources"]
     return {
         row["source_id"]: (row["name"], row["entrypoint"])
         for row in sorted(active, key=lambda row: row["source_id"])
@@ -181,17 +189,12 @@ def freshness_status(data_as_of: str | None, now: datetime, max_fresh_hours: flo
 
 # Council sources update on legislative schedules, not daily.
 # Use generous freshness windows that reflect actual publication cadence.
-SOURCE_FRESHNESS_POLICY: dict[str, tuple[float, float]] = {
-    # (max_fresh_hours, max_stale_hours)
-    "S-004": (24 * 45, 24 * 90),   # Agenda: revised once or twice per session (~months)
-    "S-006": (24 * 14, 24 * 30),   # Question order: updated per session period
-    "S-007": (24 * 90, 24 * 180),  # Meeting records: published after meeting periods
-    "S-009": (24 * 14, 24 * 60),   # Proposals: session-based, API-confirmed
-    "S-029": (24 * 45, 24 * 90),   # Project reports: updated per session cycle
-    "S-001": (13, 24),              # Police news: event/news cadence
-    "S-019": (36, 72),              # City meetings: daily publication cadence
-    "S-032": (13, 24),              # Traffic news: event/news cadence
-}
+_freshness_spec = importlib.util.spec_from_file_location("collector_freshness", ROOT / "intel_v2/freshness_policy.py")
+if _freshness_spec is None or _freshness_spec.loader is None:
+    raise RuntimeError("source freshness module is unavailable")
+_freshness_module = importlib.util.module_from_spec(_freshness_spec)
+_freshness_spec.loader.exec_module(_freshness_module)
+SOURCE_FRESHNESS_POLICY = _freshness_module.SOURCE_FRESHNESS_POLICY
 
 
 def gap_reasons(source_run: dict, lkg: dict | None, freshness: str) -> list[str]:
@@ -336,6 +339,7 @@ def run_slot(
     partial = sum(record["result"] == "PARTIAL" for record in run_records)
     status = "FAILED" if failed == len(run_records) else "PARTIAL" if failed or partial else "SUCCEEDED"
     state["collection_runs"][collection_run_id] = {
+        "source_policy": SOURCE_POLICY_BINDING,
         "record_type": "collection_run",
         "collection_run_id": collection_run_id,
         "slot_date": slot_date.isoformat(),

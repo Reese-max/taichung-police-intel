@@ -10,6 +10,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import unicodedata
 import re
 from pathlib import Path
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -558,36 +559,21 @@ def _load_current_snapshot(
     query_store_path: Path | None = None,
     public_events_path: Path | None = None,
     statistics_path: Path | None = None,
-    *,
-    preserve_artifacts: bool = False,
 ) -> dict[str, Any]:
-    feed, feed_hash = qs.load_json(qs.DEFAULT_FEED)
-    status, status_hash = qs.load_json(qs.DEFAULT_STATUS)
-    brief, brief_hash = qs.load_json(qs.DEFAULT_BRIEF)
-    artifact_hashes = {"feed": feed_hash, "status": status_hash, "brief": brief_hash}
-    expected_store = qs.build_store(
-        feed,
-        status,
-        brief,
-        artifact_hashes,
-    )
+    captured = qs.canonical_artifacts_from_paths()
+    expected_store = qs.build_from_canonical_artifacts(captured)
+    status, brief = (json.loads(captured[name].decode("utf-8")) for name in ("status", "brief"))
     if query_store_path is None:
         store = expected_store
     else:
         store, _ = qs.load_json(query_store_path)
-        qs.validate_store(store)
+        qs.validate_store(store, canonical_artifacts=captured)
         if store != expected_store:
             raise ValueError("query store does not match canonical publication artifacts")
-    snapshot = {"store": store, "status": status, "brief": brief}
+    snapshot = {"store": store, "status": status, "brief": brief,
+                "canonical_artifacts": {name: raw.decode("utf-8") for name, raw in captured.items()}}
     # Preserve the exact bytes, rather than re-serializing JSON and inventing a
     # different publication hash. These copies are derived restart evidence.
-    if preserve_artifacts:
-        snapshot["canonical_artifacts"] = {}
-        for name, path in (("feed", qs.DEFAULT_FEED), ("status", qs.DEFAULT_STATUS), ("brief", qs.DEFAULT_BRIEF)):
-            raw = path.read_bytes()
-            if qs.sha256_bytes(raw) != artifact_hashes[name]:
-                raise ValueError("canonical artifacts changed while building query generation")
-            snapshot["canonical_artifacts"][name] = raw.decode("utf-8")
     if located_facts_path is not None:
         bundle = json.loads(located_facts_path.read_text(encoding="utf-8"))
         snapshot["located_facts"] = validate_located_facts_bundle(bundle, approved_evidence_source_ids())
@@ -694,8 +680,7 @@ def load_snapshot(
         raise ValueError("query generation cache must not overwrite a canonical or query input")
     try:
         with _generation_lock(last_good_path):
-            snapshot = _load_current_snapshot(located_facts_path, query_store_path, public_events_path, statistics_path,
-                                              preserve_artifacts=True)
+            snapshot = _load_current_snapshot(located_facts_path, query_store_path, public_events_path, statistics_path)
             QueryGateway(snapshot)
             _write_generation_cache(last_good_path, snapshot)
         return snapshot
@@ -772,6 +757,13 @@ class QueryGateway:
         self.store = self.snapshot["store"]
         self.status = self.snapshot["status"]
         self.brief = self.snapshot["brief"]
+        captured = self.snapshot.get("canonical_artifacts")
+        if captured is None:
+            captured = qs.canonical_artifacts_from_paths()
+        qs.validate_store(self.store, canonical_artifacts=captured)
+        if (self.status != json.loads(captured["status"]) or self.brief != json.loads(captured["brief"])):
+            raise ValueError("gateway snapshot does not match captured canonical publication artifacts")
+        self.canonical_artifacts = dict(captured)
         self.located_facts = (
             validate_located_facts_bundle(
                 self.snapshot["located_facts"], approved_evidence_source_ids()
@@ -802,6 +794,7 @@ class QueryGateway:
             now=_now(now),
             capability_id=capability_id,
             expected_generation=expected_generation,
+            canonical_artifacts=self.canonical_artifacts,
         ))
 
     def _index_scope(self, scope: dict[str, Any]) -> dict[str, Any]:
@@ -920,12 +913,28 @@ class QueryGateway:
         return sorted(catalog, key=lambda row: row["evidence_id"])
 
     def _run_answer_gate(self, claims: list[dict[str, Any]]) -> dict[str, Any]:
+        formal = qs.load_policy_module().formal_admission(qs.load_current_policy())
+        if formal["status"] != "ADMITTED":
+            raise GatewayError("RIGHTS_BLOCKED", "Current formal answer evidence lacks approved governance or publication rights", 503)
+        for claim in claims:
+            proposition = claim.get("proposition")
+            subject = proposition.get("subject", "") if isinstance(proposition, dict) else ""
+            normalized = "".join(unicodedata.normalize("NFC", str(subject)).split())
+            if re.fullmatch(r"publication:.*:(?:title|source_id)", normalized) and claim.get("claim_type") != "STATUS":
+                raise GatewayError("INVALID_ARGUMENTS", "Publication metadata cannot authorize other factual claim types")
         node = shutil.which("node")
         if not node:
             raise GatewayError("GATE_UNAVAILABLE", "answer evidence gate runtime is unavailable", 503)
         evidence = self._trusted_evidence_catalog(self.store, self.clock())
+        if self.statistics_store is not None:
+            self._require_formal_admission(self.statistics_store["source_ids"], domain=True)
+            self._require_source_origins(self.statistics_store["statistics"])
         evidence.extend(self._trusted_statistics_evidence())
         if self.located_facts is not None:
+            self._require_formal_admission({self.located_facts["document_version"]["source_id"]}, domain=True)
+            document = self.located_facts["document_version"]
+            self._require_source_origins([{"source_id": document["source_id"], "official_url": document[field]}
+                                          for field in ("requested_url", "final_url")])
             # Re-check the live source catalog at request time: a source
             # demotion must stop feeding the gate without restarting the server.
             try:
@@ -1132,6 +1141,12 @@ class QueryGateway:
                 f"{tool} requires a validated canonical domain store; no such store is configured",
                 422,
             )
+        source_ids = set(store["source_ids"])
+        for event in store["public_events"]:
+            source_ids.update(event.get("independent_source_ids", []))
+        self._require_formal_admission(source_ids, domain=True)
+        self._require_source_origins([link for event in store["public_events"]
+                                      for link in event["linked_document_versions"]])
         if tool == "search_events":
             for name in ("q", "region", "district", "agency", "category", "time_from", "time_to", "verification_status", "event_status", "public_event_id"):
                 args[name] = self._require_string(args, name)
@@ -1152,6 +1167,7 @@ class QueryGateway:
                 **{key: value for key, value in result.items() if key != "results"},
                 "domain_query_generation_id": result["query_generation_id"],
             }
+            self._require_public_fields(result["results"], source_ids)
             if time_resolution is not None:
                 payload["time_resolution"] = time_resolution
             return self._envelope(
@@ -1163,6 +1179,7 @@ class QueryGateway:
         try:
             if tool == "get_event":
                 event = query_domain.get_event(store, event_id)
+                self._require_public_fields(event, source_ids)
                 scope = self._domain_scope(store, now)
                 evidence_ids = [document["evidence_id"] for document in event["documents"]]
                 return self._envelope(
@@ -1177,6 +1194,7 @@ class QueryGateway:
             comparison = query_domain.compare_event_versions(
                 store, event_id, before_version=args.get("before_version"), after_version=args.get("after_version")
             )
+            self._require_public_fields(comparison, source_ids)
         except KeyError as error:
             missing = error.args[0] if error.args else event_id
             code = "EVENT_NOT_FOUND" if missing == event_id or tool == "get_event" else "EVENT_VERSION_NOT_FOUND"
@@ -1199,12 +1217,15 @@ class QueryGateway:
                 "query_statistics requires a validated canonical statistics store; no such store is configured",
                 422,
             )
+        self._require_formal_admission(self.statistics_store["source_ids"], domain=True)
+        self._require_source_origins(self.statistics_store["statistics"])
         for name in ("dataset_id", "metric", "geography", "agency", "period_from", "period_to"):
             args[name] = self._require_string(args, name, max_length=512 if name in {"dataset_id", "metric", "geography"} else 128)
         if "provisional" in args and not isinstance(args["provisional"], bool):
             raise GatewayError("INVALID_ARGUMENTS", "provisional must be boolean")
         try:
             result = query_domain.query_statistics(self.statistics_store, args)
+            self._require_public_fields(result["results"], self.statistics_store["source_ids"])
         except ValueError as error:
             raise GatewayError("INVALID_ARGUMENTS", str(error)) from error
         scope = self._domain_scope(self.statistics_store, now)
@@ -1214,6 +1235,41 @@ class QueryGateway:
              "domain_query_generation_id": result["query_generation_id"]},
             result_count=result["result_count"], truncated=result["truncated"], result_type="statistics",
         )
+
+    def _require_public_fields(self, value, source_ids):
+        rows = {row["source_id"]: row for row in qs.load_current_policy()["active_sources"]}
+        permitted = [set(rows[sid]["rights_retention_public_policy_refs"]["public_fields"]) for sid in source_ids]
+        allowed = set.intersection(*permitted) if permitted else set()
+        def fields_allowed(item):
+            if isinstance(item, dict):
+                return set(item) <= allowed and all(fields_allowed(child) for child in item.values())
+            if isinstance(item, list):
+                return all(fields_allowed(child) for child in item)
+            return True
+        if not fields_allowed(value):
+            raise GatewayError("SOURCE_GOVERNANCE_UNVERIFIED", "Domain projection contains fields outside the reviewed source whitelist", 503)
+
+    def _require_source_origins(self, records):
+        rows = {row["source_id"]: row for row in qs.load_current_policy()["active_sources"]}
+        for record in records:
+            source = rows.get(record["source_id"])
+            parsed = urlsplit(record["official_url"])
+            origin = f"{parsed.scheme}://{parsed.netloc}"
+            if source is None or origin not in source.get("approved_origins", []):
+                raise GatewayError("SOURCE_GOVERNANCE_UNVERIFIED", "Domain document origin is not approved for its source", 503)
+
+    def _require_formal_admission(self, source_ids=None, *, domain=False):
+        policy_module = qs.load_policy_module()
+        policy = qs.load_current_policy()
+        formal = policy_module.formal_admission(policy)
+        if formal["status"] != "ADMITTED":
+            raise GatewayError("RIGHTS_BLOCKED", "Current formal query lacks approved governance or publication rights", 503)
+        if source_ids is not None:
+            rows = {row["source_id"]: row for row in policy["active_sources"]}
+            if not set(source_ids) <= set(rows):
+                raise GatewayError("SOURCE_GOVERNANCE_UNVERIFIED", "Domain records reference a source outside the approved active policy", 503)
+            if domain and any(rows[sid]["rights_retention_public_policy_refs"]["public_projection"] != "EVIDENCE_BOUND_SUMMARY_ONLY" for sid in source_ids):
+                raise GatewayError("SOURCE_GOVERNANCE_UNVERIFIED", "Metadata-only source permission cannot authorize domain facts", 503)
 
     def execute(self, tool: str, arguments: Any = None) -> dict[str, Any]:
         args = self._arguments(tool, arguments)
@@ -1261,7 +1317,8 @@ class QueryGateway:
             )
         if tool == "search_evidence":
             query_args = {"text": args.get("q"), **{key: value for key, value in args.items() if key != "q"}}
-            result = self._index_scope(qs.query_store(self.store, now=now, **query_args))
+            result = self._index_scope(qs.query_store(self.store, now=now, **query_args,
+                                                    canonical_artifacts=self.canonical_artifacts))
             return self._envelope(
                 tool,
                 args,
@@ -1280,11 +1337,14 @@ class QueryGateway:
                 truncated=result["truncated"],
             )
         if tool == "get_current_brief":
+            self._require_formal_admission()
             scope = self._scope(now=now, capability_id="publication_metadata")
             try:
                 brief = project_public_brief(self.brief)
             except ValueError as error:
                 raise GatewayError("PUBLIC_PROJECTION_INVALID", "canonical brief violates public projection schema", 503) from error
+            if not qs.load_policy_module().governance_module().brief_admission(qs.load_current_policy(), brief):
+                raise GatewayError("RIGHTS_BLOCKED", "Current derived brief lacks reviewed summary fields and source permissions", 503)
             return self._envelope(
                 tool,
                 args,
@@ -1337,7 +1397,12 @@ class QueryGateway:
             tool,
             args,
             scope,
-            {"sources": selected},
+            {"sources": selected,
+             "source_rights": [{"source_id": row["source_id"],
+                 "rights_status": RETENTION_POLICY["source_policies"][row["source_id"]]["rights_status"],
+                 "review_required": RETENTION_POLICY["source_policies"][row["source_id"]]["review_required"]}
+                for row in selected],
+             "formal_admission": qs.load_policy_module().formal_admission(qs.load_current_policy())},
             result_count=len(selected),
         )
 

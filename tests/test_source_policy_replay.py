@@ -30,15 +30,17 @@ class SourcePolicyReplayTests(unittest.TestCase):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.root = Path(self.directory.name)
-        for relative in ("docs/govintel", "apps/web/public/data"):
+        for relative in ("docs/govintel", "apps/web/public/data", "intel_v2"):
             shutil.copytree(ROOT / relative, self.root / relative)
         (self.root / "scripts").mkdir()
-        for relative in ("collect.py", "scripts/source-policy.py", "scripts/query-store.py"):
+        for relative in ("collect.py", "scripts/source-policy.py", "scripts/source-governance.py", "scripts/retention-policy.py", "scripts/query-store.py"):
             shutil.copy2(ROOT / relative, self.root / relative)
         self.sp = module_at("replay_policy", self.root / "scripts/source-policy.py")
         self.qs = module_at("replay_store", self.root / "scripts/query-store.py")
         self.old_policy = self.sp.load_current_policy()
-        self.old_store = self.qs.build_from_paths(self.qs.DEFAULT_FEED, self.qs.DEFAULT_STATUS, self.qs.DEFAULT_BRIEF)
+        self.current_store = self.qs.build_from_paths(self.qs.DEFAULT_FEED, self.qs.DEFAULT_STATUS, self.qs.DEFAULT_BRIEF)
+        self.old_store = json.loads((ROOT / "tests/fixtures/source-policy/publication-metadata-v3.json").read_text(encoding="utf-8"))
+        self.assertEqual(len(self.old_store["items"]), 118)
         self.clock = self.qs.instant(self.old_store["generated_from"]["feed_generated_at"])
 
     def promote_fixture(self):
@@ -61,9 +63,9 @@ class SourcePolicyReplayTests(unittest.TestCase):
         for source in status["sources"]:
             source.update(source_health="PASS", window_completeness="COMPLETE_ZERO", result="NO_NEW_ITEM",
                           freshness_status="RECENT", last_checked_at=feed["generated_at"])
-        hashes = {key: self.qs.sha256_bytes(self.qs.canonical_json(value))
-                  for key, value in (("feed", feed), ("status", status), ("brief", brief))}
-        return self.qs.build_store(feed, status, brief, hashes)
+        for path, value in ((self.qs.DEFAULT_FEED, feed), (self.qs.DEFAULT_STATUS, status), (self.qs.DEFAULT_BRIEF, brief)):
+            path.write_bytes(self.qs.canonical_json(value))
+        return self.qs.build_from_paths(self.qs.DEFAULT_FEED, self.qs.DEFAULT_STATUS, self.qs.DEFAULT_BRIEF)
 
     def test_collector_rejects_unapproved_catalog_change(self):
         catalog = self.sp.load_catalog()
@@ -83,7 +85,7 @@ class SourcePolicyReplayTests(unittest.TestCase):
         self.assertEqual(sorted(collector.P0_SOURCES), policy["active_source_ids"])
 
     def test_generated_policy_binding_cannot_be_resealed(self):
-        changed = copy.deepcopy(self.old_store)
+        changed = copy.deepcopy(self.current_store)
         changed["generated_from"]["policy_hash"] = "0" * 64
         seal(changed, self.qs)
         with self.assertRaisesRegex(ValueError, "generated policy"):
@@ -92,7 +94,7 @@ class SourcePolicyReplayTests(unittest.TestCase):
     def test_generation_cannot_be_resealed_independently_of_artifacts_and_policy(self):
         for field in ("generation_id", "feed_sha256"):
             with self.subTest(field=field):
-                changed = copy.deepcopy(self.old_store)
+                changed = copy.deepcopy(self.current_store)
                 if field == "generation_id":
                     changed[field] = "0" * 64
                 else:
@@ -104,18 +106,21 @@ class SourcePolicyReplayTests(unittest.TestCase):
     def test_unsupported_traffic_zero_is_not_answerable(self):
         store = self.zero_store()
         supported = self.qs.query_store(store, now=self.clock)
-        self.assertTrue(supported["answerable_no_match"])
+        self.assertFalse(supported["answerable_no_match"])
+        self.assertEqual(supported["query_coverage"]["status"], "UNKNOWN")
+        self.assertEqual(supported["query_coverage"]["collection_coverage_status"], "COVERED_BOUNDED_SCOPE")
         unsupported = self.qs.query_store(store, now=self.clock, capability_id="traffic_events")
         self.assertEqual(unsupported["query_coverage"]["status"], "CAPABILITY_NOT_AVAILABLE")
         self.assertFalse(unsupported["query_coverage"]["can_state_bounded_no_match"])
         self.assertFalse(unsupported["answerable_no_match"])
 
     def test_old_publication_replays_original_result_after_approved_fixture_transition(self):
-        before = self.qs.query_store(self.old_store, text="議事", limit=2, now=self.clock)
+        before = self.qs.replay_query_store(self.old_store, policy_hash=self.old_policy["policy_hash"], as_of=self.clock.isoformat(), text="議事", limit=2)["result"]
+        self.assertGreater(before["result_count"], 0)
         original_store = copy.deepcopy(self.old_store)
         original_archive = (self.sp.APPROVED_HISTORY / f"{self.old_policy['policy_hash']}.json").read_bytes()
         self.promote_fixture()
-        with self.assertRaisesRegex(ValueError, "policy mismatch"):
+        with self.assertRaisesRegex(ValueError, "legacy query store"):
             self.qs.query_store(self.old_store, now=self.clock)
         replay = self.qs.replay_query_store(self.old_store, policy_hash=self.old_policy["policy_hash"],
                                           as_of=self.clock.isoformat(), text="議事", limit=2)
@@ -161,12 +166,13 @@ class SourcePolicyReplayTests(unittest.TestCase):
     def test_cli_replays_historical_projection_but_live_query_rejects_it(self):
         path = self.root / "old-store.json"
         path.write_text(json.dumps(self.old_store), encoding="utf-8")
-        expected = self.qs.query_store(self.old_store, now=self.clock)
+        expected = self.qs.replay_query_store(self.old_store, policy_hash=self.old_policy["policy_hash"], as_of=self.clock.isoformat())["result"]
+        self.assertGreater(expected["result_count"], 0)
         self.promote_fixture()
         command = [sys.executable, str(self.root / "scripts/query-store.py")]
         denied = subprocess.run(command + ["query", "--store", str(path)], text=True, capture_output=True)
         self.assertNotEqual(denied.returncode, 0)
-        self.assertIn("policy mismatch", denied.stderr)
+        self.assertIn("legacy query store", denied.stderr)
         allowed = subprocess.run(command + ["replay", "--store", str(path), "--policy-hash",
                                              self.old_policy["policy_hash"], "--as-of", self.clock.isoformat()],
                                  text=True, capture_output=True)

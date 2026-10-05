@@ -1,7 +1,10 @@
 from datetime import datetime, timezone
 import importlib.util
+import json
 from pathlib import Path
 import unittest
+import tempfile
+from governed_policy_fixture import make_governed_policy_fixture, load_fixture_module, bind_checked_in_publication
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -33,7 +36,7 @@ def event():
             "document_id": "doc-1",
             "document_version_id": "doc-1:v1",
             "source_id": "S-001",
-            "official_url": "https://police.example/event",
+            "official_url": "https://www.police.taichung.gov.tw/fictional/event",
         }],
     }
 
@@ -50,12 +53,18 @@ def statistic():
         "geography": "臺中市",
         "provisional": False,
         "updated_at": "2026-09-21T00:00:00+08:00",
-        "official_url": "https://data.example/statistics/1",
+        "official_url": "https://data.gov.tw/fictional/statistics/1",
     }
 
 
 class QueryGatewayDomainTests(unittest.TestCase):
     def setUp(self):
+        global gateway_module
+        directory = tempfile.TemporaryDirectory(prefix="fictional-domain-permissions-")
+        self.addCleanup(directory.cleanup)
+        fixture = bind_checked_in_publication(make_governed_policy_fixture(
+            directory.name, domain_source_ids=("S-001", "S-028", "S-032")))
+        gateway_module = load_fixture_module(fixture, "fictional_domain_permissions", "scripts/query-gateway.py")
         snapshot = gateway_module.load_snapshot()
         snapshot["event_store"] = gateway_module.query_domain.build_event_store([event()])
         snapshot["statistics_store"] = gateway_module.query_domain.build_statistics_store([statistic()])
@@ -171,6 +180,34 @@ class QueryGatewayDomainTests(unittest.TestCase):
         gateway = gateway_module.QueryGateway(clock=lambda: datetime(2026, 9, 21, 9, 0, tzinfo=timezone.utc))
         with self.assertRaisesRegex(gateway_module.GatewayError, "canonical domain store"):
             gateway.execute("get_event", {"event_id": "PE-DOMAIN-1"})
+
+    def test_unpromoted_secondary_identity_and_unapproved_document_origin_are_refused(self):
+        for mutation in (lambda row: row["independent_source_ids"].append("S-034"),
+                         lambda row: row["linked_document_versions"][0].update(official_url="https://unapproved.example.test/fictional")):
+            with self.subTest(mutation=mutation):
+                candidate = event()
+                mutation(candidate)
+                snapshot = gateway_module.load_snapshot()
+                snapshot["event_store"] = gateway_module.query_domain.build_event_store([candidate])
+                with self.assertRaises(gateway_module.GatewayError) as denied:
+                    gateway_module.QueryGateway(snapshot).execute("search_events", {})
+                self.assertEqual(denied.exception.code, "SOURCE_GOVERNANCE_UNVERIFIED")
+
+    def test_version_comparison_cannot_publish_an_unreviewed_nested_field(self):
+        candidate = event()
+        candidate["version_history"] = [
+            {"version_id": "v1", "observed_at": "2026-09-20T08:00:00+08:00", "fields": {"private_case": "PRIVATE_SYNTHETIC"}},
+            {"version_id": "v2", "observed_at": "2026-09-21T08:00:00+08:00", "fields": {"private_case": "PRIVATE_SYNTHETIC_CHANGED"}},
+        ]
+        snapshot = gateway_module.load_snapshot()
+        snapshot["event_store"] = gateway_module.query_domain.build_event_store([candidate])
+        result = gateway_module.dispatch_mcp(gateway_module.QueryGateway(snapshot), {
+            "jsonrpc": "2.0", "id": 49, "method": "tools/call",
+            "params": {"name": "compare_event_versions", "arguments": {"event_id": candidate["public_event_id"]}},
+        })["result"]
+        self.assertTrue(result["isError"])
+        self.assertEqual(json.loads(result["content"][0]["text"])["error"]["code"], "SOURCE_GOVERNANCE_UNVERIFIED")
+        self.assertNotIn("PRIVATE_SYNTHETIC", str(result))
 
 
 if __name__ == "__main__":

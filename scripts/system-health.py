@@ -54,12 +54,7 @@ def load_current_policy() -> dict[str, Any]:
 
 
 def policy_binding(policy: dict[str, Any]) -> dict[str, Any]:
-    return {
-        "policy_version": policy["policy_version"],
-        "policy_hash": policy["policy_hash"],
-        "catalog_hash": policy["catalog_hash"],
-        "active_source_ids": list(policy["active_source_ids"]),
-    }
+    return load_source_policy().policy_binding(policy)
 
 
 def load_schema_drift(path: Path = DEFAULT_SCHEMA_DRIFT) -> dict[str, Any] | None:

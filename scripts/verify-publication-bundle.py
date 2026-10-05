@@ -12,13 +12,17 @@ DATA_DIR = ROOT / "apps" / "web" / "public" / "data"
 SOURCE_POLICY = ROOT / "scripts" / "source-policy.py"
 
 
-def load_expected_sources() -> set[str]:
+def load_source_policy():
     spec = importlib.util.spec_from_file_location("publication_source_policy", SOURCE_POLICY)
     if spec is None or spec.loader is None:
         raise ValueError("source policy module is unavailable")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    policy = module.load_current_policy()
+    return module, module.load_current_policy()
+
+
+def load_expected_sources() -> set[str]:
+    _, policy = load_source_policy()
     expected = set(policy["active_source_ids"])
     if not expected:
         raise ValueError("source policy has no active sources")
@@ -62,6 +66,16 @@ def main() -> int:
         return 1
 
     status_run = status.get("latest_collection_run") or {}
+    module, policy = load_source_policy()
+    if policy["schema_version"] == 2:
+        expected_binding = module.policy_binding(policy)
+        try:
+            brief = load_json("v2-daily-brief.json")
+        except ValueError as error:
+            errors.append(str(error))
+            brief = {}
+        if any(value.get("source_policy") != expected_binding for value in (status, feed, summary, brief)):
+            errors.append("publication artifacts have mixed or missing governed policy bindings")
     run_ids = {
         "source-status.json": status_run.get("collection_run_id"),
         "intelligence-feed.json": feed.get("collection_run_id"),

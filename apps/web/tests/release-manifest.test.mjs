@@ -1,25 +1,24 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { copyFile, mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import test from "node:test";
-import * as gateway from "../../../workers/query-gateway/src/index.js";
+import test, { after } from "node:test";
+import { createGovernedPolicyFixture } from "./governed-policy-fixture.mjs";
 
-const data = new URL("../public/data/", import.meta.url);
+const governed = await createGovernedPolicyFixture({ rightsReviewed: true });
+after(() => governed.cleanup());
+const data = governed.publicRoot;
+const gateway = await governed.loadWorker("release-builder");
 const origin = "https://reese-max.github.io/taichung-police-intel";
 const codeSha = "a".repeat(40);
 const env = { PUBLIC_ORIGIN: origin, CF_VERSION_METADATA: { id: "worker-version-62", tag: codeSha } };
 const builtAt = "2026-09-30T00:00:00Z";
-let scenario = 0;
 
 async function fixture(transform = () => {}) {
-  const bytes = Object.fromEntries(await Promise.all(
-    ["intelligence-feed.json", "source-status.json", "v2-daily-brief.json", "source-policy.json"]
-      .map(async name => [name, await readFile(new URL(name, data))]),
-  ));
+  const bytes = await governed.publication();
   transform(bytes);
   const snapshot = await gateway.buildSnapshot(env, async name => ({
     value: JSON.parse(bytes[name]), hash: createHash("sha256").update(bytes[name]).digest("hex"),
@@ -34,7 +33,7 @@ async function withWorker(t, bytes) {
     const name = new URL(url).pathname.split("/").at(-1);
     return new Response(bytes[name] || "missing", { status: bytes[name] ? 200 : 404 });
   });
-  const { default: worker } = await import(`../../../workers/query-gateway/src/index.js?release-test=${scenario++}`);
+  const { default: worker } = await governed.loadWorker("release-test");
   return async (path, body, runtime = env) => {
     const response = await worker.fetch(new Request(`https://gateway.example${path}`, body ? {
       method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
@@ -45,6 +44,9 @@ async function withWorker(t, bytes) {
 
 test("release builder reuses the canonical snapshot and never claims deployment", async () => {
   const { snapshot, release } = await fixture();
+  assert.equal(snapshot.policy.schema_version, 2);
+  assert.equal(snapshot.items.length, 2);
+  assert.equal(snapshot.formalAdmission.status, "ADMITTED");
   assert.equal(release.code_sha, codeSha);
   assert.equal(release.publication_generation, snapshot.generatedFrom.collection_run_id);
   assert.equal(release.publication_hash, snapshot.generatedFrom.brief_sha256);
@@ -66,7 +68,11 @@ test("release CLI produces a manifest without modifying canonical input", async 
   const directory = await mkdtemp(join(tmpdir(), "govintel-release-"));
   try {
     const output = join(directory, "release.json");
-    execFileSync(process.execPath, [fileURLToPath(new URL("../../../scripts/build-release-manifest.mjs", import.meta.url)),
+    const script = join(governed.repoRoot, "scripts/build-release-manifest.mjs");
+    // Copy the actual CLI unchanged so its runtime resolves this fixture's
+    // approved compiler output, never the real unreviewed rights snapshot.
+    await copyFile(fileURLToPath(new URL("../../../scripts/build-release-manifest.mjs", import.meta.url)), script);
+    execFileSync(process.execPath, [script,
       "--data-dir", fileURLToPath(data), "--output", output, "--code-sha", codeSha], { encoding: "utf8" });
     const result = JSON.parse(await readFile(output, "utf8"));
     assert.equal(result.release_id, (await fixture()).release.release_id);

@@ -24,9 +24,24 @@ export function validateSourceStatus(data, policy) {
       || data.mode !== "COMPETITION_DEMO"
       || !validIso(data.generated_at)) throw new Error("來源狀態快照格式無法驗證");
   const expected = policy?.active_source_ids;
-  if (policy?.schema_version !== 1 || !Array.isArray(expected) || !expected.length
+  if (![1, 2].includes(policy?.schema_version) || !Array.isArray(expected) || !expected.length
       || expected.some((id) => typeof id !== "string" || !id.trim() || id !== id.trim())
       || new Set(expected).size !== expected.length) throw new Error("來源狀態來源政策無法驗證");
+  if (policy.schema_version === 2 && (!/^[a-f0-9]{64}$/.test(policy.governance_binding?.governance_hash || "")
+      || !Array.isArray(policy.active_sources) || JSON.stringify(policy.active_sources.map(row => row.source_id)) !== JSON.stringify(expected))) {
+    throw new Error("來源狀態治理政策無法驗證");
+  }
+  if (policy.schema_version === 2) {
+    const binding = {policy_version: policy.policy_version, policy_hash: policy.policy_hash,
+      catalog_hash: policy.catalog_hash, active_source_ids: [...expected].sort(),
+      governance_hash: policy.governance_binding.governance_hash,
+      retention_policy_hash: policy.governance_binding.retention_policy.policy_hash};
+    const actual = data.source_policy;
+    if (!actual || Object.keys(actual).length !== Object.keys(binding).length
+        || Object.entries(binding).some(([key, value]) => JSON.stringify(actual[key]) !== JSON.stringify(value))) {
+      throw new Error("來源狀態治理世代無法驗證");
+    }
+  }
   const ids = new Set();
   for (const source of data.sources) {
     if (!source || typeof source.source_id !== "string" || !source.source_id.trim() || ids.has(source.source_id)) {

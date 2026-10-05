@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from governed_policy_fixture import make_governed_policy_fixture, load_fixture_module, bind_checked_in_publication
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,9 +19,15 @@ spec.loader.exec_module(qs)
 
 class QueryBoundaryTests(unittest.TestCase):
     def setUp(self):
-        self.feed, fh = qs.load_json(qs.DEFAULT_FEED)
-        self.status, sh = qs.load_json(qs.DEFAULT_STATUS)
-        self.brief, bh = qs.load_json(qs.DEFAULT_BRIEF)
+        global qs
+        temporary = tempfile.TemporaryDirectory(prefix="fictional-query-positive-")
+        self.addCleanup(temporary.cleanup)
+        fixture = bind_checked_in_publication(make_governed_policy_fixture(temporary.name))
+        qs = load_fixture_module(fixture, "fictional_query_positive", "scripts/query-store.py")
+
+        self.feed, _ = qs.load_json(qs.DEFAULT_FEED)
+        self.status, _ = qs.load_json(qs.DEFAULT_STATUS)
+        self.brief, _ = qs.load_json(qs.DEFAULT_BRIEF)
         run_id = self.status["latest_collection_run"]["collection_run_id"]
         self.status["latest_collection_run"]["status"] = "SUCCEEDED"
         self.feed["collection_run_id"] = run_id
@@ -34,10 +41,19 @@ class QueryBoundaryTests(unittest.TestCase):
             source["window_completeness"] = "COMPLETE_ZERO"
             source["result"] = "NO_NEW_ITEM"
             source["freshness_status"] = "FRESH"
-        self.hashes = {'feed': fh, 'status': sh, 'brief': bh}
+        self.hashes = {}
         self.now = max(qs.instant(d['generated_at']) for d in (self.feed, self.status, self.brief)) + timedelta(minutes=1)
 
     def build(self):
+        # Publish only into this fictional fixture's isolated canonical paths.
+        # Every scenario mutation gets an actual byte hash, rather than keeping
+        # the hashes of the checked-in inputs it intentionally changed.
+        for name, document, target in (("feed", self.feed, qs.DEFAULT_FEED),
+                                       ("status", self.status, qs.DEFAULT_STATUS),
+                                       ("brief", self.brief, qs.DEFAULT_BRIEF)):
+            raw = json.dumps(document, ensure_ascii=False, indent=2).encode("utf-8") + b"\n"
+            target.write_bytes(raw)
+            self.hashes[name] = qs.sha256_bytes(raw)
         return qs.build_store(self.feed, self.status, self.brief, self.hashes)
 
     def test_mixed_collection_runs_rejected(self):
@@ -156,6 +172,21 @@ class QueryBoundaryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'hash mismatch'):
             qs.query_store(store)
 
+    def test_rehashed_valid_projection_cannot_replace_canonical_title(self):
+        store = self.build()
+        store['items'][0]['title'] = 'valid-looking substitution without canonical bytes'
+        store['projection_sha256'] = qs.sha256_bytes(qs.canonical_json(
+            {key: value for key, value in store.items() if key != 'projection_sha256'}))
+        with self.assertRaisesRegex(ValueError, 'canonical publication'):
+            qs.query_store(store, now=self.now)
+
+    def test_current_query_rederives_changed_canonical_bytes(self):
+        store = self.build()
+        self.feed['items'][0]['title'] = 'new canonical fixture title'
+        qs.DEFAULT_FEED.write_text(json.dumps(self.feed, ensure_ascii=False), encoding='utf-8')
+        with self.assertRaisesRegex(ValueError, 'canonical publication'):
+            qs.query_store(store, now=self.now)
+
     def test_cursor_pagination_keeps_ids_and_snapshot_without_duplicates(self):
         store = self.build()
         ids, cursor = [], None
@@ -174,7 +205,7 @@ class QueryBoundaryTests(unittest.TestCase):
         self.assertIsNotNone(cursor)
         with self.assertRaisesRegex(ValueError, 'cursor'):
             qs.query_store(store, cursor=cursor, source_id='S-004')
-        self.hashes['brief'] = 'b'*64
+        self.brief['fixture_revision'] = 'new cursor generation'
         newer = self.build()
         with self.assertRaisesRegex(ValueError, 'cursor'):
             qs.query_store(newer, cursor=cursor)
@@ -191,7 +222,7 @@ class QueryBoundaryTests(unittest.TestCase):
             output = Path(tmp)/'index.json'
             qs.atomic_write_json(output, self.build())
             before = output.read_bytes()
-            self.hashes['brief'] = 'b'*64
+            self.brief['fixture_revision'] = 'failed index swap'
             with mock.patch.object(qs.os, 'replace', side_effect=OSError('injected disk fault')):
                 with self.assertRaises(OSError):
                     qs.atomic_write_json(output, self.build())

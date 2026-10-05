@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -22,6 +23,7 @@ DEFAULT_CATALOG = ROOT / "docs/govintel/source-catalog.v2.json"
 APPROVED_POLICY = ROOT / "docs/govintel/source-policy.approved.json"
 APPROVED_HISTORY = ROOT / "docs/govintel/source-policy-history"
 SCHEMA_VERSION = 1
+GOVERNED_SCHEMA_VERSION = 2
 VALID_STATUSES = {"PRODUCTION_ACTIVE", "AUDITED_EXISTING", "VERIFIED_CANDIDATE", "REFERENCE_ONLY"}
 VALID_ROLES = {"PRIMARY_EVENT", "PRIMARY_REFERENCE", "ENRICHMENT", "DISCOVERY_ONLY"}
 COMPLETE = {"COMPLETE_ZERO", "COMPLETE_WITH_ITEMS"}
@@ -44,6 +46,29 @@ def canonical(value: Any) -> bytes:
 
 def digest(value: Any) -> str:
     return hashlib.sha256(canonical(value)).hexdigest()
+
+
+def governance_module():
+    spec = importlib.util.spec_from_file_location("source_policy_governance", ROOT / "scripts/source-governance.py")
+    if spec is None or spec.loader is None:
+        raise ValueError("source governance module unavailable")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def formal_admission(policy: dict[str, Any]) -> dict[str, Any]:
+    validate_policy(policy)
+    return governance_module().admission(policy)
+
+
+def policy_binding(policy: dict[str, Any]) -> dict[str, Any]:
+    binding = {"policy_version": policy["policy_version"], "policy_hash": policy["policy_hash"],
+               "catalog_hash": policy["catalog_hash"], "active_source_ids": list(policy["active_source_ids"])}
+    if policy["schema_version"] == GOVERNED_SCHEMA_VERSION:
+        binding["governance_hash"] = policy["governance_binding"]["governance_hash"]
+        binding["retention_policy_hash"] = policy["governance_binding"]["retention_policy"]["policy_hash"]
+    return binding
 
 
 def load_catalog(path: Path = DEFAULT_CATALOG) -> dict[str, Any]:
@@ -212,7 +237,7 @@ def compile_policy(
 
 
 def validate_policy(policy: dict[str, Any]) -> None:
-    if not isinstance(policy, dict) or policy.get("schema_version") != SCHEMA_VERSION:
+    if not isinstance(policy, dict) or type(policy.get("schema_version")) is not int or policy.get("schema_version") not in {SCHEMA_VERSION, GOVERNED_SCHEMA_VERSION}:
         raise ValueError("unsupported policy schema")
     if type(policy.get("policy_version")) is not int or policy["policy_version"] < 1:
         raise ValueError("invalid policy_version")
@@ -270,13 +295,56 @@ def validate_policy(policy: dict[str, Any]) -> None:
             or capability.get("supported") is not (bool(required))
         ):
             raise ValueError("invalid policy capability source binding")
+    if policy["schema_version"] == GOVERNED_SCHEMA_VERSION:
+        governance = policy.get("governance_binding")
+        if not isinstance(governance, dict) or not re.fullmatch(r"[a-f0-9]{64}", str(governance.get("governance_hash", ""))):
+            raise ValueError("governance binding missing")
+        if not isinstance(governance.get("derived_summary_policy"), dict):
+            raise ValueError("derived summary policy binding missing")
+        for ref in ("retention_policy", "freshness_rules"):
+            value = governance.get(ref)
+            if not isinstance(value, dict) or not re.fullmatch(r"[a-f0-9]{64}", str(value.get("file_sha256", ""))):
+                raise ValueError("governance input reference missing")
+        for row in active_sources + policy.get("candidate_source_governance", []):
+            for field in ("integration_status", "original_source_identity", "approved_origins", "geographic_scope",
+                          "temporal_semantics", "freshness_policy", "rights_retention_public_policy_refs"):
+                if field not in row:
+                    raise ValueError(f"governance source field missing: {field}")
+            rights = row["rights_retention_public_policy_refs"]
+            if not isinstance(rights, dict) or rights.get("policy_hash") != governance["retention_policy"].get("policy_hash"):
+                raise ValueError("source rights policy reference mismatch")
+
+
+def compile_governed_policy(catalog: dict[str, Any], *, previous: dict[str, Any],
+                            promotions=None, retirements=None) -> dict[str, Any]:
+    """Generate a candidate; this never writes or approves the effective snapshot."""
+    validate_policy(previous)
+    base = compile_policy(catalog, previous=previous, promotions=promotions, retirements=retirements)
+    derived = governance_module().compile_governance(catalog)
+    if (previous["schema_version"] == GOVERNED_SCHEMA_VERSION and previous["catalog_hash"] == base["catalog_hash"]
+            and previous["governance_binding"]["governance_hash"] == derived["governance_hash"]):
+        return json.loads(json.dumps(previous))
+    by_source = {row["source_id"]: row for row in derived["sources"]}
+    base.update(schema_version=GOVERNED_SCHEMA_VERSION, policy_version=previous["policy_version"] + 1,
+                parent_policy_hash=previous["policy_hash"])
+    base["active_sources"] = [{**row, **by_source[row["source_id"]]} for row in base["active_sources"]]
+    candidates = next(row for row in base["capabilities"] if row["capability_id"] == "traffic_events")["candidate_or_optional_sources"]
+    base["candidate_source_governance"] = [by_source[sid] for sid in candidates]
+    base["governance_binding"] = {key: value for key, value in derived.items() if key != "sources"}
+    base["rules"] = {**base["rules"], "unknown_rights_are_formal_query_admitted": False,
+                     "legacy_policy_may_answer_current_formal_query": False}
+    base["policy_hash"] = digest({key: value for key, value in base.items() if key != "policy_hash"})
+    validate_policy(base)
+    return base
 
 
 def validate_catalog_binding(policy: dict[str, Any], catalog: dict[str, Any]) -> None:
     """Rebuild compiler-owned fields from a trusted catalog, not the policy's self-hash."""
     validate_policy(policy)
     expected = compile_policy(catalog, bootstrap=True)
-    for key in expected.keys() - {"policy_version", "transition", "policy_hash"}:
+    if policy["schema_version"] == GOVERNED_SCHEMA_VERSION:
+        expected = compile_governed_policy(catalog, previous=expected)
+    for key in expected.keys() - {"policy_version", "transition", "policy_hash", "parent_policy_hash"}:
         if policy.get(key) != expected[key]:
             raise ValueError(f"policy/catalog binding mismatch: {key}")
     if set(policy) != set(expected):
@@ -296,7 +364,7 @@ def assess_query(policy: dict[str, Any], capability_id: str, source_states: dict
     # A recomputed self-hash is not authorization to change required sources.
     if policy != load_current_policy():
         raise ValueError("policy differs from the approved catalog-bound snapshot")
-    return _assess_query(policy, capability_id, source_states)
+    return _assess_formal_query(policy, capability_id, source_states)
 
 
 def load_approved_history(policy_hash: str) -> dict[str, Any]:
@@ -316,7 +384,25 @@ def load_approved_history(policy_hash: str) -> dict[str, Any]:
 
 def assess_historical_query(policy_hash: str, capability_id: str,
                             source_states: dict[str, dict[str, Any]] | None = None) -> dict[str, Any]:
-    return _assess_query(load_approved_history(policy_hash), capability_id, source_states)
+    policy = load_approved_history(policy_hash)
+    # v1 replay preserves its original collection-only semantics. v2 replay uses
+    # its archived governance values, never today's rights matrix.
+    return (_assess_query if policy["schema_version"] == 1 else _assess_formal_query)(policy, capability_id, source_states)
+
+
+def _assess_formal_query(policy, capability_id, source_states):
+    result = _assess_query(policy, capability_id, source_states)
+    if capability_id == "source_health" or result["status"] == "CAPABILITY_NOT_AVAILABLE":
+        return result
+    formal = formal_admission(policy)
+    denied = sorted(set(result.get("required_sources", [])) & set(formal["blocked_sources"]))
+    result.update(formal_admission=formal, rights_blocked_sources=denied)
+    if denied:
+        result["collection_coverage_status"] = result["status"]
+        result["status"] = formal["status"]
+        result["can_state_bounded_no_match"] = False
+        result["coverage_limitations"].append("來源治理／公開權利尚未核准，不能從正式查詢零結果推論沒有事件。")
+    return result
 
 
 def _assess_query(policy: dict[str, Any], capability_id: str,
@@ -385,8 +471,8 @@ def self_check() -> None:
     assert assess_query(policy, "traffic_events")["status"] == "CAPABILITY_NOT_AVAILABLE"
     states = {source_id: {"source_health": "PASS", "window_completeness": "COMPLETE_WITH_ITEMS", "result": "NEW_ITEMS", "freshness": "RECENT"} for source_id in policy["active_source_ids"]}
     result = assess_query(policy, "publication_metadata", states)
-    assert result["status"] == "COVERED_BOUNDED_SCOPE"
-    assert result["can_state_bounded_no_match"] is True
+    assert result.get("collection_coverage_status", result["status"]) == "COVERED_BOUNDED_SCOPE"
+    assert result["can_state_bounded_no_match"] is (result["status"] == "COVERED_BOUNDED_SCOPE")
     print(f"SOURCE_POLICY_SELF_CHECK_OK version={policy['policy_version']} active={len(policy['active_source_ids'])} hash={policy['policy_hash'][:12]}")
 
 
@@ -396,6 +482,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output", type=Path)
     parser.add_argument("--promotions", type=Path, help="JSON array of exact promotion receipts")
     parser.add_argument("--retirements", type=Path, help="JSON array of exact retirement receipts")
+    parser.add_argument("--governed-candidate", action="store_true", help="compile schema2 proposed output; never activate policy")
     parser.add_argument("--self-check", action="store_true")
     return parser.parse_args()
 
@@ -414,7 +501,12 @@ def main() -> int:
         raise ValueError("promotions must be a JSON array")
     if retirements is not None and not isinstance(retirements, list):
         raise ValueError("retirements must be a JSON array")
-    if digest(catalog) == previous["catalog_hash"] and promotions is None and retirements is None:
+    if args.governed_candidate:
+        if args.output and (args.output.resolve() in {APPROVED_POLICY.resolve(), (ROOT / "apps/web/public/data/source-policy.json").resolve()}
+                            or APPROVED_HISTORY.resolve() in args.output.resolve().parents):
+            raise ValueError("candidate compiler cannot overwrite effective or approved historical policy")
+        policy = compile_governed_policy(catalog, previous=previous, promotions=promotions, retirements=retirements)
+    elif digest(catalog) == previous["catalog_hash"] and promotions is None and retirements is None:
         validate_catalog_binding(previous, catalog)
         policy = previous
     else:

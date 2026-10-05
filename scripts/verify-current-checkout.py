@@ -42,6 +42,7 @@ MODULES = {
     "query_store": "scripts/query-store.py",
     "system_health": "scripts/system-health.py",
     "source_policy": "scripts/source-policy.py",
+    "public_brief": "intel_v2/public_brief.py",
 }
 PUBLICATION_VERIFIERS = ("scripts/verify-publication-bundle.py", "scripts/verify-v2-publication.py")
 SABOTAGE_FILES = (
@@ -155,6 +156,8 @@ def build_candidate_context(root: Path, modules: dict[str, Any]) -> dict[str, An
         raise ValueError("query store rebuild is not deterministic")
     catalog = sp.load_catalog(root / "docs" / "govintel" / "source-catalog.v2.json")
     policy = sp.load_current_policy()
+    projected_brief = modules["public_brief"].project_public_brief(brief)
+    brief_admission = sp.governance_module().brief_admission(policy, projected_brief)
     current_policy = qs.load_current_policy()
     if policy["active_source_ids"] != current_policy["active_source_ids"]:
         raise ValueError("source policy active set does not match the pinned P0 query scope")
@@ -174,6 +177,8 @@ def build_candidate_context(root: Path, modules: dict[str, Any]) -> dict[str, An
         "artifacts": {"feed": feed, "status": status, "brief": brief},
         "hashes": {"feed": feed_hash, "status": status_hash, "brief": brief_hash},
         "store": store, "policy": policy,
+        "formal_admission": store["formal_admission"],
+        "brief_admission": brief_admission,
         "enabled_capabilities": supported + [
             "canonical_query_index", "static_site_http", "loopback_query_api", "read_only_mcp",
         ],
@@ -195,6 +200,8 @@ def candidate_manifest(ctx: dict[str, Any], data_status: str) -> dict[str, Any]:
         "projection_version": store["projection_version"],
         "policy_version": ctx["policy"]["policy_version"],
         "policy_hash": ctx["policy"]["policy_hash"],
+        "formal_admission": ctx["formal_admission"],
+        "brief_admission": ctx["brief_admission"],
         "data_status": data_status,
         "enabled_capabilities": ctx["enabled_capabilities"],
         "unavailable_capabilities": ctx["unavailable_capabilities"],
@@ -213,7 +220,8 @@ def prepare_serve_dir(ctx: dict[str, Any], dest: Path, site_dir: Path | None = N
                 shutil.copy2(entry, target)
     else:
         (dest / "data").mkdir(parents=True, exist_ok=True)
-        for artifact in DATA_DIR.iterdir() if DATA_DIR.is_dir() else []:
+        data_dir = ctx["root"] / "apps" / "web" / "public" / "data"
+        for artifact in data_dir.iterdir() if data_dir.is_dir() else []:
             if artifact.is_file():
                 shutil.copy2(artifact, dest / "data" / artifact.name)
         (dest / "index.html").write_text(
@@ -243,22 +251,28 @@ def make_handler(ctx: dict[str, Any], serve_dir: Path):
     health = ctx["modules"]["system_health"]
     sp = ctx["modules"]["source_policy"]
     store_path = serve_dir / "data" / "query-store.json"
-    gateway_spec = importlib.util.spec_from_file_location("current_checkout_query_gateway", QUERY_GATEWAY)
+    gateway_spec = importlib.util.spec_from_file_location("current_checkout_query_gateway", ctx["root"] / "scripts/query-gateway.py")
     if gateway_spec is None or gateway_spec.loader is None:
         raise ValueError("query gateway module is unavailable")
     gateway_module = importlib.util.module_from_spec(gateway_spec)
     gateway_spec.loader.exec_module(gateway_module)
 
-    def served_store() -> dict[str, Any]:
+    def served_artifacts():
+        return qs.canonical_artifacts_from_paths(serve_dir / "data/intelligence-feed.json",
+            serve_dir / "data/source-status.json", serve_dir / "data/v2-daily-brief.json")
+
+    def served_store(captured=None) -> dict[str, Any]:
         store, _ = qs.load_json(store_path)
-        qs.validate_store(store)
+        qs.validate_store(store, canonical_artifacts=served_artifacts() if captured is None else captured)
         return store
 
     def served_gateway():
+        captured = served_artifacts()
         return gateway_module.QueryGateway(snapshot={
-            "store": served_store(),
-            "status": ctx["artifacts"]["status"],
-            "brief": ctx["artifacts"]["brief"],
+            "store": served_store(captured),
+            "status": json.loads(captured["status"]),
+            "brief": json.loads(captured["brief"]),
+            "canonical_artifacts": captured,
         })
 
     class Handler(SimpleHTTPRequestHandler):
@@ -277,7 +291,8 @@ def make_handler(ctx: dict[str, Any], serve_dir: Path):
                 return _json_response(self, {"status": "QUERY_UNAVAILABLE",
                                              "error": "query service unavailable"}, 503)
             try:
-                store = served_store()
+                captured = served_artifacts()
+                store = served_store(captured)
             except Exception as error:
                 return _json_response(self, {"status": "QUERY_UNAVAILABLE",
                                              "error": f"query index unavailable: {type(error).__name__}"}, 503)
@@ -292,7 +307,8 @@ def make_handler(ctx: dict[str, Any], serve_dir: Path):
                 return _json_response(self, {"code": "INVALID_QUERY", "error": "limit must be an integer"}, 400)
             try:
                 result = qs.query_store(store, text=text, source_id=source_id, change_type=change_type,
-                                        limit=limit, cursor=cursor, expected_generation=expected)
+                                        limit=limit, cursor=cursor, expected_generation=expected,
+                                        canonical_artifacts=captured)
             except ValueError as error:
                 message = str(error)
                 code = "GENERATION_MISMATCH" if ("generation" in message or "cursor" in message) else "INVALID_QUERY"
@@ -480,8 +496,8 @@ def run_stdio_mcp_check(ctx: dict[str, Any]) -> dict[str, Any]:
     payload = "\n".join(json.dumps(request, ensure_ascii=False) for request in requests) + "\n"
     try:
         result = subprocess.run(
-            [sys.executable, "-X", "utf8", str(QUERY_GATEWAY_STDIO)],
-            cwd=ROOT,
+            [sys.executable, "-X", "utf8", str(ctx["root"] / "scripts/query-gateway-stdio.py")],
+            cwd=ctx["root"],
             input=payload,
             capture_output=True,
             text=True,
@@ -573,6 +589,20 @@ def run_http_checks(ctx: dict[str, Any], base: str) -> list[dict[str, Any]]:
           and doc.get("result_count", 99) <= 3 and all(r["source_id"] == "S-004" for r in doc.get("results", [])))
     checks.append(check_record("http_query_same_generation_bounded", ok,
                                f"GET /api/query?q=S-004&limit=3 -> {status}, {doc.get('result_count') if isinstance(doc, dict) else 'n/a'} results"))
+
+    admission = ctx["formal_admission"]
+    formal_allowed = admission["status"] == "ADMITTED"
+    governed_query_ok = (status == 200 and isinstance(doc, dict) and
+        (formal_allowed or (doc.get("result_count") == 0 and not doc.get("answerable_no_match")
+         and doc.get("query_coverage", {}).get("can_state_bounded_no_match") is False)))
+    checks.append(check_record("http_query_governance_disposition", governed_query_ok,
+        f"formal_admission={admission['status']}; unreviewed current evidence cannot be VERIFIED or bounded zero"))
+    formal_status, formal_doc = http_post_json(base + "/query", {"tool": "get_current_brief", "arguments": {}})
+    brief_allowed = ctx["brief_admission"]
+    formal_ok = (formal_status == 200 if brief_allowed else
+                 formal_status == 503 and isinstance(formal_doc, dict) and formal_doc.get("error", {}).get("code") == "RIGHTS_BLOCKED")
+    checks.append(check_record("http_current_formal_authority", formal_ok,
+        f"formal_admission={admission['status']}; brief_admission={brief_allowed}; current brief HTTP={formal_status}"))
 
     mcp_status, mcp = http_post_json(base + "/mcp", {
         "jsonrpc": "2.0",
@@ -670,13 +700,17 @@ def run_http_checks(ctx: dict[str, Any], base: str) -> list[dict[str, Any]]:
     before = doc.get("generation_id") if isinstance(doc, dict) else None
     mutated = dict(ctx["artifacts"]["feed"])
     mutated["items"] = mutated["items"][:-1]
-    alt = qs.build_store(mutated, ctx["artifacts"]["status"], ctx["artifacts"]["brief"],
-                         {"feed": "f" * 64, "status": ctx["hashes"]["status"], "brief": ctx["hashes"]["brief"]})
+    captured = qs.canonical_artifacts_from_paths(ctx["serve_dir"] / "data/intelligence-feed.json",
+        ctx["serve_dir"] / "data/source-status.json", ctx["serve_dir"] / "data/v2-daily-brief.json")
+    alternative = dict(captured, feed=canonical_json(mutated))
+    alt = qs.build_from_canonical_artifacts(alternative)
     store_file = ctx["serve_dir"] / "data" / "query-store.json"
+    feed_file = ctx["serve_dir"] / "data" / "intelligence-feed.json"
     original = store_file.read_bytes()
     try:
         shutil.copy2(store_file, ctx["serve_dir"] / "data" / "query-store.archive.json")
-        qs.atomic_write_json(store_file, alt)
+        feed_file.write_bytes(alternative["feed"])
+        qs.atomic_write_json(store_file, alt, canonical_artifacts=alternative)
         status, doc = http_json(base + "/api/query?expected_generation=" + generation)
         refused = status == 409 and isinstance(doc, dict) and doc.get("code") == "GENERATION_MISMATCH"
         status2, body = http_get(base + "/data/query-store.archive.json")
@@ -691,7 +725,8 @@ def run_http_checks(ctx: dict[str, Any], base: str) -> list[dict[str, Any]]:
                                    f"post-cutover served generation detected as {served_check['status']}",
                                    negative_case="http_200_wrong_version_not_publish"))
     finally:
-        qs.atomic_write_json(store_file, json.loads(original))
+        feed_file.write_bytes(captured["feed"])
+        qs.atomic_write_json(store_file, json.loads(original), canonical_artifacts=captured)
 
     try:
         ctx["server"].query_down = True
@@ -1010,7 +1045,7 @@ def main(argv=None) -> int:
     try:
         modules = load_checkout_modules(ROOT)
         checks.append(check_record("modules_loaded_from_checkout", True,
-                                   "query_store/system_health/source_policy imported from this checkout"))
+                                   "query_store/system_health/source_policy/public_brief imported from this checkout"))
     except Exception as error:
         modules = None
         checks.append(check_record("modules_loaded_from_checkout", False, f"{type(error).__name__}: {error}"))
@@ -1099,12 +1134,15 @@ def main(argv=None) -> int:
             "schema_version": ctx["store"]["schema_version"] if ctx else None,
             "projection_version": ctx["store"]["projection_version"] if ctx else None,
             "counts": ctx["store"]["counts"] if ctx else None,
+            "formal_admission": ctx["formal_admission"] if ctx else None,
         } if ctx else None,
         "source_policy": {
             "policy_version": ctx["policy"]["policy_version"] if ctx else None,
             "policy_hash": ctx["policy"]["policy_hash"] if ctx else None,
             "catalog_hash": ctx["policy"]["catalog_hash"] if ctx else None,
             "active_source_ids": ctx["policy"]["active_source_ids"] if ctx else None,
+            "formal_admission": ctx["formal_admission"] if ctx else None,
+            "brief_admission": ctx["brief_admission"] if ctx else None,
         } if ctx else None,
         "test_mode": ctx["test_mode"] if ctx else "CURRENT_CHECKOUT_FAILED_EARLY",
         "checks": checks,

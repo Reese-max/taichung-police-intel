@@ -12,6 +12,7 @@ import copy
 import datetime as dt
 import hashlib
 import importlib.metadata
+import importlib.util
 import io
 import json
 from pathlib import Path
@@ -21,9 +22,14 @@ import tarfile
 import tempfile
 
 SDK_VERSION = "1.30.0"
+SDK_READ_TIMEOUT_SECONDS = 15
 ARTIFACTS = {"feed": "intelligence-feed.json", "status": "source-status.json", "brief": "v2-daily-brief.json"}
 MARKER = "SYNTHETIC_PRIVATE_MARKER_NO_REAL_DATA"
 ROOT = Path(__file__).resolve().parents[1]
+CANONICAL_INPUTS = tuple("apps/web/public/data/" + name for name in ARTIFACTS.values()) + (
+    "apps/web/public/data/source-policy.json", "docs/govintel/source-policy.approved.json",
+    "docs/govintel/source-catalog.v2.json", "docs/govintel/retention-rights-policy.v1.json",
+)
 
 
 def git(*args: str) -> bytes:
@@ -32,6 +38,62 @@ def git(*args: str) -> bytes:
 
 def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def canonical_input_hashes(source: Path) -> dict[str, str]:
+    return {name: sha256(source / name) for name in CANONICAL_INPUTS}
+
+
+def prepare_fictional_fixture(source: Path, destination: Path) -> dict:
+    """Use the actual compiler in a separate, explicitly fictional review root."""
+    spec = importlib.util.spec_from_file_location("mcp_probe_governed_fixture", source / "tests/governed_policy_fixture.py")
+    if spec is None or spec.loader is None:
+        raise ValueError("selected source has no governed fixture factory")
+    helper = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(helper)
+    before = canonical_input_hashes(source)
+    fixture = helper.make_governed_policy_fixture(
+        destination, source_root=source, rights_reviewed=True, brief_reviewed=True,
+    )
+    if canonical_input_hashes(source) != before:
+        raise ValueError("fictional review changed canonical source inputs")
+    policy = fixture["policy"]
+    return {"root": fixture["root"], "scope": "FICTIONAL_OFFLINE_ONLY",
+            "review": "Separate fictional metadata and derived/domain summary permission; no real approval",
+            "policy_schema_version": policy["schema_version"], "policy_binding": fixture["binding"],
+            "active_source_ids": policy["active_source_ids"],
+            "source_origins": {row["source_id"]: row["approved_origins"] for row in policy["active_sources"]},
+            "policy_sha256": sha256(fixture["paths"]["approved"]),
+            "rights_matrix_sha256": sha256(fixture["paths"]["rights_matrix"])}
+
+
+async def canonical_negative(source: Path) -> dict:
+    """Observe current refusal without changing source policy or timestamps."""
+    from mcp import ClientSession, StdioServerParameters
+    from mcp.client.stdio import stdio_client
+    params = StdioServerParameters(command=sys.executable, args=["-B", str(source / "scripts/query-gateway-stdio.py")], cwd=str(source))
+    async with stdio_client(params) as streams:
+        async with ClientSession(*streams, read_timeout_seconds=dt.timedelta(seconds=SDK_READ_TIMEOUT_SECONDS)) as session:
+            initialized = await session.initialize()
+            search = await session.call_tool("search_evidence", {"limit": 1})
+            assert not search.isError
+            current = search.structuredContent
+            assert current["result_count"] == 0
+            assert current["query_coverage"]["formal_admission"]["status"] == "UNKNOWN"
+            assert current["query_coverage"]["status"] == "UNKNOWN"
+            assert not current["query_coverage"]["can_state_bounded_no_match"]
+            errors = {}
+            for tool, arguments in [("get_current_brief", {}), ("validate_answer", {"claims": [{"claim_type": "OTHER", "text": "inert research candidate"}]})]:
+                result = await session.call_tool(tool, arguments)
+                assert result.isError
+                error = json.loads(result.content[0].text)["error"]
+                assert error["code"] == "RIGHTS_BLOCKED"
+                errors[tool] = error
+            return {"case": "unchanged_current_source_rights", "protocol_version": initialized.protocolVersion,
+                    "formal_item_count": 0, "query_coverage": current["query_coverage"],
+                    "policy": current["policy"], "publication_hash": current["publication_hash"],
+                    "query_generation_id": current["query_generation_id"], "rights_blocked_tools": errors,
+                    "clock_override": False, "canonical_inputs_modified": False}
 
 
 async def probe(source: Path, mode: str) -> list[dict]:
@@ -55,6 +117,8 @@ async def probe(source: Path, mode: str) -> list[dict]:
     for row in docs["feed"]["items"]:
         row.update(freshness_status="FRESH", source_health="PASS", data_as_of=now)
     base = copy.deepcopy(docs)
+    base["brief"].setdefault("source_health", {"status": "PASS", "pass_count": len(base["status"]["sources"]),
+        "stale_count": 0, "failed_count": 0, "gap_count": 0})
     rows: list[dict] = []
     previous: dict = {}
 
@@ -75,7 +139,7 @@ async def probe(source: Path, mode: str) -> list[dict]:
                                        args=["-X", "utf8", str(source / "scripts/query-gateway-stdio.py")],
                                        cwd=str(source))
         async with stdio_client(params) as streams:
-            async with ClientSession(*streams) as session:
+            async with ClientSession(*streams, read_timeout_seconds=dt.timedelta(seconds=SDK_READ_TIMEOUT_SECONDS)) as session:
                 initialized = await session.initialize()
                 result = await body(session)
                 rows.append({"case": name, "protocol_version": initialized.protocolVersion,
@@ -121,9 +185,10 @@ async def probe(source: Path, mode: str) -> list[dict]:
 
         await case("sdk_full_brief_search_evidence_health_receipt_journey", journey)
         mutations = {
-            "FAILED": {"source_health": "FAIL", "result": "FAILED", "window_completeness": "FAILED"},
-            "PARTIAL": {"source_health": "WARN", "result": "PARTIAL", "window_completeness": "PARTIAL"},
-            "CONFLICT": {"source_health": "FAIL", "result": "CONFLICT", "window_completeness": "PARTIAL"},
+            "FAILED": {"source_health": "FAILED", "result": "FAILED", "window_completeness": "PARTIAL"},
+            "PARTIAL": {"source_health": "DEGRADED", "result": "PARTIAL", "window_completeness": "PARTIAL"},
+            "CONFLICT": {"source_health": "QUARANTINED", "result": "PARTIAL", "window_completeness": "PARTIAL",
+                         "intelligence_gaps": ["CONFLICT"]},
             "STALE": {"source_health": "PASS", "result": "NEW_ITEMS", "freshness_status": "STALE"},
         }
         for state, mutation in mutations.items():
@@ -172,6 +237,13 @@ async def probe(source: Path, mode: str) -> list[dict]:
 
         await case("sdk_publication_head_switch", head)
     else:
+        if mode == "private-green":
+            write(base)
+            async def valid_control(session):
+                for tool in ("get_current_brief", "get_source_health"):
+                    assert not (await session.call_tool(tool, {})).isError
+                return {"valid_reviewed_fixture_control": True}
+            await case("sdk_valid_reviewed_private_control", valid_control)
         for name, tool in [("brief_nested_private_field", "get_current_brief"),
                            ("source_gap_nested_private_field", "get_source_health")]:
             fixture = copy.deepcopy(base)
@@ -199,9 +271,17 @@ async def probe(source: Path, mode: str) -> list[dict]:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source-ref", default="HEAD", help="Committed source to archive and probe")
-    parser.add_argument("--mode", choices=("journeys", "private-green", "private-red"), default="journeys")
+    parser.add_argument("--mode", choices=("current-negative", "journeys", "private-green", "private-red"), default="current-negative")
+    parser.add_argument("--fixture-policy", choices=("fictional-reviewed",),
+                        help="Explicit fictional metadata and summary permissions in a separate temporary root")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
+    if args.output.resolve().is_relative_to(ROOT.resolve()):
+        parser.error("write research receipts outside the source checkout")
+    if args.mode in {"journeys", "private-green"} and args.fixture_policy != "fictional-reviewed":
+        parser.error("positive research requires --fixture-policy fictional-reviewed")
+    if args.mode in {"current-negative", "private-red"} and args.fixture_policy:
+        parser.error("the unmodified current/historical control cannot activate a fictional review")
     if importlib.metadata.version("mcp") != SDK_VERSION:
         parser.error("use an isolated diagnostic environment with mcp==" + SDK_VERSION)
     import anyio
@@ -210,23 +290,48 @@ def main() -> None:
     tree = git("rev-parse", commit + "^{tree}").decode().strip()
     archive = git("archive", "--format=tar", commit)
     with tempfile.TemporaryDirectory(prefix="issue15-offline-mcp-") as owned:
-        source = Path(owned)
+        source = Path(owned) / "canonical"
+        source.mkdir()
         with tarfile.open(fileobj=io.BytesIO(archive)) as bundle:
             bundle.extractall(source, filter="data")
         runtime_files = ["scripts/query-gateway.py", "scripts/query-gateway-stdio.py",
                          "scripts/query-store.py", "scripts/source-policy.py"]
-        if (source / "intel_v2/public_brief.py").exists():
-            runtime_files.append("intel_v2/public_brief.py")  # Absent only in the pre-repair red source.
+        for name in ("intel_v2/public_brief.py", "scripts/source-governance.py",
+                     "scripts/retention-policy.py", "intel_v2/freshness_policy.py",
+                     "tests/governed_policy_fixture.py"):
+            if (source / name).exists():
+                runtime_files.append(name)  # Some paths are absent in the historical red source.
         runtime_hashes = {name: sha256(source / name) for name in runtime_files}
-        rows = anyio.run(probe, source, args.mode)
-    receipt = {"schema_version": 1, "repository": "Reese-max/taichung-police-intel", "issue": 15,
+        frozen_hashes = {str(path.relative_to(source)): sha256(path)
+                         for path in sorted((source / "docs/research").glob("issue-15-*.json"))}
+        original_hashes = canonical_input_hashes(source)
+        current_negative = None if args.mode == "private-red" else anyio.run(canonical_negative, source)
+        fictional = None
+        if args.fixture_policy:
+            fictional = prepare_fictional_fixture(source, Path(owned) / "fictional-reviewed")
+        measured = fictional["root"] if fictional else source
+        rows = [] if args.mode == "current-negative" else anyio.run(probe, measured, args.mode)
+        # The historical red mode intentionally edits its disposable archive's
+        # old publication copies; current-source modes leave the archive intact.
+        if args.mode != "private-red":
+            assert canonical_input_hashes(source) == original_hashes
+        assert {name: sha256(source / name) for name in frozen_hashes} == frozen_hashes
+        if fictional:
+            fictional = {key: value for key, value in fictional.items() if key != "root"}
+    receipt = {"schema_version": 2, "repository": "Reese-max/taichung-police-intel", "issue": 15,
                "mode": args.mode, "source_commit": commit, "source_tree": tree,
                "runtime_file_sha256": runtime_hashes, "client": "Official Python MCP SDK", "client_version": SDK_VERSION,
                "transport": "STDIO", "observed_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
-               "fixture_scope": "Owned temporary git archive with synthetic public metadata; live checkout unmodified",
+               "client_read_timeout_seconds": SDK_READ_TIMEOUT_SECONDS,
+               "fixture_scope": ("Disposable historical publication copies intentionally mutated; no current approval" if args.mode == "private-red" else
+                   "Canonical archive unchanged; positive permissions exist only in a separate explicitly fictional root"),
+               "canonical_source_input_sha256": original_hashes,
+               "frozen_research_receipt_sha256": frozen_hashes,
+               "canonical_current_negative": current_negative, "fictional_governance": fictional,
                "network_requirement": "Run inside a network-disabled sandbox; probe performs no provider calls",
                "cases": rows, "limitations": ["Default five read-only metadata tools only",
                    "Head change is exercised by fresh-server restart, not live hot reload",
+                   "Fictional timestamps and permissions do not verify actual freshness or rights",
                    "No real-source promotion, production host, OAuth or human usability claim"],
                "result": "CONFIRMED_RED_MAIN_NESTED_FIELD_LEAK" if args.mode == "private-red" else "PASS"}
     args.output.write_text(json.dumps(receipt, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
