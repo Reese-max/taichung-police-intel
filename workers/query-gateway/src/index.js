@@ -1,3 +1,4 @@
+import { parseResearchInput, researchProviderState, researchTerms, selectResearchSources, ResearchError, readBoundedJson } from "./research.js";
 import { gateAnswer } from "../../../apps/web/lib/answer-evidence-gate.js";
 import { projectPublicBrief, projectPublicSource } from "./public-brief.js";
 import { projectPublicationDates, projectSourceDates } from "../../../apps/web/lib/publication-dates.js";
@@ -694,6 +695,52 @@ async function execute(snapshot, tool, rawArgs = {}) {
   return { ...envelope(snapshot, tool, args, scope, { gate_status: gate.gate_status, answer: gate.answer, final_claims: gate.final_claims, evidence_ids: gate.receipt.evidence_ids || [], answer_evidence_receipt: gate.receipt }, gate.final_claims?.length || 0, false, "answer_evidence"), receipt: { ...envelope(snapshot, tool, args, scope, {}, gate.final_claims?.length || 0).receipt, arguments_sha256: argumentsHash } };
 }
 
+// Research reads only the same server-owned metadata index as search_evidence.
+// No model prose or caller-provided evidence can cross the formal answer gate.
+export async function executeResearch(snapshot, rawInput, env, request, fetchImpl = fetch) {
+  const input = parseResearchInput(rawInput);
+  const scope = assessScope(snapshot);
+  const terms = researchTerms(input);
+  const candidates = new Map();
+  for (const term of terms) {
+    const found = await queryStore(snapshot, { q: term, limit: 6 });
+    for (const row of found.results) candidates.set(row.canonical_id, row);
+  }
+  const rows = [...candidates.values()].sort((a, b) => {
+    const score = row => terms.filter(term => String(row.title || "").toLowerCase().includes(term)).length;
+    return score(b) - score(a) || a.canonical_id.localeCompare(b.canonical_id);
+  }).slice(0, 6);
+  const source = row => ({ evidence_id: `PUB-${row.canonical_id}`, source_id: row.source_id,
+    title: row.title, official_url: row.official_url, published_at: row.published_at,
+    data_as_of: row.data_as_of, fetched_at: row.fetched_at });
+  const state = researchProviderState(env);
+  const result = { schema_version: 1, release: snapshot.release, status: "METADATA_ONLY", reason_code: null,
+    provider: { name: "MiniMax", state }, question: input.question, answer: [], sources: rows.map(source),
+    source_gaps: scope.gaps, query_generation_id: snapshot.generationId, data_status: scope.dataStatus,
+    coverage_limitation: "僅檢索核准快照的標題、議會欄位及來源代碼，不是全文研究；引用僅支持索引記載，不證明標題中的事件事實。零結果不表示現實中沒有事件。",
+  };
+  if (snapshot.formalAdmission?.status !== "ADMITTED") return { ...result, reason_code: "RIGHTS_BLOCKED" };
+  if (!rows.length) return { ...result, reason_code: "NO_MATCH" };
+  if (state !== "READY") return { ...result, reason_code: state };
+  const trusted = new Set(trustedEvidence(snapshot).filter(row => row.is_current).map(row => row.evidence_id));
+  const approved = rows.filter(row => trusted.has(`PUB-${row.canonical_id}`));
+  if (!approved.length) return { ...result, reason_code: "NO_APPROVED_SOURCES" };
+  try {
+    const ids = await selectResearchSources(input, approved.map(source), env, request, fetchImpl);
+    if (!ids.length) return { ...result, reason_code: "NO_RELEVANT_SELECTION" };
+    const selected = ids.map(id => approved.find(row => `PUB-${row.canonical_id}` === id));
+    const claims = selected.map((row, index) => ({ schema_version: 1, claim_id: `research-${index + 1}`,
+      text: row.title, claim_type: "STATUS", temporal_scope: "CURRENT",
+      proposition: { subject: `publication:${row.canonical_id}:title`, value: row.title }, cited_evidence_ids: [`PUB-${row.canonical_id}`] }));
+    const checked = await validateAnswer(snapshot, claims);
+    if (checked.gate_status !== "PASS" || checked.final_claims.some(claim => claim.support_status !== "SUPPORTED")) return { ...result, reason_code: "OUTPUT_REJECTED" };
+    return { ...result, status: "ANSWER_READY", sources: selected.map(source), answer: checked.answer,
+      answer_evidence_receipt: checked.receipt, reason_code: null };
+  } catch (error) {
+    return { ...result, reason_code: error instanceof ResearchError ? error.code : "OUTPUT_REJECTED" };
+  }
+}
+
 class GatewayError extends Error {
   constructor(code, message, status = 400) { super(message); this.code = code; this.status = status; }
 }
@@ -770,7 +817,12 @@ export default {
 
       }
       if (request.method === "GET" && url.pathname === "/capabilities") return responseJson({ schema_version: 1, server_version: SERVER_VERSION, read_only: true, release: snapshot.release, capabilities: ["search_evidence", "get_current_brief", "get_publication_receipt", "get_source_health", "validate_answer"], unavailable_capabilities: DOMAIN_CAPABILITIES, policy: snapshot.policyBinding, retention: retentionPolicy(snapshot) }, 200, request, env);
-      if (request.method !== "POST" || !["/query", "/mcp"].includes(url.pathname)) return responseJson(jsonError("NOT_FOUND", "route not found"), 404, request, env);
+      if (request.method !== "POST" || !["/query", "/mcp", "/research"].includes(url.pathname)) return responseJson(jsonError("NOT_FOUND", "route not found"), 404, request, env);
+      if (url.pathname === "/research") {
+        const input = await readBoundedJson(request, 8192);
+        if (typeof input?.release_id !== "string" || input.release_id !== snapshot.release.release_id) throw new GatewayError("QUERY_TEMPORARILY_UNAVAILABLE", "Research release mismatch; reload the publication", 503);
+        return responseJson(await executeResearch(snapshot, input, env, request), 200, request, env);
+      }
       const bytes = await request.arrayBuffer();
       if (bytes.byteLength > MAX_REQUEST_BYTES) return responseJson(jsonError("REQUEST_TOO_LARGE", "request exceeds byte budget"), 413, request, env);
       const input = JSON.parse(new TextDecoder().decode(bytes));
@@ -779,7 +831,7 @@ export default {
       return responseJson(await dispatchMcp(snapshot, input), 200, request, env);
     } catch (error) {
       if (!(error instanceof GatewayError)) console.error("gateway request failed");
-      const gatewayError = error instanceof GatewayError ? error : new GatewayError("UPSTREAM_UNAVAILABLE", "upstream publication is unavailable", 503);
+      const gatewayError = error instanceof GatewayError || error instanceof ResearchError ? error : new GatewayError("UPSTREAM_UNAVAILABLE", "upstream publication is unavailable", 503);
       return responseJson(jsonError(gatewayError.code, gatewayError.message), gatewayError.status, request, env);
     }
   },

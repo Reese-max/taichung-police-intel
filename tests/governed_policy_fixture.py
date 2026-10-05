@@ -24,7 +24,7 @@ RUNTIME_PATHS = (
     "intel_v2/located_facts.py", "intel_v2/freshness_policy.py", "intel_v2/public_brief.py",
     "workers/query-gateway/src/index.js", "apps/web/lib/answer-evidence-gate.js",
     "apps/web/lib/publication-dates.js",
-    "workers/query-gateway/src/public-brief.js",
+    "workers/query-gateway/src/public-brief.js", "workers/query-gateway/src/research.js",
     "apps/web/lib/council-prep.js", "docs/govintel/source-catalog.v2.json",
     "docs/govintel/retention-rights-policy.v1.json", "docs/govintel/source-policy.approved.json",
 )
