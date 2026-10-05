@@ -29,7 +29,7 @@
     }
   ],
   "baseline_established_at": "2026-08-27T12:13:22+08:00",
-  "generated_at": "2026-10-05T09:08:39+08:00",
+  "generated_at": "2026-10-06T00:16:44+08:00",
   "generator_version": 2,
   "mode": "V2_SHADOW",
   "other_changes": [],
@@ -119,15 +119,27 @@
   ],
   "schema_version": 1,
   "snapshot_complete": false,
-  "source_collection_run_id": "CR-DEMO-20261005-MORNING-SCHEDULE",
+  "source_collection_run_id": "CR-DEMO-20261005-EVENING-MANUAL",
   "source_health": {
     "failed_count": 1,
     "gap_count": 8,
     "pass_count": 4,
-    "stale_count": 2,
+    "stale_count": 3,
     "status": "PARTIAL"
   },
-  "source_status_generated_at": "2026-10-05T09:08:39+08:00",
+  "source_policy": {
+    "active_source_ids": [
+      "S-004",
+      "S-006",
+      "S-007",
+      "S-009",
+      "S-029"
+    ],
+    "catalog_hash": "95ae82270eaab6f6270d9c00c8122e9bcfafbaf0dd216dc575a5f0b99544c51a",
+    "policy_hash": "3404809ff40f7647c44203329d4476b12b62e9ee64df24cd1f1f46cbda59caf4",
+    "policy_version": 1
+  },
+  "source_status_generated_at": "2026-10-06T00:16:44+08:00",
   "status_message": "本期未偵測到可確認的新增或修正；歷史資料保留於資料庫。",
   "tracking_items": []
 }
