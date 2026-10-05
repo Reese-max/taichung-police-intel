@@ -4,16 +4,19 @@ from __future__ import annotations
 
 import argparse
 from collections import deque
+from contextlib import contextmanager
 from datetime import date, datetime, timedelta, timezone
 import hashlib
 import importlib.util
 import json
+import os
 import re
 from pathlib import Path
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from typing import Any, Callable
 from urllib.parse import quote, urlsplit
@@ -549,11 +552,13 @@ def validate_located_facts_bundle(bundle: Any, approved_source_ids: set[str]) ->
     return bundle
 
 
-def load_snapshot(
+def _load_current_snapshot(
     located_facts_path: Path | None = None,
     query_store_path: Path | None = None,
     public_events_path: Path | None = None,
     statistics_path: Path | None = None,
+    *,
+    preserve_artifacts: bool = False,
 ) -> dict[str, Any]:
     feed, feed_hash = qs.load_json(qs.DEFAULT_FEED)
     status, status_hash = qs.load_json(qs.DEFAULT_STATUS)
@@ -573,6 +578,15 @@ def load_snapshot(
         if store != expected_store:
             raise ValueError("query store does not match canonical publication artifacts")
     snapshot = {"store": store, "status": status, "brief": brief}
+    # Preserve the exact bytes, rather than re-serializing JSON and inventing a
+    # different publication hash. These copies are derived restart evidence.
+    if preserve_artifacts:
+        snapshot["canonical_artifacts"] = {}
+        for name, path in (("feed", qs.DEFAULT_FEED), ("status", qs.DEFAULT_STATUS), ("brief", qs.DEFAULT_BRIEF)):
+            raw = path.read_bytes()
+            if qs.sha256_bytes(raw) != artifact_hashes[name]:
+                raise ValueError("canonical artifacts changed while building query generation")
+            snapshot["canonical_artifacts"][name] = raw.decode("utf-8")
     if located_facts_path is not None:
         bundle = json.loads(located_facts_path.read_text(encoding="utf-8"))
         snapshot["located_facts"] = validate_located_facts_bundle(bundle, approved_evidence_source_ids())
@@ -581,6 +595,117 @@ def load_snapshot(
     if statistics_path is not None:
         snapshot["statistics_store"] = query_domain.load_statistics_store(statistics_path)
     return snapshot
+
+
+def _cached_snapshot(path: Path) -> dict[str, Any]:
+    cached, _ = qs.load_json(path)
+    if not isinstance(cached, dict) or cached.get("schema_version") != 1:
+        raise ValueError("unsupported query generation cache")
+    snapshot = cached.get("snapshot")
+    if not isinstance(snapshot, dict) or cached.get("snapshot_sha256") != _json_hash(snapshot):
+        raise ValueError("query generation cache hash mismatch")
+    artifacts = snapshot.get("canonical_artifacts")
+    if not isinstance(artifacts, dict) or set(artifacts) != {"feed", "status", "brief"} or any(
+        not isinstance(raw, str) for raw in artifacts.values()
+    ):
+        raise ValueError("query generation cache lacks canonical artifact bytes")
+    documents = {name: json.loads(raw) for name, raw in artifacts.items()}
+    hashes = {name: qs.sha256_bytes(raw.encode("utf-8")) for name, raw in artifacts.items()}
+    # Current approved policy still applies. A policy demotion or incompatible
+    # schema cannot be bypassed by falling back to an old persisted generation.
+    expected = qs.build_store(documents["feed"], documents["status"], documents["brief"], hashes)
+    if snapshot.get("store") != expected or snapshot.get("status") != documents["status"] or snapshot.get("brief") != documents["brief"]:
+        raise ValueError("query generation cache does not match its canonical publication")
+    QueryGateway(snapshot)  # revalidate optional evidence/domain stores as well
+    return snapshot
+
+
+def _write_generation_cache(path: Path, snapshot: dict[str, Any]) -> None:
+    cached = {"schema_version": 1, "snapshot": snapshot, "snapshot_sha256": _json_hash(snapshot)}
+    payload = qs.canonical_json(cached) + b"\n"
+    if len(payload) > qs.MAX_BYTES:
+        raise ValueError("query generation cache exceeds byte limit")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile("wb", dir=path.parent, delete=False) as handle:
+            temporary = Path(handle.name)
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+        if os.name != "nt":
+            # File fsync does not persist the directory entry created by rename.
+            # Flush that entry before reporting a successful retained generation.
+            directory_fd = os.open(path.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
+@contextmanager
+def _generation_lock(path: Path):
+    """Only one startup rebuild may replace a service's retained generation."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.with_name(path.name + ".lock").open("a+b") as handle:
+        if os.name == "nt":
+            import msvcrt
+            if handle.tell() == 0:
+                handle.write(b"0"); handle.flush()
+            handle.seek(0)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+            try:
+                yield
+            finally:
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            try:
+                yield
+            finally:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+def load_snapshot(
+    located_facts_path: Path | None = None,
+    query_store_path: Path | None = None,
+    public_events_path: Path | None = None,
+    statistics_path: Path | None = None,
+    *,
+    last_good_path: Path | None = None,
+) -> dict[str, Any]:
+    """Build one generation; an opt-in cache preserves a validated restart fallback.
+
+    No public tool writes this cache. A failed build or pre-rename write leaves
+    the old bytes intact; fallback is identified as a retained historical index.
+    """
+    if last_good_path is None:
+        return _load_current_snapshot(located_facts_path, query_store_path, public_events_path, statistics_path)
+    inputs = (qs.DEFAULT_FEED, qs.DEFAULT_STATUS, qs.DEFAULT_BRIEF,
+              located_facts_path, query_store_path, public_events_path, statistics_path)
+    if last_good_path.resolve() in {path.resolve() for path in inputs if path is not None}:
+        raise ValueError("query generation cache must not overwrite a canonical or query input")
+    try:
+        with _generation_lock(last_good_path):
+            snapshot = _load_current_snapshot(located_facts_path, query_store_path, public_events_path, statistics_path,
+                                              preserve_artifacts=True)
+            QueryGateway(snapshot)
+            _write_generation_cache(last_good_path, snapshot)
+        return snapshot
+    except (ValueError, OSError) as error:
+        snapshot = _cached_snapshot(last_good_path)
+        snapshot["rebuild_failure"] = {
+            "error_class": type(error).__name__,
+            "serving_generation_id": snapshot["store"]["generation_id"],
+            "observed_at": datetime.now(timezone.utc).isoformat(),
+        }
+        return snapshot
 
 
 def _json_hash(value: Any) -> str:
@@ -671,14 +796,24 @@ class QueryGateway:
         capability_id: str = "publication_metadata",
         expected_generation: str | None = None,
     ) -> dict[str, Any]:
-        return qs.query_store(
+        return self._index_scope(qs.query_store(
             self.store,
             source_id=source_id,
             limit=1,
             now=_now(now),
             capability_id=capability_id,
             expected_generation=expected_generation,
-        )
+        ))
+
+    def _index_scope(self, scope: dict[str, Any]) -> dict[str, Any]:
+        if not self.snapshot.get("rebuild_failure"):
+            return scope
+        scope["data_status"] = "STALE"
+        scope["answerable_no_match"] = False
+        scope["source_gaps"] = [*scope["source_gaps"], {"reason": "QUERY_INDEX_REBUILD_FAILED"}]
+        scope["query_coverage"] = {**scope["query_coverage"], "can_state_bounded_no_match": False,
+                                   "status": "STALE", "index_status": "STALE_INDEX"}
+        return scope
 
     @staticmethod
     def _trusted_evidence_catalog(
@@ -926,6 +1061,8 @@ class QueryGateway:
                 "issued_at": queried_at,
             },
             **payload,
+            **({"query_index_status": "STALE_INDEX", "rebuild_failure": self.snapshot["rebuild_failure"]}
+               if self.snapshot.get("rebuild_failure") else {}),
         }
 
     @staticmethod
@@ -1087,6 +1224,8 @@ class QueryGateway:
         if tool == "query_statistics":
             return self._execute_statistics(args, now)
         if tool == "validate_answer":
+            if self.snapshot.get("rebuild_failure"):
+                raise GatewayError("STALE_INDEX", "query rebuild failed; retained historical index cannot validate current answers", 503)
             claims = args.get("claims")
             if not isinstance(claims, list) or not 1 <= len(claims) <= 32:
                 raise GatewayError("INVALID_ARGUMENTS", "validate_answer requires 1 to 32 structured claims")
@@ -1123,7 +1262,7 @@ class QueryGateway:
             )
         if tool == "search_evidence":
             query_args = {"text": args.get("q"), **{key: value for key, value in args.items() if key != "q"}}
-            result = qs.query_store(self.store, now=now, **query_args)
+            result = self._index_scope(qs.query_store(self.store, now=now, **query_args))
             return self._envelope(
                 tool,
                 args,
@@ -1240,7 +1379,9 @@ class QueryGateway:
             "schema_version": 1,
             "service": "govintel-query-gateway",
             "server_version": SERVER_VERSION,
-            "status": "ok",
+            "status": "degraded" if self.snapshot.get("rebuild_failure") else "ok",
+            **({"query_index_status": "STALE_INDEX", "rebuild_failure": self.snapshot["rebuild_failure"]}
+               if self.snapshot.get("rebuild_failure") else {}),
             "publication_freshness": _freshness(scope["data_status"]),
             "publication_id": self.store["generated_from"]["collection_run_id"],
             "publication_hash": self.store["generated_from"]["brief_sha256"],
@@ -1457,6 +1598,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--query-store", type=Path)
     parser.add_argument("--public-events", type=Path)
     parser.add_argument("--statistics", type=Path)
+    parser.add_argument("--last-good-snapshot", type=Path, help="Operator-managed persistent generation cache; failed rebuilds serve a validated stale snapshot")
     return parser.parse_args()
 
 
@@ -1464,7 +1606,8 @@ def main() -> int:
     args = parse_args()
     server = build_server(
         args.host, args.port,
-        QueryGateway(load_snapshot(args.located_facts_bundle, args.query_store, args.public_events, args.statistics)),
+        QueryGateway(load_snapshot(args.located_facts_bundle, args.query_store, args.public_events, args.statistics,
+                                   last_good_path=args.last_good_snapshot)),
         args.allow_origin, args.rate_limit,
     )
     print(f"QUERY_GATEWAY_LISTENING http://{args.host}:{server.server_port}", flush=True)
