@@ -3,8 +3,11 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
+import sys
 import tempfile
+import textwrap
 import threading
 import unittest
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -241,6 +244,114 @@ class PublicationStateBranchTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "pending publication"):
             module.persist(self.work, "publication-state", "102", "1", "morning")
         self.assertEqual(self.head(), before)
+
+    def run_pages_schema_step(self, *, pending, interrupted=False):
+        if not shutil.which("bash") or not shutil.which("timeout"):
+            self.skipTest("the Pages shell requires bash and timeout")
+        from scripts import schema_drift
+
+        module.restore(self.work, "publication-state")
+        state_path = self.work / "state/schema-drift-state.json"
+        state_path.write_text(json.dumps(schema_drift.empty_state()) + "\n", encoding="utf-8")
+        if pending:
+            module.persist(self.work, "publication-state", "schema-seed", "1", "code")
+        output = self.root / "restore-output"
+        with mock.patch.dict(os.environ, {"GITHUB_OUTPUT": str(output)}):
+            module.restore(self.work, "publication-state")
+        # Non-pending legacy fixture state is deliberately just opaque bytes.
+        if not pending:
+            state_path.write_text(json.dumps(schema_drift.empty_state()) + "\n", encoding="utf-8")
+        before = module.read_working_bundle(self.work)
+        checkpoint = self.head()
+
+        workflow = (SCRIPT.parents[1] / ".github/workflows/pages.yml").read_text()
+        step = workflow.split("        id: schema_drift\n", 1)[1].split("\n      - name:", 1)[0]
+        self.assertIn("PENDING_RECOVERY: ${{ steps.restore_state.outputs.pending_recovery }}", step)
+        script = textwrap.dedent(step.split("        run: |\n", 1)[1])
+        restore = dict(line.split("=", 1) for line in output.read_text().splitlines())
+        self.assertEqual(restore["pending_recovery"], str(pending).lower())
+
+        observed_at = "2026-10-05T00:00:00+00:00"
+        sample = {"success": True, "data": {"data": [{
+            "proceedingsId": "SYNTHETIC-SCHEMA-PROBE", "date": "2026-10-05T00:00:00",
+            "speaker": "synthetic", "content": "synthetic schema observation",
+        }], "totalPages": 1, "totalCount": 1}}
+        observations = self.root / "synthetic-schema-observations.json"
+        observations.write_text(json.dumps([{
+            "source_id": "S-007", "body_text": json.dumps(sample), "http_status": 200,
+            "content_type": "application/json", "observed_at": observed_at,
+        }]), encoding="utf-8")
+        receipt_path = self.work / "apps/web/public/data/schema-drift.json"
+        receipt_path.write_text('{"from_old_run":true}\n', encoding="utf-8")
+        calls_path = self.root / "schema-calls.jsonl"
+        bin_dir = self.root / "schema-test-bin"
+        bin_dir.mkdir()
+        python = bin_dir / "python"
+        # Replace only external live input. Execute the actual schema CLI and
+        # the actual workflow shell, including its interrupted-probe fallback.
+        python.write_text(f"#!{sys.executable}\n" + textwrap.dedent('''
+            import json, os, sys
+            from pathlib import Path
+            args = sys.argv[1:]
+            with Path(os.environ["SCHEMA_REPLAY_CALLS"]).open("a") as handle:
+                handle.write(json.dumps(args) + "\\n")
+            if "--live" in args:
+                if os.environ["SCHEMA_REPLAY_INTERRUPT"] == "1":
+                    raise SystemExit(124)
+                index = args.index("--live")
+                args[index:index + 1] = ["--input", os.environ["SCHEMA_REPLAY_INPUT"]]
+            args[args.index("scripts/schema_drift.py")] = os.environ["SCHEMA_REPLAY_SCRIPT"]
+            os.execv(sys.executable, [sys.executable, *args])
+        '''), encoding="utf-8")
+        python.chmod(0o755)
+        result = subprocess.run(["bash", "-c", script], cwd=self.work, capture_output=True,
+                                text=True, timeout=20, env={
+            **os.environ, "PATH": str(bin_dir) + os.pathsep + os.environ.get("PATH", ""),
+            "PENDING_RECOVERY": restore["pending_recovery"],
+            "SCHEMA_REPLAY_INPUT": str(observations),
+            "SCHEMA_REPLAY_SCRIPT": str(SCRIPT.with_name("schema_drift.py")),
+            "SCHEMA_REPLAY_CALLS": str(calls_path),
+            "SCHEMA_REPLAY_INTERRUPT": "1" if interrupted else "0",
+        })
+        self.assertEqual(result.returncode, 124 if interrupted else 0, result.stdout + result.stderr)
+        calls = [json.loads(line) for line in calls_path.read_text().splitlines()]
+        self.assertIn("--live", calls[0])
+        for call in calls:
+            self.assertEqual("--preserve-state" in call, pending)
+        receipt = json.loads(receipt_path.read_text())
+        self.assertNotIn("from_old_run", receipt)
+        self.assertTrue(receipt["generated_at"])
+        if interrupted:
+            self.assertEqual(len(calls), 2)
+            self.assertIn("--live-interrupted-receipt", calls[1])
+            self.assertEqual(receipt["overall"], "BLOCKED")
+        else:
+            source = next(row for row in receipt["sources"] if row["source_id"] == "S-007")
+            self.assertEqual(source["observed_at"], observed_at)
+            self.assertEqual(source["status"], "NO_DRIFT")
+        return before, checkpoint
+
+    def test_pending_pages_schema_probe_refreshes_receipt_without_changing_checkpoint(self):
+        before, checkpoint = self.run_pages_schema_step(pending=True)
+        self.assertEqual(module.read_working_bundle(self.work), before)
+        self.assertFalse(module.persist(self.work, "publication-state", "replay", "1", "code"))
+        self.assertEqual(self.head(), checkpoint)
+
+    def test_interrupted_pending_pages_probe_keeps_state_and_fresh_failure_receipt(self):
+        before, checkpoint = self.run_pages_schema_step(pending=True, interrupted=True)
+        self.assertEqual(module.read_working_bundle(self.work), before)
+        self.assertFalse(module.persist(self.work, "publication-state", "replay", "1", "code"))
+        self.assertEqual(self.head(), checkpoint)
+
+    def test_nonpending_pages_schema_probe_advances_durable_state(self):
+        before, checkpoint = self.run_pages_schema_step(pending=False)
+        after = module.read_working_bundle(self.work)
+        self.assertNotEqual(after["state/schema-drift-state.json"], before["state/schema-drift-state.json"])
+        for path in module.STATE_PATHS:
+            if path != "state/schema-drift-state.json":
+                self.assertEqual(after[path], before[path])
+        self.assertTrue(module.persist(self.work, "publication-state", "probe", "1", "code"))
+        self.assertNotEqual(self.head(), checkpoint)
 
     def test_restore_exposes_pending_recovery_without_changing_data_time(self):
         self.save_pending()

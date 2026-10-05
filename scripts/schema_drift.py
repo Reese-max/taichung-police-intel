@@ -1123,6 +1123,8 @@ def main(argv: list[str] | None = None) -> int:
     source.add_argument("--live-interrupted-receipt", action="store_true")
     parser.add_argument("--state", type=Path, default=DEFAULT_STATE)
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
+    parser.add_argument("--preserve-state", action="store_true",
+                        help="Write a fresh observation receipt without advancing durable schema state")
     parser.add_argument("--self-check", action="store_true")
     args = parser.parse_args(argv)
     if args.self_check:
@@ -1141,8 +1143,10 @@ def main(argv: list[str] | None = None) -> int:
     # Persist whenever observations were actually collected, otherwise the
     # last-known-good, the fingerprint history and resource-id drift can never
     # survive a run. The interrupted fallback deliberately leaves the state
-    # untouched: it records no observation worth keeping.
-    if args.input or args.live:
+    # untouched: it records no observation worth keeping. Pending publication
+    # replay also preserves the exact durable bundle while emitting a fresh
+    # receipt from the current observations and the stored baseline.
+    if (args.input or args.live) and not args.preserve_state:
         _write_state(args.state, next_state)
     print(f"SCHEMA_DRIFT_RECEIPT_OK overall={receipt['overall']} sources={len(receipt['sources'])} output={args.output}")
     return 0

@@ -141,14 +141,20 @@ jobs:
         id: schema_drift
         shell: bash
         timeout-minutes: 47
+        env:
+          PENDING_RECOVERY: ${{ steps.restore_state.outputs.pending_recovery }}
         run: |
           set -euo pipefail
           output=apps/web/public/data/schema-drift.json
+          schema_args=()
+          if [[ "$PENDING_RECOVERY" == "true" ]]; then
+            schema_args+=(--preserve-state)
+          fi
           # Never export a receipt checked out from main as this run's result.
           rm -f "$output"
           # The observed successful probe took 25 minutes; allow slow official sites.
           if timeout --signal=TERM --kill-after=5s 45m \
-            python -X utf8 scripts/schema_drift.py --live \
+            python -X utf8 scripts/schema_drift.py --live "${schema_args[@]}" \
               --state state/schema-drift-state.json --output "$output"; then
             exit 0
           else
@@ -156,7 +162,7 @@ jobs:
           fi
           if [[ "$status" -eq 124 || "$status" -eq 137 ]]; then
             echo "::error::Source contract drift live probe was interrupted (exit $status)."
-            python -X utf8 scripts/schema_drift.py --live-interrupted-receipt \
+            python -X utf8 scripts/schema_drift.py --live-interrupted-receipt "${schema_args[@]}" \
               --state state/schema-drift-state.json --output "$output"
           fi
           exit "$status"
