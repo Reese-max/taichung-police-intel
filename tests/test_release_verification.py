@@ -135,14 +135,20 @@ class ReleaseVerificationTests(unittest.TestCase):
 
     def test_each_worker_surface_must_match_the_pages_release(self):
         for route in ("health", "capabilities", "get_publication_receipt", "search_evidence", "initialize", "tools/list", "tools/call"):
-            for field in ("code_sha", "release_id", "publication_generation", "source_policy_hash", "query_generation", "evidence_catalog_hash"):
+            for field in ("code_sha", "release_id", "publication_generation", "publication_hash",
+                          "artifact_hashes", "source_policy_hash", "query_generation", "evidence_catalog_hash"):
                 with self.subTest(route=route, field=field):
                     client = PublicationClient()
                     def mutate(actual_route, document):
                         if route == actual_route:
                             target = document.get("result", document)
                             target = target.get("structuredContent", target)
-                            target["release"][field] = "mixed-release"
+                            if field == "artifact_hashes":
+                                # A same-shape tamper (one flipped artifact hash)
+                                # must fail closed, not just a type change.
+                                target["release"][field] = {**target["release"][field], "feed": "f" * 64}
+                            else:
+                                target["release"][field] = "mixed-release"
                     client.mutate = mutate
                     with self.assertRaisesRegex(RuntimeError, "release"):
                         module.verify("https://gateway.example", PUBLIC, client)
