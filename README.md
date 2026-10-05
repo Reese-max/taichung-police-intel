@@ -130,6 +130,36 @@ python scripts/query-store.py build --output runtime/query-store.json
 python scripts/query-gateway.py --query-store runtime/query-store.json --port 8788 --allow-origin http://localhost:3000
 ```
 
+For a persistent local service, opt in to a last-good generation cache outside
+the public site directory:
+
+```bash
+python scripts/query-gateway.py --last-good-snapshot .runtime/query-generations/gateway.json --port 8788
+python scripts/query-gateway-stdio.py --last-good-snapshot .runtime/query-generations/gateway.json
+```
+
+Each startup validates one complete publication and atomically saves its exact
+canonical bytes and query projection. If the next build or cache write fails,
+the service can restart from the previous validated generation. Responses retain
+that generation's IDs and hashes, show `STALE_INDEX`, and disable current-answer
+validation and bounded no-result claims. `/health` reports `degraded`. A missing,
+inconsistently hashed or policy-incompatible cache still refuses startup; the cache never
+licenses a source demoted by the current approved policy. A later valid rebuild
+replaces the cache and restores the regular response contract.
+
+The cache is trusted, operator-owned local restart evidence, written with mode
+0600 and a single-writer OS lock. Its unkeyed hashes detect corruption and
+inconsistent artifacts; they do not authenticate a cache against someone who
+can rewrite its bytes and hashes. Protect the cache's parent directory as part
+of the service configuration. POSIX writes flush the file and its renamed
+directory entry before reporting success. Failure before rename preserves the
+old bytes; a flush failure after rename retains the readable validated cache
+with `STALE_INDEX` instead of claiming a successful durable rebuild.
+
+HTTP/MCP tools remain read-only. Use one cache per configured service and keep
+it out of public artifacts. This local Python option does not deploy or change
+the Cloudflare Worker or the published canonical source data.
+
 For an MCP client using stdio, run `python scripts/query-gateway-stdio.py`; it
 reuses the same read-only JSON-RPC gateway. A reviewed located-facts bundle can
 be loaded with `--located-facts-bundle`; only hash-bound

@@ -33,9 +33,11 @@ def main() -> int:
     parser.add_argument("--query-store", type=Path)
     parser.add_argument("--public-events", type=Path)
     parser.add_argument("--statistics", type=Path)
+    parser.add_argument("--last-good-snapshot", type=Path)
     args = parser.parse_args()
     gateway = gateway_module.QueryGateway(
-        gateway_module.load_snapshot(args.located_facts_bundle, args.query_store, args.public_events, args.statistics)
+        gateway_module.load_snapshot(args.located_facts_bundle, args.query_store, args.public_events, args.statistics,
+                                     last_good_path=args.last_good_snapshot)
     )
     stdin = getattr(sys.stdin, "buffer", sys.stdin)
     while True:
