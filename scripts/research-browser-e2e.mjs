@@ -78,7 +78,7 @@ try {
     return route.continue();
   });
   await page.goto(`${origin}/ask/`);
-  await page.waitForURL("**/research/");
+  await page.waitForURL(url => url.origin === origin && url.pathname.replace(/\/$/, "") === "/research");
   assert.equal(await page.getByRole("navigation", { name: "主要導覽" }).getByRole("link", { name: "公開研究", exact: true }).count(), 1);
   assert.equal(await page.getByRole("link", { name: "Ask GovIntel", exact: true }).count(), 0);
   checks.push("legacy /ask alias replaces navigation into the single /research entry");
