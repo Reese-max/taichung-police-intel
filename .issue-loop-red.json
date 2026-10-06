@@ -1,0 +1,7 @@
+{
+  "repo": "Reese-max/taichung-police-intel",
+  "issue": 29,
+  "base_sha": "2c660cef6f1b1fbf86b141306e54d06e0511c9f9",
+  "command": "python -X utf8 -c \"import sys; ws='workers/query-gateway/src/index.js'; source=open(ws).read(); allowed_start=source.find('const allowed = {'); allowed_section=source[allowed_start:source.find('}', allowed_start+1)]; print('RED' if 'chat_turn' not in allowed_section else 'GREEN'); sys.exit(1 if 'chat_turn' not in allowed_section else 0)\"",
+  "exit": 1
+}
