@@ -362,6 +362,10 @@ def detail_recheck_candidates(outcomes: Iterable[dict[str, Any]]) -> list[dict[s
     for row in outcomes:
         if not isinstance(row, dict):
             raise ValueError("detail recheck outcome must be an object")
+        if row.get("status") == "SKIPPED":
+            # A budget-refused target carries no document evidence, so it can
+            # never produce a review candidate.
+            continue
         classification = row.get("classification")
         if not isinstance(classification, dict):
             raise ValueError("detail recheck classification is required")

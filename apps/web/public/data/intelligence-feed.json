@@ -3,6 +3,7 @@
   "generated_at": "2026-09-11T08:23:26+08:00",
   "items": [
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "",
       "content_sha256": "18e2745a002bbc0962a16eb4f27d2660e3a61a0215fd5a50bb258df179d0a5f6",
@@ -11,6 +12,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "STALE",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 80,
       "next_milestone": null,
       "official_url": "https://www.tccc.gov.tw/pic/DocCouncil/17851655792861(1).doc",
@@ -26,6 +28,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "",
       "content_sha256": "6db7c5b2b5a9f1fae47fa71901fb4ca6093a87fbc4acd96ea2730de631ca65bf",
@@ -34,6 +37,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://www.tccc.gov.tw/pic/DocCouncil/17851628782860(1).doc",
@@ -49,6 +53,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "",
       "content_sha256": "cf19ce4cb1a7198edab073305e928cebcccaf193aa018c5c3349d64009bda59d",
@@ -57,6 +62,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://www.tccc.gov.tw/pic/DocCouncil/17882754682859(1).doc",
@@ -72,6 +78,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "",
       "content_sha256": "b075cd9dcaeb63aeb7cdadadd68454976ed94543f3097ae2c062cbb978b051bb",
@@ -80,6 +87,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://www.tccc.gov.tw/pic/DocCouncil/17851627092858(1).doc",
@@ -95,6 +103,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "",
       "content_sha256": "78d181c5e533cbd17961d92bf99922d6bca9100d8df9a365ec20a874ae592fb4",
@@ -103,6 +112,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://www.tccc.gov.tw/pic/DocCouncil/17851626392857(1).doc",
@@ -118,6 +128,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "",
       "content_sha256": "080804e88a1fccf5059e01bd8459fd95ecedbb0d2686cab187c54d247af710d6",
@@ -126,6 +137,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://www.tccc.gov.tw/pic/DocCouncil/17851625432855(1).doc",
@@ -141,6 +153,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "",
       "content_sha256": "81e00c940bab532c69a16306628d1e84464e09e04ed3403a6a2addc0c7bbb330",
@@ -149,6 +162,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://www.tccc.gov.tw/pic/DocCouncil/17851624952854(1).docx",
@@ -164,6 +178,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "",
       "content_sha256": "4840ed1525a0a5c46967b2d2b3bda26f1a9e4c657db4a1369ee24fb54909991c",
@@ -172,6 +187,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://www.tccc.gov.tw/pic/DocCouncil/17885343862853(1).doc",
@@ -187,6 +203,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "c31f7a99f577adb1c4a74867de042d28451fa20b10bc1ee6121230f5d8482a69",
@@ -195,6 +212,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/7bbd2bb0-20da-48e8-9a01-08dee6e33192",
@@ -210,6 +228,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "19a9ec20e3fdee7b769dc22b9e4a6d996889d442f05eb5c5373e81823e5999df",
@@ -218,6 +237,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/584c5a02-de46-4baa-a33a-08dee170c2a2",
@@ -233,6 +253,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "ad267e3d367cfbd060d217ff033b173726187602e311af8b9300388920e7c0e7",
@@ -241,6 +262,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/215f0dcc-0bea-48c7-5978-08def11e5708",
@@ -256,6 +278,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-消防",
       "content_sha256": "1d6d4e5cbf086e112497642ea92f07fd480eff8271ea222316b989d8be556ab7",
@@ -264,6 +287,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/5812f4c9-7c27-4343-21d3-08dea68abbf3",
@@ -279,6 +303,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "d002d1ea0f37bf3bb936f12db9f0d70818ac9aaf43efb8675ca258ff7788c20d",
@@ -287,6 +312,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/a7086c02-a10d-47af-fbfc-08de8871c31e",
@@ -302,6 +328,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "6f7bc74c127d8e6b15551a38d961321e2477c8b5d6d0e90492baf8880880b773",
@@ -310,6 +337,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/50733845-398e-483a-f248-08de09faa5f7",
@@ -325,6 +353,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "12e40badaeca2c04e48d99c933ac68136228e56931f6ba45707f9492a808c78c",
@@ -333,6 +362,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/34cd50aa-5884-4ae2-f5fe-08de225e92ca",
@@ -348,6 +378,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "cf8f98c875d61326cf6b140256caf76f6e53d77251c63c756aa0091b46839802",
@@ -356,6 +387,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/7023af16-4688-456a-f8ca-08de1cc538b1",
@@ -371,6 +403,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "4f086acd0f86d2c99ce27a8e497c8ef79247210e30907836953c4a54f9fc1142",
@@ -379,6 +412,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/9edb08be-b194-4787-2267-08de1c0f6913",
@@ -394,6 +428,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "25e2f760fc5b0c0d6d5f669e8e60a6b17d3ce84d5d7db6b4d50d2ff4c4b1f863",
@@ -402,6 +437,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/ebc42014-9af1-422e-1c48-08dde9bbf3b2",
@@ -417,6 +453,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "1387c8fe4996593df294445af3d3647357aec35837273c6bdeb8af01aac9b049",
@@ -425,6 +462,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/30585d1f-d7b6-4af7-76c4-08ddf4be043f",
@@ -440,6 +478,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "0545bd52ababde729b70fcfb2ecea6062843b3c4cdb595d172105e993ff85e96",
@@ -448,6 +487,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/90735fd1-aec9-4de9-d422-08ddf1b6b0e7",
@@ -463,6 +503,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "2d5c57f4a7799ddf64e85aefee4226b39c259c308792d6aad37c6ee1600d5791",
@@ -471,6 +512,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/1b8f5879-c0f8-4791-d421-08ddf1b6b0e7",
@@ -486,6 +528,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "f8afe4abf158bedd167cb39e1a4ee2c06c555add0168e19156b448f962fcb4b2",
@@ -494,6 +537,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/ef83bc74-c992-45f4-7925-08ddea824e82",
@@ -509,6 +553,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "財政經濟委員會-數位",
       "content_sha256": "57ba4c8733a1d303a7341f356c97cce6843f4db62cd8485676ce08de56ba7829",
@@ -517,6 +562,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/f40130f6-4413-4480-95ad-1a7a43b06868",
@@ -532,6 +578,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "9c339db38f82911c6c969ca387132fd1e62b0d070b0361b089eb222c783f95fe",
@@ -540,6 +587,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/0f9eb253-c7e8-4a08-beb9-6dcfca651e71",
@@ -555,6 +603,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "aedb99f66dffbae4d461f3f4f12eb11b7dea069c42809479ed4ceb6b6d104a1d",
@@ -563,6 +612,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/35c1f073-0f4d-4793-93ab-6251a03fe268",
@@ -578,6 +628,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "297e6a604e38dd9efaad4c4f8bce2fd2aaf295b6dbf146eb010564c9056c0a8f",
@@ -586,6 +637,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/a20e7920-6b73-40f8-a822-eb0b5b5c82d1",
@@ -601,6 +653,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "dfb76769ddcb0512d6c71571155101135891feb9ea936ee6a1d182618642b835",
@@ -609,6 +662,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/0432f596-d2fc-440f-9496-d03c50efe860",
@@ -624,6 +678,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "aa434283031cff2264146be6930c3d85725bca6c831376004e1a06a1b27f5a9f",
@@ -632,6 +687,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/a2f50b78-ee5c-4524-a1cf-e4dfd1c0ee9c",
@@ -647,6 +703,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "交通地政委員會-地政",
       "content_sha256": "0287b771ecf272d9a7844fa60b0f1c6616547560bbb35bc9fb1e9f90b0cd82d5",
@@ -655,6 +712,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/9b574c69-838b-4d25-87ec-f75a246a3913",
@@ -670,6 +728,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "52a6bc067762e0159a36049c377d14abcdb9eec8641705adbe827c978610a792",
@@ -678,6 +737,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/6259cb7e-9822-4877-9610-e7eb0f9ceb99",
@@ -693,6 +753,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "5f812a13b52988b342cb3456f9dd53469877ebe864bfba6bcce617bb5aad5270",
@@ -701,6 +762,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/27e3d20f-7dad-4343-888a-a27434ff49a5",
@@ -716,6 +778,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "1056edac4db9dbc8c135c7d1dbd26e7391e1400c8082eec35ef6e8b0b4d78494",
@@ -724,6 +787,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/8c5bdcf2-73e5-4ac4-a2f1-04e349a22d12",
@@ -739,6 +803,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "8d39556ae44ca8fd43faa30517e45f747443f95e2daf45fa19c7d279cde460ef",
@@ -747,6 +812,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/4ba78b79-f4f9-4748-8cd3-8c44efc5ae83",
@@ -762,6 +828,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "8f2795037beddd999e117fa59f9677bc7266b9a0fda532efef553a40c08bd18c",
@@ -770,6 +837,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/08bd3d8e-db79-4bee-b1a5-0fa9a544c72a",
@@ -785,6 +853,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "民政委員會-民政",
       "content_sha256": "5c080354109037d69f5fc362579ef1de2a0af3e6e53c12a211a90440906e1b3b",
@@ -793,6 +862,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/df91b656-fd5c-4c82-a1e4-0933cab8aec8",
@@ -808,6 +878,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "59196116fe092e56452920e3d3681a3e603cd189076af0e419b7347ac87b48e8",
@@ -816,6 +887,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/c6f9ebbc-8f2c-46a1-9326-ee637763c0e5",
@@ -831,6 +903,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "079b72851b4b1221562277a4a0ba5db52f1e1b6d6c8aee4d6148cbd8e3b21e4d",
@@ -839,6 +912,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/8bae86f2-c883-4233-a25e-d4d245294aef",
@@ -854,6 +928,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "8ea10318c39d2dd4136c9bb64428a0fb0ec4b9dbb8c13482f4de3a62503250ab",
@@ -862,6 +937,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/7671b166-f4a8-4303-af88-1163b2512159",
@@ -877,6 +953,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "4f514cd4ad56cf256641f4edf2f698ed64f6e1e3f7979c8a8275819c55a8ef08",
@@ -885,6 +962,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/8c936817-7589-4d43-9dca-7ad1b1ab9c0a",
@@ -900,6 +978,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "4dc8798624b21de5d602c66f88f3df12e0f706ed85bd11f7eb16b5743a901212",
@@ -908,6 +987,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/35b037eb-73c4-4307-b776-8572146442b4",
@@ -923,6 +1003,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "民政委員會-勞工",
       "content_sha256": "eb168cb062bc6ee08167aaa97ceb11383866843832df76d0fb13c995dada984c",
@@ -931,6 +1012,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/abc9291c-b0a2-4955-8b56-398cf9b7b999",
@@ -946,6 +1028,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "cec0ac19dbfc3b5386d3d8355d5e4dfa72e8ba813e7b3942353464506b42561a",
@@ -954,6 +1037,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/6f91254d-0c2d-4946-83e4-1b4a1f2ab9de",
@@ -969,6 +1053,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "8611794f389f6839ccf044f69bba5a88bf83ea357fcd63cc084b1a15fde8dc21",
@@ -977,6 +1062,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/4983fff0-e33e-4931-9ad3-74290d178c37",
@@ -992,6 +1078,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-環保",
       "content_sha256": "965d1c6bfbc5835ed28889436f595bfe975db0145eda5a731b6acd446ee9e6af",
@@ -1000,6 +1087,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/f09e8603-de1f-481e-bba9-c11eb22cf2fb",
@@ -1015,6 +1103,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "b26649e0921f071bafbce64b27544ec8724c79824bddc0c00c01c101d3e9bd70",
@@ -1023,6 +1112,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/22b2ccdb-f537-4d99-969f-7bd650094bf1",
@@ -1038,6 +1128,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "01fa69e64588461ceec71818f7482c6d26dba24400d2998f883371486143eb96",
@@ -1046,6 +1137,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/3850ad0c-29d6-4dec-bc39-5b7b7c1a48a8",
@@ -1061,6 +1153,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "d9a31e6d78b14ee37bc50fff8c877c4b6fe34278a372b967b53bdfe97edf290e",
@@ -1069,6 +1162,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/7f17b19c-cab3-474c-8557-bc3cec14af6a",
@@ -1084,6 +1178,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-消防",
       "content_sha256": "fb861e3886b0dc8805a051c1f83448132d4f528ada153196786fbb7e7010e441",
@@ -1092,6 +1187,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/2df39850-af72-4fcf-8f38-a8e1f83a717f",
@@ -1107,6 +1203,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "62777a557e5f6566f47f813099f90eeb85f8a961fc7564ebf40e3dee7c5cc06b",
@@ -1115,6 +1212,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/d848167b-3805-4b42-b0b7-4ab09ec11354",
@@ -1130,6 +1228,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "923062d0c47df441624aadfd3d5260a5fb37877e9e0b88779862e25f882a4d28",
@@ -1138,6 +1237,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/a82744ea-06b6-4bf2-ab2f-96f32a761955",
@@ -1153,6 +1253,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "657ae331d7c47d82f6fb1a16ffb6ad81a7ab4c1ac8204056ccc01e33c8aa67d8",
@@ -1161,6 +1262,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/9d0cf74f-4925-4477-8286-52a38e22a193",
@@ -1176,6 +1278,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "法規委員會-交通",
       "content_sha256": "928bb5c1ad0cf8ec6863b75545550364be8c2f188662d236f4ee6601ab2cdd2c",
@@ -1184,6 +1287,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/2c08eba5-4109-4ea8-8872-136527da6e6f",
@@ -1199,6 +1303,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "法規委員會-警察",
       "content_sha256": "467f7b0a347502f4c8ca48917f1e54cc07c9076d87c0bd13582d06d67a6020e1",
@@ -1207,6 +1312,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/25c3393e-0c66-4188-ba85-40dbabb17e34",
@@ -1222,6 +1328,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "7add09c7bc6203b1c058b5f6ad67f049e1b88376b33b8e4b689c5c3f365c54e1",
@@ -1230,6 +1337,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/4538820c-b11a-451d-b244-589ec00e6e82",
@@ -1245,6 +1353,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "d772fa5bd001c83f316d8224892bd2b84d0fb664fb038de45734ac4e34c4e47e",
@@ -1253,6 +1362,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/59a64b06-3e86-4827-8e6b-da962ab52528",
@@ -1268,6 +1378,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "12a6c33b8ab807358e0168cd0df8b0a39dc935f5ce57f782fc0e41b5f4b506e7",
@@ -1276,6 +1387,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/c2548fba-2e7d-48aa-b4b6-2cf547bdc3a9",
@@ -1291,6 +1403,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "a5b1a042c384f99fc03938ce31c4be29680fde7a584addc2aac00d245dffb359",
@@ -1299,6 +1412,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/daaebb6c-c18d-459f-a3e3-5200281f280a",
@@ -1314,6 +1428,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "26cd98d356a9e165441834aa0f060cf35071f242ab945f0e6f9459bdd75781f9",
@@ -1322,6 +1437,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/e50f54da-dc49-403f-afea-e3c92e02350d",
@@ -1337,6 +1453,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "c205c2bcb8aaf3493b866e16b08ac8be0ed5c4e42e5de1af14afe19c942e3c30",
@@ -1345,6 +1462,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/2ca5ebce-30df-4fb4-bc22-d56b1ae0bdf1",
@@ -1360,6 +1478,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "05c5629399ac1a648ce8c7a2811f9dae1dfb4737352af8cacb30db9033635cc2",
@@ -1368,6 +1487,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/13a3191f-7b1e-4aac-a6f5-392dcdc939ae",
@@ -1383,6 +1503,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "交通地政委員會-交通",
       "content_sha256": "e19bec8e178e9a265a8c777c7da998b490db38c4628f2791c0f89e8f1e62ebc8",
@@ -1391,6 +1512,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/a0b38ff5-1d9e-40eb-9ab8-6f38023a95e4",
@@ -1406,6 +1528,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "7e262664146500e7b268ce98e7a2e7462c8d9260a41d59074882a94a5c6f9978",
@@ -1414,6 +1537,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/1b04fd7e-37eb-495c-ba42-b898e50bdabb",
@@ -1429,6 +1553,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "6f93091ef951eb633d730e170bccb680f7123f4b15c5bc3674197d51ecaeb3f8",
@@ -1437,6 +1562,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/b8fc9ca6-df58-4a99-bab4-0a56f72ab424",
@@ -1452,6 +1578,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "財政經濟委員會-經發",
       "content_sha256": "1b801adfd7eb3e98fc7aa590c5523e6a4bcd50c170ae916a60cec8d2d76800ad",
@@ -1460,6 +1587,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/fc114a27-b042-4e0c-bf63-2adcbe7461de",
@@ -1475,6 +1603,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "e2b76ecb1816e3787eea500393a834487a97b4c370ec3a269d468ef2e0459909",
@@ -1483,6 +1612,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/26598527-0e4d-43c4-928a-b1c68363831a",
@@ -1498,6 +1628,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "2f0d2e3b1aaf21e20097666567c6d8c4f9a9532c59a34404dd34a6cc919c8c8a",
@@ -1506,6 +1637,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/66d3a731-aaf9-4978-9245-46a8229a27d8",
@@ -1521,6 +1653,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "交通地政委員會-交通",
       "content_sha256": "0d0773b323f8b25105b1b98446251268f7d41fd6bf8ec407e865495332665862",
@@ -1529,6 +1662,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/e01c95c8-cffd-4dff-a3c8-9be490fc985b",
@@ -1544,6 +1678,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "5c65450c476ab6fec2fde9b17917255173abf7c3f47b692f0886b3b1a7eebe55",
@@ -1552,6 +1687,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/75a92d60-957c-4d1a-997a-0a78607b4baf",
@@ -1567,6 +1703,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "d89650c5ef6c42863a719ad43df1a01c1ec6229c7b339ac06e4fceabd32ea177",
@@ -1575,6 +1712,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/78661caf-adcf-4403-81bd-ae191776d8bd",
@@ -1590,6 +1728,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "d4bc1aa76a7792d7439fe9875cc285d2d7ba59fee0c29e6939fa4f94ced3cffe",
@@ -1598,6 +1737,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/3701b526-bf81-44d6-b3c9-1a07821d03aa",
@@ -1613,6 +1753,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "交通地政委員會-交通",
       "content_sha256": "69319c13015214ae2c8fdc4e7f0e6d27e228019d65555c9526a5b2c2970041d4",
@@ -1621,6 +1762,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/1cb7527f-e0a8-4303-a2a0-6111e3cc8450",
@@ -1636,6 +1778,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "法規委員會-警察",
       "content_sha256": "6e9fd91417493def21a5d4ef58c403c8682344698b9411109d86caec3e9a013f",
@@ -1644,6 +1787,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/e9d4b6da-ebe8-447d-9a77-f00e1667f225",
@@ -1659,6 +1803,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "42a8f2a63c52ad826b03ac96b8fbc678868d2ce366a12641ef1bf0f78328fcbb",
@@ -1667,6 +1812,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/ab27cdd1-7e2b-4cb7-81ee-e404aeb1e186",
@@ -1682,6 +1828,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-消防",
       "content_sha256": "96bb0355445993f0e9b7c2e4a916a0fde40318fc94fdf81a575829d36bd05bfb",
@@ -1690,6 +1837,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/9b8d423d-9117-4f89-8fb7-ef0bee213d05",
@@ -1705,6 +1853,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "b881fef524dd3d0e8be318dc9e5a3ae3683885b63994937189588bbf5dddf8c1",
@@ -1713,6 +1862,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/489f3c1a-9ea8-4a20-9ca6-fd11e15a275e",
@@ -1728,6 +1878,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "3f6a0e6bca469701d6b3857b0f4521265e383ae09888a993a229e7232724d88b",
@@ -1736,6 +1887,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/fb4cf8a1-55b5-4b86-bb74-7aea5061070a",
@@ -1751,6 +1903,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "f96762a1b7f60606906b544e97a1c4c033557b73b0faeb94f04fb06e1a96815a",
@@ -1759,6 +1912,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/6a411c87-6b4c-4474-ac99-ccc63853371a",
@@ -1774,6 +1928,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "教育文化委員會-教育",
       "content_sha256": "32d222e6e852d9d488ed188fe1a6dd0afb18789a5662eda9b8ff7ea53454a7d7",
@@ -1782,6 +1937,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/7ccb1247-bb63-4b10-a282-a663af54d130",
@@ -1797,6 +1953,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "都發建設水利委員會-建設",
       "content_sha256": "17067428a5cce03448e15874bd65f292814812cff7d56aaadeb40495e39c34ac",
@@ -1805,6 +1962,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/2a187d8e-a511-4a50-9c7d-16e84992ad78",
@@ -1820,6 +1978,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "2367d7dac4842bbf520da25667f2b9c39b32c8e719bcfe0df12e0ecd2e27731d",
@@ -1828,6 +1987,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/93d6e244-3913-4d1f-a24c-4f9a7b7a4230",
@@ -1843,6 +2003,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "47a7b5fb9907f6a9869c0aa4ddc66456579dc523d2d0c30fb0c349fc3e10f7f4",
@@ -1851,6 +2012,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/f92e3994-1d5a-42c3-af95-604be38051f5",
@@ -1866,6 +2028,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "11e2fa45d29129e0c81fd18aedab29b3f711aad4878853ccbce7de22ca46188c",
@@ -1874,6 +2037,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/d80a3f3f-e3bf-45a5-a55a-1f7d9154db76",
@@ -1889,6 +2053,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "ebd33223ccd0a6d6e13742cb926ac1a7cf3ff4282f20236d57c93f75b2e92fba",
@@ -1897,6 +2062,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/70b9e5d5-ffdf-4c34-8a4b-752fd10b5929",
@@ -1912,6 +2078,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "2990f6821df504cd3272e87c8602eb117fde5cf988f2424977bec867a319df67",
@@ -1920,6 +2087,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/e5b73605-6cd6-49b5-a5ba-beb42ad1b8b9",
@@ -1935,6 +2103,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "ab9b499a8641f1166ea5a34ac42c0be5ae8214c14bcf27a7e77413df49198cf4",
@@ -1943,6 +2112,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/55867fae-2c48-4902-a5c5-e32085292a79",
@@ -1958,6 +2128,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "9c5fb1da0385c36755ad310a86bd029e6f57d77e5a65d784495e0e2e03ecfc78",
@@ -1966,6 +2137,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/b34f6c84-4637-48d6-ba93-1a4e2b915047",
@@ -1981,6 +2153,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "41a2cc945c4edabf0c8dab1cfd6693e102116904bf1bf25549fc65b3c2d2c798",
@@ -1989,6 +2162,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/f904ded6-ef63-4f6c-b866-ebb435e330bc",
@@ -2004,6 +2178,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "ddda8f4a9cc173940c0b2a0fc45d41169ce2ff8e327ca1ff3ec473fc52e42c4b",
@@ -2012,6 +2187,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/15e60df8-be74-44c8-9199-b247eb85abdc",
@@ -2027,6 +2203,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "c3826a4e7d3a89d24a21e184e112a3a91ed0a80b8661f815efb42be38285d717",
@@ -2035,6 +2212,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/549320fc-2ae1-4cb0-aab4-8bd9ef030b7b",
@@ -2050,6 +2228,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "f2b535ca0d1adc216e7efd1f67fdd2674477fdc827d5da58df14323a5d155d6b",
@@ -2058,6 +2237,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/55d3eaa2-bf0c-416a-83a8-4ca3a0ce877b",
@@ -2073,6 +2253,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "0381bb7634a07d0ad5977ccd93fd3f2373574e04aa61b127076789a20b640588",
@@ -2081,6 +2262,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/1806274a-48d9-4cd7-9faf-690ddb360522",
@@ -2096,6 +2278,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "02f1f94fce0e225cb5e92d9b32b76b3192de48eb90292d95aef9673ed0cd3015",
@@ -2104,6 +2287,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/6330e57f-dc66-4bbd-bf6c-631da941ee7f",
@@ -2119,6 +2303,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "c9fdf66c233cda5c7f6251c56a399d74948acc41b9138768a75d8c80485f4d98",
@@ -2127,6 +2312,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/b3428e50-14ad-4478-8509-5dfb3e9edaa2",
@@ -2142,6 +2328,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "18c4c5f4191ee20bce5abebc826ae062dc329666fbc8e5d3a6503721e108891f",
@@ -2150,6 +2337,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/30e3e70d-6c60-4ace-926b-76226874b36c",
@@ -2165,6 +2353,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "f68877aeaf0c56721d22cf0935c2b8339be688fd14fdbe905956cf7ff8605f22",
@@ -2173,6 +2362,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/5f02ff2d-89b3-41af-8866-05108b6d7d69",
@@ -2188,6 +2378,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "21a22ab9fda485e0c32c8bded41c0d15b134ccaecf51f173069cd448a2019ac6",
@@ -2196,6 +2387,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/cbcff7ed-29e2-4399-b375-fd311114175d",
@@ -2211,6 +2403,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "e358d0001a871eb1b914d96fbf3157d1e582e3cfa939b1362c4f15646f41a581",
@@ -2219,6 +2412,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/b275ef67-2f11-4425-ad97-574bb4b5ac93",
@@ -2234,6 +2428,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "4a244b5b20ca82afd0daafa4d93de0c8bd5efb7c43e9e1e2913c92740fd50fff",
@@ -2242,6 +2437,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/2f0ab7a3-7f75-41c3-9b7f-a33a286e7d53",
@@ -2257,6 +2453,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "15814d84607a67d9d656c5592030a8934355b411a2fc092ae4ffda1ebca0229c",
@@ -2265,6 +2462,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/7907b7a4-7594-4ad3-aece-4c7f6ff46273",
@@ -2280,6 +2478,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "a6ba51255e2d92209ab987a4e8b65d248d2e3cc372e8ddb4a5b86a149c8b32c4",
@@ -2288,6 +2487,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/b2d9019b-2d57-4d72-a77a-3e3758167ddf",
@@ -2303,6 +2503,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "3d5c29cad9b84bf15ec98ab2e6d2e5f83e16054b924085a22a4e2ac27454527e",
@@ -2311,6 +2512,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/5508fa73-b448-4d47-87f2-ce91a1a656b6",
@@ -2326,6 +2528,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "00d023504535b3b03927eb4eb9bfa4bd6dadd00a4097a95c62c3a9183eba381f",
@@ -2334,6 +2537,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/6611cb62-53ea-4b2d-abd9-1dbabaec6ac2",
@@ -2349,6 +2553,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "35059dc1293672fed5984b7420bfcc5d18404138642248e4e956bfc08b5cdbdb",
@@ -2357,6 +2562,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/e8552cc4-1637-41c4-8d5c-cb2f3f25039f",
@@ -2372,6 +2578,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "9e51da9afe4ee0af9c4a827e6bd160a33f4a35220f38e3ac86932becbdb30e5b",
@@ -2380,6 +2587,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/1f5fe6dd-d45a-4bb3-80a9-fcc0ab94b086",
@@ -2395,6 +2603,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "27df02f3e38cd7f416dda03f1643273e092c653ab0f470514af90ee125afa185",
@@ -2403,6 +2612,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/69aa62ee-c145-41c3-b4b2-ab58bca663e0",
@@ -2418,6 +2628,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "67dc1a5822d6594527cb596f8585d90c86b8e2dc8794e742532084ef1ab82a9c",
@@ -2426,6 +2637,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/556b7916-6625-4078-a00c-453fb32284c2",
@@ -2441,6 +2653,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "aea91aaffee6ffa8c085519252ca736816deb36efdc3d0fccd23292ef118ef2a",
@@ -2449,6 +2662,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/a0d8c08e-f679-4f06-a1c6-3863216e1438",
@@ -2464,6 +2678,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "47c5994acec5731b6494adafca8893f48f4be85887277807686eaff2ed6087dc",
@@ -2472,6 +2687,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/b2a40007-d873-4073-b2ad-7eb92a399887",
@@ -2487,6 +2703,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "民政委員會-民政",
       "content_sha256": "98e86bb1dbbc9920e8f795d280fa2dfbca75b2d6c7d32f081a666f83fa2fa896",
@@ -2495,6 +2712,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/a5fc786a-4997-4228-884d-5dc564f0942d",
@@ -2510,6 +2728,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "民政委員會-民政",
       "content_sha256": "5a271c9bb420908d56544762c196dd41a132fd571ed791b13a49f9904f2bf875",
@@ -2518,6 +2737,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/d8a0b037-3399-441c-9099-c0fc2f1d39a7",
@@ -2533,6 +2753,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "交通地政委員會-交通",
       "content_sha256": "c9765b7afd3b90d7f00e821f3060bb6b3378dd503c43225573df0a79bdbf55de",
@@ -2541,6 +2762,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/c37163ae-f6e7-4ce5-a5b8-a3d63c477c41",
@@ -2556,6 +2778,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "8ff1093ce086a7aff896806899ca15322465e5ef491035616d74e0055bc7ace6",
@@ -2564,6 +2787,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/e82a6c99-a1d5-47bc-9eb6-df89cd2783e4",
@@ -2579,6 +2803,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "9a9dea9289d39fb3f20652e93d48fd6ab8b9598268f8cd757b12cb387e217ccd",
@@ -2587,6 +2812,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/f50fa9c5-ef46-4196-8347-04074a040a71",
@@ -2602,6 +2828,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "c7da45ec4b603afb2e6f37cbb23b65d3c9802f37dcf00aa62d5a0e79239dc867",
@@ -2610,6 +2837,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/364cffb2-73e8-4139-a52b-a6e4f9f4b2cc",
@@ -2625,6 +2853,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "民政委員會-法制",
       "content_sha256": "442d3655de5423f23cd6bbf204150ab8debba3f82033762a8c44ff2d3fc86b0a",
@@ -2633,6 +2862,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/160fc4dd-6f8b-489e-81c5-b1857c221bf7",
@@ -2648,6 +2878,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_EVENT",
       "change_type": "CONFIRMED",
       "committee": "警消環衛委員會-警察",
       "content_sha256": "62cfdd13a53b913fc95b72207a6b9ae7b321526be4381e0c9ca6f424ce21c0f7",
@@ -2656,6 +2887,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "FRESH",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 70,
       "next_milestone": null,
       "official_url": "https://yishi.tccc.gov.tw/proposals/6c3bdcf0-411f-4b0e-b69d-ec7334723576",
@@ -2671,6 +2903,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_REFERENCE",
       "change_type": "CONFIRMED",
       "committee": "",
       "content_sha256": "79cb0a84437b3814067c12513a5a63845552dfc8e10f93042ae9d5c448c5ede3",
@@ -2679,6 +2912,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "STALE",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 80,
       "next_milestone": null,
       "official_url": "https://www.rdec.taichung.gov.tw/media/1443292/1150731-4-臺中市科技執法設置應以-危險路口改善為優先-執法為輔-之理念推動-罰鍰收入優先投入道路工程改善及標誌標線優化專案報告-警察-交通.pdf",
@@ -2694,6 +2928,7 @@
       "window_completeness": "COMPLETE_ZERO"
     },
     {
+      "catalog_role": "PRIMARY_REFERENCE",
       "change_type": "CONFIRMED",
       "committee": "",
       "content_sha256": "7c8df1961843aef2ba2771cfab2d0d68fc739e1e46c5f413a14d10593dbea40c",
@@ -2702,6 +2937,7 @@
       "evidence_count": 1,
       "fetched_at": "2026-09-11T08:23:26+08:00",
       "freshness_status": "STALE",
+      "integration_status": "PRODUCTION_ACTIVE",
       "item_value_score": 80,
       "next_milestone": null,
       "official_url": "https://www.rdec.taichung.gov.tw/media/1443294/1150803-2-菸品與依托咪酯進入校園-社會之防範-改善措施及各類毒品查緝績效專案報告-衛生-教育-警察.pdf",

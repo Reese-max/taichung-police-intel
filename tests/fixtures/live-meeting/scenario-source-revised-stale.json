@@ -1,0 +1,28 @@
+{
+  "scenario": "source-revised-stale",
+  "covers": "When the official source is revised after confirmation, the receipt is marked stale and drops out of formal candidates instead of being rewritten.",
+  "session": {
+    "source_id": "S-010",
+    "official_source_url": "https://www.tccc.gov.tw/",
+    "stream_url": "https://vod.tccc.gov.tw/live/stale.m3u8",
+    "started_at": "2026-09-21T10:00:00+08:00",
+    "max_duration_seconds": 1800,
+    "transport_enabled": true,
+    "provider_authorized": true,
+    "budget_seconds": 1800,
+    "session_id": "LM-FX-STALE"
+  },
+  "ops": [
+    {"op": "append_segment", "sequence": 0, "start_seconds": 0, "end_seconds": 60, "text": "已被官方文件確認的片段", "at": "2026-09-21T10:01:00+08:00", "finalized": true},
+    {"op": "bookmark", "segment_ids": ["$seg:0"], "reason_code": "REVIEW", "at": "2026-09-21T10:01:30+08:00"},
+    {"op": "stop_session", "at": "2026-09-21T10:30:00+08:00"},
+    {"op": "reconcile", "at": "2026-09-22T09:00:00+08:00", "candidates": [
+      {"candidate_id": "$bookmark:0", "outcome": "CONFIRMED_BY_MINUTES", "official_source_id": "S-010", "official_url": "https://www.tccc.gov.tw/minutes/2026-09-21", "official_locator": "minutes:item-3", "official_document_version": "MINUTES-DRAFT-1", "official_text_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}
+    ], "expect": {"status": "RECONCILED", "formal_count": 1}},
+    {"op": "mark_receipt_stale", "receipt_id": "$receipt:0", "observed_official_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "at": "2026-09-25T09:00:00+08:00", "expect": {"status": "RECONCILING", "stale_count": 1, "formal_count": 0}},
+    {"op": "reconcile", "at": "2026-09-26T09:00:00+08:00", "candidates": [
+      {"candidate_id": "$bookmark:0", "outcome": "CONFIRMED_BY_MINUTES", "official_source_id": "S-010", "official_url": "https://www.tccc.gov.tw/minutes/2026-09-21", "official_locator": "minutes:item-3", "official_document_version": "MINUTES-FINAL-2", "official_text_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"}
+    ], "expect": {"status": "RECONCILED", "receipt_count": 2, "stale_count": 1, "superseded_count": 1, "formal_count": 1}}
+  ],
+  "expect": {"status": "RECONCILED", "stale_count": 1, "superseded_count": 1, "formal_count": 1}
+}

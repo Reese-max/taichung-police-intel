@@ -117,7 +117,7 @@ jobs:
 
       - name: Verify generated V1 publication bundle
         id: v1
-        run: python -X utf8 scripts/verify-publication-bundle.py
+        run: python -X utf8 scripts/verify-publication-bundle.py --require-candidate-lane
 
       - name: Build persistent V2 daily intelligence
         id: v2

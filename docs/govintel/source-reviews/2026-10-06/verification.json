@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "scope": "ACTUAL_BOUNDED_OFFICIAL_HTTP_RECHECK_NO_PROMOTION_OR_RIGHTS_APPROVAL",
+  "reviewer": "/root",
+  "recorded_at": "2026-10-06T00:39:49.556371+00:00",
+  "observations": [
+    {
+      "id": "council-schedule",
+      "url": "https://www.tccc.gov.tw/main.asp?cno=49&uno=59",
+      "final_url": "https://www.tccc.gov.tw/main.asp?cno=49&uno=59",
+      "http_status": 200,
+      "bytes": 28813,
+      "sha256": "9f81d5ce39b87110ddd82d545a91160527a422ee0c6de8503d37ab293a668804",
+      "fetched_at": "2026-10-06T00:27:46.509314+00:00",
+      "snippet": null
+    },
+    {
+      "id": "council-questions",
+      "url": "https://www.tccc.gov.tw/main.asp?cno=50&uno=59",
+      "final_url": "https://www.tccc.gov.tw/main.asp?cno=50&uno=59",
+      "http_status": 200,
+      "bytes": 28813,
+      "sha256": "614237b77881a061e17884f834a7e84b65c69f6997cf56d2cfdbcfd3f9145f7a",
+      "fetched_at": "2026-10-06T00:27:46.509726+00:00",
+      "snippet": null
+    },
+    {
+      "id": "council-api-home",
+      "url": "https://yishi.tccc.gov.tw/",
+      "final_url": "https://yishi.tccc.gov.tw/",
+      "http_status": 200,
+      "bytes": 172450,
+      "sha256": "47ed24c81839e07e16f75af995d707263de69c48ca375bb445cf35c64589ea25",
+      "fetched_at": "2026-10-06T00:27:46.511860+00:00",
+      "snippet": null
+    },
+    {
+      "id": "rdec-terms",
+      "url": "https://www.rdec.taichung.gov.tw/30103/30122/443962",
+      "final_url": "https://www.rdec.taichung.gov.tw/30103/30122/443962",
+      "http_status": 503,
+      "bytes": 91,
+      "sha256": "2f85832e31ca57711e6107af6b142363351ae516adb71c69afc643fac26be7f6",
+      "fetched_at": "2026-10-06T00:27:46.512553+00:00",
+      "snippet": "upstream connect error or disconnect/reset before headers. reset reason: connection timeout"
+    },
+    {
+      "id": "rdec-list",
+      "url": "https://www.rdec.taichung.gov.tw/12047/12142/12145",
+      "final_url": "https://www.rdec.taichung.gov.tw/12047/12142/12145",
+      "http_status": 503,
+      "bytes": 91,
+      "sha256": "2f85832e31ca57711e6107af6b142363351ae516adb71c69afc643fac26be7f6",
+      "fetched_at": "2026-10-06T00:27:46.516128+00:00",
+      "snippet": "upstream connect error or disconnect/reset before headers. reset reason: connection timeout"
+    },
+    {
+      "id": "proposal-list.json",
+      "url": "https://yishi.tccc.gov.tw/api/Proposal/FrontList?keywordList=%E8%AD%A6%E5%AF%9F%E5%B1%80&pageNumber=1&pageSize=1",
+      "http_status": 200,
+      "bytes": 959,
+      "sha256": "aac151fb05589360a0c17e77c1a03e6dc0294d7dbd3f0881c9b5df1f23dff203",
+      "observation_date": "2026-10-06",
+      "scope": "One official list record; totalCount=108 is inventory count, not daily additions.",
+      "official_publication_date": null
+    },
+    {
+      "id": "proposal-detail.json",
+      "url": "https://yishi.tccc.gov.tw/api/Proposal/FrontDetail?id=7bbd2bb0-20da-48e8-9a01-08dee6e33192",
+      "http_status": 200,
+      "bytes": 1314,
+      "sha256": "cb4d278309a12cfb5111bf75ff11e51432873dbdb6aae9d2e359bdf12bbbb9ae",
+      "observation_date": "2026-10-06",
+      "scope": "One public detail record; its official schema still has no publication timestamp; not a complete detail inventory.",
+      "official_publication_date": null
+    }
+  ],
+  "source_status": {
+    "S-004/S-006": "Official wrappers reachable; explicit reuse permission unverified; revision dates remain separate from first publication.",
+    "S-007": "Official API availability does not change the observed official record date or prove whole-inventory freshness.",
+    "S-009": "Public list and one detail still have no verifiable publication timestamp; preserve UNKNOWN/NO_DATA.",
+    "S-029": "List and terms URL both returned HTTP 503 with upstream connection timeout; preserve failure and LKG, do not attribute conclusively to official origin outage."
+  },
+  "rights_review": {
+    "status": "PENDING_SOURCE_SPECIFIC_PERMISSION",
+    "effective_policy_changed": false,
+    "details": "Fetched council wrapper bytes contain an All rights reserved footer and no verified reuse permission. The SPA landing page/asset describes a public API, not a licence. RDEC terms bytes are a proxy timeout response, not official terms."
+  },
+  "limits": [
+    "No new official publication dates invented",
+    "No calendar-days-only candidate promotion",
+    "No permission inferred from HTTP 200 or owner merge authorization",
+    "Raw HTML/API/PDF body is not republished in this evidence file"
+  ]
+}

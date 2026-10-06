@@ -1,0 +1,20 @@
+{
+  "scenario": "interim-final-revision",
+  "covers": "Provider interim→final correction keeps one stable segment with append-only revision history.",
+  "session": {
+    "source_id": "S-010",
+    "official_source_url": "https://www.tccc.gov.tw/",
+    "stream_url": "https://vod.tccc.gov.tw/live/revision.m3u8",
+    "started_at": "2026-09-21T10:00:00+08:00",
+    "max_duration_seconds": 1800,
+    "transport_enabled": true,
+    "provider_authorized": true,
+    "budget_seconds": 1800,
+    "session_id": "LM-FX-REVISION"
+  },
+  "ops": [
+    {"op": "append_segment", "sequence": 0, "start_seconds": 0, "end_seconds": 5, "text": "交通議題正在討論", "at": "2026-09-21T10:00:01+08:00", "partial": true, "expect": {"revision": 1, "revision_history_len": 0}},
+    {"op": "append_segment", "sequence": 0, "start_seconds": 0, "end_seconds": 5, "text": "交通議題已進入討論", "at": "2026-09-21T10:00:04+08:00", "finalized": true, "expect": {"revision": 2, "revision_history_len": 1}}
+  ],
+  "expect": {"status": "LIVE", "segment_count": 1}
+}

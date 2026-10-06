@@ -1,0 +1,21 @@
+{
+  "scenario": "search-stream-seek",
+  "covers": "When the session carries a verified allowlisted STREAM_TIME seek contract, locators stay actionable and still flag provisional.",
+  "session": {
+    "source_id": "S-010",
+    "official_source_url": "https://www.tccc.gov.tw/",
+    "stream_url": "https://vod.tccc.gov.tw/live/seek.m3u8",
+    "started_at": "2026-09-21T10:00:00+08:00",
+    "max_duration_seconds": 1800,
+    "transport_enabled": true,
+    "provider_authorized": true,
+    "budget_seconds": 1800,
+    "session_id": "LM-FX-SEEK",
+    "seek": {"kind": "STREAM_TIME", "base_url": "https://vod.tccc.gov.tw/live/seek.m3u8", "offset_seconds": 0}
+  },
+  "ops": [
+    {"op": "append_segment", "sequence": 0, "start_seconds": 30, "end_seconds": 35, "text": "可尋址片段", "at": "2026-09-21T10:00:35+08:00", "finalized": true},
+    {"op": "locator", "segment_id": "$seg:0", "expect": {"locator_kind": "STREAM_TIME", "locator_reliable": true, "locator_url_null": false}}
+  ],
+  "expect": {"status": "LIVE", "segment_count": 1}
+}

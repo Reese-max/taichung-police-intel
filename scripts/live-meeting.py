@@ -21,10 +21,15 @@ from intel_v2.live_meeting import (
     add_bookmark,
     append_segment,
     budget_stop,
+    build_timeline,
+    fail_session,
     formal_candidates,
+    mark_receipt_stale,
     reconcile_session,
     record_gap,
     resume_session,
+    search_segments,
+    segment_locator,
     start_session,
     stop_session,
     validate_session,
@@ -64,6 +69,7 @@ def command_start(args: argparse.Namespace) -> int:
         agenda_id=args.agenda_id,
         max_duration_seconds=args.max_duration,
         asr_contract={"provider": args.provider, "model": args.model, "version": args.asr_version, "language": args.language},
+        seek={"kind": "STREAM_TIME", "base_url": args.seek_base_url, "offset_seconds": args.seek_offset} if args.seek_base_url else None,
         transport_enabled=args.enable_transport,
         provider_authorized=args.provider_authorized,
         budget_seconds=args.budget_seconds,
@@ -100,6 +106,13 @@ def command_gap(args: argparse.Namespace) -> int:
     state = record_gap(read(args.state), start_seconds=args.start, end_seconds=args.end, reason=args.reason, detected_at=args.at or now())
     write(args.state, state)
     print(f"LIVE_GAP_RECORDED session_id={state['session_id']} status={state['status']}")
+    return 0
+
+
+def command_fail(args: argparse.Namespace) -> int:
+    state = fail_session(read(args.state), failed_at=args.at or now(), reason=args.reason)
+    write(args.state, state)
+    print(f"LIVE_MEETING_FAILED session_id={state['session_id']} status={state['status']}")
     return 0
 
 
@@ -152,6 +165,34 @@ def command_status(args: argparse.Namespace) -> int:
 
 def command_formal(args: argparse.Namespace) -> int:
     print(json.dumps(formal_candidates(read(args.state)), ensure_ascii=False, indent=2, sort_keys=True))
+    return 0
+
+
+def command_search(args: argparse.Namespace) -> int:
+    result = search_segments(read(args.state), args.query, limit=args.limit)
+    print(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True))
+    return 0
+
+
+def command_locator(args: argparse.Namespace) -> int:
+    print(json.dumps(segment_locator(read(args.state), args.segment_id), ensure_ascii=False, indent=2, sort_keys=True))
+    return 0
+
+
+def command_timeline(args: argparse.Namespace) -> int:
+    print(json.dumps(build_timeline(read(args.state)), ensure_ascii=False, indent=2, sort_keys=True))
+    return 0
+
+
+def command_mark_stale(args: argparse.Namespace) -> int:
+    state = mark_receipt_stale(
+        read(args.state),
+        receipt_id=args.receipt_id,
+        observed_official_sha256=args.observed_sha256,
+        marked_at=args.at or now(),
+    )
+    write(args.state, state)
+    print(f"LIVE_RECEIPT_STALE_CHECK session_id={state['session_id']} status={state['status']} receipts={len(state['reconciliation_receipts'])}")
     return 0
 
 
@@ -221,7 +262,23 @@ def self_check() -> None:
     assert state["segments"][0]["profile_relevance"]["profile_id"] == "traffic-policy"
     assert len(state["gap_intervals"]) == 1
     assert formal_candidates(state)[0]["provisional"] is False
-    print("LIVE_MEETING_SELF_CHECK_OK revision=true gap=true bookmark=true official_reconciliation=true")
+    search = search_segments(state, "交通")
+    assert search["provisional"] and search["match_count"] == 1
+    locator = search["matches"][0]["locator"]
+    assert locator["kind"] == "TIME_TEXT" and locator["url"] is None and not locator["reliable_seek"]
+    timeline = build_timeline(state)
+    assert [entry["kind"] for entry in timeline] == ["SEGMENT", "GAP"]
+    assert all(entry["display_empty"] is False and entry["provisional"] for entry in timeline)
+    stale_state = mark_receipt_stale(
+        state,
+        receipt_id=state["reconciliation_receipts"][0]["receipt_id"],
+        observed_official_sha256="b" * 64,
+        marked_at="2026-09-21T10:00:08+08:00",
+    )
+    assert stale_state["status"] == "RECONCILING"
+    assert stale_state["reconciliation_receipts"][0]["stale"] is True
+    assert formal_candidates(stale_state) == []
+    print("LIVE_MEETING_SELF_CHECK_OK revision=true gap=true bookmark=true official_reconciliation=true search=true locator=true stale=true")
 
 
 def parser() -> argparse.ArgumentParser:
@@ -244,6 +301,8 @@ def parser() -> argparse.ArgumentParser:
     start.add_argument("--budget-seconds", type=int)
     start.add_argument("--enable-transport", action="store_true")
     start.add_argument("--provider-authorized", action="store_true")
+    start.add_argument("--seek-base-url", help="verified official base URL with reliable stream-time seek semantics")
+    start.add_argument("--seek-offset", type=float, default=0.0)
     start.add_argument("--at")
     start.set_defaults(handler=command_start)
 
@@ -274,6 +333,11 @@ def parser() -> argparse.ArgumentParser:
     gap.add_argument("--at")
     gap.set_defaults(handler=command_gap)
 
+    fail = commands.add_parser("fail")
+    fail.add_argument("--reason", required=True)
+    fail.add_argument("--at")
+    fail.set_defaults(handler=command_fail)
+
     resume = commands.add_parser("resume")
     resume.add_argument("--at")
     resume.set_defaults(handler=command_resume)
@@ -303,6 +367,24 @@ def parser() -> argparse.ArgumentParser:
     status.add_argument("--json", action="store_true")
     status.set_defaults(handler=command_status)
     commands.add_parser("formal-candidates").set_defaults(handler=command_formal)
+
+    search = commands.add_parser("search")
+    search.add_argument("--query", required=True)
+    search.add_argument("--limit", type=int, default=50)
+    search.set_defaults(handler=command_search)
+
+    locator = commands.add_parser("locator")
+    locator.add_argument("--segment-id", required=True)
+    locator.set_defaults(handler=command_locator)
+
+    commands.add_parser("timeline").set_defaults(handler=command_timeline)
+
+    stale = commands.add_parser("mark-stale")
+    stale.add_argument("--receipt-id", required=True)
+    stale.add_argument("--observed-sha256", required=True)
+    stale.add_argument("--at")
+    stale.set_defaults(handler=command_mark_stale)
+
     commands.add_parser("self-check").set_defaults(handler=lambda _: self_check() or 0)
     return result
 

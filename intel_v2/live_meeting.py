@@ -46,6 +46,11 @@ ALLOWED_SOURCE_HOSTS = {
 SPEAKER_LABEL = re.compile(r"^(?:SPEAKER_[0-9]+|UNKNOWN|UNVERIFIED)$")
 REASON_CODE = re.compile(r"^[A-Z][A-Z0-9_]{1,48}$")
 PUBLIC_IDENTIFIER = re.compile(r"(?:[\w.+-]+@[\w.-]+|09\d{8}|\b\d{10,}\b)")
+SHA256_HEX = re.compile(r"^[0-9a-fA-F]{64}$")
+PROVISIONAL_BADGES = ("LIVE", "AI_TRANSCRIPT", "UNCHECKED")
+PROVISIONAL_EVIDENCE_STATE = "LIVE_ASR_PROVISIONAL"
+SEARCH_LIMIT_MAX = 200
+STALE_REASONS = {"SOURCE_REVISED"}
 PROFILE_RELEVANCE_FIELDS = {
     "profile_id",
     "profile_version",
@@ -253,6 +258,18 @@ def _add_gap(state: dict[str, Any], start: float, end: float, reason: str, at: s
     state["gap_intervals"].sort(key=lambda row: (row["start_seconds"], row["end_seconds"], row["gap_id"]))
 
 
+def _seek_contract(source_id: str, value: object) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise ValueError("seek contract must be an object")
+    if value.get("kind") != "STREAM_TIME":
+        raise ValueError("only verified STREAM_TIME seek semantics are accepted")
+    base_url = _official_url(source_id, value.get("base_url"))
+    offset = _number(value.get("offset_seconds", 0), "seek offset_seconds")
+    return {"kind": "STREAM_TIME", "base_url": base_url, "offset_seconds": offset}
+
+
 def start_session(
     *,
     source_id: str,
@@ -267,11 +284,13 @@ def start_session(
     provider_authorized: bool = False,
     budget_seconds: int | None = None,
     session_id: str | None = None,
+    seek: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if source_id not in ALLOWED_SOURCE_HOSTS:
         raise ValueError(f"live meeting source is not allowlisted: {source_id}")
     official_source_url = _official_url(source_id, official_source_url)
     stream_url = _official_url(source_id, stream_url)
+    seek_contract = _seek_contract(source_id, seek)
     if isinstance(max_duration_seconds, bool) or not isinstance(max_duration_seconds, int):
         raise ValueError("max_duration_seconds must be an integer")
     if not 1 <= max_duration_seconds <= MAX_DURATION_SECONDS:
@@ -320,6 +339,7 @@ def start_session(
         "budget_seconds": budget_seconds,
         "transport_status": transport_status,
         "asr_contract": contract,
+        "seek": seek_contract,
         "status": status,
         "termination_reason": None,
         "session_revision": 1,
@@ -461,6 +481,8 @@ def resume_session(state: dict[str, Any], *, resumed_at: str | datetime) -> dict
     result = _copy(state)
     if result["status"] not in {"DEGRADED", "FAILED"}:
         raise ValueError("only DEGRADED or FAILED sessions can be resumed")
+    if result["budget_seconds"] is None:
+        raise ValueError("cannot resume a session that was never activated with a bounded budget")
     result["status"] = "LIVE"
     result["transport_status"] = "READY"
     result["termination_reason"] = None
@@ -475,8 +497,8 @@ def stop_session(
     reason: str = "USER_STOP",
 ) -> dict[str, Any]:
     result = _copy(state)
-    if result["status"] not in {"PREPARING", "LIVE", "DEGRADED"}:
-        raise ValueError("only active sessions can be stopped")
+    if result["status"] not in {"PREPARING", "LIVE", "DEGRADED", "FAILED"}:
+        raise ValueError("only active or failed sessions can be stopped")
     ended = _stamp(ended_at)
     if datetime.fromisoformat(ended) < datetime.fromisoformat(result["started_at"]):
         raise ValueError("ended_at cannot precede started_at")
@@ -504,6 +526,156 @@ def budget_stop(state: dict[str, Any], *, stopped_at: str | datetime) -> dict[st
     result["termination_reason"] = "MAX_DURATION_OR_BUDGET"
     _bump(result)
     return _touch(result, stopped_at)
+
+
+def fail_session(state: dict[str, Any], *, failed_at: str | datetime, reason: str) -> dict[str, Any]:
+    """Mark a live session FAILED after a transport/ASR crash.
+
+    The failure is an honest lifecycle state: recorded segments and gaps are
+    preserved, the timeline is never silently stitched, and only
+    ``resume_session`` can return it to LIVE. A session that never activated
+    its transport (PREPARING) cannot "fail" — it can only be stopped, which
+    keeps the provider-authorization gate unbypassable.
+    """
+    result = _copy(state)
+    if result["status"] not in {"LIVE", "DEGRADED"}:
+        raise ValueError("only sessions with active transport can fail")
+    result["status"] = "FAILED"
+    result["transport_status"] = "FAILED"
+    result["termination_reason"] = _text(reason, "failure reason", max_length=80)
+    _bump(result)
+    return _touch(result, failed_at)
+
+
+def _stream_clock(seconds: float) -> str:
+    total = int(seconds)
+    hours, rem = divmod(total, 3600)
+    minutes, secs = divmod(rem, 60)
+    return f"stream+{hours:02d}:{minutes:02d}:{secs:02d}"
+
+
+def segment_locator(state: dict[str, Any], segment_id: str) -> dict[str, Any]:
+    """Resolve a provisional segment back to stream time.
+
+    Without a verified STREAM_TIME seek contract the locator degrades to plain
+    time text — it never fabricates a deep link.
+    """
+    validate_session(state)
+    segment = next(
+        (item for item in state["segments"] if item["segment_id"] == segment_id),
+        None,
+    )
+    if segment is None:
+        raise ValueError("unknown segment")
+    seek = state.get("seek")
+    absolute = segment["start_seconds"] + (seek["offset_seconds"] if seek else 0.0)
+    if seek is not None and seek["kind"] == "STREAM_TIME":
+        return {
+            "kind": "STREAM_TIME",
+            "url": seek["base_url"],
+            "time_seconds": absolute,
+            "display": _stream_clock(absolute),
+            "reliable_seek": True,
+            "provisional": True,
+            "evidence_state": PROVISIONAL_EVIDENCE_STATE,
+        }
+    return {
+        "kind": "TIME_TEXT",
+        "url": None,
+        "time_seconds": absolute,
+        "display": _stream_clock(absolute),
+        "reliable_seek": False,
+        "provisional": True,
+        "evidence_state": PROVISIONAL_EVIDENCE_STATE,
+    }
+
+
+def search_segments(
+    state: dict[str, Any],
+    query: str,
+    *,
+    limit: int = 50,
+) -> dict[str, Any]:
+    """Bounded case-insensitive search over provisional transcript text.
+
+    Every hit stays provisional and carries its own locator; search can feed
+    navigation and bookmarks but never produces a formal fact.
+    """
+    validate_session(state)
+    needle = _text(query, "query", max_length=200).casefold()
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= SEARCH_LIMIT_MAX:
+        raise ValueError(f"limit must be an integer within 1..{SEARCH_LIMIT_MAX}")
+    matched = [
+        segment for segment in state["segments"] if needle in segment["text"].casefold()
+    ]
+    truncated = len(matched) > limit
+    hits = [
+        {
+            "segment_id": segment["segment_id"],
+            "sequence": segment["sequence"],
+            "start_seconds": segment["start_seconds"],
+            "end_seconds": segment["end_seconds"],
+            "text": segment["text"],
+            "revision": segment["revision"],
+            "finalized": segment["finalized"],
+            "partial": segment["partial"],
+            "provisional": True,
+            "evidence_state": PROVISIONAL_EVIDENCE_STATE,
+            "locator": segment_locator(state, segment["segment_id"]),
+        }
+        for segment in matched[:limit]
+    ]
+    return {
+        "query": query.strip(),
+        "provisional": True,
+        "evidence_state": PROVISIONAL_EVIDENCE_STATE,
+        "match_count": len(hits),
+        "truncated": truncated,
+        "matches": hits,
+    }
+
+
+def build_timeline(state: dict[str, Any]) -> list[dict[str, Any]]:
+    """Merged segment+gap view where a gap interval is visible, never "no content"."""
+    validate_session(state)
+    entries: list[dict[str, Any]] = []
+    for segment in state["segments"]:
+        entries.append(
+            {
+                "kind": "SEGMENT",
+                "segment_id": segment["segment_id"],
+                "sequence": segment["sequence"],
+                "start_seconds": segment["start_seconds"],
+                "end_seconds": segment["end_seconds"],
+                "text": segment["text"],
+                "finalized": segment["finalized"],
+                "partial": segment["partial"],
+                "revision": segment["revision"],
+                "speaker_label": segment["speaker_label"],
+                "badges": list(PROVISIONAL_BADGES),
+                "provisional": True,
+                "evidence_state": PROVISIONAL_EVIDENCE_STATE,
+                "display_empty": False,
+                "locator": segment_locator(state, segment["segment_id"]),
+            }
+        )
+    for gap in state["gap_intervals"]:
+        entries.append(
+            {
+                "kind": "GAP",
+                "gap_id": gap["gap_id"],
+                "reason": gap["reason"],
+                "start_seconds": gap["start_seconds"],
+                "end_seconds": gap["end_seconds"],
+                "detected_at": gap["detected_at"],
+                "badges": ["GAP"],
+                "provisional": True,
+                "evidence_state": PROVISIONAL_EVIDENCE_STATE,
+                "display_empty": False,
+            }
+        )
+    entries.sort(key=lambda row: (row["start_seconds"], row["end_seconds"], row["kind"]))
+    return entries
 
 
 def add_bookmark(
@@ -629,10 +801,21 @@ def reconcile_session(
                 "provisional_text_sha256": provisional_hash,
                 "official": official,
                 "asr_contract": dict(result["asr_contract"]),
+                "reconciler": {
+                    "name": "intel_v2.live_meeting",
+                    "schema_version": SCHEMA_VERSION,
+                },
                 "reconciled_at": _stamp(reconciled_at),
                 "session_revision": result["session_revision"],
             }
         )
+        previous_receipt_id = result["current_reconciliations"].get(candidate_id)
+        if previous_receipt_id and previous_receipt_id != receipt_id:
+            previous = next(
+                receipt for receipt in result["reconciliation_receipts"]
+                if receipt["receipt_id"] == previous_receipt_id
+            )
+            previous["superseded_by"] = receipt_id
         result["current_reconciliations"][candidate_id] = receipt_id
     current = {
         candidate_id: next(
@@ -642,14 +825,64 @@ def reconcile_session(
         for candidate_id, receipt_id in result["current_reconciliations"].items()
     }
     expected = set(bookmarks)
-    if not expected or expected <= set(current) and all(
-        receipt["outcome"] in TERMINAL_RECONCILIATION_OUTCOMES for receipt in current.values()
+    if current and expected <= set(current) and all(
+        receipt["outcome"] in TERMINAL_RECONCILIATION_OUTCOMES and not receipt.get("stale")
+        for receipt in current.values()
     ):
         result["status"] = "RECONCILED"
     else:
         result["status"] = "RECONCILING"
     _bump(result)
     return _touch(result, reconciled_at)
+
+
+def mark_receipt_stale(
+    state: dict[str, Any],
+    *,
+    receipt_id: str,
+    observed_official_sha256: str,
+    marked_at: str | datetime,
+) -> dict[str, Any]:
+    """Mark a confirmed receipt stale when its official source was revised.
+
+    Receipts are append-only records: staleness is new metadata on the receipt,
+    the recorded before/after hashes are never rewritten, and the session drops
+    back to RECONCILING until the candidate is reconciled against the revised
+    source. A stale receipt no longer feeds ``formal_candidates``.
+    """
+    result = _copy(state)
+    receipt = next(
+        (item for item in result["reconciliation_receipts"] if item["receipt_id"] == receipt_id),
+        None,
+    )
+    if receipt is None:
+        raise ValueError("unknown receipt_id")
+    if not isinstance(observed_official_sha256, str) or not SHA256_HEX.fullmatch(observed_official_sha256):
+        raise ValueError("observed_official_sha256 must be a SHA-256 hex digest")
+    if receipt.get("stale"):
+        return result
+    official = receipt.get("official")
+    if not isinstance(official, dict):
+        raise ValueError("receipt has no official source binding to revise")
+    if observed_official_sha256.lower() == official["text_sha256"].lower():
+        return result
+    receipt["stale"] = True
+    receipt["stale_reason"] = "SOURCE_REVISED"
+    receipt["stale_marked_at"] = _stamp(marked_at)
+    current = set(result["current_reconciliations"].values())
+    current_receipts = [
+        item for item in result["reconciliation_receipts"] if item["receipt_id"] in current
+    ]
+    expected = {item["bookmark_id"] for item in result["bookmarks"]}
+    if current and expected <= set(result["current_reconciliations"]) and all(
+        item["outcome"] in TERMINAL_RECONCILIATION_OUTCOMES and not item.get("stale")
+        for item in current_receipts
+    ):
+        result["status"] = "RECONCILED"
+    else:
+        result["status"] = "RECONCILING"
+    _bump(result)
+    return _touch(result, marked_at)
 
 
 def formal_candidates(state: dict[str, Any]) -> list[dict[str, Any]]:
@@ -659,6 +892,8 @@ def formal_candidates(state: dict[str, Any]) -> list[dict[str, Any]]:
     for candidate_id, receipt_id in state["current_reconciliations"].items():
         receipt = receipts[receipt_id]
         if receipt["outcome"] not in {"CONFIRMED_BY_OFFICIAL_MEDIA", "CONFIRMED_BY_MINUTES"}:
+            continue
+        if receipt.get("stale"):
             continue
         result.append(
             {
@@ -708,6 +943,9 @@ def validate_session(state: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("asr_contract is incomplete")
     _official_url(state["source_id"], state.get("official_source_url"))
     _official_url(state["source_id"], state.get("stream_url"))
+    seek = state.get("seek")
+    if seek is not None:
+        _seek_contract(state["source_id"], seek)
     if not isinstance(state.get("segments"), list) or not isinstance(state.get("gap_intervals"), list):
         raise ValueError("segments and gap_intervals must be arrays")
     if not isinstance(state.get("bookmarks"), list) or not isinstance(state.get("reconciliation_receipts"), list):
@@ -761,6 +999,8 @@ def validate_session(state: dict[str, Any]) -> dict[str, Any]:
             if not isinstance(prior, dict) or isinstance(prior.get("revision"), bool) or not isinstance(prior.get("revision"), int):
                 raise ValueError("segment revision history is invalid")
             prior_text = _text(prior.get("text"), "revision text")
+            _check_speaker(prior.get("speaker_label"))
+            _stamp(prior.get("received_at"))
             prior_profile = prior.get("profile_relevance")
             _validate_profile_relevance(prior_profile, prior_text)
             prior_hash = _segment_content_hash(
@@ -819,8 +1059,89 @@ def validate_session(state: dict[str, Any]) -> dict[str, Any]:
                 raise ValueError("bookmark profile relevance is not bound to its segments")
             _validate_profile_relevance(relevance, matching[0]["text"])
     receipt_ids = {receipt.get("receipt_id") for receipt in state["reconciliation_receipts"]}
+    if len(receipt_ids) != len(state["reconciliation_receipts"]):
+        raise ValueError("duplicate reconciliation receipt_id")
     if any(receipt_id not in receipt_ids for receipt_id in state["current_reconciliations"].values()):
         raise ValueError("current reconciliation points to an unknown receipt")
+    for receipt in state["reconciliation_receipts"]:
+        if not isinstance(receipt, dict):
+            raise ValueError("receipt must be an object")
+        receipt_id = receipt.get("receipt_id")
+        if not isinstance(receipt_id, str) or not re.fullmatch(r"RC-[0-9A-F]{20}", receipt_id):
+            raise ValueError("receipt_id is malformed")
+        outcome = receipt.get("outcome")
+        if outcome not in RECONCILIATION_OUTCOMES:
+            raise ValueError("receipt outcome is not recognized")
+        candidate_id = _text(receipt.get("candidate_id"), "receipt candidate_id", max_length=160)
+        receipt_segment_ids = receipt.get("segment_ids")
+        if (
+            not isinstance(receipt_segment_ids, list)
+            or not receipt_segment_ids
+            or len(set(receipt_segment_ids)) != len(receipt_segment_ids)
+            or any(segment_id not in segment_ids for segment_id in receipt_segment_ids)
+        ):
+            raise ValueError("receipt segment_ids are malformed or unknown")
+        if not isinstance(receipt.get("provisional_text_sha256"), str) or not SHA256_HEX.fullmatch(
+            receipt["provisional_text_sha256"]
+        ):
+            raise ValueError("receipt provisional_text_sha256 must be a SHA-256 hex digest")
+        if receipt.get("session_id") != state["session_id"]:
+            raise ValueError("receipt session_id does not match its session")
+        if receipt.get("asr_contract") != contract:
+            raise ValueError("receipt asr_contract does not match its session")
+        if not isinstance(receipt.get("session_revision"), int) or isinstance(receipt["session_revision"], bool) or receipt["session_revision"] < 1:
+            raise ValueError("receipt session_revision must be a positive integer")
+        reconciled_at = _stamp(receipt.get("reconciled_at"))
+        official = receipt.get("official")
+        if outcome in {"CONFIRMED_BY_OFFICIAL_MEDIA", "CONFIRMED_BY_MINUTES"}:
+            if not isinstance(official, dict):
+                raise ValueError("confirmed receipt requires official source evidence")
+            official_source_id = official.get("source_id")
+            if official_source_id not in ALLOWED_SOURCE_HOSTS:
+                raise ValueError("receipt official source is not allowlisted")
+            _official_url(official_source_id, official.get("official_url"))
+            _text(official.get("locator"), "receipt official locator", max_length=300)
+            _text(official.get("document_version"), "receipt official document_version", max_length=160)
+            if not isinstance(official.get("text_sha256"), str) or not SHA256_HEX.fullmatch(official["text_sha256"]):
+                raise ValueError("receipt official text_sha256 must be a SHA-256 hex digest")
+        elif official is not None:
+            raise ValueError("a non-confirmed receipt cannot carry an official binding")
+        material = {
+            "session_id": state["session_id"],
+            "candidate_id": candidate_id,
+            "segment_ids": list(receipt_segment_ids),
+            "outcome": outcome,
+            "provisional_text_sha256": receipt["provisional_text_sha256"],
+            "official": official,
+            "reconciled_at": reconciled_at,
+        }
+        if receipt_id != "RC-" + canonical_sha256(material).upper()[:20]:
+            raise ValueError("receipt_id does not match its bound material")
+        reconciler = receipt.get("reconciler")
+        if reconciler is not None and (
+            not isinstance(reconciler, dict)
+            or not isinstance(reconciler.get("name"), str)
+            or not reconciler["name"].strip()
+            or reconciler.get("schema_version") != SCHEMA_VERSION
+        ):
+            raise ValueError("receipt reconciler metadata is malformed")
+        if "stale" in receipt:
+            if not isinstance(receipt["stale"], bool):
+                raise ValueError("receipt stale flag must be boolean")
+            if receipt["stale"]:
+                if receipt.get("stale_reason") not in STALE_REASONS:
+                    raise ValueError("receipt stale_reason is not recognized")
+                _stamp(receipt.get("stale_marked_at"))
+        if "superseded_by" in receipt:
+            if receipt["superseded_by"] not in receipt_ids:
+                raise ValueError("receipt superseded_by must reference a known receipt")
+    if state.get("status") == "RECONCILED":
+        current_receipts = [
+            receipt for receipt in state["reconciliation_receipts"]
+            if receipt["receipt_id"] in set(state["current_reconciliations"].values())
+        ]
+        if any(receipt.get("stale") for receipt in current_receipts):
+            raise ValueError("a stale current receipt cannot leave the session RECONCILED")
     if state.get("content_hash") != _full_hash(state):
         raise ValueError("session content hash mismatch")
     if state.get("stream_content_hash") != _stream_hash(state):

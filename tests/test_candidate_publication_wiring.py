@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest import mock
 
 import online_collect as collector
+from scripts import candidate_lane
 from intel_v2.semantics import ChangeEvent
 
 
@@ -16,20 +17,139 @@ spec = importlib.util.spec_from_file_location("build_v2_shadow_brief", V2_SCRIPT
 v2 = importlib.util.module_from_spec(spec)
 assert spec.loader is not None
 spec.loader.exec_module(v2)
+V2_VERIFY_SCRIPT = ROOT / "scripts" / "verify-v2-publication.py"
+verify_spec = importlib.util.spec_from_file_location("verify_v2_publication", V2_VERIFY_SCRIPT)
+verify_v2 = importlib.util.module_from_spec(verify_spec)
+assert verify_spec.loader is not None
+verify_spec.loader.exec_module(verify_v2)
+BUNDLE_SCRIPT = ROOT / "scripts" / "verify-publication-bundle.py"
+bundle_spec = importlib.util.spec_from_file_location("verify_publication_bundle", BUNDLE_SCRIPT)
+bundle = importlib.util.module_from_spec(bundle_spec)
+assert bundle_spec.loader is not None
+bundle_spec.loader.exec_module(bundle)
 
 
 class CandidatePublicationWiringTests(unittest.TestCase):
-    def test_promoted_candidate_uses_the_same_demo_status_and_feed_path(self):
+    def test_candidate_stays_in_separate_pages_status_and_feed_lanes(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "source-status.json"
-            active_sources = dict(collector.P0_SOURCES)
-            active_sources["S-032"] = (
-                "臺中市政府交通局最新消息",
-                "https://www.traffic.taichung.gov.tw/",
-            )
 
             def fake_collect(_session, source_id, _start, _end, *_args, **_kwargs):
-                name, source_url = active_sources[source_id]
+                if source_id in collector.P0_SOURCES:
+                    name, source_url = collector.P0_SOURCES[source_id]
+                else:
+                    config = collector.NEWS_LIST_SOURCES[source_id]
+                    name, source_url = config["name"], config["list_url"]
+                return {
+                    "source_health": "PASS",
+                    "window_completeness": "COMPLETE_WITH_ITEMS",
+                    "window_item_count": 1,
+                    "snapshot_item_count": 1,
+                    "snapshots": [{"http_status": 200, "purpose": "LIST"}],
+                    "pagination": {"strategy": "next-link", "pages_fetched": 2, "page_limit": 4, "complete": True},
+                    "manifest_sha256": source_id.lower().replace("-", "") * 16,
+                    "items": [{
+                        "stable_key": f"{source_id}-1",
+                        "source_url": f"{source_url.rstrip('/')}/item",
+                        "published_at": "2026-09-11T00:00:00+08:00",
+                        "content_sha256": (source_id.lower().replace("-", "") * 16)[:64],
+                        "payload": {"title": f"{name}公告"},
+                    }],
+                }
+
+            with mock.patch.object(collector, "collect_source", side_effect=fake_collect), mock.patch.object(
+                candidate_lane, "_bounded_session", return_value=mock.Mock()
+            ):
+                collector.build_demo_status(output, "MORNING", date(2026, 9, 11), "manual")
+
+            status = json.loads(output.read_text(encoding="utf-8"))
+            feed = json.loads((output.parent / "intelligence-feed.json").read_text(encoding="utf-8"))
+            active_ids = set(collector.P0_SOURCES)
+            candidate_ids = {"S-001", "S-019", "S-032"}
+            self.assertEqual({row["source_id"] for row in status["sources"]}, active_ids)
+            self.assertEqual({row["source_id"] for row in status["candidate_sources"]}, candidate_ids)
+            self.assertEqual({item["source_id"] for item in feed["items"]}, active_ids)
+            self.assertTrue(all(item["eligibility"] == "INELIGIBLE_BASELINE" for item in feed["items"]))
+            self.assertTrue(all(item["change_type"] == "CONFIRMED" for item in feed["items"]))
+            self.assertTrue(all(row["result"] == "NO_NEW_ITEM" for row in status["sources"]))
+            self.assertEqual({item["source_id"] for item in feed["candidate_items"]}, candidate_ids)
+            candidate_status = next(row for row in status["candidate_sources"] if row["source_id"] == "S-032")
+            candidate_item = next(row for row in feed["candidate_items"] if row["source_id"] == "S-032")
+            expected_pagination = {"strategy": "next-link", "pages_fetched": 2, "page_limit": 4, "complete": True}
+            self.assertEqual(candidate_status["pagination"], expected_pagination)
+            self.assertEqual(candidate_status["source_name"], "臺中市政府交通局最新消息")
+            self.assertEqual(candidate_status["source_role"], "PRIMARY_EVENT")
+            self.assertEqual(candidate_status["catalog_status"], "VERIFIED_CANDIDATE")
+            self.assertEqual(candidate_item["source_name"], "臺中市政府交通局最新消息")
+            self.assertEqual(candidate_item["catalog_role"], "PRIMARY_EVENT")
+            self.assertEqual(candidate_item["official_url"], "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,20/item")
+            self.assertEqual(candidate_item["integration_status"], "CANDIDATE")
+            self.assertFalse(candidate_item["promotion_eligible"])
+            self.assertEqual(candidate_item["eligibility"], "INELIGIBLE_CANDIDATE")
+            bundle.validate_candidate_lane(
+                status,
+                feed,
+                active_ids=set(collector.P0_SOURCES),
+                required=True,
+            )
+            candidate_context = v2.candidate_source_context_projection(status, feed)
+            self.assertEqual(candidate_context["integration_status"], "CANDIDATE")
+            self.assertFalse(candidate_context["promotion_eligible"])
+            self.assertEqual(
+                {row["source_id"] for row in candidate_context["sources"]}, candidate_ids
+            )
+            self.assertEqual(
+                next(row for row in candidate_context["sources"] if row["source_id"] == "S-032")["pagination"],
+                expected_pagination,
+            )
+            brief = {"candidate_source_context": candidate_context}
+            verify_v2.validate_candidate_source_context(feed, status, {"items": {}}, brief)
+            forged_feed = {**feed, "items": [*feed["items"], feed["candidate_items"][0]]}
+            with self.assertRaisesRegex(ValueError, "leaked into the active feed"):
+                verify_v2.validate_candidate_source_context(
+                    forged_feed, status, {"items": {}}, brief
+                )
+
+    def test_promoted_news_candidate_keeps_source_identity_in_feed_projection(self):
+        item = {
+            "stable_key": "632",
+            "source_url": "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,632",
+            "published_at": "2026-09-11T00:00:00+08:00",
+            "content_sha256": "a" * 64,
+            "payload": {"title": "交通局公告"},
+        }
+        projected = collector.project_feed_item(
+            item,
+            "S-032",
+            "臺中市政府交通局最新消息",
+            "https://www.traffic.taichung.gov.tw/",
+            "PRIMARY_EVENT",
+            "VERIFIED_CANDIDATE",
+            "FRESH",
+            "PASS",
+            "COMPLETE_WITH_ITEMS",
+            item["published_at"],
+            "2026-09-11T01:00:00+08:00",
+            set(),
+        )
+        self.assertEqual(projected["source_id"], "S-032")
+        self.assertEqual(projected["source_name"], "臺中市政府交通局最新消息")
+        self.assertEqual(projected["catalog_role"], "PRIMARY_EVENT")
+        self.assertEqual(projected["integration_status"], "VERIFIED_CANDIDATE")
+        self.assertEqual(projected["official_url"], item["source_url"])
+
+    def test_failed_candidate_keeps_lkg_and_gaps_without_affecting_active_sources(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "source-status.json"
+
+            def fake_collect(_session, source_id, _start, _end, *_args, **_kwargs):
+                if source_id == "S-019" and fail_city_meeting[0]:
+                    raise RuntimeError("candidate-only failure")
+                if source_id in collector.P0_SOURCES:
+                    name, source_url = collector.P0_SOURCES[source_id]
+                else:
+                    config = collector.NEWS_LIST_SOURCES[source_id]
+                    name, source_url = config["name"], config["list_url"]
                 return {
                     "source_health": "PASS",
                     "window_completeness": "COMPLETE_WITH_ITEMS",
@@ -46,48 +166,45 @@ class CandidatePublicationWiringTests(unittest.TestCase):
                     }],
                 }
 
-            with mock.patch.object(collector, "P0_SOURCES", active_sources), mock.patch.object(
-                collector, "collect_source", side_effect=fake_collect
+            fail_city_meeting = [False]
+            with mock.patch.object(collector, "collect_source", side_effect=fake_collect), mock.patch.object(
+                candidate_lane, "_bounded_session", return_value=mock.Mock()
             ):
+                collector.build_demo_status(output, "MORNING", date(2026, 9, 11), "manual")
+                first_status = json.loads(output.read_text(encoding="utf-8"))
+                first_feed = json.loads((output.parent / "intelligence-feed.json").read_text(encoding="utf-8"))
+                prior_lkg = next(row for row in first_status["candidate_sources"] if row["source_id"] == "S-019")["last_known_good"]
+
+                fail_city_meeting[0] = True
                 collector.build_demo_status(output, "MORNING", date(2026, 9, 11), "manual")
 
             status = json.loads(output.read_text(encoding="utf-8"))
             feed = json.loads((output.parent / "intelligence-feed.json").read_text(encoding="utf-8"))
-            candidate_status = next(row for row in status["sources"] if row["source_id"] == "S-032")
-            candidate_item = next(row for row in feed["items"] if row["source_id"] == "S-032")
-            self.assertEqual(candidate_status["source_name"], "臺中市政府交通局最新消息")
-            self.assertEqual(candidate_item["source_name"], "臺中市政府交通局最新消息")
-            self.assertEqual(candidate_item["official_url"], "https://www.traffic.taichung.gov.tw/item")
-
-    def test_promoted_news_candidate_keeps_source_identity_in_feed_projection(self):
-        item = {
-            "stable_key": "632",
-            "source_url": "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,632",
-            "published_at": "2026-09-11T00:00:00+08:00",
-            "content_sha256": "a" * 64,
-            "payload": {"title": "交通局公告"},
-        }
-        projected = collector.project_feed_item(
-            item,
-            "S-032",
-            "臺中市政府交通局最新消息",
-            "https://www.traffic.taichung.gov.tw/",
-            "FRESH",
-            "PASS",
-            "COMPLETE_WITH_ITEMS",
-            item["published_at"],
-            "2026-09-11T01:00:00+08:00",
-            set(),
-        )
-        self.assertEqual(projected["source_id"], "S-032")
-        self.assertEqual(projected["source_name"], "臺中市政府交通局最新消息")
-        self.assertEqual(projected["official_url"], item["source_url"])
+            city = next(row for row in status["candidate_sources"] if row["source_id"] == "S-019")
+            lkg_item = next(item for item in feed["candidate_items"] if item["source_id"] == "S-019")
+            self.assertEqual(status["latest_collection_run"]["status"], "SUCCEEDED")
+            self.assertEqual({row["source_id"] for row in status["sources"]}, set(collector.P0_SOURCES))
+            self.assertEqual(city["source_health"], "FAILED")
+            self.assertEqual(city["window_completeness"], "PARTIAL")
+            self.assertEqual(city["last_known_good"], prior_lkg)
+            self.assertTrue(city["intelligence_gaps"])
+            self.assertEqual(lkg_item["change_type"], "LKG")
+            self.assertEqual(lkg_item["eligibility"], "INELIGIBLE_CANDIDATE_SOURCE_FAILED")
+            self.assertEqual(lkg_item["integration_status"], "CANDIDATE")
+            self.assertFalse(lkg_item["promotion_eligible"])
+            self.assertEqual(
+                {item["stable_id"] for item in first_feed["items"]},
+                {item["stable_id"] for item in feed["items"]},
+            )
+            self.assertEqual(first_feed["source_summary"], feed["source_summary"])
 
     def test_v2_context_names_all_first_promotion_candidates(self):
         expected = {
             "S-001": "臺中市政府警察局警政新聞",
             "S-019": "臺中市政府市政會議紀錄與專案報告",
             "S-032": "臺中市政府交通局最新消息",
+            "S-033": "臺中市政府市政新聞",
+            "S-031": "臺中市政府消防局即時災情",
         }
         self.assertEqual(
             {source_id: v2.SOURCE_CONTEXT[source_id]["source_name"] for source_id in expected},
@@ -119,6 +236,42 @@ class CandidatePublicationWiringTests(unittest.TestCase):
         self.assertEqual(projected["identity"], event.identity)
         self.assertEqual(projected["source_version"], 1)
         self.assertTrue(projected["watch_id"].startswith("WATCH-"))
+
+    def test_v2_builder_does_not_publish_a_promoted_source_baseline(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            observed = "2026-09-11T10:00:00+08:00"
+            existing = {
+                "stable_id": "FEED-S-009-existing", "source_id": "S-009",
+                "title": "既有提案", "official_url": "https://yishi.tccc.gov.tw/existing",
+                "content_sha256": "a" * 64, "eligibility": "HOME_CANDIDATE",
+            }
+            promoted = {
+                "stable_id": "FEED-S-032-historical", "source_id": "S-032",
+                "title": "歷史交通公告", "official_url": "https://www.traffic.taichung.gov.tw/historical",
+                "content_sha256": "b" * 64, "eligibility": "INELIGIBLE_BASELINE",
+            }
+            state, _ = v2.compare_snapshot(None, [v2.feed_item_to_version(existing, observed)], observed)
+            (root / "state.json").write_text(json.dumps(state), encoding="utf-8")
+            (root / "feed.json").write_text(json.dumps({
+                "schema_version": 1, "generated_at": observed,
+                "collection_run_id": "CR-BASELINE", "items": [existing, promoted],
+            }), encoding="utf-8")
+            (root / "status.json").write_text(json.dumps({
+                "schema_version": 1, "generated_at": observed,
+                "latest_collection_run": {"collection_run_id": "CR-BASELINE"},
+                "sources": [{"source_id": sid, "source_health": "PASS", "window_completeness": "COMPLETE_WITH_ITEMS"}
+                            for sid in ("S-009", "S-032")],
+            }), encoding="utf-8")
+            with mock.patch("sys.argv", ["build-v2-shadow-brief.py",
+                                         "--input", str(root / "feed.json"),
+                                         "--source-status", str(root / "status.json"),
+                                         "--state", str(root / "state.json"),
+                                         "--handoff-state", str(root / "handoff.json"),
+                                         "--output", str(root / "brief.json")]):
+                self.assertEqual(v2.main(), 0)
+            brief = json.loads((root / "brief.json").read_text(encoding="utf-8"))
+            self.assertEqual(brief["overview"]["current_change_count"], 0)
 
 
 if __name__ == "__main__":

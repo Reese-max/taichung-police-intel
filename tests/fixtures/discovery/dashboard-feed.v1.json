@@ -7,7 +7,7 @@
   "source_snapshot_hash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
   "window": {"since_hours": 72},
   "truncated": false,
-  "item_count": 3,
+  "item_count": 4,
   "excluded_counts": {"out_of_window": 0, "category_filtered": 0, "no_source_identity": 0, "duplicate_source": 0},
   "items": [
     {
@@ -80,6 +80,30 @@
       "original_dataset_id": "tw-news",
       "record_ref": "media-record-3",
       "original_source_identity": "media:Example Media:road-3",
+      "rights_status": "REVIEW_REQUIRED"
+    },
+    {
+      "discovery_id": "gd-4444444444444444",
+      "title": "臺中市反詐宣導活動線索",
+      "event_time": "2026-09-20T07:00:00Z",
+      "observed_at": "2026-09-20T07:03:00Z",
+      "region": "臺中市",
+      "lat": null,
+      "lng": null,
+      "location_precision": null,
+      "category": "反詐",
+      "risk_level": "low",
+      "summary": "媒體報導反詐宣導線索，尚無官方公告佐證。",
+      "entities": ["臺中"],
+      "topic": "anti-fraud",
+      "source_url": "https://media.example.test/taichung-antifraud",
+      "publisher_name": "Example Media",
+      "authority": "media",
+      "source_confidence": "aggregated",
+      "ingest_method": "google-news-rss",
+      "original_dataset_id": "tw-news",
+      "record_ref": "media-record-4",
+      "original_source_identity": "media:Example Media:antifraud-4",
       "rights_status": "REVIEW_REQUIRED"
     }
   ]

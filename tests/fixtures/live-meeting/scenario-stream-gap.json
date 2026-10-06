@@ -1,0 +1,21 @@
+{
+  "scenario": "stream-gap",
+  "covers": "A 90-second stream disconnect records a visible gap interval, never an empty timeline.",
+  "session": {
+    "source_id": "S-010",
+    "official_source_url": "https://www.tccc.gov.tw/",
+    "stream_url": "https://vod.tccc.gov.tw/live/gap.m3u8",
+    "started_at": "2026-09-21T10:00:00+08:00",
+    "max_duration_seconds": 1800,
+    "transport_enabled": true,
+    "provider_authorized": true,
+    "budget_seconds": 1800,
+    "session_id": "LM-FX-GAP"
+  },
+  "ops": [
+    {"op": "append_segment", "sequence": 0, "start_seconds": 0, "end_seconds": 60, "text": "斷線前內容", "at": "2026-09-21T10:01:00+08:00", "finalized": true},
+    {"op": "record_gap", "start_seconds": 60, "end_seconds": 150, "reason": "STREAM_DISCONNECT", "at": "2026-09-21T10:02:30+08:00", "expect": {"status": "DEGRADED", "transport_status": "DEGRADED", "gap_count": 1}},
+    {"op": "timeline", "expect": {"timeline_kinds": ["SEGMENT", "GAP"], "timeline_all_visible": true, "timeline_all_provisional": true}}
+  ],
+  "expect": {"status": "DEGRADED", "gap_count": 1}
+}

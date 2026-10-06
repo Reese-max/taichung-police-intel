@@ -21,17 +21,30 @@ S029_FIXTURE = "source-live-canary-s026-s029-2026-08-14.json"
 SOURCE_POLICY = ROOT / "scripts" / "source-policy.py"
 
 
-def load_production_policy():
+def load_source_policy_module():
     spec = importlib.util.spec_from_file_location("collect_source_policy", SOURCE_POLICY)
     if spec is None or spec.loader is None:
         raise RuntimeError("source policy module is unavailable")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    return module
+
+
+def load_production_policy():
+    module = load_source_policy_module()
     return module, module.load_current_policy()
 
 
 _policy_module, PRODUCTION_POLICY = load_production_policy()
 SOURCE_POLICY_BINDING = _policy_module.policy_binding(PRODUCTION_POLICY)
+
+
+def load_source_catalog() -> dict:
+    return _policy_module.load_catalog()
+
+
+def catalog_rows() -> dict[str, dict]:
+    return {row["source_id"]: row for row in load_source_catalog()["sources"]}
 
 
 def load_production_sources() -> dict[str, tuple[str, str]]:

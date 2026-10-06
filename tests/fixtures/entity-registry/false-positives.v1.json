@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "registry_version": 7,
+  "updated_at": "2026-09-21T00:00:00+08:00",
+  "entities": [
+    {
+      "entity_id": "agency:tc-police-fixture", "kind": "agency", "canonical_label": "臺中市政府警察局",
+      "aliases": ["中市警", "台中市警局"], "jurisdiction": "臺中市", "status": "CONFIRMED",
+      "evidence": "synthetic fixture; not production evidence"
+    },
+    {
+      "entity_id": "agency:kh-police-fixture", "kind": "agency", "canonical_label": "高雄市政府警察局",
+      "aliases": ["中市警"], "jurisdiction": "高雄市", "status": "CONFIRMED",
+      "evidence": "synthetic alias collision across jurisdiction"
+    },
+    {
+      "entity_id": "location:tc-zhongzheng", "kind": "location", "canonical_label": "中正路",
+      "aliases": [], "jurisdiction": "臺中市", "status": "CONFIRMED",
+      "evidence": "synthetic cross-city road"
+    },
+    {
+      "entity_id": "location:tc-xitun", "kind": "location", "canonical_label": "西屯區",
+      "aliases": ["臺中市西屯區"], "jurisdiction": "臺中市", "status": "CONFIRMED",
+      "evidence": "synthetic district"
+    },
+    {
+      "entity_id": "location:kh-zhongzheng", "kind": "location", "canonical_label": "中正路",
+      "aliases": [], "jurisdiction": "高雄市", "status": "CONFIRMED",
+      "evidence": "synthetic cross-city road"
+    },
+    {
+      "entity_id": "named_event:forum-0920", "kind": "named_event", "canonical_label": "市政論壇",
+      "aliases": [], "jurisdiction": "臺中市", "event_date": "2026-09-20", "status": "CONFIRMED",
+      "evidence": "synthetic dated event"
+    },
+    {
+      "entity_id": "named_event:forum-0921", "kind": "named_event", "canonical_label": "市政論壇",
+      "aliases": [], "jurisdiction": "臺中市", "event_date": "2026-09-21", "status": "CONFIRMED",
+      "evidence": "synthetic dated event"
+    }
+  ]
+}
