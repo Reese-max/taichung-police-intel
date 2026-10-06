@@ -50,6 +50,7 @@ try {
       offlineProviderRequests++;
       const payload = JSON.parse(JSON.parse(options.body).messages[1].content);
       const output = stage++ === 0 ? supportedProducer(payload) : supportedCritic(payload);
+      if (conflict && output.claims) output.claims.forEach(row => { row.text = "OFFLINE_WITHHELD_SYNTHESIS_SENTINEL"; });
       if (conflict && output.reviews) output.reviews.forEach(row => { row.verdict = "CONFLICT"; });
       return completion(output);
     });
@@ -157,7 +158,9 @@ try {
   await page.getByLabel("輸入研究問題", { exact: true }).fill("交通"); await checkbox.check(); await submit.click();
   await page.locator(".research-document-evidence").waitFor();
   assert.equal(offlineProviderRequests, 4);
-  assert.equal(await page.locator(".research-synthesis").count(), 0);
+  await page.getByRole("heading", { name: "模型主張未釋出 · 保留檢查紀錄", exact: true }).waitFor();
+  assert.equal(await page.locator(".research-claim-text").count(), 0);
+  assert.equal((await page.locator("body").innerText()).includes("OFFLINE_WITHHELD_SYNTHESIS_SENTINEL"), false);
   assert.equal(await page.locator(".research-answer").count(), 0);
   assert.deepEqual(errors, []);
   checks.push("critic conflict withholds model prose and preserves only exact excerpts");
