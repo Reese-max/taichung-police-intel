@@ -2,7 +2,7 @@
 import { chromium } from "playwright-core";
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { readFile, mkdir, writeFile } from "node:fs/promises";
+import { readFile, mkdir, writeFile, stat } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { createGovernedPolicyFixture } from "../apps/web/tests/governed-policy-fixture.mjs";
@@ -22,14 +22,15 @@ const server = createServer(async (request, response) => {
     const pathname = decodeURIComponent(new URL(request.url, "http://localhost").pathname);
     const path = resolve(publicRoot, `.${pathname.endsWith("/") ? `${pathname}index.html` : pathname}`);
     if (path !== publicRoot && !path.startsWith(`${publicRoot}${sep}`)) throw new Error("path refused");
-    const bytes = await readFile(path);
-    response.writeHead(200, { "Content-Type": types[extname(path)] || "application/octet-stream" }); response.end(bytes);
+    const servedPath = (await stat(path)).isDirectory() ? resolve(path, "index.html") : path;
+    const bytes = await readFile(servedPath);
+    response.writeHead(200, { "Content-Type": types[extname(servedPath)] || "application/octet-stream" }); response.end(bytes);
   } catch { response.writeHead(404); response.end("not found"); }
 });
 await mkdir(output, { recursive: true });
 await new Promise((resolve, reject) => { server.once("error", reject); server.listen(0, "127.0.0.1", resolve); });
 const origin = `http://127.0.0.1:${server.address().port}`;
-let browser, governedFixture;
+let browser, governedFixture, page;
 const originalFetch = globalThis.fetch;
 globalThis.fetch = async () => { throw new Error("Unexpected Node-side network request in offline research browser QA"); };
 try {
@@ -54,7 +55,7 @@ try {
     });
   }
   browser = await chromium.launch({ ...(process.env.GOVINTEL_CHROME_PATH ? { executablePath: process.env.GOVINTEL_CHROME_PATH } : {}), headless: true });
-  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
   const errors = []; const calls = []; let mode = "blocked"; let requestObserved;
   page.on("pageerror", error => errors.push(error.message));
   await page.route("**/*", async route => {
@@ -79,6 +80,7 @@ try {
   });
   await page.goto(`${origin}/ask/`);
   await page.waitForURL(url => url.origin === origin && url.pathname.replace(/\/$/, "") === "/research");
+  await page.getByRole("heading", { name: "帶著問題，回到官方來源" }).waitFor();
   assert.equal(await page.getByRole("navigation", { name: "主要導覽" }).getByRole("link", { name: "公開研究", exact: true }).count(), 1);
   assert.equal(await page.getByRole("link", { name: "Ask GovIntel", exact: true }).count(), 0);
   checks.push("legacy /ask alias replaces navigation into the single /research entry");
@@ -121,7 +123,7 @@ try {
   await page.locator(".research-error").waitFor();
   assert.deepEqual(calls.at(-1).history, []); assert.equal((await page.locator("body").innerText()).includes("SYNTHETIC_UPSTREAM_PRIVATE_MARKER"), false);
   checks.push("new conversation clears history and server errors do not reflect raw text");
-  await page.getByRole("link", { name: "查看來源狀態 ↗" }).click(); await page.waitForURL("**/sources/");
+  await page.getByRole("link", { name: "查看來源狀態 ↗" }).click(); await page.waitForURL(url => url.origin === origin && url.pathname.replace(/\/$/, "") === "/sources");
   await page.goBack(); await page.getByRole("heading", { name: "你想查找哪類公開資料？" }).waitFor();
   assert.equal(await page.locator(".research-turn").count(), 0); assert.deepEqual(errors, []);
   checks.push("navigation back does not resurrect conversation; zero page errors");
@@ -162,6 +164,8 @@ try {
   await writeFile(resolve(output, "receipt.json"), JSON.stringify({ status: "PASS", mode: "OFFLINE_BROWSER_MOCKS", code_sha: release.code_sha, live_provider_calls: 0, offline_mock_provider_requests: offlineProviderRequests, checks }, null, 2));
   console.log("RESEARCH_BROWSER_OFFLINE_PASS");
 } catch (error) {
+  await page?.screenshot({ path: resolve(output, "failure.png"), fullPage: true }).catch(() => {});
+  if (page) await writeFile(resolve(output, "failure-context.json"), JSON.stringify({ url: page.url(), body: (await page.locator("body").innerText().catch(() => "")).slice(0, 12000) }, null, 2));
   await writeFile(resolve(output, "receipt.json"), JSON.stringify({ status: "FAIL", mode: "OFFLINE_BROWSER_MOCKS", code_sha: release.code_sha, live_provider_calls: 0, checks, error: String(error) }, null, 2));
   throw error;
 } finally { await browser?.close(); await governedFixture?.cleanup(); globalThis.fetch = originalFetch; await new Promise(resolve => server.close(resolve)); }
