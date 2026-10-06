@@ -61,7 +61,7 @@
   "daily_brief": "本期共監測 118 筆警政相關議會資訊，符合首頁展示條件 1 筆。主要來源：臺中市議會議事日程（1 筆）、臺中市議會質詢順序表（7 筆）、臺中市議會議事資訊系統－各項提案（108 筆）。關鍵議題包括：分局整建與設施、交通管理與規劃、治安巡邏與防竊。",
   "daily_brief_en": "Monitoring 118 police-related council items, 1 eligible for homepage display. Primary sources: S-004 (1 items), S-006 (7 items), S-009 (108 items). Key topics: 分局整建與設施, 交通管理與規劃, 治安巡邏與防竊.",
   "eligible_items": 1,
-  "generated_at": "2026-10-06T08:32:34+08:00",
+  "generated_at": "2026-10-06T10:46:08+08:00",
   "key_topics": [
     {
       "item_count": 39,
@@ -209,8 +209,8 @@
       "S-009",
       "S-029"
     ],
-    "catalog_hash": "95ae82270eaab6f6270d9c00c8122e9bcfafbaf0dd216dc575a5f0b99544c51a",
-    "policy_hash": "3404809ff40f7647c44203329d4476b12b62e9ee64df24cd1f1f46cbda59caf4",
+    "catalog_hash": "5088623df5af4b8a30f4c597c51235c0f36a3dfd8bc4f2aea9af8f26d10213ef",
+    "policy_hash": "3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501",
     "policy_version": 1
   },
   "total_items": 118
