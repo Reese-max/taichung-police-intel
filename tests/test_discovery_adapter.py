@@ -70,6 +70,17 @@ class DiscoveryAdapterTests(unittest.TestCase):
         media_expired = next(item for item in expired["candidates"] if item["authority"] == "media")
         self.assertEqual(media_expired["verification_status"], "EXPIRED")
 
+    def test_official_candidate_without_match_never_confirms(self):
+        result = ingest_feed(self.feed, official_documents=[], now=NOW)
+        official = next(item for item in result["candidates"] if item["authority"] == "official")
+        self.assertEqual(official["candidate_id"], "gd-2222222222222222")
+        self.assertNotEqual(official["verification_status"], "VERIFIED_OFFICIAL")
+        self.assertEqual(official["official_match_status"], "NO_OFFICIAL_MATCH")
+        self.assertEqual(official["official_document_versions"], [])
+        self.assertFalse(official["canonical_write"])
+        self.assertEqual(result["receipt"]["official_match_count"], 0)
+        self.assertEqual(result["receipt"]["canonical_change_count"], 0)
+
     def test_conflicting_official_documents_are_visible(self):
         docs = copy.deepcopy(self.documents)
         docs.append({**docs[0], "document_id": "DOC-OFFICIAL-ROAD-2", "document_version_id": "DOCV-OFFICIAL-ROAD-2", "fact_fingerprint": "road-control:2026-09-21"})
