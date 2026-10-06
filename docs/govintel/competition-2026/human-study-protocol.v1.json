@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "status": "PREPARED_NOT_RUN",
+  "protocol_scope": "V6_PLANNED_PRODUCT_METHODS",
+  "production_trial_readiness": "BLOCKED_PENDING_SOURCE_RIGHTS_AND_REVIEWED_HOLDOUT",
+  "participants": {
+    "planned_minimum": 3,
+    "actual_count": 0,
+    "consent_storage": "PRIVATE_ONLY",
+    "participant_identifiers": "RANDOM_PSEUDONYMS_ONLY",
+    "do_not_publish": [
+      "names",
+      "contact details",
+      "raw answers",
+      "consent documents",
+      "internal police information"
+    ]
+  },
+  "arms": {
+    "A": "direct official manual lookup and reopen recheck",
+    "B": "same-scope search and general model summary",
+    "C": "full GovIntel public query and browser tracking",
+    "C_semantic_off": "same C UI, data, tracking and read rules with semantic processing disabled"
+  },
+  "same_scope_requirements": [
+    "same questions",
+    "same source scope",
+    "same information cutoff",
+    "same scheduled reopen times",
+    "no future documents in replay",
+    "failures and unknown dates recorded separately from zero events"
+  ],
+  "counterbalancing": {
+    "orders": [
+      [
+        "A",
+        "B",
+        "C",
+        "C_semantic_off"
+      ],
+      [
+        "B",
+        "C_semantic_off",
+        "A",
+        "C"
+      ],
+      [
+        "C",
+        "A",
+        "C_semantic_off",
+        "B"
+      ],
+      [
+        "C_semantic_off",
+        "C",
+        "B",
+        "A"
+      ]
+    ],
+    "assignment": "Assign participant index modulo 4 before results exist; record assigned order and deviations."
+  },
+  "holdout": {
+    "planned_events": 20,
+    "planned_documents_minimum": 60,
+    "actual_events": 0,
+    "actual_documents": 0,
+    "split_by": [
+      "event",
+      "time"
+    ],
+    "gold_labels": "Two real independent human reviewers; retain disagreements and adjudication. No model-generated labels as gold.",
+    "rights": "Only reviewed licensed public records or project-owned synthetic pilot data; pilot cannot substitute for official holdout."
+  },
+  "required_preconditions": [
+    "A concrete source and field approval receipt has passed compilation; legal scope is source-specific.",
+    "Reviewed query/document/model transmission permissions cover each intended arm.",
+    "Immutable holdout document versions and timestamps are pinned before model predictions.",
+    "The actual C and C_semantic_off product routes are available and validated for the pinned corpus.",
+    "Consent and assigned order are recorded privately before the task timer starts."
+  ],
+  "per_task_record_fields": [
+    "protocol_version",
+    "participant_pseudonym",
+    "consent_private_reference",
+    "assigned_order",
+    "arm",
+    "case_id",
+    "source_scope_hash",
+    "cutoff_at",
+    "reopen_at",
+    "started_at",
+    "submitted_at",
+    "elapsed_seconds",
+    "answer",
+    "evidence_ids",
+    "task_complete",
+    "correction_seconds",
+    "source_acquisition_gap",
+    "rights_gap",
+    "valid_time_unknown",
+    "interruption_seconds",
+    "reviewer_ids",
+    "adjudication_reference"
+  ],
+  "timing_rules": [
+    "Use actual browser/server monotonic elapsed time, not intended duration.",
+    "Record interruptions and corrections separately; do not silently remove slow or failed tasks.",
+    "No simulated users, synthetic timing or Codex decisions count as participants."
+  ],
+  "metrics": {
+    "aggregation": "Compute explicit denominators and null for zero denominator; separate acquisition gaps, abstentions and answerable tasks.",
+    "public_output": "Aggregate counts and ranges only; small group re-identification review required."
+  },
+  "synthetic_component_diagnostic_reference": "docs/govintel/competition-2026/model-diagnostic-20261006/diagnostic-index.json",
+  "completed_product_methods": [],
+  "completed_human_timing_tasks": 0,
+  "next_actual_action": "Have real reviewers label a rights-cleared pinned holdout, then invite actual consenting participants after product admission is ready."
+}

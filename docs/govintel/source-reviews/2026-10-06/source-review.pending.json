@@ -1,0 +1,718 @@
+{
+  "artifact_type": "NON_EFFECTIVE_SOURCE_REVIEW_DRAFT",
+  "draft_schema_version": 1,
+  "note": "原始官方條款與實際候選歷史產物的非生效補充；人工決策仍空白。本文件不核准來源、模型傳輸、全文或附件。",
+  "created_by": "Codex draft preparation",
+  "human_reviewer": null,
+  "effective": false,
+  "code_ref": "fdbfac27e0d141cf04c59dff9c0b959e61ca0392",
+  "all_reviews_pending": true,
+  "source_records": [
+    {
+      "source_id": "S-001",
+      "name": "臺中市政府警察局警政新聞",
+      "authority": "臺中市政府警察局",
+      "catalog_status": "AUDITED_EXISTING",
+      "catalog_entrypoint": "https://www.police.taichung.gov.tw/ch/home.jsp?id=1&parentpath=0&mcustomize=news_list.jsp",
+      "list_endpoint": null,
+      "rights_class": "OFFICIAL_METADATA_LINK",
+      "rights_status": "UNKNOWN",
+      "review_required": true,
+      "full_text_allowed": false,
+      "excerpt_allowed": false,
+      "review_status": "PENDING_HUMAN_REVIEW",
+      "human_reviewer": null,
+      "human_reviewed_at": null,
+      "approved_at": null,
+      "decision": null,
+      "terms_evidence_ids": [
+        "E-010"
+      ],
+      "public_field_review_complete": false,
+      "attachments_review_status": "UNKNOWN",
+      "geographic_scope_status": "UNKNOWN",
+      "valid_time_semantics_status": "UNKNOWN",
+      "missing_evidence": [
+        "官方條款／授權範圍尚未核實",
+        "低頻delta連線、日期窗與七日觀測未通過",
+        "原始官方條款requested/final URL、抓取時間、bytes/hash、locator",
+        "來源範圍／逐欄位／第三方及個資例外核對",
+        "具有角色與時間的真實人工決策及逐來源審查收據"
+      ],
+      "candidate_observation": {
+        "basis": "SHA256_VERIFIED_ORIGINAL_WORKFLOW_ARTIFACTS",
+        "window": "2026-09-30/2026-10-06",
+        "result": {
+          "observation_count": 7,
+          "observed_days": [
+            "2026-09-30",
+            "2026-10-01",
+            "2026-10-02",
+            "2026-10-03",
+            "2026-10-04",
+            "2026-10-05",
+            "2026-10-06"
+          ],
+          "valid_observed_days": [],
+          "successful_transport_days": [],
+          "partial_collection_days": [
+            "2026-09-30",
+            "2026-10-01",
+            "2026-10-02",
+            "2026-10-03",
+            "2026-10-04",
+            "2026-10-05",
+            "2026-10-06"
+          ],
+          "missing_guardrail_days": [],
+          "missing_days": [],
+          "first_observed_at": "2026-09-30T18:32:47.712796+08:00",
+          "last_observed_at": "2026-10-06T09:58:07.251521+08:00",
+          "window_complete": false,
+          "promotion_eligible": false,
+          "coverage_independently_verified": false
+        },
+        "scope": "CANDIDATE_OBSERVATION_WINDOW_NOT_PROMOTION"
+      }
+    },
+    {
+      "source_id": "S-004",
+      "name": "臺中市議會議事日程",
+      "authority": "臺中市議會",
+      "catalog_status": "PRODUCTION_ACTIVE",
+      "catalog_entrypoint": "https://www.tccc.gov.tw/wb_download13.asp?uno=&cno=49",
+      "list_endpoint": null,
+      "rights_class": "OFFICIAL_METADATA_LINK",
+      "rights_status": "UNKNOWN",
+      "review_required": true,
+      "full_text_allowed": false,
+      "excerpt_allowed": false,
+      "review_status": "PENDING_HUMAN_REVIEW",
+      "human_reviewer": null,
+      "human_reviewed_at": null,
+      "approved_at": null,
+      "decision": null,
+      "terms_evidence_ids": [
+        "E-001"
+      ],
+      "public_field_review_complete": false,
+      "attachments_review_status": "UNKNOWN",
+      "geographic_scope_status": "UNKNOWN",
+      "valid_time_semantics_status": "UNKNOWN",
+      "missing_evidence": [
+        "metadata許可不明",
+        "個別議事日程附件及第三方權利未審",
+        "原始官方條款requested/final URL、抓取時間、bytes/hash、locator",
+        "來源範圍／逐欄位／第三方及個資例外核對",
+        "具有角色與時間的真實人工決策及逐來源審查收據"
+      ],
+      "candidate_observation": null
+    },
+    {
+      "source_id": "S-006",
+      "name": "臺中市議會質詢順序表",
+      "authority": "臺中市議會",
+      "catalog_status": "PRODUCTION_ACTIVE",
+      "catalog_entrypoint": "https://www.tccc.gov.tw/wb_download13.asp?uno=&cno=50",
+      "list_endpoint": null,
+      "rights_class": "OFFICIAL_METADATA_LINK",
+      "rights_status": "UNKNOWN",
+      "review_required": true,
+      "full_text_allowed": false,
+      "excerpt_allowed": false,
+      "review_status": "PENDING_HUMAN_REVIEW",
+      "human_reviewer": null,
+      "human_reviewed_at": null,
+      "approved_at": null,
+      "decision": null,
+      "terms_evidence_ids": [
+        "E-002"
+      ],
+      "public_field_review_complete": false,
+      "attachments_review_status": "UNKNOWN",
+      "geographic_scope_status": "UNKNOWN",
+      "valid_time_semantics_status": "UNKNOWN",
+      "missing_evidence": [
+        "metadata許可不明",
+        "質詢表附件及個資公開欄位未審",
+        "原始官方條款requested/final URL、抓取時間、bytes/hash、locator",
+        "來源範圍／逐欄位／第三方及個資例外核對",
+        "具有角色與時間的真實人工決策及逐來源審查收據"
+      ],
+      "candidate_observation": null
+    },
+    {
+      "source_id": "S-007",
+      "name": "臺中市議會議事資訊系統－議事錄",
+      "authority": "臺中市議會",
+      "catalog_status": "PRODUCTION_ACTIVE",
+      "catalog_entrypoint": "https://yishi.tccc.gov.tw/api/ProceedingsBackWeb/FrontList",
+      "list_endpoint": null,
+      "rights_class": "OFFICIAL_METADATA_LINK",
+      "rights_status": "UNKNOWN",
+      "review_required": true,
+      "full_text_allowed": false,
+      "excerpt_allowed": false,
+      "review_status": "PENDING_HUMAN_REVIEW",
+      "human_reviewer": null,
+      "human_reviewed_at": null,
+      "approved_at": null,
+      "decision": null,
+      "terms_evidence_ids": [
+        "E-003"
+      ],
+      "public_field_review_complete": false,
+      "attachments_review_status": "UNKNOWN",
+      "geographic_scope_status": "UNKNOWN",
+      "valid_time_semantics_status": "UNKNOWN",
+      "missing_evidence": [
+        "API條款不明",
+        "議事內容、附件及第三方著作未審",
+        "原始官方條款requested/final URL、抓取時間、bytes/hash、locator",
+        "來源範圍／逐欄位／第三方及個資例外核對",
+        "具有角色與時間的真實人工決策及逐來源審查收據"
+      ],
+      "candidate_observation": null
+    },
+    {
+      "source_id": "S-009",
+      "name": "臺中市議會議事資訊系統－各項提案",
+      "authority": "臺中市議會",
+      "catalog_status": "PRODUCTION_ACTIVE",
+      "catalog_entrypoint": "https://yishi.tccc.gov.tw/api/Proposal/FrontList",
+      "list_endpoint": null,
+      "rights_class": "OFFICIAL_METADATA_LINK",
+      "rights_status": "UNKNOWN",
+      "review_required": true,
+      "full_text_allowed": false,
+      "excerpt_allowed": false,
+      "review_status": "PENDING_HUMAN_REVIEW",
+      "human_reviewer": null,
+      "human_reviewed_at": null,
+      "approved_at": null,
+      "decision": null,
+      "terms_evidence_ids": [
+        "E-003"
+      ],
+      "public_field_review_complete": false,
+      "attachments_review_status": "UNKNOWN",
+      "geographic_scope_status": "UNKNOWN",
+      "valid_time_semantics_status": "UNKNOWN",
+      "missing_evidence": [
+        "API條款不明",
+        "無可核實日期的提案不能推為新事件",
+        "原始官方條款requested/final URL、抓取時間、bytes/hash、locator",
+        "來源範圍／逐欄位／第三方及個資例外核對",
+        "具有角色與時間的真實人工決策及逐來源審查收據"
+      ],
+      "candidate_observation": null
+    },
+    {
+      "source_id": "S-029",
+      "name": "臺中市政府議會專案報告",
+      "authority": "臺中市政府研究發展考核委員會",
+      "catalog_status": "PRODUCTION_ACTIVE",
+      "catalog_entrypoint": "https://www.rdec.taichung.gov.tw/12047/12142/12145",
+      "list_endpoint": null,
+      "rights_class": "OFFICIAL_METADATA_LINK",
+      "rights_status": "UNKNOWN",
+      "review_required": true,
+      "full_text_allowed": false,
+      "excerpt_allowed": false,
+      "review_status": "PENDING_HUMAN_REVIEW",
+      "human_reviewer": null,
+      "human_reviewed_at": null,
+      "approved_at": null,
+      "decision": null,
+      "terms_evidence_ids": [
+        "E-004"
+      ],
+      "public_field_review_complete": false,
+      "attachments_review_status": "UNKNOWN",
+      "geographic_scope_status": "UNKNOWN",
+      "valid_time_semantics_status": "UNKNOWN",
+      "missing_evidence": [
+        "terms直接頁面bytes/hash缺失",
+        "個別PDF第三方著作與個資未審",
+        "原始官方條款requested/final URL、抓取時間、bytes/hash、locator",
+        "來源範圍／逐欄位／第三方及個資例外核對",
+        "具有角色與時間的真實人工決策及逐來源審查收據"
+      ],
+      "candidate_observation": null
+    },
+    {
+      "source_id": "S-031",
+      "name": "臺中市政府消防局即時災情",
+      "authority": "臺中市政府消防局",
+      "catalog_status": "VERIFIED_CANDIDATE",
+      "catalog_entrypoint": "https://www.fire.taichung.gov.tw/",
+      "list_endpoint": "https://www.fire.taichung.gov.tw/caselist/index.asp?Parser=99,8,226",
+      "rights_class": "OFFICIAL_TRANSIENT_METADATA",
+      "rights_status": "UNKNOWN",
+      "review_required": true,
+      "full_text_allowed": false,
+      "excerpt_allowed": false,
+      "review_status": "PENDING_HUMAN_REVIEW",
+      "human_reviewer": null,
+      "human_reviewed_at": null,
+      "approved_at": null,
+      "decision": null,
+      "terms_evidence_ids": [
+        "E-006",
+        "E-009",
+        "E-015"
+      ],
+      "public_field_review_complete": false,
+      "attachments_review_status": "UNKNOWN",
+      "geographic_scope_status": "UNKNOWN",
+      "valid_time_semantics_status": "UNKNOWN",
+      "missing_evidence": [
+        "即時救護／巷弄時間組合重識別風險",
+        "raw七日只是專案留存規則",
+        "觀測窗不等於coverage、promotion",
+        "來源範圍／逐欄位／第三方及個資例外核對",
+        "具有角色與時間的真實人工決策及逐來源審查收據"
+      ],
+      "candidate_observation": {
+        "basis": "SHA256_VERIFIED_ORIGINAL_WORKFLOW_ARTIFACTS",
+        "window": "2026-09-30/2026-10-06",
+        "result": {
+          "observation_count": 7,
+          "observed_days": [
+            "2026-09-30",
+            "2026-10-01",
+            "2026-10-02",
+            "2026-10-03",
+            "2026-10-04",
+            "2026-10-05",
+            "2026-10-06"
+          ],
+          "valid_observed_days": [
+            "2026-10-06"
+          ],
+          "successful_transport_days": [
+            "2026-09-30",
+            "2026-10-01",
+            "2026-10-02",
+            "2026-10-03",
+            "2026-10-04",
+            "2026-10-05",
+            "2026-10-06"
+          ],
+          "partial_collection_days": [
+            "2026-09-30",
+            "2026-10-01",
+            "2026-10-02",
+            "2026-10-03",
+            "2026-10-04",
+            "2026-10-05",
+            "2026-10-06"
+          ],
+          "missing_guardrail_days": [
+            "2026-09-30",
+            "2026-10-01",
+            "2026-10-02",
+            "2026-10-03",
+            "2026-10-04",
+            "2026-10-05"
+          ],
+          "missing_days": [],
+          "first_observed_at": "2026-09-30T18:32:47.190956+08:00",
+          "last_observed_at": "2026-10-06T09:58:03.466771+08:00",
+          "window_complete": false,
+          "promotion_eligible": false,
+          "coverage_independently_verified": false
+        },
+        "scope": "CANDIDATE_OBSERVATION_WINDOW_NOT_PROMOTION"
+      },
+      "original_terms_capture": {
+        "requested_url": "https://www.fire.taichung.gov.tw/content/index.asp?Parser=1,14,190",
+        "final_url": "https://www.fire.taichung.gov.tw/content/index.asp?Parser=1,14,190",
+        "fetched_at": "2026-10-06T03:08:40.083199+00:00",
+        "http_status": 200,
+        "body_sha256": "311e4c9e692f5e2102a744e0d72fccc255393fc9deed11d563c26ed98a54e14c",
+        "locator": "#div_content .content_txt",
+        "license_scope": "METADATA_LINK_ONLY",
+        "license_id": "OGDL-1.0",
+        "bytes": 75123,
+        "content_type": "text/html; Charset=utf-8",
+        "scope_status": "AWAITING_SOURCE_AND_FIELD_REVIEW",
+        "exceptions": [
+          "third-party works and specially excluded content",
+          "personal data and re-identification",
+          "logos, trademarks and other IP",
+          "attribution and no agency endorsement"
+        ],
+        "original_body_publicly_republished": false
+      },
+      "metadata_review_template": {
+        "decision": null,
+        "rights_status": null,
+        "resource_url": "https://www.fire.taichung.gov.tw/",
+        "public_fields": null,
+        "human_review": {
+          "reviewer": null,
+          "role": null,
+          "reviewed_at": null
+        },
+        "terms_evidence": {
+          "requested_url": "https://www.fire.taichung.gov.tw/content/index.asp?Parser=1,14,190",
+          "final_url": "https://www.fire.taichung.gov.tw/content/index.asp?Parser=1,14,190",
+          "fetched_at": "2026-10-06T03:08:40.083199+00:00",
+          "http_status": 200,
+          "body_sha256": "311e4c9e692f5e2102a744e0d72fccc255393fc9deed11d563c26ed98a54e14c",
+          "locator": "#div_content .content_txt",
+          "license_scope": "METADATA_LINK_ONLY",
+          "license_id": "OGDL-1.0"
+        },
+        "exceptions_reviewed": false,
+        "attribution": "臺中市政府消防局；保留官方連結與官方日期，觀察時間另列。"
+      }
+    },
+    {
+      "source_id": "S-032",
+      "name": "臺中市政府交通局最新消息",
+      "authority": "臺中市政府交通局",
+      "catalog_status": "VERIFIED_CANDIDATE",
+      "catalog_entrypoint": "https://www.traffic.taichung.gov.tw/",
+      "list_endpoint": null,
+      "rights_class": "OFFICIAL_METADATA_LINK",
+      "rights_status": "UNKNOWN",
+      "review_required": true,
+      "full_text_allowed": false,
+      "excerpt_allowed": false,
+      "review_status": "PENDING_HUMAN_REVIEW",
+      "human_reviewer": null,
+      "human_reviewed_at": null,
+      "approved_at": null,
+      "decision": null,
+      "terms_evidence_ids": [
+        "E-005",
+        "E-009"
+      ],
+      "public_field_review_complete": false,
+      "attachments_review_status": "UNKNOWN",
+      "geographic_scope_status": "UNKNOWN",
+      "valid_time_semantics_status": "UNKNOWN",
+      "missing_evidence": [
+        "圖片附件及個資另審",
+        "觀測窗未滿七日",
+        "來源範圍／逐欄位／第三方及個資例外核對",
+        "具有角色與時間的真實人工決策及逐來源審查收據"
+      ],
+      "candidate_observation": {
+        "basis": "SHA256_VERIFIED_ORIGINAL_WORKFLOW_ARTIFACTS",
+        "window": "2026-09-30/2026-10-06",
+        "result": {
+          "observation_count": 7,
+          "observed_days": [
+            "2026-09-30",
+            "2026-10-01",
+            "2026-10-02",
+            "2026-10-03",
+            "2026-10-04",
+            "2026-10-05",
+            "2026-10-06"
+          ],
+          "valid_observed_days": [
+            "2026-09-30",
+            "2026-10-01",
+            "2026-10-02",
+            "2026-10-03",
+            "2026-10-04",
+            "2026-10-05",
+            "2026-10-06"
+          ],
+          "successful_transport_days": [
+            "2026-09-30",
+            "2026-10-01",
+            "2026-10-02",
+            "2026-10-03",
+            "2026-10-04",
+            "2026-10-05",
+            "2026-10-06"
+          ],
+          "partial_collection_days": [
+            "2026-10-05",
+            "2026-10-06"
+          ],
+          "missing_guardrail_days": [],
+          "missing_days": [],
+          "first_observed_at": "2026-09-30T18:32:48.903525+08:00",
+          "last_observed_at": "2026-10-06T09:58:39.555165+08:00",
+          "window_complete": true,
+          "promotion_eligible": false,
+          "coverage_independently_verified": false
+        },
+        "scope": "CANDIDATE_OBSERVATION_WINDOW_NOT_PROMOTION"
+      },
+      "original_terms_capture": {
+        "requested_url": "https://www.traffic.taichung.gov.tw/content/index.asp?Parser=1,12,442",
+        "final_url": "https://www.traffic.taichung.gov.tw/content/index.asp?Parser=1,12,442",
+        "fetched_at": "2026-10-06T03:08:39.559150+00:00",
+        "http_status": 200,
+        "body_sha256": "010c8a51f35aa21c082505a11e5b24ca9027b0ccd443cfe9ac5d3122ea048e4c",
+        "locator": "Main content paragraph beginning 為利各界廣為利用網站資料; official link to data.gov.tw/license",
+        "license_scope": "METADATA_LINK_ONLY",
+        "license_id": "OGDL-1.0",
+        "bytes": 64128,
+        "content_type": "text/html; Charset=utf-8",
+        "scope_status": "AWAITING_SOURCE_AND_FIELD_REVIEW",
+        "exceptions": [
+          "third-party works and specially excluded content",
+          "personal data and re-identification",
+          "logos, trademarks and other IP",
+          "attribution and no agency endorsement"
+        ],
+        "original_body_publicly_republished": false
+      },
+      "metadata_review_template": {
+        "decision": null,
+        "rights_status": null,
+        "resource_url": "https://www.traffic.taichung.gov.tw/",
+        "public_fields": null,
+        "human_review": {
+          "reviewer": null,
+          "role": null,
+          "reviewed_at": null
+        },
+        "terms_evidence": {
+          "requested_url": "https://www.traffic.taichung.gov.tw/content/index.asp?Parser=1,12,442",
+          "final_url": "https://www.traffic.taichung.gov.tw/content/index.asp?Parser=1,12,442",
+          "fetched_at": "2026-10-06T03:08:39.559150+00:00",
+          "http_status": 200,
+          "body_sha256": "010c8a51f35aa21c082505a11e5b24ca9027b0ccd443cfe9ac5d3122ea048e4c",
+          "locator": "Main content paragraph beginning 為利各界廣為利用網站資料; official link to data.gov.tw/license",
+          "license_scope": "METADATA_LINK_ONLY",
+          "license_id": "OGDL-1.0"
+        },
+        "exceptions_reviewed": false,
+        "attribution": "臺中市政府交通局；保留官方連結與官方日期，觀察時間另列。"
+      }
+    },
+    {
+      "source_id": "S-033",
+      "name": "臺中市政府市政新聞",
+      "authority": "臺中市政府",
+      "catalog_status": "VERIFIED_CANDIDATE",
+      "catalog_entrypoint": "https://www.taichung.gov.tw/",
+      "list_endpoint": "https://www.taichung.gov.tw/10179/564770/rss?nodeId=9962",
+      "rights_class": "OFFICIAL_METADATA_LINK",
+      "rights_status": "UNKNOWN",
+      "review_required": true,
+      "full_text_allowed": false,
+      "excerpt_allowed": false,
+      "review_status": "PENDING_HUMAN_REVIEW",
+      "human_reviewer": null,
+      "human_reviewed_at": null,
+      "approved_at": null,
+      "decision": null,
+      "terms_evidence_ids": [
+        "E-007",
+        "E-008",
+        "E-009",
+        "E-011",
+        "E-012"
+      ],
+      "public_field_review_complete": false,
+      "attachments_review_status": "UNKNOWN",
+      "geographic_scope_status": "UNKNOWN",
+      "valid_time_semantics_status": "UNKNOWN",
+      "missing_evidence": [
+        "dataset OGDL不得泛化HTML/RSS",
+        "聯絡人／電話／圖片／附件／下架日期排除或另審",
+        "S033与agency轉載不得增加獨立佐證",
+        "觀測窗未滿七日",
+        "來源範圍／逐欄位／第三方及個資例外核對",
+        "具有角色與時間的真實人工決策及逐來源審查收據"
+      ],
+      "candidate_observation": {
+        "basis": "SHA256_VERIFIED_ORIGINAL_WORKFLOW_ARTIFACTS",
+        "window": "2026-09-30/2026-10-06",
+        "result": {
+          "observation_count": 7,
+          "observed_days": [
+            "2026-09-30",
+            "2026-10-01",
+            "2026-10-02",
+            "2026-10-03",
+            "2026-10-04",
+            "2026-10-05",
+            "2026-10-06"
+          ],
+          "valid_observed_days": [
+            "2026-09-30",
+            "2026-10-01",
+            "2026-10-02",
+            "2026-10-03",
+            "2026-10-04",
+            "2026-10-05",
+            "2026-10-06"
+          ],
+          "successful_transport_days": [
+            "2026-09-30",
+            "2026-10-01",
+            "2026-10-02",
+            "2026-10-03",
+            "2026-10-04",
+            "2026-10-05",
+            "2026-10-06"
+          ],
+          "partial_collection_days": [],
+          "missing_guardrail_days": [],
+          "missing_days": [],
+          "first_observed_at": "2026-09-30T18:32:47.304764+08:00",
+          "last_observed_at": "2026-10-06T09:58:06.272721+08:00",
+          "window_complete": true,
+          "promotion_eligible": false,
+          "coverage_independently_verified": false
+        },
+        "scope": "CANDIDATE_OBSERVATION_WINDOW_NOT_PROMOTION"
+      },
+      "original_terms_capture": {
+        "requested_url": "https://www.taichung.gov.tw/10179/10185/13599",
+        "final_url": "https://www.taichung.gov.tw/10179/10185/13599",
+        "fetched_at": "2026-10-06T03:08:42.150689+00:00",
+        "http_status": 200,
+        "body_sha256": "a2f072098939880a55ad2bc4acac351dc6637ec48a12d36d1f3f4b094ad1b426",
+        "locator": "article#cpArticle",
+        "license_scope": "METADATA_LINK_ONLY",
+        "license_id": "TAICHUNG_WEBSITE_OPEN_DECLARATION",
+        "bytes": 72481,
+        "content_type": "text/html; charset=utf-8",
+        "scope_status": "AWAITING_SOURCE_AND_FIELD_REVIEW",
+        "exceptions": [
+          "third-party works and specially excluded content",
+          "personal data and re-identification",
+          "logos, trademarks and other IP",
+          "attribution and no agency endorsement"
+        ],
+        "original_body_publicly_republished": false
+      },
+      "metadata_review_template": {
+        "decision": null,
+        "rights_status": null,
+        "resource_url": "https://www.taichung.gov.tw/",
+        "public_fields": null,
+        "human_review": {
+          "reviewer": null,
+          "role": null,
+          "reviewed_at": null
+        },
+        "terms_evidence": {
+          "requested_url": "https://www.taichung.gov.tw/10179/10185/13599",
+          "final_url": "https://www.taichung.gov.tw/10179/10185/13599",
+          "fetched_at": "2026-10-06T03:08:42.150689+00:00",
+          "http_status": 200,
+          "body_sha256": "a2f072098939880a55ad2bc4acac351dc6637ec48a12d36d1f3f4b094ad1b426",
+          "locator": "article#cpArticle",
+          "license_scope": "METADATA_LINK_ONLY",
+          "license_id": "TAICHUNG_WEBSITE_OPEN_DECLARATION"
+        },
+        "exceptions_reviewed": false,
+        "attribution": "臺中市政府；保留官方連結與官方日期，觀察時間另列。"
+      }
+    },
+    {
+      "human_reviewer": null,
+      "human_reviewed_at": null,
+      "approved_at": null,
+      "decision": null,
+      "source_id": "S-019",
+      "name": "臺中市政府市政會議紀錄與專案報告",
+      "authority": "臺中市政府研究發展考核委員會",
+      "catalog_status": "AUDITED_EXISTING",
+      "catalog_entrypoint": "https://www.rdec.taichung.gov.tw/12047/12142/12186",
+      "rights_status": "UNKNOWN",
+      "review_required": true,
+      "full_text_allowed": false,
+      "excerpt_allowed": false,
+      "review_status": "PENDING_HUMAN_REVIEW",
+      "missing_evidence": [
+        "原始官方條款直接抓取失敗",
+        "逐來源／逐欄位權利與例外審查",
+        "真實人工決策",
+        "七日有效觀察"
+      ],
+      "candidate_observation": {
+        "basis": "SHA256_VERIFIED_ORIGINAL_WORKFLOW_ARTIFACTS",
+        "result": {
+          "observation_count": 2,
+          "observed_days": [
+            "2026-10-05",
+            "2026-10-06"
+          ],
+          "valid_observed_days": [],
+          "successful_transport_days": [],
+          "partial_collection_days": [
+            "2026-10-05",
+            "2026-10-06"
+          ],
+          "missing_guardrail_days": [],
+          "missing_days": [],
+          "first_observed_at": "2026-10-05T17:08:45.283882+08:00",
+          "last_observed_at": "2026-10-06T09:58:03.843563+08:00",
+          "window_complete": false,
+          "promotion_eligible": false,
+          "coverage_independently_verified": false
+        }
+      }
+    }
+  ],
+  "evidence": [
+    {
+      "evidence_id": "traffic-terms",
+      "requested_url": "https://www.traffic.taichung.gov.tw/content/index.asp?Parser=1,12,442",
+      "http_status": 200,
+      "body_sha256": "010c8a51f35aa21c082505a11e5b24ca9027b0ccd443cfe9ac5d3122ea048e4c",
+      "fetched_at": "2026-10-06T03:08:39.559150+00:00"
+    },
+    {
+      "evidence_id": "fire-terms",
+      "requested_url": "https://www.fire.taichung.gov.tw/content/index.asp?Parser=1,14,190",
+      "http_status": 200,
+      "body_sha256": "311e4c9e692f5e2102a744e0d72fccc255393fc9deed11d563c26ed98a54e14c",
+      "fetched_at": "2026-10-06T03:08:40.083199+00:00"
+    },
+    {
+      "evidence_id": "city-terms",
+      "requested_url": "https://www.taichung.gov.tw/10179/10185/13599",
+      "http_status": 200,
+      "body_sha256": "a2f072098939880a55ad2bc4acac351dc6637ec48a12d36d1f3f4b094ad1b426",
+      "fetched_at": "2026-10-06T03:08:42.150689+00:00"
+    },
+    {
+      "evidence_id": "ogdl-terms",
+      "requested_url": "https://data.gov.tw/license",
+      "http_status": 200,
+      "body_sha256": "9be737b7fad673e393b51da2be62164abc5bbb1a9d4f323f02c01f112c9e78ab",
+      "fetched_at": "2026-10-06T03:08:40.216813+00:00"
+    },
+    {
+      "evidence_id": "rdec-terms",
+      "requested_url": "https://www.rdec.taichung.gov.tw/30103/30122/443962",
+      "http_status": 503,
+      "body_sha256": "2f85832e31ca57711e6107af6b142363351ae516adb71c69afc643fac26be7f6",
+      "fetched_at": "2026-10-06T03:08:37.940866+00:00"
+    },
+    {
+      "evidence_id": "council-wrapper",
+      "requested_url": "https://www.tccc.gov.tw/main.asp?cno=49&uno=59",
+      "http_status": 200,
+      "body_sha256": "9f81d5ce39b87110ddd82d545a91160527a422ee0c6de8503d37ab293a668804",
+      "fetched_at": "2026-10-06T03:08:36.762520+00:00"
+    },
+    {
+      "evidence_id": "council-api-home",
+      "requested_url": "https://yishi.tccc.gov.tw/",
+      "http_status": 200,
+      "body_sha256": "47ed24c81839e07e16f75af995d707263de69c48ca375bb445cf35c64589ea25",
+      "fetched_at": "2026-10-06T03:08:39.601414+00:00"
+    }
+  ],
+  "research_ref": null,
+  "integration_base_ref": "edb7148c9565c7d59ac222689c35bff41376d1cb",
+  "evidence_origin": "ORIGINAL_HTTP_TERMS_AND_SHA256_VERIFIED_WORKFLOW_ARTIFACTS",
+  "prepared_at": "2026-10-06T03:23:05.296238+00:00",
+  "supersedes_draft_reference": "docs/govintel/source-reviews/2026-10-05/source-review.pending.json"
+}

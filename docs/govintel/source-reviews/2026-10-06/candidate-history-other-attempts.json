@@ -1,0 +1,231 @@
+{
+  "schema_version": 1,
+  "observations": [
+    {
+      "artifact_id": 11322651323,
+      "workflow_run": {
+        "id": 37255538865,
+        "repository_id": 1343595802,
+        "head_repository_id": 1343595802,
+        "head_branch": "main",
+        "head_sha": "a9dd750680647ad317812b8dff53743313587996"
+      },
+      "zip_sha256": "316261bbf3e6c46c56fca8d922f4e089387ff22151a4a0868230f3095ab3df64",
+      "report_sha256": "b348b2c6f01cd6a3493aa8b91d3e98729133faf2f05a7aaf902154b38ab32d5e",
+      "observed_at": "2026-10-05T10:28:39.359640+08:00",
+      "report_status": "FAILED",
+      "sources": [
+        {
+          "source_id": "S-019",
+          "source_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186",
+          "integration_status": "CANDIDATE",
+          "promotion_eligible": false,
+          "observed_at": "2026-10-05T10:28:39.359640+08:00",
+          "source_health": "FAILED",
+          "collector_window_claim": "PARTIAL",
+          "window_item_count": null,
+          "snapshot_item_count": null,
+          "snapshot_count": null,
+          "detail_fetch_count": null,
+          "manifest_sha256": null,
+          "error_type": "ConnectionError",
+          "error_message": "HTTPSConnectionPool(host='www.rdec.taichung.gov.tw', port=443): Max retries exceeded with url: /12047/12142/12186 (Caused by NewConnectionError(\"HTTPSConnection(host='www.rdec.taichung.gov.tw', port=443): Failed to establish a new connection: [Errno 101] N",
+          "schema_contract": {
+            "status": "CONTENT_SHAPE_UNKNOWN",
+            "reasons": [
+              "COLLECTOR_DID_NOT_RETURN_VERIFIABLE_SNAPSHOT"
+            ],
+            "review_required": false
+          },
+          "http_calls": 1,
+          "last_http_status": null,
+          "elapsed_ms": 5190
+        }
+      ],
+      "selected_for_seven_day_matrix": false,
+      "exclusion_reason": "Earlier attempt on the same Taipei date, retained without replacing the selected later attempt."
+    },
+    {
+      "artifact_id": 11322356828,
+      "workflow_run": {
+        "id": 37255538865,
+        "repository_id": 1343595802,
+        "head_repository_id": 1343595802,
+        "head_branch": "main",
+        "head_sha": "a9dd750680647ad317812b8dff53743313587996"
+      },
+      "zip_sha256": "acdd37110e4f408a1542d140699c1462643955e0e5f8c9971d0d1f751d2e5775",
+      "report_sha256": "cb1849fb8e7ae991ed7a000bb05fea9348d65960a3dc588b563f65966f375716",
+      "observed_at": "2026-10-05T10:28:37.212203+08:00",
+      "report_status": "OBSERVED",
+      "sources": [
+        {
+          "source_id": "S-031",
+          "source_url": "https://www.fire.taichung.gov.tw/caselist/index.asp?Parser=99,8,226",
+          "integration_status": "CANDIDATE",
+          "promotion_eligible": false,
+          "observed_at": "2026-10-05T10:28:37.212203+08:00",
+          "source_health": "PASS",
+          "collector_window_claim": "PARTIAL",
+          "window_item_count": null,
+          "snapshot_item_count": 10,
+          "snapshot_count": 1,
+          "detail_fetch_count": 0,
+          "manifest_sha256": "c93ea41b300af829d3b125dd29f146d84760dc4979249481ef38528e6fe86ede",
+          "coverage_independently_verified": false,
+          "schema_contract": {
+            "contract_version": "1.1",
+            "parser_version": "online_collect:p0-live-1",
+            "transport": "HTML_LIVE_SNAPSHOT",
+            "status": "NO_DRIFT",
+            "observed_schema_fingerprint": "47c2cbe52471e9c7cc4fa76d13ffe5a01525104560eb434aae287b352d3148ca",
+            "sample_sha256": "bac32ca16cd58c9bf15f9bf4e6c5e486d0d4171e4104ddf1cb49afeb4f425a93",
+            "reasons": [],
+            "review_required": false
+          },
+          "http_calls": 1,
+          "last_http_status": 200,
+          "elapsed_ms": 1638
+        }
+      ],
+      "selected_for_seven_day_matrix": false,
+      "exclusion_reason": "Earlier attempt on the same Taipei date, retained without replacing the selected later attempt."
+    },
+    {
+      "artifact_id": 11322208374,
+      "workflow_run": {
+        "id": 37255538865,
+        "repository_id": 1343595802,
+        "head_repository_id": 1343595802,
+        "head_branch": "main",
+        "head_sha": "a9dd750680647ad317812b8dff53743313587996"
+      },
+      "zip_sha256": "15b94df7f9b6c824f294bbb6ce3b8324dd04a72fb572ceda8b9e791ba8f9a8c6",
+      "report_sha256": "574dd3e305ea115d0da9a194867bd0100bdcb251ee85f455f80cbe88589cdd11",
+      "observed_at": "2026-10-05T10:28:43.831416+08:00",
+      "report_status": "OBSERVED",
+      "sources": [
+        {
+          "source_id": "S-032",
+          "source_url": "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,20",
+          "integration_status": "CANDIDATE",
+          "promotion_eligible": false,
+          "observed_at": "2026-10-05T10:28:43.831416+08:00",
+          "source_health": "PASS",
+          "collector_window_claim": "PARTIAL",
+          "window_item_count": 10,
+          "snapshot_item_count": 10,
+          "snapshot_count": 2,
+          "detail_fetch_count": 1,
+          "manifest_sha256": "ca82570581f1b823b19702e887f9f07fea631219cd464ba1c8c8a03246e74afe",
+          "coverage_independently_verified": false,
+          "schema_contract": {
+            "contract_version": "1.1",
+            "parser_version": "online_collect:p0-live-1",
+            "transport": "HTML_LIST_DETAIL",
+            "status": "NO_DRIFT",
+            "observed_schema_fingerprint": "98b99108d6e847c3b387b06b279f5c45e59a49fc0eaff89cca1d554647c80a2a",
+            "sample_sha256": "3173bdcac6346d0d3979d416bff09350e42de14bce6eb07dfc08788d1039ffbf",
+            "reasons": [],
+            "review_required": false
+          },
+          "http_calls": 2,
+          "last_http_status": 200,
+          "elapsed_ms": 4347
+        }
+      ],
+      "selected_for_seven_day_matrix": false,
+      "exclusion_reason": "Earlier attempt on the same Taipei date, retained without replacing the selected later attempt."
+    },
+    {
+      "artifact_id": 11322088848,
+      "workflow_run": {
+        "id": 37255538865,
+        "repository_id": 1343595802,
+        "head_repository_id": 1343595802,
+        "head_branch": "main",
+        "head_sha": "a9dd750680647ad317812b8dff53743313587996"
+      },
+      "zip_sha256": "81ab8befbcd578d05b74a394f24abb459858959c621ff1079b2052cc0f022556",
+      "report_sha256": "f7e934a03a2fcf6fd24cad05d1e7a061ea35bc627cbf5ae9413b3fc45c5080c0",
+      "observed_at": "2026-10-05T10:28:35.870281+08:00",
+      "report_status": "OBSERVED",
+      "sources": [
+        {
+          "source_id": "S-033",
+          "source_url": "https://www.taichung.gov.tw/10179/564770/rss?nodeId=9962",
+          "integration_status": "CANDIDATE",
+          "promotion_eligible": false,
+          "observed_at": "2026-10-05T10:28:35.870281+08:00",
+          "source_health": "PASS",
+          "collector_window_claim": "COMPLETE_WITH_ITEMS",
+          "window_item_count": 121,
+          "snapshot_item_count": 500,
+          "snapshot_count": 2,
+          "detail_fetch_count": 1,
+          "manifest_sha256": "5df5008a202c2d016a237a00733bbe4137559e1f6bd46e7cc3eba5cb9d8a5841",
+          "coverage_independently_verified": false,
+          "schema_contract": {
+            "contract_version": "1.1",
+            "parser_version": "online_collect:p0-live-1",
+            "transport": "RSS_LIST_DETAIL",
+            "status": "NO_DRIFT",
+            "observed_schema_fingerprint": "4fc6c2966cedee7b875279d323f8f2e54419b283c9a3ae778c42606abfe51b17",
+            "sample_sha256": "ae6d8b0f97c6c3432f6eb272a7d5dd085fb1b71ff13e46648a4653dfa8cf6443",
+            "reasons": [],
+            "review_required": false
+          },
+          "http_calls": 2,
+          "last_http_status": 200,
+          "elapsed_ms": 2649
+        }
+      ],
+      "selected_for_seven_day_matrix": false,
+      "exclusion_reason": "Earlier attempt on the same Taipei date, retained without replacing the selected later attempt."
+    },
+    {
+      "artifact_id": 11321953906,
+      "workflow_run": {
+        "id": 37255538865,
+        "repository_id": 1343595802,
+        "head_repository_id": 1343595802,
+        "head_branch": "main",
+        "head_sha": "a9dd750680647ad317812b8dff53743313587996"
+      },
+      "zip_sha256": "9de5aa7bc36ff8beefea28fde46bcf6231b5e4cf7f5b9c9b6ae72d240d20fa87",
+      "report_sha256": "226c2b653ddffc2b5b7601ab7674d930fda7babc8b61b7164ec7bf2acea8e395",
+      "observed_at": "2026-10-05T10:28:36.268785+08:00",
+      "report_status": "FAILED",
+      "sources": [
+        {
+          "source_id": "S-001",
+          "source_url": "https://www.police.taichung.gov.tw/ch/home.jsp?id=1&parentpath=0&mcustomize=news_list.jsp",
+          "integration_status": "CANDIDATE",
+          "promotion_eligible": false,
+          "observed_at": "2026-10-05T10:28:36.268785+08:00",
+          "source_health": "FAILED",
+          "collector_window_claim": "PARTIAL",
+          "window_item_count": null,
+          "snapshot_item_count": null,
+          "snapshot_count": null,
+          "detail_fetch_count": null,
+          "manifest_sha256": null,
+          "error_type": "ConnectionError",
+          "error_message": "HTTPSConnectionPool(host='www.police.taichung.gov.tw', port=443): Max retries exceeded with url: /ch/home.jsp?id=1 (Caused by NewConnectionError(\"HTTPSConnection(host='www.police.taichung.gov.tw', port=443): Failed to establish a new connection: [Errno 101",
+          "schema_contract": {
+            "status": "CONTENT_SHAPE_UNKNOWN",
+            "reasons": [
+              "COLLECTOR_DID_NOT_RETURN_VERIFIABLE_SNAPSHOT"
+            ],
+            "review_required": false
+          },
+          "http_calls": 2,
+          "last_http_status": null,
+          "elapsed_ms": 10630
+        }
+      ],
+      "selected_for_seven_day_matrix": false,
+      "exclusion_reason": "Earlier attempt on the same Taipei date, retained without replacing the selected later attempt."
+    }
+  ]
+}

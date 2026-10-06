@@ -412,6 +412,7 @@ if (["quick", "full"].includes(mode) && !failures.length) {
       ["date-metadata-projection-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_date_metadata_projection.py", "-v"]],
       ["candidate-canary-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_candidate_runtime_canary.py", "-v"]],
       ["candidate-observation-window-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_candidate_observation_window.py", "-v"]],
+      ["free-model-synthetic-offline-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_free_model_synthetic.py", "-v"]],
       ["candidate-publication-wiring-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_candidate_publication_wiring.py", "-v"]],
       ["publication-bundle-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_publication_bundle.py", "-v"]],
       ["v2-publication-check", ["-X", "utf8", "scripts/verify-v2-publication.py"]],

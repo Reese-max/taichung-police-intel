@@ -1,0 +1,31 @@
+name: Diagnose official source egress with temporary Worker
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: govintel-source-egress-diagnostic
+  cancel-in-progress: false
+jobs:
+  probe:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements.txt
+      - name: Create expiring probe, capture metadata, delete temporary Worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: python scripts/probe-cloudflare-source-egress.py
+      - name: Retain transport and cleanup evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: source-egress-probe-${{ github.run_id }}
+          path: source-egress-probe.json
+          if-no-files-found: warn
+          retention-days: 14

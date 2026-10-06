@@ -1,0 +1,12 @@
+{"case_id": "event-same-001", "prediction": {"same_event": true}}
+{"case_id": "event-different-date-001", "prediction": {"same_event": false}}
+{"case_id": "event-conflict-place-001", "prediction": {"same_event": false}}
+{"case_id": "event-repost-001", "prediction": {"same_event": true}}
+{"case_id": "change-time-001", "prediction": {"material_change": true, "fields": ["start_time"]}}
+{"case_id": "change-punctuation-001", "prediction": {"material_change": false, "fields": []}}
+{"case_id": "change-location-001", "prediction": {"material_change": true, "fields": ["location"]}}
+{"case_id": "change-layout-001", "prediction": {"material_change": false, "fields": []}}
+{"case_id": "claim-time-supported-001", "prediction": {"support_status": "SUPPORTED"}}
+{"case_id": "claim-cause-unsupported-001", "prediction": {"support_status": "PARTIAL"}}
+{"case_id": "claim-conflict-001", "prediction": {"support_status": "CONFLICT"}}
+{"case_id": "claim-stale-001", "prediction": {"support_status": "STALE"}}

@@ -1,0 +1,135 @@
+{
+  "schema_version": 1,
+  "validation_scope": "CANDIDATE_OBSERVATION_WINDOW_NOT_PROMOTION",
+  "required_observation_days": 7,
+  "source_ids": [
+    "S-031"
+  ],
+  "report_count": 7,
+  "status": "BLOCKED",
+  "promotion_eligible": false,
+  "as_of": "2026-10-06T03:18:08.739911+00:00",
+  "qualification_note": "window_complete counts valid observation days only; it does not verify collection coverage, source rights, or production admission",
+  "reasons": [
+    "/workspace/scratch/govintel-remaining-repair-20261006/candidate-history/37288082018/S-031/candidate-source-observation.json:S-031: missing required public usage notice",
+    "/workspace/scratch/govintel-remaining-repair-20261006/candidate-history/37288082018/S-031/candidate-source-observation.json:S-031: missing required retention class",
+    "/workspace/scratch/govintel-remaining-repair-20261006/candidate-history/37189085475/S-031/candidate-source-observation.json:S-031: missing required public usage notice",
+    "/workspace/scratch/govintel-remaining-repair-20261006/candidate-history/37189085475/S-031/candidate-source-observation.json:S-031: missing required retention class",
+    "/workspace/scratch/govintel-remaining-repair-20261006/candidate-history/37108820203/S-031/candidate-source-observation.json:S-031: missing required public usage notice",
+    "/workspace/scratch/govintel-remaining-repair-20261006/candidate-history/37108820203/S-031/candidate-source-observation.json:S-031: missing required retention class",
+    "/workspace/scratch/govintel-remaining-repair-20261006/candidate-history/36984870468/S-031/candidate-source-observation.json:S-031: missing required public usage notice",
+    "/workspace/scratch/govintel-remaining-repair-20261006/candidate-history/36984870468/S-031/candidate-source-observation.json:S-031: missing required retention class",
+    "/workspace/scratch/govintel-remaining-repair-20261006/candidate-history/36839828884/S-031/candidate-source-observation.json:S-031: missing required public usage notice",
+    "/workspace/scratch/govintel-remaining-repair-20261006/candidate-history/36839828884/S-031/candidate-source-observation.json:S-031: missing required retention class",
+    "/workspace/scratch/govintel-remaining-repair-20261006/candidate-history/36703064392/S-031/candidate-source-observation.json:S-031: missing required public usage notice",
+    "/workspace/scratch/govintel-remaining-repair-20261006/candidate-history/36703064392/S-031/candidate-source-observation.json:S-031: missing required retention class",
+    "S-031: only 1 valid observed days; need 7"
+  ],
+  "reports": [
+    {
+      "path": "37401798185/S-031/candidate-source-observation.json",
+      "observed_at": "2026-10-06T09:58:03.466771+08:00",
+      "local_date": "2026-10-06",
+      "source_count": 1,
+      "failed_count": 0,
+      "report_sha256": "ed35768d2bf144adbb55e4325c6a262a63225780facc7d3f30c6223ca569a296"
+    },
+    {
+      "path": "37288082018/S-031/candidate-source-observation.json",
+      "observed_at": "2026-10-05T17:08:43.773461+08:00",
+      "local_date": "2026-10-05",
+      "source_count": 1,
+      "failed_count": 0,
+      "report_sha256": "83e8453406f805cb458dc2fc8038fe39564d6c913cdaab57472c26c5db2da2af"
+    },
+    {
+      "path": "37189085475/S-031/candidate-source-observation.json",
+      "observed_at": "2026-10-04T16:29:36.689993+08:00",
+      "local_date": "2026-10-04",
+      "source_count": 1,
+      "failed_count": 0,
+      "report_sha256": "59cf4f4e24cf5dad9afb9e99a36f0963b2740f21722501a06fe83d650c8c20a2"
+    },
+    {
+      "path": "37108820203/S-031/candidate-source-observation.json",
+      "observed_at": "2026-10-03T16:10:54.276526+08:00",
+      "local_date": "2026-10-03",
+      "source_count": 1,
+      "failed_count": 0,
+      "report_sha256": "09b7bb1ae279477921005a106a75ada8e7e2431a659509666d11299ea780a231"
+    },
+    {
+      "path": "36984870468/S-031/candidate-source-observation.json",
+      "observed_at": "2026-10-02T16:35:22.733438+08:00",
+      "local_date": "2026-10-02",
+      "source_count": 1,
+      "failed_count": 0,
+      "report_sha256": "75e5040a7cbecf04c68801044ea2f9ae0654c1d1b1cc4ba16371cda37ca1b117"
+    },
+    {
+      "path": "36839828884/S-031/candidate-source-observation.json",
+      "observed_at": "2026-10-01T16:59:47.690824+08:00",
+      "local_date": "2026-10-01",
+      "source_count": 1,
+      "failed_count": 0,
+      "report_sha256": "5125d373c255b6cd976999ddc600436ffc657adcab432f5a23ba3daa2171ddfb"
+    },
+    {
+      "path": "36703064392/S-031/candidate-source-observation.json",
+      "observed_at": "2026-09-30T18:32:47.190956+08:00",
+      "local_date": "2026-09-30",
+      "source_count": 1,
+      "failed_count": 0,
+      "report_sha256": "63ca74e4567135b672b5732cb0ba64ab47d3aaabd1051fb8fc026247b57bca99"
+    }
+  ],
+  "sources": {
+    "S-031": {
+      "observation_count": 7,
+      "observed_days": [
+        "2026-09-30",
+        "2026-10-01",
+        "2026-10-02",
+        "2026-10-03",
+        "2026-10-04",
+        "2026-10-05",
+        "2026-10-06"
+      ],
+      "valid_observed_days": [
+        "2026-10-06"
+      ],
+      "successful_transport_days": [
+        "2026-09-30",
+        "2026-10-01",
+        "2026-10-02",
+        "2026-10-03",
+        "2026-10-04",
+        "2026-10-05",
+        "2026-10-06"
+      ],
+      "partial_collection_days": [
+        "2026-09-30",
+        "2026-10-01",
+        "2026-10-02",
+        "2026-10-03",
+        "2026-10-04",
+        "2026-10-05",
+        "2026-10-06"
+      ],
+      "missing_guardrail_days": [
+        "2026-09-30",
+        "2026-10-01",
+        "2026-10-02",
+        "2026-10-03",
+        "2026-10-04",
+        "2026-10-05"
+      ],
+      "missing_days": [],
+      "first_observed_at": "2026-09-30T18:32:47.190956+08:00",
+      "last_observed_at": "2026-10-06T09:58:03.466771+08:00",
+      "window_complete": false,
+      "promotion_eligible": false,
+      "coverage_independently_verified": false
+    }
+  }
+}

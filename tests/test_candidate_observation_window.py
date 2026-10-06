@@ -1,7 +1,7 @@
 import importlib.util
 import json
 import re
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 import unittest
 from unittest import mock
@@ -45,6 +45,37 @@ def report(day: date, *, source_ids=PROMOTION_IDS, failed_count=0, notice=True):
 
 
 class CandidateObservationWindowTests(unittest.TestCase):
+    def test_future_days_cannot_complete_a_window(self):
+        start = date(2026, 9, 15)
+        result = module.validate_reports([
+            (f"{day}.json", report(day))
+            for day in (start + timedelta(days=offset) for offset in range(7))
+        ], as_of=datetime(2026, 9, 20, 12, tzinfo=timezone.utc))
+        self.assertEqual(result["status"], "BLOCKED")
+        self.assertTrue(any("future observation" in reason for reason in result["reasons"]))
+        self.assertFalse(result["sources"]["S-033"]["window_complete"])
+
+    def test_success_days_are_separate_from_partial_coverage_and_guardrails(self):
+        start = date(2026, 9, 15)
+        result = module.validate_reports([
+            (f"{day}.json", report(day, notice=False))
+            for day in (start + timedelta(days=offset) for offset in range(7))
+        ])
+        fire = result["sources"]["S-031"]
+        self.assertEqual(len(fire["successful_transport_days"]), 7)
+        self.assertEqual(len(fire["partial_collection_days"]), 7)
+        self.assertEqual(len(fire["missing_guardrail_days"]), 7)
+        self.assertEqual(fire["valid_observed_days"], [])
+        self.assertFalse(fire["coverage_independently_verified"])
+        self.assertFalse(fire["promotion_eligible"])
+
+    def test_a_source_cannot_borrow_another_report_day(self):
+        observed = report(date(2026, 9, 15), source_ids=("S-033",))
+        observed["sources"][0]["observed_at"] = "2026-09-14T10:00:00+08:00"
+        result = module.validate_reports([("clock-mismatch.json", observed)], required_days=1, required_source_ids=("S-033",))
+        self.assertFalse(result["sources"]["S-033"]["window_complete"])
+        self.assertTrue(any("clock does not match" in reason for reason in result["reasons"]))
+
     def test_seven_continuous_days_pass_without_promotion(self):
         start = date(2026, 9, 15)
         result = module.validate_reports([

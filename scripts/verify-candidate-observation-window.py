@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import argparse
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -63,11 +64,15 @@ def validate_reports(
     *,
     required_days: int = 7,
     required_source_ids: tuple[str, ...] | None = None,
+    as_of: datetime | None = None,
 ) -> dict[str, Any]:
     if not reports:
         raise ValueError("at least one canary report is required")
     if required_days < 1:
         raise ValueError("required_days must be positive")
+    as_of = datetime.now(timezone.utc) if as_of is None else as_of
+    if as_of.tzinfo is None:
+        raise ValueError("as_of must include timezone")
     required = (
         promotion_source_ids() if required_source_ids is None else tuple(required_source_ids)
     )
@@ -81,8 +86,12 @@ def validate_reports(
 
     for path, report in reports:
         observed_at = report.get("observed_at")
+        clock_valid = True
         try:
             local_day = observed_date(observed_at)
+            if datetime.fromisoformat(observed_at.replace("Z", "+00:00")) > as_of:
+                reasons.append(f"{path}: future observation cannot qualify")
+                clock_valid = False
         except ValueError as exc:
             reasons.append(f"{path}: {exc}")
             local_day = None
@@ -110,6 +119,8 @@ def validate_reports(
                 continue
             schema = row.get("schema_contract") or {}
             row_reasons: list[str] = []
+            if "observed_at" in row and row["observed_at"] != observed_at:
+                row_reasons.append("source observation clock does not match report")
             if not isinstance(schema, dict):
                 row_reasons.append("invalid schema contract")
                 schema = {}
@@ -143,7 +154,9 @@ def validate_reports(
             source_observations.setdefault(source_id, []).append({
                 "observed_at": observed_at,
                 "local_date": local_day.isoformat() if local_day else None,
-                "valid": report_valid and not row_reasons and local_day is not None,
+                "valid": report_valid and not row_reasons and local_day is not None and clock_valid,
+                "transport_success": row.get("source_health") in GOOD_HEALTH_STATUSES and local_day is not None and clock_valid,
+                "guardrails_present": source_id not in USAGE_NOTICE_REQUIRED or bool(row.get("public_usage_notice") and row.get("retention_class")),
                 "source_health": row.get("source_health"),
                 "window_completeness": row.get("collector_window_claim"),
                 "schema_status": schema.get("status"),
@@ -155,6 +168,7 @@ def validate_reports(
             "local_date": local_day.isoformat() if local_day else None,
             "source_count": len(rows),
             "failed_count": failed_count,
+            "report_sha256": hashlib.sha256(json.dumps(report,ensure_ascii=False,sort_keys=True,separators=(",", ":")).encode()).hexdigest(),
         })
 
     expected_ids: tuple[str, ...] | None = None
@@ -178,6 +192,8 @@ def validate_reports(
         )
         days = sorted({item["local_date"] for item in observations if item["local_date"]})
         valid_days = sorted({item["local_date"] for item in observations if item["valid"]})
+        transport_days = sorted({item["local_date"] for item in observations if item["transport_success"]})
+        partial_days = sorted({item["local_date"] for item in observations if item["window_completeness"] == "PARTIAL"})
         if len(valid_days) < required_days:
             reasons.append(f"{source_id}: only {len(valid_days)} valid observed days; need {required_days}")
         missing_days: list[str] = []
@@ -194,11 +210,15 @@ def validate_reports(
             "observation_count": len(observations),
             "observed_days": days,
             "valid_observed_days": valid_days,
+            "successful_transport_days": transport_days,
+            "partial_collection_days": partial_days,
+            "missing_guardrail_days": sorted({item["local_date"] for item in observations if not item["guardrails_present"] and item["local_date"]}),
             "missing_days": missing_days,
             "first_observed_at": observations[0]["observed_at"] if observations else None,
             "last_observed_at": observations[-1]["observed_at"] if observations else None,
             "window_complete": len(valid_days) >= required_days and not missing_days and source_id not in duplicate_sources,
             "promotion_eligible": False,
+            "coverage_independently_verified": False,
         }
 
     return {
@@ -209,6 +229,8 @@ def validate_reports(
         "report_count": len(reports),
         "status": "PASS" if not reasons else "BLOCKED",
         "promotion_eligible": False,
+        "as_of": as_of.isoformat(),
+        "qualification_note": "window_complete counts valid observation days only; it does not verify collection coverage, source rights, or production admission",
         "reasons": reasons,
         "reports": report_summaries,
         "sources": sources,

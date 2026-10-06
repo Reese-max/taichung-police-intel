@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "dataset_id": "govintel-gold-v1-live-free-model-subset-20261006",
+  "dataset_type": "SYNTHETIC_REGRESSION_SEED",
+  "created_at": "2026-09-17",
+  "description": "12 existing synthetic regression seeds evaluated with a real free model; not a heldout, human-labelled or production quality benchmark. Query cases excluded because no input corpus is supplied.",
+  "case_file": "cases.jsonl",
+  "task_types": [
+    "event_pair",
+    "material_change",
+    "claim_support"
+  ],
+  "label_policy": {
+    "model_generated_labels_are_gold": false,
+    "synthetic_cases_must_be_marked": true,
+    "human_review_required_for_historical_cases": true
+  }
+}
