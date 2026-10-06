@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "scope": "TEMPORARY_AUTHENTICATED_TRANSPORT_PROBE_NOT_PRODUCTION",
+  "code_sha": "341c6c89a1378244434b5d0e904811c08e0d4716",
+  "workflow_run_id": "37410450212",
+  "started_at": "2026-10-06T03:45:18.882600+00:00",
+  "worker_name": "govintel-source-egress-probe-37410450212-1",
+  "observations": [
+    {
+      "schema_version": 1,
+      "scope": "TRANSPORT_ONLY_NOT_SOURCE_RECOVERY",
+      "source_id": "S-029",
+      "official_url": "https://www.rdec.taichung.gov.tw/12047/12142/12145",
+      "observed_at": "2026-10-06T03:45:22.318Z",
+      "promotion_eligible": false,
+      "status": "FAILED",
+      "reason": "TIMEOUT",
+      "elapsed_ms": 15000
+    },
+    {
+      "schema_version": 1,
+      "scope": "TRANSPORT_ONLY_NOT_SOURCE_RECOVERY",
+      "source_id": "S-001",
+      "official_url": "https://www.police.taichung.gov.tw/ch/home.jsp?id=1&parentpath=0&mcustomize=news_list.jsp",
+      "observed_at": "2026-10-06T03:45:37.343Z",
+      "promotion_eligible": false,
+      "status": "FAILED",
+      "reason": "TIMEOUT",
+      "elapsed_ms": 15000
+    },
+    {
+      "schema_version": 1,
+      "scope": "TRANSPORT_ONLY_NOT_SOURCE_RECOVERY",
+      "source_id": "S-019",
+      "official_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186",
+      "observed_at": "2026-10-06T03:45:52.368Z",
+      "promotion_eligible": false,
+      "status": "FAILED",
+      "reason": "TIMEOUT",
+      "elapsed_ms": 15000
+    }
+  ],
+  "cleanup": "DELETED",
+  "production_worker_modified": false,
+  "source_promoted": false,
+  "raw_origin_bytes_in_artifact": false,
+  "probe_code_sha256": "3db8bba49f99653bf4c23c8540d19436576b04f0acda0f20ab8c01c48f17cb26",
+  "status": "PROBE_EXECUTED",
+  "finished_at": "2026-10-06T03:46:07.784284+00:00"
+}

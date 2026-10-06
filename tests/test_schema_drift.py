@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import copy
 import json
+import signal
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -898,6 +900,79 @@ class SchemaDriftTests(unittest.TestCase):
         self.assertEqual(calls["S-001"], 2)
         self.assertEqual(next(item for item in observations if item["source_id"] == "S-001")["http_status"], 200)
         sleep.assert_called_once_with(1)
+
+    @unittest.skipUnless(hasattr(signal, "setitimer"), "publication deadline requires Unix")
+    def test_live_deadline_interrupts_nested_retry_and_continues_without_replacing_lkg(self):
+        contracts = {source_id: drift.CONTRACTS[source_id] for source_id in ("S-007", "S-009")}
+        good = drift.observe(contracts["S-007"], json.dumps(API), content_type="application/json")
+        state = drift.update_state(drift.empty_state(), good)
+        before_lkg = copy.deepcopy(state["sources"]["S-007"]["last_known_good"])
+        response = SimpleNamespace(content=b'{"success":true,"data":{"data":[],"totalPages":0,"totalCount":0}}',
+                                   status_code=200, headers={"content-type": "application/json"},
+                                   url="https://official.test/source")
+        calls = []
+
+        def fetch(_session, source_id):
+            calls.append(source_id)
+            if source_id == "S-007":
+                # Simulate a helper that would swallow ordinary exceptions and
+                # retry indefinitely. The real source deadline must escape it.
+                while True:
+                    try:
+                        time.sleep(30)
+                    except Exception:
+                        continue
+            return response, None
+
+        previous_handler = signal.getsignal(signal.SIGALRM)
+        started = time.monotonic()
+        with mock.patch.object(drift, "CONTRACTS", contracts), mock.patch.object(drift, "LIVE_SOURCE_BUDGET_SECONDS", 0.03):
+            observations = drift.live_observations(session=object(), fetch_source=fetch)
+        self.assertLess(time.monotonic() - started, 2)
+        self.assertEqual(calls, ["S-007", "S-009"])
+        self.assertEqual(len(observations), 2)
+        self.assertEqual(observations[0]["error_reason"], "LIVE_SOURCE_DEADLINE_EXCEEDED")
+        self.assertEqual(observations[0]["http_status"], 0)
+        self.assertEqual(observations[1]["http_status"], 200)
+        self.assertEqual(signal.getsignal(signal.SIGALRM), previous_handler)
+        self.assertEqual(signal.getitimer(signal.ITIMER_REAL), (0.0, 0.0))
+        receipt, next_state = drift.build_receipt(observations, state=state, contracts=contracts)
+        self.assertEqual(receipt["overall"], "BLOCKED")
+        self.assertEqual(receipt["sources"][0]["status"], "SOURCE_UNAVAILABLE")
+        self.assertEqual(receipt["sources"][0]["window_completeness"], "PARTIAL")
+        self.assertEqual(next_state["sources"]["S-007"]["last_known_good"], before_lkg)
+
+    def test_live_probe_caps_helper_timeout_and_preserves_proxy_tls_and_redirect_checks(self):
+        import requests
+        session = drift._live_session()
+        response = SimpleNamespace(status_code=200)
+        try:
+            with mock.patch.object(requests.Session, "request", return_value=response) as request:
+                self.assertIs(session.get("https://official.test/source", timeout=120, allow_redirects=False), response)
+            kwargs = request.call_args.kwargs
+            self.assertEqual(kwargs["timeout"], (5, 15))
+            self.assertIs(kwargs["allow_redirects"], False)
+            self.assertNotIn("verify", kwargs)
+            self.assertNotIn("proxies", kwargs)
+            self.assertTrue(session.verify)
+            self.assertTrue(session.trust_env)
+            self.assertEqual(session.get_adapter("https://official.test").max_retries.total, 0)
+        finally:
+            session.close()
+
+    def test_production_probe_has_no_second_outer_transport_retry(self):
+        session = drift._live_session()
+        contracts = {"S-007": drift.CONTRACTS["S-007"]}
+        try:
+            with mock.patch.object(drift, "CONTRACTS", contracts), mock.patch.object(
+                drift, "_fetch_live_source", side_effect=ConnectionError("unreachable")
+            ) as fetch, mock.patch.object(drift.time, "sleep") as sleep:
+                observations = drift.live_observations(session=session)
+            fetch.assert_called_once_with(session, "S-007")
+            sleep.assert_not_called()
+            self.assertEqual(observations[0]["error_reason"], "LIVE_FETCH_CONNECTIONERROR")
+        finally:
+            session.close()
 
     def test_interrupted_live_receipt_blocks_every_source_and_preserves_lkg(self):
         good = drift.observe(
