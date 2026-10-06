@@ -1,0 +1,29 @@
+[
+  {
+    "requested_url": "https://www.taichung.gov.tw/12047/12142/12145",
+    "observed_at": "2026-10-06T03:48:20.144541+00:00",
+    "http_status": 302,
+    "final_url": "https://www.taichung.gov.tw/12047/12142/12145",
+    "location": "/404.html",
+    "bytes": 126,
+    "sha256": "e1781328fca869d461172803143ee3fb458b0b5c33ab6a858f10d24afbae54c3"
+  },
+  {
+    "requested_url": "https://www.taichung.gov.tw/12047/12142/12186",
+    "observed_at": "2026-10-06T03:48:20.144870+00:00",
+    "http_status": 302,
+    "final_url": "https://www.taichung.gov.tw/12047/12142/12186",
+    "location": "/404.html",
+    "bytes": 126,
+    "sha256": "e1781328fca869d461172803143ee3fb458b0b5c33ab6a858f10d24afbae54c3"
+  },
+  {
+    "requested_url": "https://www.taichung.gov.tw/443962/post",
+    "observed_at": "2026-10-06T03:48:20.146212+00:00",
+    "http_status": 302,
+    "final_url": "https://www.taichung.gov.tw/443962/post",
+    "location": "/404.html",
+    "bytes": 126,
+    "sha256": "e1781328fca869d461172803143ee3fb458b0b5c33ab6a858f10d24afbae54c3"
+  }
+]

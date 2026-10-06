@@ -24,4 +24,10 @@
 
 `official-source-access.json` 只代表本次 runtime 路徑：WWW 研考會與警察局連線失敗；不能宣稱機關全球停站。替代官方頁面未取得原始 bytes；索引快取與其他來源也不能代替 S-029 的專案報告。保留 LKG 內容與原始日期、標明 FAILED，未把重抓時間填成發布日期。
 
+同日較早的原始日期核對保存在 `verification.json`：S-006 的 PDF 修訂日期不能當成首次發布日；S-007 的有限 API 觀察不能當成全庫最新日期。S-009 的列表與詳細 API 沒有官方發布日期，108 筆是清單存量，不是每日新增量；未知日期保持 null。
+
 獨立 `source-egress-probe.yml` 只在 main 手動執行：建立短效秘密保護的臨時 Worker，最多讀三個固定 WWW 官方入口，每次 15 秒／2 MiB；回傳運輸 metadata/hash，不公開原始內容、不接收任意 URL、不跟隨重新導向。helper 在 finally 刪除自身臨時 Worker，失敗也記錄 cleanup；驗證未執行前不得宣稱新路徑修復了來源。現有正式 Worker 不會被此探測修改。
+
+`source-egress-probe-actual.json` 記錄實際流程 37410450212：S-029、S-001、S-019 都在 15 秒逾時；臨時 Worker 已刪除。流程成功只表示探測與清理完成。`official-shared-cms-probes.json` 的市府同路徑入口均重新導向 `/404.html`，不能當作相同來源的鏡像或「沒有資料」。
+
+發布用合約探測另外限制單次 connect/read 為 5/15 秒、每個來源整體 60 秒，移除 adapter 與外層疊加重試。逾時來源明確記為 `LIVE_SOURCE_DEADLINE_EXCEEDED`、`SOURCE_UNAVAILABLE`、`PARTIAL`；保留 last-known-good，繼續檢查其他來源。外層 12 分鐘保護仍會留下 interrupted receipt 並使流程失敗。此預算不修改正式蒐集器、来源准入或日期含義。

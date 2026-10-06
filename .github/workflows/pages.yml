@@ -154,7 +154,7 @@ jobs:
       - name: Build source contract drift receipt
         id: schema_drift
         shell: bash
-        timeout-minutes: 47
+        timeout-minutes: 14
         env:
           PENDING_RECOVERY: ${{ steps.restore_state.outputs.pending_recovery }}
         run: |
@@ -166,8 +166,9 @@ jobs:
           fi
           # Never export a receipt checked out from main as this run's result.
           rm -f "$output"
-          # The observed successful probe took 25 minutes; allow slow official sites.
-          if timeout --signal=TERM --kill-after=5s 45m \
+          # Ten source probes have separate 60-second deadlines. This outer
+          # guard covers startup/parsing and still emits an interrupted receipt.
+          if timeout --signal=TERM --kill-after=5s 12m \
             python -X utf8 scripts/schema_drift.py --live "${schema_args[@]}" \
               --state state/schema-drift-state.json --output "$output"; then
             exit 0

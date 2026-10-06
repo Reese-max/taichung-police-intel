@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+from contextlib import contextmanager
 import csv
 import hashlib
 import importlib.util
@@ -12,7 +13,9 @@ import io
 import json
 import os
 import re
+import signal
 import sys
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -37,6 +40,8 @@ CONTRACT_VERSION = "1.1"
 MAX_ROW_REASONS = 10
 MAX_SIGNATURE_NAMES = 500
 MAX_OBSERVATION_TEXT = 4096
+LIVE_SOURCE_BUDGET_SECONDS = 60
+LIVE_REQUEST_TIMEOUT = (5, 15)
 OBSERVATION_KEYS = {
     "body": (bytes, str),
     "http_status": (int,),
@@ -885,22 +890,49 @@ def _load_observations(path: Path) -> list[dict[str, Any]]:
 def _live_session():
     import requests
     from requests.adapters import HTTPAdapter
-    from urllib3.util.retry import Retry
 
-    retry = Retry(
-        total=2,
-        backoff_factor=1,
-        status_forcelist=(429, 500, 502, 503, 504),
-        allowed_methods=("GET",),
-        raise_on_status=False,
-    )
-    session = requests.Session()
+    class ProbeSession(requests.Session):
+        # Discovery helpers pass collection-sized timeouts and sometimes retry.
+        # This read-only contract probe has its own wall-clock source budget.
+        _govintel_retry_budget_owned = True
+
+        def request(self, method, url, **kwargs):
+            kwargs["timeout"] = LIVE_REQUEST_TIMEOUT
+            return super().request(method, url, **kwargs)
+
+    session = ProbeSession()
     session.headers.update({
         "User-Agent": "TaichungPoliceIntelSchemaDrift/1.0 (+public-source-monitor)",
         "Accept-Language": "zh-TW,zh;q=0.9",
     })
-    session.mount("https://", HTTPAdapter(max_retries=retry))
+    session.mount("https://", HTTPAdapter(max_retries=0))
     return session
+
+
+class _SourceDeadlineExceeded(BaseException):
+    """Escape nested Requests retry loops without hiding a probe deadline."""
+
+
+@contextmanager
+def _source_deadline(seconds: float):
+    # The publication CLI runs on Linux's main thread. Fail closed on an
+    # unsupported caller instead of silently leaving the source unbounded.
+    if not hasattr(signal, "setitimer") or threading.current_thread() is not threading.main_thread():
+        raise RuntimeError("live source deadline requires a Unix main thread")
+    if signal.getitimer(signal.ITIMER_REAL) != (0.0, 0.0):
+        raise RuntimeError("live source deadline cannot replace an existing alarm")
+    previous_handler = signal.getsignal(signal.SIGALRM)
+
+    def expired(_signum, _frame):
+        raise _SourceDeadlineExceeded()
+
+    signal.signal(signal.SIGALRM, expired)
+    signal.setitimer(signal.ITIMER_REAL, seconds)
+    try:
+        yield
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous_handler)
 
 
 def _load_s028_module():
@@ -1013,8 +1045,10 @@ def live_observations(*, session=None, fetch_source=None) -> list[dict[str, Any]
     import requests
 
     attempts = 2
-    if isinstance(session, requests.Session) and any(
-        adapter.max_retries.total not in (0, False) for adapter in session.adapters.values()
+    if getattr(session, "_govintel_retry_budget_owned", False) or (
+        isinstance(session, requests.Session) and any(
+            adapter.max_retries.total not in (0, False) for adapter in session.adapters.values()
+        )
     ):
         attempts = 1
     observations = []
@@ -1022,21 +1056,31 @@ def live_observations(*, session=None, fetch_source=None) -> list[dict[str, Any]
         started_at = time.monotonic()
         print(f"SCHEMA_DRIFT_SOURCE_START source={source_id}", flush=True)
         error = None
-        for attempt in range(attempts):
-            try:
-                response, resource_id = fetch_source(session, source_id)
-                observations.append(_response_observation(source_id, response, resource_id))
-                error = None
-                break
-            except Exception as caught:
-                error = caught
-                error_name = type(caught).__name__.upper()
-                if attempt < attempts - 1 and any(marker in error_name for marker in ("CONNECTION", "TIMEOUT", "PROXY")):
-                    time.sleep(1)
-                    continue
-                break
+        observation = None
+        deadline_exceeded = False
+        try:
+            with _source_deadline(LIVE_SOURCE_BUDGET_SECONDS):
+                for attempt in range(attempts):
+                    try:
+                        response, resource_id = fetch_source(session, source_id)
+                        observation = _response_observation(source_id, response, resource_id)
+                        error = None
+                        break
+                    except Exception as caught:
+                        error = caught
+                        error_name = type(caught).__name__.upper()
+                        if attempt < attempts - 1 and any(marker in error_name for marker in ("CONNECTION", "TIMEOUT", "PROXY")):
+                            time.sleep(1)
+                            continue
+                        break
+        except _SourceDeadlineExceeded:
+            error = TimeoutError("source contract probe wall-clock deadline exceeded")
+            deadline_exceeded = True
         if error is not None:
-            observations.append(_failed_observation(source_id, error))
+            observation = _failed_observation(source_id, error)
+            if deadline_exceeded:
+                observation["error_reason"] = "LIVE_SOURCE_DEADLINE_EXCEEDED"
+        observations.append(observation)
         print(
             f"SCHEMA_DRIFT_SOURCE_END source={source_id} "
             f"http_status={observations[-1]['http_status']} "
