@@ -30,10 +30,25 @@
   ],
   "baseline_established_at": "2026-08-27T12:13:22+08:00",
   "candidate_source_context": {
-    "collection_run_id": "CR-DEMO-20261006-MORNING-MANUAL",
-    "generated_at": "2026-10-06T10:46:08+08:00",
+    "collection_run_id": "CR-DEMO-20261006-EVENING-MANUAL",
+    "generated_at": "2026-10-06T21:54:19+08:00",
     "integration_status": "CANDIDATE",
     "items": [
+      {
+        "change_type": "CANDIDATE_OBSERVATION",
+        "eligibility": "INELIGIBLE_CANDIDATE",
+        "integration_status": "CANDIDATE",
+        "official_url": "https://www.traffic.taichung.gov.tw/news/index-1.asp?Parser=9,4,20,,,,21806",
+        "promotion_eligible": false,
+        "published_at": "2026-10-06T00:00:00+08:00",
+        "source_health": "PASS",
+        "source_id": "S-032",
+        "source_name": "臺中市政府交通局最新消息",
+        "stable_id": "FEED-S-032-2d306dfee4704515",
+        "stable_key": "21806",
+        "title": "2026台中爵士音樂節漫遊Pass！ 交通局串聯旅宿餐飲業10/7起推多項優惠",
+        "window_completeness": "PARTIAL"
+      },
       {
         "change_type": "CANDIDATE_OBSERVATION",
         "eligibility": "INELIGIBLE_CANDIDATE",
@@ -173,7 +188,7 @@
         "change_type": "CANDIDATE_OBSERVATION",
         "eligibility": "INELIGIBLE_CANDIDATE",
         "integration_status": "CANDIDATE",
-        "official_url": "https://www.traffic.taichung.gov.tw/news/index-1.asp?Parser=9,4,20,,,,21773",
+        "official_url": "https://www.traffic.taichung.gov.tw/news/index-1.asp?Parser=9,4,20,,,,21773,,,,2",
         "promotion_eligible": false,
         "published_at": "2026-09-29T00:00:00+08:00",
         "source_health": "PASS",
@@ -242,31 +257,13 @@
           "NO_LAST_KNOWN_GOOD",
           "NO_DATA_AS_OF"
         ],
-        "last_checked_at": "2026-10-06T10:46:00+08:00",
+        "last_checked_at": "2026-10-06T21:54:09+08:00",
         "pagination": null,
         "promotion_eligible": false,
         "source_health": "FAILED",
         "source_id": "S-001",
         "source_name": "臺中市政府警察局警政新聞",
         "source_url": "https://www.police.taichung.gov.tw/ch/home.jsp?id=1&parentpath=0&mcustomize=news_list.jsp",
-        "window_completeness": "PARTIAL"
-      },
-      {
-        "freshness_status": "NO_DATA",
-        "integration_status": "CANDIDATE",
-        "intelligence_gaps": [
-          "SOURCE_FAILED",
-          "WINDOW_PARTIAL",
-          "NO_LAST_KNOWN_GOOD",
-          "NO_DATA_AS_OF"
-        ],
-        "last_checked_at": "2026-10-06T10:46:05+08:00",
-        "pagination": null,
-        "promotion_eligible": false,
-        "source_health": "FAILED",
-        "source_id": "S-019",
-        "source_name": "臺中市政府市政會議紀錄與專案報告",
-        "source_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186",
         "window_completeness": "PARTIAL"
       },
       {
@@ -277,7 +274,29 @@
           "NO_LAST_KNOWN_GOOD",
           "VERY_STALE_DATA"
         ],
-        "last_checked_at": "2026-10-06T10:46:08+08:00",
+        "last_checked_at": "2026-10-06T21:54:16+08:00",
+        "pagination": {
+          "complete": false,
+          "page_limit": 4,
+          "pages_fetched": 4,
+          "strategy": "next-link"
+        },
+        "promotion_eligible": false,
+        "source_health": "PASS",
+        "source_id": "S-019",
+        "source_name": "臺中市政府市政會議紀錄與專案報告",
+        "source_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186",
+        "window_completeness": "PARTIAL"
+      },
+      {
+        "freshness_status": "STALE",
+        "integration_status": "CANDIDATE",
+        "intelligence_gaps": [
+          "WINDOW_PARTIAL",
+          "NO_LAST_KNOWN_GOOD",
+          "STALE_DATA"
+        ],
+        "last_checked_at": "2026-10-06T21:54:19+08:00",
         "pagination": {
           "complete": false,
           "page_limit": 4,
@@ -293,14 +312,14 @@
       }
     ]
   },
-  "generated_at": "2026-10-06T10:46:08+08:00",
+  "generated_at": "2026-10-06T21:54:19+08:00",
   "generator_version": 2,
   "mode": "V2_SHADOW",
   "other_changes": [],
   "overview": {
     "archive_total": 118,
     "current_change_count": 0,
-    "legacy_home_candidate_count": 1,
+    "legacy_home_candidate_count": 3,
     "other_change_count": 0,
     "priority_count": 0,
     "tracking_count": 0,
@@ -371,7 +390,7 @@
   "quality_issues": [
     {
       "code": "LEGACY_CONFIRMED_AS_CURRENT",
-      "count": 1,
+      "count": 3,
       "severity": "HIGH"
     },
     {
@@ -383,11 +402,11 @@
   ],
   "schema_version": 1,
   "snapshot_complete": false,
-  "source_collection_run_id": "CR-DEMO-20261006-MORNING-MANUAL",
+  "source_collection_run_id": "CR-DEMO-20261006-EVENING-MANUAL",
   "source_health": {
-    "failed_count": 1,
-    "gap_count": 8,
-    "pass_count": 4,
+    "failed_count": 0,
+    "gap_count": 6,
+    "pass_count": 5,
     "stale_count": 3,
     "status": "PARTIAL"
   },
@@ -403,7 +422,7 @@
     "policy_hash": "3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501",
     "policy_version": 1
   },
-  "source_status_generated_at": "2026-10-06T10:46:08+08:00",
+  "source_status_generated_at": "2026-10-06T21:54:19+08:00",
   "status_message": "本期未偵測到可確認的新增或修正；歷史資料保留於資料庫。",
   "tracking_items": []
 }
