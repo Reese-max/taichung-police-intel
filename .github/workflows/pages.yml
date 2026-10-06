@@ -327,6 +327,7 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+      issues: write
     steps:
       - name: Checkout reporting code from the workflow commit
         uses: actions/checkout@v7
@@ -359,11 +360,29 @@ jobs:
           STATE_COMMIT: ${{ needs.build.outputs.state_commit }}
         run: python scripts/publication-outcome.py --health-output runtime-evidence/publication-health.json
 
+      - name: Deliver failure or verified infrastructure recovery alert
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python scripts/publication-alert.py \
+            --health runtime-evidence/publication-health.json \
+            --output runtime-evidence/publication-alert-delivery.json
+
       - name: Retain end-to-end runtime health receipt
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: publication-health-${{ github.run_id }}-${{ github.run_attempt }}
           path: runtime-evidence/publication-health.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Retain alert API delivery and readback receipt
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: publication-alert-${{ github.run_id }}-${{ github.run_attempt }}
+          path: runtime-evidence/publication-alert-delivery.json
           if-no-files-found: error
           retention-days: 14

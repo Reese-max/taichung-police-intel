@@ -8,7 +8,7 @@
 
 ## 七日資料
 
-核對 30 份原始 GitHub Actions ZIP，archive digest 全部吻合。`candidate-history-verified-ledger.json` 區分 archive SHA-256、原始 JSON SHA-256 與來源 manifest；window receipt 的 `report_sha256` 是 canonical JSON hash。9/30–10/6 每個臺北日選最新 workflow attempt，選擇在查閱來源結果之前完成；10/5 另有較早手動流程，不取代已選失敗紀錄。
+核對 35 份原始 GitHub Actions ZIP，archive digest 全部吻合：當期每日選定矩陣 30 份、較早其他嘗試 5 份另列，不以較早成功覆蓋當日已選失敗。`candidate-history-verified-ledger.json` 區分 archive SHA-256、原始 JSON SHA-256 與來源 manifest；window receipt 的 `report_sha256` 是 canonical JSON hash。9/30–10/6 每個臺北日選最新 workflow attempt，選擇在查閱來源結果之前完成；10/5 另有較早手動流程，不取代已選失敗紀錄。
 
 | 來源 | 連線成功日 | 有效觀察日 | 尚缺條件 |
 | --- | ---: | ---: | --- |
@@ -31,3 +31,5 @@
 `source-egress-probe-actual.json` 記錄實際流程 37410450212：S-029、S-001、S-019 都在 15 秒逾時；臨時 Worker 已刪除。流程成功只表示探測與清理完成。`official-shared-cms-probes.json` 的市府同路徑入口均重新導向 `/404.html`，不能當作相同來源的鏡像或「沒有資料」。
 
 發布用合約探測另外限制單次 connect/read 為 5/15 秒、每個來源整體 60 秒，移除 adapter 與外層疊加重試。逾時來源明確記為 `LIVE_SOURCE_DEADLINE_EXCEEDED`、`SOURCE_UNAVAILABLE`、`PARTIAL`；保留 last-known-good，繼續檢查其他來源。外層 12 分鐘保護仍會留下 interrupted receipt 並使流程失敗。此預算不修改正式蒐集器、来源准入或日期含義。
+
+待審模板已保留 10/5 的 `historical_evidence` 原始限制，並連到 10/6 實際 terms captures；historical reported observation 不當原始條款 bytes。S-032／S-033 七個有效觀察日已核對，尚缺的是權利與獨立完整性，不再寫觀察未滿七日。人工角色與決策仍空白。

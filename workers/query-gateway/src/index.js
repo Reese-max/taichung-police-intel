@@ -200,6 +200,11 @@ async function validatePolicy(policy) {
         replay_limitation_reasons: retentionMatrix.replay_limitation_reasons,
       });
     }
+    // Match the Python compiler: nonempty source reviews participate in the
+    // rights hash; an absent/empty review map preserves historical hashes.
+    if (retentionMatrix.source_reviews && Object.keys(retentionMatrix.source_reviews).length) {
+      retentionCore.source_reviews = retentionMatrix.source_reviews;
+    }
     if (await sha256(canonicalJson(retentionCore)) !== policy.governance_binding?.retention_policy?.policy_hash) throw new Error("governed rights matrix binding mismatch");
   }
 }

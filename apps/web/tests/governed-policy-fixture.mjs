@@ -7,11 +7,12 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 let fixtureNumber = 0;
-export async function createGovernedPolicyFixture({ rightsReviewed = true, briefReviewed = false } = {}) {
+export async function createGovernedPolicyFixture({ rightsReviewed = true, briefReviewed = false, perSourceReview = false } = {}) {
   const repoRoot = await mkdtemp(join(tmpdir(), "govintel-fictional-rights-"));
   try {
     const result = spawnSync(process.env.PYTHON || "python", ["-B", join(root, "tests/governed_policy_fixture.py"),
-      "--root", repoRoot, ...(rightsReviewed ? [] : ["--rights-unknown"]), ...(briefReviewed ? ["--brief-reviewed"] : [])], { encoding: "utf8", timeout: 15_000 });
+      "--root", repoRoot, ...(rightsReviewed ? [] : ["--rights-unknown"]), ...(briefReviewed ? ["--brief-reviewed"] : []),
+      ...(perSourceReview ? ["--per-source-review"] : [])], { encoding: "utf8", timeout: 15_000 });
     if (result.status !== 0) throw new Error(`fictional compiler fixture failed: ${result.stderr || result.error}`);
     const publicRoot = pathToFileURL(join(repoRoot, "apps/web/public/data/"));
     const policy = JSON.parse(await readFile(new URL("source-policy.json", publicRoot), "utf8"));

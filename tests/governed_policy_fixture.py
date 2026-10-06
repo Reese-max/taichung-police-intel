@@ -43,7 +43,7 @@ def load_fixture_module(fixture, name, relative):
     return module
 
 
-def make_governed_policy_fixture(root, *, source_root=ROOT, rights_reviewed=True, domain_source_ids=(), brief_reviewed=False):
+def make_governed_policy_fixture(root, *, source_root=ROOT, rights_reviewed=True, domain_source_ids=(), brief_reviewed=False, per_source_review=False):
     """Compile copied canonical inputs into a fictional approved temp snapshot."""
     root, source_root = Path(root).resolve(), Path(source_root).resolve()
     if root.is_relative_to(source_root) or source_root.is_relative_to(root):
@@ -73,6 +73,24 @@ def make_governed_policy_fixture(root, *, source_root=ROOT, rights_reviewed=True
         )
         paths["rights_matrix"].write_text(json.dumps(matrix, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     catalog = json.loads(paths["catalog"].read_text(encoding="utf-8"))
+    if per_source_review:
+        matrix["terms_status_values"]["HUMAN_REVIEWED_SOURCE_TERMS"] = "FICTIONAL_OFFLINE_ONLY"
+        sid = "S-032"
+        row = next(row for row in catalog["sources"] if row["source_id"] == sid)
+        now = datetime.now(timezone.utc)
+        matrix["source_reviews"] = {sid: {
+            "decision": "APPROVE_METADATA_ONLY", "rights_status": "OPEN_DATA_LICENSED",
+            "resource_url": row["entrypoint"], "public_fields": ["title", "official_url"],
+            "human_review": {"reviewer": "FICTIONAL_TEST_REVIEWER", "role": "FICTIONAL_OFFLINE_ONLY",
+                             "reviewed_at": (now - timedelta(seconds=1)).isoformat()},
+            "terms_evidence": {"requested_url": "https://fictional.example.test/terms",
+                "final_url": "https://fictional.example.test/terms", "http_status": 200,
+                "fetched_at": (now - timedelta(seconds=2)).isoformat(),
+                "body_sha256": hashlib.sha256(b"FICTIONAL_TERMS_NOT_ACTUAL_PERMISSION").hexdigest(),
+                "locator": "FICTIONAL_TEST_ONLY", "license_scope": "METADATA_LINK_ONLY", "license_id": "FICTIONAL_TEST_ONLY"},
+            "exceptions_reviewed": True, "attribution": "FICTIONAL_OFFLINE_ONLY",
+        }}
+        paths["rights_matrix"].write_text(json.dumps(matrix, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     promotions = []
     if brief_reviewed:
         if not rights_reviewed:
@@ -189,7 +207,8 @@ if __name__ == "__main__":
     parser.add_argument("--root", required=True, type=Path)
     parser.add_argument("--rights-unknown", action="store_true")
     parser.add_argument("--brief-reviewed", action="store_true")
+    parser.add_argument("--per-source-review", action="store_true")
     args = parser.parse_args()
-    fixture = make_governed_policy_fixture(args.root, rights_reviewed=not args.rights_unknown, brief_reviewed=args.brief_reviewed)
+    fixture = make_governed_policy_fixture(args.root, rights_reviewed=not args.rights_unknown, brief_reviewed=args.brief_reviewed, per_source_review=args.per_source_review)
     print(json.dumps({"root": str(fixture["root"]), "policy_hash": fixture["policy"]["policy_hash"],
         "fixture_rights_review": fixture["fixture_rights_review"]}))
