@@ -657,16 +657,127 @@ function envelope(snapshot, tool, args, scope, payload, resultCount = 0, truncat
   };
 }
 
+const CHAT_ACTIONS = {
+  "today-important": "get_current_brief", "recent-changes": "get_current_brief",
+  "weekend-events": "search_events", "anti-fraud": "search_evidence",
+  "by-district": "search_events", "official-evidence": "search_evidence",
+  "statistics": "query_statistics", "no-data": "get_source_health",
+};
+const CHAT_RECEIPT_KEYS = ["tool_name", "arguments_sha256", "publication_hash", "query_generation_id", "query_id", "issued_at"];
+
+function chatText(value, name, max = 256) {
+  if (typeof value !== "string" || !value.trim() || value.length > max) throw new GatewayError("INVALID_ARGUMENTS", `invalid ${name}`);
+  return value.trim();
+}
+
+function chatContext(raw) {
+  if (raw == null) return { schema_version: 1 };
+  if (typeof raw !== "object" || Array.isArray(raw)) throw new GatewayError("INVALID_ARGUMENTS", "context must be an object");
+  const context = { schema_version: 1 };
+  for (const key of ["selected_event_id", "selected_region", "selected_agency", "selected_category"]) {
+    if (raw[key] != null) context[key] = chatText(raw[key], key);
+  }
+  if (raw.selected_time_window != null) {
+    const window = raw.selected_time_window;
+    if (typeof window !== "object" || Array.isArray(window)) throw new GatewayError("INVALID_ARGUMENTS", "invalid selected_time_window");
+    context.selected_time_window = {};
+    for (const key of ["time_from", "time_to", "time_zone", "label"]) {
+      if (window[key] != null) context.selected_time_window[key] = chatText(window[key], key, 64);
+    }
+    const { time_from: from, time_to: to } = context.selected_time_window;
+    if (!from || !to || !Number.isFinite(Date.parse(from)) || !Number.isFinite(Date.parse(to)) || Date.parse(from) > Date.parse(to)) {
+      throw new GatewayError("INVALID_ARGUMENTS", "invalid context time range");
+    }
+  }
+  if (raw.last_result_event_ids != null) {
+    if (!Array.isArray(raw.last_result_event_ids) || raw.last_result_event_ids.length > 100) throw new GatewayError("INVALID_ARGUMENTS", "invalid last_result_event_ids");
+    context.last_result_event_ids = [...new Set(raw.last_result_event_ids.map(value => chatText(value, "event_id")))];
+  }
+  if (raw.last_query_receipt != null) {
+    if (typeof raw.last_query_receipt !== "object" || Array.isArray(raw.last_query_receipt)) throw new GatewayError("INVALID_ARGUMENTS", "invalid last_query_receipt");
+    context.last_query_receipt = Object.fromEntries(CHAT_RECEIPT_KEYS.filter(key => raw.last_query_receipt[key] != null)
+      .map(key => [key, chatText(raw.last_query_receipt[key], key)]));
+  }
+  return context;
+}
+
+async function executeChat(snapshot, args) {
+  const text = args.text == null ? null : chatText(args.text, "text", 512);
+  const action = args.quick_action == null ? null : chatText(args.quick_action, "quick_action", 64);
+  if (text === null && action === null) throw new GatewayError("INVALID_ARGUMENTS", "chat_turn requires text or quick_action");
+  if (action !== null && !Object.hasOwn(CHAT_ACTIONS, action)) throw new GatewayError("INVALID_ARGUMENTS", "unknown quick_action");
+  const context = chatContext(args.context);
+  const normalized = text || "";
+  let tool = action ? CHAT_ACTIONS[action] : /統計|趨勢|件數/.test(normalized) ? "query_statistics" :
+    /來源健康|來源狀態|(為什麼|為何).{0,8}(沒有|無|找不到|查不到)|沒有.{0,4}(資料|更新)/.test(normalized) ? "get_source_health" :
+    /證據|原文|佐證|出處|官方文件|官方資料/.test(normalized) ? "search_evidence" :
+    /簡報|概況|總覽/.test(normalized) ? "get_current_brief" : "search_events";
+  const resolvedArgs = {};
+  const notices = [];
+  // Metadata has no event, geography, category or time index. Never silently
+  // broaden a narrowed request into an unrestricted metadata search.
+  const unsupportedFilters = ["selected_event_id", "selected_region", "selected_category", "selected_time_window"].filter(key => context[key] != null);
+  if (context.selected_agency) {
+    if (["search_evidence", "get_source_health"].includes(tool) && snapshot.sources.some(row => row.source_id === context.selected_agency)) {
+      resolvedArgs.source_id = context.selected_agency;
+    } else unsupportedFilters.push("selected_agency");
+  }
+  if (tool === "search_evidence") {
+    const q = normalized.replace(/^查官方證據[：:\s]*/, "").trim();
+    if (q) resolvedArgs.q = q;
+    else if (action === "anti-fraud") resolvedArgs.q = "反詐";
+  }
+  let executed = null;
+  if (!DOMAIN_CAPABILITIES.includes(tool) && !unsupportedFilters.length) executed = await execute(snapshot, tool, resolvedArgs);
+  else notices.push(unsupportedFilters.length ? `索引不支援這些縮小條件：${unsupportedFilters.join("、")}。本次未改查更大範圍。` :
+    "此 Worker 尚未提供事件或統計資料庫，無法回答該問題；沒有查詢結果不代表沒有事件。");
+  const scope = executed ? { dataStatus: executed.freshness, gaps: executed.source_gaps, coverage: executed.query_coverage } :
+    { ...assessScope(snapshot), coverage: queryCoverage(snapshot, tool, resolvedArgs) };
+  const sources = executed ? executed.sources || snapshot.sources.filter(row => !resolvedArgs.source_id || row.source_id === resolvedArgs.source_id) : [];
+  const results = executed?.results || [];
+  let status = executed ? (sources.some(row => row.source_health === "FAILED") ? "FAILED" : executed.freshness) : "CAPABILITY_NOT_AVAILABLE";
+  let noMatch = null;
+  if (executed?.results && executed.total_matches === 0) {
+    noMatch = { status: executed.answerable_no_match ? "BOUNDED_NO_MATCH" : "UNBOUNDED_NO_MATCH", answerable: executed.answerable_no_match,
+      scope: "Matching indexed publication metadata only", message: "索引中未找到符合的中繼資料；不能據此推論現實中沒有相關事件。" };
+    if (status === "RECENT") status = noMatch.status;
+  }
+  const lines = executed ? tool === "get_source_health" ? sources.map(row =>
+    `${row.source_id}：${row.source_health}／${row.window_completeness}／${row.freshness_status}`) :
+    tool === "search_evidence" ? ["以下只列已核准公開快照的索引中繼資料，尚未驗證語意主張或現況。", ...results.map(row => row.title)] :
+    ["以下是公開快照簡報，不代表完整事件範圍或目前現況。"] : [...notices];
+  // Prior receipts are client input, never proof of this turn. Echo only the
+  // actual resolved query's bounded identity, without a transcript or claims.
+  delete context.last_query_receipt;
+  if (executed) context.last_query_receipt = Object.fromEntries(CHAT_RECEIPT_KEYS.map(key =>
+    [key, key === "query_id" ? executed.query_id : executed.receipt[key]]).filter(([, value]) => typeof value === "string"));
+  const chat = { schema_version: 1, intent: "chat_turn", status, resolved_request: { tool, arguments: resolvedArgs },
+    lines, verified: [], unverified: [], conflicts: [], stale: scope.dataStatus === "STALE" ? [executed?.verification_summary || verificationSummary(scope.dataStatus)] : [],
+    statistics: [], sources, source_rights: executed?.source_rights || [], formal_admission: executed?.formal_admission || null,
+    results, evidence_ids: executed?.evidence_ids || [], evidence_links: results.map(row => ({ canonical_id: row.canonical_id,
+      source_id: row.source_id, official_url: row.official_url, title: row.title, published_at: row.published_at,
+      data_as_of: row.data_as_of, fetched_at: row.fetched_at })), event_ids: executed?.event_ids || [],
+    gaps: scope.gaps, freshness: executed?.freshness || freshness(scope.dataStatus), trust: executed?.verification_summary || null,
+    no_match: noMatch, notices, quick_action_hints: [], publication_hash: snapshot.generatedFrom.brief_sha256,
+    query_receipt: executed?.receipt || null, context, ...(executed?.brief ? { brief: executed.brief } : {}) };
+  const result = envelope(snapshot, "chat_turn", args, scope, { chat }, executed?.receipt.result_count || 0, executed?.truncated || false, "conversation");
+  result.receipt.arguments_sha256 = await sha256(canonicalJson(args));
+  if (executed) result.queried_at = executed.queried_at;
+  return result;
+}
+
 async function execute(snapshot, tool, rawArgs = {}) {
   if (!rawArgs || typeof rawArgs !== "object" || Array.isArray(rawArgs)) throw new GatewayError("INVALID_ARGUMENTS", "arguments must be an object");
   const allowed = {
     search_evidence: ["q", "canonical_id", "source_id", "change_type", "limit", "cursor", "expected_generation"],
     get_current_brief: [], get_publication_receipt: [], get_source_health: ["source_id"], validate_answer: ["claims", "expected_generation"],
+    chat_turn: ["text", "quick_action", "context"],
   }[tool];
-  if (!allowed) throw new GatewayError("CAPABILITY_NOT_AVAILABLE", `${tool} is not implemented; available capabilities: search_evidence, get_current_brief, get_publication_receipt, get_source_health, validate_answer`, 422);
+  if (!allowed) throw new GatewayError("CAPABILITY_NOT_AVAILABLE", `${tool} is not implemented; available capabilities: ${mcpTools().map(item => item.name).join(", ")}`, 422);
   const unknown = Object.keys(rawArgs).filter((key) => !allowed.includes(key));
   if (unknown.length) throw new GatewayError("INVALID_ARGUMENTS", `unsupported argument(s): ${unknown.sort().join(", ")}`);
   const args = { ...rawArgs };
+  if (tool === "chat_turn") return executeChat(snapshot, args);
   if (tool === "search_evidence") {
     const result = await queryStore(snapshot, args);
     const scope = { dataStatus: result.data_status, gaps: result.source_gaps, coverage: result.query_coverage };
@@ -765,6 +876,10 @@ function mcpTools() {
     { name: "get_publication_receipt", description: "Read the current publication and canonical artifact hashes without exposing raw content.", inputSchema: { type: "object", additionalProperties: false, properties: {} }, annotations: readonly },
     { name: "get_source_health", description: "Read approved source health, freshness, completeness, and gaps.", inputSchema: { type: "object", additionalProperties: false, properties: { source_id: { type: "string", maxLength: 64 } } }, annotations: readonly },
     { name: "validate_answer", description: "Validate structured answer claims against the server-controlled canonical evidence catalog.", inputSchema: { type: "object", additionalProperties: false, properties: { claims: { type: "array", maxItems: 32, items: { type: "object" } }, expected_generation: { type: "string", maxLength: 128 } }, required: ["claims"] }, annotations: readonly },
+    { name: "chat_turn", description: "Bounded conversation over publication metadata, source health and brief. Event/statistics and unsupported context filters return CAPABILITY_NOT_AVAILABLE; no semantic answer claims.",
+      inputSchema: { type: "object", additionalProperties: false, properties: { text: { type: "string", minLength: 1, maxLength: 512 },
+        quick_action: { type: "string", enum: Object.keys(CHAT_ACTIONS) }, context: { type: "object", description: "Minimal event/time/region/agency/category selections and last query receipt; unsupported filters never broaden scope." } },
+        anyOf: [{ required: ["text"] }, { required: ["quick_action"] }] }, annotations: readonly },
   ];
 }
 
@@ -824,7 +939,7 @@ export default {
         return responseJson({ schema_version: 1, service: "govintel-query-gateway", server_version: SERVER_VERSION, status: snapshot.degradedSince ? "degraded" : "ok", release: snapshot.release, publication_freshness: freshness(scope.dataStatus), publication_id: snapshot.generatedFrom.collection_run_id, publication_hash: snapshot.generatedFrom.brief_sha256, query_coverage: queryCoverage(snapshot, "publication_metadata"), policy: snapshot.policyBinding, retention: retentionPolicy(snapshot), source_gaps: scope.gaps, read_only: true }, 200, request, env);
 
       }
-      if (request.method === "GET" && url.pathname === "/capabilities") return responseJson({ schema_version: 1, server_version: SERVER_VERSION, read_only: true, release: snapshot.release, capabilities: ["search_evidence", "get_current_brief", "get_publication_receipt", "get_source_health", "validate_answer"], unavailable_capabilities: [...DOMAIN_CAPABILITIES, "chat_turn"], policy: snapshot.policyBinding, retention: retentionPolicy(snapshot) }, 200, request, env);
+      if (request.method === "GET" && url.pathname === "/capabilities") return responseJson({ schema_version: 1, server_version: SERVER_VERSION, read_only: true, release: snapshot.release, capabilities: mcpTools().map(tool => tool.name), unavailable_capabilities: DOMAIN_CAPABILITIES, policy: snapshot.policyBinding, retention: retentionPolicy(snapshot) }, 200, request, env);
       if (request.method !== "POST" || !["/query", "/mcp", "/research"].includes(url.pathname)) return responseJson(jsonError("NOT_FOUND", "route not found"), 404, request, env);
       if (url.pathname === "/research") {
         const input = await readBoundedJson(request, 8192);
@@ -834,7 +949,10 @@ export default {
 
       const bytes = await request.arrayBuffer();
       if (bytes.byteLength > MAX_REQUEST_BYTES) return responseJson(jsonError("REQUEST_TOO_LARGE", "request exceeds byte budget"), 413, request, env);
-      const input = JSON.parse(new TextDecoder().decode(bytes));
+      let input;
+      try { input = JSON.parse(new TextDecoder().decode(bytes)); }
+      catch { throw new GatewayError("INVALID_ARGUMENTS", "request body must be valid JSON"); }
+      if (!input || typeof input !== "object" || Array.isArray(input)) throw new GatewayError("INVALID_ARGUMENTS", "request body must be an object");
       if (input?.release_id !== undefined && input.release_id !== snapshot.release.release_id) throw new GatewayError("QUERY_TEMPORARILY_UNAVAILABLE", "Pages and Worker release mismatch; reload the publication", 503);
       if (url.pathname === "/query") return responseJson(await execute(snapshot, input?.tool, input?.arguments), 200, request, env);
       return responseJson(await dispatchMcp(snapshot, input), 200, request, env);

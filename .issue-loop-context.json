@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "repo": "Reese-max/taichung-police-intel",
+  "issue": 29,
+  "worker": "w4",
+  "runner": "opencode",
+  "base_ref": "origin/main",
+  "base_sha": "2c660cef6f1b1fbf86b141306e54d06e0511c9f9",
+  "starting_head": "2c660cef6f1b1fbf86b141306e54d06e0511c9f9"
+}

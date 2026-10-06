@@ -177,6 +177,8 @@ Every query response also carries the catalog-derived `query_coverage` projectio
 
 Current-checkout integration receipt:
 
+The Workers `/query` and MCP transports also expose bounded `chat_turn` conversation over publication metadata, source health and the canonical brief. Responses use a `conversation` envelope with `chat`, preserving freshness, gaps, source dates and the resolved query receipt. Event and statistics requests remain `CAPABILITY_NOT_AVAILABLE`; unsupported context filters are refused rather than silently broadening a search. Metadata links do not establish verified semantic claims or real-world event absence. This gateway capability does not add another Web entry point: `/research` remains the user journey and `/ask` redirects there.
+
 ```bash
 npm ci
 npm run verify:current-checkout
