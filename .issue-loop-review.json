@@ -1,0 +1,10 @@
+{
+  "repo": "Reese-max/taichung-police-intel",
+  "issue": 29,
+  "base_sha": "2c660cef6f1b1fbf86b141306e54d06e0511c9f9",
+  "candidate_sha": "2c660cef6f1b1fbf86b141306e54d06e0511c9f9",
+  "reviewer": "issue-loop-worker",
+  "read_only": true,
+  "status": "pass",
+  "findings": []
+}
