@@ -135,7 +135,9 @@ class LastKnownGoodAgeTests(unittest.TestCase):
                      patch.object(online_collect, "http_session", return_value=object()), \
                      patch.object(online_collect, "collect_source", side_effect=RuntimeError("offline failure")), \
                      redirect_stdout(io.StringIO()):
-                    result = online_collect.build_demo_status(path, "EVENING", date(2026, 10, 5), "manual")
+                    # NOW is 18:00 in Taipei; the evening window is not due yet.
+                    # Exercise failed collection with the already due morning window.
+                    result = online_collect.build_demo_status(path, "MORNING", date(2026, 10, 5), "manual")
                 row = next(item for item in result["sources"] if item["source_id"] == "S-004")
                 self.assertEqual(row["last_known_good"], saved)
                 self.assertEqual(row["data_as_of"], official)
