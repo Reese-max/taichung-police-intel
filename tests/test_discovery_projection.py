@@ -101,6 +101,16 @@ class DiscoveryProjectionTests(unittest.TestCase):
         with self.assertRaises(DiscoveryFeedError):
             project_discovery_signals(result, now=NOW, status="LIVE")
 
+    def test_forged_media_confirmation_is_rejected_even_with_versions(self):
+        media = next(row for row in self.result["candidates"] if row["authority"] == "media")
+        forged = copy.deepcopy(media)
+        forged["verification_status"] = "VERIFIED_OFFICIAL"
+        forged["official_document_versions"] = ["DOCV-OFFICIAL-ROAD-1"]
+        forged["official_urls"] = ["https://www.traffic.taichung.gov.tw/news/road-1"]
+        bad = {**self.result, "candidates": [forged]}
+        with self.assertRaises(DiscoveryFeedError):
+            project_discovery_signals(bad, now=NOW)
+
     def test_projection_fails_closed_on_invalid_or_inconsistent_input(self):
         with self.assertRaises(DiscoveryFeedError):
             project_discovery_signals(None)
