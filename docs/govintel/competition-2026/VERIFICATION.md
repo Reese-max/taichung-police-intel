@@ -21,7 +21,7 @@
 
 瀏覽器操作可核對原文連結與官方影音導航，但「點得開連結／導覽正確」不等於來源回應 HTTP 200、內容新鮮或答案準確；匿名 HTTP／bytes、資料涵蓋與人工答案判定另驗。
 
-2026-10-05 22:18 Asia/Taipei 文件核對：PR #103／#124／#125／#126 已依受保護流程合併；上述固定 SHA 的 receipt 保留為歷史工程證據。尚待完成：真實部署 readback、七日來源資格／promotion、release supersession audit、D2 取得／CRS、獨立事件保留集、實際語意 AI 與經同意真人 A/B/C。v6 的 85%／90%／30% 仍為目標；結果空白不填成功。主辦受理／更名仍待回覆。[驗收清單](ACCEPTANCE_CHECKLIST.md)逐項保存證據。
+2026-10-05 22:18 Asia/Taipei 文件核對：PR #103／#124／#125／#126 已依受保護流程合併；上述固定 SHA 的 receipt 保留為歷史工程證據。尚待完成：真實部署 readback、七日來源資格／promotion、release supersession audit、D2 取得／CRS、獨立事件保留集、實際語意 AI 與經同意真人 A/B/C。v6 的 85%／90%／30% 仍為目標；結果空白不填成功。2026-10-06 外部狀態補充：主辦已於 10-05 確認補件收妥，但未接受更名；原報名完整名稱與重送要求仍待指示，見[核對紀錄](ORGANIZER_STATUS_2026-10-06.md)。[驗收清單](ACCEPTANCE_CHECKLIST.md)逐項保存證據。
 
 重播本輪工程驗證：
 
