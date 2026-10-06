@@ -1,0 +1,65 @@
+name: Isolated publication alert delivery drill
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: govintel-publication-alert-drill
+  cancel-in-progress: false
+
+jobs:
+  delivery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Exercise an actual isolated Pages artifact packaging failure
+        id: rejected_upload
+        continue-on-error: true
+        uses: actions/upload-pages-artifact@v5
+        with:
+          name: govintel-alert-drill-rejected-${{ github.run_id }}
+          path: ${{ runner.temp }}/govintel-alert-deliberately-missing
+      - name: Deliver and read back the actual failed-stage alert
+        env:
+          DRILL_UPLOAD_OUTCOME: ${{ steps.rejected_upload.outcome }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          test "$DRILL_UPLOAD_OUTCOME" = failure
+          python scripts/publication-alert-drill-health.py --outcome "$DRILL_UPLOAD_OUTCOME" --output runtime-evidence/alert-drill/failure-health.json
+          python scripts/publication-alert.py --health runtime-evidence/alert-drill/failure-health.json --scope ISOLATED_ARTIFACT_UPLOAD_DRILL --output runtime-evidence/alert-drill/failure-delivery.json
+      - name: Prepare an isolated recovery artifact
+        run: |
+          mkdir -p "$RUNNER_TEMP/govintel-alert-recovery"
+          printf '%s\n' '<!doctype html><title>Isolated alert drill</title><p>This artifact is not deployed.</p>' > "$RUNNER_TEMP/govintel-alert-recovery/index.html"
+      - name: Upload the isolated recovery Pages artifact without deployment
+        id: recovered_upload
+        uses: actions/upload-pages-artifact@v5
+        with:
+          name: govintel-alert-drill-recovered-${{ github.run_id }}
+          path: ${{ runner.temp }}/govintel-alert-recovery
+      - name: Deliver and read back the actual upload recovery
+        env:
+          DRILL_UPLOAD_OUTCOME: ${{ steps.recovered_upload.outcome }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          test "$DRILL_UPLOAD_OUTCOME" = success
+          python scripts/publication-alert-drill-health.py --outcome "$DRILL_UPLOAD_OUTCOME" --output runtime-evidence/alert-drill/recovery-health.json
+          python scripts/publication-alert.py --health runtime-evidence/alert-drill/recovery-health.json --scope ISOLATED_ARTIFACT_UPLOAD_DRILL --output runtime-evidence/alert-drill/recovery-delivery.json
+      - name: Retain exact delivery receipts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: govintel-publication-alert-drill-${{ github.run_id }}-${{ github.run_attempt }}
+          path: runtime-evidence/alert-drill/
+          if-no-files-found: error
+          retention-days: 14

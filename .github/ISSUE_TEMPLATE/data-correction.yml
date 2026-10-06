@@ -1,0 +1,50 @@
+name: 公開資料問題與更正
+description: 回報官方原文、日期、來源狀態、版本或公開查詢結果的問題。
+title: '[資料更正] '
+body:
+  - type: markdown
+    attributes:
+      value: |
+        本表單送出後會公開在 GitHub。只填公開原文與問題；不要提供個資、私人追蹤條件、私人問題、同意書、憑證或內部資料。網站不會自動將你的查詢或追蹤填入此表單。
+        若原文已無法開啟，可填原入口並說明；不要把來源失敗視為事件已解除。
+  - type: input
+    id: original_url
+    attributes:
+      label: 官方原文或來源入口網址
+      placeholder: https://官方網站/公開頁面
+    validations:
+      required: true
+  - type: input
+    id: observed_at
+    attributes:
+      label: 看到問題的時間與時區
+      placeholder: YYYY-MM-DD HH:mm，Asia/Taipei
+    validations:
+      required: true
+  - type: dropdown
+    id: problem_kind
+    attributes:
+      label: 問題類型
+      options:
+        - 日期或統計期別
+        - 原文連結或來源取得失敗
+        - 版本、異動、取消或解除判定
+        - 公開查詢或背景資料
+        - 授權、公開欄位或內容更正
+        - 其他公開資料問題
+    validations:
+      required: true
+  - type: textarea
+    id: difference
+    attributes:
+      label: 網站顯示與官方原文的差異
+      description: 說明問題與可回查的公開依據；來源 ID、文件版本或公開收據 ID 可選填。未核實處請註明未知。
+    validations:
+      required: true
+  - type: checkboxes
+    id: public_only
+    attributes:
+      label: 公開內容確認
+      options:
+        - label: 我已檢查送出內容，不含個資、私人追蹤、內部資料或憑證。
+          required: true

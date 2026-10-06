@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import test, { after } from "node:test";
 import { createGovernedPolicyFixture } from "./governed-policy-fixture.mjs";
 const governedFixture = await createGovernedPolicyFixture();
@@ -13,6 +13,26 @@ const endpoint = "https://govintel-query-gateway.example/query";
 const mcpEndpoint = "https://govintel-query-gateway.example/mcp";
 const env = { PUBLIC_ORIGIN: origin, ALLOWED_ORIGINS: "https://reese-max.github.io", CF_VERSION_METADATA: { id: "test-worker", tag: "a".repeat(40) } };
 const artifactNames = ["intelligence-feed.json", "source-status.json", "v2-daily-brief.json", "source-policy.json"];
+
+test("Worker binds source-specific metadata reviews to the compiler policy hash", async () => {
+  for (const changed of [false, true]) {
+    const fixture = await createGovernedPolicyFixture({ perSourceReview: true });
+    try {
+      if (changed) {
+        const file = `${fixture.repoRoot}/docs/govintel/retention-rights-policy.v1.json`;
+        const matrix = JSON.parse(await readFile(file, "utf8"));
+        matrix.source_reviews["S-032"].attribution = "TAMPERED_FICTIONAL_REVIEW";
+        await writeFile(file, JSON.stringify(matrix));
+      }
+      const instance = await fixture.loadWorker(`per-source-review-${changed}`);
+      const bytes = await fixture.publication();
+      const build = () => instance.buildSnapshot(env, async name => ({bytes:bytes[name],
+        hash:createHash("sha256").update(bytes[name]).digest("hex")}));
+      if (changed) await assert.rejects(build, /governed rights matrix binding mismatch/);
+      else assert.equal((await build()).policy.governance_binding.retention_policy.policy_hash, fixture.binding.retention_policy_hash);
+    } finally { await fixture.cleanup(); }
+  }
+});
 
 test("Worker refuses canonical nested source-health payloads before returning gaps", async () => {
   const originalFetch = globalThis.fetch;
