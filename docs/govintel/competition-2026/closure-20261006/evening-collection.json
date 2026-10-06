@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "scope": "ACTUAL_DUE_EVENING_MANUAL_COLLECTION_WITH_SEPARATE_QUERY_FAILURE_AND_LATER_READBACK",
+  "code_sha": "5e2298c8db12ec2631dbd8dac11c14599133dcc6",
+  "run_id": 37474304213,
+  "run_attempt": 1,
+  "workflow_conclusion": "failure",
+  "pages_deploy_outcome": "success",
+  "public_five_file_hashes": "PASS",
+  "initial_query_verification": "HTTP_503_FAILED",
+  "later_anonymous_query_binding": "PASS",
+  "later_query_receipt": "evening-production-query.json",
+  "source_29": {
+    "source_id": "S-029",
+    "source_health": "PASS",
+    "freshness_status": "STALE",
+    "window_completeness": "COMPLETE_ZERO",
+    "data_as_of": "2026-07-24T00:00:00+08:00",
+    "data_as_of_basis": null,
+    "data_as_of_scope": null,
+    "error_code": null,
+    "last_checked_at": "2026-10-06T21:53:58+08:00",
+    "last_success_at": "2026-10-06T21:53:58+08:00",
+    "snapshot_item_count": 19,
+    "window_item_count": 0,
+    "result": "NO_NEW_ITEM"
+  },
+  "source_29_network_recovered": true,
+  "source_29_official_date_became_current": false,
+  "candidate_S019_schema_probe": "HTTP_200_NO_DRIFT_NOT_CANARY_QUALIFICATION",
+  "remaining_schema_drift": "BLOCKED_S001_UNAVAILABLE",
+  "production_verified": false,
+  "failure_alert_comment": "https://github.com/Reese-max/taichung-police-intel/issues/20#issuecomment-6017852105",
+  "failure_alert_body_sha256": "3a0ea13c5133dddd004ab22a7d38823ff92dec3b07ee5eb2f7d475793a6c593f",
+  "independent_alert_readback": "PASS",
+  "human_acknowledged": null,
+  "limits": [
+    "Manual evening collection does not prove natural scheduled execution.",
+    "Later readback does not rewrite the workflow failure or initial receipt.",
+    "Source transport recovery does not approve source rights or make July data current."
+  ]
+}

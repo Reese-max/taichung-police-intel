@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "status": "PASS",
+  "scope": "ACTUAL_REQUIRED_CI_WITH_EXACT_MERGE_TREE_BINDING",
+  "run_id": 37471741603,
+  "artifact_id": 11416399043,
+  "artifact_zip_sha256": "12d33988db9b0dea641564ac3830c6a9b27e4c95302e02c14110224644f1d7d1",
+  "tested_merge_sha": "e4ecedcd519e9180890b2720e7fb82b1c5d11fa1",
+  "tested_tree": "acd7dff3f10d4059ff4430e1fdb3fedf742c83c5",
+  "merged_code_sha": "5e2298c8db12ec2631dbd8dac11c14599133dcc6",
+  "merged_tree": "acd7dff3f10d4059ff4430e1fdb3fedf742c83c5",
+  "root_review": {
+    "reviewer": "/root",
+    "independent_agent_review": false,
+    "human_source_approval": false
+  },
+  "lanes": {
+    "loopback_current_checkout": {
+      "status": "PASS",
+      "checks": 28,
+      "not_run": 0,
+      "production_verified": false
+    },
+    "finite_synthetic_browser": {
+      "status": "PASS",
+      "checks": 22,
+      "scope": "ACTUAL_BROWSER_FINITE_SYNTHETIC_UI_FLOW"
+    },
+    "research_mock_browser": {
+      "status": "PASS",
+      "checks": 10,
+      "scope": "OFFLINE_BROWSER_MOCKS",
+      "live_provider_calls": 0
+    }
+  }
+}

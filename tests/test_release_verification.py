@@ -203,6 +203,20 @@ class ReleaseVerificationTests(unittest.TestCase):
             self.assertIs(receipt["production_verified"], False)
             self.assertEqual(receipt["status"], "FAILED")
 
+    def test_cli_retry_window_covers_artifact_cache_and_retains_failed_attempts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "receipt.json"
+            verified = {"deployment_verified": True, "production_verified": False, "query_readiness": "RIGHTS_BLOCKED"}
+            with patch.object(sys, "argv", ["verify", "--output", str(output)]), \
+                    patch.object(module, "verify", side_effect=[RuntimeError("health HTTP 503"), RuntimeError("health HTTP 503"), verified]), \
+                    patch.object(module.time, "sleep") as delay, patch("builtins.print"):
+                self.assertEqual(module.main(), 0)
+            self.assertEqual([c.args[0] for c in delay.call_args_list], [20, 20])
+            receipt = json.loads(output.read_text())
+            self.assertEqual(receipt["attempt"], 3)
+            self.assertEqual([x["status"] for x in receipt["verification_attempts"]], ["FAILED", "FAILED", "PASS"])
+            self.assertIs(receipt["production_verified"], False)
+
     def test_local_client_receipt_is_not_production_evidence(self):
         client = PublicationClient()
         receipt = module.verify("https://gateway.example", PUBLIC, client)

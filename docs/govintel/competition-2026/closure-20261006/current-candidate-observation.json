@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "scope": "ONE_ACTUAL_LOCAL_DATE_CANARY_WITH_METADATA_ONLY_PUBLIC_SUMMARY",
+  "run_id": 37476132402,
+  "workflow_conclusion": "failure",
+  "code_sha": "5e2298c8db12ec2631dbd8dac11c14599133dcc6",
+  "status": "BLOCKED",
+  "as_of": "2026-10-06T14:09:46.714943+00:00",
+  "observations": [
+    {
+      "source_id": "S-031",
+      "observed_at": "2026-10-06T22:06:14.782831+08:00",
+      "report_status": "OBSERVED",
+      "source_health": "PASS",
+      "snapshot_item_count": 10,
+      "valid_day_observation": true,
+      "coverage_independently_verified": false,
+      "promotion_eligible": false,
+      "report_sha256": "0089bd37ce67084f303d217e719514b48ad0b2f6aa279964a14235b9b49fd3fb",
+      "artifact_id": 11418159794,
+      "artifact_zip_sha256": "5e2d04a95950a36f8aafc6ef49d370717cfd9129a809970dbe622847210cbee5"
+    },
+    {
+      "source_id": "S-019",
+      "observed_at": "2026-10-06T22:06:15.866246+08:00",
+      "report_status": "OBSERVED",
+      "source_health": "PASS",
+      "snapshot_item_count": 153,
+      "valid_day_observation": true,
+      "coverage_independently_verified": false,
+      "promotion_eligible": false,
+      "report_sha256": "8cead616b5cb55f5ca2e92818a9f69b2a13a5c2cdf1d675b81a013409dd53e4e",
+      "artifact_id": 11418772938,
+      "artifact_zip_sha256": "714e73e475b0ac1439cee79aa40d53bc437dcf9f65697ecb65324d92ce311095"
+    },
+    {
+      "source_id": "S-033",
+      "observed_at": "2026-10-06T22:06:17.139755+08:00",
+      "report_status": "OBSERVED",
+      "source_health": "PASS",
+      "snapshot_item_count": 500,
+      "valid_day_observation": true,
+      "coverage_independently_verified": false,
+      "promotion_eligible": false,
+      "report_sha256": "e09b383bbd2edfb957fa0865030ce7a425b70d7972d1a29691b3259b4ddbe267",
+      "artifact_id": 11419226375,
+      "artifact_zip_sha256": "7ebfaf557ab2b7a5068d10a44ce1a36c52aa1f91864edd851ff9264128d822c1"
+    },
+    {
+      "source_id": "S-032",
+      "observed_at": "2026-10-06T22:06:15.399208+08:00",
+      "report_status": "OBSERVED",
+      "source_health": "PASS",
+      "snapshot_item_count": 39,
+      "valid_day_observation": true,
+      "coverage_independently_verified": false,
+      "promotion_eligible": false,
+      "report_sha256": "4f47454c63e255c7eba4d233bd5634d40d5b33e9c1226d507554f6a9c84eebc4",
+      "artifact_id": 11419441003,
+      "artifact_zip_sha256": "d74338c0248f451bf267359759540bb088cc838c5cadbbcec31d1688ca1803dd"
+    },
+    {
+      "source_id": "S-001",
+      "observed_at": "2026-10-06T22:06:17.921587+08:00",
+      "report_status": "FAILED",
+      "source_health": "FAILED",
+      "snapshot_item_count": null,
+      "valid_day_observation": false,
+      "coverage_independently_verified": false,
+      "promotion_eligible": false,
+      "report_sha256": "9487d5a78c43b44eaf9e26e8311549ca4574bf44e7f1e4b9868bdc29ed5f3976",
+      "artifact_id": 11419475876,
+      "artifact_zip_sha256": "de8b519b7a08ea6e4e62dfc92466257c1c185fcd88df9bab66cc9a6aef32c311"
+    }
+  ],
+  "S019_new_valid_observation_days": 1,
+  "historical_window": "../../source-reviews/2026-10-06/candidate-window-actual.json",
+  "historical_receipts_rewritten": false,
+  "promotion_eligible": false,
+  "independent_coverage": "NOT_VERIFIED",
+  "remaining": "S-001 failed; S-019 needs six additional future valid local dates; S-031 also needs six additional future valid local dates. Traffic/city historical seven-day window remains subject to rights and independent coverage review."
+}

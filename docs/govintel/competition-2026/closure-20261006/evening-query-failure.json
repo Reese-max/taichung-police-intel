@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "kind": "GOVINTEL_PRODUCTION_QUERY_RECEIPT",
+  "status": "FAILED",
+  "deployment_verified": false,
+  "production_verified": false,
+  "query_readiness": "VERIFICATION_FAILED",
+  "evidence_level": "VERIFICATION_FAILED",
+  "failed_at": "2026-10-06T13:57:20.033940+00:00",
+  "error": "https://govintel-query-gateway.irisx-tracker.workers.dev/health returned HTTP 503"
+}

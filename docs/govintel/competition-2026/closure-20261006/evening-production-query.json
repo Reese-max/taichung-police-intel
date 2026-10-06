@@ -1,0 +1,73 @@
+{
+  "anonymous_http_verified_at": "2026-10-06T14:00:01.375826+00:00",
+  "artifact_hashes": {
+    "brief": "65dda30db33e0b1fe12d84c084de9fe3b4c646fed9dd835f529b8d4da7889380",
+    "feed": "94304a0919bbb7afed78739f50f87bdcb5df608ebb89b05204ec56fcbdb71584",
+    "status": "a1b91194c812ed19bc9619b7b36fae83b09b153fde1c7a3111e01cc585777999"
+  },
+  "attempt": 1,
+  "built_at": "2026-10-06T13:56:12.158Z",
+  "capabilities": [
+    "chat_turn",
+    "get_current_brief",
+    "get_publication_receipt",
+    "get_source_health",
+    "search_evidence",
+    "validate_answer"
+  ],
+  "checks": {
+    "capabilities": "SUCCESS",
+    "evidence_locator": "RIGHTS_BLOCKED",
+    "formal_query_admission": "UNKNOWN",
+    "hash_binding": "SUCCESS",
+    "health": "SUCCESS",
+    "mcp": "SUCCESS",
+    "protected_query_refusal": "SUCCESS",
+    "query": "SUCCESS",
+    "release_binding": "SUCCESS"
+  },
+  "code_sha": "5e2298c8db12ec2631dbd8dac11c14599133dcc6",
+  "deployed_at": "2026-10-06T13:57:04Z",
+  "deployment_verified": true,
+  "evidence_catalog_hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "evidence_level": "DEPLOYMENT_BOUND_RIGHTS_BLOCKED",
+  "formal_admission": {
+    "blocked_sources": [
+      "S-004",
+      "S-006",
+      "S-007",
+      "S-009",
+      "S-029"
+    ],
+    "governance_hash": null,
+    "per_source": {
+      "S-004": "APPROVED_GOVERNANCE_MISSING",
+      "S-006": "APPROVED_GOVERNANCE_MISSING",
+      "S-007": "APPROVED_GOVERNANCE_MISSING",
+      "S-009": "APPROVED_GOVERNANCE_MISSING",
+      "S-029": "APPROVED_GOVERNANCE_MISSING"
+    },
+    "reason": "APPROVED_GOVERNANCE_MISSING",
+    "status": "UNKNOWN"
+  },
+  "gateway_url": "https://govintel-query-gateway.irisx-tracker.workers.dev",
+  "kind": "GOVINTEL_PRODUCTION_QUERY_RECEIPT",
+  "official_evidence_id": null,
+  "official_evidence_url": null,
+  "pages_deployment": "https://github.com/Reese-max/taichung-police-intel/actions/runs/37474304213/attempts/1",
+  "production_verified": false,
+  "public_generation": "CR-DEMO-20261006-EVENING-MANUAL",
+  "public_url": "https://reese-max.github.io/taichung-police-intel",
+  "publication_freshness": "UNKNOWN",
+  "publication_generation": "CR-DEMO-20261006-EVENING-MANUAL",
+  "publication_hash": "65dda30db33e0b1fe12d84c084de9fe3b4c646fed9dd835f529b8d4da7889380",
+  "publication_id": "CR-DEMO-20261006-EVENING-MANUAL",
+  "query_generation": "c396cb75430618658c3bfda28ff4ad8b901db2b361887563f6a0f87195d6e594",
+  "query_generation_id": "c396cb75430618658c3bfda28ff4ad8b901db2b361887563f6a0f87195d6e594",
+  "query_readiness": "RIGHTS_BLOCKED",
+  "release_id": "0fe046f5899fe26847c36b58a492027955db84c1c65ac5df2a04c65043a64763",
+  "schema_version": 1,
+  "source_policy_hash": "3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501",
+  "verified_at": "2026-10-06T14:00:01.375826+00:00",
+  "worker_version": "7f305124-95d3-42e8-aaf2-6543b13ca9a2"
+}

@@ -4,7 +4,7 @@
 
 **首期任務：查公告 → 保存自己選擇的地區／議題／路段條件 → 再次開站看有原文依據的變更。**
 
-既有公開基線是五來源的議會／市政查證與影音導覽。v6 的公開查詢、個人追蹤與評測候選 PR 仍須驗收，不把計畫書全文當作已上線功能。個人追蹤在同一瀏覽器保存；開站或重新整理才比對，不含關站背景推播或跨裝置帳號。
+公開查詢與同瀏覽器追蹤已合併發布；2026-10-06 的匿名五檔 hash、Gateway 綁定與 15 項正式 browser 通過。正式來源正值查詢仍 RIGHTS_BLOCKED，模型／真人效果另需驗收。個人追蹤在同一瀏覽器保存；開站或重新整理才比對，不含關站背景推播或跨裝置帳號。
 
 ## 3–5 分鐘檢視
 
@@ -16,12 +16,12 @@
 
 ## 目前可說的結論
 
-- Oct 4 [run 37169331249](https://github.com/Reese-max/taichung-police-intel/actions/runs/37169331249)實際重新蒐集，五個公開檔案 hash 與 Gateway check 通過；稍後 [37212963039](https://github.com/Reese-max/taichung-police-intel/actions/runs/37212963039)也成功。
-- 資料仍為 `PARTIAL`，S-007 陳舊、S-029 失敗；候選來源尚未 promotion，沒有每日新增 100–200 筆的證據。
-- v6 首期功能的 candidate／local acceptance、public deployment、真人成效各自驗收，不互相替代。
-- D1 已取得指定 112Y12M 官方歷史 CSV，驗證 368 國內記錄、臺中 29 區，並整合本地背景查詢；未 promotion，真人任務效益未測。D2 官方 bytes 仍 403／CRS 未驗證，Twinkle 既有連線需重新認證。
-- 本地已驗證版本 `3a06754…`：完整 gate PASS、Web 406/406、runtime 26/26、v6 browser 22/22，served `BUILD_ONLY` release／三檔 hash 綁定。[VERIFICATION](VERIFICATION.md)保存 scope；v6 新功能正式部署仍待驗證。語意 AI、獨立事件保留集與經同意真人 A／B／C 仍未執行，不預填成功。
-- v6 與補件寄送完成；主辦受理／更名回覆仍未確認。
+- [2026-10-06 驗收包](closure-20261006/README.md)固定已發布 `5e2298c…`、release、checkpoint、資料 generation、policy／hash 與 browser；本地、CI、正式發布及真人各自留證。
+- D1 固定 112Y12M 官方 CSV 與臺中 29 區已核對，正式 UI 值通過；不是目前人口或真人用途效益。D2 原檔 403、資料列／CRS 未驗證。
+- 真實隔離 artifact 失敗→恢復通知已送達 #20，API 回讀 body hash 一致；正式 source/deploy recovery、raw purge、負載與成本仍需逐項留證。
+- 四類候選未 promotion；交通／市政 7 有效日、消防 1 日、警政 0 日，權利及獨立完整性另驗。沒有每日新增 100–200 筆證據。
+- 免費模型只完成 12 合成開發題診斷；官方保留集、語意 off 與真人 A/B/C 未執行，85%／90%／30% 仍是目標。
+- v6／補件寄送完成；10/5 主辦確認補件收妥、未接受更名，原題名及代表資格仍待核對。
 
 ## 文件索引
 

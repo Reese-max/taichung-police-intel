@@ -1,0 +1,2460 @@
+{
+  "schema_version": 1,
+  "scope": "ACTUAL_GIT_CHANGED_FILES_NOT_INNOVATION_PERCENTAGE",
+  "old_sha": "562141e396c693e115b3fce10594c434c401a58e",
+  "new_sha": "5e2298c8db12ec2631dbd8dac11c14599133dcc6",
+  "old_timestamp": "2026-09-30T19:06:49+08:00",
+  "changes": [
+    {
+      "status": "A",
+      "paths": [
+        ".gitattributes"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        ".github/ISSUE_TEMPLATE/data-correction.yml"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        ".github/workflows/candidate-source-observation.yml"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        ".github/workflows/ci.yml"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        ".github/workflows/pages.yml"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        ".github/workflows/publication-alert-drill.yml"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        ".github/workflows/query-gateway-workers.yml"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        ".github/workflows/source-egress-probe.yml"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        ".github/workflows/workspace-ui.yml"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        ".issue-loop-context.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        ".issue-loop-evidence.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        ".issue-loop-prompt.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        ".issue-loop-red.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        ".issue-loop-review.json"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "README.md"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "SUBMISSION.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/app/api/system-health.json/route.js"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/app/ask/page.js"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/app/govintel.css"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "apps/web/app/layout.js"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "apps/web/app/page.js"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/app/public-query/page.js"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/app/public-query/query.css"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/app/research/evidence-results.js"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/app/research/page.js"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/app/research/research-chat.js"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/app/research/research.css"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/app/sources/page.js"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/app/tracking/page.js"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/app/tracking/tracking.css"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "apps/web/app/v2.css"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/components/DiscoverySignalsPanel.js"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/components/GovIntelFrame.js"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/components/LocalConditionsPanel.js"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/components/PopulationBackground.js"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "apps/web/components/PublicEventFusionDemo.js"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "apps/web/components/QueryGatewayPanel.js"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "apps/web/components/V2DailyDashboard.js"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "apps/web/lib/answer-evidence-gate.js"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/lib/chat-answer.js"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/lib/condition-datasets.js"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/lib/controlled-answer-client.js"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/lib/discovery-signals.js"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "apps/web/lib/feed-projection.js"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/lib/live-session-view.js"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/lib/local-conditions.js"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/lib/population-background.js"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/lib/public-query.js"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/lib/publication-dates.js"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/lib/query-release-client.js"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/lib/research-client.js"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "apps/web/lib/source-status.js"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/lib/system-health-view.mjs"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "apps/web/next.config.mjs"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/public/data/discovery-signals.json"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "apps/web/public/data/intelligence-feed.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/public/data/population-112Y12M.json"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "apps/web/public/data/public-event-demo.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/public/data/public-query-replay.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/public/data/retention-policy-binding.json"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "apps/web/public/data/source-policy.json"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "apps/web/public/data/source-status.json"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "apps/web/public/data/system-health.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/public/workspace-preview/base-path-links.mjs"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/public/workspace-preview/dialog-trigger-focus.mjs"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/public/workspace-preview/index.html"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/public/workspace-preview/model.mjs"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/public/workspace-preview/skip-focus.mjs"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/public/workspace-preview/snapshot-freshness.mjs"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/public/workspace-preview/workspace.css"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/public/workspace-preview/workspace.mjs"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "apps/web/scripts/sync-source-policy.mjs"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "apps/web/tests/answer-evidence-gate.test.mjs"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/tests/answer-gate-runner.test.mjs"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/tests/chat-answer.test.mjs"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/tests/chat-turn-worker.test.mjs"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/tests/commute-reopen-replay.test.mjs"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/tests/condition-datasets.test.mjs"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/tests/controlled-answer-client.test.mjs"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/tests/controlled-answer-draft.test.mjs"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/tests/controlled-answer-pipeline.test.mjs"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "apps/web/tests/current-checkout.test.mjs"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/tests/discovery-signals.test.mjs"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/tests/document-evidence.test.mjs"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/tests/document-research-fixture.mjs"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/tests/document-research.test.mjs"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "apps/web/tests/entity-registry.test.mjs"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "apps/web/tests/gold-eval.test.mjs"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/tests/governed-policy-fixture.mjs"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/tests/live-session-view.test.mjs"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/tests/live-session.test.mjs"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/tests/lkg-age.test.mjs"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/tests/local-conditions.test.mjs"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/tests/population-background.test.mjs"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "apps/web/tests/public-event-demo.test.mjs"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "apps/web/tests/public-event-fusion.test.mjs"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/tests/public-query.test.mjs"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/tests/publication-dates.test.mjs"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "apps/web/tests/query-gateway-worker.test.mjs"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/tests/query-release-client.test.mjs"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/tests/release-manifest.test.mjs"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/tests/research-admission.test.mjs"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/tests/research-client.test.mjs"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/tests/research-gold.test.mjs"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/tests/research-worker.test.mjs"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "apps/web/tests/retention-policy.test.mjs"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/tests/source-egress-probe.test.mjs"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "apps/web/tests/source-status-contract.test.mjs"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "apps/web/tests/system-health.test.mjs"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "apps/web/tests/v2-dashboard.test.mjs"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "apps/web/tests/workspace-preview.test.mjs"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "canary-s026-s029.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "collect.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "docs/DEMO_SCRIPT.md"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "docs/KIRO_USAGE.md"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "docs/SUBMISSION_CHECKLIST.md"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "docs/govintel/DATA_SOURCE_STRATEGY.md"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "docs/govintel/GOVINTEL_PLAN.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/competition-2026/ACCEPTANCE_CHECKLIST.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/competition-2026/ARCHITECTURE.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/competition-2026/CURRENT_STATUS.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/competition-2026/DATA_SOURCE_MATRIX.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/competition-2026/DEMO_SCRIPT.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/competition-2026/DOCUMENT_READBACK_20261005.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/competition-2026/EVALUATION.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/competition-2026/JUDGE_PATH.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/competition-2026/LIMITATIONS_AND_SAFETY.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/competition-2026/OLD_VS_NEW.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/competition-2026/PROPOSAL_MAPPING.md"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "docs/govintel/competition-2026/PUBLICATION_RECOVERY.md"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "docs/govintel/competition-2026/README.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/competition-2026/SOURCE_RELIABILITY_REVIEW_2026-10-05.md"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "docs/govintel/competition-2026/VERIFICATION.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/competition-2026/background-source-observations-2026-10-05.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/competition-2026/browser-ui-observation-20261005.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/competition-2026/browser-verification-20261005.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/competition-2026/current-checkout-verification-20261005.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/competition-2026/document-link-readback-20261005.json"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "docs/govintel/competition-2026/evaluation-manifest.template.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/competition-2026/human-study-protocol.v1.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/competition-2026/model-diagnostic-20261006/README.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/competition-2026/model-diagnostic-20261006/attempt-3/cases.jsonl"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/competition-2026/model-diagnostic-20261006/attempt-3/evaluation-report.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/competition-2026/model-diagnostic-20261006/attempt-3/live-model-receipt.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/competition-2026/model-diagnostic-20261006/attempt-3/manifest.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/competition-2026/model-diagnostic-20261006/attempt-3/predictions.jsonl"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/competition-2026/model-diagnostic-20261006/attempt-3/prompt.txt"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/competition-2026/model-diagnostic-20261006/attempt-4/cases.jsonl"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/competition-2026/model-diagnostic-20261006/attempt-4/evaluation-report.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/competition-2026/model-diagnostic-20261006/attempt-4/live-model-receipt.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/competition-2026/model-diagnostic-20261006/attempt-4/manifest.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/competition-2026/model-diagnostic-20261006/attempt-4/predictions.jsonl"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/competition-2026/model-diagnostic-20261006/attempt-4/prompt.txt"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/competition-2026/model-diagnostic-20261006/diagnostic-index.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/competition-2026/production-observation-20261005.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/competition-2026/registration-verification-20261006.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/competition-2026/segis-112Y12M-taichung.verified.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/document-evidence.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/document-research.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/historical/README.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/historical/competition-2026-08/DEMO_SCRIPT.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/historical/competition-2026-08/KIRO_USAGE.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/historical/competition-2026-08/SUBMISSION.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/historical/competition-2026-08/SUBMISSION_CHECKLIST.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/issue-107-local-condition-tracking.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/issue-108-commute-reopen-replay.md"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "docs/govintel/issue-13-live-meeting.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/issue-14-cross-agency-collectors.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/issue-14-observation-window.md"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "docs/govintel/issue-15-mcp-runtime.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/issue-162-acceptance-verification.md"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "docs/govintel/issue-21-detail-recheck.md"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "docs/govintel/issue-22-publication-wiring.md"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "docs/govintel/issue-23-handoff-flow.md"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "docs/govintel/issue-24-public-event-fusion.md"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "docs/govintel/issue-27-discovery-adapter.md"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "docs/govintel/issue-28-npa-source-matrix.md"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "docs/govintel/issue-30-runtime-boundaries.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/issue-31-entity-bindings.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/issue-31-entity-registry.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/issue-32-controlled-draft-pipeline.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/issue-35-end-to-end-health.md"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "docs/govintel/issue-36-migration-replay.md"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "docs/govintel/issue-37-feedback-loop.md"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "docs/govintel/issue-38-schema-drift.md"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "docs/govintel/issue-39-retention-rights.md"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "docs/govintel/issue-47-current-checkout.md"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "docs/govintel/issue-48-official-document-replay.md"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "docs/govintel/issue-49-source-policy-integration.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/issue-62-lkg-age.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/issue-62-release-closure.md"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "docs/govintel/npa-source-inventory.v1.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/operations-recovery.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/pr-convergence-2026-10-05.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/prototypes/live-session-storage.sql"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/research-admission.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/research-integration-plan.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/research-mvp.md"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "docs/govintel/retention-rights-policy.v1.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/s038-candidate/README.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/s038-candidate/canary-2026-10-05.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/s038-candidate/canary-2026-10-06.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/sequential-integration-2026-10-06.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/sequential-integration-2026-10-06.md"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "docs/govintel/source-catalog.v2.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/source-policy-history/3404809ff40f7647c44203329d4476b12b62e9ee64df24cd1f1f46cbda59caf4.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/source-policy-history/3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501.json"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "docs/govintel/source-policy.approved.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/source-repair-evidence-2026-10-05.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/source-reviews/2026-10-05/README.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/source-reviews/2026-10-05/national-candidate.pending.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/source-reviews/2026-10-05/research-context.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/source-reviews/2026-10-05/source-review.pending.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/source-reviews/2026-10-05/validation-results.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/source-reviews/2026-10-06/README.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/source-reviews/2026-10-06/candidate-history-other-attempts.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/source-reviews/2026-10-06/candidate-history-verified-ledger.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/source-reviews/2026-10-06/candidate-window-S-031.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/source-reviews/2026-10-06/candidate-window-S-032.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/source-reviews/2026-10-06/candidate-window-S-033.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/source-reviews/2026-10-06/candidate-window-actual.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/source-reviews/2026-10-06/official-shared-cms-probes.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/source-reviews/2026-10-06/official-source-access.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/source-reviews/2026-10-06/source-egress-probe-actual.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/source-reviews/2026-10-06/source-review.pending.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/govintel/source-reviews/2026-10-06/verification.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/research/issue-15-mcp-http-shutdown-2026-10-05.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/research/issue-15-mcp-runtime-file-hashes-2026-10-05.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/research/issue-15-mcp-sdk-private-green-2026-10-05.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/research/issue-15-mcp-sdk-private-red-2026-10-05.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/research/issue-15-mcp-sdk-runtime-2026-10-05.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "docs/research/issue-15-mcp-sdk-seven-journeys-2026-10-05.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "eval/gold/README.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "eval/gold/research-v1/README.md"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "eval/gold/research-v1/cases.jsonl"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "eval/gold/research-v1/manifest.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "eval/gold/v2/cases.jsonl"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "eval/gold/v2/manifest.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "eval/gold/v3/cases.jsonl"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "eval/gold/v3/manifest.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "eval/gold/v6/commute-reopen-v1/annotations.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "eval/gold/v6/commute-reopen-v1/cases.jsonl"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "eval/gold/v6/commute-reopen-v1/cost-ledger.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "eval/gold/v6/commute-reopen-v1/manifest.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "eval/gold/v6/commute-reopen-v1/session.json"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "evaluation/ingestion-record.schema.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "intel_v2/commute_replay.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "intel_v2/conversation.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "intel_v2/detail_recheck_budget.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "intel_v2/discovery_adapter.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "intel_v2/discovery_projection.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "intel_v2/entity_binding.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "intel_v2/feedback.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "intel_v2/freshness_policy.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "intel_v2/handoff.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "intel_v2/live_meeting.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "intel_v2/lkg_age.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "intel_v2/located_facts.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "intel_v2/npa_news.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "intel_v2/npa_source_adapters.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "intel_v2/population_background.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "intel_v2/public_brief.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "intel_v2/query_domain.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "intel_v2/review.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "intel_v2/semantics.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "migrations/0004_detail_recheck_budget.sql"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "online_collect.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "package.json"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "requirements.txt"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "scripts/answer-gate-runner.mjs"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "scripts/build-public-query-replay.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "scripts/build-release-manifest.mjs"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "scripts/build-v2-shadow-brief.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "scripts/candidate-runtime-canary.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "scripts/candidate_lane.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "scripts/candidate_publication.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "scripts/detail-recheck-budget.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "scripts/discovery-adapter.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "scripts/discovery-signals.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "scripts/e2e-browser.mjs"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "scripts/e2e-v6-browser.mjs"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "scripts/entity-registry.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "scripts/evaluate-free-model-synthetic.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "scripts/evaluate-govintel.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "scripts/feedback.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "scripts/handoff-state.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "scripts/live-meeting.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "scripts/migration_replay.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "scripts/npa-news-candidate.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "scripts/probe-cloudflare-source-egress.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "scripts/probe-evidence-mcp-sdk.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "scripts/public-event-fusion.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "scripts/publication-alert-drill-health.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "scripts/publication-alert.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "scripts/publication-outcome.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "scripts/query-gateway-stdio.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "scripts/query-gateway.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "scripts/query-store.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "scripts/replay-commute-reopen.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "scripts/research-browser-e2e.mjs"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "scripts/retention-policy.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "scripts/schema_drift.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "scripts/source-governance.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "scripts/source-policy.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "scripts/system-health.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "scripts/verify-candidate-observation-window.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "scripts/verify-current-checkout.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "scripts/verify-project.mjs"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "scripts/verify-publication-bundle.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "scripts/verify-query-gateway-production.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "scripts/verify-source-policy-integration.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "scripts/verify-v2-publication.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "scripts/verify-workspace-ui.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/__init__.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/fixtures/date-provenance/revision-metadata.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/fixtures/date-provenance/s006-official-revision-metadata.json"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "tests/fixtures/discovery/dashboard-feed.v1.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/fixtures/entity-registry/false-positives.v1.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/fixtures/entity-registry/seeded-collision-coverage.v2.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/fixtures/live-meeting/scenario-asr-reconnect.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/fixtures/live-meeting/scenario-budget-stop.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/fixtures/live-meeting/scenario-crash-restart.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/fixtures/live-meeting/scenario-interim-final-revision.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/fixtures/live-meeting/scenario-minutes-contradiction.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/fixtures/live-meeting/scenario-no-post-event-source.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/fixtures/live-meeting/scenario-normal-30min-session.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/fixtures/live-meeting/scenario-search-no-seek.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/fixtures/live-meeting/scenario-search-stream-seek.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/fixtures/live-meeting/scenario-source-revised-stale.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/fixtures/live-meeting/scenario-speaker-label-drift.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/fixtures/live-meeting/scenario-stream-gap.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/fixtures/live-meeting/scenario-vod-later-available.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/fixtures/live-meeting/session-live.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/fixtures/live-meeting/session-reconciled.json"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "tests/fixtures/npa/batch1.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/fixtures/s006-synthetic-revision-date.pdf"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/fixtures/s006-synthetic-revision-date.provenance.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/fixtures/s009-undated-front-list.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/fixtures/source-policy/publication-metadata-v3.json"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/governed_policy_fixture.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/support/live-session-prototype-fixtures.mjs"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/support/live-session-prototype.mjs"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "tests/test_candidate_observation_window.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "tests/test_candidate_publication_wiring.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "tests/test_candidate_runtime_canary.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/test_collection_slot_dates.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/test_commute_reopen_replay.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "tests/test_current_checkout_e2e.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/test_date_metadata_projection.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "tests/test_detail_recheck.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "tests/test_detail_recheck_database.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "tests/test_discovery_adapter.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/test_discovery_projection.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "tests/test_entity_registry.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/test_evidence_mcp_probe_fixture.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "tests/test_feedback.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/test_free_model_synthetic.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "tests/test_gold_evaluator.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "tests/test_handoff_state.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "tests/test_live_canary_transport.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "tests/test_live_meeting.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/test_live_meeting_scenarios.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/test_lkg_age.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "tests/test_located_facts.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "tests/test_migration_replay.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "tests/test_news_list_collector.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/test_npa_news.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "tests/test_npa_source_inventory.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/test_official_source_dates.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "tests/test_public_event_fusion.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/test_public_query_interface.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/test_publication_alert.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "tests/test_publication_bundle.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "tests/test_publication_outcome.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "tests/test_publication_state_branch.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "tests/test_query_domain.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "tests/test_query_gateway.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "tests/test_query_gateway_domain.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "tests/test_query_gateway_stdio.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/test_query_generation_fallback.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "tests/test_query_store.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "tests/test_query_store_boundaries.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/test_release_verification.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "tests/test_retention_policy.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "tests/test_review_inbox.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "tests/test_schema_drift.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/test_source_governance.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/test_source_governance_integration.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "tests/test_source_policy.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "tests/test_source_policy_integration.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/test_source_policy_replay.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/test_source_state_filter.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "tests/test_source_transport_recovery.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "tests/test_system_health.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "tests/test_v2_publication_contract.py"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "tests/test_v2_semantics.py"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "workers/query-gateway/src/document-evidence.js"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "workers/query-gateway/src/document-research.js"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "workers/query-gateway/src/index.js"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "workers/query-gateway/src/public-brief.js"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "workers/query-gateway/src/research.js"
+      ]
+    },
+    {
+      "status": "M",
+      "paths": [
+        "workers/query-gateway/wrangler.jsonc"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "workers/research-admission/src/auth.js"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "workers/research-admission/src/budget.js"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "workers/research-admission/src/config.js"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "workers/research-admission/src/index.js"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "workers/research-admission/wrangler.example.jsonc"
+      ]
+    },
+    {
+      "status": "A",
+      "paths": [
+        "workers/source-egress-probe/src/index.js"
+      ]
+    }
+  ],
+  "official_innovation_percentage": null,
+  "previous_award_history": "UNKNOWN",
+  "organizer_determination": "PENDING"
+}
