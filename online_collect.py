@@ -2247,7 +2247,11 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
                     lkg_item = {**prior_item}
                     lkg_item["change_type"] = "LKG"
                     lkg_item["source_health"] = "FAILED"
-                    lkg_item["source_role"] = record["source_role"]
+                    # Legacy publications did not separate official trust from
+                    # the catalog's purpose. Rebind both to the current active
+                    # source without changing the retained content or clocks.
+                    lkg_item["source_role"] = "PRIMARY_OFFICIAL"
+                    lkg_item["catalog_role"] = record["source_role"]
                     lkg_item["integration_status"] = record["integration_status"]
                     lkg_item["eligibility"] = "INELIGIBLE_SOURCE_FAILED"
                     lkg_item["freshness_status"] = freshness if freshness != "FRESH" else "VERY_STALE"

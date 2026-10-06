@@ -1,3 +1,5 @@
+import copy
+import csv
 import importlib.util
 import json
 import tempfile
@@ -30,6 +32,59 @@ bundle_spec.loader.exec_module(bundle)
 
 
 class CandidatePublicationWiringTests(unittest.TestCase):
+    def test_failed_active_sources_upgrade_legacy_lkg_roles_without_refetch_claims(self):
+        for legacy_role in (None, "DISCOVERY_ONLY"):
+            with self.subTest(legacy_role=legacy_role), tempfile.TemporaryDirectory() as directory:
+                output = Path(directory) / "source-status.json"
+                saved_lkg = {"source_run_id": "SR-LEGACY", "completed_at": "2026-09-10T08:00:00+08:00"}
+                prior_sources = []
+                prior_items = []
+                for source_id, (name, url) in collector.P0_SOURCES.items():
+                    prior_sources.append({"source_id": source_id, "data_as_of": None,
+                                          "last_success_at": saved_lkg["completed_at"],
+                                          "last_known_good": copy.deepcopy(saved_lkg)})
+                    item = collector.project_feed_item(
+                        {"stable_key": "legacy", "source_url": url, "published_at": None,
+                         "content_sha256": "a" * 64, "payload": {"title": "retained official item"}},
+                        source_id, name, url, collector.catalog_rows()[source_id]["role"],
+                        "PRODUCTION_ACTIVE", "NO_DATA", "PASS", "COMPLETE_WITH_ITEMS", None,
+                        "2026-09-10T08:00:00+08:00", set(),
+                    )
+                    item["source_role"] = "LEGACY_ROLE"
+                    item["integration_status"] = "LEGACY_STATUS"
+                    if legacy_role is None:
+                        item.pop("catalog_role")
+                    else:
+                        item["catalog_role"] = legacy_role
+                    prior_items.append(item)
+                output.write_text(json.dumps({"schema_version": 1, "mode": "COMPETITION_DEMO",
+                                              "sources": prior_sources}), encoding="utf-8")
+                (output.parent / "intelligence-feed.json").write_text(
+                    json.dumps({"items": prior_items}), encoding="utf-8")
+                with mock.patch.object(collector, "collect_source", side_effect=RuntimeError("offline failure")), mock.patch.object(
+                    candidate_lane, "_bounded_session", return_value=mock.Mock()
+                ):
+                    status = collector.build_demo_status(output, "MORNING", date(2026, 9, 11), "manual")
+                feed = json.loads((output.parent / "intelligence-feed.json").read_text(encoding="utf-8"))
+                summary = json.loads((output.parent / "intelligence-summary.json").read_text(encoding="utf-8"))
+                with (output.parent / "feed-export.csv").open(encoding="utf-8-sig") as exported:
+                    csv_rows = list(csv.DictReader(exported))
+                self.assertEqual(bundle.bundle_errors(status, feed, summary, csv_rows,
+                                                     collector.load_source_catalog(), set(collector.P0_SOURCES),
+                                                     require_candidate_lane=True), [])
+                self.assertEqual(len(feed["items"]), len(prior_items))
+                for before, after in zip(prior_items, feed["items"]):
+                    for field in ("stable_id", "title", "official_url", "content_sha256", "published_at", "fetched_at"):
+                        self.assertEqual(after[field], before[field])
+                    self.assertEqual(after["catalog_role"], collector.catalog_rows()[after["source_id"]]["role"])
+                    self.assertEqual(after["source_role"], "PRIMARY_OFFICIAL")
+                    self.assertEqual(after["integration_status"], "PRODUCTION_ACTIVE")
+                    self.assertEqual(after["change_type"], "LKG")
+                    self.assertEqual(after["source_health"], "FAILED")
+                    self.assertEqual(after["eligibility"], "INELIGIBLE_SOURCE_FAILED")
+                self.assertTrue(all(row["last_known_good"] == saved_lkg for row in status["sources"]))
+                self.assertEqual(summary["eligible_items"], 0)
+
     def test_candidate_stays_in_separate_pages_status_and_feed_lanes(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "source-status.json"
