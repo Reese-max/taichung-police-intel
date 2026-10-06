@@ -131,6 +131,32 @@ def check_promoted_fixture(old_store: dict[str, Any], old_result: dict[str, Any]
             "required_source_gaps": gap_results, "provider_calls": 0, "source_promotion": "isolated fixture only"}
 
 
+def reconcile_promoted_candidate_fixture(fixture: Path, active_ids, feed, status, brief) -> None:
+    """Keep the copied candidate lane disjoint from a fictional promotion."""
+    if fixture.resolve() == ROOT.resolve():
+        raise ValueError("candidate fixture reconciliation cannot edit the real checkout")
+    active = set(active_ids)
+    # The real candidate scope remains fixed. Only this temporary checkout's
+    # explicitly promoted catalog needs the corresponding candidate removal.
+    scope_path = fixture / "scripts/candidate_publication.py"
+    with scope_path.open("a", encoding="utf-8") as handle:
+        handle.write("\n# Fictional promotion scope; isolated integration fixture only.\n"
+                     "CANDIDATE_PUBLICATION_SOURCE_IDS = tuple(sid for sid in "
+                     "CANDIDATE_PUBLICATION_SOURCE_IDS if sid not in " + repr(sorted(active)) + ")\n")
+    for document, key in ((status, "candidate_sources"), (feed, "candidate_items")):
+        if key in document:
+            document[key] = [row for row in document[key] if row["source_id"] not in active]
+    if "candidate_source_summary" in feed:
+        feed["candidate_source_summary"] = {
+            sid: row for sid, row in feed["candidate_source_summary"].items() if sid not in active
+        }
+    if "candidate_source_context" in brief:
+        for key in ("sources", "items"):
+            brief["candidate_source_context"][key] = [
+                row for row in brief["candidate_source_context"][key] if row["source_id"] not in active
+            ]
+
+
 def run_promoted_fixture(catalog, current, old_store, query_store) -> dict[str, Any]:
     with tempfile.TemporaryDirectory(prefix="govintel-policy-transition-") as directory:
         fixture = Path(directory)
@@ -185,6 +211,7 @@ def run_promoted_fixture(catalog, current, old_store, query_store) -> dict[str, 
             row.update(source_role=catalog_row["role"], integration_status=catalog_row["status"])
         status["candidate_catalog"] = [row for row in status.get("candidate_catalog", [])
                                        if row["source_id"] not in promoted["active_source_ids"]]
+        reconcile_promoted_candidate_fixture(fixture, promoted["active_source_ids"], feed, status, brief)
         brief.update(publication_status="READY", snapshot_complete=True)
         summary = {"schema_version": 1, "generated_at": feed["generated_at"], "collection_run_id": feed["collection_run_id"],
                    "total_items": 0, "eligible_items": 0, "source_breakdown": [{"source_id": source_id, "item_count": 0}
