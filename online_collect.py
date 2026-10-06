@@ -33,6 +33,7 @@ from collect import (
     freshness_status,
     gap_reasons,
     next_update,
+    resolve_collection_date,
     save_state,
     scheduled_time,
     timestamp,
@@ -1751,6 +1752,8 @@ def generate_feed_csv(feed_items: list[dict], raw_items_by_source: dict[str, lis
 
 def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) -> dict:
     now = datetime.now(TZ)
+    # Refuse a future completed window before reading state or making requests.
+    slot_date = resolve_collection_date(slot, trigger, slot_date, now=now)
     prior = json.loads(output.read_text(encoding="utf-8")) if output.exists() else None
     if prior and (prior.get("schema_version"), prior.get("mode")) != (1, "COMPETITION_DEMO"):
         raise ValueError("unsupported competition demo state")
@@ -1996,7 +1999,7 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
 def main() -> int:
     parser = argparse.ArgumentParser(description="Production P0 source collector")
     parser.add_argument("--slot", choices=("morning", "evening"))
-    parser.add_argument("--slot-date", type=date.fromisoformat, default=datetime.now(TZ).date())
+    parser.add_argument("--slot-date", type=date.fromisoformat)
     parser.add_argument("--canary", action="store_true")
     parser.add_argument("--demo-output", type=Path)
     parser.add_argument("--trigger", choices=("manual", "schedule"), default="manual")
@@ -2006,6 +2009,13 @@ def main() -> int:
         parser.error("--demo-output requires --slot")
     if sum((bool(args.slot and not args.demo_output), args.canary, args.self_check, bool(args.demo_output))) != 1:
         parser.error("choose exactly one database slot, --canary, --demo-output, or --self-check")
+    if args.slot:
+        try:
+            args.slot_date = resolve_collection_date(
+                args.slot, args.trigger, args.slot_date, now=datetime.now(TZ),
+            )
+        except ValueError as error:
+            parser.error(str(error))
     if args.self_check:
         self_check()
     elif args.canary:

@@ -171,6 +171,27 @@ def scheduled_time(slot_date: date, slot: str) -> datetime:
     return datetime.combine(slot_date, clock, TZ)
 
 
+def resolve_collection_date(
+    slot: str, trigger: str, requested_date: date | None = None,
+    *, now: datetime | None = None,
+) -> date:
+    """Resolve delayed schedules to the latest due occurrence of their slot."""
+    slot = slot.upper()
+    if slot not in {"MORNING", "EVENING"} or trigger not in {"manual", "schedule"}:
+        raise ValueError("unsupported collection slot or trigger")
+    now = now or datetime.now(TZ)
+    if now.tzinfo is None or now.utcoffset() is None:
+        raise ValueError("collection clock must include a timezone")
+    now = now.astimezone(TZ)
+    resolved = requested_date if requested_date is not None else now.date()
+    if requested_date is None and trigger == "schedule" and now < scheduled_time(resolved, slot):
+        resolved -= timedelta(days=1)
+    deadline = scheduled_time(resolved, slot)
+    if now < deadline:
+        raise ValueError(f"{slot} slot is not due until {timestamp(deadline)}")
+    return resolved
+
+
 def next_update(slot_date: date, slot: str) -> str:
     if slot == "MORNING":
         return timestamp(datetime.combine(slot_date, time(18, 30), TZ))
