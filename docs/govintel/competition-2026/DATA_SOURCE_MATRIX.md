@@ -1,6 +1,6 @@
 # GovIntel AI－資料來源與取得狀態
 
-文件更新 2026-10-05。active 來源以[核准 policy](../source-policy.approved.json)為準，catalog、入口可取得與 fixture 不代表正式啟用。最新具日期的 production 觀察見[CURRENT_STATUS](CURRENT_STATUS.md)。
+文件更新 2026-10-06。active 來源以[核准 policy](../source-policy.approved.json)為準，catalog、入口可取得與 fixture 不代表正式啟用。最新具日期的 production 觀察見[CURRENT_STATUS](CURRENT_STATUS.md)。
 
 ## 已核准基線
 
@@ -26,13 +26,13 @@
 | S-033 市政 | 同上；[市政新聞 83551](https://data.gov.tw/dataset/83551) | `CANDIDATE_CANARY`；83551 與同源市政公告不增加獨立佐證。 |
 | S-031 消防 | 同上 | `CANDIDATE_CANARY`；短生命週期 snapshot 附觀測時間／涵蓋；消失不等於解除，列數不等於完整事件數。 |
 
-部署基準 `main@562141e` 的獨立每日 workflow 觀察 S-001／S-032／S-033／S-031，漏了 catalog promotion-plan 的 S-019。本地整合已補入 S-019，驗證器要求五個計畫來源各有有效觀察日，避免從未出現在 receipt 的來源被漏驗；這沒有製造七日證據，也沒有把 v6 首期四類改成五類。完整性、權利／敏感內容、版本、核准 promotion 與公開 readback 另需通過。S-019 及四類候選均未啟用，沒有每日新增 100–200 筆的證據。
+歷史 `main@562141e` 的獨立 workflow 漏了 S-019；目前已合併補入並要求五個計畫來源各有有效觀察日，避免漏驗。這沒有製造七日證據，也沒有把 v6 首期四類改成五類。[10/6 原始窗口驗算](../source-reviews/2026-10-06/candidate-window-actual.json)：S-032／33 各 7 有效日、S-031 1 日、S-001／19 為 0；完整性、權利／敏感內容、版本、核准 promotion 與公開 readback 另需通過。S-019 及四類候選均未啟用，沒有每日新增 100–200 筆的證據。
 
 ## v6 指定背景資料
 
 | 資料 | 送件／現況 | 驗收與限制 |
 |---|---|---|
-| D1 [SEGIS](https://segis.moi.gov.tw/STATCloud/Index)112 年 12 月鄉鎮市區人口／戶數 | `IMPLEMENTED_NOT_PRODUCTION`；送件時未下載，本輪已取得固定 CSV、[驗證樣本](segis-112Y12M-taichung.verified.json)及本地 UI | 全國 368 記錄／臺中 29 區，代碼、人口／戶數、合計與 hash 已核對；`production_active=false`。不是目前人口、人潮或影響人數，真人用途效益未測。 |
+| D1 [SEGIS](https://segis.moi.gov.tw/STATCloud/Index)112 年 12 月鄉鎮市區人口／戶數 | 固定樣本與正式 UI 已驗；送件時未下載，本輪已取得固定 CSV、[驗證樣本](segis-112Y12M-taichung.verified.json)及[正式 browser](closure-20261006/production-browser.json) | 全國 368 記錄／臺中 29 區，代碼、人口／戶數、合計與 hash 已核對；`production_active=false`。不是目前人口、人潮或影響人數，真人用途效益未測。 |
 | D2 [dataset5958](https://data.gov.tw/dataset/5958)警察機關地址名錄 | `DESIGN_ONLY`；metadata 200，官方 TGOS ZIP／原生頁面 403，資料列未取得 | [receipt](background-source-observations-2026-10-05.json)保留失敗；POINT_X/Y 不足以證明 CRS。地址／電話／座標內容未驗證，不能推論管轄／派遣／警力。 |
 | S-026／S-028／其他 reference | catalog 與既有 canary／fixture | 各來源另需驗收，不因列名而變 production，背景資料不作即時事件。 |
 | Taiwan Intel 媒體 | [discovery replay](../../../scripts/discovery-adapter.py)、[設計](../issue-27-discovery-adapter.md) | 固定 fixture 可重播；正式 live 與 14 日 shadow 尚需證據。72 小時、200 項、256KB 為交換上限，非每日新增。 |
@@ -41,3 +41,9 @@
 每筆結果保留官方 URL、文件版本／hash、發布／觀測／適用時間與未知欄位。健康、過期、部分涵蓋、來源失敗與有效零筆各自呈現；資料取得限制不得被高 fixture 分數掩蓋。
 
 D1 由官方固定期別頁的原生 CSV 下載流程取得；同頁 JSON open service 回傳的是 **114Y12M**，不是 112Y12M，未用它覆寫歷史樣本。原始 CSV SHA256 `95500e06310098d4c194a26e4aeba00e7142d5c9e441a62fe18f71250d65496b`；變更聲明與授權／來源均在樣本。其他人口 dataset 也不能替代本期。D2 的原生瀏覽器與合法官方 referrer 仍未恢復存取，兩個 Twinkle 既有連線需重新認證；這些失敗不會被當成成功取得。
+
+## 2026-10-06 晚間更新
+
+[真實手動晚間蒐集](closure-20261006/evening-collection.json)已取得 S-029 原 WWW 資源，source health PASS／COMPLETE_ZERO；官方日期仍 2026-07-24／STALE，不把取得時間冒成更新。較早 FAILED／LKG receipt 不改寫。S-019 的 schema probe HTTP 200／NO_DRIFT 只算一次實際連線；有效 canary 日數仍依另存原始 observation 驗算。S-001 未恢復。Gateway 初次 503／workflow failure 與後來完整匿名回讀 PASS 分別留證，不以 HTTP 200 取代版本／hash。
+
+10/6 22:06 Asia/Taipei 的[新一輪真實 canary](closure-20261006/current-candidate-observation.json)已獨立留證：S-019 有第一個有效當地日；S-031 仍只有同一天的 1 日，重跑不增加日數。S-032／33 仍需權利及獨立完整性，S-001 失敗；全部未 promotion。較早七日窗口及其失敗不改寫，S-019 至少還需六個未來實際有效日。

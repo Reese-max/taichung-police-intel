@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "scope": "OBSERVED_ARTIFACT_BYTES_AND_SINGLE_COLLECTION_DURATION_NOT_SERVICE_COST_OR_CAPACITY",
+  "observed_at": "2026-10-06T13:50:46.416068+00:00",
+  "code_sha": "5e2298c8db12ec2631dbd8dac11c14599133dcc6",
+  "publication_generation": "CR-DEMO-20261006-MORNING-MANUAL",
+  "public_files": {
+    "source-status.json": {
+      "sha256": "105093ce881e7db0c21cc34d10c19998b2a0317641fa09515cf694c22fcd0df6",
+      "bytes": 15169,
+      "checkpoint_match": true
+    },
+    "intelligence-feed.json": {
+      "sha256": "0b3021ef2eba38fb5b3ed645d73d61cd53b085401b5c587e6186c123cea001f3",
+      "bytes": 145700,
+      "checkpoint_match": true
+    },
+    "intelligence-summary.json": {
+      "sha256": "a4ec97326dac553ab8f3b31dce0a7fd80d62862b5da0d873fbd296d60cc166df",
+      "bytes": 6887,
+      "checkpoint_match": true
+    },
+    "feed-export.csv": {
+      "sha256": "5b25651a92a208eb97a9e12c29782f69548fb76a9a2e9ddb7421f71a5b3b1aa8",
+      "bytes": 63555,
+      "checkpoint_match": true
+    },
+    "v2-daily-brief.json": {
+      "sha256": "5c0f6b099f85666948b8ab2362430396723e2669b1da41adb37176e947ffe6fd",
+      "bytes": 15752,
+      "checkpoint_match": true
+    }
+  },
+  "five_file_total_bytes": 247063,
+  "collection": {
+    "collection_run_id": "CR-DEMO-20261006-MORNING-MANUAL",
+    "slot_date": "2026-10-06",
+    "slot": "MORNING",
+    "trigger": "MANUAL",
+    "scheduled_for": "2026-10-06T06:30:00+08:00",
+    "started_at": "2026-10-06T10:42:23+08:00",
+    "finished_at": "2026-10-06T10:46:08+08:00",
+    "elapsed_seconds": 225.0,
+    "sample_count": 1,
+    "p95_seconds": null
+  },
+  "model_provider": {
+    "production_state": "DISABLED",
+    "synthetic_development_diagnostic": "../model-diagnostic-20261006/diagnostic-index.json",
+    "official_holdout_calls": 0,
+    "billing_receipt": null
+  },
+  "monthly_queries": null,
+  "peak_concurrent_queries": null,
+  "human_review_hours": null,
+  "unit_costs": null,
+  "monthly_cost_estimate": null,
+  "team_cost_cap": null,
+  "raw_storage_total": null,
+  "load_test": "NOT_RUN",
+  "limitations": [
+    "One observed collection is not a latency distribution.",
+    "Five public canonical files exclude raw captures, Actions artifacts, code and CDN transfer.",
+    "CLI step cost zero cannot prove total monthly service cost."
+  ]
+}

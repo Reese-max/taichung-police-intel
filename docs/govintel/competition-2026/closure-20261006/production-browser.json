@@ -1,0 +1,355 @@
+{
+  "schema_version": 1,
+  "status": "PASS",
+  "scope": "ACTUAL_INTEGRATED_PRODUCTION_RELEASE_DATES_AND_RESEARCH_REFUSAL",
+  "code_sha": "5e2298c8db12ec2631dbd8dac11c14599133dcc6",
+  "release_id": "af84411b8bdd49c717c8de26b68149b5286fde6672f470cd2c73f21656b009b7",
+  "worker_version": "6623af5a-d018-485b-8cda-eab36ef3e028",
+  "publication_generation": "CR-DEMO-20261006-MORNING-MANUAL",
+  "production_verified": false,
+  "formal_query": "RIGHTS_BLOCKED",
+  "published_query_and_tracking": "NOT_ACCEPTED",
+  "semantic_ai_trial": "NOT_RUN",
+  "human_trial": "NOT_RUN",
+  "source_date_ui": "PASS",
+  "data_quality": "PARTIAL",
+  "observed_at": "2026-10-06T13:52:04.516Z",
+  "checks": [
+    {
+      "id": "actual-pages-release-and-hashes",
+      "status": "PASS"
+    },
+    {
+      "id": "correction-entry-static-link-without-query-or-tracking-data",
+      "status": "PASS",
+      "external_form_submitted": false
+    },
+    {
+      "id": "actual-D1-fixed-period-district-values-and-limit",
+      "status": "PASS",
+      "period": "2023-12",
+      "population": 235441,
+      "households": 94971,
+      "formal_source_promotion": false,
+      "human_comprehension": "NOT_RUN"
+    },
+    {
+      "id": "compact-policy-validated-revision-and-unknown-dates-visible",
+      "status": "PASS",
+      "s006_card": "S-006 · 臺中市議會質詢順序表\n\n健康：PASS · 快照新鮮度：VERY_STALE · 完整性：PARTIAL\n\n最後成功：2026/10/6 10:42:34\n\n最後檢查：2026/10/6 10:42:34\n\n官方修訂日期（已核對附件）：2026/9/1 00:00:00\n\n缺口：WINDOW_PARTIAL、VERY_STALE_DATA\n\n官方來源入口",
+      "s009_card": "S-009 · 臺中市議會議事資訊系統－各項提案\n\n健康：PASS · 快照新鮮度：NO_DATA · 完整性：PARTIAL\n\n最後成功：2026/10/6 10:42:47\n\n最後檢查：2026/10/6 10:42:47\n\n官方資料截至：未提供\n\n缺口：WINDOW_PARTIAL、NO_DATA_AS_OF\n\n官方來源入口"
+    },
+    {
+      "id": "stale-official-record-and-upstream-failure-remain-distinct",
+      "status": "PASS",
+      "s007_card": "S-007 · 臺中市議會議事資訊系統－議事錄\n\n健康：PASS · 快照新鮮度：STALE · 完整性：COMPLETE_ZERO\n\n最後成功：2026/10/6 10:42:46\n\n最後檢查：2026/10/6 10:42:46\n\n官方記錄日期：2026/5/27 01:12:00\n\n缺口：STALE_DATA\n\n官方來源入口",
+      "s029_card": "S-029 · 臺中市政府議會專案報告\n\n健康：FAILED · 快照新鮮度：STALE · 完整性：PARTIAL\n\n最後成功：2026/9/24 23:18:12\n\n最後檢查：2026/10/6 10:45:50\n\n官方資料截至：2026/7/24 00:00:00\n\n缺口：SOURCE_FAILED、WINDOW_PARTIAL、STALE_DATA\n\n官方來源入口"
+    },
+    {
+      "id": "rights-blocked-search-coverage-and-protected-brief-refusal",
+      "status": "PASS",
+      "http_status": 200,
+      "blocked_search": {
+        "release": {
+          "schema_version": 1,
+          "release_id": "af84411b8bdd49c717c8de26b68149b5286fde6672f470cd2c73f21656b009b7",
+          "code_sha": "5e2298c8db12ec2631dbd8dac11c14599133dcc6",
+          "publication_generation": "CR-DEMO-20261006-MORNING-MANUAL",
+          "publication_hash": "5c0f6b099f85666948b8ab2362430396723e2669b1da41adb37176e947ffe6fd",
+          "artifact_hashes": {
+            "feed": "0b3021ef2eba38fb5b3ed645d73d61cd53b085401b5c587e6186c123cea001f3",
+            "status": "105093ce881e7db0c21cc34d10c19998b2a0317641fa09515cf694c22fcd0df6",
+            "brief": "5c0f6b099f85666948b8ab2362430396723e2669b1da41adb37176e947ffe6fd"
+          },
+          "source_policy_hash": "3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501",
+          "query_generation": "25ee81adac4464120274f255c129ec76651089b98585d26ea8d12c0bd31daff2",
+          "evidence_catalog_hash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "built_at": "2026-10-06T13:43:25.446Z",
+          "worker_version": "6623af5a-d018-485b-8cda-eab36ef3e028",
+          "pages_deployment": null,
+          "deployed_at": null,
+          "anonymous_http_verified_at": null,
+          "evidence_level": "RUNTIME_BOUND",
+          "production_verified": false
+        },
+        "schema_version": 1,
+        "query_id": "c578a12a-9966-46c3-b42e-57aabbf5dabb",
+        "tool_name": "search_evidence",
+        "publication_id": "CR-DEMO-20261006-MORNING-MANUAL",
+        "publication_hash": "5c0f6b099f85666948b8ab2362430396723e2669b1da41adb37176e947ffe6fd",
+        "query_generation_id": "25ee81adac4464120274f255c129ec76651089b98585d26ea8d12c0bd31daff2",
+        "generated_at": "2026-10-06T10:46:08+08:00",
+        "queried_at": "2026-10-06T13:51:57.932Z",
+        "freshness": "UNKNOWN",
+        "verification_summary": "資料時效或完整性無法核對，不能把結果解讀成完整現況。",
+        "event_ids": [],
+        "evidence_ids": [],
+        "source_gaps": [
+          {
+            "source_id": null,
+            "reason": "INCOMPLETE_PUBLICATION"
+          },
+          {
+            "source_id": "S-006",
+            "reason": "SOURCE_INCOMPLETE",
+            "source_health": "PASS"
+          },
+          {
+            "source_id": "S-006",
+            "reason": "STALE_SOURCE_DATA",
+            "freshness_status": "VERY_STALE"
+          },
+          {
+            "source_id": "S-007",
+            "reason": "STALE_SOURCE_DATA",
+            "freshness_status": "STALE"
+          },
+          {
+            "source_id": "S-009",
+            "reason": "SOURCE_INCOMPLETE",
+            "source_health": "PASS"
+          },
+          {
+            "source_id": "S-009",
+            "reason": "UNKNOWN_SOURCE_FRESHNESS",
+            "freshness_status": "NO_DATA"
+          },
+          {
+            "source_id": "S-029",
+            "reason": "SOURCE_INCOMPLETE",
+            "source_health": "FAILED"
+          },
+          {
+            "source_id": "S-029",
+            "reason": "STALE_SOURCE_DATA",
+            "freshness_status": "STALE"
+          }
+        ],
+        "query_coverage": {
+          "status": "UNKNOWN",
+          "policy_version": 1,
+          "policy_hash": "3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501",
+          "capability_id": "publication_metadata",
+          "required_sources": [
+            "S-004",
+            "S-006",
+            "S-007",
+            "S-009",
+            "S-029"
+          ],
+          "missing_required_sources": [
+            "S-006",
+            "S-009",
+            "S-029"
+          ],
+          "stale_required_sources": [
+            "S-006",
+            "S-007",
+            "S-029"
+          ],
+          "formal_admission": {
+            "status": "UNKNOWN",
+            "reason": "APPROVED_GOVERNANCE_MISSING",
+            "governance_hash": null,
+            "blocked_sources": [
+              "S-004",
+              "S-006",
+              "S-007",
+              "S-009",
+              "S-029"
+            ],
+            "per_source": {
+              "S-004": "APPROVED_GOVERNANCE_MISSING",
+              "S-006": "APPROVED_GOVERNANCE_MISSING",
+              "S-007": "APPROVED_GOVERNANCE_MISSING",
+              "S-009": "APPROVED_GOVERNANCE_MISSING",
+              "S-029": "APPROVED_GOVERNANCE_MISSING"
+            }
+          },
+          "rights_blocked_sources": [
+            "S-004",
+            "S-006",
+            "S-007",
+            "S-009",
+            "S-029"
+          ],
+          "collection_coverage_status": "PARTIAL",
+          "can_state_bounded_no_match": false,
+          "coverage_limitations": [
+            "只代表 policy 中已啟用來源，不代表世界完整性。",
+            "來源治理／公開權利尚未核准，不能從正式查詢零結果推論沒有事件。"
+          ],
+          "supported_capabilities": [
+            "publication_metadata",
+            "source_health",
+            "council_affairs"
+          ],
+          "covered_sources": [],
+          "collection_covered_sources": [
+            "S-004"
+          ],
+          "formally_admitted_sources": [],
+          "collection_completeness": {
+            "S-004": "COMPLETE_WITH_ITEMS",
+            "S-006": "PARTIAL",
+            "S-007": "COMPLETE_ZERO",
+            "S-009": "PARTIAL",
+            "S-029": "PARTIAL"
+          },
+          "requested_scope": {
+            "text": "議事"
+          }
+        },
+        "discovery_unverified_count": 0,
+        "truncated": false,
+        "policy": {
+          "policy_version": 1,
+          "policy_hash": "3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501",
+          "catalog_hash": "5088623df5af4b8a30f4c597c51235c0f36a3dfd8bc4f2aea9af8f26d10213ef",
+          "active_source_ids": [
+            "S-004",
+            "S-006",
+            "S-007",
+            "S-009",
+            "S-029"
+          ]
+        },
+        "retention": {
+          "catalog_hash": "5088623df5af4b8a30f4c597c51235c0f36a3dfd8bc4f2aea9af8f26d10213ef",
+          "excerpt_allowed": false,
+          "full_text_allowed": false,
+          "policy_hash": "9c7f589c80df456d4b547151a1e3a5eb7d29258fee6ed2268613598de820729d",
+          "policy_version": 2,
+          "public_projection": "METADATA_LINK_ONLY",
+          "query_index_extends_source_retention": false,
+          "review_required": true,
+          "rights_status": "UNKNOWN",
+          "rights_status_values": [
+            "PROJECT_CONTROLLED",
+            "UNKNOWN"
+          ],
+          "schema_version": 1,
+          "terms_status": "CATALOG_ENTRYPOINT_NOT_A_LICENSE",
+          "terms_status_values": [
+            "CATALOG_ENTRYPOINT_NOT_A_LICENSE",
+            "PROJECT_OWNED_NO_THIRD_PARTY_LICENSE"
+          ]
+        },
+        "result_type": "publication_metadata",
+        "receipt": {
+          "schema_version": 1,
+          "tool_name": "search_evidence",
+          "arguments_sha256": "f4f85d7dbd7c9185cd7b57a20d7d4026fa73356e7a16818081c4f3749151417f",
+          "publication_hash": "5c0f6b099f85666948b8ab2362430396723e2669b1da41adb37176e947ffe6fd",
+          "query_generation_id": "25ee81adac4464120274f255c129ec76651089b98585d26ea8d12c0bd31daff2",
+          "result_count": 0,
+          "truncated": false,
+          "server_version": "query-gateway-v1-workers",
+          "issued_at": "2026-10-06T13:51:57.932Z"
+        },
+        "search_scope": "TITLE_COMMITTEE_SOURCE_ID_ONLY",
+        "answerable_no_match": false,
+        "total_matches": 0,
+        "result_count": 0,
+        "offset": 0,
+        "has_more": false,
+        "next_cursor": null,
+        "results": []
+      },
+      "protected_brief": {
+        "http_status": 503,
+        "payload": {
+          "schema_version": 1,
+          "error": {
+            "code": "RIGHTS_BLOCKED",
+            "message": "Current formal brief lacks approved governance or publication rights"
+          }
+        }
+      },
+      "published_tracking": "NOT_ACCEPTED",
+      "visible_coverage": "只查已發布原文的標題與中介資料，不是全文或精確路段查詢。 查詢不使用付費模型，也不暗改你的條件。\n涵蓋狀態：UNKNOWN · 缺口：S-006、S-009、S-029 · 過期：S-006、S-007、S-029"
+    },
+    {
+      "id": "native-source-health-and-lkg-warning-mobile-page",
+      "status": "PASS",
+      "mobile": {
+        "viewport": 390,
+        "scroll": 390
+      }
+    },
+    {
+      "id": "actual-local-tracking-save-edit-reload-and-cancel-with-partial-warning",
+      "status": "PASS",
+      "scope": "ISOLATED_BROWSER_LOCAL_PREFERENCES_ONLY",
+      "baseline_complete": false,
+      "coverage_warning": "資料涵蓋仍有缺口或陳舊來源，僅比對已收錄快照；未讀清單不能代表完整現況。 至少一個來源沒有可核對的資料新鮮度，不能排除其他異動。",
+      "mobile": {
+        "viewport": 390,
+        "scroll": 390
+      }
+    },
+    {
+      "id": "explicit-tracking-clear-removes-only-test-browser-preferences",
+      "status": "PASS"
+    },
+    {
+      "id": "actual-research-route-disabled-provider-and-rights-refusal",
+      "status": "PASS",
+      "http_status": 200,
+      "reason_code": "RIGHTS_BLOCKED",
+      "provider_state": "DISABLED",
+      "mobile": {
+        "viewport": 390,
+        "scroll": 390
+      }
+    },
+    {
+      "id": "document-and-synthesis-production-calls-refuse-before-transmission",
+      "status": "PASS",
+      "modes": [
+        {
+          "mode": "documents",
+          "http_status": 200,
+          "reason_code": "RIGHTS_BLOCKED",
+          "provider_transmission_attempted": false
+        },
+        {
+          "mode": "synthesis",
+          "http_status": 200,
+          "reason_code": "RIGHTS_BLOCKED",
+          "provider_transmission_attempted": false
+        }
+      ]
+    },
+    {
+      "id": "production-legacy-ask-redirect-single-research-entry",
+      "status": "PASS"
+    },
+    {
+      "id": "production-discovery-panel-remains-explicit-fixture",
+      "status": "PASS"
+    },
+    {
+      "id": "production-workspace-snapshot-assets-and-mobile-rendering",
+      "status": "PASS",
+      "mobile": {
+        "viewport": 390,
+        "scroll": 390
+      }
+    },
+    {
+      "id": "browser-javascript-runtime",
+      "status": "PASS",
+      "page_errors": []
+    }
+  ],
+  "pageErrors": [],
+  "screenshots": [
+    "browser-source-revision-date.png",
+    "browser-source-dates-and-failures.png",
+    "browser-formal-query-rights-blocked.png",
+    "browser-integrated-tracking-local-persistence.png",
+    "browser-integrated-research-rights-blocked.png",
+    "browser-integrated-dashboard-limits.png"
+  ]
+}

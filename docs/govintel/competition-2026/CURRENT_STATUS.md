@@ -1,56 +1,44 @@
 # GovIntel AI－現行實作與證據狀態
 
-文件更新：2026-10-05（Asia/Taipei）。日期化已發布程式基準：`main@edb7148c9565c7d59ac222689c35bff41376d1cb`，對應成功的 [run 37303622240](https://github.com/Reese-max/taichung-police-intel/actions/runs/37303622240)。這是本頁核對時點的證據；公開資料與版本會隨後續排程更新，引用前須重讀 receipt 的時間、code SHA、generation 與 hash。PR #103／#124／#125／#126 已合併；本輪來源／日期修復另待合併、發布與正式回讀。
+核對日：2026-10-06（Asia/Taipei）。本頁以已合併 `main@5e2298c8db12ec2631dbd8dac11c14599133dcc6` 與 [發布 run 37472606240](https://github.com/Reese-max/taichung-police-intel/actions/runs/37472606240)為固定工程基準。匿名回讀及 15 項正式 Chromium 操作通過；[日期化證據包](closure-20261006/README.md)保存 release、checkpoint、generation、Worker version、公開五檔 hash 與各自的實際查核時間。之後的程式合併或蒐集另留 receipt，不將這一份記錄宣稱永遠最新。
 
-公開查詢與同瀏覽器追蹤已合併並發布。2026-10-05 的 `31d93f52bb6df37ff9b4e94c13bfdfdad7109699` 正式驗收保存了 Gateway 7 項、公開五檔 bytes/hash、原生瀏覽器 6 項 PASS；瀏覽器範圍包含實際受限查詢、官方原文卡、條件保存／刷新／重開，以及明示資料缺口。較早 `3a06754a2428023bf316d8cb180f239f9c3b971d` 的完整 gate、406 項 Web 與本地 runtime／browser 記錄仍屬歷史本地工程證據。以上均不證明 AI／真人成效、完整事件覆蓋或來源 promotion；詳細界線見 [VERIFICATION.md](VERIFICATION.md)。
+**程式已發布，正式來源查詢仍 `RIGHTS_BLOCKED`。** `deployment_verified=true` 與 `production_verified=false` 同時成立：發布與受限拒答通過，逐來源正式權利尚未准入；不是已能返回核准官方內容的正值查詢。原始 v6 的 85%／90%／30%、20 事件／60 文件及 3–5 位試用者仍是計畫，沒有模型／真人效益結果。
 
-提案名稱固定為 **GovIntel AI－公共資訊查詢與個人化追蹤平台**。v6 修訂日為 2026-10-01，首期服務民眾與公開資訊研究／業務人員；公開查詢、同一瀏覽器追蹤與可重播驗證包是主交付。交班、研究匯出與多人協作不是首期主流程。
+產品／構想書工作題名為 **GovIntel AI－公共資訊查詢與個人化追蹤平台**。主辦已確認收妥補件、未接受更名；原報名完整題名、代表資格與封面指示仍待確認。不能把產品工作題名當已核准的正式報名題名。
 
-## 狀態語意
+## 能力與證據
 
-- `PRODUCTION_ACTIVE`：已在目前公開發布路徑使用；不保證每次資料完整、新鮮或涵蓋所有事件。
-- `IMPLEMENTED_NOT_PRODUCTION`：程式、fixture 或本地 receipt 可重播；正式部署、資料 promotion 與真人驗收須另有證據。
-- `CANDIDATE_CANARY`：候選來源正在觀察，未進入核准 production 集合。
-- `DESIGN_ONLY`：規劃、規格或評測方法存在，尚無可用性證明。
-- `BLOCKED`：明確驗收缺口未解決。
-
-`PARTIAL`、`STALE`、`FAILED`、`NOT_RUN`、`UNVERIFIED` 描述資料或評測 receipt，不能直接替代能力狀態。
-
-## Claim / evidence table
-
-| 能力／主張 | 狀態 | 可核對的證據與限制 |
+| 項目 | 現況 | 實際證據及限制 |
 |---|---|---|
-| 五個來源 publication baseline、來源健康與官方影音導覽 | `PRODUCTION_ACTIVE` | [核准 policy](../source-policy.approved.json)：S-004／S-006／S-007／S-009／S-029。[公開 source status](https://reese-max.github.io/taichung-police-intel/data/source-status.json)仍須逐項讀取日期、完整性與 LKG。 |
-| 受限 production Query Gateway | `PRODUCTION_ACTIVE` | [production verifier](../../../scripts/verify-query-gateway-production.py)與下列日期化正式驗收；release／generation／hash 綁定、受限查詢及官方證據通過，不代表語意 AI 或 domain-store 全域涵蓋。 |
-| v6 公開查詢 | `PRODUCTION_ACTIVE` | [PR #124](https://github.com/Reese-max/taichung-police-intel/pull/124)與後續修正已整合；正式 `/public-query/` 的實際 metadata 查詢、原文卡與缺口提示通過日期化瀏覽器驗收。未宣稱完整跨機關事件或語意模型能力。 |
-| v6 個人追蹤／重開站更新 | `PRODUCTION_ACTIVE` | [PR #125](https://github.com/Reese-max/taichung-police-intel/pull/125)與後續修正已整合；正式 `/tracking/` 的條件保存、刷新及同瀏覽器重開通過。每日時段、延長、已讀、取消與明文解除另有本地 replay；完整真人跨日情境仍待驗，不含背景推播／跨裝置。 |
-| v6 可重播評測工具 | `IMPLEMENTED_NOT_PRODUCTION` | [PR #126](https://github.com/Reese-max/taichung-police-intel/pull/126)與修正已本地整合；工程範圍為 `SYNTHETIC_DETERMINISTIC_POLICY_REPLAY`。[評測協定](EVALUATION.md)與 [manifest](evaluation-manifest.template.json)中 A／B／C／語意消融的完整方法執行仍 `NOT_RUN`。 |
-| Source Policy、located facts、角色排序、local-first handoff、Review Inbox | `IMPLEMENTED_NOT_PRODUCTION` | [#49](../issue-49-source-policy-integration.md)、[#48](../issue-48-official-document-replay.md)、[#23](../issue-23-handoff-flow.md)及 self-check；不是正式多人簽核或機關採用。 |
-| PublicEvent 融合 | `IMPLEMENTED_NOT_PRODUCTION` | [JSON](../../../apps/web/public/data/public-event-demo.json)明示 `FIXTURE_ONLY`；三份測試文件與衝突不是真實即時事件或準確率。 |
-| 四類首期候選 S-001／S-032／S-033／S-031 | `CANDIDATE_CANARY` | [獨立觀察 workflow](../../../.github/workflows/candidate-source-observation.yml)、[窗口驗證器](../../../scripts/verify-candidate-observation-window.py)；七個有效觀察日也不能自動取代權利、完整性、敏感內容與 promotion review。 |
-| S-019、其他 reference／Twinkle／Taiwan Intel 擴充 | `CANDIDATE_CANARY`／`DESIGN_ONLY` | S-019 不是 v6 首期四類；本地 workflow 已補入 S-019，窗口驗證器對 promotion-plan 五來源都 fail closed，但尚未取得七日自然觀察／核准啟用。Twinkle 兩個既有連線需重新認證；媒體 live／十四日 shadow 尚未驗收。 |
-| D1 固定人口／戶數背景查詢 | `IMPLEMENTED_NOT_PRODUCTION` | [官方 112Y12M 樣本](segis-112Y12M-taichung.verified.json)已核對 368 國內記錄，涵蓋臺中 29 區；`/public-query/` 提供固定期別選單、人口／戶數／代碼、來源與 hash。`production_active=false`；不是現況人口，真人用途效益未測。 |
-| D2 警察機關查詢、語意 AI | `DESIGN_ONLY` | [D2 receipt](background-source-observations-2026-10-05.json)：dataset 5958 metadata 200，但官方 ZIP／native TGOS 403，列數與 CRS 未驗證。deterministic keyword／fixture 不能冒充語意模型與 AI 增益。 |
-| 真人試用、A／B／C 效益、採用 | `DESIGN_ONLY` | 結果 `NOT_RUN`／null；約 20 事件／60 文件、3–5 位使用者與 85%／90%／30% 都是規劃。 |
-| #20 完整排程／failure-recovery 驗收 | `BLOCKED` | [Issue #20](https://github.com/Reese-max/taichung-police-intel/issues/20)的未完成條件須逐項留證；不能把整條已成功發布流程繼續稱為未合併，也不能用單次成功取代全部 failure drill。 |
+| Pages／Worker／metadata 查詢 | 已發布、受限拒答通過 | [query receipt](closure-20261006/production-query.json)：release／hash 綁定，正式准入 `UNKNOWN`；不回傳未核准內容，也不把空結果稱為世界沒有事件。 |
+| 公開查詢／來源狀態 | 已發布並驗收受限流程 | [browser receipt](closure-20261006/production-browser.json)：可見條件、五來源狀態、修訂／未知日期、LKG 與取得失敗。正式正值結果及原文閉環仍待 [#161](https://github.com/Reese-max/taichung-police-intel/issues/161)。 |
+| 同瀏覽器條件追蹤 | 保存、修改、刷新、取消、清除通過 | 真實正式頁面操作；來源不足時 `baseline_complete=false`，沒有真實官方新版本／明文解除的完整成功情境。不含關站推播、跨裝置帳號或真人成效。 |
+| 合成道路 v1→v2→v3 | 可離線重播 | [必要 CI 樹綁定](closure-20261006/ci-tree-binding.json)：有限合成 UI 22 項、loopback runtime 28 項；結束日延長、時段不變、已讀、取消與明文解除不是正式即時公告。 |
+| 研究／文件／摘要 | 已發布、provider 停用 | 正式 browser 核對 `RIGHTS_BLOCKED`、`provider_transmission_attempted=false`；未送未准入資料給模型。文件及 synthesis 的正值能力仍需權利與正式原件驗收。 |
+| D1 歷史人口／戶數背景 | 固定樣本取得、正式 UI 值通過 | 112Y12M／2023-12、全國 368 記錄／臺中 29 區；西屯 235,441 人／94,971 戶。不是目前人口、人潮、管轄或 AI 效益；來源 promotion／真人理解另驗。 |
+| D2 警察機關名錄 | 原始資源受阻 | dataset 5958 metadata 可讀，原檔／native TGOS 403；資料列、列數、CRS 未核對。不得以中繼資料成功或 POINT_X/Y 字樣代替資料取得。 |
+| 四類候選來源 | 尚未 promotion | S-032／S-033 各 7 有效日；S-031 只有 1 有效日；S-001 為 0。日數不替代權利、獨立完整性與欄位核對；S-019 不是 v6 首期四類。 |
+| 發布告警與恢復 | 真實 upload drill 通過 | [drill receipt](closure-20261006/alert-drill.json)：實際 artifact 失敗→成功，通知送達 #20 並核對 body hash。尚未驗真實 Pages／Worker deploy 失敗、source recovery 或真人閱讀。 |
+| 資料問題回報 | 正式入口已驗收 | 固定 GitHub 表單連結，不帶查詢／追蹤資料；使用者自行提交。維運接案人員、處理時限與完成更正案例仍未確認。 |
+| 語意 AI／真人比較 | 正式評測未執行 | 12 合成開發題調整 prompt 後 11/12→12/12 是診斷；沒有獨立保留集、真人 A/B/C、訪談或採用成果。 |
+| 工時、負荷、成本、作品權利 | 已補可核對清冊，仍待輸入 | [資源觀察](closure-20261006/resource-observation.json)、[依賴宣告授權](closure-20261006/dependency-license-inventory.json)、[新舊差異](OLD_VS_NEW.md)。沒有發票、尖峰負載、真實工時、作品權利人同意或官方創新比例認定。 |
 
-## 已有的日期化 production 證據
+## 來源與日期
 
-- [Run 37169331249](https://github.com/Reese-max/taichung-police-intel/actions/runs/37169331249)，2026-10-04 10:22 Asia/Taipei 開始，執行了實際蒐集，五個公開檔案 hash 與 Gateway 檢查通過。
-- 同日稍後的 [run 37212963039](https://github.com/Reese-max/taichung-police-intel/actions/runs/37212963039)也通過部署、五檔公開 bytes/hash 與 legacy Gateway 檢查。2026-10-05 01:13 Asia/Taipei 的匿名觀察對應 `CR-DEMO-20261004-EVENING-SCHEDULE`，`generated_at=2026-10-04T23:26:28+08:00`，publication hash 為 `1c9e8087121e513776dc1da0379af80615945f53dfaa68bb46641689de3471bd`。這些是各自 generation 的證據，不把較早快照寫成永遠的 latest。
-- 本輪已核對的來源缺口仍為 `PARTIAL`：S-007 陳舊、S-029 蒐集失敗。失敗與 LKG 不能解讀成零事件或來源解除。
-- 核准 active set 仍只有五個來源；沒有四類候選已啟用、全臺完整涵蓋或每日新增 100–200 筆的證據。
-- `publication-state` lifecycle 已在 main；[PUBLICATION_RECOVERY.md](PUBLICATION_RECOVERY.md)的 9 月「尚未 merge」記錄屬歷史根因，不是目前合併狀態。
-- [較早 production observation](production-observation-20261005.json)綁定 `562141e`：當時 release.json 404 與能力缺口是該時點的記錄。後續 PR #103 合併與以下正式 release 驗收不改寫這份歷史收據。
-- 2026-10-05 11:22 Asia/Taipei，[run 37257702283](https://github.com/Reese-max/taichung-police-intel/actions/runs/37257702283)完成 `31d93f5` Pages／Worker 發布；11:49–11:50 的匿名正式驗收通過 Gateway 7 項、公開五檔 hash 與瀏覽器 6 項。驗收包 `GovIntel-secret-and-production-acceptance-20261005-31d93f5.zip` 的 `acceptance-index.json` 綁定 code SHA、release `9392d0d17a59e6fe4157b7a7f19f2a74a7d5fc143bdea5c4c0078ea2cad5af86`、Worker version 與各 receipt。`data/release.json` 已可取得；Pages manifest 的 `BUILD_ONLY`、Worker 的 `RUNTIME_BOUND` 與匿名 verifier 的 `PRODUCTION` 是不同證據層，不能自行把 manifest 的空驗收欄位填成成功。
-- [run 37303622240](https://github.com/Reese-max/taichung-police-intel/actions/runs/37303622240)於 2026-10-05 19:54 Asia/Taipei 成功完成 `edb7148` 發布。此 run 的成功與較早 `31d93f5` 的完整瀏覽器 receipt 分開留證；不把早期 6 項操作改標為新 SHA 的瀏覽器驗收。
-- [本輪來源稽核](SOURCE_RELIABILITY_REVIEW_2026-10-05.md)與 [metadata-only 修復證據](../source-repair-evidence-2026-10-05.json)保留四種時間：擷取／檢查時鐘、API 記錄日期、文件修訂日、首次發布日。S-006 附件明示的修訂日期以 `document_revision_at`／`OFFICIAL_DOCUMENT_REVISION_DATE` 記錄，不能冒充 `published_at`，未取得證據仍未知。S-007 的 2026-05-28 至 2026-10-05 受限官方窗口回傳零筆，已觀察 API 頁面的舊記錄仍陳舊；不能捏造新文件或把零筆推成來源已更新。S-009 的受查 FrontList 記錄與相符 FrontDetail 未提供可核對發布日期，內容日期維持 `UNKNOWN`，擷取時鐘不得補成日期。這批修復尚待正式發布與回讀。
-- 2026-10-05 22:19 Asia/Taipei 的受限連線診斷中，S-029／S-019 研考會與 S-001 警察局入口仍回 HTTP 503，訊息為 upstream connection timeout；只證明本執行環境的當次連線失敗，不能由此斷定 GitHub runner 的 ConnectionError 根因。保留 FAILED／PARTIAL 與 LKG，來源恢復仍待外部連線成功及正式蒐集證據。
+核准 active 集合維持 S-004／S-006／S-007／S-009／S-029。`source-policy.approved.json` 的 legacy active 與逐用途權利准入是不同條件，不能以 active 名稱推論正式查詢權利。
 
-## 送件與外部確認
+[五檔回讀](closure-20261006/production-bytes.json)固定 `CR-DEMO-20261006-MORNING-MANUAL`：S-004 為 FRESH；S-006 有已核對附件修訂日 2026-09-01、首次發布日未知，VERY_STALE／PARTIAL；S-007 觀察到的官方 API 記錄截至 2026-05-27，STALE；S-009 首次發布日期未知、PARTIAL；S-029 CONNECTIONERROR、PARTIAL，保留 LKG。重新取得或檢查時間沒有被填成官方日期。Schema drift 仍 BLOCKED，沒有藉發布成功抹除來源缺口。
 
-v6 已完成；補件已於 2026-10-01 22:00 Asia/Taipei 寄出。10/5 主辦已確認收妥補件，但未接受提案更名；收件確認不等於代表資格或全部參賽條件已核准。原報名完整題名及封面／是否需重交指示仍待確認。報名題名、參賽編號、代表人與成員資格、資料使用「或／與」與 D1/D2 使用範圍的核對見 [registration-verification-20261006](registration-verification-20261006.md)。官方資格、團隊真實分工、權利與提交格式須由官方原件及私有紀錄核對。公開 repo 不收錄參賽者個資、收件人、信件識別碼、原始信件或私人附件。
+[候選七日窗口](../source-reviews/2026-10-06/candidate-window-actual.json)使用原始日期化 receipts；[待覆核 packet](../source-reviews/2026-10-06/README.md)已修復斷掉的證據引用並保留實際條款取得資料。`reviewer`／`decision` 仍未填，沒有 Codex 代簽權利核准。沒有四類來源已正式啟用、全臺完整涵蓋或每日新增 100–200 筆的證據。
 
-## 更新規則
+## 參賽與剩餘 gate
 
-功能改為 `PRODUCTION_ACTIVE` 前，須綁定已合併 code SHA、部署產物、匿名 readback 與該功能的真實瀏覽器／runtime 操作。本地驗收通過只可提升本地驗收狀態；資料、模型、真人與主辦結果各自留證，不能互相代替。未完成項目見 [ACCEPTANCE_CHECKLIST.md](ACCEPTANCE_CHECKLIST.md)；37 張舊 PR 的逐 head 判定與整合目標見 [PR 收斂紀錄](../pr-convergence-2026-10-05.md)。
+v6 是 2026-10-01 的原始 10 頁 A4 送件版本，保留原件；本頁不改寫當日承諾，也不自行重交。10/5 的補件收妥確認與「更名未接受」已由 [PR #168](https://github.com/Reese-max/taichung-police-intel/pull/168)統一；它不代表代表資格、資料「或／與」要求或作品權利已核准。
+
+行政核對見 [registration-verification](registration-verification-20261006.md)；實作逐頁對照見 [PROPOSAL_MAPPING](PROPOSAL_MAPPING.md)；完成與未完成條件見 [ACCEPTANCE_CHECKLIST](ACCEPTANCE_CHECKLIST.md)及 [總清單 #62](https://github.com/Reese-max/taichung-police-intel/issues/62)。歷史 receipt 保留在 [VERIFICATION](VERIFICATION.md)，不以新 SHA 重標舊驗收。
+
+## 10/6 晚間新觀察
+
+[晚間手動蒐集](closure-20261006/evening-collection.json)的 S-029 已恢復可讀與 PASS，但官方 7/24 日期仍 STALE，其他日期缺口不變。Pages 五檔 hash 通過；初次 Gateway 檢查 503 令該 run failure，稍後完整匿名 verifier 已通過並另留 receipt。S-019 只有本次 contract probe 可讀，不自動成為七日資格；S-001 仍令 schema drift BLOCKED。上方晨間收據保留，正式 browser 15 項不改標為新的晚間 generation。
+
+10/6 22:06 Asia/Taipei 的[新一輪真實 canary](closure-20261006/current-candidate-observation.json)已獨立留證：S-019 有第一個有效當地日；S-031 仍只有同一天的 1 日，重跑不增加日數。S-032／33 仍需權利及獨立完整性，S-001 失敗；全部未 promotion。較早七日窗口及其失敗不改寫，S-019 至少還需六個未來實際有效日。

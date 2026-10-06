@@ -1,17 +1,17 @@
-# GovIntel AI－既有基礎與 v6 新增範圍
+# GovIntel AI－既有作品與本次新增範圍
 
-新增方向不等於已部署；主辦創新／資格認定另待官方確認。
+固定既有基準：2026-09-30 `562141e396c693e115b3fce10594c434c401a58e`；新增工程基準：已合併、發布及匿名驗收的 `5e2298c8db12ec2631dbd8dac11c14599133dcc6`。完整 [檔案差異](closure-20261006/old-new-file-delta.json)可回查；檔案／行數不是官方創新比例，曾否獲獎及必要權利人同意仍待確認。
 
-| 項目 | 既有／歷史基礎 | v6 首期與目前邊界 |
+| 項目 | 既有基準 | 本次新增及驗收邊界 |
 |---|---|---|
-| 名稱／使用者 | Taichung Police Public Intelligence，議會備詢／交班技術方向 | GovIntel AI－公共資訊查詢與個人化追蹤平台；民眾及公開資訊研究／業務人員。 |
-| 主流程 | priority brief、health／gap、官方影音導航 | query→保存地區／議題／路段條件→重開站查看更新；query／tracking candidate 待驗收與部署。 |
-| 來源 | 五個核准議會／市政來源與 S-010 影音 | 首期四類 S-001／S-032／S-033／S-031 仍未 promotion；S-019 不是首期四類；同源市政與轉載不重複算佐證。 |
-| 版本 | identity、hash、LKG、source status 與異動核心 | 未讀重要更正、純排版去重、明文解除、取消條件；合成道路 v1/v2/v3 與真實 sample 分開。 |
-| 追蹤 | local-first handoff／ReviewInbox | 同一瀏覽器條件與已讀，開站／刷新比對；無關站 push 或跨裝置帳號。handoff／研究匯出列後續。 |
-| AI | fixture／規則與 locatedfacts／fusion 核心 | 語意查詢／抽取／修訂規劃；keyword 與 deterministic replay 不是 model 結果，尚缺 AI 驗收。 |
-| 背景 | 候選人口／法規／統計／機關清冊 | D1 112Y12M 官方 CSV 已核對／本地臺中 29 區背景選單已實作，未 promotion；D2 dataset5958 metadata 可取得但 resource 403，CRS 未驗證。不能推現況人流或管轄。 |
-| 評測 | 舊 A/B0/B/C 技術計畫與工程 receipts | v6 A 官方人工、B 同 scope 搜尋摘要、C 產品、同介面 semantic-off；真人與模型執行仍 NOT_RUN，fixture policy 另外報。 |
-| 發布 | 歷史 protected-main 推送失敗 | publication-state 已合併；Oct4 collection／五檔 hash／Gateway 通過，但 PARTIAL 資料、來源 promotion 與#20 剩餘 failure/recovery 另驗。 |
+| 使用者與入口 | 議會資訊、brief、health／gap 與官方影音導覽 | 民眾公開查詢與同瀏覽器條件追蹤頁已發布。正式資料權利尚未准入，受限拒答與正值成功分開。 |
+| 查詢 | metadata／Gateway、版本及 evidence 技術基礎 | 可見地區、議題、路段、期間；日期／來源缺口與原文依據。正式核准原文成功路徑仍待 #161。 |
+| 追蹤 | local-first handoff／Review Inbox | 保存、修改、重載、取消、清除通過正式 browser；合成延長、已讀與解除另有 22 項 CI UI。沒有背景推播／跨裝置或真人跨日成果。 |
+| 研究與 AI | locatedfacts／規則、融合技術與 fixture | `/research/`、文件與 synthesis 路徑及聊天工具已合併；正式 provider 停用且在傳輸前 `RIGHTS_BLOCKED`。免費模型的 12 題合成診斷不能當正式增益。 |
+| 背景資料 | 人口、法規、統計與機關清冊候選 | D1 固定 112Y12M 已取得，臺中 29 區及正式 UI 值通過；D2 原檔 403／CRS 未驗。沒有背景效益或管轄驗收。 |
+| 來源 | 五個 legacy active 與影音導覽 | 四類候選維持未 promotion；交通／市政 7 有效日、消防 1 日、警政 0 日。完整性與人員權利覆核另驗。 |
+| 發布與恢復 | protected-main 阻擋及早期失敗告警缺口 | publication-state 生命週期、匿名五檔 hash、Pages／Worker 綁定已正式運作；真實隔離 artifact 失敗／恢復通知送達 #20。實際 deploy 失敗／raw purge 仍待驗。 |
+| 使用者回報 | 沒有此次資料更正入口 | 靜態資料問題表單入口已發布，不自動附帶私人條件。尚缺接案人員、處理時限與真實更正案例。 |
+| 評測 | 既有技術評測與合成 fixtures | 同 cutoff、事件切分、A/B/C 與 semantic-off 協定、可重播工具；20 事件／60 原件與真人比較仍未跑。 |
 
-舊 Kirodeadline、credits 與 2:43 影片位於[Historical](../historical/README.md)。查看[CURRENT_STATUS](CURRENT_STATUS.md)與[v6 對照](PROPOSAL_MAPPING.md)，避免把歷史 receipt、OpenPR 或 synthetic 示例寫成現在公開功能或實測效益。
+[驗收包](closure-20261006/README.md)固定程式樹、資料、policy、CI、正式 browser 及告警收據；[依賴授權清單](closure-20261006/dependency-license-inventory.json)僅記已觀察的宣告授權，不自行授權無 LICENSE 的作品。舊競賽 deadline、Kiro credits 與舊影片保留在 [Historical](../historical/README.md)，不當目前功能或本次已核准資格。

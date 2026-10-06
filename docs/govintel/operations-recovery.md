@@ -44,3 +44,9 @@ Python retention compiler 將非空 `source_reviews` 納入 hash，空 map／不
 正式公開查詢頁連到 repository 的「公開資料問題與更正」表單，僅固定 template URL；不夾帶查詢、追蹤、原始使用者問題或瀏覽器儲存。提交前由使用者檢查公開內容並自行送出，需 GitHub 登入。
 
 待維護角色確認後，依原文／時間／版本回查，將錯誤分類到來源、日期、投影或權利；修復透過 PR 與驗證，附新版本與匿名回讀連結回覆原 issue。未知日期與來源消失不自行推定取消；涉及內容權利或個資時依 #39 處置。表單及處置流程已備妥，不宣稱實際維護工時或值班人力已承諾。
+
+## 2026-10-06 真實驗收與 ACK 重跑
+
+[隔離 drill](competition-2026/closure-20261006/alert-drill.json)確有實際 upload failure→success、#20 送達與 API hash 回讀；真人閱讀仍未知。[晚間正常 workflow](competition-2026/closure-20261006/evening-collection.json)已保存實際 Query Gateway 503 故障與告警，以及其後綁定一致的匿名回讀。這不是受控 Pages/Worker deploy 拒絕演練。
+
+下游 query 失敗發生在資料已 ACK 後時，deploy job 重跑可以重新驗相同公開 bytes；只容許原 pending commit 的直接 ACK child，且只有 checkpoint manifest 改變。其他 generation、producer、metadata、state 路徑或並行推進仍拒絕；HTTP 舊 bytes／hash 不符也拒絕。verifier 三次完整檢查間隔 20 秒，各次失敗保留，不放寬任何 release/hash/admission 條件。

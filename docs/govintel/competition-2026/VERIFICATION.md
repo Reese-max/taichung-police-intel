@@ -1,5 +1,15 @@
 # GovIntel AI－驗證紀錄與未完成閘門
 
+## 2026-10-06 最新日期化驗收
+
+固定版本 `5e2298c8db12ec2631dbd8dac11c14599133dcc6` 已由 [run 37472606240](https://github.com/Reese-max/taichung-police-intel/actions/runs/37472606240)發布；[本輪證據包](closure-20261006/README.md)保存必要 CI exact tree、匿名五檔 bytes/hash、Gateway release/refusal、15 項正式 browser，以及真實隔離 artifact 失敗→恢復與 #20 通知送達／API body hash 回讀。`deployment_verified=true`、正式 `production_verified=false`／`RIGHTS_BLOCKED`；來源仍 PARTIAL，schema drift BLOCKED。
+
+PR #169 的 CI merge SHA 為 `e4ecedcd519e9180890b2720e7fb82b1c5d11fa1`；其樹與已合併 `5e2298c…` 同為 `acd7dff3f10d4059ff4430e1fdb3fedf742c83c5`。CI 的 loopback runtime 28 項、有限合成 UI 22 項、research mocks 10 項各自通過，不能加成真人／模型成果。正式 browser 使用既有 session proxy；首次通用 synthetic driver 未設定 proxy，route.fetch 連線失敗，不將該次執行計成 PASS。其後原生正式站 driver 的 15 項實際操作另存新 receipt。
+
+補件已收妥、更名未被接受；代表資格、原報名題名、資料要求、人力／工時、權利覆核、正式模型／真人成效仍待確認。下方 2026-10-05、2026-09-16 記錄是當日歷史事實，不能把其「待合併／未部署／待回覆」文字當成現在狀態，亦不以新 SHA 改寫舊 receipts。
+
+10/6 晚間新增真實蒐集：[原始 run 故障、S-029 連線恢復及後續完整匿名回讀](closure-20261006/evening-collection.json)另存，沒有將晨間 browser 重標晚間 generation。ACK 重跑與 artifact-cache 重試窗口的新修復需在新 PR 的 exact tree／部署重新驗證。
+
 ## 2026-10-05 本地整合與來源查核
 
 部署基準仍為 `main@562141e`；本輪正式執行完整 gate／同 checkout runtime 的已提交、乾淨程式版本為 **`3a06754a2428023bf316d8cb180f239f9c3b971d`**。2026-10-05 01:47–01:48 Asia/Taipei 執行 loopback runtime；文件後續修訂不改寫這份 tested SHA。正式部署與其後匿名 readback 尚未完成，不能把 `BUILD_ONLY` release 當 production receipt。

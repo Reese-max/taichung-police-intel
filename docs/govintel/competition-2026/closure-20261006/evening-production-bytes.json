@@ -1,0 +1,152 @@
+{
+  "schema_version": 1,
+  "execution_scope": "ANONYMOUS_ACTUAL_PRODUCTION_READBACK",
+  "status": "PASS",
+  "observed_at": "2026-10-06T14:05:59.137660+00:00",
+  "public_base_url": "https://reese-max.github.io/taichung-police-intel",
+  "code_sha": "5e2298c8db12ec2631dbd8dac11c14599133dcc6",
+  "release_id": "0fe046f5899fe26847c36b58a492027955db84c1c65ac5df2a04c65043a64763",
+  "release_evidence_level": "BUILD_ONLY",
+  "checkpoint_commit": "536ec9cdcd1b5f79f6fc25dc11a2da69a4b0ef35",
+  "checkpoint_state": "PUBLISHED",
+  "checkpoint_generation": "6d449ff0b44f1f397c6e7a6efe2a9937ebabafcf8caa1a2bc1d0a730bf6c8d2c",
+  "checkpoint_producer_run_id": "37474304213",
+  "checkpoint_producer_attempt": "1",
+  "checkpoint_code_sha": "5e2298c8db12ec2631dbd8dac11c14599133dcc6",
+  "publication_generation": "CR-DEMO-20261006-EVENING-MANUAL",
+  "public_files": {
+    "source-status.json": {
+      "sha256": "a1b91194c812ed19bc9619b7b36fae83b09b153fde1c7a3111e01cc585777999",
+      "bytes": 15277,
+      "checkpoint_match": true
+    },
+    "intelligence-feed.json": {
+      "sha256": "94304a0919bbb7afed78739f50f87bdcb5df608ebb89b05204ec56fcbdb71584",
+      "bytes": 146775,
+      "checkpoint_match": true
+    },
+    "intelligence-summary.json": {
+      "sha256": "cb96fd47f73bf611dbea0f9a434092003466d6f6f701eff70cbc35649ab1182d",
+      "bytes": 6887,
+      "checkpoint_match": true
+    },
+    "feed-export.csv": {
+      "sha256": "2027e7cbbffe98a0ef94f7a558d29e21fc3129fd73d8fd4a3e4bf819fb830b58",
+      "bytes": 63567,
+      "checkpoint_match": true
+    },
+    "v2-daily-brief.json": {
+      "sha256": "65dda30db33e0b1fe12d84c084de9fe3b4c646fed9dd835f529b8d4da7889380",
+      "bytes": 16560,
+      "checkpoint_match": true
+    }
+  },
+  "sources": [
+    {
+      "source_id": "S-004",
+      "source_health": "PASS",
+      "freshness_status": "FRESH",
+      "window_completeness": "COMPLETE_WITH_ITEMS",
+      "data_as_of": "2026-10-02T00:00:00+08:00",
+      "data_as_of_basis": null,
+      "data_as_of_scope": null,
+      "error_code": null,
+      "last_checked_at": "2026-10-06T21:53:28+08:00",
+      "last_success_at": "2026-10-06T21:53:28+08:00",
+      "snapshot_item_count": 1,
+      "window_item_count": 1,
+      "result": "NO_NEW_ITEM"
+    },
+    {
+      "source_id": "S-006",
+      "source_health": "PASS",
+      "freshness_status": "VERY_STALE",
+      "window_completeness": "PARTIAL",
+      "data_as_of": "2026-09-01T00:00:00+08:00",
+      "data_as_of_basis": "OFFICIAL_DOCUMENT_REVISION_DATE",
+      "data_as_of_scope": "LATEST_EVIDENCED_DOCUMENT_VERSION",
+      "error_code": null,
+      "last_checked_at": "2026-10-06T21:53:36+08:00",
+      "last_success_at": "2026-10-06T21:53:36+08:00",
+      "snapshot_item_count": 7,
+      "window_item_count": 0,
+      "result": "PARTIAL"
+    },
+    {
+      "source_id": "S-007",
+      "source_health": "PASS",
+      "freshness_status": "STALE",
+      "window_completeness": "COMPLETE_ZERO",
+      "data_as_of": "2026-05-27T01:12:00+08:00",
+      "data_as_of_basis": "OFFICIAL_API_RECORD_DATE",
+      "data_as_of_scope": "OBSERVED_API_PAGE",
+      "error_code": null,
+      "last_checked_at": "2026-10-06T21:53:50+08:00",
+      "last_success_at": "2026-10-06T21:53:50+08:00",
+      "snapshot_item_count": 0,
+      "window_item_count": 0,
+      "result": "NO_NEW_ITEM"
+    },
+    {
+      "source_id": "S-009",
+      "source_health": "PASS",
+      "freshness_status": "NO_DATA",
+      "window_completeness": "PARTIAL",
+      "data_as_of": null,
+      "data_as_of_basis": null,
+      "data_as_of_scope": null,
+      "error_code": null,
+      "last_checked_at": "2026-10-06T21:53:51+08:00",
+      "last_success_at": "2026-10-06T21:53:51+08:00",
+      "snapshot_item_count": 108,
+      "window_item_count": 0,
+      "result": "PARTIAL"
+    },
+    {
+      "source_id": "S-029",
+      "source_health": "PASS",
+      "freshness_status": "STALE",
+      "window_completeness": "COMPLETE_ZERO",
+      "data_as_of": "2026-07-24T00:00:00+08:00",
+      "data_as_of_basis": null,
+      "data_as_of_scope": null,
+      "error_code": null,
+      "last_checked_at": "2026-10-06T21:53:58+08:00",
+      "last_success_at": "2026-10-06T21:53:58+08:00",
+      "snapshot_item_count": 19,
+      "window_item_count": 0,
+      "result": "NO_NEW_ITEM"
+    }
+  ],
+  "latest_collection_run": {
+    "collection_run_id": "CR-DEMO-20261006-EVENING-MANUAL",
+    "slot_date": "2026-10-06",
+    "slot": "EVENING",
+    "trigger": "MANUAL",
+    "scheduled_for": "2026-10-06T18:30:00+08:00",
+    "started_at": "2026-10-06T21:53:23+08:00",
+    "finished_at": "2026-10-06T21:54:19+08:00"
+  },
+  "official_revision_checks": {
+    "status": "PASS",
+    "s006_evidenced_revision_dates": [
+      "2026-08-20T00:00:00+08:00",
+      "2026-08-27T00:00:00+08:00",
+      "2026-09-01T00:00:00+08:00"
+    ],
+    "s006_official_pdf_hash_metadata_match": true,
+    "s006_first_publication_dates": "UNKNOWN",
+    "s006_unknown_revision_count": 4,
+    "s009_official_date": "UNKNOWN"
+  },
+  "schema_drift_overall": "BLOCKED",
+  "extra_artifact_hashes": {
+    "release.json": "58bc413b46d02be4b54f9f6b1ab9335da0cb35ce4cf69ac366f73dd08d6e71f0",
+    "source-policy.json": "6dacd9e41f85d59c31d430d24cf07478136943fa037503fc5987473ba23d8c0a",
+    "schema-drift.json": "d03605db91125083573f1e34fc60c91831f8ed8c3d5654c4718afbc1472b878a",
+    "population-112Y12M.json": "a5e23180d01fd6f1619d032878749d625be73717dc3195d74410b0d2208ba5eb",
+    "public-query-replay.json": "f7ba487e93ee7527755754491520cda2c5eec9af8951f7c5e2ada5bd8c9d2bce"
+  },
+  "population_period": "112Y12M",
+  "scope_limit": "Byte coherence and evidence-bound official revision/unknown dates only; separate Worker and browser receipts are required."
+}

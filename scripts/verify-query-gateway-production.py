@@ -18,6 +18,9 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 
 MAX_BYTES = 2 * 1024 * 1024
+# Worker artifact fetches cache for 30 seconds. Three attempts span 40 seconds
+# while preserving every release/hash/admission check and the failure receipt.
+RELEASE_BINDING_RETRY_DELAY_SECONDS = 20
 REQUIRED_CAPABILITIES = {
     "search_evidence",
     "get_current_brief",
@@ -554,6 +557,7 @@ def main() -> int:
     parser.add_argument("--expected-code-sha", default=os.environ.get("GITHUB_SHA"))
     args = parser.parse_args()
     last_error = None
+    attempts = []
     for attempt in range(3):
         try:
             receipt = verify(args.gateway_url, args.public_base_url, pages_deployment=args.pages_deployment,
@@ -561,6 +565,8 @@ def main() -> int:
             if not receipt["deployment_verified"]:
                 raise RuntimeError("production receipt requires Pages deployment, deployment time and expected code SHA")
             receipt["attempt"] = attempt + 1
+            attempts.append({"attempt": attempt + 1, "status": "PASS", "observed_at": datetime.now(timezone.utc).isoformat()})
+            receipt["verification_attempts"] = attempts
             if args.output:
                 args.output.parent.mkdir(parents=True, exist_ok=True)
                 args.output.write_text(json.dumps(receipt, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -572,14 +578,17 @@ def main() -> int:
             return 0
         except (OSError, RuntimeError, ValueError, TypeError, AttributeError, KeyError) as error:
             last_error = error
+            attempts.append({"attempt": attempt + 1, "status": "FAILED", "observed_at": datetime.now(timezone.utc).isoformat(),
+                             "error_type": type(error).__name__, "error": str(error)[:1024]})
             if attempt < 2:
-                time.sleep(5)
+                time.sleep(RELEASE_BINDING_RETRY_DELAY_SECONDS)
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps({
             "schema_version": 1, "kind": "GOVINTEL_PRODUCTION_QUERY_RECEIPT", "status": "FAILED",
             "deployment_verified": False, "production_verified": False, "query_readiness": "VERIFICATION_FAILED", "evidence_level": "VERIFICATION_FAILED",
             "failed_at": datetime.now(timezone.utc).isoformat(), "error": str(last_error),
+            "verification_attempts": attempts,
         }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"PRODUCTION_QUERY_RECEIPT_FAIL {last_error}")
     return 1

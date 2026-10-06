@@ -4,7 +4,7 @@
 
 ## 計時前固定展示範圍
 
-準備一份已驗收的乾淨 checkout、版本／lockfile、測試 receipt 與資料 cutoff。公開已部署 baseline 與 PR 候選本地畫面分開。若候選尚未通過，僅展示明示合成／offline 的資料與腳本，不用預錄或舊畫面冒充 live 功能。
+準備一份已驗收的乾淨 checkout、版本／lockfile、測試 receipt 與資料 cutoff。公開已部署受限流程與合成重播分開；固定基準及 receipt 見 [驗收包](closure-20261006/README.md)。若候選尚未通過，僅展示明示合成／offline 的資料與腳本，不用預錄或舊畫面冒充 live 功能。
 
 ```bash
 npm ci
@@ -20,11 +20,11 @@ npm --prefix apps/web run dev
 
 說明使用者想知道「測試路 A 到 B 路口的工程何時結束」，並希望下次開站看見工期是否延長。這是合成道路及公告，不代表真實道路安全或已取得的正式四類來源。
 
-讀[CURRENT_STATUS](CURRENT_STATUS.md)：核准 baseline 為五來源；v6 query／tracking／eval PR 已合併到 main，公開部署與真人成效仍待各自驗收。新功能演示若來自本地，螢幕先標版本與`SYNTHETIC`／`OFFLINE_REPLAY`。
+讀[CURRENT_STATUS](CURRENT_STATUS.md)：核准 baseline 為五來源；v6 query／tracking／eval PR 已合併到 main，受限正式部署已驗，正式權利准入與真人成效仍待驗收。新功能演示若來自本地，螢幕先標版本與`SYNTHETIC`／`OFFLINE_REPLAY`。
 
 ## 0:35–1:25 查詢與保存條件
 
-在已驗收的本地 candidate 開 `/public-query/`，查詢臺中、測試路 A–B 工程。v1 資料顯示 10 月 5–7 日、每日 9:00–17:00，開原文與資料時間。檢查查詢條件可見、缺值與來源限制可讀，不暗改地區／期間。
+在已驗收的固定 checkout 或正式頁面開 `/public-query/`，明確選擇合成重播模式後，查詢臺中、測試路 A–B 工程。v1 資料顯示 10 月 5–7 日、每日 9:00–17:00，開原文與資料時間。檢查查詢條件可見、缺值與來源限制可讀，不暗改地區／期間。
 
 開 `/tracking/` 保存地區、路段、工程關鍵字；條件可預覽／修改，已讀版本存同一瀏覽器，不要求住址、登入或敏感身分。首次資料列為初始清單，不叫「今日新增」。來源頁 `/sources/` 可核對已部署資料的時間與限制。
 

@@ -301,7 +301,20 @@ def acknowledge(repo, branch, expected_commit, expected_generation, base_url, *,
         raise RuntimeError("invalid expected commit")
     remote = fetch_state_branch(repo, branch)
     if remote != expected_commit:
-        raise RuntimeError("state advanced before acknowledgement")
+        # A downstream query check can fail after this exact bundle was ACKed.
+        # Permit only the direct ACK child; no later producer or data change is
+        # a retry of the same publication, even if its generation hash agrees.
+        parents = git(repo, "rev-list", "--parents", "-n", "1", remote).decode().split()
+        changed = git(repo, "diff", "--name-only", expected_commit, remote).decode().splitlines()
+        if parents != [remote, expected_commit] or changed != [MANIFEST]:
+            raise RuntimeError("state advanced before acknowledgement")
+        old_bundle, old_manifest, _ = read_checkpoint(repo, expected_commit)
+        new_bundle, new_manifest, _ = read_checkpoint(repo, remote)
+        immutable = lambda m: {k: v for k, v in m.items() if k not in {"state", "http_verification"}}
+        if (old_manifest is None or new_manifest is None or
+                old_manifest["state"] != "PENDING_PUBLICATION" or new_manifest["state"] != "PUBLISHED" or
+                old_bundle != new_bundle or immutable(old_manifest) != immutable(new_manifest)):
+            raise RuntimeError("state advanced before acknowledgement")
     bundle, manifest, _ = read_checkpoint(repo, remote)
     if manifest is None or generation(bundle) != expected_generation:
         raise RuntimeError("acknowledgement generation mismatch")

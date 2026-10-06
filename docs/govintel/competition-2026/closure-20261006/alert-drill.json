@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "status": "PASS",
+  "scope": "ISOLATED_ARTIFACT_UPLOAD_FAILURE_AND_RECOVERY",
+  "run_id": 37472690306,
+  "run_attempt": 1,
+  "code_sha": "5e2298c8db12ec2631dbd8dac11c14599133dcc6",
+  "artifact_id": 11416898864,
+  "artifact_zip_sha256": "7a92ffbf6400d8aaf7cd0e6fa9405e15ef68ad02b96b4492558df8d2b9332ecb",
+  "observed_upload_outcomes": [
+    "failure",
+    "success"
+  ],
+  "deliveries": [
+    {
+      "mode": "FAILURE",
+      "comment_id": 6017544708,
+      "url": "https://github.com/Reese-max/taichung-police-intel/issues/20#issuecomment-6017544708",
+      "body_sha256": "f1dece6808783d887303d12ecfda3672ac99eee3820ba6dbda8e0e6d4cfd8cb2",
+      "independent_api_readback": "PASS",
+      "human_acknowledged": null,
+      "created_at": "2026-10-06T13:40:49Z"
+    },
+    {
+      "mode": "RECOVERY",
+      "comment_id": 6017545556,
+      "url": "https://github.com/Reese-max/taichung-police-intel/issues/20#issuecomment-6017545556",
+      "body_sha256": "28f9b6fc0bd7bdf5ef93a4abf5971f5f66af7fe31039e1b01b272e2e48ad1c40",
+      "independent_api_readback": "PASS",
+      "human_acknowledged": null,
+      "created_at": "2026-10-06T13:40:52Z"
+    }
+  ],
+  "production_deploy_exercised": false,
+  "source_recovery_exercised": false,
+  "human_acknowledged": null
+}

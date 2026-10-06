@@ -1,0 +1,1272 @@
+{
+  "schema_version": 1,
+  "scope": "DECLARED_DEPENDENCY_LICENSE_INVENTORY_NOT_LEGAL_OR_OWNER_APPROVAL",
+  "observed_at": "2026-10-06T13:52:41.510741+00:00",
+  "code_sha": "5e2298c8db12ec2631dbd8dac11c14599133dcc6",
+  "lock_hashes": {
+    "package-lock.json": "ca1ee8307e524a281937c287ce21ab0b70f98501e5eb561b7403de44d935286f",
+    "apps/web/package-lock.json": "c3cb89ac0c2cf1db85a534389393b143bf0ed2a3c2a483f0c8856e41eb8bef5f",
+    "requirements.txt": "3a1805e2744bd714d93ce26a3e9680f7b034146f6a025b548c58c3caff9e34cb"
+  },
+  "dependencies": [
+    {
+      "ecosystem": "npm",
+      "name": "playwright-core",
+      "version_pinned": "1.63.0",
+      "lock_file": "package-lock.json",
+      "lock_entry": "node_modules/playwright-core",
+      "declared_license": "Apache-2.0",
+      "license_basis": "INSTALLED_MANIFEST",
+      "optional": false,
+      "installed_version_observed": "1.63.0",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "node_modules/playwright-core/LICENSE",
+          "sha256": "45873d00a0dd243596deb4aa23b2493b3d1f0671921bf2538ea431d7380220eb",
+          "bytes": 11601
+        },
+        {
+          "path": "node_modules/playwright-core/NOTICE",
+          "sha256": "6d602191187b35b9b01d2cffa01c8469c2c8d9de8a96f1bf868e0f264f51c81d",
+          "bytes": 254
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@emnapi/runtime",
+      "version_pinned": "1.11.3",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/@emnapi/runtime",
+      "declared_license": "MIT",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": "1.11.3",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "apps/web/node_modules/@emnapi/runtime/LICENSE",
+          "sha256": "2088f55c6731498410b20c95ebd345ed4a4a800bf74c0fba4d282fd2a021daaa",
+          "bytes": 1076
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@img/colour",
+      "version_pinned": "1.1.0",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/@img/colour",
+      "declared_license": "MIT",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": "1.1.0",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "apps/web/node_modules/@img/colour/LICENSE.md",
+          "sha256": "e2eaa4603c14cb26f301e88648c12a853fa3f0f5da6d4b0972958c666e7f2ab8",
+          "bytes": 4433
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@img/sharp-darwin-arm64",
+      "version_pinned": "0.35.4",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/@img/sharp-darwin-arm64",
+      "declared_license": "Apache-2.0",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": null,
+      "installed_pin_match": null,
+      "license_files_observed": []
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@img/sharp-darwin-x64",
+      "version_pinned": "0.35.4",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/@img/sharp-darwin-x64",
+      "declared_license": "Apache-2.0",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": null,
+      "installed_pin_match": null,
+      "license_files_observed": []
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@img/sharp-freebsd-wasm32",
+      "version_pinned": "0.35.4",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/@img/sharp-freebsd-wasm32",
+      "declared_license": "Apache-2.0",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": null,
+      "installed_pin_match": null,
+      "license_files_observed": []
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@img/sharp-libvips-darwin-arm64",
+      "version_pinned": "1.3.3",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/@img/sharp-libvips-darwin-arm64",
+      "declared_license": "LGPL-3.0-or-later",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": null,
+      "installed_pin_match": null,
+      "license_files_observed": []
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@img/sharp-libvips-darwin-x64",
+      "version_pinned": "1.3.3",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/@img/sharp-libvips-darwin-x64",
+      "declared_license": "LGPL-3.0-or-later",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": null,
+      "installed_pin_match": null,
+      "license_files_observed": []
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@img/sharp-libvips-linux-arm",
+      "version_pinned": "1.3.3",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/@img/sharp-libvips-linux-arm",
+      "declared_license": "LGPL-3.0-or-later",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": null,
+      "installed_pin_match": null,
+      "license_files_observed": []
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@img/sharp-libvips-linux-arm64",
+      "version_pinned": "1.3.3",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/@img/sharp-libvips-linux-arm64",
+      "declared_license": "LGPL-3.0-or-later",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": null,
+      "installed_pin_match": null,
+      "license_files_observed": []
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@img/sharp-libvips-linux-ppc64",
+      "version_pinned": "1.3.3",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/@img/sharp-libvips-linux-ppc64",
+      "declared_license": "LGPL-3.0-or-later",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": null,
+      "installed_pin_match": null,
+      "license_files_observed": []
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@img/sharp-libvips-linux-riscv64",
+      "version_pinned": "1.3.3",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/@img/sharp-libvips-linux-riscv64",
+      "declared_license": "LGPL-3.0-or-later",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": null,
+      "installed_pin_match": null,
+      "license_files_observed": []
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@img/sharp-libvips-linux-s390x",
+      "version_pinned": "1.3.3",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/@img/sharp-libvips-linux-s390x",
+      "declared_license": "LGPL-3.0-or-later",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": null,
+      "installed_pin_match": null,
+      "license_files_observed": []
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@img/sharp-libvips-linux-x64",
+      "version_pinned": "1.3.3",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/@img/sharp-libvips-linux-x64",
+      "declared_license": "LGPL-3.0-or-later",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": "1.3.3",
+      "installed_pin_match": true,
+      "license_files_observed": []
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@img/sharp-libvips-linuxmusl-arm64",
+      "version_pinned": "1.3.3",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/@img/sharp-libvips-linuxmusl-arm64",
+      "declared_license": "LGPL-3.0-or-later",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": null,
+      "installed_pin_match": null,
+      "license_files_observed": []
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@img/sharp-libvips-linuxmusl-x64",
+      "version_pinned": "1.3.3",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/@img/sharp-libvips-linuxmusl-x64",
+      "declared_license": "LGPL-3.0-or-later",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": null,
+      "installed_pin_match": null,
+      "license_files_observed": []
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@img/sharp-linux-arm",
+      "version_pinned": "0.35.4",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/@img/sharp-linux-arm",
+      "declared_license": "Apache-2.0",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": null,
+      "installed_pin_match": null,
+      "license_files_observed": []
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@img/sharp-linux-arm64",
+      "version_pinned": "0.35.4",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/@img/sharp-linux-arm64",
+      "declared_license": "Apache-2.0",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": null,
+      "installed_pin_match": null,
+      "license_files_observed": []
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@img/sharp-linux-ppc64",
+      "version_pinned": "0.35.4",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/@img/sharp-linux-ppc64",
+      "declared_license": "Apache-2.0",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": null,
+      "installed_pin_match": null,
+      "license_files_observed": []
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@img/sharp-linux-riscv64",
+      "version_pinned": "0.35.4",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/@img/sharp-linux-riscv64",
+      "declared_license": "Apache-2.0",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": null,
+      "installed_pin_match": null,
+      "license_files_observed": []
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@img/sharp-linux-s390x",
+      "version_pinned": "0.35.4",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/@img/sharp-linux-s390x",
+      "declared_license": "Apache-2.0",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": null,
+      "installed_pin_match": null,
+      "license_files_observed": []
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@img/sharp-linux-x64",
+      "version_pinned": "0.35.4",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/@img/sharp-linux-x64",
+      "declared_license": "Apache-2.0",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": "0.35.4",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "apps/web/node_modules/@img/sharp-linux-x64/LICENSE",
+          "sha256": "73ba74dfaa520b49a401b5d21459a8523a146f3b7518a833eea5efa85130bf68",
+          "bytes": 10273
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@img/sharp-linuxmusl-arm64",
+      "version_pinned": "0.35.4",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/@img/sharp-linuxmusl-arm64",
+      "declared_license": "Apache-2.0",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": null,
+      "installed_pin_match": null,
+      "license_files_observed": []
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@img/sharp-linuxmusl-x64",
+      "version_pinned": "0.35.4",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/@img/sharp-linuxmusl-x64",
+      "declared_license": "Apache-2.0",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": null,
+      "installed_pin_match": null,
+      "license_files_observed": []
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@img/sharp-wasm32",
+      "version_pinned": "0.35.4",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/@img/sharp-wasm32",
+      "declared_license": "Apache-2.0 AND LGPL-3.0-or-later AND MIT",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": "0.35.4",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "apps/web/node_modules/@img/sharp-wasm32/LICENSE",
+          "sha256": "73ba74dfaa520b49a401b5d21459a8523a146f3b7518a833eea5efa85130bf68",
+          "bytes": 10273
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@img/sharp-webcontainers-wasm32",
+      "version_pinned": "0.35.4",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/@img/sharp-webcontainers-wasm32",
+      "declared_license": "Apache-2.0",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": null,
+      "installed_pin_match": null,
+      "license_files_observed": []
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@img/sharp-win32-arm64",
+      "version_pinned": "0.35.4",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/@img/sharp-win32-arm64",
+      "declared_license": "Apache-2.0 AND LGPL-3.0-or-later",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": null,
+      "installed_pin_match": null,
+      "license_files_observed": []
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@img/sharp-win32-ia32",
+      "version_pinned": "0.35.4",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/@img/sharp-win32-ia32",
+      "declared_license": "Apache-2.0 AND LGPL-3.0-or-later",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": null,
+      "installed_pin_match": null,
+      "license_files_observed": []
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@img/sharp-win32-x64",
+      "version_pinned": "0.35.4",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/@img/sharp-win32-x64",
+      "declared_license": "Apache-2.0 AND LGPL-3.0-or-later",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": null,
+      "installed_pin_match": null,
+      "license_files_observed": []
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@next/env",
+      "version_pinned": "16.3.5",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/@next/env",
+      "declared_license": "MIT",
+      "license_basis": "LOCKFILE",
+      "optional": false,
+      "installed_version_observed": "16.3.5",
+      "installed_pin_match": true,
+      "license_files_observed": []
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@next/swc-darwin-arm64",
+      "version_pinned": "16.3.5",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/@next/swc-darwin-arm64",
+      "declared_license": "MIT",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": null,
+      "installed_pin_match": null,
+      "license_files_observed": []
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@next/swc-darwin-x64",
+      "version_pinned": "16.3.5",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/@next/swc-darwin-x64",
+      "declared_license": "MIT",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": null,
+      "installed_pin_match": null,
+      "license_files_observed": []
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@next/swc-linux-arm64-gnu",
+      "version_pinned": "16.3.5",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/@next/swc-linux-arm64-gnu",
+      "declared_license": "MIT",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": null,
+      "installed_pin_match": null,
+      "license_files_observed": []
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@next/swc-linux-arm64-musl",
+      "version_pinned": "16.3.5",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/@next/swc-linux-arm64-musl",
+      "declared_license": "MIT",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": null,
+      "installed_pin_match": null,
+      "license_files_observed": []
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@next/swc-linux-x64-gnu",
+      "version_pinned": "16.3.5",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/@next/swc-linux-x64-gnu",
+      "declared_license": "MIT",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": "16.3.5",
+      "installed_pin_match": true,
+      "license_files_observed": []
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@next/swc-linux-x64-musl",
+      "version_pinned": "16.3.5",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/@next/swc-linux-x64-musl",
+      "declared_license": "MIT",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": null,
+      "installed_pin_match": null,
+      "license_files_observed": []
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@next/swc-win32-arm64-msvc",
+      "version_pinned": "16.3.5",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/@next/swc-win32-arm64-msvc",
+      "declared_license": "MIT",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": null,
+      "installed_pin_match": null,
+      "license_files_observed": []
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@next/swc-win32-x64-msvc",
+      "version_pinned": "16.3.5",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/@next/swc-win32-x64-msvc",
+      "declared_license": "MIT",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": null,
+      "installed_pin_match": null,
+      "license_files_observed": []
+    },
+    {
+      "ecosystem": "npm",
+      "name": "@swc/helpers",
+      "version_pinned": "0.5.23",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/@swc/helpers",
+      "declared_license": "Apache-2.0",
+      "license_basis": "LOCKFILE",
+      "optional": false,
+      "installed_version_observed": "0.5.23",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "apps/web/node_modules/@swc/helpers/LICENSE",
+          "sha256": "d96eba1f1881334d50ffc144276dfa98e147a415e7c591ecdfcb81680361dc91",
+          "bytes": 10836
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "baseline-browser-mapping",
+      "version_pinned": "2.11.14",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/baseline-browser-mapping",
+      "declared_license": "Apache-2.0",
+      "license_basis": "LOCKFILE",
+      "optional": false,
+      "installed_version_observed": "2.11.14",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "apps/web/node_modules/baseline-browser-mapping/LICENSE.txt",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+          "bytes": 11357
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "caniuse-lite",
+      "version_pinned": "1.0.30001809",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/caniuse-lite",
+      "declared_license": "CC-BY-4.0",
+      "license_basis": "LOCKFILE",
+      "optional": false,
+      "installed_version_observed": "1.0.30001809",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "apps/web/node_modules/caniuse-lite/LICENSE",
+          "sha256": "fd3a263fe19ed8faa9068b43abaebafc02c77897b0c6fc09abc04bb592e5f16e",
+          "bytes": 18651
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "client-only",
+      "version_pinned": "0.0.1",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/client-only",
+      "declared_license": "MIT",
+      "license_basis": "LOCKFILE",
+      "optional": false,
+      "installed_version_observed": "0.0.1",
+      "installed_pin_match": true,
+      "license_files_observed": []
+    },
+    {
+      "ecosystem": "npm",
+      "name": "detect-libc",
+      "version_pinned": "2.1.2",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/detect-libc",
+      "declared_license": "Apache-2.0",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": "2.1.2",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "apps/web/node_modules/detect-libc/LICENSE",
+          "sha256": "b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1",
+          "bytes": 11357
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "hls.js",
+      "version_pinned": "1.7.0",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/hls.js",
+      "declared_license": "Apache-2.0",
+      "license_basis": "LOCKFILE",
+      "optional": false,
+      "installed_version_observed": "1.7.0",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "apps/web/node_modules/hls.js/LICENSE",
+          "sha256": "ca8773cf798c7ed997d4dd7c8e23c348699f8d5b7462636694cc14de6cda12db",
+          "bytes": 1338
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "nanoid",
+      "version_pinned": "3.3.18",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/nanoid",
+      "declared_license": "MIT",
+      "license_basis": "LOCKFILE",
+      "optional": false,
+      "installed_version_observed": "3.3.18",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "apps/web/node_modules/nanoid/LICENSE",
+          "sha256": "da4db1480d9beea3483a2eda5c53b22238d0827d57da162b48f122e04d2d9987",
+          "bytes": 1095
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "next",
+      "version_pinned": "16.3.5",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/next",
+      "declared_license": "MIT",
+      "license_basis": "LOCKFILE",
+      "optional": false,
+      "installed_version_observed": "16.3.5",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "apps/web/node_modules/next/license.md",
+          "sha256": "ee765244e2d59f5234d474f62e0766fa0c8b99af967fdd4c0cb8dcb0c76ea224",
+          "bytes": 1079
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "pg",
+      "version_pinned": "8.23.0",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/pg",
+      "declared_license": "MIT",
+      "license_basis": "LOCKFILE",
+      "optional": false,
+      "installed_version_observed": "8.23.0",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "apps/web/node_modules/pg/LICENSE",
+          "sha256": "192b8f5c96900f04a1271dec39688655d7416c1c6ea84a508e18b50d2b6751f3",
+          "bytes": 1077
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "pg-cloudflare",
+      "version_pinned": "1.4.0",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/pg-cloudflare",
+      "declared_license": "MIT",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": "1.4.0",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "apps/web/node_modules/pg-cloudflare/LICENSE",
+          "sha256": "192b8f5c96900f04a1271dec39688655d7416c1c6ea84a508e18b50d2b6751f3",
+          "bytes": 1077
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "pg-connection-string",
+      "version_pinned": "2.14.0",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/pg-connection-string",
+      "declared_license": "MIT",
+      "license_basis": "LOCKFILE",
+      "optional": false,
+      "installed_version_observed": "2.14.0",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "apps/web/node_modules/pg-connection-string/LICENSE",
+          "sha256": "2244b5486c4427001b6756a87b9a297d427c111dcc3ba64a097492a8979c23d0",
+          "bytes": 1082
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "pg-int8",
+      "version_pinned": "1.0.1",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/pg-int8",
+      "declared_license": "ISC",
+      "license_basis": "LOCKFILE",
+      "optional": false,
+      "installed_version_observed": "1.0.1",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "apps/web/node_modules/pg-int8/LICENSE",
+          "sha256": "4e8e87ccdfc7e4b47fd89015f78468aa53b6bf43ab6e6e12d43e8f55294911de",
+          "bytes": 750
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "pg-pool",
+      "version_pinned": "3.14.0",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/pg-pool",
+      "declared_license": "MIT",
+      "license_basis": "LOCKFILE",
+      "optional": false,
+      "installed_version_observed": "3.14.0",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "apps/web/node_modules/pg-pool/LICENSE",
+          "sha256": "4f15ee7fc2a72082859d7e0d12dfa4bcdd70b1c744ad3850d07780730ac08557",
+          "bytes": 1073
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "pg-protocol",
+      "version_pinned": "1.16.0",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/pg-protocol",
+      "declared_license": "MIT",
+      "license_basis": "LOCKFILE",
+      "optional": false,
+      "installed_version_observed": "1.16.0",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "apps/web/node_modules/pg-protocol/LICENSE",
+          "sha256": "192b8f5c96900f04a1271dec39688655d7416c1c6ea84a508e18b50d2b6751f3",
+          "bytes": 1077
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "pg-types",
+      "version_pinned": "2.2.0",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/pg-types",
+      "declared_license": "MIT",
+      "license_basis": "LOCKFILE",
+      "optional": false,
+      "installed_version_observed": "2.2.0",
+      "installed_pin_match": true,
+      "license_files_observed": []
+    },
+    {
+      "ecosystem": "npm",
+      "name": "pgpass",
+      "version_pinned": "1.0.5",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/pgpass",
+      "declared_license": "MIT",
+      "license_basis": "LOCKFILE",
+      "optional": false,
+      "installed_version_observed": "1.0.5",
+      "installed_pin_match": true,
+      "license_files_observed": []
+    },
+    {
+      "ecosystem": "npm",
+      "name": "picocolors",
+      "version_pinned": "1.1.1",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/picocolors",
+      "declared_license": "ISC",
+      "license_basis": "LOCKFILE",
+      "optional": false,
+      "installed_version_observed": "1.1.1",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "apps/web/node_modules/picocolors/LICENSE",
+          "sha256": "6582629e2979466878f6014313dcc2f3756c9616148682227ce3063dde310750",
+          "bytes": 787
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "postcss",
+      "version_pinned": "8.5.23",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/postcss",
+      "declared_license": "MIT",
+      "license_basis": "LOCKFILE",
+      "optional": false,
+      "installed_version_observed": "8.5.23",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "apps/web/node_modules/postcss/LICENSE",
+          "sha256": "5be1f3465bba68a626777f984878814aaf35e7ef8e9fd314d469bcf887050fb8",
+          "bytes": 1095
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "postgres-array",
+      "version_pinned": "2.0.0",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/postgres-array",
+      "declared_license": "MIT",
+      "license_basis": "LOCKFILE",
+      "optional": false,
+      "installed_version_observed": "2.0.0",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "apps/web/node_modules/postgres-array/license",
+          "sha256": "f057f36739d53d228a746de4440c1e0c644ecde06d6beab45337d39c9d12a393",
+          "bytes": 1111
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "postgres-bytea",
+      "version_pinned": "1.0.1",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/postgres-bytea",
+      "declared_license": "MIT",
+      "license_basis": "LOCKFILE",
+      "optional": false,
+      "installed_version_observed": "1.0.1",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "apps/web/node_modules/postgres-bytea/license",
+          "sha256": "f057f36739d53d228a746de4440c1e0c644ecde06d6beab45337d39c9d12a393",
+          "bytes": 1111
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "postgres-date",
+      "version_pinned": "1.0.7",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/postgres-date",
+      "declared_license": "MIT",
+      "license_basis": "LOCKFILE",
+      "optional": false,
+      "installed_version_observed": "1.0.7",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "apps/web/node_modules/postgres-date/license",
+          "sha256": "f057f36739d53d228a746de4440c1e0c644ecde06d6beab45337d39c9d12a393",
+          "bytes": 1111
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "postgres-interval",
+      "version_pinned": "1.2.0",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/postgres-interval",
+      "declared_license": "MIT",
+      "license_basis": "LOCKFILE",
+      "optional": false,
+      "installed_version_observed": "1.2.0",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "apps/web/node_modules/postgres-interval/license",
+          "sha256": "f057f36739d53d228a746de4440c1e0c644ecde06d6beab45337d39c9d12a393",
+          "bytes": 1111
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "react",
+      "version_pinned": "19.2.8",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/react",
+      "declared_license": "MIT",
+      "license_basis": "LOCKFILE",
+      "optional": false,
+      "installed_version_observed": "19.2.8",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "apps/web/node_modules/react/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
+          "bytes": 1088
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "react-dom",
+      "version_pinned": "19.2.8",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/react-dom",
+      "declared_license": "MIT",
+      "license_basis": "LOCKFILE",
+      "optional": false,
+      "installed_version_observed": "19.2.8",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "apps/web/node_modules/react-dom/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
+          "bytes": 1088
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "scheduler",
+      "version_pinned": "0.27.0",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/scheduler",
+      "declared_license": "MIT",
+      "license_basis": "LOCKFILE",
+      "optional": false,
+      "installed_version_observed": "0.27.0",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "apps/web/node_modules/scheduler/LICENSE",
+          "sha256": "da6d3703ed11cbe42bd212c725957c98da23cbff1998c05fa4b3d976d1a58e93",
+          "bytes": 1088
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "semver",
+      "version_pinned": "7.8.5",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/semver",
+      "declared_license": "ISC",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": "7.8.5",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "apps/web/node_modules/semver/LICENSE",
+          "sha256": "4ec3d4c66cd87f5c8d8ad911b10f99bf27cb00cdfcff82621956e379186b016b",
+          "bytes": 765
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "sharp",
+      "version_pinned": "0.35.4",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/sharp",
+      "declared_license": "Apache-2.0",
+      "license_basis": "LOCKFILE",
+      "optional": true,
+      "installed_version_observed": "0.35.4",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "apps/web/node_modules/sharp/LICENSE",
+          "sha256": "73ba74dfaa520b49a401b5d21459a8523a146f3b7518a833eea5efa85130bf68",
+          "bytes": 10273
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "source-map-js",
+      "version_pinned": "1.2.1",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/source-map-js",
+      "declared_license": "BSD-3-Clause",
+      "license_basis": "LOCKFILE",
+      "optional": false,
+      "installed_version_observed": "1.2.1",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "apps/web/node_modules/source-map-js/LICENSE",
+          "sha256": "6cb0631f71c7749763fd3dd1d5bee52dd1070ec17f2edc1710079ad070bd2fbd",
+          "bytes": 1526
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "split2",
+      "version_pinned": "4.2.0",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/split2",
+      "declared_license": "ISC",
+      "license_basis": "LOCKFILE",
+      "optional": false,
+      "installed_version_observed": "4.2.0",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "apps/web/node_modules/split2/LICENSE",
+          "sha256": "c372ef2fa1dfcb124ed807609751e75e3a009f108c5724916b489288fcb88a0c",
+          "bytes": 764
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "styled-jsx",
+      "version_pinned": "5.1.6",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/styled-jsx",
+      "declared_license": "MIT",
+      "license_basis": "LOCKFILE",
+      "optional": false,
+      "installed_version_observed": "5.1.6",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "apps/web/node_modules/styled-jsx/license.md",
+          "sha256": "24d4a4580df855c345705b3016404f0c9da7e7674dc3b21a3ce7d0e5d0c37e2d",
+          "bytes": 1077
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "tslib",
+      "version_pinned": "2.8.1",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/tslib",
+      "declared_license": "0BSD",
+      "license_basis": "LOCKFILE",
+      "optional": false,
+      "installed_version_observed": "2.8.1",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "apps/web/node_modules/tslib/LICENSE.txt",
+          "sha256": "210b19e543130388c68654b7497e967119ce17145f66ab7d85688fbd70f08751",
+          "bytes": 655
+        }
+      ]
+    },
+    {
+      "ecosystem": "npm",
+      "name": "xtend",
+      "version_pinned": "4.0.2",
+      "lock_file": "apps/web/package-lock.json",
+      "lock_entry": "node_modules/xtend",
+      "declared_license": "MIT",
+      "license_basis": "LOCKFILE",
+      "optional": false,
+      "installed_version_observed": "4.0.2",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "apps/web/node_modules/xtend/LICENSE",
+          "sha256": "82e67379203d5794e7c44549847d8d64ae6904591381682360470898bd306821",
+          "bytes": 1078
+        }
+      ]
+    },
+    {
+      "ecosystem": "python",
+      "name": "requests",
+      "version_pinned": "2.33.0",
+      "lock_file": "requirements.txt",
+      "declared_license": "Apache-2.0",
+      "license_basis": "INSTALLED_DISTRIBUTION_METADATA",
+      "installed_version_observed": "2.33.0",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "requests-2.33.0.dist-info/licenses/LICENSE",
+          "sha256": "09e8a9bcec8067104652c168685ab0931e7868f9c8284b66f5ae6edae5f1130b",
+          "bytes": 10142
+        },
+        {
+          "path": "requests-2.33.0.dist-info/licenses/NOTICE",
+          "sha256": "f5110972dedad2b4e9d314518daf3b7d72d6e02e499acd802181de6f74571dcc",
+          "bytes": 38
+        }
+      ]
+    },
+    {
+      "ecosystem": "python",
+      "name": "beautifulsoup4",
+      "version_pinned": "4.14.3",
+      "lock_file": "requirements.txt",
+      "declared_license": "MIT License",
+      "license_basis": "INSTALLED_DISTRIBUTION_METADATA",
+      "installed_version_observed": "4.14.3",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "beautifulsoup4-4.14.3.dist-info/licenses/LICENSE",
+          "sha256": "55b4d8d4b1e5bc86d10efac91b74c87bcb77526b0f5b9edaf8b9cd2adc7397b2",
+          "bytes": 1441
+        }
+      ]
+    },
+    {
+      "ecosystem": "python",
+      "name": "lxml",
+      "version_pinned": "6.1.2",
+      "lock_file": "requirements.txt",
+      "declared_license": "BSD-3-Clause",
+      "license_basis": "INSTALLED_DISTRIBUTION_METADATA",
+      "installed_version_observed": "6.1.2",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "lxml-6.1.2.dist-info/licenses/LICENSE.txt",
+          "sha256": "8fc2b568133516e46845d2147917adeee1648e70ae9ab5ed6c5417afef4ce855",
+          "bytes": 1507
+        },
+        {
+          "path": "lxml-6.1.2.dist-info/licenses/LICENSES.txt",
+          "sha256": "388fa99f3bde4447cd5a4cbb114037be026854db6cfe89e112691c1d8abdcf3c",
+          "bytes": 6221
+        }
+      ]
+    },
+    {
+      "ecosystem": "python",
+      "name": "jsonschema",
+      "version_pinned": "4.26.0",
+      "lock_file": "requirements.txt",
+      "declared_license": "MIT",
+      "license_basis": "INSTALLED_DISTRIBUTION_METADATA",
+      "installed_version_observed": "4.26.0",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "jsonschema-4.26.0.dist-info/licenses/COPYING",
+          "sha256": "4f92a015a13c4d1a040bef018aa13430b4f1bc73b41b16bb846c346766de7439",
+          "bytes": 1057
+        }
+      ]
+    },
+    {
+      "ecosystem": "python",
+      "name": "psycopg",
+      "version_pinned": "3.3.4",
+      "lock_file": "requirements.txt",
+      "declared_license": "LGPL-3.0-only",
+      "license_basis": "INSTALLED_DISTRIBUTION_METADATA",
+      "installed_version_observed": "3.3.4",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "psycopg-3.3.4.dist-info/licenses/LICENSE.txt",
+          "sha256": "e3a994d82e644b03a792a930f574002658412f62407f5fee083f2555c5f23118",
+          "bytes": 7652
+        }
+      ]
+    },
+    {
+      "ecosystem": "python",
+      "name": "pypdf",
+      "version_pinned": "6.19.0",
+      "lock_file": "requirements.txt",
+      "declared_license": "BSD-3-Clause",
+      "license_basis": "INSTALLED_DISTRIBUTION_METADATA",
+      "installed_version_observed": "6.19.0",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "pypdf-6.19.0.dist-info/licenses/LICENSE",
+          "sha256": "a97ac230e5f33ef10a5367a850eb01f91f1a0b064e34742c7794d2294557f524",
+          "bytes": 1605
+        }
+      ]
+    },
+    {
+      "ecosystem": "python",
+      "name": "psycopg-binary",
+      "version_pinned": "3.3.4",
+      "lock_file": "requirements.txt",
+      "declared_license": "LGPL-3.0-only",
+      "license_basis": "INSTALLED_DISTRIBUTION_METADATA",
+      "installed_version_observed": "3.3.4",
+      "installed_pin_match": true,
+      "license_files_observed": [
+        {
+          "path": "psycopg_binary-3.3.4.dist-info/licenses/LICENSE.txt",
+          "sha256": "e3a994d82e644b03a792a930f574002658412f62407f5fee083f2555c5f23118",
+          "bytes": 7652
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "npm_lock_entries": 70,
+    "python_direct_plus_binary_extra": 7,
+    "unknown_declared_license": 0,
+    "observed_pin_mismatches": 0
+  },
+  "project_license_file": "NOT_FOUND",
+  "owner_consent": "NOT_VERIFIED",
+  "award_history": "UNKNOWN",
+  "python_transitive_inventory": "NOT_IN_THIS_DIRECT_DEPENDENCY_SCOPE",
+  "shipping_third_party_notice": "NOT_VERIFIED"
+}

@@ -45,3 +45,7 @@ python3 -X utf8 scripts/verify-source-policy-integration.py --self-check
 原始同意書、participant 紀錄與個人追蹤保持私有；公開成果只放已核准的匿名彙總與合法 fixture。
 
 目前資料包是固定合成工程案例，不是已完成獨立事件保留集或實際模型品質研究。語意 AI／同介面消融與真人 A/B/C 必須實際執行後另留 receipt；D1 合法取得與 UI 可讀，不能代替使用者背景查詢耗時／限制理解的比較。
+
+## 2026-10-06 免費模型合成開發題診斷
+
+[原始紀錄](model-diagnostic-20261006/README.md)固定 MiMo-v2.6-flash-free、prompt、12 合成題、輸出及診斷 receipt。第一次可用 prompt 為 11/12，調整後在同一批開發題為 12/12；初次 free-tier 403 與工具 ASK 拒絕均保留，實際外部工具呼叫為 0。沒有獨立保留集、官方樣本語意成效、真人計時或服務總費用結果。正式 provider 維持停用／RIGHTS_BLOCKED，工程診斷不改寫本頁目標。

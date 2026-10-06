@@ -402,6 +402,66 @@ class PublicationStateBranchTests(unittest.TestCase):
         self.assertEqual(self.head(), before)
         self.assertEqual(self.checkpoint()[1]["state"], "PENDING_PUBLICATION")
 
+    def test_retry_of_exact_acknowledged_pending_commit_rechecks_real_http_without_new_commit(self):
+        self.save_pending()
+        bundle, marker = self.checkpoint()
+        pending = self.head()
+        base, directory = self.serve(bundle)
+        def verify(url, data):
+            return module.verify_public_files(url, data, attempts=1, allow_loopback=True)
+        module.acknowledge(self.work, "publication-state", pending, marker["generation_id"], base, verifier=verify)
+        published = self.head()
+        self.assertNotEqual(pending, published)
+        proof = module.acknowledge(self.work, "publication-state", pending, marker["generation_id"], base, verifier=verify)
+        self.assertEqual(len(proof["verified_files"]), 5)
+        self.assertEqual(self.head(), published)
+        (directory / "data/v2-daily-brief.json").write_text("actual later HTTP mismatch")
+        with self.assertRaisesRegex(RuntimeError, "verification failed"):
+            module.acknowledge(self.work, "publication-state", pending, marker["generation_id"], base, verifier=verify)
+        self.assertEqual(self.head(), published)
+
+    def test_acknowledgement_retry_rejects_later_generation_or_changed_producer(self):
+        self.save_pending()
+        bundle, marker = self.checkpoint()
+        pending = self.head()
+        base, _ = self.serve(bundle)
+        verify = lambda url, data: module.verify_public_files(url, data, attempts=1, allow_loopback=True)
+        module.acknowledge(self.work, "publication-state", pending, marker["generation_id"], base, verifier=verify)
+        module.restore(self.work, "publication-state")
+        self.write_bundle(self.work, "newer generation")
+        module.persist(self.work, "publication-state", "102", "1", "evening")
+        newer = self.head()
+        with mock.patch.object(module, "verify_public_files") as probe, self.assertRaisesRegex(RuntimeError, "advanced"):
+            module.acknowledge(self.work, "publication-state", pending, marker["generation_id"], base)
+        probe.assert_not_called()
+        self.assertEqual(self.head(), newer)
+
+    def test_acknowledgement_retry_rejects_a_published_child_with_changed_metadata(self):
+        self.save_pending()
+        bundle, marker = self.checkpoint()
+        pending = self.head()
+        proof = {"generation_id": marker["generation_id"], "verified_files": {p: module.digest(bundle[p]) for p in module.PUBLIC_PATHS}}
+        changed = {**marker, "state": "PUBLISHED", "http_verification": proof, "producer_run_id": "someone-else"}
+        child = module.commit_bundle(self.work, pending, {module.MANIFEST: module.encoded(changed)}, "altered producer fixture")
+        with mock.patch.object(module, "verify_public_files") as probe, self.assertRaisesRegex(RuntimeError, "advanced"):
+            module.acknowledge(self.work, "publication-state", pending, marker["generation_id"], "https://invalid")
+        probe.assert_not_called()
+        self.assertEqual(self.head(), child)
+
+    def test_acknowledgement_retry_rejects_unrelated_paths_in_the_direct_child(self):
+        self.save_pending()
+        bundle, marker = self.checkpoint()
+        pending = self.head()
+        proof = {"generation_id": marker["generation_id"], "verified_files": {p: module.digest(bundle[p]) for p in module.PUBLIC_PATHS}}
+        child = module.commit_bundle(self.work, pending, {
+            module.MANIFEST: module.encoded({**marker, "state": "PUBLISHED", "http_verification": proof}),
+            "unrelated-file.txt": b"different transaction",
+        }, "unrelated changes fixture")
+        with mock.patch.object(module, "verify_public_files") as probe, self.assertRaisesRegex(RuntimeError, "advanced"):
+            module.acknowledge(self.work, "publication-state", pending, marker["generation_id"], "https://invalid")
+        probe.assert_not_called()
+        self.assertEqual(self.head(), child)
+
     def test_public_probe_forbids_noncanonical_origin_and_loopback_by_default(self):
         bundle = module.read_working_bundle(self.work)
         for url in ("http://127.0.0.1:1", "https://evil.test", "https://reese-max.github.io/other",
