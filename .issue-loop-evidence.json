@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "status": "failed",
+  "repo": "Reese-max/taichung-police-intel",
+  "issue": 29,
+  "base_sha": "2c660cef6f1b1fbf86b141306e54d06e0511c9f9",
+  "created_at": "2026-10-06T05:11:59.498475Z",
+  "gates": {
+    "baseline": "pass",
+    "tdd": "pass",
+    "review": "fail"
+  },
+  "commands": [],
+  "candidate_sha": "eb53499854c92ddf170abc874978cb4fa55e9e77",
+  "changed_files": [
+    ".issue-loop-context.json",
+    ".issue-loop-evidence.json",
+    ".issue-loop-prompt.md",
+    ".issue-loop-red.json",
+    ".issue-loop-review.json",
+    "tests/test_chat_turn_worker.py",
+    "workers/query-gateway/src/index.js"
+  ],
+  "red_proof": {
+    "repo": "Reese-max/taichung-police-intel",
+    "issue": 29,
+    "base_sha": "2c660cef6f1b1fbf86b141306e54d06e0511c9f9",
+    "command": "python -X utf8 -c \"import sys; ws='workers/query-gateway/src/index.js'; source=open(ws).read(); allowed_start=source.find('const allowed = {'); allowed_section=source[allowed_start:source.find('}', allowed_start+1)]; print('RED' if 'chat_turn' not in allowed_section else 'GREEN'); sys.exit(1 if 'chat_turn' not in allowed_section else 0)\"",
+    "exit": 1
+  },
+  "review": null,
+  "failure_reason": "review_sha_mismatch"
+}
