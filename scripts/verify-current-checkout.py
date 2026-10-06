@@ -61,7 +61,7 @@ MAX_SABOTAGE_SECONDS = 300
 MCP_PROTOCOL_VERSION = "2025-06-18"
 EXPECTED_MCP_TOOLS = frozenset({
     "search_evidence", "get_current_brief", "get_publication_receipt",
-    "get_source_health", "validate_answer",
+    "get_source_health", "validate_answer", "chat_turn",
 })
 QUERY_INDEX_CHECK_IDS = frozenset({
     "served_store_consistency",

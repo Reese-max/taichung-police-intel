@@ -305,6 +305,10 @@ def sync_with_detail_rechecks(
         raise ValueError("detail rechecks must be an array")
     for raw_outcome in outcomes:
         outcome = _as_dict(raw_outcome)
+        if outcome.get("status") == "SKIPPED":
+            # A budget-refused recheck fetched nothing, so it cannot prove any
+            # stored claim stale.
+            continue
         classification = outcome.get("classification")
         if not isinstance(classification, dict):
             raise ValueError("detail recheck classification is required")
@@ -528,14 +532,81 @@ def find_handoff(state: dict[str, Any], brief_id: str | None = None) -> dict[str
     raise ValueError(f"unknown handoff ID: {brief_id}")
 
 
-def handoff_markdown(handoff: dict[str, Any]) -> str:
+def handoff_review_warnings(
+    state: dict[str, Any], handoff: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """List unreviewed official source changes that still affect one confirmed version.
+
+    The confirmed record is never rewritten; a warning is derived at export time so a
+    later source revision is visible without mutating the version the user confirmed.
+    """
+    claims = {
+        entry["claim_id"]: entry
+        for entry in handoff.get("items", [])
+        if isinstance(entry, dict)
+        and isinstance(entry.get("claim_id"), str)
+        and entry["claim_id"]
+    }
+    rows = []
+    for watch in state.get("watch_items", {}).values():
+        for invalidation in watch.get("invalidations", []):
+            if invalidation.get("resolved_in_handoff_id"):
+                continue
+            after = invalidation.get("after") or {}
+            for affected in invalidation.get("affected_claims", []):
+                if affected.get("brief_id") != handoff.get("brief_id"):
+                    continue
+                entry = claims.get(affected.get("claim_id"))
+                if entry is None and affected.get("claim_id") is None:
+                    continue
+                rows.append(
+                    {
+                        "warning": "NEEDS_REVIEW",
+                        "brief_id": handoff.get("brief_id"),
+                        "brief_version": handoff.get("brief_version"),
+                        "claim_id": affected.get("claim_id"),
+                        "watch_id": watch["watch_id"],
+                        "identity": watch["identity"],
+                        "invalidation_id": invalidation.get("invalidation_id"),
+                        "reason": invalidation.get("reason"),
+                        "detected_at": invalidation.get("detected_at"),
+                        "confirmed_source_version": (
+                            entry.get("source_version")
+                            if entry is not None
+                            else affected.get("source_version")
+                        ),
+                        "latest_source_version": after.get("version"),
+                        "latest_source_document_version": after.get("document_version_id"),
+                        "evidence_locator": (
+                            (entry.get("evidence") or {}).get("locator")
+                            if entry is not None
+                            else None
+                        )
+                        or affected.get("evidence_locator"),
+                    }
+                )
+    return sorted(
+        rows,
+        key=lambda row: (
+            row["brief_version"] or 0,
+            row["claim_id"] or "",
+            row["invalidation_id"] or "",
+        ),
+    )
+
+
+def handoff_markdown(
+    handoff: dict[str, Any], warnings: Iterable[dict[str, Any]] | None = None
+) -> str:
+    publication = handoff.get("publication") or {}
     lines = [
         f"# GovIntel AI 交班摘要 v{handoff['brief_version']}",
         "",
         f"- brief_id: `{handoff['brief_id']}`",
         f"- generated_at: `{handoff['generated_at']}`",
         f"- confirmed_at: `{handoff['confirmed_at']}`",
-        f"- collection_run_id: `{handoff.get('publication', {}).get('collection_run_id', 'UNKNOWN')}`",
+        f"- collection_run_id: `{publication.get('collection_run_id', 'UNKNOWN')}`",
+        f"- brief_sha256: `{publication.get('brief_sha256', 'UNKNOWN')}`",
         "",
         "## 追蹤項目",
         "",
@@ -554,4 +625,25 @@ def handoff_markdown(handoff: dict[str, Any]) -> str:
                 "",
             ]
         )
+    pending = list(warnings or [])
+    if pending:
+        lines.extend(["## 交班前提醒（來源更新，尚未重新確認）", ""])
+        for row in pending:
+            latest = row.get("latest_source_version")
+            document_version = row.get("latest_source_document_version")
+            if latest is not None:
+                latest_label = f"source v{latest}"
+            elif document_version:
+                latest_label = f"document version {document_version}"
+            else:
+                latest_label = "UNKNOWN"
+            lines.extend(
+                [
+                    f"- `{row['warning']}` `{row['claim_id']}`（{row['identity']}）：本版記載 "
+                    f"source v{row['confirmed_source_version']}，官方來源已更新至 {latest_label}"
+                    f"（{row.get('reason') or 'SOURCE_CHANGED'}），請核對後再建立新版本。",
+                    f"- locator: `{row.get('evidence_locator') or 'UNKNOWN'}`",
+                ]
+            )
+        lines.append("")
     return "\n".join(lines)

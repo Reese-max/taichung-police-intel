@@ -38,12 +38,17 @@ def self_check() -> None:
     feed = load_feed(str(ROOT / "tests/fixtures/discovery/dashboard-feed.v1.json"))
     documents = json.loads((ROOT / "tests/fixtures/discovery/official-matches.json").read_text(encoding="utf-8"))
     result = ingest_feed(feed, official_documents=documents, now=datetime(2026, 9, 21, tzinfo=timezone.utc))
-    assert result["receipt"]["relevant_count"] == 2
+    assert result["receipt"]["relevant_count"] == 3
     assert result["receipt"]["official_match_count"] == 2
-    assert result["receipt"]["new_public_event_count"] == 1
-    assert result["receipt"]["existing_event_match_count"] == 1
-    assert result["receipt"]["status"] == "PENDING_PUBLICATION"
-    print("DISCOVERY_ADAPTER_SELF_CHECK_OK relevant=2 official=2 new_event=1 existing=1 media_boundary=true")
+    assert result["receipt"]["official_provenance_candidate_count"] == 2
+    assert result["receipt"]["new_public_event_count"] == 0
+    assert result["receipt"]["existing_event_match_count"] == 0
+    assert result["receipt"]["canonical_change_count"] == 0
+    media = next(row for row in result["candidates"] if row["authority"] == "media")
+    assert media["verification_status"] == "DISCOVERY_UNVERIFIED"
+    assert media["official_match_status"] == "VERIFIED_OFFICIAL"
+    print("DISCOVERY_ADAPTER_SELF_CHECK_OK relevant=3 official_provenance_candidates=2 canonical_changes=0 media_unverified=true")
+
 
 
 def main() -> int:
@@ -54,6 +59,13 @@ def main() -> int:
     parser.add_argument("--state", type=Path)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--now")
+    parser.add_argument("--ttl-hours", type=int, default=72)
+    parser.add_argument("--max-candidates", type=int, default=50)
+    parser.add_argument("--max-retained-candidates", type=int, default=500)
+    parser.add_argument("--historical-replay", action="store_true",
+                        help="Allow historical verification for a PAUSED snapshot only")
+    parser.add_argument("--canary-mode", action="store_true",
+                        help="Evaluate matches without promotion for a RESTORING snapshot only")
     args = parser.parse_args()
     if args.command == "self-check":
         self_check()
@@ -64,7 +76,17 @@ def main() -> int:
     documents = json.loads(args.official_documents.read_text(encoding="utf-8")) if args.official_documents else []
     previous = json.loads(args.state.read_text(encoding="utf-8")) if args.state and args.state.exists() else None
     now = datetime.fromisoformat(args.now.replace("Z", "+00:00")) if args.now else datetime.now(timezone.utc)
-    result = ingest_feed(feed, previous_state=previous, official_documents=documents, now=now)
+    result = ingest_feed(
+        feed,
+        previous_state=previous,
+        official_documents=documents,
+        now=now,
+        ttl_hours=args.ttl_hours,
+        max_candidates=args.max_candidates,
+        max_retained_candidates=args.max_retained_candidates,
+        historical_replay=args.historical_replay,
+        canary_mode=args.canary_mode,
+    )
     write_json(args.output, result)
     print(f"DISCOVERY_ADAPTER_OK status={result['receipt']['status']} relevant={result['receipt']['relevant_count']} output={args.output}")
     return 0

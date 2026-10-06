@@ -37,16 +37,17 @@ class SourcePolicyReplayTests(unittest.TestCase):
             shutil.copy2(ROOT / relative, self.root / relative)
         self.sp = module_at("replay_policy", self.root / "scripts/source-policy.py")
         self.qs = module_at("replay_store", self.root / "scripts/query-store.py")
-        self.old_policy = self.sp.load_current_policy()
+        self.current_policy = self.sp.load_current_policy()
         self.current_store = self.qs.build_from_paths(self.qs.DEFAULT_FEED, self.qs.DEFAULT_STATUS, self.qs.DEFAULT_BRIEF)
         self.old_store = json.loads((ROOT / "tests/fixtures/source-policy/publication-metadata-v3.json").read_text(encoding="utf-8"))
+        self.old_policy = self.sp.load_approved_history(self.old_store["policy"]["policy_hash"])
         self.assertEqual(len(self.old_store["items"]), 118)
         self.clock = self.qs.instant(self.old_store["generated_from"]["feed_generated_at"])
 
     def promote_fixture(self):
         catalog = self.sp.load_catalog()
         next(row for row in catalog["sources"] if row["source_id"] == "S-032")["status"] = "PRODUCTION_ACTIVE"
-        policy = self.sp.compile_policy(catalog, previous=self.old_policy, promotions=[{
+        policy = self.sp.compile_policy(catalog, previous=self.current_policy, promotions=[{
             "source_id": "S-032", "receipt_id": "fixture:explicit-approval", "reason": "isolated test only",
         }])
         self.sp.DEFAULT_CATALOG.write_text(json.dumps(catalog), encoding="utf-8")

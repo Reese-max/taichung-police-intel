@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "dataset_id": "govintel-gold-v3-synthetic",
+  "dataset_type": "SYNTHETIC_REGRESSION_SEED",
+  "created_at": "2026-09-17",
+  "updated_at": "2026-10-06",
+  "description": "Small deterministic starter set for engineering regressions. It is not a production accuracy claim and is not a substitute for the planned human-labelled holdout set.",
+  "case_file": "cases.jsonl",
+  "task_types": [
+    "event_pair",
+    "material_change",
+    "query_ids",
+    "claim_support",
+    "discovery_verification"
+  ],
+  "splits": [
+    "dev",
+    "holdout"
+  ],
+  "split_rule": "Every case carries split=dev or split=holdout. Tune rules and models only on dev; holdout cases measure final behaviour. Metrics are reported per split in split_metrics.",
+  "fixture_kinds_required": [
+    "false-merge",
+    "body-only",
+    "source-failure",
+    "official-conflict",
+    "media-only",
+    "stale",
+    "no-result"
+  ],
+  "planned_scale": {
+    "planned_events": 50,
+    "planned_official_documents": 200,
+    "planned_material_change_cases": 100,
+    "planned_event_pairs": 50,
+    "planned_query_questions": 50,
+    "planned_discovery_verifications": 30,
+    "actual_cases": 21,
+    "actual_event_pairs": 4,
+    "actual_material_change_cases": 5,
+    "actual_query_questions": 3,
+    "actual_claim_support_cases": 4,
+    "actual_discovery_verifications": 5,
+    "missing_samples_reason": "第一版僅交付覆蓋每個量測面向的合成種子集；議題建議的完整規模留待人工標註，不以重複或模型產生的樣本湊數。"
+  },
+  "determinism": {
+    "seed": "none-required",
+    "note": "The evaluator performs no random sampling; identical manifest, cases and predictions produce byte-identical report JSON (sorted keys).",
+    "command": "python -X utf8 scripts/evaluate-govintel.py --predictions <predictions.jsonl> --output <report.json>"
+  },
+  "regression_gate": {
+    "compare_command": "python -X utf8 scripts/evaluate-govintel.py --predictions <predictions.jsonl> --baseline <previous-report.json> --output <report.json>",
+    "gate_command": "python -X utf8 scripts/evaluate-govintel.py --predictions <predictions.jsonl> --baseline <previous-report.json> --output <report.json> --fail-on-regression",
+    "gate_exit_code": 3,
+    "rule": "A failed regression gate cannot be bypassed by claiming the new model is better overall; every regressed metric and case is listed in baseline_comparison."
+  },
+  "label_policy": {
+    "model_generated_labels_are_gold": false,
+    "synthetic_cases_must_be_marked": true,
+    "human_review_required_for_historical_cases": true,
+    "annotation_relabel_requires_history": true
+  },
+  "derived_from": "govintel-gold-v1",
+  "version_note": "Versioned extension: the original v1 and current v6 reopen datasets remain frozen; these dev/holdout cases are synthetic only."
+}

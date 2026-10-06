@@ -1,0 +1,261 @@
+{
+  "schema_version": 1,
+  "scope": "ROOT_SOURCE_DELTA_REVIEW_AND_LOCAL_VERIFICATION_NOT_PRODUCTION",
+  "base_sha": "fd106ff8ce73e7ba12d45b75617ca06b7bfe3bac",
+  "reviewed_code_head": "55b861590f54bf7c006382247821ebed979b8d3f",
+  "reviewer": "/root",
+  "items": [
+    {
+      "number": 151,
+      "head_sha": "00a33b62cf5152f8f6ef59893a2ff63c1388edd0",
+      "url": "https://github.com/Reese-max/taichung-police-intel/pull/151",
+      "title": "feat(research): guarded research UI, admission budgets, document evidence and S038 candidate",
+      "status": "RECONCILED_WITH_COMPONENT_TESTS",
+      "coverage": "Single research UI and /ask alias, pinned document quotations, qualified two-pass draft, closed auth/budget service and S038 candidate-only collector.",
+      "local_component_commit": "b423cde34effb3b2c9a1c2a532c2a0e28fe63f1e"
+    },
+    {
+      "number": 150,
+      "head_sha": "32d10e580531e5e25c2a0470da924c3cde873f0d",
+      "url": "https://github.com/Reese-max/taichung-police-intel/pull/150",
+      "title": "feat(discovery): discovery adapter + signals (#27)",
+      "status": "RECONCILED_WITH_COMPONENT_TESTS",
+      "coverage": "TTL-bounded discovery panel; media with official pointers remains unverified, fixture payload is explicit.",
+      "local_component_commit": "3d61318c3c8b26c35e6c1ad9fc030f91fc198906"
+    },
+    {
+      "number": 149,
+      "head_sha": "c4cd09142634bc017b82cb76d55e10d354c23508",
+      "url": "https://github.com/Reese-max/taichung-police-intel/pull/149",
+      "title": "feat(eval): gold evaluator updates (#33)",
+      "status": "RECONCILED_WITH_COMPONENT_TESTS",
+      "coverage": "Additional evaluation axes and diagnostic comparison retained in synthetic v3 without replacing v1 or weakening promotion.",
+      "local_component_commit": "372c8abdb2ff8d55773798d4f23f0cee5046a4fb"
+    },
+    {
+      "number": 148,
+      "head_sha": "c11645497d17855c62408ee6d438d884ca287fe3",
+      "url": "https://github.com/Reese-max/taichung-police-intel/pull/148",
+      "title": "feat(ask): query-gateway conversation path (#29)",
+      "status": "RECONCILED_WITH_COMPONENT_TESTS",
+      "coverage": "Bounded Python chat resolution shares existing primitives/admission; no second public chat page, Worker chat_turn stays unavailable.",
+      "local_component_commit": "795c98a1f62e877892b3feddca217857c2512986"
+    },
+    {
+      "number": 123,
+      "head_sha": "299b549a9ce5b923275cd4bbed318b4672479ac7",
+      "url": "https://github.com/Reese-max/taichung-police-intel/pull/123",
+      "title": "feat(governance): versioned retention/rights matrix with enforced archive gates",
+      "status": "RECONCILED_WITH_COMPONENT_TESTS",
+      "coverage": "Layered retention/archive rights binding, conservative projections and dry-run expiry; real rights remain unknown.",
+      "local_component_commit": "52b7b71b360a6b220248ae7231590d5468a9b730"
+    },
+    {
+      "number": 121,
+      "head_sha": "96cee6d304edf03f842c83f3229f10fe0a02b9d8",
+      "url": "https://github.com/Reese-max/taichung-police-intel/pull/121",
+      "title": "feat(feedback): route accepted corrections to human-approved promotion targets (#37)",
+      "status": "RECONCILED_WITH_COMPONENT_TESTS",
+      "coverage": "Feedback routing proposes corrections for human review; no automatic canonical approval.",
+      "local_component_commit": "982b3ba5b8bcc0e4b7bbde169e46c0ca49b950fc"
+    },
+    {
+      "number": 120,
+      "head_sha": "eaa8180f6cda16ece5396cc9765278a04594923b",
+      "url": "https://github.com/Reese-max/taichung-police-intel/pull/120",
+      "title": "feat(entity): ship named-event, venue, and cross-city registry fixtures (#31)",
+      "status": "RECONCILED_WITH_COMPONENT_TESTS",
+      "coverage": "Collision/date seed expansion isolated to synthetic test registry; production event dates and CONFIRMED entities are unchanged.",
+      "local_component_commit": "7a12b0c42c2d25bc9d977e6622c818b6b5b39e12"
+    },
+    {
+      "number": 119,
+      "head_sha": "1ed3a1eb3f58b3c9c15c78f7f0540d41ff11cb09",
+      "url": "https://github.com/Reese-max/taichung-police-intel/pull/119",
+      "title": "feat(data): make the migration registry drive schema bumps and version the body-hash axis",
+      "status": "RECONCILED_WITH_COMPONENT_TESTS",
+      "coverage": "Versioned migration registry, hash axes and atomic replay; no inferred raw/model history.",
+      "local_component_commit": "6c2994d03d20bd2887c6b610f5dae5b69de9859b"
+    },
+    {
+      "number": 118,
+      "head_sha": "40fdec65d5e474209929b644a65f4c7d1c27de6b",
+      "url": "https://github.com/Reese-max/taichung-police-intel/pull/118",
+      "title": "feat: bound detail recheck requests per source and host (#21)",
+      "status": "RECONCILED_WITH_COMPONENT_TESTS",
+      "coverage": "Rolling per-source/host detail budgets charge prior runs under a PostgreSQL transaction lock; actual database regressions passed.",
+      "local_component_commit": "f585b1c6e558aeba9c3c3607efdfb46d48c22e91"
+    },
+    {
+      "number": 117,
+      "head_sha": "000994caeb06fa786efd93bfcfa872017b06acbc",
+      "url": "https://github.com/Reese-max/taichung-police-intel/pull/117",
+      "title": "feat(located-facts): guard uncertain time sentences and diff versioned facts (#48)",
+      "status": "RECONCILED_WITH_COMPONENT_TESTS",
+      "coverage": "Located facts and version differences; uncertain/rescheduled time is not promoted.",
+      "local_component_commit": "c650030e1b24f245fba663a22f3478f341f6e9ef"
+    },
+    {
+      "number": 116,
+      "head_sha": "b31de73aa3d3ffa02ad4997ed187efc3f243122b",
+      "url": "https://github.com/Reese-max/taichung-police-intel/pull/116",
+      "title": "fix: harden NPA official reference adapters",
+      "status": "RECONCILED_WITH_COMPONENT_TESTS",
+      "coverage": "Strict NPA reference adapters, source inventory and attachment schema validation.",
+      "local_component_commit": "9a4375db8e64036538ba364a188fdc2799385521"
+    },
+    {
+      "number": 115,
+      "head_sha": "5bbfa26790e81674870e435c8ebd80877793038a",
+      "url": "https://github.com/Reese-max/taichung-police-intel/pull/115",
+      "title": "feat(handoff): flag unreviewed source changes in exported handoff versions",
+      "status": "RECONCILED_WITH_COMPONENT_TESTS",
+      "coverage": "Immutable confirmed handoff exports and source-change review warnings.",
+      "local_component_commit": "55f776a493bf451087e385887186ff2fc987df94"
+    },
+    {
+      "number": 113,
+      "head_sha": "965df6f2fdf85d8363413b88aaf59039b6dc5989",
+      "url": "https://github.com/Reese-max/taichung-police-intel/pull/113",
+      "title": "feat: preserve PublicEvent provenance and version history (#24)",
+      "status": "RECONCILED_WITH_COMPONENT_TESTS",
+      "coverage": "Immutable event provenance/version history; unknown acquisition provenance is not guessed official.",
+      "local_component_commit": "09f8c789492d7d5726886fb2cce2a0a7a40c5deb"
+    },
+    {
+      "number": 112,
+      "head_sha": "3691935a3ca69cbf81dff18c71b4836ddf15c45a",
+      "url": "https://github.com/Reese-max/taichung-police-intel/pull/112",
+      "title": "fix: bound candidate pagination and canary entrypoint (#22)",
+      "status": "RECONCILED_WITH_COMPONENT_TESTS",
+      "coverage": "Candidate pagination, transport and canary limits reconciled with the active lane.",
+      "local_component_commit": "b0e5d4a9506805c67de83aa7e2f498caa4719736"
+    },
+    {
+      "number": 111,
+      "head_sha": "1793fae7fc2fd5f7f5002cc719d482d358789c76",
+      "url": "https://github.com/Reese-max/taichung-police-intel/pull/111",
+      "title": "feat(health): end-to-end stage model and SLO measurement fields (#35)",
+      "status": "RECONCILED_WITH_COMPONENT_TESTS",
+      "coverage": "Ordered health/SLO stages; official data time drives freshness; rights-blocked formal query remains visible.",
+      "local_component_commit": "8c14ea382064a987abe0114a8f0faa901ce64e1e"
+    },
+    {
+      "number": 104,
+      "head_sha": "ce67f539e182beb92ea62669c627909a25b5357e",
+      "url": "https://github.com/Reese-max/taichung-police-intel/pull/104",
+      "title": "feat: wire incremental cross-agency candidate collection",
+      "status": "RECONCILED_WITH_COMPONENT_TESTS",
+      "coverage": "List-first incremental collection, candidate lane isolated from the unchanged five active sources.",
+      "local_component_commit": "b0e5d4a9506805c67de83aa7e2f498caa4719736"
+    },
+    {
+      "number": 99,
+      "head_sha": "c26fe38eef8f9851d7d9cc96e60906ec33a76419",
+      "url": "https://github.com/Reese-max/taichung-police-intel/pull/99",
+      "title": "Baseline newly activated public sources before emitting changes",
+      "status": "RECONCILED_WITH_COMPONENT_TESTS",
+      "coverage": "One-time first-observation baseline; successful incomplete windows cannot invent current NEW items.",
+      "local_component_commit": "b0e5d4a9506805c67de83aa7e2f498caa4719736"
+    },
+    {
+      "number": 97,
+      "head_sha": "914ef98ab6b3d1bb8f1fea735a77660c94521582",
+      "url": "https://github.com/Reese-max/taichung-police-intel/pull/97",
+      "title": "feat: 直播會議 Provisional Intelligence Session＋會後官方證據對帳 (#13)",
+      "status": "RECONCILED_WITH_COMPONENT_TESTS",
+      "coverage": "Canonical provisional live lifecycle, visible gaps, explicit bounded adapters and official reconciliation; offline scenarios only.",
+      "local_component_commit": "7fe849ca84ed7c5d85aed6042b9e81ad1115bfb7"
+    },
+    {
+      "number": 91,
+      "head_sha": "65e8384c2b6bab96efd3a78e888d71f5892f350c",
+      "url": "https://github.com/Reese-max/taichung-police-intel/pull/91",
+      "title": "feat: bind source metadata to publication bundle (#14)",
+      "status": "RECONCILED_WITH_COMPONENT_TESTS",
+      "coverage": "Catalog role/usage metadata bound to canonical source policy; independent official trust preserved.",
+      "local_component_commit": "b0e5d4a9506805c67de83aa7e2f498caa4719736"
+    },
+    {
+      "number": 89,
+      "head_sha": "31f1d20a5686d53f583ee06dc57c188dfe1e857e",
+      "url": "https://github.com/Reese-max/taichung-police-intel/pull/89",
+      "title": "fix: align NPA 172159 adapter with official CSV schema",
+      "status": "RECONCILED_WITH_COMPONENT_TESTS",
+      "coverage": "ROC year/month and strict NPA 172159 statistics parsing retained through #116.",
+      "local_component_commit": "9a4375db8e64036538ba364a188fdc2799385521"
+    },
+    {
+      "number": 84,
+      "head_sha": "a1bea19bf5e3739b621c6bd597772b4730ce3db2",
+      "url": "https://github.com/Reese-max/taichung-police-intel/pull/84",
+      "title": "feat(eval): compare gold baselines with a fail-closed promotion gate (#33)",
+      "status": "RECONCILED_WITH_COMPONENT_TESTS",
+      "coverage": "Strict pinned baseline comparison and promotion refusal; v1/v6 frozen, new cases versioned as synthetic v2/v3.",
+      "local_component_commit": "372c8abdb2ff8d55773798d4f23f0cee5046a4fb"
+    },
+    {
+      "number": 83,
+      "head_sha": "438f45e2955a711d3ab6b23273566e640374f007",
+      "url": "https://github.com/Reese-max/taichung-police-intel/pull/83",
+      "title": "fix(news): bound candidate pagination before completeness (#22)",
+      "status": "RECONCILED_WITH_COMPONENT_TESTS",
+      "coverage": "Unique bounded pagination retained through #112; no cross-origin traversal or candidate promotion.",
+      "local_component_commit": "b0e5d4a9506805c67de83aa7e2f498caa4719736"
+    },
+    {
+      "number": 81,
+      "head_sha": "56882f85aa5919b613cbd40bf338ac0a5e575e84",
+      "url": "https://github.com/Reese-max/taichung-police-intel/pull/81",
+      "title": "[P1] Bind event, discovery, and query consumers to canonical entity IDs",
+      "status": "RECONCILED_WITH_COMPONENT_TESTS",
+      "coverage": "Shared confirmed entity IDs, typed aliases, retired-ID refusal and bounded discovery consumers.",
+      "local_component_commit": "f2f32b6619bbcf386f51dff4bb4fc3a3a0c7830f"
+    },
+    {
+      "number": 51,
+      "head_sha": "03da387dc9becfba8980efabc4c8adb894ac5c3b",
+      "url": "https://github.com/Reese-max/taichung-police-intel/pull/51",
+      "title": "feat: 直播會議 Provisional Intelligence Session＋會後官方證據對帳 (#13)",
+      "status": "RECONCILED_WITH_COMPONENT_TESTS",
+      "coverage": "Unique JavaScript prototype and 60 regressions retained under tests/support; production uses the canonical #97 Python lifecycle.",
+      "local_component_commit": "2d183bfe6d0b44e7b07388bd2fabd6984c229697"
+    },
+    {
+      "number": 50,
+      "head_sha": "1dbfaf4cc6bca98ff6f39ef195de8dedbbd2865a",
+      "url": "https://github.com/Reese-max/taichung-police-intel/pull/50",
+      "title": "feat(ui): Figma 工作台六頁實作、手機互動與快照／示例分流",
+      "status": "RECONCILED_WITH_COMPONENT_TESTS",
+      "coverage": "Isolated six-view workspace; synthetic browser-local state and actual saved snapshot modes; 34 model tests and 15 Chromium scenarios.",
+      "local_component_commit": "056407e180301612908a88d99bedbb850271257c"
+    }
+  ],
+  "constraints": {
+    "active_sources": [
+      "S-004",
+      "S-006",
+      "S-007",
+      "S-009",
+      "S-029"
+    ],
+    "real_formal_admission": "NOT_APPROVED",
+    "paid_research_enabled": false,
+    "s038_activated": false,
+    "seeded_future_events_in_production": false,
+    "frozen_v1_and_commute_gold_preserved": true,
+    "synthetic_gold_is_live_model_quality_evidence": false,
+    "independent_agent_review_performed": false,
+    "production_validation": "PENDING_EXACT_PR_CI_MERGE_AND_ACTUAL_RELEASE_READBACK"
+  },
+  "status": "LOCAL_FULL_GATES_PASS",
+  "reviewed_at": "2026-10-06T01:32:26.544798+00:00",
+  "local_full_gate": {
+    "status": "PASS",
+    "command": "npm run check",
+    "test_database": "isolated local PostgreSQL 16",
+    "required_artifacts": 157,
+    "specifications": 4,
+    "secret_pattern_findings": 0
+  }
+}

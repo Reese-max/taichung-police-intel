@@ -74,6 +74,16 @@ SOURCE_CONTEXT = {
         "why_it_matters": "提供交通管制、道路與公共運輸公告的官方異動。",
         "affected_roles": ["交通業管", "相關分局或大隊", "局本部幕僚"],
     },
+    "S-033": {
+        "source_name": "臺中市政府市政新聞",
+        "why_it_matters": "提供跨局處公開事件線索；轉載不能算作獨立佐證。",
+        "affected_roles": ["跨機關業管單位", "局本部幕僚"],
+    },
+    "S-031": {
+        "source_name": "臺中市政府消防局即時災情",
+        "why_it_matters": "提供短生命週期的公開災情線索，不可作為派遣依據。",
+        "affected_roles": ["局本部幕僚", "相關業管單位"],
+    },
 }
 
 CHANGE_ACTIONS = {
@@ -157,6 +167,61 @@ def source_health_projection(source_status: dict | None) -> dict:
         "stale_count": stale_count,
         "failed_count": failed_count,
         "gap_count": gap_count,
+    }
+
+
+def candidate_source_context_projection(source_status: dict | None, feed: dict) -> dict | None:
+    """Expose candidate observations separately from active V2 events and health."""
+    if not source_status or "candidate_sources" not in source_status:
+        return None
+    from scripts.candidate_publication import load_candidate_publication_sources
+
+    expected_ids = tuple(load_candidate_publication_sources())
+    status_rows = {
+        row.get("source_id"): row
+        for row in source_status.get("candidate_sources", [])
+        if isinstance(row, dict)
+    }
+    candidate_items = [
+        item for item in feed.get("candidate_items", [])
+        if isinstance(item, dict)
+    ]
+    sources = []
+    for source_id in expected_ids:
+        row = status_rows.get(source_id)
+        if not row:
+            continue
+        sources.append({
+            "source_id": source_id,
+            "source_name": row.get("source_name"),
+            "source_url": row.get("source_url"),
+            "source_health": row.get("source_health"),
+            "window_completeness": row.get("window_completeness"),
+            "freshness_status": row.get("freshness_status"),
+            "last_checked_at": row.get("last_checked_at"),
+            "intelligence_gaps": row.get("intelligence_gaps") or [],
+            "pagination": row.get("pagination"),
+            "integration_status": row.get("integration_status"),
+            "promotion_eligible": row.get("promotion_eligible"),
+        })
+    return {
+        "scope": "ISSUE22_CANDIDATE_ONLY",
+        "integration_status": "CANDIDATE",
+        "promotion_eligible": False,
+        "collection_run_id": feed.get("collection_run_id"),
+        "generated_at": feed.get("generated_at"),
+        "sources": sources,
+        "items": [
+            {
+                key: item.get(key)
+                for key in (
+                    "stable_id", "stable_key", "source_id", "source_name", "title",
+                    "official_url", "published_at", "source_health", "window_completeness",
+                    "change_type", "eligibility", "integration_status", "promotion_eligible",
+                )
+            }
+            for item in candidate_items
+        ],
     }
 
 
@@ -303,12 +368,18 @@ def main() -> int:
             raise ValueError("unsupported V2 shadow state")
 
     current_items = [feed_item_to_version(item, observed_at) for item in feed["items"]]
+    baseline_identities = {
+        item.identity
+        for raw, item in zip(feed["items"], current_items)
+        if raw.get("eligibility") == "INELIGIBLE_BASELINE"
+    }
     snapshot_complete = collection_is_complete(source_status) and not args.snapshot_partial
     state, events = compare_snapshot(
         previous_state,
         current_items,
         observed_at,
         snapshot_complete=snapshot_complete,
+        baseline_identities=baseline_identities,
     )
     handoff_state = load_handoff_state(args.handoff_state)
     handoff_state = sync_with_publication(
@@ -339,6 +410,9 @@ def main() -> int:
     brief["snapshot_complete"] = snapshot_complete
     brief["source_health"] = source_health_projection(source_status)
     brief["source_status_generated_at"] = source_status.get("generated_at") if source_status else None
+    candidate_context = candidate_source_context_projection(source_status, feed)
+    if candidate_context is not None:
+        brief["candidate_source_context"] = candidate_context
 
     save_json(args.state, state)
     save_json(args.handoff_state, handoff_state)

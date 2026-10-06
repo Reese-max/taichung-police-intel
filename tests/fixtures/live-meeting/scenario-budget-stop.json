@@ -1,0 +1,21 @@
+{
+  "scenario": "budget-stop",
+  "covers": "Hitting the bounded budget records a gap to max_duration instead of silently ending coverage.",
+  "session": {
+    "source_id": "S-010",
+    "official_source_url": "https://www.tccc.gov.tw/",
+    "stream_url": "https://vod.tccc.gov.tw/live/budget.m3u8",
+    "started_at": "2026-09-21T10:00:00+08:00",
+    "max_duration_seconds": 1800,
+    "transport_enabled": true,
+    "provider_authorized": true,
+    "budget_seconds": 300,
+    "session_id": "LM-FX-BUDGET"
+  },
+  "ops": [
+    {"op": "append_segment", "sequence": 0, "start_seconds": 0, "end_seconds": 300, "text": "預算內片段", "at": "2026-09-21T10:05:00+08:00", "finalized": true},
+    {"op": "budget_stop", "at": "2026-09-21T10:05:01+08:00", "expect": {"status": "DEGRADED", "transport_status": "BUDGET_STOP", "gap_count": 1}},
+    {"op": "timeline", "expect": {"timeline_kinds": ["SEGMENT", "GAP"], "timeline_all_visible": true}}
+  ],
+  "expect": {"status": "DEGRADED", "gap_count": 1}
+}

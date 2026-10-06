@@ -24,6 +24,7 @@ TZ = ZoneInfo("Asia/Taipei")
 FUSION_STATUSES = {"CONFIRMED", "CANDIDATE", "CONFLICT", "SPLIT_REQUIRED"}
 OCCURRENCE_RELATION_TYPES = {"RESCHEDULES"}
 OCCURRENCE_REVIEW_STATUSES = {"PENDING_REVIEW", "CONFIRMED", "REJECTED"}
+DEFAULT_ACQUISITION_PATH = "UNKNOWN_UNDECLARED"
 ENTITY_REGISTRY_PATH = Path(__file__).with_name("entity-registry.py")
 _entity_registry_module = None
 
@@ -74,6 +75,44 @@ def bind_document_entities(document: dict[str, Any], registry: dict[str, Any]) -
                 raise ValueError(f"unresolved {kind} label: {label}")
             resolved.append(match["entity_id"])
         result[id_field] = sorted(set(existing + resolved))
+    named_label = result.pop("named_event_label", None)
+    named_date = result.pop("named_event_date", None)
+    named_jurisdiction = result.pop("named_event_jurisdiction", None)
+    if named_label is not None:
+        jurisdiction = named_jurisdiction or result.get("jurisdiction")
+        if not isinstance(jurisdiction, str) or not jurisdiction.strip() or not isinstance(named_date, str):
+            raise ValueError("named_event_label requires explicit jurisdiction and event_date")
+        observed_date = _iso_date(result.get("event_start_at"))
+        if observed_date is not None and observed_date != named_date:
+            raise ValueError("named_event_date conflicts with document event_start_at")
+        match = module.resolve(registry, "named_event", named_label, jurisdiction, named_date)
+        if match["status"] != "RESOLVED":
+            raise ValueError(f"unresolved named_event label: {named_label}")
+        if result.get("named_event_id") and result["named_event_id"] != match["entity_id"]:
+            raise ValueError("named_event label conflicts with supplied entity ID")
+        result["named_event_id"] = match["entity_id"]
+    elif named_date is not None or (
+        named_jurisdiction is not None
+        and not (
+            isinstance(result.get("named_event_id"), str)
+            and result["named_event_id"].startswith("named_event:")
+        )
+    ):
+        raise ValueError("named_event date/jurisdiction requires a label")
+    named_id = result.get("named_event_id")
+    if isinstance(named_id, str) and named_id.startswith("named_event:"):
+        jurisdiction = named_jurisdiction or result.get("jurisdiction")
+        observed_date = _iso_date(result.get("event_start_at"))
+        if not isinstance(jurisdiction, str) or not jurisdiction.strip() or observed_date is None:
+            raise ValueError("named_event_id requires document jurisdiction and observed event_start_at")
+        match = module.resolve(registry, "named_event", named_id, jurisdiction, observed_date)
+        if match.get("status") != "RESOLVED":
+            raise ValueError("named_event_id conflicts with document jurisdiction or observed event_start_at")
+    district_id = result.get("district_id")
+    if isinstance(district_id, str) and district_id.startswith("location:"):
+        active_locations = {entity["entity_id"] for entity in registry["entities"] if entity["kind"] == "location"}
+        if district_id not in active_locations:
+            raise ValueError("unknown district entity ID")
     result["entity_registry"] = module.registry_receipt(registry)
     return result
 
@@ -82,6 +121,20 @@ def _https(value: Any) -> str:
     if not isinstance(value, str) or not value.startswith("https://"):
         raise ValueError("official/source URLs must use nonempty HTTPS URLs")
     return value
+
+
+def _acquisition_paths(document: dict[str, Any]) -> list[str]:
+    raw_paths = document.get("acquisition_paths")
+    if raw_paths is None:
+        raw_paths = [document.get("acquisition_path", DEFAULT_ACQUISITION_PATH)]
+    if not isinstance(raw_paths, list) or not raw_paths:
+        raise ValueError("acquisition_paths must be a nonempty string array")
+    paths = []
+    for path in raw_paths:
+        if not isinstance(path, str) or not path.strip():
+            raise ValueError("acquisition_paths must be a nonempty string array")
+        paths.append(path.strip())
+    return sorted(set(paths))
 
 
 def _parse_timestamp(value: Any) -> datetime | None:
@@ -185,6 +238,7 @@ def validate_document(document: dict[str, Any]) -> None:
     if document.get("authority") != "official":
         raise ValueError("only affirmatively official documents can enter canonical PublicEvent fusion")
     _https(document.get("official_url"))
+    _acquisition_paths(document)
     for field in ("agency_ids", "location_ids"):
         value = document.get(field, [])
         if not isinstance(value, list) or any(not isinstance(item, str) or not item for item in value):
@@ -270,11 +324,41 @@ def _linked_documents(documents: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "document_version_id": doc["document_version_id"],
             "source_id": doc["source_id"],
             "independent_source_id": doc.get("independent_source_id") or doc["source_id"],
+            "acquisition_paths": _acquisition_paths(doc),
             "official_url": _https(doc["official_url"]),
             "evidence_locator": doc.get("evidence_locator"),
         }
         for doc in ordered
     ]
+
+
+def _source_provenance_from_links(links: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    grouped: dict[str, dict[str, set[str] | list[str]]] = {}
+    for link in links:
+        if not isinstance(link, dict):
+            continue
+        source_id = link.get("independent_source_id") or link.get("source_id")
+        version_id = link.get("document_version_id")
+        if not isinstance(source_id, str) or not source_id or not isinstance(version_id, str) or not version_id:
+            continue
+        paths = link.get("acquisition_paths")
+        if not isinstance(paths, list) or not paths:
+            paths = [link.get("acquisition_path", DEFAULT_ACQUISITION_PATH)]
+        entry = grouped.setdefault(source_id, {"acquisition_paths": set(), "document_version_ids": []})
+        entry["acquisition_paths"].update(path for path in paths if isinstance(path, str) and path)
+        entry["document_version_ids"].append(version_id)
+    return [
+        {
+            "independent_source_id": source_id,
+            "acquisition_paths": sorted(entry["acquisition_paths"]),
+            "document_version_ids": sorted(set(entry["document_version_ids"])),
+        }
+        for source_id, entry in sorted(grouped.items())
+    ]
+
+
+def _source_provenance(documents: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return _source_provenance_from_links(_linked_documents(documents))
 
 
 def build_public_event(
@@ -332,6 +416,7 @@ def build_public_event(
         "independent_source_ids": independent_sources,
         "independent_source_count": len(independent_sources),
         "linked_document_versions": _linked_documents(ordered),
+        "source_provenance": _source_provenance(ordered),
         "occurrence_relations": occurrence_relations,
         "link_reasons": (
             ["stable_occurrence_id"] if key and key[2].startswith("occurrence:")
@@ -393,6 +478,26 @@ def _overlay_event_evidence(base: dict[str, Any], extra: dict[str, Any]) -> dict
     for field in ("agency_ids", "location_candidates", "location_ids", "independent_source_ids"):
         result[field] = sorted(set(result.get(field, [])) | set(extra.get(field, [])))
     result["independent_source_count"] = len(result["independent_source_ids"])
+    result["source_provenance"] = _source_provenance_from_links(result["linked_document_versions"])
+    return result
+
+
+def _preserve_event_history(current: dict[str, Any], previous: dict[str, Any]) -> dict[str, Any]:
+    result = copy.deepcopy(current)
+    result["linked_document_versions"] = _unique_dicts([
+        *previous.get("linked_document_versions", []),
+        *current.get("linked_document_versions", []),
+    ])
+    result["linked_document_versions"] = sorted(
+        result["linked_document_versions"],
+        key=lambda link: (link.get("source_id", ""), link.get("document_id", ""), link.get("document_version_id", "")),
+    )
+    result["source_provenance"] = _source_provenance_from_links(result["linked_document_versions"])
+    for field in ("manual_history", "background", "occurrence_history", "public_event_redirects"):
+        result[field] = _unique_dicts([
+            *previous.get(field, []),
+            *current.get(field, []),
+        ])
     return result
 
 
@@ -468,6 +573,34 @@ def _apply_official_reschedule(
     return result
 
 
+def _rebind_partial_event_registry(
+    event: dict[str, Any], registry: dict[str, Any], receipt: dict[str, Any]
+) -> None:
+    """Rebind a partial-snapshot event only while each canonical ID remains active and typed."""
+    module = _load_entity_registry_module()
+    module.validate_registry(registry)
+    active = {entity["entity_id"]: entity for entity in registry["entities"]}
+    for field, kind in (("agency_ids", "agency"), ("location_ids", "location")):
+        values = event.get(field, [])
+        if not isinstance(values, list) or any(not isinstance(value, str) or not value for value in values):
+            raise ValueError(f"partial PublicEvent cannot be rebound: invalid {field}")
+        if any(active.get(value, {}).get("kind") != kind for value in values):
+            raise ValueError(f"partial PublicEvent cannot be rebound: inactive or wrong-kind ID in {field}")
+
+    district_id = event.get("district_id")
+    if district_id is not None and (
+        not isinstance(district_id, str) or active.get(district_id, {}).get("kind") != "location"
+    ):
+        raise ValueError("partial PublicEvent cannot be rebound: inactive or wrong-kind district_id")
+
+    named_event_id = event.get("named_event_id")
+    if isinstance(named_event_id, str) and named_event_id.startswith("named_event:"):
+        if active.get(named_event_id, {}).get("kind") != "named_event":
+            raise ValueError("partial PublicEvent cannot be rebound: inactive or wrong-kind named_event_id")
+
+    event["entity_registry"] = copy.deepcopy(receipt)
+
+
 def reconcile_public_events(
     previous_events: list[dict[str, Any]],
     documents: list[dict[str, Any]],
@@ -540,6 +673,12 @@ def reconcile_public_events(
             by_id.pop(current_id, None)
         by_id[target_id] = target
 
+    for previous in previous_events:
+        event_id = previous.get("public_event_id") if isinstance(previous, dict) else None
+        if not event_id or event_id not in by_id:
+            continue
+        by_id[event_id] = _preserve_event_history(by_id[event_id], previous)
+
     if snapshot_complete:
         return sorted(by_id.values(), key=lambda event: event["public_event_id"])
 
@@ -560,11 +699,15 @@ def reconcile_public_events(
         event["linked_document_versions"] = sorted(
             old_links.values(), key=lambda link: (link.get("source_id", ""), link.get("document_version_id", ""))
         )
+        event["source_provenance"] = _source_provenance_from_links(event["linked_document_versions"])
         event["source_state"] = "PARTIAL_LKG"
         event["lkg"] = True
         event["previous_fusion_status"] = previous.get("fusion_status")
         if previous.get("fusion_status") == "CONFIRMED" and event.get("fusion_status") != "CONFLICT":
             event["fusion_status"] = "CONFIRMED"
+    if entity_registry is not None:
+        for event in by_id.values():
+            _rebind_partial_event_registry(event, entity_registry, registry_receipt)
     return sorted(by_id.values(), key=lambda event: event["public_event_id"])
 
 
@@ -596,6 +739,7 @@ def merge_public_events(events: list[dict[str, Any]], *, operator: str, decided_
     target["linked_document_versions"] = sorted(
         links.values(), key=lambda link: (link.get("source_id", ""), link.get("document_version_id", ""))
     )
+    target["source_provenance"] = _source_provenance_from_links(target["linked_document_versions"])
     target["agency_ids"] = sorted({agency for event in ordered for agency in event.get("agency_ids", [])})
     target["location_candidates"] = sorted({location for event in ordered for location in event.get("location_candidates", [])})
     target["location_ids"] = target["location_candidates"]
@@ -634,6 +778,7 @@ def split_public_event(
         child = copy.deepcopy(event)
         child["public_event_id"] = _stable_id("PE", f"split|{event['public_event_id']}|{index}|{'|'.join(sorted(group))}")
         child["linked_document_versions"] = [link_by_id[item] for item in group]
+        child["source_provenance"] = _source_provenance_from_links(child["linked_document_versions"])
         child["independent_source_ids"] = sorted({link.get("independent_source_id") or link.get("source_id") for link in child["linked_document_versions"]})
         child["independent_source_count"] = len(child["independent_source_ids"])
         child["fusion_status"] = "CANDIDATE"

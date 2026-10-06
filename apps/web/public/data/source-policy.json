@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "catalog_schema_version": 2,
-  "catalog_updated_at": "2026-09-30",
+  "catalog_updated_at": "2026-10-06",
   "policy_version": 1,
-  "policy_hash": "3404809ff40f7647c44203329d4476b12b62e9ee64df24cd1f1f46cbda59caf4",
-  "catalog_hash": "95ae82270eaab6f6270d9c00c8122e9bcfafbaf0dd216dc575a5f0b99544c51a",
+  "policy_hash": "3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501",
+  "catalog_hash": "5088623df5af4b8a30f4c597c51235c0f36a3dfd8bc4f2aea9af8f26d10213ef",
   "active_source_ids": [
     "S-004",
     "S-006",

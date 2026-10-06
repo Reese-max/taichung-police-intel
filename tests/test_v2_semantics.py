@@ -64,6 +64,20 @@ class V2SemanticsTest(unittest.TestCase):
         self.assertEqual(events, [])
         self.assertEqual(next_state["items"][item.identity]["version_no"], 1)
 
+    def test_new_source_first_observation_is_baseline_then_future_item_is_new(self):
+        old = make_item("bill-1", {"title": "既有提案"})
+        state, _ = compare_snapshot(None, [old], T0)
+        historical = make_item("traffic-1", {"title": "既有交通公告"}, T1, source_id="S-032")
+        state, events = compare_snapshot(
+            state, [old, historical], T1, baseline_identities={historical.identity}
+        )
+        self.assertEqual(events, [])
+        self.assertEqual(state["items"][historical.identity]["version_no"], 1)
+
+        current = make_item("traffic-2", {"title": "新交通公告"}, T2, source_id="S-032")
+        _, events = compare_snapshot(state, [old, historical, current], T2)
+        self.assertEqual([(event.source_id, event.change_type) for event in events], [("S-032", "NEW")])
+
     def test_raw_wrapper_change_without_semantic_change_emits_no_event(self):
         item = make_item(
             "bill-1",

@@ -1,0 +1,24 @@
+{
+  "scenario": "minutes-contradiction",
+  "covers": "When official minutes contradict the ASR wording, the provisional claim is superseded, not silently rewritten.",
+  "session": {
+    "source_id": "S-010",
+    "official_source_url": "https://www.tccc.gov.tw/",
+    "stream_url": "https://vod.tccc.gov.tw/live/minutes.m3u8",
+    "started_at": "2026-09-21T10:00:00+08:00",
+    "max_duration_seconds": 1800,
+    "transport_enabled": true,
+    "provider_authorized": true,
+    "budget_seconds": 1800,
+    "session_id": "LM-FX-MINUTES"
+  },
+  "ops": [
+    {"op": "append_segment", "sequence": 0, "start_seconds": 0, "end_seconds": 60, "text": "ASR 以為已通過預算", "at": "2026-09-21T10:01:00+08:00", "finalized": true},
+    {"op": "bookmark", "segment_ids": ["$seg:0"], "reason_code": "DECISION_WATCH", "at": "2026-09-21T10:01:30+08:00"},
+    {"op": "stop_session", "at": "2026-09-21T10:30:00+08:00"},
+    {"op": "reconcile", "at": "2026-09-24T09:00:00+08:00", "candidates": [
+      {"candidate_id": "$bookmark:0", "outcome": "SUPERSEDED_TRANSCRIPT"}
+    ], "expect": {"status": "RECONCILED", "formal_count": 0}}
+  ],
+  "expect": {"status": "RECONCILED", "receipt_count": 1, "formal_count": 0}
+}

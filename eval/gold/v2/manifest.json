@@ -1,0 +1,26 @@
+{
+  "schema_version": 2,
+  "dataset_id": "govintel-gold-v2-synthetic",
+  "dataset_type": "SYNTHETIC_REGRESSION_SEED",
+  "created_at": "2026-10-03",
+  "description": "Synthetic-only regression fixtures for metric plumbing. These cases are not human-reviewed labels or production accuracy evidence.",
+  "case_file": "cases.jsonl",
+  "task_types": [
+    "event_pair",
+    "material_change",
+    "query_ids",
+    "claim_support",
+    "discovery_official"
+  ],
+  "label_policy": {
+    "model_generated_labels_are_gold": false,
+    "synthetic_cases_must_be_marked": true,
+    "human_review_required_for_historical_cases": true,
+    "human_reviewed_holdout_included": false
+  },
+  "split_policy": {
+    "synthetic_regression_seed": "regression-only",
+    "human_dev_set": "not-included",
+    "human_holdout_set": "not-included"
+  }
+}

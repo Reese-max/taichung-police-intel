@@ -17,6 +17,9 @@ CATALOG = ROOT / "docs" / "govintel" / "source-catalog.v2.json"
 GOOD_SCHEMA_STATUSES = {"NO_DRIFT", "ADDITIVE_COMPATIBLE"}
 GOOD_HEALTH_STATUSES = {"PASS", "DEGRADED"}
 GOOD_WINDOW_CLAIMS = {"COMPLETE_ZERO", "COMPLETE_WITH_ITEMS", "PARTIAL"}
+# Transient public-safety feeds must always carry their usage disclaimer and
+# retention class so a promotion window can never drop the guardrail.
+USAGE_NOTICE_REQUIRED = {"S-031"}
 
 
 def promotion_source_ids() -> tuple[str, ...]:
@@ -123,6 +126,11 @@ def validate_reports(
                 row_reasons.append("invalid window claim")
             if not isinstance(manifest, str) or not re.fullmatch(r"[0-9a-f]{64}", manifest):
                 row_reasons.append("invalid manifest")
+            if source_id in USAGE_NOTICE_REQUIRED:
+                if not isinstance(row.get("public_usage_notice"), str) or not row["public_usage_notice"].strip():
+                    row_reasons.append("missing required public usage notice")
+                if not isinstance(row.get("retention_class"), str) or not row["retention_class"].strip():
+                    row_reasons.append("missing required retention class")
             if schema.get("status") not in GOOD_SCHEMA_STATUSES or schema.get("review_required"):
                 row_reasons.append("schema requires review")
             reasons.extend(f"{path}:{source_id}: {reason}" for reason in row_reasons)
@@ -215,7 +223,7 @@ def self_check() -> None:
         observed_at = f"{day.isoformat()}T10:00:00+08:00"
         rows = []
         for source_id in required:
-            rows.append({
+            row = {
                 "source_id": source_id,
                 "integration_status": "CANDIDATE",
                 "promotion_eligible": False,
@@ -224,7 +232,11 @@ def self_check() -> None:
                 "collector_window_claim": "PARTIAL" if source_id == "S-031" else "COMPLETE_WITH_ITEMS",
                 "manifest_sha256": "a" * 64,
                 "schema_contract": {"status": "NO_DRIFT", "review_required": False},
-            })
+            }
+            if source_id in USAGE_NOTICE_REQUIRED:
+                row["public_usage_notice"] = "僅供公共態勢感知，不作派遣或勤務指揮依據。"
+                row["retention_class"] = "OFFICIAL_TRANSIENT_METADATA"
+            rows.append(row)
         reports.append((f"fixture-{offset}.json", {
             "observed_at": observed_at,
             "status": "OBSERVED",

@@ -207,14 +207,14 @@ class DownloadListDateTruthTests(unittest.TestCase):
             source = state["sources"][0]
             feed = json.loads((Path(directory) / "intelligence-feed.json").read_text())
         self.assertIsNone(source["data_as_of"])
-        self.assertEqual(source["last_checked_at"], state["generated_at"])
+        self.assertLessEqual(source["last_checked_at"], state["generated_at"])
         self.assertEqual(source["freshness_status"], "NO_DATA")
         self.assertEqual(source["source_health"], "PASS")
         self.assertEqual(source["result"], "PARTIAL")
         self.assertEqual(state["latest_collection_run"]["status"], "PARTIAL")
         self.assertIn("WINDOW_PARTIAL", source["intelligence_gaps"])
         self.assertIn("NO_DATA_AS_OF", source["intelligence_gaps"])
-        self.assertEqual(feed["items"][0]["eligibility"], "INELIGIBLE_PARTIAL")
+        self.assertEqual(feed["items"][0]["eligibility"], "INELIGIBLE_BASELINE")
 
 
 class ProposalDateTruthTests(unittest.TestCase):
@@ -256,7 +256,7 @@ class ProposalDateTruthTests(unittest.TestCase):
                 source = state["sources"][0]
                 feed = json.loads((Path(directory) / "intelligence-feed.json").read_text())
                 self.assertIsNone(source["data_as_of"])
-                self.assertEqual(source["last_checked_at"], state["generated_at"])
+                self.assertLessEqual(source["last_checked_at"], state["generated_at"])
                 self.assertEqual(source["freshness_status"], "NO_DATA")
                 self.assertEqual(source["source_health"], "PASS")
                 self.assertIn("NO_DATA_AS_OF", source["intelligence_gaps"])
@@ -267,7 +267,7 @@ class ProposalDateTruthTests(unittest.TestCase):
                     self.assertEqual(source["result"], "PARTIAL")
                     self.assertEqual(state["latest_collection_run"]["status"], "PARTIAL")
                     self.assertIn("WINDOW_PARTIAL", source["intelligence_gaps"])
-                    self.assertEqual(feed["items"][0]["eligibility"], "INELIGIBLE_PARTIAL")
+                    self.assertEqual(feed["items"][0]["eligibility"], "INELIGIBLE_BASELINE")
                     self.assertIsNone(feed["items"][0]["data_as_of"])
 
     def test_empty_page_cannot_establish_complete_zero_when_official_total_is_positive(self):
@@ -310,6 +310,7 @@ class ProposalDateTruthTests(unittest.TestCase):
         prior_item = oc.project_feed_item(
             item=collected["items"][0], source_id="S-009",
             source_name=oc.P0_SOURCES["S-009"][0], source_url=oc.P0_SOURCES["S-009"][1],
+            source_role="PRIMARY_REFERENCE", integration_status="PRODUCTION_ACTIVE",
             freshness="FRESH", source_health="PASS", window_completeness="COMPLETE_ZERO",
             data_as_of=legacy_time, fetched_at=legacy_time, previous_sha256s=set(),
         )

@@ -95,7 +95,10 @@ class QueryGatewayStdioTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         responses = [json.loads(line) for line in result.stdout.splitlines()]
         self.assertEqual([row["id"] for row in responses], [0, 1, 2])
-        self.assertEqual(len(responses[1]["result"]["tools"]), 5)
+        self.assertEqual({tool["name"] for tool in responses[1]["result"]["tools"]}, {
+            "search_evidence", "get_current_brief", "get_publication_receipt",
+            "get_source_health", "validate_answer", "chat_turn",
+        })
         self.assertEqual(responses[2]["error"]["code"], -32000)
         self.assertEqual(responses[2]["error"]["data"]["code"], "RATE_LIMITED")
         self.assertEqual(result.stderr, "")

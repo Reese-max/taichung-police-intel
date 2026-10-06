@@ -1,0 +1,30 @@
+{
+  // Review-only example. No deployment, namespace, Access app, or binding exists
+  // merely because this file exists. Do not enable without owner approval.
+  "name": "govintel-research-admission",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-18",
+  "compatibility_flags": ["enable_request_signal"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [],
+  "observability": { "enabled": false },
+  "vars": {
+    "ADMISSION_ENABLED": "false",
+    "RESEARCH_BILLING_REVIEWED": "false",
+    "ACCESS_TEAM_DOMAIN": "",
+    "ACCESS_AUD": "",
+    "ACCESS_ALLOWED_SUBJECTS": "[]",
+    "RESEARCH_DAILY_USER_CALLS": "0",
+    "RESEARCH_DAILY_GLOBAL_CALLS": "0",
+    "RESEARCH_DAILY_USER_TOKENS": "0",
+    "RESEARCH_DAILY_GLOBAL_TOKENS": "0",
+    "RESEARCH_INPUT_USD_MICROS_PER_MILLION_TOKENS": "0",
+    "RESEARCH_OUTPUT_USD_MICROS_PER_MILLION_TOKENS": "0",
+    "RESEARCH_DAILY_GLOBAL_USD_MICROS": "0"
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "RESEARCH_BUDGET", "class_name": "ResearchBudget" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ResearchBudget"] }]
+}

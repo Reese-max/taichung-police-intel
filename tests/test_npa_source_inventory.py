@@ -43,6 +43,9 @@ class NpaSourceInventoryTests(unittest.TestCase):
         self.assertGreater(canary["records"], 0)
         self.assertEqual(canary["parse_failures"], 0)
         self.assertEqual(canary["schema_drift"], 0)
+        stats = next(item for item in self.inventory["sources"] if item["inventory_id"] == "NPA-IMPORTANT-STATS")
+        self.assertIn("附件版本", stats["fields"])
+        self.assertIn("附件 SHA-256", stats["fields"])
 
     def test_invalid_excluded_row_cannot_become_public(self):
         broken = copy.deepcopy(self.inventory)
@@ -86,13 +89,100 @@ class NpaSourceInventoryTests(unittest.TestCase):
         self.assertIn("年度統計", records[0]["official_notes"])
         self.assertFalse(records[0]["realtime_allowed"])
 
+    def test_statistics_preserve_attachment_version_and_hash(self):
+        records = adapters.parse_important_statistics_rows(
+            [{
+                "統計期別": "2026-08",
+                "表號": "治安-01",
+                "機關別值": 12,
+                "官方註記": "初步統計",
+                "發布日": "2026-09-10",
+                "附件版本": "important-stats-2026-08-v1",
+                "附件 SHA-256": "a" * 64,
+            }],
+            observed_at="2026-09-21T09:00:00+08:00",
+        )
+        self.assertEqual(records[0]["attachment_version"], "important-stats-2026-08-v1")
+        self.assertEqual(records[0]["attachment_sha256"], "a" * 64)
+        with self.assertRaisesRegex(ValueError, "64-character hexadecimal"):
+            adapters.parse_important_statistics_rows(
+                [{"統計期別": "2026-08", "表號": "治安-01", "機關別值": 12, "附件 SHA-256": "not-a-hash"}],
+                observed_at="2026-09-21T09:00:00+08:00",
+            )
+
     def test_fraud_effectiveness_is_period_bound_reference_data(self):
         records = adapters.parse_fraud_effectiveness_rows(
             self.fixture["fraud_effectiveness"], observed_at="2026-09-21T09:00:00+08:00"
         )
         self.assertEqual(records[0]["period"], "2026-08")
         self.assertEqual(records[0]["metrics"]["groups"], 10)
+        self.assertEqual(records[0]["metrics"]["people"], 3666)
+        self.assertEqual(records[0]["source_calendar"], "ROC")
         self.assertFalse(records[0]["realtime_allowed"])
+
+    def test_fraud_effectiveness_uses_official_csv_schema_and_provenance(self):
+        records = adapters.parse_fraud_effectiveness_rows(
+            [{
+                "年度": "115",
+                "月": "08",
+                "查緝不法犯罪集團團數": "10",
+                "查緝不法犯罪集團人數": "3,666",
+                "查扣不法所得金額": "1,000,000",
+                "攔阻金額": "2,000,000",
+            }],
+            observed_at="2026-09-21T09:00:00+08:00",
+        )
+        self.assertEqual(records[0]["period"], "2026-08")
+        self.assertEqual(records[0]["source_period"], "115-08")
+        self.assertEqual(records[0]["source_calendar"], "ROC")
+        self.assertEqual(records[0]["dataset_id"], "172159")
+        self.assertEqual(records[0]["source_url"], "https://data.gov.tw/dataset/172159")
+        self.assertEqual(records[0]["source_schema_version"], "npa-172159.v1")
+        self.assertEqual(records[0]["metrics"]["people"], 3666)
+        self.assertEqual(records[0]["metrics"]["seized_amount"], 1_000_000)
+        self.assertFalse(records[0]["realtime_allowed"])
+
+    def test_fraud_effectiveness_rejects_legacy_period_or_malformed_metrics(self):
+        valid = copy.deepcopy(self.fixture["fraud_effectiveness"][0])
+        invalid_rows = [
+            ({**valid, "年度": "2026"}, "three-digit ROC year"),
+            ({**valid, "年度": "000"}, "three-digit ROC year"),
+            ({**valid, "月": "13"}, "between 1 and 12"),
+            ({key: value for key, value in valid.items() if key != "月"}, "missing required field: 月"),
+            ({**valid, "查緝不法犯罪集團團數": "1,00"}, "non-negative integer"),
+            ({**valid, "查扣不法所得金額": -1}, "non-negative integer"),
+        ]
+        for row, expected_error in invalid_rows:
+            with self.subTest(row=row):
+                with self.assertRaisesRegex(ValueError, expected_error):
+                    adapters.parse_fraud_effectiveness_rows(
+                        [row], observed_at="2026-09-21T09:00:00+08:00"
+                    )
+        with self.assertRaisesRegex(ValueError, "missing required field: 查緝不法犯罪集團團數"):
+            adapters.parse_fraud_effectiveness_rows(
+                [{"年度": "115", "月": "08"}], observed_at="2026-09-21T09:00:00+08:00"
+            )
+        with self.assertRaisesRegex(ValueError, "observed_at must include a timezone"):
+            adapters.parse_fraud_effectiveness_rows(
+                [valid], observed_at="2026-09-21T09:00:00"
+            )
+
+    def test_fraud_effectiveness_inventory_records_verified_contract_without_promotion(self):
+        row = next(item for item in self.inventory["sources"] if item["inventory_id"] == "NPA-172159")
+        self.assertEqual(row["source_schema_version"], "npa-172159.v1")
+        self.assertEqual(row["metadata_api_version"], "v2")
+        self.assertEqual(row["periodicity"], "MONTHLY")
+        self.assertEqual(row["update_cadence"], "IRREGULAR_RESOURCE_UPDATE")
+        self.assertEqual(row["integration_status"], "FIXTURE_ONLY")
+        self.assertEqual(row["resource_format"], "CSV")
+        self.assertEqual(row["resource_encoding"], "UTF-8")
+        self.assertEqual(row["metric_value_format"], "NON_NEGATIVE_INTEGER_WITH_OPTIONAL_COMMA_GROUPING")
+        self.assertEqual(row["license"], "OGDL v1")
+        self.assertEqual(
+            row["fields"],
+            ["年度", "月", "查緝不法犯罪集團團數", "查緝不法犯罪集團人數", "查扣不法所得金額", "攔阻金額"],
+        )
+
 
     def test_165_family_dedupes_same_domain_and_keeps_supersession(self):
         old = adapters.parse_165_records(self.fixture["old_fraud_domains"], dataset_id="160055")

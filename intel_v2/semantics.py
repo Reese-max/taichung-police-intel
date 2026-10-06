@@ -374,12 +374,14 @@ def compare_snapshot(
     *,
     snapshot_complete: bool = True,
     removal_confirmations: int = 2,
+    baseline_identities: Iterable[str] = (),
 ) -> tuple[dict[str, Any], list[ChangeEvent]]:
     """Compare one complete normalized snapshot against the durable baseline.
 
-    The first snapshot establishes a baseline and emits no NEW events. Later
-    snapshots emit item-level events. An item must be absent from at least two
-    complete snapshots before a REMOVED event is publishable.
+    The first snapshot establishes a baseline and emits no NEW events. Newly
+    activated source identities can likewise be baselined without an event.
+    An item must be absent from at least two complete snapshots before a
+    REMOVED event is publishable.
     """
 
     if removal_confirmations < 2:
@@ -390,6 +392,7 @@ def compare_snapshot(
         for identity, value in (previous_state or {}).get("items", {}).items()
     }
     baseline_exists = bool((previous_state or {}).get("baseline_established_at"))
+    first_observations = set(baseline_identities)
 
     current_by_identity: dict[str, ItemVersion] = {}
     for item in current_items:
@@ -411,7 +414,7 @@ def compare_snapshot(
                 missing_streak=0,
                 is_current=True,
             )
-            if baseline_exists:
+            if baseline_exists and identity not in first_observations:
                 events.append(
                     _make_event(
                         current=current,

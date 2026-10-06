@@ -1,4 +1,5 @@
 {
+  "generated_at": "2026-09-20T23:35:53+00:00",
   "lanes": {
     "discovery": "UNKNOWN",
     "publication": "STALE",
@@ -11,7 +12,7 @@
     "verify_to_publish_ms": null
   },
   "operator_summary": {
-    "attention_count": 6,
+    "attention_count": 13,
     "message": "資料仍可讀取但已過期，請確認來源新鮮度。",
     "primary_stage": {
       "error_class": "SOURCE_FRESHNESS_STALE",
@@ -31,8 +32,8 @@
       "S-009",
       "S-029"
     ],
-    "catalog_hash": "95ae82270eaab6f6270d9c00c8122e9bcfafbaf0dd216dc575a5f0b99544c51a",
-    "policy_hash": "3404809ff40f7647c44203329d4476b12b62e9ee64df24cd1f1f46cbda59caf4",
+    "catalog_hash": "5088623df5af4b8a30f4c597c51235c0f36a3dfd8bc4f2aea9af8f26d10213ef",
+    "policy_hash": "3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501",
     "policy_version": 1
   },
   "review_inbox": [
@@ -85,18 +86,259 @@
     "source_count": 8
   },
   "schema_version": 1,
+  "slo": {
+    "metrics": {
+      "collection_success_ratio": {
+        "measured": true,
+        "reason": null,
+        "unit": "ratio",
+        "value": 1.0
+      },
+      "detect_to_verify_ms": {
+        "measured": false,
+        "reason": "NO_RELIABLE_STAGE_TIMESTAMPS",
+        "unit": "milliseconds",
+        "value": null
+      },
+      "partial_source_ratio": {
+        "measured": true,
+        "reason": null,
+        "unit": "ratio",
+        "value": 0.0
+      },
+      "publication_mismatch_count": {
+        "measured": true,
+        "reason": null,
+        "unit": "count",
+        "value": 0
+      },
+      "publish_to_public_visible_ms": {
+        "measured": false,
+        "reason": "NO_RELIABLE_STAGE_TIMESTAMPS",
+        "unit": "milliseconds",
+        "value": null
+      },
+      "query_error_rate": {
+        "measured": false,
+        "reason": "NO_QUERY_ERROR_COUNTS",
+        "unit": "ratio",
+        "value": null
+      },
+      "query_index_lag_ms": {
+        "measured": false,
+        "reason": "NO_QUERY_INDEX_RECEIPT",
+        "unit": "milliseconds",
+        "value": null
+      },
+      "source_freshness_age_ms": {
+        "measured": true,
+        "reason": null,
+        "unit": "milliseconds",
+        "value": 10131833000
+      },
+      "source_to_detect_ms": {
+        "measured": false,
+        "reason": "NO_RELIABLE_STAGE_TIMESTAMPS",
+        "unit": "milliseconds",
+        "value": null
+      },
+      "stale_source_ratio": {
+        "measured": true,
+        "reason": null,
+        "unit": "ratio",
+        "value": 0.6
+      },
+      "verify_to_publish_ms": {
+        "measured": false,
+        "reason": "NO_RELIABLE_STAGE_TIMESTAMPS",
+        "unit": "milliseconds",
+        "value": null
+      }
+    },
+    "note": "第一版只量測欄位，不承諾未驗證的 SLA 門檻。",
+    "status": "MEASUREMENT_ONLY",
+    "thresholds": null
+  },
+  "stage_model": {
+    "required_publication_stages": [
+      "canonical_validation",
+      "collection",
+      "deployment",
+      "public_http_verification"
+    ],
+    "stage_ids": [
+      "source_contracts",
+      "upstream_operating_state",
+      "collection",
+      "parsing",
+      "fusion_verification",
+      "canonical_validation",
+      "publication_build",
+      "deployment",
+      "public_http_verification",
+      "query_index",
+      "read_only_mcp",
+      "worker_deployment",
+      "mcp_web_query",
+      "formal_query_admission"
+    ],
+    "stages": [
+      {
+        "description": "上游來源結構契約比對",
+        "lane": "discovery",
+        "measures": [
+          "source_contract_status"
+        ],
+        "order": 10,
+        "stage": "source_contracts"
+      },
+      {
+        "description": "上游 Dashboard operating state（只反映上游，不覆蓋 GovIntel 自身健康）",
+        "lane": "discovery",
+        "measures": [
+          "upstream_operating_state",
+          "upstream_current"
+        ],
+        "order": 20,
+        "stage": "upstream_operating_state"
+      },
+      {
+        "description": "來源抓取（每個 active source 的結果與 gap）",
+        "lane": "publication",
+        "measures": [
+          "collection_success_ratio",
+          "source_freshness_age_ms",
+          "stale_source_ratio"
+        ],
+        "order": 30,
+        "stage": "collection"
+      },
+      {
+        "description": "抓取結果解析為正規化紀錄",
+        "lane": "publication",
+        "measures": [
+          "parsed_item_count"
+        ],
+        "order": 40,
+        "stage": "parsing"
+      },
+      {
+        "description": "跨來源融合與官方來源驗證",
+        "lane": "publication",
+        "measures": [
+          "verified_item_count"
+        ],
+        "order": 50,
+        "stage": "fusion_verification"
+      },
+      {
+        "description": "canonical 發布與來源世代一致性驗證",
+        "lane": "publication",
+        "measures": [
+          "publication_mismatch_count"
+        ],
+        "order": 60,
+        "stage": "canonical_validation"
+      },
+      {
+        "description": "publication bundle / Pages 產物建置",
+        "lane": "publication",
+        "measures": [],
+        "order": 70,
+        "stage": "publication_build"
+      },
+      {
+        "description": "protected state 分支推送與 Pages 部署",
+        "lane": "publication",
+        "measures": [],
+        "order": 80,
+        "stage": "deployment"
+      },
+      {
+        "description": "公開 HTTP / hash 驗證（部署後可讀回）",
+        "lane": "publication",
+        "measures": [
+          "publish_to_public_visible_ms"
+        ],
+        "order": 90,
+        "stage": "public_http_verification"
+      },
+      {
+        "description": "Query Store 索引建置與世代綁定",
+        "lane": "query",
+        "measures": [
+          "query_index_lag_ms"
+        ],
+        "order": 100,
+        "stage": "query_index"
+      },
+      {
+        "description": "唯讀 MCP stdio 生命週期與發布綁定",
+        "lane": "query",
+        "measures": [],
+        "order": 105,
+        "stage": "read_only_mcp"
+      },
+      {
+        "description": "Worker 實際部署結果",
+        "lane": "query",
+        "measures": [],
+        "order": 108,
+        "stage": "worker_deployment"
+      },
+      {
+        "description": "Web Chat / MCP 查詢服務",
+        "lane": "query",
+        "measures": [
+          "query_error_rate"
+        ],
+        "order": 110,
+        "stage": "mcp_web_query"
+      },
+      {
+        "description": "來源授權與正式查詢驗收",
+        "lane": "query",
+        "measures": [],
+        "order": 115,
+        "stage": "formal_query_admission"
+      }
+    ],
+    "version": "govintel-e2e-stages.v1"
+  },
   "stages": [
     {
       "contract_overall": "UNKNOWN",
+      "downstream_hash": null,
       "ended_at": "2026-09-20T23:35:53+00:00",
       "error_class": "SOURCE_CONTRACT_UNVERIFIED",
+      "error_stage": "source_contracts",
+      "gap_count": null,
       "generation_id": null,
+      "item_count": null,
       "lane": "discovery",
       "last_success_at": null,
       "outcome": "UNKNOWN",
+      "receipt_ref": null,
       "review_inbox_count": 0,
       "stage": "source_contracts",
-      "started_at": null
+      "started_at": null,
+      "upstream_hash": null
+    },
+    {
+      "downstream_hash": null,
+      "ended_at": null,
+      "error_class": "NO_UPSTREAM_OPERATING_STATE_RECEIPT",
+      "error_stage": "upstream_operating_state",
+      "gap_count": null,
+      "generation_id": null,
+      "item_count": null,
+      "lane": "discovery",
+      "last_success_at": null,
+      "outcome": "UNKNOWN",
+      "receipt_ref": null,
+      "stage": "upstream_operating_state",
+      "started_at": null,
+      "upstream_hash": null
     },
     {
       "active_source_ids": [
@@ -106,17 +348,23 @@
         "S-009",
         "S-029"
       ],
-      "catalog_hash": "95ae82270eaab6f6270d9c00c8122e9bcfafbaf0dd216dc575a5f0b99544c51a",
+      "catalog_hash": "5088623df5af4b8a30f4c597c51235c0f36a3dfd8bc4f2aea9af8f26d10213ef",
+      "downstream_hash": null,
       "ended_at": "2026-09-11T08:23:26+08:00",
       "error_class": null,
+      "error_stage": null,
+      "gap_count": null,
       "generation_id": "CR-DEMO-20260911-MORNING-SCHEDULE",
+      "item_count": null,
       "lane": "publication",
       "last_success_at": "2026-09-11T08:23:26+08:00",
       "outcome": "SUCCESS",
-      "policy_hash": "3404809ff40f7647c44203329d4476b12b62e9ee64df24cd1f1f46cbda59caf4",
+      "policy_hash": "3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501",
       "policy_version": 1,
+      "receipt_ref": "apps/web/public/data/v2-daily-brief.json",
       "stage": "canonical_validation",
-      "started_at": null
+      "started_at": null,
+      "upstream_hash": null
     },
     {
       "active_source_ids": [
@@ -126,17 +374,23 @@
         "S-009",
         "S-029"
       ],
-      "catalog_hash": "95ae82270eaab6f6270d9c00c8122e9bcfafbaf0dd216dc575a5f0b99544c51a",
+      "catalog_hash": "5088623df5af4b8a30f4c597c51235c0f36a3dfd8bc4f2aea9af8f26d10213ef",
+      "downstream_hash": null,
       "ended_at": "2026-09-11T08:23:26+08:00",
       "error_class": "SOURCE_FRESHNESS_STALE",
+      "error_stage": "collection",
+      "gap_count": 0,
       "generation_id": "CR-DEMO-20260911-MORNING-SCHEDULE",
+      "item_count": 5,
       "lane": "publication",
       "last_success_at": "2026-09-11T08:23:26+08:00",
       "outcome": "STALE",
-      "policy_hash": "3404809ff40f7647c44203329d4476b12b62e9ee64df24cd1f1f46cbda59caf4",
+      "policy_hash": "3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501",
       "policy_version": 1,
+      "receipt_ref": "apps/web/public/data/source-status.json",
       "stage": "collection",
-      "started_at": null
+      "started_at": null,
+      "upstream_hash": null
     },
     {
       "active_source_ids": [
@@ -146,17 +400,23 @@
         "S-009",
         "S-029"
       ],
-      "catalog_hash": "95ae82270eaab6f6270d9c00c8122e9bcfafbaf0dd216dc575a5f0b99544c51a",
+      "catalog_hash": "5088623df5af4b8a30f4c597c51235c0f36a3dfd8bc4f2aea9af8f26d10213ef",
+      "downstream_hash": null,
       "ended_at": null,
       "error_class": "NO_DEPLOYMENT_RECEIPT_IN_CANONICAL_ARTIFACT",
+      "error_stage": "deployment",
+      "gap_count": null,
       "generation_id": null,
+      "item_count": null,
       "lane": "publication",
       "last_success_at": null,
       "outcome": "UNKNOWN",
-      "policy_hash": "3404809ff40f7647c44203329d4476b12b62e9ee64df24cd1f1f46cbda59caf4",
+      "policy_hash": "3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501",
       "policy_version": 1,
+      "receipt_ref": null,
       "stage": "deployment",
-      "started_at": null
+      "started_at": null,
+      "upstream_hash": null
     },
     {
       "active_source_ids": [
@@ -166,17 +426,75 @@
         "S-009",
         "S-029"
       ],
-      "catalog_hash": "95ae82270eaab6f6270d9c00c8122e9bcfafbaf0dd216dc575a5f0b99544c51a",
+      "catalog_hash": "5088623df5af4b8a30f4c597c51235c0f36a3dfd8bc4f2aea9af8f26d10213ef",
+      "downstream_hash": null,
+      "ended_at": null,
+      "error_class": "NO_FUSION_RECEIPT_IN_CANONICAL_ARTIFACT",
+      "error_stage": "fusion_verification",
+      "gap_count": null,
+      "generation_id": null,
+      "item_count": null,
+      "lane": "publication",
+      "last_success_at": null,
+      "outcome": "UNKNOWN",
+      "policy_hash": "3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501",
+      "policy_version": 1,
+      "receipt_ref": "apps/web/public/data/public-event-demo.json",
+      "stage": "fusion_verification",
+      "started_at": null,
+      "upstream_hash": null
+    },
+    {
+      "active_source_ids": [
+        "S-004",
+        "S-006",
+        "S-007",
+        "S-009",
+        "S-029"
+      ],
+      "catalog_hash": "5088623df5af4b8a30f4c597c51235c0f36a3dfd8bc4f2aea9af8f26d10213ef",
+      "downstream_hash": null,
+      "ended_at": null,
+      "error_class": "NO_PARSING_RECEIPT_IN_CANONICAL_ARTIFACT",
+      "error_stage": "parsing",
+      "gap_count": null,
+      "generation_id": null,
+      "item_count": null,
+      "lane": "publication",
+      "last_success_at": null,
+      "outcome": "UNKNOWN",
+      "policy_hash": "3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501",
+      "policy_version": 1,
+      "receipt_ref": "apps/web/public/data/source-status.json",
+      "stage": "parsing",
+      "started_at": null,
+      "upstream_hash": null
+    },
+    {
+      "active_source_ids": [
+        "S-004",
+        "S-006",
+        "S-007",
+        "S-009",
+        "S-029"
+      ],
+      "catalog_hash": "5088623df5af4b8a30f4c597c51235c0f36a3dfd8bc4f2aea9af8f26d10213ef",
+      "downstream_hash": null,
       "ended_at": null,
       "error_class": "NO_HTTP_HASH_RECEIPT_IN_CANONICAL_ARTIFACT",
+      "error_stage": "public_http_verification",
+      "gap_count": null,
       "generation_id": null,
+      "item_count": null,
       "lane": "publication",
       "last_success_at": null,
       "outcome": "UNKNOWN",
-      "policy_hash": "3404809ff40f7647c44203329d4476b12b62e9ee64df24cd1f1f46cbda59caf4",
+      "policy_hash": "3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501",
       "policy_version": 1,
+      "receipt_ref": null,
       "stage": "public_http_verification",
-      "started_at": null
+      "started_at": null,
+      "upstream_hash": null
     },
     {
       "active_source_ids": [
@@ -186,17 +504,75 @@
         "S-009",
         "S-029"
       ],
-      "catalog_hash": "95ae82270eaab6f6270d9c00c8122e9bcfafbaf0dd216dc575a5f0b99544c51a",
+      "catalog_hash": "5088623df5af4b8a30f4c597c51235c0f36a3dfd8bc4f2aea9af8f26d10213ef",
+      "downstream_hash": null,
+      "ended_at": null,
+      "error_class": "NO_PUBLICATION_BUILD_RECEIPT_IN_CANONICAL_ARTIFACT",
+      "error_stage": "publication_build",
+      "gap_count": null,
+      "generation_id": null,
+      "item_count": null,
+      "lane": "publication",
+      "last_success_at": null,
+      "outcome": "UNKNOWN",
+      "policy_hash": "3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501",
+      "policy_version": 1,
+      "receipt_ref": "apps/web/public/data/intelligence-feed.json",
+      "stage": "publication_build",
+      "started_at": null,
+      "upstream_hash": null
+    },
+    {
+      "active_source_ids": [
+        "S-004",
+        "S-006",
+        "S-007",
+        "S-009",
+        "S-029"
+      ],
+      "catalog_hash": "5088623df5af4b8a30f4c597c51235c0f36a3dfd8bc4f2aea9af8f26d10213ef",
+      "downstream_hash": null,
+      "ended_at": null,
+      "error_class": "RIGHTS_BLOCKED",
+      "error_stage": "formal_query_admission",
+      "gap_count": null,
+      "generation_id": null,
+      "item_count": null,
+      "lane": "query",
+      "last_success_at": null,
+      "outcome": "UNKNOWN",
+      "policy_hash": "3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501",
+      "policy_version": 1,
+      "receipt_ref": "runtime-evidence/query-gateway-receipt.json",
+      "stage": "formal_query_admission",
+      "started_at": null,
+      "upstream_hash": null
+    },
+    {
+      "active_source_ids": [
+        "S-004",
+        "S-006",
+        "S-007",
+        "S-009",
+        "S-029"
+      ],
+      "catalog_hash": "5088623df5af4b8a30f4c597c51235c0f36a3dfd8bc4f2aea9af8f26d10213ef",
+      "downstream_hash": null,
       "ended_at": null,
       "error_class": "QUERY_RUNTIME_NOT_YET_WIRED",
+      "error_stage": "mcp_web_query",
+      "gap_count": null,
       "generation_id": null,
+      "item_count": null,
       "lane": "query",
       "last_success_at": null,
       "outcome": "UNKNOWN",
-      "policy_hash": "3404809ff40f7647c44203329d4476b12b62e9ee64df24cd1f1f46cbda59caf4",
+      "policy_hash": "3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501",
       "policy_version": 1,
+      "receipt_ref": null,
       "stage": "mcp_web_query",
-      "started_at": null
+      "started_at": null,
+      "upstream_hash": null
     },
     {
       "active_source_ids": [
@@ -206,17 +582,83 @@
         "S-009",
         "S-029"
       ],
-      "catalog_hash": "95ae82270eaab6f6270d9c00c8122e9bcfafbaf0dd216dc575a5f0b99544c51a",
+      "catalog_hash": "5088623df5af4b8a30f4c597c51235c0f36a3dfd8bc4f2aea9af8f26d10213ef",
+      "downstream_hash": null,
       "ended_at": null,
       "error_class": "QUERY_INDEX_NOT_YET_WIRED",
+      "error_stage": "query_index",
+      "gap_count": null,
       "generation_id": null,
+      "item_count": null,
       "lane": "query",
       "last_success_at": null,
       "outcome": "UNKNOWN",
-      "policy_hash": "3404809ff40f7647c44203329d4476b12b62e9ee64df24cd1f1f46cbda59caf4",
+      "policy_hash": "3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501",
       "policy_version": 1,
+      "receipt_ref": null,
       "stage": "query_index",
-      "started_at": null
+      "started_at": null,
+      "upstream_hash": null
+    },
+    {
+      "active_source_ids": [
+        "S-004",
+        "S-006",
+        "S-007",
+        "S-009",
+        "S-029"
+      ],
+      "catalog_hash": "5088623df5af4b8a30f4c597c51235c0f36a3dfd8bc4f2aea9af8f26d10213ef",
+      "downstream_hash": null,
+      "ended_at": null,
+      "error_class": "READ_ONLY_MCP_NOT_YET_WIRED",
+      "error_stage": "read_only_mcp",
+      "gap_count": null,
+      "generation_id": null,
+      "item_count": null,
+      "lane": "query",
+      "last_success_at": null,
+      "outcome": "UNKNOWN",
+      "policy_hash": "3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501",
+      "policy_version": 1,
+      "receipt_ref": null,
+      "stage": "read_only_mcp",
+      "started_at": null,
+      "upstream_hash": null
+    },
+    {
+      "active_source_ids": [
+        "S-004",
+        "S-006",
+        "S-007",
+        "S-009",
+        "S-029"
+      ],
+      "catalog_hash": "5088623df5af4b8a30f4c597c51235c0f36a3dfd8bc4f2aea9af8f26d10213ef",
+      "downstream_hash": null,
+      "ended_at": null,
+      "error_class": "WORKER_DEPLOYMENT_NOT_VERIFIED",
+      "error_stage": "worker_deployment",
+      "gap_count": null,
+      "generation_id": null,
+      "item_count": null,
+      "lane": "query",
+      "last_success_at": null,
+      "outcome": "UNKNOWN",
+      "policy_hash": "3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501",
+      "policy_version": 1,
+      "receipt_ref": null,
+      "stage": "worker_deployment",
+      "started_at": null,
+      "upstream_hash": null
     }
-  ]
+  ],
+  "upstream": {
+    "generation_id": null,
+    "note": "上游 operating state 只反映上游事實，不覆蓋 GovIntel 自身健康判定。",
+    "overrides_govintel_health": false,
+    "stage": "upstream_operating_state",
+    "upstream_current": false,
+    "upstream_operating_state": "UNKNOWN"
+  }
 }

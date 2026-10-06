@@ -30,15 +30,23 @@ from collect import (
     SOURCE_POLICY_BINDING,
     TZ,
     canonical_sha256,
+    catalog_rows,
     freshness_status,
     gap_reasons,
+    load_source_catalog,
     next_update,
     resolve_collection_date,
     save_state,
     scheduled_time,
     timestamp,
 )
-from intel_v2.detail_recheck import classify_observation
+from intel_v2.detail_recheck import classify_observation, plan_recheck
+from intel_v2.detail_recheck_budget import (
+    budget_state_for_storage,
+    plan_recheck_budget,
+    recheck_budget_policy,
+    record_recheck_budget,
+)
 from intel_v2.detail_recheck_http import recheck_detail
 from intel_v2.lkg_age import last_known_good_age
 from intel_v2.located_facts import validate_document_url
@@ -52,6 +60,8 @@ MAX_REDIRECTS = 3
 API_S007 = "https://yishi.tccc.gov.tw/api/ProceedingsBackWeb/FrontList"
 API_S009 = "https://yishi.tccc.gov.tw/api/Proposal/FrontList"
 PARSER_VERSION = "p0-live-1"
+MAX_NEWS_LIST_PAGES = 4
+CANARY_MAX_DETAILS = 5
 SOURCE_ROWS = {
     source_id: (name, "PRIMARY_OFFICIAL", "PREP_CORE", "ACTIVE")
     for source_id, (name, _) in P0_SOURCES.items()
@@ -513,17 +523,20 @@ def collect_s029(session: requests.Session, start: date, end: date) -> dict:
 NEWS_LIST_SOURCES = {
     "S-001": {
         "name": "臺中市政府警察局警政新聞",
+        "pages_candidate": True,
         "list_url": "https://www.police.taichung.gov.tw/ch/home.jsp?id=1&parentpath=0&mcustomize=news_list.jsp",
         "fallback_list_url": "https://www.police.taichung.gov.tw/ch/home.jsp?id=1",
         "id_pattern": r"news_view\.jsp[^\"']*dataserno=(\d+)",
     },
     "S-019": {
         "name": "臺中市政府市政會議紀錄與專案報告",
+        "pages_candidate": True,
         "list_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186",
         "id_pattern": r"/(\d+)/post\b",
     },
     "S-032": {
         "name": "臺中市政府交通局最新消息",
+        "pages_candidate": True,
         "list_url": "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,20",
         "id_pattern": r"index-1\.asp\?Parser=9,4,20,,,,(\d+)",
     },
@@ -583,6 +596,55 @@ def parse_news_list(html: bytes, base_url: str, id_pattern: str) -> list[dict]:
     if not entries:
         raise ValueError("news list has no parseable entries")
     return entries
+
+
+def next_news_list_page(html: bytes, base_url: str, source_id: str) -> tuple[str | None, bool]:
+    """Return a safe next-page URL and whether pagination needs accounting for."""
+    soup = BeautifulSoup(html, "html.parser")
+    pagination_hint = False
+    for control in soup.find_all(["a", "link", "button"]):
+        label = " ".join(control.stripped_strings).strip().lower()
+        title = str(control.get("title") or "").strip().lower()
+        aria_label = str(control.get("aria-label") or "").strip().lower()
+        classes = {str(value).lower() for value in control.get("class", [])}
+        rel = {str(value).lower() for value in control.get("rel", [])}
+        href = str(control.get("href") or "").strip()
+        labels = (label, title, aria_label)
+        is_next = (
+            any(any(token in value for token in ("下一頁", "下一页", "下頁", "下页")) for value in labels if value)
+            or any(re.search(r"\bnext(?:\s+page)?\b", value) for value in labels if value)
+            or "next" in rel
+            or any("next" in value for value in classes)
+        )
+        numbered = any(
+            re.fullmatch(r"(?:第\s*)?\d{1,4}\s*(?:頁|页)?", value)
+            for value in labels
+            if value
+        )
+        if not is_next:
+            if numbered and (
+                re.search(r"[?&](?:page|intpage)=\d+", href, re.I)
+                or re.search(r"javascript:\s*list\(", href, re.I)
+            ):
+                pagination_hint = True
+            continue
+        pagination_hint = True
+        if not href or href.startswith("#"):
+            return None, True
+        if href.lower().startswith("javascript:"):
+            match = re.fullmatch(r"javascript:\s*list\((\d{1,4}),\s*(\d{1,4})\)\s*;?", href, re.I)
+            if source_id != "S-001" or not match or int(match.group(1)) < 1:
+                return None, True
+            parts = urllib.parse.urlsplit(base_url)
+            query = [
+                (key, value)
+                for key, value in urllib.parse.parse_qsl(parts.query, keep_blank_values=True)
+                if key.lower() not in {"page", "intpage"}
+            ]
+            query.extend((("page", match.group(1)), ("intpage", match.group(2))))
+            return urllib.parse.urlunsplit(parts._replace(query=urllib.parse.urlencode(query))), True
+        return urllib.parse.urljoin(base_url, href), True
+    return None, pagination_hint
 
 
 def parse_news_rss(xml: bytes, base_url: str) -> list[dict]:
@@ -725,14 +787,49 @@ def collect_news_list(
     existing: dict[str, dict] | None = None,
     max_details: int | None = None,
 ) -> dict:
-    """Collect a candidate list with bounded detail-page requests."""
+    """Collect a candidate list with bounded list and detail-page requests."""
     config = NEWS_LIST_SOURCES[source_id]
-    listing = get_news_listing(session, source_id)
-    responses = [snapshot(listing, "LIST")]
-    if config.get("format") == "rss":
+    responses = []
+    all_pages_seen = True
+    is_rss = config.get("format") == "rss"
+    page_limit = 1 if is_rss else MAX_NEWS_LIST_PAGES
+    if is_rss:
+        listing = get_news_listing(session, source_id)
+        responses.append(snapshot(listing, "LIST"))
         entries = parse_news_rss(listing.content, listing.url)
+        observed_entries = entries
     else:
-        entries = parse_news_list(listing.content, listing.url, config["id_pattern"])
+        entries = []
+        observed_entries = []
+        seen_keys = set()
+        seen_pages = set()
+        page_url = config["list_url"]
+        for _ in range(MAX_NEWS_LIST_PAGES):
+            if page_url in seen_pages:
+                all_pages_seen = False
+                break
+            seen_pages.add(page_url)
+            listing = (
+                get_news_listing(session, source_id)
+                if page_url == config["list_url"]
+                else get(session, page_url, source_id=source_id)
+            )
+            responses.append(snapshot(listing, "LIST"))
+            page_entries = parse_news_list(listing.content, listing.url, config["id_pattern"])
+            observed_entries.extend(page_entries)
+            for entry in page_entries:
+                if entry["stable_key"] not in seen_keys:
+                    entries.append(entry)
+                    seen_keys.add(entry["stable_key"])
+            next_url, has_next = next_news_list_page(listing.content, listing.url, source_id)
+            if not has_next:
+                break
+            if not next_url or next_url in seen_pages:
+                all_pages_seen = False
+                break
+            page_url = next_url
+        else:
+            all_pages_seen = False
     existing = existing or {}
     details_fetched = 0
     items = []
@@ -771,16 +868,17 @@ def collect_news_list(
             }
         )
 
-    dated = [date.fromisoformat(item["published_at"][:10]) for item in items if item["published_at"]]
+    dated = [entry["published"] for entry in observed_entries if entry["published"]]
     window_items = [
         item for item in items
         if item["published_at"] and start <= date.fromisoformat(item["published_at"][:10]) <= end
     ]
     reverse_chronological = all(left >= right for left, right in zip(dated, dated[1:]))
+    complete_list = all_pages_seen and len(dated) == len(observed_entries) and reverse_chronological
     reaches_before_window = bool(dated) and min(dated) < start
-    if window_items and reverse_chronological and reaches_before_window:
+    if complete_list and window_items and reaches_before_window:
         completeness = "COMPLETE_WITH_ITEMS"
-    elif dated and reverse_chronological and max(dated) < start:
+    elif complete_list and dated and max(dated) < start:
         completeness = "COMPLETE_ZERO"
     else:
         completeness = "PARTIAL"
@@ -788,6 +886,12 @@ def collect_news_list(
     return {
         "source_health": "PASS",
         "window_completeness": completeness,
+        "pagination": {
+            "strategy": "rss" if is_rss else "next-link",
+            "pages_fetched": sum(response["purpose"] == "LIST" for response in responses),
+            "page_limit": page_limit,
+            "complete": all_pages_seen,
+        },
         "window_item_count": len(window_items),
         "snapshot_item_count": len(items),
         "items": items,
@@ -1018,6 +1122,66 @@ def _save_detail_snapshot(
     return snapshot_id
 
 
+def _detail_budget_host(row: dict) -> str:
+    """Return the approved host used for the per-host request cap."""
+    try:
+        source = validate_document_url(row["source_id"], row["requested_url"])
+        host = urllib.parse.urlsplit(source["entrypoint"]).hostname
+    except (ValueError, TypeError, OSError):
+        host = None
+    if not host:
+        try:
+            host = urllib.parse.urlsplit(str(row["requested_url"])).hostname
+        except (ValueError, TypeError, OSError):
+            host = None
+    return str(host or f"unresolved:{row['source_id']}")
+
+
+def _defer_detail_recheck(
+    connection,
+    row: dict,
+    *,
+    due_at: str | None,
+    budget_state: dict,
+    observed_at: datetime,
+) -> None:
+    connection.execute(
+        """
+        UPDATE detail_recheck_state
+        SET next_check_at = GREATEST(next_check_at, COALESCE(%s, next_check_at)),
+            budget_state = %s::jsonb,
+            updated_at = %s
+        WHERE source_id = %s AND stable_key = %s
+        """,
+        (
+            datetime.fromisoformat(due_at) if due_at else None,
+            _detail_json(budget_state),
+            observed_at,
+            row["source_id"],
+            row["stable_key"],
+        ),
+    )
+
+
+def _detail_recheck_outcome(row: dict, reason: str, budget_state: dict, decision: dict) -> dict:
+    """Return a refused-target outcome that carries no document evidence."""
+    return {
+        "source_id": row["source_id"],
+        "stable_key": row["stable_key"],
+        "requested_url": row["requested_url"],
+        "status": "SKIPPED",
+        "reason": reason,
+        "review_required": False,
+        "classification": None,
+        "snapshot_id": None,
+        "budget": {
+            "reason": reason,
+            "due_at": decision["due_at"],
+            "state": budget_state,
+        },
+    }
+
+
 def run_detail_rechecks(
     connection,
     session: requests.Session,
@@ -1026,31 +1190,119 @@ def run_detail_rechecks(
     *,
     limit: int = DETAIL_RECHECK_MAX_PER_RUN,
     interval_hours: float = DETAIL_RECHECK_INTERVAL_HOURS,
+    budget_policy: dict | None = None,
 ) -> list[dict]:
-    if not isinstance(limit, int) or limit < 0:
+    if not isinstance(limit, int) or isinstance(limit, bool) or limit < 0:
         raise ValueError("detail recheck limit must be non-negative")
     if not source_run_ids or limit == 0:
         return []
+    # Validate the policy before opening the row-lock transaction so a bad
+    # operator input can never abort a collection run mid-flight.
+    resolved_policy = recheck_budget_policy(budget_policy)
     source_ids = sorted(source_run_ids)
     placeholders = ", ".join(["%s"] * len(source_ids))
+    # The candidate batch is the unit of accounting: it must be wider than the
+    # request limit, otherwise the per-source and per-host caps could never
+    # arbitrate between due targets.
+    candidate_limit = max(
+        limit,
+        resolved_policy["per_source_limit"],
+        resolved_policy["per_host_limit"],
+    )
     # ponytail: one row lock spans one bounded request; split claim/worker
     # phases only if recheck throughput becomes a measured bottleneck.
     with connection.transaction():
+        # Serialize rolling-budget admission and ledger updates across runs.
+        # Row locks alone would allow two disjoint target batches on one host.
+        connection.execute("SELECT pg_advisory_xact_lock(hashtext('govintel-detail-budget-v1'))")
+        historical_rows = connection.execute(
+            "SELECT source_id, stable_key, requested_url, budget_state FROM detail_recheck_state"
+        ).fetchall()
         rows = connection.execute(
             f"""
             SELECT source_id, stable_key, requested_url, last_checked_at, next_check_at,
                    etag, last_modified, document_version_id, body_sha256,
-                   normalized_text_sha256, attachments
+                   normalized_text_sha256, attachments, budget_state
             FROM detail_recheck_state
             WHERE next_check_at <= %s AND source_id IN ({placeholders})
             ORDER BY next_check_at, source_id, stable_key
             LIMIT %s
             FOR UPDATE SKIP LOCKED
             """,
-            (observed_at, *source_ids, limit),
+            (observed_at, *source_ids, candidate_limit),
         ).fetchall()
+        observed = timestamp(observed_at)
+        # Due-ness is decided once, with the same TTL planner the transport
+        # uses, so a target that is not due never consumes a budget slot.
+        due_keys = {
+            (row["source_id"], row["stable_key"])
+            for row in rows
+            if plan_recheck(
+                _detail_previous(row),
+                observed,
+                interval_hours=interval_hours,
+            )["status"]
+            == "DUE"
+        }
+        decisions = {
+            (item["source_id"], item["stable_key"]): item
+            for item in plan_recheck_budget(
+                [
+                    {
+                        "source_id": row["source_id"],
+                        "stable_key": row["stable_key"],
+                        "host": _detail_budget_host(row),
+                        "budget_state": row.get("budget_state"),
+                    }
+                    for row in rows
+                    if (row["source_id"], row["stable_key"]) in due_keys
+                ],
+                now=observed,
+                policy=resolved_policy,
+                run_limit=limit,
+                historical_targets=[{
+                    "source_id": row["source_id"], "stable_key": row["stable_key"],
+                    "host": _detail_budget_host(row), "budget_state": row.get("budget_state"),
+                } for row in historical_rows],
+            )
+        }
         outcomes = []
         for row in rows:
+            key = (row["source_id"], row["stable_key"])
+            if key not in due_keys:
+                checked = row.get("last_checked_at")
+                base = checked if isinstance(checked, datetime) else observed_at
+                next_due = timestamp(max(base + timedelta(hours=interval_hours), observed_at))
+                state = budget_state_for_storage(
+                    row.get("budget_state"), now=observed, policy=resolved_policy
+                )
+                state["last_decision"] = "NOT_DUE"
+                _defer_detail_recheck(
+                    connection,
+                    row,
+                    due_at=next_due,
+                    budget_state=state,
+                    observed_at=observed_at,
+                )
+                outcomes.append(
+                    _detail_recheck_outcome(row, "NOT_DUE", state, {"due_at": next_due})
+                )
+                continue
+            decision = decisions[key]
+            if decision["decision"] != "ALLOW":
+                _defer_detail_recheck(
+                    connection,
+                    row,
+                    due_at=decision["due_at"],
+                    budget_state=decision["budget_state"],
+                    observed_at=observed_at,
+                )
+                outcomes.append(
+                    _detail_recheck_outcome(
+                        row, decision["reason"], decision["budget_state"], decision
+                    )
+                )
+                continue
             previous = _detail_previous(row)
             try:
                 source = validate_document_url(row["source_id"], row["requested_url"])
@@ -1069,7 +1321,29 @@ def run_detail_rechecks(
             except (ValueError, TypeError, OSError, requests.RequestException) as error:
                 result = _detail_unavailable(row["requested_url"], previous, observed_at, error)
 
-            classification = result["classification"]
+            classification = result.get("classification")
+            if not isinstance(classification, dict):
+                # Defence in depth: the target was planned as due but the
+                # transport refused to classify it, so no document evidence
+                # exists.  Never record that as a completed check.
+                checked = row.get("last_checked_at")
+                base = checked if isinstance(checked, datetime) else observed_at
+                next_due = timestamp(max(base + timedelta(hours=interval_hours), observed_at))
+                state = budget_state_for_storage(
+                    row.get("budget_state"), now=observed, policy=resolved_policy
+                )
+                state["last_decision"] = "NOT_DUE"
+                _defer_detail_recheck(
+                    connection,
+                    row,
+                    due_at=next_due,
+                    budget_state=state,
+                    observed_at=observed_at,
+                )
+                outcomes.append(
+                    _detail_recheck_outcome(row, "NOT_DUE", state, {"due_at": next_due})
+                )
+                continue
             snapshot_id = _save_detail_snapshot(
                 connection,
                 source_run_ids[row["source_id"]],
@@ -1089,6 +1363,14 @@ def run_detail_rechecks(
             }
             checked_at = datetime.fromisoformat(classification["last_checked_at"])
             next_check_at = detail_next_check(classification, checked_at, interval_hours=interval_hours)
+            budget_state = record_recheck_budget(
+                row.get("budget_state"),
+                classification,
+                now=observed,
+                policy=resolved_policy,
+            )
+            if budget_state["deferred_until"]:
+                next_check_at = max(next_check_at, datetime.fromisoformat(budget_state["deferred_until"]))
             public_result = {key: value for key, value in result.items() if key != "response_body"}
             connection.execute(
                 """
@@ -1108,7 +1390,8 @@ def run_detail_rechecks(
                     changed_fields = %s::jsonb,
                     last_result = %s::jsonb,
                     last_snapshot_id = COALESCE(%s, last_snapshot_id),
-                    updated_at = %s
+                    updated_at = %s,
+                    budget_state = %s::jsonb
                 WHERE source_id = %s AND stable_key = %s
                 """,
                 (
@@ -1128,6 +1411,7 @@ def run_detail_rechecks(
                     _detail_json(public_result),
                     snapshot_id,
                     observed_at,
+                    _detail_json(budget_state),
                     row["source_id"],
                     row["stable_key"],
                 ),
@@ -1138,9 +1422,15 @@ def run_detail_rechecks(
                     "stable_key": row["stable_key"],
                     "requested_url": row["requested_url"],
                     "status": classification["status"],
+                    "reason": None,
                     "review_required": classification["review_required"],
                     "classification": public_result["classification"],
                     "snapshot_id": snapshot_id,
+                    "budget": {
+                        "reason": None,
+                        "due_at": timestamp(next_check_at),
+                        "state": budget_state,
+                    },
                 }
             )
     return outcomes
@@ -1299,7 +1589,9 @@ def run_database_slot(slot: str, slot_date: date, now: datetime | None = None) -
     if not database_url:
         raise RuntimeError("DATABASE_URL is required for an online slot")
     slot = slot.upper()
-    now = (now or datetime.now(TZ)).astimezone(TZ)
+    observed_now = now or datetime.now(TZ)
+    slot_date = resolve_collection_date(slot, "manual", slot_date, now=observed_now)
+    now = observed_now.astimezone(TZ)
     scheduled_for = scheduled_time(slot_date, slot)
     if now < scheduled_for:
         raise ValueError(f"{slot} slot is not due until {timestamp(scheduled_for)}")
@@ -1345,7 +1637,12 @@ def run_database_slot(slot: str, slot_date: date, now: datetime | None = None) -
                 attempted_at = datetime.now(TZ)
                 started = time.monotonic()
                 try:
-                    collected = collect_source(session, source_id, window_start.date(), window_end.date())
+                    # List-first collectors diff against durable current items so
+                    # unchanged list rows never refetch their detail pages.
+                    existing = current_items(connection, source_id)
+                    collected = collect_source(
+                        session, source_id, window_start.date(), window_end.date(), existing
+                    )
                     completed_at = datetime.now(TZ)
                     with connection.transaction():
                         save_success(
@@ -1423,7 +1720,8 @@ def canary() -> None:
     summary = {}
     for source_id in P0_SOURCES:
         started = time.monotonic()
-        result = collect_source(session, source_id, start, end)
+        options = {"max_details": CANARY_MAX_DETAILS} if COLLECTORS.get(source_id) is collect_news_list else {}
+        result = collect_source(session, source_id, start, end, {}, **options)
         summary[source_id] = {
             "source_health": result["source_health"],
             "window_completeness": result["window_completeness"],
@@ -1441,19 +1739,25 @@ def project_feed_item(
     source_id: str,
     source_name: str,
     source_url: str,
+    source_role: str,
+    integration_status: str,
     freshness: str,
     source_health: str,
     window_completeness: str,
     data_as_of: str | None,
     fetched_at: str,
     previous_sha256s: set[str],
+    *,
+    baseline_only: bool = False,
 ) -> dict:
     """Project a raw collector item into a safe feed item for the homepage."""
     stable_key_hash = canonical_sha256(f"{source_id}:{item['stable_key']}")[:16]
     stable_id = f"FEED-{source_id}-{stable_key_hash}"
 
     # Determine change type
-    if item["content_sha256"] in previous_sha256s:
+    if baseline_only:
+        change_type = "CONFIRMED"
+    elif item["content_sha256"] in previous_sha256s:
         # Item content is identical to prior feed. However, if the source is
         # confirmed FRESH and healthy, mark as CONFIRMED (still active/valid)
         # rather than UNCHANGED (implies stale repetition).
@@ -1485,7 +1789,9 @@ def project_feed_item(
         title = title[:197] + "…"
 
     # Eligibility rules — order matters: most restrictive first
-    if change_type == "UNCHANGED":
+    if baseline_only:
+        eligibility = "INELIGIBLE_BASELINE"
+    elif change_type == "UNCHANGED":
         eligibility = "INELIGIBLE_UNCHANGED"
     elif source_health == "FAILED":
         eligibility = "INELIGIBLE_SOURCE_FAILED"
@@ -1498,6 +1804,9 @@ def project_feed_item(
     else:
         eligibility = "HOME_CANDIDATE"
 
+    if integration_status != "PRODUCTION_ACTIVE":
+        eligibility = "INELIGIBLE_CANDIDATE_SOURCE_FAILED" if source_health == "FAILED" else "INELIGIBLE_CANDIDATE"
+
     # Reason codes based on source context
     reason_codes = []
     if source_id in ("S-007",):
@@ -1508,6 +1817,8 @@ def project_feed_item(
         reason_codes.append("POLICY_CHANGE")
     elif source_id in ("S-029",):
         reason_codes.append("CROSS_SOURCE")
+    if baseline_only:
+        reason_codes.append("FIRST_OBSERVATION_BASELINE")
     if not reason_codes:
         reason_codes.append("HIGH_VALUE")
 
@@ -1531,7 +1842,9 @@ def project_feed_item(
         "stable_id": stable_id,
         "source_id": source_id,
         "source_name": source_name,
-        "source_role": "PRIMARY_OFFICIAL",
+        "source_role": "PRIMARY_OFFICIAL" if integration_status == "PRODUCTION_ACTIVE" else "CANDIDATE_UNVERIFIED",
+        "catalog_role": source_role,
+        "integration_status": integration_status,
         "title": title,
         "official_url": item.get("source_url") or source_url,
         "published_at": item.get("published_at"),
@@ -1767,6 +2080,7 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
         prior_feed_sha256s = {item["content_sha256"] for item in prior_feed["items"] if item.get("content_sha256")}
 
     session = http_session()
+    catalog = catalog_rows()
     window_end = scheduled_time(slot_date, slot)
     window_start = window_end - timedelta(days=7)
     next_at = next_update(slot_date, slot)
@@ -1779,6 +2093,9 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
         source_run_id = f"SR-DEMO-{slot_date:%Y%m%d}-{slot}-{source_id[2:]}"
         previous = prior_sources.get(source_id, {})
         previous_lkg = previous.get("last_known_good")
+        baseline_only = previous_lkg is None and not any(
+            item.get("source_id") == source_id for item in (prior_feed or {}).get("items", [])
+        )
         retained_data_as_of = previous.get("data_as_of")
         retained_date_metadata = {
             key: previous[key]
@@ -1797,6 +2114,7 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
         collected_items = []
         try:
             collected = collect_source(session, source_id, window_start.date(), window_end.date())
+            source_checked_at = datetime.now(TZ)
             collected_items = collected.get("items", [])
             raw_items_by_source[source_id] = collected_items
             dated_items = [
@@ -1835,11 +2153,11 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
                     data_as_of = retained_data_as_of
                     date_metadata = dict(retained_date_metadata)
             manifest_changed = collected["manifest_sha256"] != previous.get("manifest_sha256")
-            change_count = collected["window_item_count"] if manifest_changed else 0
+            change_count = collected["window_item_count"] if manifest_changed and not baseline_only else 0
             result = result_for(collected["window_completeness"], change_count)
             lkg = {
                 "source_run_id": source_run_id,
-                "completed_at": timestamp(now),
+                "completed_at": timestamp(source_checked_at),
                 "manifest_sha256": collected["manifest_sha256"],
                 "snapshot_item_count": collected["snapshot_item_count"],
                 "snapshot_count": len(collected["snapshots"]),
@@ -1857,12 +2175,13 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
                 "snapshot_count": len(collected["snapshots"]),
                 "manifest_sha256": collected["manifest_sha256"],
                 "data_as_of": data_as_of,
-                "last_checked_at": timestamp(now),
-                "last_success_at": timestamp(now),
+                "last_checked_at": timestamp(source_checked_at),
+                "last_success_at": timestamp(source_checked_at),
                 "next_update_at": next_at,
                 "last_known_good": lkg,
             }
         except Exception as error:
+            source_checked_at = datetime.now(TZ)
             record = {
                 "source_id": source_id,
                 "source_name": source_name,
@@ -1879,7 +2198,7 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
                 # clock even when today's fetch fails. Preserve LKG content,
                 # while removing that unsupported publication-time claim.
                 "data_as_of": retained_data_as_of,
-                "last_checked_at": timestamp(now),
+                "last_checked_at": timestamp(source_checked_at),
                 "last_success_at": previous.get("last_success_at"),
                 "next_update_at": next_at,
                 "last_known_good": previous_lkg,
@@ -1888,16 +2207,21 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
         if isinstance(date_metadata.get("data_as_of_evidence"), dict):
             date_metadata["data_as_of_evidence"] = public_date_evidence(date_metadata["data_as_of_evidence"])
         record.update(date_metadata)
-        freshness = freshness_status(record["data_as_of"], now, *SOURCE_FRESHNESS_POLICY.get(source_id, (13, 24)))
+        catalog_row = catalog.get(source_id, {})
+        record["source_role"] = catalog_row.get("role")
+        record["integration_status"] = catalog_row.get("status")
+        if source_checked_at < now:
+            raise ValueError("collection clock moved backwards")
+        freshness = freshness_status(record["data_as_of"], source_checked_at, *SOURCE_FRESHNESS_POLICY.get(source_id, (13, 24)))
         record["freshness_status"] = freshness
-        record["last_known_good_age"] = last_known_good_age(record["last_known_good"], now)
+        record["last_known_good_age"] = last_known_good_age(record["last_known_good"], source_checked_at)
         record["intelligence_gaps"] = gap_reasons(record, record["last_known_good"], freshness)
         if freshness == "NO_DATA":
             record["intelligence_gaps"].append("NO_DATA_AS_OF")
         source_status.append(record)
 
         # Project items into feed
-        fetched_at = timestamp(now)
+        fetched_at = timestamp(source_checked_at)
         if collected_items:
             for item in collected_items:
                 feed_item = project_feed_item(
@@ -1905,12 +2229,15 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
                     source_id=source_id,
                     source_name=source_name,
                     source_url=source_url,
+                    source_role=record["source_role"],
+                    integration_status=record["integration_status"],
                     freshness=freshness,
                     source_health=record["source_health"],
                     window_completeness=record["window_completeness"],
                     data_as_of=record["data_as_of"],
                     fetched_at=fetched_at,
                     previous_sha256s=prior_feed_sha256s,
+                    baseline_only=baseline_only,
                 )
                 feed_items.append(feed_item)
         elif record["source_health"] == "FAILED" and prior_feed and isinstance(prior_feed.get("items"), list):
@@ -1920,10 +2247,13 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
                     lkg_item = {**prior_item}
                     lkg_item["change_type"] = "LKG"
                     lkg_item["source_health"] = "FAILED"
+                    lkg_item["source_role"] = record["source_role"]
+                    lkg_item["integration_status"] = record["integration_status"]
                     lkg_item["eligibility"] = "INELIGIBLE_SOURCE_FAILED"
                     lkg_item["freshness_status"] = freshness if freshness != "FRESH" else "VERY_STALE"
                     lkg_item["data_as_of"] = record["data_as_of"]
-                    lkg_item["fetched_at"] = fetched_at
+                    # A failed poll did not fetch these retained bytes.
+                    lkg_item["fetched_at"] = prior_item.get("fetched_at")
                     if isinstance(lkg_item.get("date_evidence"), dict):
                         lkg_item["date_evidence"] = public_date_evidence(lkg_item["date_evidence"])
                     feed_items.append(lkg_item)
@@ -1935,6 +2265,44 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
             "item_count": len(collected_items),
         }
 
+    candidate_sources = []
+    for source_id in load_source_catalog().get("promotion_plan", []):
+        row = catalog.get(source_id)
+        if not row or row["status"] == "PRODUCTION_ACTIVE" or source_id not in NEWS_LIST_SOURCES:
+            continue
+        entry = {
+            "source_id": source_id,
+            "source_name": row["name"],
+            "source_url": row["entrypoint"],
+            "source_role": row["role"],
+            "integration_status": row["status"],
+            "cadence_class": row.get("cadence_class"),
+            "promotion_eligible": False,
+        }
+        for field in ("public_usage_notice", "retention_class"):
+            if row.get(field):
+                entry[field] = row[field]
+        candidate_sources.append(entry)
+    from scripts.candidate_lane import collect_pages_candidate_lane
+
+    candidate_status, candidate_items, candidate_summary = collect_pages_candidate_lane(
+        globals(),
+        window_start.date(),
+        window_end.date(),
+        prior,
+        prior_feed,
+        now,
+        next_at,
+        clock=lambda: datetime.now(TZ),
+    )
+
+    finished_at = datetime.now(TZ)
+    if finished_at < now or any(
+        datetime.fromisoformat(row["last_checked_at"]) > finished_at
+        for row in source_status + candidate_status
+    ):
+        raise ValueError("collection clock moved backwards")
+
     failed = sum(item["result"] == "FAILED" for item in source_status)
     partial = sum(item["result"] == "PARTIAL" for item in source_status)
     status = "FAILED" if failed == len(source_status) else "PARTIAL" if failed or partial else "SUCCEEDED"
@@ -1943,8 +2311,9 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
         "schema_version": 1,
         "source_policy": SOURCE_POLICY_BINDING,
         "mode": "COMPETITION_DEMO",
-        "generated_at": timestamp(now),
+        "generated_at": timestamp(finished_at),
         "next_update_at": next_at,
+        "candidate_catalog": candidate_sources,
         "latest_collection_run": {
             "source_policy": SOURCE_POLICY_BINDING,
             "collection_run_id": collection_run_id,
@@ -1952,10 +2321,12 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
             "slot": slot,
             "trigger": trigger.upper(),
             "scheduled_for": timestamp(window_end),
-            "finished_at": timestamp(now),
+            "started_at": timestamp(now),
+            "finished_at": timestamp(finished_at),
             "status": status,
         },
         "sources": source_status,
+        "candidate_sources": candidate_status,
     }
     save_state(output, state)
 
@@ -1971,10 +2342,12 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
     feed_state = {
         "source_policy": SOURCE_POLICY_BINDING,
         "schema_version": 1,
-        "generated_at": timestamp(now),
+        "generated_at": timestamp(finished_at),
         "collection_run_id": collection_run_id,
         "items": deduped_items,
         "source_summary": source_summary,
+        "candidate_items": candidate_items,
+        "candidate_source_summary": candidate_summary,
     }
     save_state(feed_output, feed_state)
 
@@ -1983,7 +2356,7 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
 
     # Generate intelligence summary
     summary_output = output.parent / "intelligence-summary.json"
-    summary_data = generate_intelligence_summary(deduped_items, collection_run_id, now, source_status)
+    summary_data = generate_intelligence_summary(deduped_items, collection_run_id, finished_at, source_status)
     summary_data["source_policy"] = SOURCE_POLICY_BINDING
     save_state(summary_output, summary_data)
     print(f"SUMMARY_OK topics={len(summary_data['key_topics'])} output={summary_output}")

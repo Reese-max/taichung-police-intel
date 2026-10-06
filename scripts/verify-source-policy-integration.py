@@ -179,6 +179,12 @@ def run_promoted_fixture(catalog, current, old_store, query_store) -> dict[str, 
         for row in status["sources"]:
             row.update(source_health="PASS", window_completeness="COMPLETE_ZERO", result="NO_NEW_ITEM",
                        freshness_status="FRESH", last_checked_at=feed["generated_at"], last_success_at=feed["generated_at"])
+        promoted_rows = {row["source_id"]: row for row in promoted_catalog["sources"]}
+        for row in status["sources"]:
+            catalog_row = promoted_rows[row["source_id"]]
+            row.update(source_role=catalog_row["role"], integration_status=catalog_row["status"])
+        status["candidate_catalog"] = [row for row in status.get("candidate_catalog", [])
+                                       if row["source_id"] not in promoted["active_source_ids"]]
         brief.update(publication_status="READY", snapshot_complete=True)
         summary = {"schema_version": 1, "generated_at": feed["generated_at"], "collection_run_id": feed["collection_run_id"],
                    "total_items": 0, "eligible_items": 0, "source_breakdown": [{"source_id": source_id, "item_count": 0}
@@ -192,7 +198,9 @@ def run_promoted_fixture(catalog, current, old_store, query_store) -> dict[str, 
         write("old-result.json", old_result)
         completed = subprocess.run([sys.executable, "scripts/verify-source-policy-integration.py", "--fixture-check",
                                     "--old-store", "old-store.json", "--old-result", "old-result.json",
-                                    "--as-of", clock.isoformat()], cwd=fixture, text=True, capture_output=True, check=True)
+                                    "--as-of", clock.isoformat()], cwd=fixture, text=True, capture_output=True)
+        if completed.returncode:
+            raise ValueError("promoted fixture check failed: " + (completed.stdout + completed.stderr)[-4000:])
         result = json.loads(completed.stdout.splitlines()[-1])
         if result["policy_hash"] != promoted["policy_hash"]:
             raise ValueError("executed fixture policy differs from compiled candidate")

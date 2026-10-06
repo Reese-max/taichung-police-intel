@@ -22,9 +22,12 @@ RUNTIME_PATHS = (
     "scripts/answer-gate-runner.mjs", "scripts/query-gateway-stdio.py",
     "intel_v2/__init__.py", "intel_v2/semantics.py", "intel_v2/query_domain.py",
     "intel_v2/located_facts.py", "intel_v2/freshness_policy.py", "intel_v2/public_brief.py",
+    "intel_v2/conversation.py", "intel_v2/entity_binding.py", "scripts/entity-registry.py", "config/entity-registry.v1.json",
     "workers/query-gateway/src/index.js", "apps/web/lib/answer-evidence-gate.js",
     "apps/web/lib/publication-dates.js",
-    "workers/query-gateway/src/public-brief.js",
+    "workers/query-gateway/src/public-brief.js", "workers/query-gateway/src/research.js",
+    "workers/query-gateway/src/document-evidence.js", "workers/query-gateway/src/document-research.js",
+    "apps/web/public/data/retention-policy-binding.json",
     "apps/web/lib/council-prep.js", "docs/govintel/source-catalog.v2.json",
     "docs/govintel/retention-rights-policy.v1.json", "docs/govintel/source-policy.approved.json",
 )
@@ -105,7 +108,8 @@ def make_governed_policy_fixture(root, *, source_root=ROOT, rights_reviewed=True
             document_id document_version_id evidence_id official_url evidence_locator version_id observed_at
             published_at effective_at fields tracking version_count comparison_status before after materiality
             source_document_versions affected_handoff_claims statistic_id dataset_id metric period value unit geography
-            agency provisional comparison_period official_note""".split()
+            agency provisional comparison_period official_note entity_registry registry_hash registry_version
+            control_start road""".split()
         matrix["classes"]["FICTIONAL_DOMAIN_SUMMARY"]["public_fields"] = sorted(
             set(matrix["classes"]["FICTIONAL_DOMAIN_SUMMARY"]["public_fields"]) | set(domain_fields))
         for sid in domain_source_ids:
@@ -126,7 +130,10 @@ def make_governed_policy_fixture(root, *, source_root=ROOT, rights_reviewed=True
     policy = compiler.compile_governed_policy(catalog, previous=previous, promotions=promotions)
     binding = compiler.policy_binding(policy)
     paths["approved"].write_text(json.dumps(policy, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    paths["public"].mkdir(parents=True)
+    paths["public"].mkdir(parents=True, exist_ok=True)
+    retention = load_fixture_module(fixture, "fixture_retention_binding", "scripts/retention-policy.py")
+    (paths["public"] / "retention-policy-binding.json").write_text(
+        json.dumps(retention.policy_binding(retention.compile_policy(catalog, matrix)), ensure_ascii=False) + "\n", encoding="utf-8")
     stamp = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat().replace("+00:00", "Z")
     run = "CR-FICTIONAL-GOVERNED-PUBLICATION"
     source = policy["active_sources"][0]

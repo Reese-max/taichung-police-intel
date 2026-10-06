@@ -2,6 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { assessPublication } from "../lib/publication-freshness.mjs";
+import {
+  formatSloMetric,
+  sloMetricEntries,
+  stageModelEntries,
+  upstreamOperatingStateLabel,
+} from "../lib/system-health-view.mjs";
 import { isHealthyStaleSource } from "../lib/source-status.js";
 import {
   addLocalWatch,
@@ -28,6 +34,7 @@ import {
 } from "../lib/local-review.js";
 import QueryGatewayPanel from "./QueryGatewayPanel.js";
 import PublicEventFusionDemo from "./PublicEventFusionDemo.js";
+import DiscoverySignalsPanel from "./DiscoverySignalsPanel.js";
 
 
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
@@ -274,6 +281,8 @@ function ReviewInboxPanel({ health, localReview, onDecision, onFeedback, onExpor
 
 function SystemHealthSummary({ health, localReview, onDecision, onFeedback, onExport, notice, error }) {
   if (!health || !health.lanes || !Array.isArray(health.stages)) return null;
+  const stageIds = stageModelEntries(health);
+  const sloMetrics = sloMetricEntries(health);
   return (
     <details className="v2-system-health" data-testid="v2-system-health">
       <summary>端到端系統健康：{health.overall}</summary>
@@ -286,6 +295,19 @@ function SystemHealthSummary({ health, localReview, onDecision, onFeedback, onEx
             </div>
           ))}
         </div>
+        {stageIds.length > 0 && (
+          <p className="v2-health-note" data-testid="v2-stage-model">
+            階段模型：{health.stage_model.version} · {stageIds.length} 個階段
+            {health.generated_at && ` · 產生於 ${formatDateTime(health.generated_at)}`}
+          </p>
+        )}
+        {health.upstream && (
+          <p className="v2-health-note" data-testid="v2-upstream-operating-state">
+            上游 Dashboard 狀態：{upstreamOperatingStateLabel(health)}
+            {health.upstream.generation_id && ` · ${health.upstream.generation_id}`}
+            {` · 只反映上游事實，不覆蓋 GovIntel 自身健康`}
+          </p>
+        )}
         {health.operator_summary && (
           <p className="v2-health-note" data-testid="v2-operator-summary">
             操作提示：{health.operator_summary.message}
@@ -298,10 +320,34 @@ function SystemHealthSummary({ health, localReview, onDecision, onFeedback, onEx
             <li key={`${stage.lane}-${stage.stage}`}>
               <span>{stage.lane} / {stage.stage}</span>
               <strong>{stage.outcome}</strong>
-              <small>{stage.error_class || `最後觀測：${formatDateTime(stage.ended_at || stage.last_success_at)}`}</small>
+              <small>
+                {stage.error_class
+                  ? `${stage.error_class}${stage.error_stage ? ` @ ${stage.error_stage}` : ""}`
+                  : `最後觀測：${formatDateTime(stage.ended_at || stage.last_success_at)}`}
+                {stage.generation_id && ` · generation ${stage.generation_id}`}
+              </small>
             </li>
           ))}
         </ul>
+        {sloMetrics.length > 0 && (
+          <>
+            <p className="v2-health-note" data-testid="v2-slo-status">
+              量測欄位（{health.slo.status}）：第一版只量測欄位，不承諾未驗證的 SLA 門檻。
+            </p>
+            <ul className="v2-health-stage-list" data-testid="v2-slo-metrics">
+              {sloMetrics.map(([name, metric]) => {
+                const shown = formatSloMetric(metric);
+                return (
+                  <li key={name}>
+                    <span>{name}</span>
+                    <strong>{shown.value}</strong>
+                    {shown.note && <small>{shown.note}</small>}
+                  </li>
+                );
+              })}
+            </ul>
+          </>
+        )}
         <ReviewInboxPanel
           health={health}
           localReview={localReview}
@@ -400,43 +446,83 @@ function ActionCard({ item, index, tracked, onAddWatch, storageReady }) {
   );
 }
 
-function SourceHealthSummary({ sourceStatus, canReassure }) {
+function SourceHealthSummary({ sourceStatus, canReassure, candidateContext }) {
   const sources = Array.isArray(sourceStatus?.sources) ? sourceStatus.sources : [];
-  if (!sources.length) return null;
+  const candidateSources = Array.isArray(candidateContext?.sources) ? candidateContext.sources : [];
+  const candidateItems = Array.isArray(candidateContext?.items) ? candidateContext.items : [];
+  if (!sources.length && !candidateSources.length) return null;
 
   return (
-    <details className="v2-source-health">
-      <summary>查看 {sources.length} 個官方來源的快照健康狀態</summary>
-      <div className="v2-source-health-grid">
-        {sources.map((source) => (
-          <article key={source.source_id}>
-            <div>
-              <span
-                className={`v2-source-dot ${canReassure && source.source_health === "PASS" ? "pass" : "fail"}`}
-                aria-hidden="true"
-              />
-              <strong>{source.source_id}</strong>
-            </div>
-            <h3>{SOURCE_NAMES[source.source_id] || source.source_name}</h3>
-            <p>
-              {source.source_health} · {source.freshness_status}
-            </p>
-            <small>最後檢查：{formatDateTime(source.last_checked_at)}</small>
-            {isHealthyStaleSource(source) && (
-              <small data-testid={`healthy-stale-note-${source.source_id}`}>
-                已成功核對官方來源；最新資料日期較舊，不能解讀為目前沒有事件。
-              </small>
-            )}
-            {source.intelligence_gaps?.length > 0 && (
-              <small>缺口：{source.intelligence_gaps.join("、")}</small>
-            )}
-            <a href={source.source_url} target="_blank" rel="noreferrer">
-              官方來源
-            </a>
-          </article>
-        ))}
-      </div>
-    </details>
+    <>
+      {sources.length > 0 && (
+        <details className="v2-source-health">
+          <summary>查看 {sources.length} 個官方來源的快照健康狀態</summary>
+          <div className="v2-source-health-grid">
+            {sources.map((source) => (
+              <article key={source.source_id}>
+                <div>
+                  <span
+                    className={`v2-source-dot ${canReassure && source.source_health === "PASS" ? "pass" : "fail"}`}
+                    aria-hidden="true"
+                  />
+                  <strong>{source.source_id}</strong>
+                </div>
+                <h3>{SOURCE_NAMES[source.source_id] || source.source_name}</h3>
+                <p>
+                  {source.source_health} · {source.freshness_status}
+                </p>
+                <small>最後檢查：{formatDateTime(source.last_checked_at)}</small>
+                {isHealthyStaleSource(source) && (
+                  <small data-testid={`healthy-stale-note-${source.source_id}`}>
+                    已成功核對官方來源；最新資料日期較舊，不能解讀為目前沒有事件。
+                  </small>
+                )}
+                {source.intelligence_gaps?.length > 0 && (
+                  <small>缺口：{source.intelligence_gaps.join("、")}</small>
+                )}
+                <a href={source.source_url} target="_blank" rel="noreferrer">
+                  官方來源
+                </a>
+              </article>
+            ))}
+          </div>
+        </details>
+      )}
+      {candidateSources.length > 0 && (
+        <details className="v2-source-health v2-candidate-observations" data-testid="candidate-source-observations">
+          <summary>候選來源觀察（尚未啟用）· {candidateSources.length} 個來源 / {candidateItems.length} 筆觀察</summary>
+          <p className="v2-candidate-note">
+            下列來源維持 CANDIDATE，只供人工檢視；不列入正式事件、來源健康總數或自動追蹤。
+          </p>
+          <div className="v2-source-health-grid">
+            {candidateSources.map((source) => (
+              <article key={source.source_id}>
+                <div>
+                  <strong>{source.source_id}</strong>
+                  <span className="v2-candidate-status">候選觀察</span>
+                </div>
+                <h3>{SOURCE_NAMES[source.source_id] || source.source_name}</h3>
+                <p>{source.source_health} · {source.window_completeness} · {source.freshness_status}</p>
+                <small>最後檢查：{formatDateTime(source.last_checked_at)}</small>
+                {source.intelligence_gaps?.length > 0 && (
+                  <small>缺口：{source.intelligence_gaps.join("、")}</small>
+                )}
+                <a href={source.source_url} target="_blank" rel="noreferrer">官方來源</a>
+                <ul className="v2-candidate-item-list">
+                  {candidateItems.filter((item) => item.source_id === source.source_id).map((item) => (
+                    <li key={item.stable_id}>
+                      <a href={item.official_url} target="_blank" rel="noreferrer">
+                        {item.title || "（官方資料未提供標題）"}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            ))}
+          </div>
+        </details>
+      )}
+    </>
   );
 }
 
@@ -808,6 +894,7 @@ export default function V2DailyDashboard() {
 
       <QueryGatewayPanel onFeedback={handleReviewFeedback} feedbackReady={Boolean(localReview)} publicationGeneration={generationMixed ? null : publication?.source_collection_run_id} />
       <PublicEventFusionDemo />
+      <DiscoverySignalsPanel />
 
       {loadState === "loading" && (
         <section className="v2-system-message" role="status">
@@ -996,7 +1083,13 @@ export default function V2DailyDashboard() {
             notice={reviewNotice}
             error={reviewError}
           />
-          {!generationMixed && <SourceHealthSummary sourceStatus={sourceStatus} canReassure={assessment.canReassure} />}
+          {!generationMixed && (
+            <SourceHealthSummary
+              sourceStatus={sourceStatus}
+              canReassure={assessment.canReassure}
+              candidateContext={publication?.candidate_source_context}
+            />
+          )}
           <PublicationProvenance
             publication={publication}
             archive={archive}
