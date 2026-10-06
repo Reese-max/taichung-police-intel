@@ -1,0 +1,44 @@
+{
+  "evaluation_scope": "LIVE_MODEL_SYNTHETIC_DIAGNOSTIC_NOT_PRODUCTION",
+  "model_requested": "opencode/mimo-v2.6-flash-free",
+  "started_at": "2026-10-06T03:19:27.595192+00:00",
+  "case_count": 12,
+  "prompt_sha256": "ee4a3edbc5cab6a43879e61def36c0fccdc2317d68922c737f5acc2f908d1358",
+  "dataset_sha256": "79a2c3f2cf106fe4f24264af2ee2f25755e000c86f13a9dd60aad335bb211a42",
+  "official_records_transmitted": 0,
+  "human_participants": 0,
+  "tool_permission": "ASK_NONINTERACTIVE_REJECT",
+  "production_provider_enabled": false,
+  "exit_code": 0,
+  "status": "EVALUATED",
+  "events_sha256": "35942b973eb4cc58c51e1a9a3102f83da918a56e46e88cc730d8d6e511051aef",
+  "finished_at": "2026-10-06T03:19:39.348837+00:00",
+  "elapsed_seconds": 11.754,
+  "evaluated_cases": 12,
+  "exact_case_matches": 11,
+  "tool_calls": 0,
+  "opencode_version": "1.18.33",
+  "provider_reported_steps": [
+    {
+      "reason": "stop",
+      "tokens": {
+        "total": 9184,
+        "input": 1195,
+        "output": 253,
+        "reasoning": 312,
+        "cache": {
+          "write": 0,
+          "read": 7424
+        }
+      },
+      "cost": 0
+    }
+  ],
+  "free_tier_config_correction": "Use standard build agent with ask permissions; CLI noninteractive tool requests are rejected. No spoofed provider headers or paid fallback.",
+  "provider_network_request_count": null,
+  "cli_attempt": 3,
+  "cli_version": "1.18.33",
+  "gold_scope": "EXISTING_SYNTHETIC_DEVELOPMENT_SEEDS_NOT_HOLDOUT",
+  "actual_product_arms_executed": false,
+  "human_study_executed": false
+}

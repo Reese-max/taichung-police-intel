@@ -14,6 +14,80 @@ spec.loader.exec_module(retention)
 
 
 class RetentionPolicyTests(unittest.TestCase):
+    def reviewed_policy(self):
+        policy = copy.deepcopy(retention.load_json(retention.POLICY))
+        policy["terms_status_values"]["HUMAN_REVIEWED_SOURCE_TERMS"] = "Explicit source-bound human metadata review."
+        policy["source_reviews"] = {"S-032": {
+            "decision": "APPROVE_METADATA_ONLY", "rights_status": "OPEN_DATA_LICENSED",
+            "resource_url": next(row["entrypoint"] for row in retention.load_json(retention.CATALOG)["sources"] if row["source_id"] == "S-032"),
+            "public_fields": ["title", "official_url"],
+            "human_review": {"reviewer": "Fictional reviewer for tests", "role": "TEST_FIXTURE_ONLY", "reviewed_at": "2026-09-21T10:00:00+08:00"},
+            "terms_evidence": {"requested_url": "https://example.gov.tw/terms", "final_url": "https://example.gov.tw/terms",
+                "fetched_at": "2026-09-21T09:00:00+08:00", "http_status": 200, "body_sha256": "a" * 64,
+                "locator": "main article", "license_scope": "METADATA_LINK_ONLY", "license_id": "FICTIONAL_TEST_LICENSE"},
+            "exceptions_reviewed": True, "attribution": "Fictional test attribution",
+        }}
+        return policy
+
+    def test_source_review_does_not_approve_its_class_peers(self):
+        default = retention.compile_policy()
+        compiled = retention.compile_policy(policy=self.reviewed_policy())
+        self.assertFalse(compiled["source_policies"]["S-032"]["review_required"])
+        self.assertEqual(compiled["source_policies"]["S-032"]["public_fields"], ["title", "official_url"])
+        self.assertEqual(compiled["source_policies"]["S-033"], default["source_policies"]["S-033"])
+        self.assertEqual(compiled["classes"], default["classes"])
+        self.assertNotEqual(compiled["policy_hash"], default["policy_hash"])
+        self.assertFalse(compiled["source_policies"]["S-032"]["full_text_allowed"])
+        self.assertFalse(compiled["source_policies"]["S-032"]["excerpt_allowed"])
+
+    def test_empty_source_reviews_preserve_existing_policy_hash(self):
+        policy = retention.load_json(retention.POLICY)
+        original = retention.compile_policy(policy=policy)
+        policy["source_reviews"] = {}
+        self.assertEqual(retention.compile_policy(policy=policy), original)
+
+    def test_review_requires_original_capture_and_human_decision(self):
+        mutations = [
+            (lambda r: r.update(decision="PENDING_HUMAN_REVIEW"), "explicit metadata approval"),
+            (lambda r: r["human_review"].update(reviewer=None), "human reviewer"),
+            (lambda r: r["terms_evidence"].update(http_status=503), "successful original capture"),
+            (lambda r: r["terms_evidence"].update(body_sha256="missing"), "SHA-256"),
+            (lambda r: r["terms_evidence"].update(fetched_at="2026-09-22T09:00:00+08:00"), "predates"),
+            (lambda r: r["terms_evidence"].update(final_url="https://name:secret@example.gov.tw/terms"), "HTTPS URL"),
+            (lambda r: r.update(resource_url="https://example.gov.tw/unreviewed"), "match the catalog"),
+            (lambda r: r.update(public_fields=["full_text"]), "widen public fields"),
+            (lambda r: r.update(exceptions_reviewed=False), "exceptions"),
+            (lambda r: r.update(attribution=""), "attribution"),
+        ]
+        for mutate, reason in mutations:
+            with self.subTest(reason=reason):
+                policy = self.reviewed_policy()
+                mutate(policy["source_reviews"]["S-032"])
+                with self.assertRaisesRegex(ValueError, reason):
+                    retention.compile_policy(policy=policy)
+
+    def test_review_scope_and_any_grant_metadata_are_hash_bound(self):
+        policy = self.reviewed_policy()
+        first = retention.compile_policy(policy=policy)
+        policy["source_reviews"]["S-032"]["public_fields"] = ["official_url"]
+        second = retention.compile_policy(policy=policy)
+        self.assertNotEqual(first["policy_hash"], second["policy_hash"])
+        self.assertNotEqual(first["source_policies"]["S-032"]["source_review_sha256"], second["source_policies"]["S-032"]["source_review_sha256"])
+
+    def test_public_projection_obeys_source_fields_without_approving_summary(self):
+        compiled = retention.compile_policy(policy=self.reviewed_policy())
+        record = {"record_id":"source-review-test", "source_id":"S-032", "layer":"publication",
+                  "title":"Fictional notice", "official_url":"https://example.gov.tw/notice", "published_at":"2026-09-21T00:00:00+08:00"}
+        projected = retention.project_public_record(record, policy=compiled)
+        self.assertFalse(projected["review_required"])
+        self.assertEqual(set(projected["projected_fields"]), {"title", "official_url"})
+        self.assertIn("published_at", projected["dropped_fields"])
+        self.assertEqual(projected["attribution"], "Fictional test attribution")
+        self.assertRegex(projected["source_review_sha256"], r"^[a-f0-9]{64}$")
+        summary = retention.project_public_record(record, policy=compiled, class_id="DERIVED_SUMMARY")
+        self.assertTrue(summary["review_required"])
+        self.assertEqual(summary["rights_status"], "PROJECT_CONTROLLED")
+
     def test_catalog_has_one_conservative_policy_per_source(self):
         catalog = retention.load_json(retention.CATALOG)
         compiled = retention.compile_policy()

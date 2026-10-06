@@ -1,0 +1,277 @@
+{
+  "schema_version": 3,
+  "dataset_id": "govintel-gold-v1",
+  "dataset_type": "SYNTHETIC_REGRESSION_SEED",
+  "dataset_sha256": "dd20bbb2a38459824aaf3064c03204f166b891cabbaa6a7540c5eb2c274d80aa",
+  "evaluation_scope": "LIVE_MODEL_SYNTHETIC_DIAGNOSTIC_NOT_PRODUCTION",
+  "case_denominator": 12,
+  "evaluated_cases": 12,
+  "evaluation_status": "COMPLETE",
+  "missing_prediction_count": 0,
+  "missing_prediction_ids": [],
+  "exact_case_match_count": 12,
+  "exact_case_match_rate": 1.0,
+  "evaluated_exact_case_match_rate": 1.0,
+  "event_pair": {
+    "denominator": 4,
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "tn": 2,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0,
+    "false_merge_count": 0,
+    "false_merge_denominator": 2,
+    "false_merge_rate": 0.0,
+    "missed_merge_count": 0,
+    "missed_merge_denominator": 2,
+    "missed_merge_rate": 0.0
+  },
+  "material_change": {
+    "denominator": 4,
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "tn": 2,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0,
+    "changed_fields": {
+      "case_denominator": 4,
+      "expected_id_denominator": 2,
+      "predicted_id_denominator": 2,
+      "tp": 2,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    }
+  },
+  "discovery_official": {
+    "denominator": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "tn": 0,
+    "precision": null,
+    "recall": null,
+    "f1": null,
+    "confirmation_precision_denominator": 0,
+    "confirmation_precision": null
+  },
+  "query_ids": {
+    "case_denominator": 0,
+    "expected_id_denominator": 0,
+    "predicted_id_denominator": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "precision": null,
+    "recall": null,
+    "f1": null,
+    "exact_id_match_count": 0,
+    "exact_id_match_accuracy": null,
+    "ranking": {
+      "case_denominator": 0,
+      "exact_order_match_count": 0,
+      "exact_order_match_accuracy": null,
+      "top1_correct": 0,
+      "top1_accuracy": null,
+      "mrr_sum": 0.0,
+      "mean_reciprocal_rank": null
+    }
+  },
+  "query_answer_state": {
+    "denominator": 0,
+    "correct": 0,
+    "accuracy": null
+  },
+  "no_result_false_reassurance": {
+    "false_reassurance_count": 0,
+    "denominator": 0,
+    "rate": null
+  },
+  "claim_support": {
+    "denominator": 4,
+    "correct": 4,
+    "accuracy": 1.0
+  },
+  "unsupported_claim_rate": {
+    "unsupported_claim_count": 0,
+    "denominator": 1,
+    "rate": 0.0
+  },
+  "evidence_coverage": {
+    "case_denominator": 0,
+    "expected_id_denominator": 0,
+    "predicted_id_denominator": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "precision": null,
+    "recall": null,
+    "f1": null,
+    "covered_case_count": 0,
+    "case_coverage": null,
+    "coverage": null
+  },
+  "case_results": [
+    {
+      "case_id": "event-same-001",
+      "task": "event_pair",
+      "status": "EXACT"
+    },
+    {
+      "case_id": "event-different-date-001",
+      "task": "event_pair",
+      "status": "EXACT"
+    },
+    {
+      "case_id": "event-conflict-place-001",
+      "task": "event_pair",
+      "status": "EXACT"
+    },
+    {
+      "case_id": "event-repost-001",
+      "task": "event_pair",
+      "status": "EXACT"
+    },
+    {
+      "case_id": "change-time-001",
+      "task": "material_change",
+      "status": "EXACT"
+    },
+    {
+      "case_id": "change-punctuation-001",
+      "task": "material_change",
+      "status": "EXACT"
+    },
+    {
+      "case_id": "change-location-001",
+      "task": "material_change",
+      "status": "EXACT"
+    },
+    {
+      "case_id": "change-layout-001",
+      "task": "material_change",
+      "status": "EXACT"
+    },
+    {
+      "case_id": "claim-time-supported-001",
+      "task": "claim_support",
+      "status": "EXACT"
+    },
+    {
+      "case_id": "claim-cause-unsupported-001",
+      "task": "claim_support",
+      "status": "EXACT"
+    },
+    {
+      "case_id": "claim-conflict-001",
+      "task": "claim_support",
+      "status": "EXACT"
+    },
+    {
+      "case_id": "claim-stale-001",
+      "task": "claim_support",
+      "status": "EXACT"
+    }
+  ],
+  "split_metrics": {},
+  "material_change_fields": {
+    "case_denominator": 4,
+    "expected_id_denominator": 2,
+    "predicted_id_denominator": 2,
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1": 1.0
+  },
+  "canonical_event_id": {
+    "denominator": 0,
+    "correct": 0,
+    "accuracy": null
+  },
+  "entity_ids": {
+    "case_denominator": 0,
+    "expected_id_denominator": 0,
+    "predicted_id_denominator": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "precision": null,
+    "recall": null,
+    "f1": null
+  },
+  "trust_tier": {
+    "denominator": 0,
+    "correct": 0,
+    "accuracy": null
+  },
+  "query_exact_id_accuracy": {
+    "denominator": 0,
+    "correct": 0,
+    "accuracy": null
+  },
+  "query_ranking": {
+    "case_denominator": 0,
+    "ranked_denominator": 0,
+    "mrr": null
+  },
+  "discovery_verification": {
+    "denominator": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "tn": 0,
+    "precision": null,
+    "recall": null,
+    "f1": null,
+    "confirmed_status": "VERIFIED_OFFICIAL",
+    "status_accuracy": {
+      "denominator": 0,
+      "correct": 0,
+      "accuracy": null
+    }
+  },
+  "discovery_match_ids": {
+    "case_denominator": 0,
+    "expected_id_denominator": 0,
+    "predicted_id_denominator": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "precision": null,
+    "recall": null,
+    "f1": null
+  },
+  "reopen_unread": {
+    "reopen_denominator": 0,
+    "expected_id_denominator": 0,
+    "predicted_id_denominator": 0,
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "precision": null,
+    "recall": null,
+    "f1": null,
+    "multi_condition_prompt_count": 0,
+    "false_alert_breakdown": {},
+    "source_acquisition_gap": {
+      "reopen_point_count": 0,
+      "note": "來源取得缺漏另列，不併入精確率／召回率分子分母"
+    },
+    "observation_status_accuracy": null,
+    "gap_kind_accuracy": null,
+    "multi_condition_accuracy": null,
+    "condition_status_accuracy": null
+  },
+  "reopen_unread_rows": [],
+  "targets": null,
+  "target_assessment": [],
+  "not_run": []
+}

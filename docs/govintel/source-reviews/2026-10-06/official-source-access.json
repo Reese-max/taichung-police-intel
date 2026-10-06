@@ -1,0 +1,186 @@
+{
+  "schema_version": 1,
+  "scope": "OBSERVED_RUNTIME_TRANSPORT_NOT_GLOBAL_OUTAGE_OR_DATE_REPLACEMENT",
+  "observations": [
+    {
+      "id": "rdec-primary",
+      "requested_url": "https://www.rdec.taichung.gov.tw/12047/12142/12145",
+      "started_at": "2026-10-06T03:08:32.489438+00:00",
+      "proxy_and_tls_preserved": true,
+      "http_status": 503,
+      "final_url": "https://www.rdec.taichung.gov.tw/12047/12142/12145",
+      "bytes": 91,
+      "sha256": "2f85832e31ca57711e6107af6b142363351ae516adb71c69afc643fac26be7f6",
+      "transport_message": "upstream connect error or disconnect/reset before headers. reset reason: connection timeout",
+      "finished_at": "2026-10-06T03:08:38.107234+00:00"
+    },
+    {
+      "id": "rdec-apex",
+      "requested_url": "https://rdec.taichung.gov.tw/12047/12142/12145",
+      "started_at": "2026-10-06T03:08:32.489901+00:00",
+      "proxy_and_tls_preserved": true,
+      "error_type": "ProxyError",
+      "finished_at": "2026-10-06T03:08:32.728272+00:00"
+    },
+    {
+      "id": "rdec-apex-home",
+      "requested_url": "https://rdec.taichung.gov.tw/",
+      "started_at": "2026-10-06T03:08:32.492031+00:00",
+      "proxy_and_tls_preserved": true,
+      "error_type": "ProxyError",
+      "finished_at": "2026-10-06T03:08:32.851857+00:00"
+    },
+    {
+      "id": "rdec-terms",
+      "requested_url": "https://www.rdec.taichung.gov.tw/30103/30122/443962",
+      "started_at": "2026-10-06T03:08:32.492814+00:00",
+      "proxy_and_tls_preserved": true,
+      "http_status": 503,
+      "final_url": "https://www.rdec.taichung.gov.tw/30103/30122/443962",
+      "bytes": 91,
+      "sha256": "2f85832e31ca57711e6107af6b142363351ae516adb71c69afc643fac26be7f6",
+      "transport_message": "upstream connect error or disconnect/reset before headers. reset reason: connection timeout",
+      "finished_at": "2026-10-06T03:08:37.940866+00:00"
+    },
+    {
+      "id": "police-primary",
+      "requested_url": "https://www.police.taichung.gov.tw/ch/home.jsp?id=1&parentpath=0&mcustomize=news_list.jsp",
+      "started_at": "2026-10-06T03:08:32.728322+00:00",
+      "proxy_and_tls_preserved": true,
+      "http_status": 503,
+      "final_url": "https://www.police.taichung.gov.tw/ch/home.jsp?id=1&parentpath=0&mcustomize=news_list.jsp",
+      "bytes": 91,
+      "sha256": "2f85832e31ca57711e6107af6b142363351ae516adb71c69afc643fac26be7f6",
+      "transport_message": "upstream connect error or disconnect/reset before headers. reset reason: connection timeout",
+      "finished_at": "2026-10-06T03:08:39.144342+00:00"
+    },
+    {
+      "id": "police-apex",
+      "requested_url": "https://police.taichung.gov.tw/ch/home.jsp?id=1&parentpath=0&mcustomize=news_list.jsp",
+      "started_at": "2026-10-06T03:08:32.851896+00:00",
+      "proxy_and_tls_preserved": true,
+      "error_type": "ProxyError",
+      "finished_at": "2026-10-06T03:08:33.308981+00:00"
+    },
+    {
+      "id": "council-wrapper",
+      "requested_url": "https://www.tccc.gov.tw/main.asp?cno=49&uno=59",
+      "started_at": "2026-10-06T03:08:33.309020+00:00",
+      "proxy_and_tls_preserved": true,
+      "http_status": 200,
+      "final_url": "https://www.tccc.gov.tw/main.asp?cno=49&uno=59",
+      "bytes": 28813,
+      "sha256": "9f81d5ce39b87110ddd82d545a91160527a422ee0c6de8503d37ab293a668804",
+      "finished_at": "2026-10-06T03:08:36.762520+00:00"
+    },
+    {
+      "id": "council-api-home",
+      "requested_url": "https://yishi.tccc.gov.tw/",
+      "started_at": "2026-10-06T03:08:36.763588+00:00",
+      "proxy_and_tls_preserved": true,
+      "http_status": 200,
+      "final_url": "https://yishi.tccc.gov.tw/",
+      "bytes": 172450,
+      "sha256": "47ed24c81839e07e16f75af995d707263de69c48ca375bb445cf35c64589ea25",
+      "finished_at": "2026-10-06T03:08:39.601414+00:00"
+    },
+    {
+      "id": "traffic-terms",
+      "requested_url": "https://www.traffic.taichung.gov.tw/content/index.asp?Parser=1,12,442",
+      "started_at": "2026-10-06T03:08:37.942015+00:00",
+      "proxy_and_tls_preserved": true,
+      "http_status": 200,
+      "final_url": "https://www.traffic.taichung.gov.tw/content/index.asp?Parser=1,12,442",
+      "bytes": 64128,
+      "sha256": "010c8a51f35aa21c082505a11e5b24ca9027b0ccd443cfe9ac5d3122ea048e4c",
+      "finished_at": "2026-10-06T03:08:39.559150+00:00"
+    },
+    {
+      "id": "fire-terms",
+      "requested_url": "https://www.fire.taichung.gov.tw/content/index.asp?Parser=1,14,190",
+      "started_at": "2026-10-06T03:08:38.108453+00:00",
+      "proxy_and_tls_preserved": true,
+      "http_status": 200,
+      "final_url": "https://www.fire.taichung.gov.tw/content/index.asp?Parser=1,14,190",
+      "bytes": 75123,
+      "sha256": "311e4c9e692f5e2102a744e0d72fccc255393fc9deed11d563c26ed98a54e14c",
+      "finished_at": "2026-10-06T03:08:40.083199+00:00"
+    },
+    {
+      "id": "city-terms",
+      "requested_url": "https://www.taichung.gov.tw/10179/10185/13599",
+      "started_at": "2026-10-06T03:08:39.145385+00:00",
+      "proxy_and_tls_preserved": true,
+      "http_status": 200,
+      "final_url": "https://www.taichung.gov.tw/10179/10185/13599",
+      "bytes": 72481,
+      "sha256": "a2f072098939880a55ad2bc4acac351dc6637ec48a12d36d1f3f4b094ad1b426",
+      "finished_at": "2026-10-06T03:08:42.150689+00:00"
+    },
+    {
+      "id": "ogdl-terms",
+      "requested_url": "https://data.gov.tw/license",
+      "started_at": "2026-10-06T03:08:39.560864+00:00",
+      "proxy_and_tls_preserved": true,
+      "http_status": 200,
+      "final_url": "https://data.gov.tw/license",
+      "bytes": 484109,
+      "sha256": "9be737b7fad673e393b51da2be62164abc5bbb1a9d4f323f02c01f112c9e78ab",
+      "finished_at": "2026-10-06T03:08:40.216813+00:00"
+    },
+    {
+      "id": "city-dataset-license",
+      "requested_url": "https://data.gov.tw/dataset/83551",
+      "started_at": "2026-10-06T03:08:39.604139+00:00",
+      "proxy_and_tls_preserved": true,
+      "http_status": 200,
+      "final_url": "https://data.gov.tw/dataset/83551",
+      "bytes": 527026,
+      "sha256": "e019fd95a418c8496ca2704a5eaf97740b94e86097d1e2478e04bf2d984caa33",
+      "finished_at": "2026-10-06T03:08:42.195163+00:00"
+    },
+    {
+      "id": "npa-dataset-license",
+      "requested_url": "https://data.gov.tw/dataset/7505",
+      "started_at": "2026-10-06T03:08:40.084670+00:00",
+      "proxy_and_tls_preserved": true,
+      "http_status": 200,
+      "final_url": "https://data.gov.tw/dataset/7505",
+      "bytes": 518221,
+      "sha256": "8b1923b2825f54e4467ab35da912c0a8ed4a152c79b2b9bb2a50f87155ce5cb6",
+      "finished_at": "2026-10-06T03:08:42.225336+00:00"
+    },
+    {
+      "requested_url": "https://www.rdec.taichung.gov.tw/301614/post",
+      "observed_at": "2026-10-06T03:14:31.769725+00:00",
+      "http_status": 503,
+      "final_url": "https://www.rdec.taichung.gov.tw/301614/post",
+      "bytes": 91,
+      "sha256": "2f85832e31ca57711e6107af6b142363351ae516adb71c69afc643fac26be7f6"
+    },
+    {
+      "requested_url": "https://www.rdec.taichung.gov.tw/12047/12231/12360/12363/301614/post",
+      "observed_at": "2026-10-06T03:14:31.771450+00:00",
+      "http_status": 503,
+      "final_url": "https://www.rdec.taichung.gov.tw/12047/12231/12360/12363/301614/post",
+      "bytes": 91,
+      "sha256": "2f85832e31ca57711e6107af6b142363351ae516adb71c69afc643fac26be7f6"
+    },
+    {
+      "requested_url": "https://www.rdec.taichung.gov.tw/30103/30122/443962",
+      "observed_at": "2026-10-06T03:14:31.772452+00:00",
+      "http_status": 503,
+      "final_url": "https://www.rdec.taichung.gov.tw/30103/30122/443962",
+      "bytes": 91,
+      "sha256": "2f85832e31ca57711e6107af6b142363351ae516adb71c69afc643fac26be7f6"
+    },
+    {
+      "requested_url": "https://www.tccc.gov.tw/",
+      "observed_at": "2026-10-06T03:14:31.773226+00:00",
+      "http_status": 200,
+      "final_url": "https://www.tccc.gov.tw/",
+      "bytes": 28805,
+      "sha256": "f4151ca47bc4eb8feae991543925e19708f658c328611996a776a7ae7d29f1c9"
+    }
+  ]
+}

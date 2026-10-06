@@ -103,13 +103,20 @@ async function main() {
     const target = await link.getAttribute("target");
     record("source_link_is_official_https", /^https:\/\//.test(href || "") && target === "_blank", `${href} target=${target}`);
     try {
+      const expectedUrl = new URL(href).href;
+      // This checkout regression tests the actual click and navigation target.
+      // Source transport/bytes are checked by collectors and separate probes;
+      // waiting for an external origin here makes UI CI depend on its uptime.
+      await page.context().route(url => url.href === expectedUrl, route => route.fulfill({
+        status:200,contentType:"text/html",body:"<!doctype html><title>Offline source navigation fixture</title>",
+      }));
       // rel="noreferrer" intentionally removes the opener; Chromium reports
       // the new tab on the context instead of the source page's popup event.
       const popupPromise = page.context().waitForEvent("page", { timeout: 10000 });
       await link.click();
       const popup = await popupPromise;
       await popup.waitForLoadState("domcontentloaded", { timeout: 15000 }).catch(() => {});
-      record("source_link_opens_in_browser", /^https:\/\//.test(popup.url()), popup.url());
+      record("source_link_opens_in_browser", popup.url() === expectedUrl, `OFFLINE_NAVIGATION_UI_ONLY url=${popup.url()}`);
       await popup.close();
     } catch (error) {
       record("source_link_opens_in_browser", false, `${error.name}: ${error.message}`);
@@ -139,6 +146,7 @@ try {
   record("browser_run", false, `${error.name}: ${String(error.message).slice(0, 300)}`);
 }
 const failed = checks.filter((check) => check.status === "FAIL");
-const result = { status: failed.length === 0 && checks.length > 0 ? "PASS" : "FAIL", passed: checks.length - failed.length, total: checks.length, checks, screenshots };
+const result = { status: failed.length === 0 && checks.length > 0 ? "PASS" : "FAIL", passed: checks.length - failed.length, total: checks.length, checks, screenshots,
+  source_navigation_scope:"OFFLINE_NAVIGATION_UI_ONLY", original_source_availability:"NOT_TESTED_BY_THIS_BROWSER_CHECK" };
 console.log(JSON.stringify(result));
 process.exit(result.status === "PASS" ? 0 : 1);

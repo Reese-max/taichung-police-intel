@@ -8,6 +8,7 @@ import hashlib
 import json
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -22,7 +23,7 @@ EXPIRY_ACTIONS = {"REVIEW_REQUIRED", "PURGE_RAW_KEEP_AUDIT", "KEEP_AUDIT_LINKAGE
 HASH_CHARS = set("0123456789abcdef")
 ARCHIVE_ELIGIBILITY = {"NOT_ARCHIVABLE", "PROVENANCE_ONLY", "EVIDENCE_ARCHIVE"}
 WITHDRAWAL_PROJECTIONS = {"SOURCE_NO_LONGER_AVAILABLE", "RETRACTED"}
-TERMS_STATUSES = {"CATALOG_ENTRYPOINT_NOT_A_LICENSE", "PROJECT_OWNED_NO_THIRD_PARTY_LICENSE"}
+TERMS_STATUSES = {"CATALOG_ENTRYPOINT_NOT_A_LICENSE", "PROJECT_OWNED_NO_THIRD_PARTY_LICENSE", "HUMAN_REVIEWED_SOURCE_TERMS"}
 UNKNOWN_RIGHTS_TERMS_STATUS = "CATALOG_ENTRYPOINT_NOT_A_LICENSE"
 DATA_TYPE_KINDS = {"CONTENT", "LAYER"}
 LAYER_POLICY_FIELDS = {"retention_class_source", "archive_eligibility", "public_projection"}
@@ -174,6 +175,77 @@ def _compile_data_types(matrix: Any, classes: dict[str, Any], layer_policies: di
     return seen
 
 
+def _review_url(value: Any, field: str) -> str:
+    if not isinstance(value, str):
+        raise ValueError(f"{field} must be an HTTPS URL")
+    try:
+        parsed = urlsplit(value)
+        valid = parsed.scheme == "https" and parsed.hostname and not parsed.username and not parsed.password and parsed.port in (None, 443)
+    except ValueError:
+        valid = False
+    if not valid:
+        raise ValueError(f"{field} must be an HTTPS URL")
+    return value
+
+
+def _compile_source_reviews(reviews: Any, source_policies: dict[str, Any], catalog_terms: dict[str, str]) -> dict[str, Any]:
+    """Consume trusted, explicit human decisions; evidence discovery is not approval.
+
+    This configuration is part of the compiled policy hash. It is never read from
+    a query or source payload. A review can only narrow its class field allowlist;
+    it cannot grant full text, model transmission, a new origin or longer retention.
+    """
+    if not isinstance(reviews, dict):
+        raise ValueError("source_reviews must be an object keyed by catalog source ID")
+    compiled = {}
+    fields = {"decision", "rights_status", "resource_url", "public_fields", "human_review", "terms_evidence", "exceptions_reviewed", "attribution"}
+    for source_id, review in sorted(reviews.items()):
+        if source_id not in source_policies:
+            raise ValueError(f"source review references unknown source: {source_id}")
+        if not isinstance(review, dict) or set(review) != fields:
+            raise ValueError(f"source review fields are incomplete: {source_id}")
+        if review["decision"] != "APPROVE_METADATA_ONLY" or review["rights_status"] not in {"VERIFIED_METADATA_PERMISSION", "OPEN_DATA_LICENSED"}:
+            raise ValueError(f"source review must be an explicit metadata approval: {source_id}")
+        # Exact catalog binding requires a fresh review when the resource changes.
+        if review["resource_url"] != catalog_terms[source_id]:
+            raise ValueError(f"source review resource does not match the catalog: {source_id}")
+        allowed = _require_field_list(review["public_fields"], f"review public_fields:{source_id}")
+        if not set(allowed) <= set(source_policies[source_id]["public_fields"]):
+            raise ValueError(f"source review cannot widen public fields: {source_id}")
+        human = review["human_review"]
+        if not isinstance(human, dict) or set(human) != {"reviewer", "role", "reviewed_at"} or any(not isinstance(human.get(key), str) or not human[key].strip() for key in ("reviewer", "role")):
+            raise ValueError(f"source review needs an identified human reviewer and role: {source_id}")
+        reviewed = _timestamp(human.get("reviewed_at"), f"human reviewed_at:{source_id}")
+        evidence = review["terms_evidence"]
+        required = {"requested_url", "final_url", "fetched_at", "http_status", "body_sha256", "locator", "license_scope", "license_id"}
+        if not isinstance(evidence, dict) or set(evidence) != required:
+            raise ValueError(f"source review needs original terms evidence: {source_id}")
+        for key in ("requested_url", "final_url"):
+            _review_url(evidence[key], f"terms {key}:{source_id}")
+        if type(evidence["http_status"]) is not int or evidence["http_status"] != 200:
+            raise ValueError(f"source terms must have a successful original capture: {source_id}")
+        _hash(evidence["body_sha256"], f"terms body_sha256:{source_id}")
+        if _timestamp(evidence["fetched_at"], f"terms fetched_at:{source_id}") > reviewed:
+            raise ValueError(f"source review predates its terms evidence: {source_id}")
+        for key in ("locator", "license_scope", "license_id"):
+            if not isinstance(evidence[key], str) or not evidence[key].strip():
+                raise ValueError(f"source terms {key} is required: {source_id}")
+        if evidence["license_scope"] != "METADATA_LINK_ONLY":
+            raise ValueError(f"source review terms scope must be metadata only: {source_id}")
+        if review["exceptions_reviewed"] is not True:
+            raise ValueError(f"source review must address third-party and personal-data exceptions: {source_id}")
+        if not isinstance(review["attribution"], str) or not review["attribution"].strip():
+            raise ValueError(f"source review attribution is required: {source_id}")
+        compiled[source_id] = json.loads(json.dumps(review))
+        source_policies[source_id].update({
+            "rights_status": review["rights_status"], "terms_status": "HUMAN_REVIEWED_SOURCE_TERMS",
+            "terms_url": evidence["final_url"], "review_required": False,
+            "public_fields": list(allowed), "source_review_sha256": sha256(review),
+            "attribution": review["attribution"],
+        })
+    return compiled
+
+
 def compile_policy(catalog: dict[str, Any] | None = None, policy: dict[str, Any] | None = None) -> dict[str, Any]:
     catalog = load_json(CATALOG) if catalog is None else catalog
     policy = load_json(POLICY) if policy is None else policy
@@ -296,6 +368,16 @@ def compile_policy(catalog: dict[str, Any] | None = None, policy: dict[str, Any]
     if set(compiled_data_types) != declared_data_types:
         raise ValueError("data type matrix is inconsistent")
 
+    source_policies = {
+        source_id: {
+            "class_id": class_id, **compiled_classes[class_id],
+            "terms_url": catalog_terms[source_id], "data_types": sorted(class_data_types[class_id]),
+        }
+        for source_id, class_id in sorted(source_classes.items())
+    }
+    source_reviews = _compile_source_reviews(policy.get("source_reviews", {}), source_policies, catalog_terms)
+    if source_reviews and "HUMAN_REVIEWED_SOURCE_TERMS" not in terms_status_values:
+        raise ValueError("reviewed source terms status must be documented")
     material = {
         "schema_version": policy["schema_version"],
         "policy_version": policy["policy_version"],
@@ -311,6 +393,9 @@ def compile_policy(catalog: dict[str, Any] | None = None, policy: dict[str, Any]
         "source_classes": dict(sorted(source_classes.items())),
         "prohibited_public_fields": sorted(prohibited),
     }
+    # Preserve existing historical hashes when no source has actually been reviewed.
+    if source_reviews:
+        material["source_reviews"] = source_reviews
     return {
         **material,
         "policy_hash": sha256(material),
@@ -323,15 +408,7 @@ def compile_policy(catalog: dict[str, Any] | None = None, policy: dict[str, Any]
         "terms_status_values": dict(sorted(terms_status_values.items())),
         "replay_evidence_fields": sorted(replay_evidence_fields),
         "replay_limitation_reasons": dict(sorted(replay_limitation_reasons.items())),
-        "source_policies": {
-            source_id: {
-                "class_id": class_id,
-                **compiled_classes[class_id],
-                "terms_url": catalog_terms[source_id],
-                "data_types": sorted(class_data_types[class_id]),
-            }
-            for source_id, class_id in sorted(source_classes.items())
-        },
+        "source_policies": source_policies,
     }
 
 
@@ -392,6 +469,10 @@ def _governance(compiled: dict[str, Any], record: dict[str, Any],
     return {
         **compiled["source_policies"][source_id],
         **compiled["classes"][resolved_class],
+        # A source-specific reviewed allowlist takes precedence only for that
+        # source's own class. Metadata approval cannot approve derived summaries.
+        **(compiled["source_policies"][source_id]
+           if resolved_class == compiled["source_policies"][source_id]["class_id"] else {}),
         # Data types are a property of the class that was actually applied.
         "data_types": compiled["class_data_types"][resolved_class],
         "class_id": resolved_class,
@@ -505,6 +586,9 @@ def project_public_record(record: dict[str, Any], *, policy: dict[str, Any] | No
         "projected_fields": projected,
         "dropped_fields": dropped,
     }
+    if "source_review_sha256" in governance:
+        payload["source_review_sha256"] = governance["source_review_sha256"]
+        payload["attribution"] = governance["attribution"]
     payload["projection_hash"] = sha256(payload)
     return payload
 

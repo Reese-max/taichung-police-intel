@@ -1,11 +1,27 @@
-# 2026-10-06 官方來源重新核對
+# 2026-10-06 來源審查與實際觀察補充
 
-[verification.json](verification.json) 保存本次正常代理與 TLS 連線下的官方 URL、HTTP 狀態及回應 SHA-256。沒有將網路逾時的 bytes 當成官方頁面，也沒有公開原文全文。
+本目錄為**非生效審查材料**。`source-review.pending.json` 的人工角色、時間與決策保持空白；正式 retention policy、approved source policy 與五個 active IDs 沒有變更。取得條款不等於已審完個資、第三方內容、附件或模型傳輸。
 
-議會日程、質詢順序表與議事系統可讀；研考會報告入口及條款頁同時回傳 HTTP 503，上游連線逾時。這仍不足以斷言官方主機全面故障，也沒有支持替代入口的有效證據。S-029 維持來源失敗及歷史資料保留。
+交通局與消防局原始條款 HTTP 200，正文指向政府資料開放授權條款第 1 版；市府原始宣告 HTTP 200，允許著作權範圍內的重製與改作並要求出處。本次保存 requested/final URL、實際抓取時間、原始 bytes hash 與正文定位。原始 HTML 私有保存，不在公開 repo 重刊。市府宣告未明示 OGDL 版本，不能替它補上版本。
 
-S-009 的一筆公開列表及其 detail 回應均沒有可核對的發布時間。108 是列表回報的庫存量，不能寫成每日新增量。S-006 已核對的附件修訂時間也不能代替初次發布時間；S-007 的有限 API 頁面日期不能推為完整庫存最新日期。
+新增 `retention-rights-policy.v1.json` 的可選 `source_reviews` 機制：每筆需真實人工角色、時間、明確 `APPROVE_METADATA_ONLY` 決策、200 原始條款 capture、來源與 catalog 精確綁定、逐欄位子集合、例外核對與出處。每筆參與 policy hash；未審同類來源保持原政策。不得藉此授權全文、摘要、模型傳輸、新網域或放寬保留期限。待審模板不能直接當核准記錄使用。
 
-目前沒有足以解除五個正式來源權利限制的逐來源授權證據。網站可讀、官方 API、著作權頁尾或本專案合併核准皆不能替代授權。來源、全文、衍生摘要及模型傳輸範圍仍須分別有適用證據。
+## 七日資料
 
-排程日期修正已在 [PR #152](https://github.com/Reese-max/taichung-police-intel/pull/152) 通過完整 CI 與 Chromium 驗證。正式重新蒐集與發布的證據另由實際 workflow/checkpoint/readback 收據提供；本文件不預先宣稱發布成功。
+核對 30 份原始 GitHub Actions ZIP，archive digest 全部吻合。`candidate-history-verified-ledger.json` 區分 archive SHA-256、原始 JSON SHA-256 與來源 manifest；window receipt 的 `report_sha256` 是 canonical JSON hash。9/30–10/6 每個臺北日選最新 workflow attempt，選擇在查閱來源結果之前完成；10/5 另有較早手動流程，不取代已選失敗紀錄。
+
+| 來源 | 連線成功日 | 有效觀察日 | 尚缺條件 |
+| --- | ---: | ---: | --- |
+| S-001 | 0/7 | 0/7 | 連線、完整性、權利 |
+| S-019 | 0/2 | 0/2 | 先前五日未排程、連線、權利 |
+| S-031 | 7/7 | 1/7 | 前六日無告知／保留類別；即時快照為 PARTIAL |
+| S-032 | 7/7 | 7/7 | 最近兩日 PARTIAL；權利與獨立完整性 |
+| S-033 | 7/7 | 7/7 | 權利與獨立完整性 |
+
+七個有效**觀察日**不等於正式來源資格。`promotion_eligible` 與 `coverage_independently_verified` 全部保持 false；完整 promotion plan 的驗證仍 BLOCKED。驗證器新增未來時間、逐來源／報表時鐘一致性檢查，並分列連線成功日、有效日、PARTIAL 日與缺告知日。
+
+## 來源連線與日期
+
+`official-source-access.json` 只代表本次 runtime 路徑：WWW 研考會與警察局連線失敗；不能宣稱機關全球停站。替代官方頁面未取得原始 bytes；索引快取與其他來源也不能代替 S-029 的專案報告。保留 LKG 內容與原始日期、標明 FAILED，未把重抓時間填成發布日期。
+
+獨立 `source-egress-probe.yml` 只在 main 手動執行：建立短效秘密保護的臨時 Worker，最多讀三個固定 WWW 官方入口，每次 15 秒／2 MiB；回傳運輸 metadata/hash，不公開原始內容、不接收任意 URL、不跟隨重新導向。helper 在 finally 刪除自身臨時 Worker，失敗也記錄 cleanup；驗證未執行前不得宣稱新路徑修復了來源。現有正式 Worker 不會被此探測修改。

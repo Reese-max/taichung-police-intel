@@ -1,0 +1,115 @@
+{
+  "schema_version": 1,
+  "validation_scope": "CANDIDATE_OBSERVATION_WINDOW_NOT_PROMOTION",
+  "required_observation_days": 7,
+  "source_ids": [
+    "S-032"
+  ],
+  "report_count": 7,
+  "status": "PASS",
+  "promotion_eligible": false,
+  "as_of": "2026-10-06T03:18:08.740689+00:00",
+  "qualification_note": "window_complete counts valid observation days only; it does not verify collection coverage, source rights, or production admission",
+  "reasons": [],
+  "reports": [
+    {
+      "path": "37401798185/S-032/candidate-source-observation.json",
+      "observed_at": "2026-10-06T09:58:39.555165+08:00",
+      "local_date": "2026-10-06",
+      "source_count": 1,
+      "failed_count": 0,
+      "report_sha256": "0ae021f7c2aaf48780e7b78a0bb065616897358d82845990c935eabbc7ca1dde"
+    },
+    {
+      "path": "37288082018/S-032/candidate-source-observation.json",
+      "observed_at": "2026-10-05T17:08:44.290564+08:00",
+      "local_date": "2026-10-05",
+      "source_count": 1,
+      "failed_count": 0,
+      "report_sha256": "35d7f24c91eff09461b32e9fd93f6e3d8e515e04756bd6b6067edf10372b054a"
+    },
+    {
+      "path": "37189085475/S-032/candidate-source-observation.json",
+      "observed_at": "2026-10-04T16:30:12.167824+08:00",
+      "local_date": "2026-10-04",
+      "source_count": 1,
+      "failed_count": 0,
+      "report_sha256": "de99aa8c2a0358f844a8722e2fa7e609fe081d0dfabd395e25e90d79d293cc35"
+    },
+    {
+      "path": "37108820203/S-032/candidate-source-observation.json",
+      "observed_at": "2026-10-03T16:10:54.511863+08:00",
+      "local_date": "2026-10-03",
+      "source_count": 1,
+      "failed_count": 0,
+      "report_sha256": "70208b30c217b2f5891ed0841d06d0aa61ba76a363059119d4107989bc2727c7"
+    },
+    {
+      "path": "36984870468/S-032/candidate-source-observation.json",
+      "observed_at": "2026-10-02T16:35:22.343420+08:00",
+      "local_date": "2026-10-02",
+      "source_count": 1,
+      "failed_count": 0,
+      "report_sha256": "312e77bf9217f3680b37923a927e7c4a32a5598db137fdf064e365425a80c818"
+    },
+    {
+      "path": "36839828884/S-032/candidate-source-observation.json",
+      "observed_at": "2026-10-01T16:59:47.148225+08:00",
+      "local_date": "2026-10-01",
+      "source_count": 1,
+      "failed_count": 0,
+      "report_sha256": "5d17633254ce1a46e4a57d8ba9e2643ec45828564dddcb2a2440b1dd75417418"
+    },
+    {
+      "path": "36703064392/S-032/candidate-source-observation.json",
+      "observed_at": "2026-09-30T18:32:48.903525+08:00",
+      "local_date": "2026-09-30",
+      "source_count": 1,
+      "failed_count": 0,
+      "report_sha256": "9872b16f003d92b25e727176197d7dea1e55d9dca01f8ce0bcaef65464b27ae6"
+    }
+  ],
+  "sources": {
+    "S-032": {
+      "observation_count": 7,
+      "observed_days": [
+        "2026-09-30",
+        "2026-10-01",
+        "2026-10-02",
+        "2026-10-03",
+        "2026-10-04",
+        "2026-10-05",
+        "2026-10-06"
+      ],
+      "valid_observed_days": [
+        "2026-09-30",
+        "2026-10-01",
+        "2026-10-02",
+        "2026-10-03",
+        "2026-10-04",
+        "2026-10-05",
+        "2026-10-06"
+      ],
+      "successful_transport_days": [
+        "2026-09-30",
+        "2026-10-01",
+        "2026-10-02",
+        "2026-10-03",
+        "2026-10-04",
+        "2026-10-05",
+        "2026-10-06"
+      ],
+      "partial_collection_days": [
+        "2026-10-05",
+        "2026-10-06"
+      ],
+      "missing_guardrail_days": [],
+      "missing_days": [],
+      "first_observed_at": "2026-09-30T18:32:48.903525+08:00",
+      "last_observed_at": "2026-10-06T09:58:39.555165+08:00",
+      "window_complete": true,
+      "promotion_eligible": false,
+      "coverage_independently_verified": false
+    }
+  }
+}
