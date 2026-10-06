@@ -21,7 +21,7 @@
 - v6 首期功能的 candidate／local acceptance、public deployment、真人成效各自驗收，不互相替代。
 - D1 已取得指定 112Y12M 官方歷史 CSV，驗證 368 國內記錄、臺中 29 區，並整合本地背景查詢；未 promotion，真人任務效益未測。D2 官方 bytes 仍 403／CRS 未驗證，Twinkle 既有連線需重新認證。
 - 本地已驗證版本 `3a06754…`：完整 gate PASS、Web 406/406、runtime 26/26、v6 browser 22/22，served `BUILD_ONLY` release／三檔 hash 綁定。[VERIFICATION](VERIFICATION.md)保存 scope；v6 新功能正式部署仍待驗證。語意 AI、獨立事件保留集與經同意真人 A／B／C 仍未執行，不預填成功。
-- v6 補件已寄出，主辦於 2026-10-05 確認收妥，但未接受更名；原報名完整名稱及是否須重送仍待指示，見[核對紀錄](ORGANIZER_STATUS_2026-10-06.md)。
+- v6 與補件寄送完成；主辦受理／更名回覆仍未確認。
 
 ## 文件索引
 
