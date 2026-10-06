@@ -662,6 +662,7 @@ async function execute(snapshot, tool, rawArgs = {}) {
   const allowed = {
     search_evidence: ["q", "canonical_id", "source_id", "change_type", "limit", "cursor", "expected_generation"],
     get_current_brief: [], get_publication_receipt: [], get_source_health: ["source_id"], validate_answer: ["claims", "expected_generation"],
+    chat_turn: ["text", "quick_action", "context"],
   }[tool];
   if (!allowed) throw new GatewayError("CAPABILITY_NOT_AVAILABLE", `${tool} is not implemented; available capabilities: search_evidence, get_current_brief, get_publication_receipt, get_source_health, validate_answer`, 422);
   const unknown = Object.keys(rawArgs).filter((key) => !allowed.includes(key));
@@ -695,6 +696,85 @@ async function execute(snapshot, tool, rawArgs = {}) {
       return {source_id: row.source_id, rights_status: rights.rights_status, review_required: rights.review_required}; });
     return { ...envelope(snapshot, tool, args, scope, { sources: selected, source_rights: sourceRights,
       formal_admission: snapshot.formalAdmission }, selected.length), receipt: { ...envelope(snapshot, tool, args, scope, {}, selected.length).receipt, arguments_sha256: argumentsHash } };
+  }
+  if (tool === "chat_turn") {
+    const text = rawArgs.text || null;
+    const quick_action = rawArgs.quick_action || null;
+    if (text === null && quick_action === null) throw new GatewayError("INVALID_ARGUMENTS", "chat_turn requires text or quick_action");
+    let resolved_tool = "search_events";
+    let resolved_args = {};
+    const normalized = (text || "").trim();
+    if (quick_action !== null) {
+      const actionMap = {
+        "today-important": "get_current_brief",
+        "recent-changes": "get_current_brief",
+        "weekend-events": "search_events",
+        "anti-fraud": "search_evidence",
+        "by-district": "search_events",
+        "official-evidence": "search_evidence",
+        "statistics": "query_statistics",
+        "no-data": "get_source_health",
+      };
+      resolved_tool = actionMap[quick_action] || "search_events";
+      if (resolved_tool === "get_current_brief") {
+        resolved_args = {};
+      } else if (resolved_tool === "query_statistics") {
+        resolved_args = { metric: "詐欺", geography: "臺中市", period_from: "2026-01", period_to: "2026-12" };
+      } else {
+        resolved_args = { q: normalized };
+      }
+    } else {
+      if (normalized === "何故" || normalized.startsWith("為什麼")) {
+        resolved_tool = "get_source_health";
+        resolved_args = {};
+      } else if (/^(查地區|查某地區|哪個地區)/.test(normalized)) {
+        resolved_tool = "search_events";
+        resolved_args = { q: normalized };
+      } else if (/\d{4}年\d{1,2}月\d{1,2}日/.test(normalized)) {
+        resolved_tool = "search_events";
+        resolved_args = { q: normalized };
+      } else if (normalized.includes("統計") || normalized.includes("統計")) {
+        resolved_tool = "query_statistics";
+        resolved_args = { metric: "詐欁", geography: "臺中市", period_from: "2026-01", period_to: "2026-12" };
+      } else {
+        resolved_tool = "search_events";
+        resolved_args = { q: normalized };
+      }
+    }
+    const scopeRaw = assessScope(snapshot, resolved_args.source_id);
+    const scope = { ...scopeRaw, coverage: queryCoverage(snapshot, resolved_tool, resolved_args.source_id ? { source_id: resolved_args.source_id } : {}) };
+    const executed = await execute(snapshot, resolved_tool, resolved_args);
+    const chatAnswer = {
+      schema_version: 1,
+      intent: "chat_turn",
+      status: executed.gate_status || "OK",
+      resolved_request: { tool: resolved_tool, arguments: resolved_args },
+      lines: [],
+      verified: [],
+      unverified: [],
+      conflicts: [],
+      stale: [],
+      statistics: [],
+      sources: [],
+      evidence_links: [],
+      event_ids: [],
+      gaps: [],
+      freshness: null,
+      trust: null,
+      no_match: null,
+      notices: [],
+      quick_action_hints: [],
+      publication_hash: executed.receipt?.publication_hash || snapshot.brief?.generated_from?.brief_sha256,
+      query_receipt: executed.receipt,
+      context: { schema_version: 1 },
+    };
+    if (executed.gate_status === "CONFLICT") {
+      chatAnswer.conflicts = ["官方來源記載不一致"];
+    }
+    if (executed.gate_status === "PARTIAL") {
+      chatAnswer.stale = ["資料可能過期"];
+    }
+    return { ...envelope(snapshot, tool, args, scope, chatAnswer, 0, false, "answer_evidence"), receipt: { ...envelope(snapshot, tool, args, scope, {}, 0).receipt, arguments_sha256: await sha256(canonicalJson({ tool, args, resolved_tool, resolved_args, executed })) } };
   }
   if (!Array.isArray(args.claims) || args.claims.length < 1 || args.claims.length > 32 || (args.claims.some((claim) => !claim || typeof claim !== "object" || Object.keys(claim).some((key) => !["schema_version", "claim_id", "text", "claim_type", "temporal_scope", "proposition", "cited_evidence_ids"].includes(key))))) throw new GatewayError("INVALID_ARGUMENTS", "validate_answer requires 1 to 32 structured claims");
   if (args.expected_generation && args.expected_generation !== snapshot.generationId) throw new GatewayError("INVALID_ARGUMENTS", "query generation mismatch; retry against the requested snapshot");
