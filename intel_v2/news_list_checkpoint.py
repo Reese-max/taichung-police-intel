@@ -35,7 +35,7 @@ ROLE_LABELS = {
 }
 REL_ROLES = {"first": "FIRST", "prev": "PREVIOUS", "previous": "PREVIOUS", "next": "NEXT", "last": "LAST"}
 CODE_BINDING_HELPERS = ("_encoded", "_normalize", "_code_payload", "_function_payload",
-                        "runtime_code_fingerprint", "_compiled_source", "_assert_source_coherent",
+                        "runtime_code_fingerprint", "read_source_bounded", "_compiled_source", "_assert_source_coherent",
                         "callable_fingerprints", "callable_fingerprint")
 # The checker cannot establish its own replacement's authenticity by calling
 # that replacement. Hold imported identities/code/defaults and check them with
@@ -47,13 +47,31 @@ _CODE_BINDING_SNAPSHOT = tuple((name, getattr(cb, name), getattr(cb, name).__cod
                               for name in CODE_BINDING_HELPERS)
 
 
+def _code_binding_defaults_match(actual, expected):
+    """Compare builtin literal shapes without replacement normalizers/hooks."""
+    if type(actual) is not type(expected):
+        return False
+    if expected is None:
+        return actual is None
+    if type(expected) in (bool, int, float, complex, str, bytes):
+        return actual == expected
+    if type(expected) is tuple:
+        return len(actual) == len(expected) and all(_code_binding_defaults_match(a, e) for a, e in zip(actual, expected))
+    if type(expected) is dict:
+        if any(type(key) is not str for key in actual) or any(type(key) is not str for key in expected):
+            return False
+        return actual.keys() == expected.keys() and all(_code_binding_defaults_match(actual[key], value) for key, value in expected.items())
+    return False
+
+
 def _assert_code_binding_runtime():
     expected_path = Path(__file__).resolve().parent / "checkpoint_code_binding.py"
     for name, expected_function, expected_code, expected_defaults, expected_kwdefaults in _CODE_BINDING_SNAPSHOT:
         function = getattr(cb, name, None)
         if (type(function) is not FunctionType or function is not expected_function
                 or function.__code__ is not expected_code or hasattr(function, "__wrapped__")
-                or function.__defaults__ != expected_defaults or function.__kwdefaults__ != expected_kwdefaults
+                or not _code_binding_defaults_match(function.__defaults__, expected_defaults)
+                or not _code_binding_defaults_match(function.__kwdefaults__, expected_kwdefaults)
                 or function.__name__ != name or function.__qualname__ != name or function.__module__ != cb.__name__
                 or function.__globals__ is not vars(cb) or Path(function.__code__.co_filename).resolve() != expected_path):
             raise ValueError("parser code binding changed; restart from the official entrypoint")
@@ -82,17 +100,17 @@ def binding(start, end):
     modules = ("online_collect.py", "collect.py", "intel_v2/news_list_checkpoint.py",
                "intel_v2/checkpoint_code_binding.py", "scripts/news-list-resume.py",
                "scripts/candidate-runtime-canary.py")
-    module_hashes = {name: hashlib.sha256((root / name).read_bytes()).hexdigest() for name in modules}
+    module_hashes = {name: hashlib.sha256(cb.read_source_bounded(root / name)).hexdigest() for name in modules}
     registry = {name: (getattr(oc, name), root / "online_collect.py", name) for name in
                 ("parse_news_list", "roc_date", "_traffic_list_page_identity", "_traffic_news_list_next")}
     registry.update({name: (globals()[name], root / "intel_v2/news_list_checkpoint.py", name) for name in
-                     ("_assert_code_binding_runtime", "binding", "digest", "encode_checkpoint", "seal", "new_checkpoint", "canonical_cursor",
+                     ("_code_binding_defaults_match", "_assert_code_binding_runtime", "binding", "digest", "encode_checkpoint", "seal", "new_checkpoint", "canonical_cursor",
                       "pager_controls", "validated_control_targets", "control_html", "row_metadata",
                       "validate_checkpoint", "collect_batch")})
     registry.update({"code_binding." + name: (getattr(cb, name), root / "intel_v2/checkpoint_code_binding.py", name)
                      for name in CODE_BINDING_HELPERS})
     callable_hashes = cb.callable_fingerprints(registry)
-    if module_hashes != {name: hashlib.sha256((root / name).read_bytes()).hexdigest() for name in modules}:
+    if module_hashes != {name: hashlib.sha256(cb.read_source_bounded(root / name)).hexdigest() for name in modules}:
         raise ValueError("parser code binding changed; restart from the official entrypoint")
     return {
         "schema_version": 2, "source_id": "S-032", "source_url": oc.NEWS_LIST_SOURCES["S-032"]["list_url"],

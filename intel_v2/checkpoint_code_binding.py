@@ -9,7 +9,9 @@ from __future__ import annotations
 import ast
 import hashlib
 import json
+import os
 from pathlib import Path
+import stat
 import struct
 import sys
 from types import CodeType, FunctionType
@@ -47,7 +49,7 @@ def _normalize(value, *, seen=None, depth=0):
         return ["str", value]
     if kind is bytes:
         return ["bytes", value.hex()]
-    if kind not in (tuple, list, dict, set, frozenset, CodeType):
+    if kind not in (tuple, list, dict, set, frozenset, slice, CodeType):
         raise ValueError(ERROR)
     identity = id(value)
     if identity in seen:
@@ -56,6 +58,10 @@ def _normalize(value, *, seen=None, depth=0):
     try:
         if kind is CodeType:
             return ["code", _code_payload(value, seen=seen, depth=depth + 1)]
+        if kind is slice:
+            return ["slice", _normalize(value.start, seen=seen, depth=depth + 1),
+                    _normalize(value.stop, seen=seen, depth=depth + 1),
+                    _normalize(value.step, seen=seen, depth=depth + 1)]
         if kind is dict:
             pairs = [[_normalize(key, seen=seen, depth=depth + 1),
                       _normalize(item, seen=seen, depth=depth + 1)] for key, item in value.items()]
@@ -108,11 +114,31 @@ def runtime_code_fingerprint(function):
     return hashlib.sha256(_encoded(_function_payload(function))).hexdigest()
 
 
-def _compiled_source(path):
+def read_source_bounded(path):
+    """Reject nonregular/oversized sources before reading; bound file growth."""
+    descriptor = None
     try:
-        source = path.read_bytes()
+        flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_CLOEXEC", 0)
+        descriptor = os.open(path, flags)
+        metadata = os.fstat(descriptor)
+        if not stat.S_ISREG(metadata.st_mode) or not 0 <= metadata.st_size <= MAX_SOURCE_BYTES:
+            raise ValueError(ERROR)
+        with os.fdopen(descriptor, "rb") as stream:
+            descriptor = None  # The stream owns and closes it from here.
+            source = stream.read(MAX_SOURCE_BYTES + 1)
         if len(source) > MAX_SOURCE_BYTES:
             raise ValueError(ERROR)
+        return source
+    except (OSError, TypeError, ValueError) as error:
+        raise ValueError(ERROR) from error
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+
+
+def _compiled_source(path):
+    try:
+        source = read_source_bounded(path)
         tree = ast.parse(source, filename=str(path))
         compiled = compile(source, str(path), "exec", dont_inherit=True, optimize=sys.flags.optimize)
     except (OSError, SyntaxError, TypeError, ValueError) as error:

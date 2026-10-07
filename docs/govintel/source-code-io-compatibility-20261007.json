@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "status": "FIXED_LOCAL_FOCUSED_AND_ACTUAL_PYTHON314_PASS_RELEASE_RECEIPTS_SEPARATE",
+  "base_sha": "2a48c4af185bf545e6e6d80f5cef386667144b89",
+  "functional_code_sha": "d6c1dd7dbc4fa179aab57fb4587a92f4d10e8596",
+  "findings": [
+    {
+      "review_comment_id": 4206050788,
+      "type": "PYTHON314_SLICE_CONSTANT",
+      "status": "FIXED",
+      "baseline_actual_python": "3.14.7",
+      "baseline_binding": "FAIL_BEFORE_TRANSPORT",
+      "resolution": "Deterministic recursive slice normalization; meaningful compiled changed nested code fixture supports LOAD_SMALL_INT."
+    },
+    {
+      "review_comment_id": 4206050794,
+      "type": "UNBOUNDED_SOURCE_CODE_ALLOCATION",
+      "status": "FIXED",
+      "resolution": "Nonblocking regular descriptor + fstat size guard before read, one limited MAX+1 read and growth rejection; both module-hash passes and compile use bounded reader."
+    },
+    {
+      "type": "DEFAULTS_BOOL_INT_EQUALITY_AND_CUSTOM_HOOK",
+      "status": "FIXED",
+      "before": "Both types accepted by initial ordinary equality; collect later rejected after9 owned-code reads, zero source transport. Custom equality invoked2 times.",
+      "after": "Builtin shape/type comparison rejects before any owned-code read without invoking custom hooks; source transport remainszero."
+    }
+  ],
+  "validation": {
+    "python312_disjoint_focused_tests": 180,
+    "python314_actual_disjoint_tests": 112,
+    "python314_overlap_with_root_tests": true,
+    "focus_log_sha256": "76484e5c3567e187e6b86fa12d8b5d7faec4982a5ca985d5151ce7ea6c747aaf",
+    "independent_integration_review": {
+      "schema_version": 1,
+      "status": "PASS",
+      "scope": "BOUNDED_SOURCE_IO_AND_TYPED_DEFAULTS_BEFORE_READER",
+      "helper_identity_replacement_probes": 10,
+      "additional_io_probes": 10,
+      "default_type_and_custom_equality_regressions": 2,
+      "integration_tests": 9,
+      "source_http_calls": 0,
+      "model_calls": 0,
+      "credentials_read": false,
+      "limits": "Local registered functions/config; no arbitrary interpreter or unregistered globals integrity boundary."
+    },
+    "ci_change": "Additional S032 checkpoint on Python3.14 job; existing full/current-checkout Chromium jobs retained.",
+    "full_gate": "REQUIRED_AFTER_DOCUMENTATION_COMMIT",
+    "required_ci": "ALL_THREE_JOBS_AND_EXACT_TREE_BROWSER_ARTIFACT_REQUIRED",
+    "publication": "SEPARATE_POSTMERGE_BYTE_CHECKPOINT_GATEWAY_BROWSER_RECEIPT_REQUIRED"
+  },
+  "acquisition": {
+    "historical_v2_full_chain_code_sha": "2a48c4af185bf545e6e6d80f5cef386667144b89",
+    "historical_v2_full_chain_pages": 82,
+    "historical_v2_full_chain_unique_ids": 814,
+    "historical_v2_chain_http_attempts": 82,
+    "historical_v2_window_list_items": 36,
+    "historical_prefix_first_observed_at": "2026-10-07T10:48:36.662420+00:00",
+    "historical_completed_at": "2026-10-07T11:07:19.208151+00:00",
+    "atomic_snapshot": false,
+    "new_binding_restarts_from_entrypoint": true,
+    "new_binding_compatibility_http_attempts": 5,
+    "new_binding_prefix_pages": 4,
+    "new_binding_prefix_ids": 39,
+    "new_binding_standalone_terminal_page": 82,
+    "historical_checkpoints_migrated": false,
+    "additional_natural_days_claimed": 0
+  },
+  "claude": {
+    "version": "2.1.292",
+    "logged_in": true,
+    "actual_public_code_review": "COMPLETED",
+    "reported_model": "claude-opus-5-5",
+    "reviewed_code_sha": "85260b938b51e9a24ec3aabbb851e2263bd88356",
+    "repairs_implemented_by": "CODEX_AGENTS",
+    "official_source_bodies_sent": false
+  },
+  "governance": {
+    "validation_scope": "LOCAL_TRAVERSAL_RECEIPT_ONLY",
+    "window_completeness": "PARTIAL",
+    "whole_history_completeness": "UNKNOWN",
+    "coverage_independently_verified": false,
+    "detail_attachments_verified": false,
+    "rights_approved": false,
+    "promotion_eligible": false,
+    "all_15_business_scopes_complete": false,
+    "new_source_admissions": 0,
+    "model_transmission_allowed": false,
+    "formal_query": "RIGHTS_BLOCKED",
+    "provider_state": "DISABLED",
+    "product_semantic_ai_trial": "NOT_RUN",
+    "human_trial": "NOT_RUN"
+  }
+}

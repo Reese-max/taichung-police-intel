@@ -22,6 +22,29 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  checkpoint-python-314:
+    name: S032 checkpoint on Python 3.14
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up Python 3.14
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+          cache: pip
+      - name: Install Python dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Verify checkpoint runtime and bounded source IO
+        run: >-
+          python -X utf8 -m unittest
+          tests.test_checkpoint_code_binding
+          tests.test_news_list_runtime_binding_integration
+          tests.test_news_list_checkpoint
+          tests.test_news_list_parser_page
+          tests.test_news_list_terminal_page
+          tests.test_news_list_budget -v
+
   verify:
     runs-on: ubuntu-latest
     env:

@@ -1,0 +1,216 @@
+{
+  "schema_version": 2,
+  "status": "PASS",
+  "scope": "ACTUAL_PYTHON314_RUNTIME_COMPATIBILITY_AND_FICTIONAL_REGRESSION_TESTS_ONLY",
+  "recorded_at": "2026-10-07T11:19:24.156108+00:00",
+  "python": "3.14.7 (main, Sep 24 2026, 17:58:18) [Clang 22.1.3 ]",
+  "uv_version": "0.12.19",
+  "code_sha": "d6c1dd7dbc4fa179aab57fb4587a92f4d10e8596",
+  "actual_code_module_sha256": {
+    "intel_v2/checkpoint_code_binding.py": "0478361bf97a624bda20f9b6e75c5d8ef3ade146f59e0e9acc6b4ce5bfd234aa",
+    "intel_v2/news_list_checkpoint.py": "e0aab7ec42b1519a6ea89fbd12f735c5c644cc5a88acd0a7123262a7bae0ec40",
+    "online_collect.py": "fb6bcd998b4479a367c952b8ef6a1d9d860f201ccecb444f3cde0e057a6425ee",
+    "scripts/news-list-resume.py": "8e8e30acbe545d6d611d94affd1cd3a71b161cb777408c263299b767537e6616"
+  },
+  "requirements_sha256": "3a1805e2744bd714d93ce26a3e9680f7b034146f6a025b548c58c3caff9e34cb",
+  "package_versions": {
+    "beautifulsoup4": "4.14.3",
+    "jsonschema": "4.26.0",
+    "lxml": "6.1.2",
+    "psycopg": "3.3.4",
+    "psycopg-binary": "3.3.4",
+    "pypdf": "6.19.0",
+    "requests": "2.33.0"
+  },
+  "baseline": {
+    "code_sha": "2a48c4af185bf545e6e6d80f5cef386667144b89",
+    "status": "BASELINE_BUG_REPRODUCED",
+    "operations": [
+      {
+        "operation": "binding",
+        "status": "FAIL",
+        "exception": "ValueError",
+        "message": "parser code binding changed; restart from the official entrypoint"
+      },
+      {
+        "operation": "new_checkpoint",
+        "status": "FAIL",
+        "exception": "ValueError",
+        "message": "parser code binding changed; restart from the official entrypoint"
+      }
+    ],
+    "slice_normalization_probe": {
+      "status": "FAIL",
+      "exception": "ValueError",
+      "message": "parser code binding changed; restart from the official entrypoint"
+    },
+    "cause": "Python 3.14 emits slice objects into actual compiled code constants; the prior normalizer rejected type slice."
+  },
+  "staged_verification": [
+    {
+      "stage": "FIRST_FIXED_CODE_110_TEST_RUN",
+      "result": {
+        "status": "FAIL",
+        "code_sha": "bcb0eec645561bea70396e8654b74c3e76cca5c6",
+        "actual_code_module_sha256": {
+          "intel_v2/checkpoint_code_binding.py": "0478361bf97a624bda20f9b6e75c5d8ef3ade146f59e0e9acc6b4ce5bfd234aa",
+          "intel_v2/news_list_checkpoint.py": "e57744322973e46701cc94dbfe40b6d90760faa842efc22ed0e0c31aa529a39c",
+          "online_collect.py": "fb6bcd998b4479a367c952b8ef6a1d9d860f201ccecb444f3cde0e057a6425ee",
+          "scripts/news-list-resume.py": "8e8e30acbe545d6d611d94affd1cd3a71b161cb777408c263299b767537e6616"
+        },
+        "tests_run": 110,
+        "groups_disjoint_within_receipt": {
+          "tests.test_checkpoint_code_binding": 31,
+          "tests.test_news_list_checkpoint": 40,
+          "tests.test_news_list_runtime_binding_integration": 7,
+          "tests.test_news_list_parser_page": 13,
+          "tests.test_news_list_budget": 8,
+          "tests.test_news_list_terminal_page": 11
+        },
+        "errors": 0,
+        "failures": 1,
+        "skipped": 0,
+        "binding_probe": [
+          {
+            "operation": "binding",
+            "status": "PASS"
+          },
+          {
+            "operation": "new_checkpoint",
+            "status": "PASS"
+          }
+        ],
+        "started_at": "2026-10-07T11:11:44.502671+00:00",
+        "finished_at": "2026-10-07T11:12:02.069006+00:00",
+        "log_sha256": "dfccec42b2e1b49ffcd3fd76077274e18563b12c5d0baf55a975939a4bd2914f",
+        "source_http_requests": 0
+      },
+      "failure_test": "test_nested_runtime_code_change_is_fingerprinted_and_rejected (tests.test_checkpoint_code_binding.CodeBindingTests.test_nested_runtime_code_change_is_fingerprinted_and_rejected)",
+      "cause": "A nested-code mutation test changed co_consts but did not change Python 3.14 LOAD_SMALL_INT operands, so the intended runtime mutation did not occur. Integer constants can still remain in co_consts; their absence is not claimed.",
+      "resolved_by": "The test compiles a changed fictional source function and swaps the resulting nested CodeType, so the runtime mutation is real across interpreter versions."
+    },
+    {
+      "stage": "INTERMEDIATE_FIXED_CODE_110_TEST_RUN",
+      "result": {
+        "status": "PASS",
+        "code_sha": "7db98bf4f4ecf316a1cefd32baf085814b437e71",
+        "actual_code_module_sha256": {
+          "intel_v2/checkpoint_code_binding.py": "0478361bf97a624bda20f9b6e75c5d8ef3ade146f59e0e9acc6b4ce5bfd234aa",
+          "intel_v2/news_list_checkpoint.py": "e57744322973e46701cc94dbfe40b6d90760faa842efc22ed0e0c31aa529a39c",
+          "online_collect.py": "fb6bcd998b4479a367c952b8ef6a1d9d860f201ccecb444f3cde0e057a6425ee",
+          "scripts/news-list-resume.py": "8e8e30acbe545d6d611d94affd1cd3a71b161cb777408c263299b767537e6616"
+        },
+        "tests_run": 110,
+        "groups_disjoint_within_receipt": {
+          "tests.test_checkpoint_code_binding": 31,
+          "tests.test_news_list_checkpoint": 40,
+          "tests.test_news_list_runtime_binding_integration": 7,
+          "tests.test_news_list_parser_page": 13,
+          "tests.test_news_list_budget": 8,
+          "tests.test_news_list_terminal_page": 11
+        },
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "binding_probe": [
+          {
+            "operation": "binding",
+            "status": "PASS"
+          },
+          {
+            "operation": "new_checkpoint",
+            "status": "PASS"
+          }
+        ],
+        "started_at": "2026-10-07T11:13:29.239132+00:00",
+        "finished_at": "2026-10-07T11:13:47.985802+00:00",
+        "log_sha256": "57871bc93cf6dbf7f956b91c2e80554c9cf2c265430d5826054c61f1d78c1801",
+        "source_http_requests": 0
+      },
+      "scope_limit": "Before the later typed-default pre-dispatch guard and two new integration tests."
+    },
+    {
+      "stage": "FINAL_FIXED_CODE_112_TEST_RUN",
+      "result": {
+        "status": "PASS",
+        "code_sha": "d6c1dd7dbc4fa179aab57fb4587a92f4d10e8596",
+        "actual_code_module_sha256": {
+          "intel_v2/checkpoint_code_binding.py": "0478361bf97a624bda20f9b6e75c5d8ef3ade146f59e0e9acc6b4ce5bfd234aa",
+          "intel_v2/news_list_checkpoint.py": "e0aab7ec42b1519a6ea89fbd12f735c5c644cc5a88acd0a7123262a7bae0ec40",
+          "online_collect.py": "fb6bcd998b4479a367c952b8ef6a1d9d860f201ccecb444f3cde0e057a6425ee",
+          "scripts/news-list-resume.py": "8e8e30acbe545d6d611d94affd1cd3a71b161cb777408c263299b767537e6616"
+        },
+        "tests_run": 112,
+        "groups_disjoint_within_receipt": {
+          "tests.test_checkpoint_code_binding": 31,
+          "tests.test_news_list_checkpoint": 40,
+          "tests.test_news_list_runtime_binding_integration": 9,
+          "tests.test_news_list_parser_page": 13,
+          "tests.test_news_list_budget": 8,
+          "tests.test_news_list_terminal_page": 11
+        },
+        "errors": 0,
+        "failures": 0,
+        "skipped": 0,
+        "binding_probe": [
+          {
+            "operation": "binding",
+            "status": "PASS"
+          },
+          {
+            "operation": "new_checkpoint",
+            "status": "PASS"
+          }
+        ],
+        "started_at": "2026-10-07T11:17:53.143885+00:00",
+        "finished_at": "2026-10-07T11:18:11.903145+00:00",
+        "log_sha256": "afbd2698195cfa90626525a771c5b1ffd3aa621a6bc1b7f3143a0d0c385a0d08",
+        "source_http_requests": 0
+      },
+      "new_predispatch_regressions_passed": [
+        "test_bool_for_integer_helper_default_blocks_before_source_read",
+        "test_unsupported_equality_default_never_runs_hook_or_source_reader"
+      ],
+      "guard_scope": "The typed builtin default check rejects False for registered int 0 and unsupported equality objects before any source os.open; the custom equality hook does not run."
+    }
+  ],
+  "test_count_rule": "112 tests are disjoint across the six groups within the final receipt. Staged runs and other root/agent focused counts overlap and must not be summed.",
+  "limits": {
+    "source_http_requests": 0,
+    "transport": "Session.request denied during compatibility tests",
+    "official_source_bodies_accessed": false,
+    "credentials_or_auth_state_accessed": false,
+    "source_rights_approved": false,
+    "source_coverage_independently_verified": false,
+    "new_source_admissions": 0,
+    "formal_product_ai_trial": "NOT_RUN",
+    "human_trial": "NOT_RUN",
+    "publication_ci_or_production_acceptance_established_by_this_receipt": false
+  },
+  "receipts": {
+    "python314-runtime-safe.json": {
+      "sha256": "539bb54ec778d44ffc5561507f410a79feb390ae01548ad75f1ce1ee62f6d795",
+      "bytes": 1481
+    },
+    "python314-baseline-safe.json": {
+      "sha256": "6936427b9ebf7b4a2208f7657b489013a12ce4e5eb8507ae21efb0b30aa7f1b5",
+      "bytes": 2460
+    },
+    "attempt1-python314-focused-safe.json": {
+      "sha256": "139965c832cf258ab5d3bb7b43be22bc950edc1792c722b01f2649be400b7e74",
+      "bytes": 2687
+    },
+    "python314-test-fixture-portability-safe.json": {
+      "sha256": "f215fed443b154f1545097d8dd8a2ea13aeeac220477bb87d9184963897bc64c",
+      "bytes": 879
+    },
+    "intermediate1-python314-focused-safe.json": {
+      "sha256": "a628d6a18f8923979c80fe082cb258df3c03ddecabdf700b301d33d7c96ffb40",
+      "bytes": 2047
+    },
+    "python314-focused-final-safe.json": {
+      "sha256": "ca38fcc6308891d64b434dbf2fc03869e28d792b0d9dabc88e740308d178a1d1",
+      "bytes": 2047
+    }
+  }
+}
