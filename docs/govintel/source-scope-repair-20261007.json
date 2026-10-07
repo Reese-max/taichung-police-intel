@@ -1,0 +1,495 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-10-07T08:12:47.563174+00:00",
+  "base_code_sha": "4472853e1cdce1d539026d0b6161621446d3fc9b",
+  "mode": "BOUNDED_SOURCE_SCOPE_REPAIR_NOT_ADMISSION",
+  "request_counts": {
+    "S-001": 1,
+    "S-026": 2,
+    "S-010": 4,
+    "S-011": 2
+  },
+  "max_bytes_per_source_request": 2097152,
+  "redirects_followed": false,
+  "source_contents_sent_to_cli_or_provider": false,
+  "raw_source_files_public": false,
+  "rights_decisions_changed": false,
+  "S001_original_retry": {
+    "source_id": "S-001",
+    "official_url": "https://www.police.taichung.gov.tw/ch/home.jsp?id=1&parentpath=0&mcustomize=news_list.jsp",
+    "observed_at": "2026-10-07T07:57:57.937785+00:00",
+    "request_count": 1,
+    "redirects_followed": false,
+    "alternate_host_used": false,
+    "bypass_attempted": false,
+    "max_bytes": 65536,
+    "business_scope_completeness": "NOT_VERIFIED",
+    "rights_review": "PENDING",
+    "production_active": false,
+    "http_status": 503,
+    "final_url": "https://www.police.taichung.gov.tw/ch/home.jsp?id=1&parentpath=0&mcustomize=news_list.jsp",
+    "content_type": "text/plain",
+    "raw_bytes": 91,
+    "raw_sha256": "2f85832e31ca57711e6107af6b142363351ae516adb71c69afc643fac26be7f6",
+    "status": "BLOCKED_OR_UPSTREAM_FAILURE"
+  },
+  "S026_current_snapshot": {
+    "receipt": {
+      "source_id": "S-026",
+      "official_url": "https://law.taichung.gov.tw/DraftForum.aspx",
+      "final_url": "https://law.taichung.gov.tw/DraftForum.aspx",
+      "observed_at": "2026-10-07T08:00:03.790805+00:00",
+      "http_status": 200,
+      "content_type": "text/html; charset=utf-8",
+      "raw_bytes": 21555,
+      "raw_sha256": "ee21b29fede81458838bc8a8947a51e5c54c523549c894d3906d61d77984e4b5",
+      "redirects_followed": false,
+      "max_bytes": 2097152,
+      "status": "BYTES_ACQUIRED_NOT_SOURCE_COMPLETE"
+    },
+    "contract": {
+      "schema_version": 1,
+      "source_id": "S-026",
+      "kind": "CURRENT_DRAFT_SNAPSHOT",
+      "official_url": "https://law.taichung.gov.tw/DraftForum.aspx",
+      "source_body_sha256": "ee21b29fede81458838bc8a8947a51e5c54c523549c894d3906d61d77984e4b5",
+      "validation_scope": "LOCAL_SUPPLIED_HTTP_METADATA_CONTRACT_ONLY",
+      "http_metadata_asserted_by_caller": true,
+      "status": "PUBLISHER_DECLARED_EMPTY_CURRENT_SNAPSHOT",
+      "reason_codes": [],
+      "business_scope_completeness": "NOT_VERIFIED",
+      "requested_window_count": null,
+      "publication_date": "UNKNOWN",
+      "version_semantics": "NOT_VERIFIED",
+      "human_review": null,
+      "rights_review": "PENDING",
+      "model_transmission_allowed": false,
+      "promotion_eligible": false,
+      "raw_content_projection": "NONE",
+      "network_requests": 0,
+      "current_snapshot_count": 0,
+      "empty_state_evidence": {
+        "selector": "#new > #ctl00_cp_content_divNoData",
+        "marker_sha256": "e91ee4ba0dd2e616e280d9ed6e8cce8eca350c12066360c6ce89cb3bacd4578e",
+        "marker_text_length": 14,
+        "marker_text_projection": "NONE",
+        "visibility_scope": "STATIC_HTML_RULES_ONLY_NOT_BROWSER_RENDERING"
+      },
+      "observed_at": "2026-10-07T08:00:03.790805+00:00"
+    }
+  },
+  "S026_selected_detail": {
+    "receipt": {
+      "source_id": "S-026",
+      "requested_url": "https://law.taichung.gov.tw/DraftOpinion.aspx?id=112569&Type=H",
+      "final_url": "https://law.taichung.gov.tw/DraftOpinion.aspx?id=112569&Type=H",
+      "observed_at": "2026-10-07T07:22:28.083078+00:00",
+      "http_status": 200,
+      "content_type": "text/html; charset=utf-8",
+      "bytes": 23694,
+      "sha256": "78564a08eea248a3d0d4582677449f980c9d83728b6cc818b55e5d1ead7e0f32",
+      "redirect_followed": false,
+      "max_bytes": 2097152,
+      "status": "SNAPSHOT_ACQUIRED_NOT_COMPLETE"
+    },
+    "contract": {
+      "schema_version": 1,
+      "source_id": "S-026",
+      "kind": "DRAFT_DETAIL_METADATA",
+      "official_url": "https://law.taichung.gov.tw/DraftOpinion.aspx?id=112569&Type=H",
+      "source_body_sha256": "78564a08eea248a3d0d4582677449f980c9d83728b6cc818b55e5d1ead7e0f32",
+      "validation_scope": "LOCAL_SUPPLIED_HTTP_METADATA_CONTRACT_ONLY",
+      "http_metadata_asserted_by_caller": true,
+      "status": "DETAIL_METADATA_PARSED",
+      "reason_codes": [],
+      "business_scope_completeness": "NOT_VERIFIED",
+      "requested_window_count": null,
+      "publication_date": "UNKNOWN",
+      "version_semantics": "NOT_VERIFIED",
+      "human_review": null,
+      "rights_review": "PENDING",
+      "model_transmission_allowed": false,
+      "promotion_eligible": false,
+      "raw_content_projection": "NONE",
+      "network_requests": 0,
+      "draft_id": "112569",
+      "announcement_date": "2026-08-25",
+      "pre_notice_interval": {
+        "start": "2026-08-26",
+        "end": "2026-09-01",
+        "date_role": "OFFICIAL_PRE_NOTICE_DATE_LABEL"
+      },
+      "deadline_semantics": "NOT_VERIFIED_PRE_NOTICE_INTERVAL_ONLY",
+      "attachments": [
+        {
+          "attachment_id": "137020",
+          "draft_id": "112569",
+          "attachment_type": "ANN",
+          "official_url": "https://law.taichung.gov.tw/Download.ashx?FileID=137020&id=112569&type=ANN"
+        },
+        {
+          "attachment_id": "137021",
+          "draft_id": "112569",
+          "attachment_type": "ANN",
+          "official_url": "https://law.taichung.gov.tw/Download.ashx?FileID=137021&id=112569&type=ANN"
+        }
+      ],
+      "visible_bound_attachment_count": 2,
+      "unrecognized_visible_download_links": 0,
+      "attachment_byte_acquisition": "NOT_ASSERTED_BY_OFFLINE_PARSER",
+      "observed_at": "2026-10-07T07:22:28.083078+00:00",
+      "declared_visible_attachment_bytes_acquired": true,
+      "attachment_scope": "ONLY_TWO_VISIBLE_ANN_LINKS_OF_DRAFT_112569_AT_BOUND_DETAIL_HASH_NOT_ALL_HISTORY",
+      "pre_notice_interval_overlaps_pilot_start": true,
+      "pre_notice_overlap_basis": "Reported interval2026-08-26 through2026-09-01 overlaps pilot2026-09-01 through2026-10-07 at2026-09-01; no initial-publication or current-active claim."
+    },
+    "attachments": [
+      {
+        "attachment_id": "137020",
+        "source_id": "S-026",
+        "official_url": "https://law.taichung.gov.tw/Download.ashx?FileID=137020&id=112569&type=ANN",
+        "final_url": "https://law.taichung.gov.tw/Download.ashx?FileID=137020&id=112569&type=ANN",
+        "observed_at": "2026-10-07T08:00:05.407192+00:00",
+        "http_status": 200,
+        "content_type": "application/octet-stream",
+        "raw_bytes": 96792,
+        "raw_sha256": "eb4a4d147f237d4e3a0380fd2651e7354d4db0fbbab1d3544208865d763099e5",
+        "redirects_followed": false,
+        "max_bytes": 2097152,
+        "status": "BYTES_ACQUIRED_NOT_SOURCE_COMPLETE",
+        "detected_format": "PDF",
+        "format_verified_by_magic": "PDF"
+      },
+      {
+        "attachment_id": "137021",
+        "source_id": "S-026",
+        "requested_url": "https://law.taichung.gov.tw/Download.ashx?FileID=137021&id=112569&type=ANN",
+        "final_url": "https://law.taichung.gov.tw/Download.ashx?FileID=137021&id=112569&type=ANN",
+        "observed_at": "2026-10-07T07:22:49.982301+00:00",
+        "http_status": 200,
+        "content_type": "application/octet-stream",
+        "bytes": 322597,
+        "sha256": "89e3b9b1db8e8cc1c349df1941ba426b10c699fb03d9a27675e63911ed6c431b",
+        "redirect_followed": false,
+        "max_bytes": 2097152,
+        "status": "SNAPSHOT_ACQUIRED_NOT_COMPLETE",
+        "format_verified_by_magic": "PDF"
+      }
+    ]
+  },
+  "video_detail_contracts": [
+    {
+      "schema_version": 1,
+      "source_id": "S-010",
+      "kind": "VIDEO_DETAIL_METADATA",
+      "official_url": "https://vod.tccc.gov.tw/wb_news02.asp?url=92&ano=14872&pageno=1",
+      "source_body_sha256": "fe5b5cc40e20672af7cf5d16e5c57d576ea26982a0bc64ab74f90a8ff4d59fd0",
+      "validation_scope": "LOCAL_SUPPLIED_HTTP_METADATA_CONTRACT_ONLY",
+      "http_metadata_asserted_by_caller": true,
+      "status": "VIDEO_DETAIL_METADATA_PARSED",
+      "reason_codes": [],
+      "business_scope_completeness": "NOT_VERIFIED",
+      "requested_window_count": null,
+      "publication_date": "UNKNOWN",
+      "version_semantics": "NOT_VERIFIED",
+      "human_review": null,
+      "rights_review": "PENDING",
+      "model_transmission_allowed": false,
+      "promotion_eligible": false,
+      "raw_content_projection": "NONE",
+      "network_requests": 0,
+      "item_id": "14872",
+      "meeting_date": "2026-10-01",
+      "meeting_date_role": "OFFICIAL_MEETING_DATE_LABEL",
+      "playback_verification": "NOT_RUN",
+      "timeline_semantics": "NOT_VERIFIED",
+      "subtitle_or_transcript_acquisition": "NOT_RUN",
+      "official_title_numeric_identifiers": [
+        {
+          "title_sha256": "e244313ed3bc0aa79abe6c48b99d75e20936c90ff6b8eac842c6112759696942",
+          "council_term": 4,
+          "regular_session": 8
+        }
+      ],
+      "player_embeds": [
+        {
+          "embed_url_sha256": "336f8ae7d8b5f86c65045038b3fead7ed8f203816c8cb43abbd8ab9b55f7535b",
+          "player_identifier_sha256": "831a9b85e286c2e9c082fa296593f049452e5a72ccc5b1d995375447549ca8c4",
+          "player_host": "rds.ginnet.cloud",
+          "opaque_player_identifier": null,
+          "identifier_projection": "HASH_ONLY",
+          "requested": false,
+          "identifier_date_semantics": "NOT_INFERRED"
+        }
+      ],
+      "visible_player_embed_count": 1,
+      "observed_at": "2026-10-07T07:25:53.693646+00:00"
+    },
+    {
+      "schema_version": 1,
+      "source_id": "S-011",
+      "kind": "VIDEO_DETAIL_METADATA",
+      "official_url": "https://agenda-vod.tccc.gov.tw/v2_news02.asp?url=92&ano=594",
+      "source_body_sha256": "fad5eec1a25f3c264b02865de574d42aa91f773a681552828e971a6d085b40af",
+      "validation_scope": "LOCAL_SUPPLIED_HTTP_METADATA_CONTRACT_ONLY",
+      "http_metadata_asserted_by_caller": true,
+      "status": "VIDEO_DETAIL_METADATA_PARSED",
+      "reason_codes": [],
+      "business_scope_completeness": "NOT_VERIFIED",
+      "requested_window_count": null,
+      "publication_date": "UNKNOWN",
+      "version_semantics": "NOT_VERIFIED",
+      "human_review": null,
+      "rights_review": "PENDING",
+      "model_transmission_allowed": false,
+      "promotion_eligible": false,
+      "raw_content_projection": "NONE",
+      "network_requests": 0,
+      "item_id": "594",
+      "meeting_date": "2026-10-06",
+      "meeting_date_role": "OFFICIAL_MEETING_DATE_LABEL",
+      "playback_verification": "NOT_RUN",
+      "timeline_semantics": "NOT_VERIFIED",
+      "subtitle_or_transcript_acquisition": "NOT_RUN",
+      "official_title_numeric_identifiers": [
+        {
+          "title_sha256": "4acd1ad49f3bbbb70a18bdc6b2224373643aff6cefbc9f30506f994fc871a78b",
+          "council_term": 4,
+          "regular_session": 8,
+          "meeting_number": 12
+        }
+      ],
+      "player_embeds": [
+        {
+          "embed_url_sha256": "fbd0a260f34e29fb75ea0ec5c438e0a89c6c90734649b9ba8650fc73342fb696",
+          "player_identifier_sha256": "1f5958314f0b1d21caa1deca0e64b8cb4a1c2f5b97a06c58ff727d24791eac46",
+          "player_host": "rds.ginnet.cloud",
+          "opaque_player_identifier": null,
+          "identifier_projection": "HASH_ONLY",
+          "requested": false,
+          "identifier_date_semantics": "NOT_INFERRED"
+        },
+        {
+          "embed_url_sha256": "589e797b06923334966891f14860489def6f356349ea590097381ca25b26ad3d",
+          "player_identifier_sha256": "d2b3d01f857339713ccf6f700fd66f48f501187e4d10f5ccbff80440ff4b3c39",
+          "player_host": "rds.ginnet.cloud",
+          "opaque_player_identifier": null,
+          "identifier_projection": "HASH_ONLY",
+          "requested": false,
+          "identifier_date_semantics": "NOT_INFERRED"
+        }
+      ],
+      "visible_player_embed_count": 2,
+      "observed_at": "2026-10-07T07:25:53.688609+00:00"
+    }
+  ],
+  "S010_recent_index": {
+    "source_id": "S-010",
+    "section_selector": "url=91",
+    "status": "VERIFIED_DECLARED_RECENT_INDEX_ENUMERATION_ONLY",
+    "pages": [
+      {
+        "page": 1,
+        "receipt": {
+          "source_id": "S-010",
+          "requested_url": "https://vod.tccc.gov.tw/wb_news01.asp?url=91",
+          "final_url": "https://vod.tccc.gov.tw/wb_news01.asp?url=91",
+          "observed_at": "2026-10-07T07:24:37.748201+00:00",
+          "http_status": 200,
+          "content_type": "text/html; Charset=utf-8",
+          "bytes": 13025,
+          "sha256": "fae19ceb1cee478b3429b386f8ca53a8253a11f0c5a86de13e87376b9a071f26",
+          "redirect_followed": false,
+          "max_bytes": 2097152,
+          "status": "SNAPSHOT_ACQUIRED_NOT_COMPLETE"
+        },
+        "items": [
+          {
+            "item_id": "14872",
+            "official_url": "https://vod.tccc.gov.tw/index.asp?url=92&ano=14872&pageno=1"
+          },
+          {
+            "item_id": "14871",
+            "official_url": "https://vod.tccc.gov.tw/index.asp?url=92&ano=14871&pageno=1"
+          },
+          {
+            "item_id": "14866",
+            "official_url": "https://vod.tccc.gov.tw/index.asp?url=92&ano=14866&pageno=1"
+          },
+          {
+            "item_id": "14867",
+            "official_url": "https://vod.tccc.gov.tw/index.asp?url=92&ano=14867&pageno=1"
+          },
+          {
+            "item_id": "14868",
+            "official_url": "https://vod.tccc.gov.tw/index.asp?url=92&ano=14868&pageno=1"
+          },
+          {
+            "item_id": "14869",
+            "official_url": "https://vod.tccc.gov.tw/index.asp?url=92&ano=14869&pageno=1"
+          }
+        ],
+        "official_last_page_controls": [
+          "3"
+        ]
+      },
+      {
+        "page": 2,
+        "receipt": {
+          "source_id": "S-010",
+          "official_url": "https://vod.tccc.gov.tw/wb_news01.asp?url=91&pageno=2",
+          "final_url": "https://vod.tccc.gov.tw/wb_news01.asp?url=91&pageno=2",
+          "observed_at": "2026-10-07T08:00:08.891803+00:00",
+          "http_status": 200,
+          "content_type": "text/html; Charset=utf-8",
+          "raw_bytes": 13056,
+          "raw_sha256": "5a9f6ec20acd4a9909ac065e14968576a412b47252d72ff693ea789109e27cda",
+          "redirects_followed": false,
+          "max_bytes": 2097152,
+          "status": "BYTES_ACQUIRED_NOT_SOURCE_COMPLETE"
+        },
+        "items": [
+          {
+            "item_id": "14870",
+            "official_url": "https://vod.tccc.gov.tw/index.asp?url=92&ano=14870&pageno=2"
+          },
+          {
+            "item_id": "14865",
+            "official_url": "https://vod.tccc.gov.tw/index.asp?url=92&ano=14865&pageno=2"
+          },
+          {
+            "item_id": "14860",
+            "official_url": "https://vod.tccc.gov.tw/index.asp?url=92&ano=14860&pageno=2"
+          },
+          {
+            "item_id": "14861",
+            "official_url": "https://vod.tccc.gov.tw/index.asp?url=92&ano=14861&pageno=2"
+          },
+          {
+            "item_id": "14862",
+            "official_url": "https://vod.tccc.gov.tw/index.asp?url=92&ano=14862&pageno=2"
+          },
+          {
+            "item_id": "14863",
+            "official_url": "https://vod.tccc.gov.tw/index.asp?url=92&ano=14863&pageno=2"
+          }
+        ],
+        "official_last_page_controls": [
+          "3"
+        ]
+      },
+      {
+        "page": 3,
+        "receipt": {
+          "source_id": "S-010",
+          "official_url": "https://vod.tccc.gov.tw/wb_news01.asp?url=91&pageno=3",
+          "final_url": "https://vod.tccc.gov.tw/wb_news01.asp?url=91&pageno=3",
+          "observed_at": "2026-10-07T08:00:09.810358+00:00",
+          "http_status": 200,
+          "content_type": "text/html; Charset=utf-8",
+          "raw_bytes": 6105,
+          "raw_sha256": "860acea0bf6f7ed73ae0ad3dc1554a51dfba3a85e04952d94953c047370f26b1",
+          "redirects_followed": false,
+          "max_bytes": 2097152,
+          "status": "BYTES_ACQUIRED_NOT_SOURCE_COMPLETE"
+        },
+        "items": [
+          {
+            "item_id": "14864",
+            "official_url": "https://vod.tccc.gov.tw/index.asp?url=92&ano=14864&pageno=3"
+          }
+        ],
+        "official_last_page_controls": [
+          "3"
+        ]
+      }
+    ],
+    "unique_item_count": 13,
+    "page_item_counts": [
+      6,
+      6,
+      1
+    ],
+    "terminal_page": 3,
+    "temporal_consistency": "NON_ATOMIC_BOUNDED_ENUMERATION_WITH_REUSED_PAGE1",
+    "all_history_coverage": "NOT_VERIFIED",
+    "pilot_window_coverage": "NOT_VERIFIED",
+    "all_details_acquired": false,
+    "all_dates_verified_as_meeting_dates": false,
+    "media_downloaded": false,
+    "human_review": null,
+    "promotion_eligible": false
+  },
+  "S011_archive_discovery": {
+    "source_id": "S-011",
+    "archive_selector": "url=11",
+    "first_page_receipt": {
+      "source_id": "S-011",
+      "official_url": "https://agenda-vod.tccc.gov.tw/v2_vod01.asp?url=11",
+      "final_url": "https://agenda-vod.tccc.gov.tw/v2_vod01.asp?url=11",
+      "observed_at": "2026-10-07T08:00:13.536812+00:00",
+      "http_status": 200,
+      "content_type": "text/html; Charset=utf-8",
+      "raw_bytes": 17820,
+      "raw_sha256": "274d6a232e9eb0f0a42c009eea4403dd087d5d545d20e2069561721153d6f9e6",
+      "redirects_followed": false,
+      "max_bytes": 2097152,
+      "status": "BYTES_ACQUIRED_NOT_SOURCE_COMPLETE"
+    },
+    "declared_last_page": 19,
+    "first_page_item_ids": [
+      "568",
+      "569",
+      "570",
+      "571",
+      "572",
+      "580",
+      "581",
+      "592",
+      "593",
+      "594"
+    ],
+    "current_recent_index_item_ids": [
+      "589",
+      "590",
+      "591",
+      "592",
+      "593",
+      "594"
+    ],
+    "recent_ids_not_in_archive_first_page": [
+      "589",
+      "590",
+      "591"
+    ],
+    "filter_equivalence": "NOT_VERIFIED",
+    "all_archive_pages_acquired": false,
+    "window_coverage": "NOT_VERIFIED",
+    "promotion_eligible": false,
+    "human_review": null
+  },
+  "retained_external_blockers": {
+    "S-037": {
+      "last_resource_failure_observed_at": "2026-10-05T01:20:26.938110+08:00",
+      "original_resource_status": 403,
+      "failure_cause": "UNKNOWN",
+      "resource_retried_this_iteration": false,
+      "coordinate_reference_system": "UNKNOWN",
+      "resource_rows": null
+    },
+    "S-034": {
+      "last_denial_observed_at": "2026-10-07T07:05:01+00:00",
+      "failure_class": "EXPLICIT_PROXY_TUNNEL_HTTP_403",
+      "denied_path_retried_this_iteration": false,
+      "alternate_host_or_proxy_used": false,
+      "status": "STOPPED_PENDING_SUPPORTED_NETWORK_CONFIGURATION_OR_OFFICIAL_NORMAL_ACCESS"
+    }
+  },
+  "limitations": [
+    "Current0 belongs only to the10/7 default current index publisher empty declaration, not all-history/business/worldzero.",
+    "History785announcement-date enumeration cannot determine every pre-notice/deadline overlap.",
+    "Only one law detail and two declared visibleANNattachments are byte-complete.",
+    "Video3page recent index is not the full archive, and listed dates require detail roles.",
+    "Offline parsers assert no fetch, licence, actual playback, timeline, subtitle, model-transmission permission or human approval."
+  ]
+}

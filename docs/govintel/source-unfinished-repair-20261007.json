@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-07",
+  "base_code_sha": "45e9c2ba562265923727e299ea3b6b094275d89c",
+  "scope": "BOUNDED_UNFINISHED_REPAIR_NOT_ALL_SOURCE_ACCEPTANCE",
+  "claude_cli": {
+    "version": "2.1.292",
+    "package": "@anthropic-ai/claude-code",
+    "installed": true,
+    "login_status": "AUTH_REQUIRED",
+    "actual_model_invocation": "NOT_RUN_AUTH_REQUIRED",
+    "raw_official_content_sent": false
+  },
+  "completed_engineering": [
+    "S032 source-specific comma parser and terminal clamped Next proof",
+    "S032 bounded metadata-only resumable traversal checkpoint and private atomic IO",
+    "S036/CTX165 single-parser structural quarantine and multiplicity-preserving private hash index",
+    "S028/CTXPOP declaration-bound JSON collection audit",
+    "S026 explicit current empty state with date roles kept separate",
+    "S010/S011 labelled meeting-date metadata without player requests"
+  ],
+  "prior_pr172": {
+    "number": 172,
+    "merged_sha": "45e9c2ba562265923727e299ea3b6b094275d89c",
+    "reviewed_tree_sha": "2bd378ec55a4ac834b58033b8ce26f82603aa3a8",
+    "ci_run_id": 37590862469,
+    "ci_artifact_id": 11469170183,
+    "artifact_zip_sha256": "881250d301d47e177245c6e5f44fd2ec524631de95af4fa8356ff09a208b96bc",
+    "runtime_status": "PASS_BUILD_ONLY",
+    "sabotage_inner_fail": "EXPECTED_NEGATIVE_CASE"
+  },
+  "evidence": [
+    "s032-terminal-navigation-observation-20261007.json",
+    "s032-resume-live-batches-20261007.json",
+    "s032-archive-metadata-observation-20261007.json",
+    "s026-history-enumeration-20261007.json",
+    "reference-quality-disposition-20261007.json",
+    "source-scope-repair-20261007.json",
+    "source-rights-review-packet-20261007.json"
+  ],
+  "new_source_admissions": 0,
+  "human_reviews_fabricated": 0,
+  "new_source_business_scope_completeness": 0,
+  "model_transmission_allowed": false,
+  "promotion_eligible": false,
+  "current_production_formal_query": "RIGHTS_BLOCKED",
+  "public_evidence_scope": "URLs, hashes, schema, numeric metadata and aggregate only; no original rows, source text, auth or private indices",
+  "validation": {
+    "required_new_pr_ci": "PENDING_AT_RECEIPT_CREATION",
+    "production_after_this_repair": "NOT_RUN_AT_RECEIPT_CREATION",
+    "root_focused_tests": {
+      "count": 153,
+      "status": "PASS",
+      "patterns": [
+        "test_news_list*.py",
+        "test_reference_*",
+        "test_source_scope_contracts.py"
+      ],
+      "disjoint_patterns": true,
+      "logs_sha256": {
+        "integrated-pagination-tests.log": "1e3700307555f004e948742cda6817bd0f37437b6f034d5ac882379988c685d9",
+        "integrated-reference-tests.log": "3caaf1f2f087ea3b811ce476750dc7c792be0178f3bb4f3fedffa77e7834e136",
+        "integrated-scope-tests-final.log": "96ea74d1999e8d2e57ab43f14f86b8ba7803a2c2f09085ed44b99610e3e79fc0"
+      }
+    },
+    "integrated_original_csv_replay": {
+      "source_count": 2,
+      "hashes_unchanged": true,
+      "description_contract_once": true,
+      "data_record_ordinals_include_header_and_description": true,
+      "private_indices_public": false
+    }
+  }
+}

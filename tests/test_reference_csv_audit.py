@@ -1,7 +1,12 @@
 """FICTIONAL_OFFLINE_ONLY fixtures; these tests provide no source licence or acquisition proof."""
 import hashlib
 import importlib.util
+import json
+import os
 from pathlib import Path
+import subprocess
+import sys
+import tempfile
 import unittest
 
 spec = importlib.util.spec_from_file_location('reference_csv_audit', Path(__file__).resolve().parents[1] / 'scripts/reference-csv-audit.py')
@@ -80,5 +85,68 @@ class ReferenceCsvAuditTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     m.audit(body, source_id='S-036', expected_sha256=hashlib.sha256(body).hexdigest())
         finally: m.MAX_BYTES = old
+
+    def test_quarantine_is_per_row_and_multiplicity_is_retained(self):
+        good = '2026/10/01 10:00,2026/10/01 11:00,FICTIONAL_PRIVATE_CATEGORY,FICTIONAL_PRIVATE_PLACE,fictional\n'
+        bad = '2026/10/01 12:00,2026/10/01 11:00,fictional,,fictional\n'
+        body = self.assembly(good + good + bad).encode()
+        result = m.audit(body, source_id='S-036', expected_sha256=hashlib.sha256(body).hexdigest(),
+                         include_disposition_index=True)
+        self.assertEqual(result['candidate_unreviewed_rows'], 2)
+        self.assertEqual(result['candidate_unique_full_rows'], 1)
+        self.assertEqual(result['quarantined_rows'], 1)
+        self.assertEqual(result['quarantine_reason_rows'], {'EMPTY_REQUIRED_VALUE': 1, 'END_BEFORE_START': 1})
+        self.assertEqual(result['private_disposition_index']['duplicate_groups'][0]['csv_record_numbers'], [3, 4])
+        self.assertEqual(result['private_disposition_index']['duplicate_groups'][0]['multiplicity'], 2)
+        self.assertNotIn('FICTIONAL_PRIVATE', json.dumps(result))
+        self.assertFalse(result['model_transmission_allowed'])
+        self.assertFalse(result['row_hash_index_anonymization_approved'])
+        self.assertEqual(result['business_identity'], 'UNKNOWN')
+
+    def test_hash_index_record_ordinals_survive_description_and_quoted_newline(self):
+        row = '2026/10/01 10:00,2026/10/01 11:00,fictional,"fictional\nplace",fictional\n'
+        body = self.assembly(row + row).encode()
+        result = m.audit(body, source_id='S-036', expected_sha256=hashlib.sha256(body).hexdigest(),
+                         include_disposition_index=True)
+        index = result['private_disposition_index']
+        self.assertEqual([r['csv_record_number'] for r in index['rows']], [3, 4])
+        self.assertEqual(index['rows'][0]['row_sha256'], index['rows'][1]['row_sha256'])
+        self.assertEqual(result['source_timezone'], 'UNKNOWN')
+
+    def test_default_report_has_no_row_level_index_and_does_not_delete_duplicates(self):
+        row = '11509,FICTIONAL_PRIVATE.invalid,fictional,fictional,fictional\n'
+        result = self.run_audit(','.join(m.HEADERS['CTX-165']) + '\n' + row + row, 'CTX-165')
+        self.assertEqual(result['data_rows'], 2)
+        self.assertEqual(result['candidate_unreviewed_rows'], 2)
+        self.assertNotIn('private_disposition_index', result)
+        self.assertNotIn('FICTIONAL_PRIVATE', json.dumps(result))
+
+    def test_cli_rejects_original_as_output_and_preserves_original_hash(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'original.csv'
+            body = self.assembly('2026/10/01 10:00,2026/10/01 11:00,fictional,fictional,fictional\n').encode()
+            path.write_bytes(body)
+            sha = hashlib.sha256(body).hexdigest()
+            command = [sys.executable, str(Path(m.__file__)), '--source-id', 'S-036', '--resource', str(path),
+                       '--expected-sha256', sha]
+            rejected = subprocess.run(command + ['--out', str(path)], capture_output=True)
+            self.assertEqual(rejected.returncode, 2)
+            out, index = Path(directory) / 'summary.json', Path(directory) / 'index.json'
+            accepted = subprocess.run(command + ['--out', str(out), '--private-index-out', str(index)], capture_output=True)
+            self.assertEqual(accepted.returncode, 0, accepted.stderr)
+            self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(), sha)
+            self.assertEqual(index.stat().st_mode & 0o777, 0o600)
+            self.assertNotIn('private_disposition_index', json.loads(out.read_text()))
+
+    @unittest.skipUnless(hasattr(os, 'mkfifo'), 'POSIX FIFO regression')
+    def test_fifo_resource_is_rejected_without_blocking_open(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fifo = Path(directory) / 'fictional-original-fifo'
+            os.mkfifo(fifo)
+            command = [sys.executable, str(Path(m.__file__)), '--source-id', 'S-036',
+                       '--resource', str(fifo), '--expected-sha256', 'a' * 64]
+            result = subprocess.run(command, capture_output=True, timeout=2)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(b'regular file', result.stderr)
 
 if __name__ == '__main__': unittest.main()
