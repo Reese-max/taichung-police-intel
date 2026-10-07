@@ -1,0 +1,123 @@
+{
+  "schema_version": 1,
+  "status": "PASS",
+  "scope": "BOUNDED_V2_COMPATIBILITY_NOT_FULL_REACQUISITION_OR_COVERAGE",
+  "code_sha": "44e3b9d3bda5bd7d0db403d002aaf2d2fa2a0541",
+  "started_at": "2026-10-07T08:56:05.614056+00:00",
+  "finished_at": "2026-10-07T08:56:16.964211+00:00",
+  "parser_contract": "S032_COMMA_PARSER_V2",
+  "binding": {
+    "schema_version": 2,
+    "source_id": "S-032",
+    "source_url": "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,20",
+    "requested_start": "2026-09-01",
+    "requested_end": "2026-10-07",
+    "parser_contract": "S032_COMMA_PARSER_V2",
+    "parser_code_sha256": "665645b182c5f5c06bce8ff72bace608743afbf5e37777c567b02519ca212d16",
+    "module_code_sha256": {
+      "online_collect.py": "ba2bb990eb8e45f1d2320ba294bafffb92cebf109326bba27bf4506d81e2609a",
+      "collect.py": "1cc28834cf9478e8bc685c66d3432922575d36a5df6896d95a1a073c583c6b85",
+      "intel_v2/news_list_checkpoint.py": "524edbc6e56227af8bfe72bf3fa822e1207eae87b52d583597627c851b7f18bf",
+      "scripts/news-list-resume.py": "8e8e30acbe545d6d611d94affd1cd3a71b161cb777408c263299b767537e6616",
+      "scripts/candidate-runtime-canary.py": "805f2e36829df4f128704a2bf55b3217d69ddfc95308261bac2b74912165b6fd"
+    },
+    "callable_code_sha256": {
+      "row_parser": "8e0281491988d6d240b2c2cef26281eadbe18b3d65f8bf9288d8cc57c4456a22",
+      "row_date_parser": "c7bb86614ef228c166ba38fe124388ef30b38e8c6cfe06b100c89cb3a2f3a613",
+      "cursor_parser": "5f62e66966da08fd0f279f7faeab43b9940598486f8d2ae9bf545e25bce99599",
+      "navigation_parser": "593e98a51705ab6c8da42f821b61a79531d3b151f50a21cb5f8d797e0e0632f4",
+      "row_projection": "3d6c25d592d5254a9bc7411a8b0be500cdc323405f13dfb7e9c90380c7f79b6c",
+      "canonical_digest": "3541257a0bebfea67c80c311cad901f55b6a588863ce04e6df4893414eb6781c",
+      "control_projection": "4d9231e1ceddafdd007fc89cbc7f35886b8ff7034d79b1bd6fad5b3b57d4e333",
+      "batch_projection": "6462e463cd3c9bcdf22dbd92f872f4edb95dbb3ac1aa4b56aa61005c4ac37520"
+    },
+    "source_row_contract_sha256": "613cde97d5d958077a8cb1f1574d205216502ea717cea916f808c35dfb066149",
+    "control_contract_sha256": "2d5e67371e4767bc7a5e55b4833abaf1a1bee273666cabbfb969301da38d324b",
+    "validation_scope": "LOCAL_TRAVERSAL_RECEIPT_ONLY"
+  },
+  "first_default_batch": {
+    "all_observed_dates_known": true,
+    "attachments_downloaded": false,
+    "batches": 1,
+    "checkpoint_sha256": "623446cc3dbafc5e67f4e901943cc69d4e10e4ad0f2414f7a3a01dfa4d4deb1d",
+    "coverage_independently_verified": false,
+    "declared_last_page": 82,
+    "detail_pages_complete": false,
+    "http_attempts_this_batch": 4,
+    "http_call_limit_this_batch": 6,
+    "list_page_limit_this_batch": 4,
+    "next_resume_url": "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,20,,,,,,,,5",
+    "pages": 4,
+    "prefix_to_declared_terminal_consistent": false,
+    "promotion_eligible": false,
+    "requested_end": "2026-10-07",
+    "requested_start": "2026-09-01",
+    "reverse_chronological_observed": true,
+    "rights_approved": false,
+    "source_id": "S-032",
+    "unique_ids": 39,
+    "validation_scope": "LOCAL_TRAVERSAL_RECEIPT_ONLY",
+    "whole_history_completeness": "UNKNOWN",
+    "window_completeness": "PARTIAL",
+    "window_list_item_count": 36
+  },
+  "page_receipts": [
+    {
+      "requested_url": "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,20",
+      "response_url": "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,20",
+      "observed_at": "2026-10-07T08:56:08.606276+00:00",
+      "http_status": 200,
+      "body_sha256": "4f307c7efcd026265fc38699840c7326132c67b37e4a3458c09ac843db997249",
+      "byte_count": 89406,
+      "normalized_control_count": 86
+    },
+    {
+      "requested_url": "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,20,,,,,,,,2",
+      "response_url": "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,20,,,,,,,,2",
+      "observed_at": "2026-10-07T08:56:10.596880+00:00",
+      "http_status": 200,
+      "body_sha256": "37e8fd5aa8f55c3c486392dafbf0d0479d272c11cad46e4e186bfd47b4605c2b",
+      "byte_count": 89505,
+      "normalized_control_count": 86
+    },
+    {
+      "requested_url": "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,20,,,,,,,,3",
+      "response_url": "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,20,,,,,,,,3",
+      "observed_at": "2026-10-07T08:56:12.360908+00:00",
+      "http_status": 200,
+      "body_sha256": "3c1c5de9c1a0fe210fe5c5a85633cdac3f94a66cd2fe7ec6b8f7b5657313a701",
+      "byte_count": 89675,
+      "normalized_control_count": 86
+    },
+    {
+      "requested_url": "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,20,,,,,,,,4",
+      "response_url": "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,20,,,,,,,,4",
+      "observed_at": "2026-10-07T08:56:15.032236+00:00",
+      "http_status": 200,
+      "body_sha256": "509ada1642402647b11a5085a5084c8e25928961461aa32fbebea82c5cc4513d",
+      "byte_count": 89627,
+      "normalized_control_count": 86
+    }
+  ],
+  "terminal_page_standalone": {
+    "requested_url": "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,20,,,,,,,,82",
+    "response_url": "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,20,,,,,,,,82",
+    "observed_at": "2026-10-07T08:56:16.961757+00:00",
+    "http_status": 200,
+    "body_sha256": "ec8a7a6cd3e4f3c0e87e6b4409240a903dafe95b7722df1a0a384dfb82028143",
+    "byte_count": 86926,
+    "normalized_control_count": 86,
+    "next_url": null,
+    "has_next": false,
+    "http_attempts": 1,
+    "standalone_terminal_check_only": true,
+    "added_to_prefix_chain": false
+  },
+  "actual_http_attempts": 5,
+  "historical_v1_migrated": false,
+  "checkpoint_rows_publicly_saved": false,
+  "original_bodies_saved": false,
+  "official_bodies_sent_to_model": false,
+  "model_transmission_allowed": false,
+  "promotion_eligible": false
+}

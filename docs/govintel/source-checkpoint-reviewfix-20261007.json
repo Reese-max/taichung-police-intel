@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-07",
+  "base_code_sha": "ea73e93ef3f7105e7435778f0e71be89e2d3f404",
+  "scope": "FOLLOWUP_REVIEW_FIXES_NOT_NEW_SOURCE_ADMISSION",
+  "reviewed_pr_number": 173,
+  "review_comment_ids": [
+    4204677031,
+    4204677043,
+    4204677052,
+    4204677061
+  ],
+  "fix_targets": [
+    "Reject metadata output paths that alias the input and use a private fresh atomic inode",
+    "Bind checkpoint row extraction, metadata production and transport code in a versioned contract",
+    "Fail unresolved pagination before sealing a successful batch",
+    "Persist only validated normalized minimal navigation metadata"
+  ],
+  "prior_v1_observation": {
+    "evidence": "s032-v1-terminal-resume-observation-20261007.json",
+    "code_sha": "ea73e93ef3f7105e7435778f0e71be89e2d3f404",
+    "pages": 82,
+    "unique_ids": 814,
+    "window_list_items": 36,
+    "prefix_to_declared_terminal_consistent": true,
+    "window_completeness": "PARTIAL",
+    "snapshot_atomic": false,
+    "new_contract_authority": false,
+    "migration": "NO_AUTO_REHASH_OR_REISSUE_AS_V2"
+  },
+  "claude_cli": {
+    "version": "2.1.292",
+    "installed": true,
+    "login_status": "AUTH_REQUIRED",
+    "actual_model_invocation": "NOT_RUN_AUTH_REQUIRED",
+    "official_source_bodies_sent": false
+  },
+  "new_source_admissions": 0,
+  "human_reviews_fabricated": 0,
+  "model_transmission_allowed": false,
+  "promotion_eligible": false,
+  "required_exact_ci": "PENDING_AT_RECEIPT_CREATION",
+  "production_after_followup": "NOT_RUN_AT_RECEIPT_CREATION",
+  "focused_validation": {
+    "status": "PASS",
+    "root_disjoint_tests": 122,
+    "groups": {
+      "news_list_modules": 90,
+      "source_scope": 32
+    },
+    "pagination_agent_compatible_tests": 128,
+    "independent_checkpoint_review_targeted_tests": 14,
+    "counts_overlap_and_must_not_be_summed": true,
+    "raw_source_reads_in_fictional_tests": false
+  },
+  "actual_v2_compatibility": {
+    "evidence": "s032-v2-compatibility-observation-20261007.json",
+    "code_sha": "44e3b9d3bda5bd7d0db403d002aaf2d2fa2a0541",
+    "actual_http_attempts": 5,
+    "default_prefix_pages": 4,
+    "unique_ids": 39,
+    "terminal_page_standalone": 82,
+    "window_completeness": "PARTIAL",
+    "historical_v1_migrated": false,
+    "coverage_independently_verified": false,
+    "official_bodies_saved_or_sent_to_model": false
+  }
+}

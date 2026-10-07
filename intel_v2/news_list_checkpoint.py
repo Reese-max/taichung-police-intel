@@ -8,11 +8,12 @@ from __future__ import annotations
 from copy import deepcopy
 from datetime import date, datetime, timezone
 import hashlib
-import html
 import inspect
 import json
+from pathlib import Path
 import re
 import time
+from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
@@ -23,6 +24,15 @@ MAX_TOTAL_PAGES = 256
 MAX_TOTAL_ROWS = 20000
 MAX_CONTROLS = 100
 SCOPE = "LOCAL_TRAVERSAL_RECEIPT_ONLY"
+CONTRACT = "S032_COMMA_PARSER_V2"
+ROLES = {"FIRST", "PREVIOUS", "NEXT", "LAST", "NUMBERED"}
+ROLE_LABELS = {
+    "FIRST": {"第一頁", "第一页", "first", "first page"},
+    "PREVIOUS": {"上一頁", "上一页", "prev", "previous", "prev page", "previous page"},
+    "NEXT": {"下一頁", "下一页", "下頁", "下页", "next", "next page"},
+    "LAST": {"最後一頁", "最后一页", "末頁", "末页", "最末頁", "最末页", "last", "last page"},
+}
+REL_ROLES = {"first": "FIRST", "prev": "PREVIOUS", "previous": "PREVIOUS", "next": "NEXT", "last": "LAST"}
 
 
 def digest(value):
@@ -39,11 +49,28 @@ def encode_checkpoint(checkpoint):
 def binding(start, end):
     if type(start) is not date or type(end) is not date or start > end:
         raise ValueError("valid ordered start/end dates required")
-    parser_code = inspect.getsource(oc._traffic_list_page_identity) + inspect.getsource(oc._traffic_news_list_next)
+    root = Path(__file__).resolve().parents[1]
+    # Full modules cover helpers/constants as well as the row projection and
+    # transport. Live callable fingerprints also reject in-memory replacement
+    # of a core parser while an already-imported process is running.
+    modules = ("online_collect.py", "collect.py", "intel_v2/news_list_checkpoint.py",
+               "scripts/news-list-resume.py", "scripts/candidate-runtime-canary.py")
+    module_hashes = {name: hashlib.sha256((root / name).read_bytes()).hexdigest() for name in modules}
+    functions = {"row_parser": oc.parse_news_list, "row_date_parser": oc.roc_date,
+                 "cursor_parser": oc._traffic_list_page_identity, "navigation_parser": oc._traffic_news_list_next,
+                 "row_projection": row_metadata, "canonical_digest": digest, "control_projection": pager_controls,
+                 "batch_projection": collect_batch}
+    try:
+        callable_hashes = {name: hashlib.sha256(inspect.getsource(function).encode()).hexdigest() for name, function in functions.items()}
+    except (TypeError, OSError) as error:
+        raise ValueError("parser code binding is unverifiable; restart from the official entrypoint") from error
     return {
-        "schema_version": 1, "source_id": "S-032", "source_url": oc.NEWS_LIST_SOURCES["S-032"]["list_url"],
+        "schema_version": 2, "source_id": "S-032", "source_url": oc.NEWS_LIST_SOURCES["S-032"]["list_url"],
         "requested_start": start.isoformat(), "requested_end": end.isoformat(),
-        "parser_contract": "S032_COMMA_PARSER_V1", "parser_code_sha256": hashlib.sha256(parser_code.encode()).hexdigest(),
+        "parser_contract": CONTRACT, "parser_code_sha256": digest({"modules": module_hashes, "callables": callable_hashes}),
+        "module_code_sha256": module_hashes, "callable_code_sha256": callable_hashes,
+        "source_row_contract_sha256": digest(oc.NEWS_LIST_SOURCES["S-032"]),
+        "control_contract_sha256": digest({"roles": sorted(ROLES), "labels": {role: sorted(values) for role, values in ROLE_LABELS.items()}, "rel_roles": REL_ROLES}),
         "validation_scope": SCOPE,
     }
 
@@ -59,24 +86,48 @@ def new_checkpoint(start, end):
     return seal({"binding": binding(start, end), "batches": []})
 
 
-def pager_controls(body):
-    """Keep only navigation metadata, never source titles, bodies, or attachments."""
+def canonical_cursor(number):
+    if type(number) is not int or not 1 <= number <= 999999:
+        raise ValueError("bounded navigation target page required")
+    root = oc.NEWS_LIST_SOURCES["S-032"]["list_url"]
+    return root if number == 1 else root + ",,,,,,,," + str(number)
+
+
+def pager_controls(body, base_url):
+    """Recognize exact roles/official list targets before projecting metadata."""
+    current = oc._traffic_list_page_identity(base_url)
+    if current is None:
+        raise ValueError("unapproved pagination base cursor")
     result = []
     for node in BeautifulSoup(body, "html.parser").find_all(["a", "link", "button"]):
-        label = " ".join(node.stripped_strings).strip()
-        labels = (label, str(node.get("title") or ""), str(node.get("aria-label") or ""))
-        rel = list(node.get("rel", []))
-        classes = list(node.get("class", []))
-        if not (any(re.search(r"下一[頁页]|下[頁页]|最後一頁|最后一页|末[頁页]|第一[頁页]|上一[頁页]|\b(?:next|last|first|prev(?:ious)?)(?:\s+page)?\b", value, re.I)
-                    or re.fullmatch(r"(?:第\s*)?\d{1,4}\s*(?:頁|页)?", value) for value in labels)
-                or any(str(value).lower() in {"next", "last", "first", "prev", "previous"} for value in rel)
-                or any("next" in str(value).lower() for value in classes)):
+        labels = [" ".join(value.split()).lower() for value in (
+            " ".join(node.stripped_strings), str(node.get("title") or ""), str(node.get("aria-label") or ""))]
+        rel = {str(value).lower() for value in node.get("rel", [])}
+        classes = {str(value).lower() for value in node.get("class", [])}
+        roles = {role for role, values in ROLE_LABELS.items() if any(label in values for label in labels)}
+        roles.update(REL_ROLES[value] for value in rel | classes if value in REL_ROLES)
+        numbers = {int(re.search(r"\d+", label).group()) for label in labels
+                   if re.fullmatch(r"(?:第\s*)?\d{1,4}\s*(?:頁|页)?", label)}
+        if numbers:
+            roles.add("NUMBERED")
+        href = str(node.get("href") or "").strip()
+        target = oc._traffic_list_page_identity(urljoin(base_url, href)) if href and len(href) <= 2048 else None
+        if not roles:
+            loose_hint = (any(re.search(r"下一[頁页]|下[頁页]|最後一頁|最后一页|末[頁页]|第一[頁页]|上一[頁页]|\b(?:next|last|first|prev(?:ious)?)(?:\s+page)?\b", label)
+                              for label in labels) or any("next" in value for value in classes))
+            article = bool(re.search(oc.NEWS_LIST_SOURCES["S-032"]["id_pattern"], href))
+            if loose_hint and not article:
+                raise ValueError("ambiguous pagination role; acquisition blocked")
             continue
-        entry = {"tag": node.name, "label": label, "href": str(node.get("href") or ""),
-                 "title": labels[1], "aria-label": labels[2], "rel": rel, "class": classes}
-        if len(result) >= MAX_CONTROLS or any(len(value) > 2048 for value in (entry["href"],)) or any(len(value) > 128 for value in labels):
+        if len(roles) != 1 or len(numbers) > 1:
+            raise ValueError("conflicting pagination roles; acquisition blocked")
+        if target is None or target[0] != current[0]:
+            raise ValueError("unapproved pagination target; acquisition blocked")
+        if numbers and numbers != {target[1]}:
+            raise ValueError("numbered pagination label disagrees with target")
+        if len(result) >= MAX_CONTROLS:
             raise ValueError("pagination metadata bound exceeded")
-        result.append(entry)
+        result.append({"role": next(iter(roles)), "target_page": target[1]})
     return result
 
 
@@ -85,20 +136,24 @@ def control_html(controls):
         raise ValueError("invalid pager controls")
     result = []
     for control in controls:
-        if type(control) is not dict or set(control) != {"tag", "label", "href", "title", "aria-label", "rel", "class"}:
-            raise ValueError("invalid pager control shape")
-        if control["tag"] not in {"a", "link", "button"}:
-            raise ValueError("invalid pager tag")
-        for field in ("rel", "class"):
-            if type(control[field]) is not list or len(control[field]) > 20 or any(type(item) is not str or len(item) > 128 for item in control[field]):
-                raise ValueError("invalid pager attribute")
-        for field in ("label", "href", "title", "aria-label"):
-            if type(control[field]) is not str or len(control[field]) > (2048 if field == "href" else 128):
-                raise ValueError("invalid pager attribute")
-        attrs = " ".join(f'{field}="{html.escape(" ".join(value) if type(value) is list else value, quote=True)}"'
-                         for field, value in control.items() if field not in {"tag", "label"})
-        result.append(f'<{control["tag"]} {attrs}>{html.escape(control["label"])}</{control["tag"]}>')
+        if type(control) is not dict or set(control) != {"role", "target_page"} or type(control["role"]) is not str or control["role"] not in ROLES:
+            raise ValueError("invalid normalized pager control shape")
+        target = canonical_cursor(control["target_page"])
+        role = control["role"]
+        if role == "NUMBERED":
+            if control["target_page"] > 9999:
+                raise ValueError("numbered target exceeds recognized label contract")
+            result.append(f'<a href="{target}">{control["target_page"]}</a>')
+        else:
+            rel = {"FIRST": "first", "PREVIOUS": "prev", "NEXT": "next", "LAST": "last"}[role]
+            result.append(f'<a href="{target}" rel="{rel}">{rel}</a>')
     return "".join(result).encode()
+
+
+def row_metadata(row):
+    published = row["published"].isoformat() if row["published"] else None
+    return {"stable_key": row["stable_key"], "published": published,
+            "list_sha256": digest({"title": row["title"], "detail_url": row["detail_url"], "published": published})}
 
 
 def validate_checkpoint(checkpoint, start, end, expected_sha256=None):
@@ -106,7 +161,7 @@ def validate_checkpoint(checkpoint, start, end, expected_sha256=None):
         raise ValueError("invalid checkpoint shape")
     encode_checkpoint(checkpoint)
     if type(checkpoint["binding"]) is not dict or digest(checkpoint["binding"]) != digest(binding(start, end)):
-        raise ValueError("source/window/parser binding changed")
+        raise ValueError("source/window/parser binding changed; restart from the official entrypoint without migrating or rehashing old receipts")
     if seal(checkpoint)["checkpoint_sha256"] != checkpoint["checkpoint_sha256"] or (expected_sha256 is not None and checkpoint["checkpoint_sha256"] != expected_sha256):
         raise ValueError("checkpoint hash mismatch")
     batches = checkpoint["batches"]
@@ -149,16 +204,17 @@ def validate_checkpoint(checkpoint, start, end, expected_sha256=None):
                 raise ValueError("observation time must be aware and monotonic")
             last_observed = observed
             markup = control_html(page["controls"])
-            following, has_next = oc._traffic_news_list_next(BeautifulSoup(markup, "html.parser"), cursor)
+            following, has_next = oc._traffic_news_list_next(BeautifulSoup(markup.decode("utf-8"), "html.parser"), cursor)
+            if following is None and has_next:
+                raise ValueError("unresolved pagination; acquisition blocked")
             if type(page["has_next"]) is not bool or (following, has_next) != (page["next_url"], page["has_next"]):
                 raise ValueError("navigation claim differs from recorded controls")
             for control in page["controls"]:
-                label = " ".join((control["label"], control["title"], control["aria-label"]))
-                if re.search(r"最後一頁|最后一页|末[頁页]|\blast(?:\s+page)?\b", label, re.I) or "last" in {value.lower() for value in control["rel"]}:
-                    target = oc._traffic_list_page_identity(oc.urllib.parse.urljoin(cursor, control["href"]))
-                    if target is None or (total is not None and target[1] != total):
+                if control["role"] == "LAST":
+                    number = control["target_page"]
+                    if total is not None and number != total:
                         raise ValueError("official Last changed across batches")
-                    total = target[1]
+                    total = number
             rows = page["rows"]
             if type(rows) is not list or not 1 <= len(rows) <= 500:
                 raise ValueError("invalid page row metadata")
@@ -215,12 +271,13 @@ def collect_batch(session, start, end, *, checkpoint=None, expected_sha256=None,
         if response.url != cursor:
             raise ValueError("redirected list cursor requires review")
         entries = oc.parse_news_list(response.content, cursor, oc.NEWS_LIST_SOURCES["S-032"]["id_pattern"])
-        controls = pager_controls(response.content)
-        next_url, has_next = oc._traffic_news_list_next(BeautifulSoup(control_html(controls), "html.parser"), cursor)
+        controls = pager_controls(response.content, cursor)
+        next_url, has_next = oc._traffic_news_list_next(BeautifulSoup(control_html(controls).decode("utf-8"), "html.parser"), cursor)
+        if next_url is None and has_next:
+            raise ValueError("unresolved pagination; acquisition blocked before sealing")
         page = {"requested_url": cursor, "response_url": response.url, "observed_at": datetime.now(timezone.utc).isoformat(),
                 "http_status": response.status_code, "body_sha256": hashlib.sha256(response.content).hexdigest(), "byte_count": len(response.content),
-                "controls": controls, "rows": [{"stable_key": row["stable_key"], "published": row["published"].isoformat() if row["published"] else None,
-                    "list_sha256": digest({"title": row["title"], "detail_url": row["detail_url"], "published": row["published"].isoformat() if row["published"] else None})} for row in entries],
+                "controls": controls, "rows": [row_metadata(row) for row in entries],
                 "next_url": next_url, "has_next": has_next}
         pages.append(page)
         cursor = next_url

@@ -1,5 +1,7 @@
 # 15 項來源後續修復與 Claude 安裝
 
+後續四條code review的修補與V2 checkpoint契約見 [覆核後續修復](source-checkpoint-reviewfix-20261007.md)；本文件保留PR #173當時的執行與驗證範圍。
+
 本輪從已合併 PR #171 的程式狀態開始，先覆核並合併 PR #172 的四項驗證漏洞，再整合交通局分頁續跑、四組原件品質處理，以及法規／影音日期與範圍契約。各測試使用 fictional/offline fixtures；官方內容只在本地 parser 處理，公開收據限於 URL、hash、數值與聚合 metadata。
 
 | 修復範圍 | 已驗證的進展 | 仍缺少的證據 |

@@ -3,11 +3,14 @@ from copy import deepcopy
 from datetime import date
 import json
 import importlib.util
+import io
 import os
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
+from types import SimpleNamespace
+from contextlib import redirect_stdout
 from unittest import mock
 import unittest
 
@@ -28,7 +31,7 @@ def fixtures(length=6):
     for number, url in enumerate(urls, 1):
         following = urls[number] if number < length else url
         day = f"2026-09-{20-number:02d}"
-        bodies[url] = (f'<li><a href="index-1.asp?Parser=9,4,20,,,,{1000-number}">Fixture {day}</a></li>'
+        bodies[url] = (f'<meta charset="utf-8"><li><a href="index-1.asp?Parser=9,4,20,,,,{1000-number}">Fixture {day}</a></li>'
                        f'<a href="{ROOT}">第一頁</a><a href="{following}">下一頁</a>'
                        f'<a href="{urls[-1]}">最末頁</a>').encode()
     return urls, bodies
@@ -113,21 +116,19 @@ class CheckpointTests(unittest.TestCase):
 
     def test_changed_official_last_across_batches_blocks_receipt(self):
         first, _ = self.batch()
-        self.pages[self.urls[4]] = self.pages[self.urls[4]].replace(self.urls[-1].encode(), page(7).encode())
+        self.pages[self.urls[4]] = self.pages[self.urls[4]].replace(
+            f'<a href="{self.urls[-1]}">最末頁</a>'.encode(), f'<a href="{page(7)}">最末頁</a>'.encode())
         with self.assertRaisesRegex(ValueError, "Last changed"):
             self.batch(checkpoint=first)
 
     def test_case_insensitive_rel_last_cannot_hide_changed_declarations(self):
-        first, _ = self.batch(max_list_pages=6)
-        pages = first["batches"][0]["pages"]
-        for index, record in enumerate(pages):
-            last = record["controls"][-1]
-            last["label"] = ""
-            last["rel"] = ["LAST" if index == 0 else "last"]
-            if index == 0:
-                last["href"] = page(7)
+        for index,url in enumerate(self.urls):
+            old=f'<a href="{self.urls[-1]}">最末頁</a>'.encode()
+            target=page(7) if index==0 else self.urls[-1]
+            rel="LAST" if index==0 else "last"
+            self.pages[url]=self.pages[url].replace(old,f'<a href="{target}" rel="{rel}"></a>'.encode())
         with self.assertRaisesRegex(ValueError, "Last changed"):
-            cp.validate_checkpoint(rebuild(first), START, END)
+            self.batch(max_list_pages=6)
 
     def test_unknown_dates_and_nonmonotonic_order_never_become_global_complete(self):
         for replacement in (b"Unknown date", b"Fixture 2026-10-07"):
@@ -174,7 +175,7 @@ class CheckpointTests(unittest.TestCase):
                 f'<a href="{page(1)}">第一頁</a><a href="{page(max(1,number-1))}">上一頁</a>'
                 f'<a href="{page(min(82,number+1))}">下一頁</a><a href="{page(82)}">最末頁</a>'
                 + ''.join(f'<a href="{page(target)}" title="第{target}頁" class="link_brown">第 {target} 頁</a>' for target in range(1,83))
-            ).encode())
+            ).encode(),record["requested_url"])
             record["controls"] = controls
             record["next_url"] = page(number+1) if number < 82 else None
             record["has_next"] = number < 82
@@ -265,6 +266,142 @@ class CheckpointIOTests(unittest.TestCase):
                     cli.write_checkpoint_atomic(output,cp.new_checkpoint(START,END))
             self.assertEqual(output.read_bytes(),b"FICTIONAL_PRIOR_CHECKPOINT")
             self.assertEqual([path.name for path in Path(directory).iterdir()],["output.json"])
+
+
+class CheckpointV2Tests(unittest.TestCase):
+    def test_changed_row_date_parser_rejects_resume_before_another_fetch(self):
+        _, bodies = fixtures()
+        session = FakeSession(bodies)
+        checkpoint, _ = cp.collect_batch(session,START,END,max_list_pages=1)
+        session.fetched.clear()
+        with mock.patch.object(cp.oc,"roc_date",return_value=date(2000,1,1)):
+            with self.assertRaisesRegex(ValueError,"binding|code"):
+                cp.collect_batch(session,START,END,checkpoint=checkpoint,max_list_pages=1)
+        self.assertEqual(session.fetched,[])
+
+    def test_legacy_v1_checkpoint_requires_restart_even_after_resealing(self):
+        checkpoint = cp.new_checkpoint(START,END)
+        checkpoint["binding"]["schema_version"] = 1
+        checkpoint["binding"]["parser_contract"] = "S032_COMMA_PARSER_V1"
+        with self.assertRaisesRegex(ValueError,"restart"):
+            cp.validate_checkpoint(cp.seal(checkpoint),START,END)
+
+    def test_unresolved_pagination_is_rejected_before_sealing(self):
+        body=(f'<meta charset="utf-8"><li><a href="index-1.asp?Parser=9,4,20,,,,999">Fixture 2026-09-19</a></li>'
+              f'<a href="{ROOT}">下一頁</a>').encode()
+        with self.assertRaisesRegex(ValueError,"unresolved"):
+            cp.collect_batch(FakeSession({ROOT:body}),START,END,max_list_pages=1)
+
+    def test_resealed_unresolved_checkpoint_is_rejected_by_validator(self):
+        _, bodies = fixtures()
+        checkpoint, _ = cp.collect_batch(FakeSession(bodies),START,END,max_list_pages=1)
+        record=checkpoint["batches"][0]["pages"][0]
+        record["controls"]=[]
+        record["next_url"]=None
+        record["has_next"]=True
+        with self.assertRaisesRegex(ValueError,"unresolved"):
+            cp.validate_checkpoint(rebuild(checkpoint),START,END)
+
+    def test_article_next_story_does_not_retain_raw_markers_or_poison_pager(self):
+        _, bodies=fixtures()
+        bodies[ROOT]+=b'<a class="next-story FICTIONAL_PRIVATE_CLASS" href="index-1.asp?Parser=9,4,20,,,,765&note=FICTIONAL_PRIVATE_QUERY">FICTIONAL_PRIVATE_TITLE Next story</a>'
+        checkpoint,state=cp.collect_batch(FakeSession(bodies),START,END,max_list_pages=1)
+        self.assertEqual(state["next_resume_url"],page(2))
+        self.assertNotIn("FICTIONAL_PRIVATE",json.dumps(checkpoint))
+        self.assertTrue(all(set(control)=={"role","target_page"} for control in checkpoint["batches"][0]["pages"][0]["controls"]))
+
+    def test_exact_navigation_with_private_attributes_projects_only_role_and_target(self):
+        _, bodies=fixtures()
+        bodies[ROOT]=bodies[ROOT].replace(b'>\xe4\xb8\x8b\xe4\xb8\x80\xe9\xa0\x81</a>',b' title="FICTIONAL_PRIVATE_TITLE" class="FICTIONAL_PRIVATE_CLASS">\xe4\xb8\x8b\xe4\xb8\x80\xe9\xa0\x81</a>')
+        checkpoint,_=cp.collect_batch(FakeSession(bodies),START,END,max_list_pages=1)
+        self.assertNotIn("FICTIONAL_PRIVATE",json.dumps(checkpoint))
+
+    def test_invalid_next_cannot_be_dropped_to_turn_matching_last_into_terminal(self):
+        for target in ("https://evil.example.test/?Parser=9,4,20",ROOT+"&private=FICTIONAL_PRIVATE_QUERY"):
+            body=(f'<meta charset="utf-8"><li><a href="index-1.asp?Parser=9,4,20,,,,999">Fixture 2026-09-19</a></li>'
+                  f'<a href="{ROOT}">最末頁</a><a href="{ROOT}">下一頁</a><a href="{target}">下一頁</a>').encode()
+            with self.subTest(target=target),self.assertRaisesRegex(ValueError,"navigation|pagination"):
+                cp.collect_batch(FakeSession({ROOT:body}),START,END,max_list_pages=1)
+
+    def test_conflicting_exact_roles_in_one_control_are_blocked(self):
+        _,bodies=fixtures()
+        bodies[ROOT]=bodies[ROOT].replace(b'>\xe4\xb8\x8b\xe4\xb8\x80\xe9\xa0\x81</a>',b' rel="last">\xe4\xb8\x8b\xe4\xb8\x80\xe9\xa0\x81</a>')
+        with self.assertRaisesRegex(ValueError,"role"):
+            cp.collect_batch(FakeSession(bodies),START,END,max_list_pages=1)
+
+    def test_module_binding_covers_row_parser_file_changes_without_navigation_changes(self):
+        _,bodies=fixtures()
+        session=FakeSession(bodies)
+        checkpoint,_=cp.collect_batch(session,START,END,max_list_pages=1)
+        session.fetched.clear()
+        original_read=Path.read_bytes
+        def changed_module_bytes(path):
+            body=original_read(path)
+            if path.name=="online_collect.py":
+                self.assertIn(b'"published": roc_date(row_text)',body)
+                return body.replace(b'"published": roc_date(row_text)',b'"published": None')
+            return body
+        with mock.patch.object(Path,"read_bytes",autospec=True,side_effect=changed_module_bytes):
+            with self.assertRaisesRegex(ValueError,"binding changed.*restart"):
+                cp.collect_batch(session,START,END,checkpoint=checkpoint,max_list_pages=1)
+        self.assertEqual(session.fetched,[])
+
+    def test_runtime_row_metadata_projection_change_also_invalidates_checkpoint(self):
+        _,bodies=fixtures()
+        session=FakeSession(bodies)
+        checkpoint,_=cp.collect_batch(session,START,END,max_list_pages=1)
+        session.fetched.clear()
+        def different_projection(row):
+            return {"stable_key":row["stable_key"],"published":None,"list_sha256":"a"*64}
+        with mock.patch.object(cp,"row_metadata",different_projection):
+            with self.assertRaisesRegex(ValueError,"binding changed.*restart"):
+                cp.collect_batch(session,START,END,checkpoint=checkpoint,max_list_pages=1)
+        self.assertEqual(session.fetched,[])
+
+    def test_runtime_stable_key_pattern_change_rejects_resume_before_network(self):
+        _,bodies=fixtures()
+        session=FakeSession(bodies)
+        checkpoint,_=cp.collect_batch(session,START,END,max_list_pages=1)
+        session.fetched.clear()
+        with mock.patch.dict(cp.oc.NEWS_LIST_SOURCES["S-032"],{"id_pattern":r"Parser=9,4,20,,,,(\d{2})"}):
+            with self.assertRaisesRegex(ValueError,"binding changed.*restart"):
+                cp.collect_batch(session,START,END,checkpoint=checkpoint,max_list_pages=1)
+        self.assertEqual(session.fetched,[])
+
+    def test_rebinding_old_raw_controls_cannot_turn_legacy_receipt_into_v2(self):
+        _,bodies=fixtures()
+        checkpoint,_=cp.collect_batch(FakeSession(bodies),START,END,max_list_pages=1)
+        record=checkpoint["batches"][0]["pages"][0]
+        record["controls"]=[{"tag":"a","label":"Next","href":page(2),"title":"FICTIONAL_PRIVATE_TITLE",
+                             "aria-label":"","rel":["next"],"class":[]}]
+        checkpoint["binding"]=cp.binding(START,END)
+        with self.assertRaisesRegex(ValueError,"normalized pager"):
+            cp.validate_checkpoint(rebuild(checkpoint),START,END)
+
+    def test_cli_unresolved_batch_has_no_success_output_or_checkpoint_write(self):
+        _,bodies=fixtures()
+        bodies[page(2)]=(f'<meta charset="utf-8"><li><a href="index-1.asp?Parser=9,4,20,,,,998">Fixture 2026-09-18</a></li>'
+                        f'<a href="{page(2)}">下一頁</a>').encode()
+        session=FakeSession(bodies)
+        session.close=mock.Mock()
+        loader=mock.Mock()
+        spec=SimpleNamespace(loader=loader)
+        transport=SimpleNamespace(BoundedSession=lambda *args,**kwargs:session)
+        with tempfile.TemporaryDirectory() as directory:
+            output=Path(directory)/"output.json"
+            output.write_bytes(b"FICTIONAL_PRIOR_RECEIPT")
+            command=[str(CLI_PATH),"--start",START.isoformat(),"--end",END.isoformat(),"--output-checkpoint",str(output)]
+            stdout=io.StringIO()
+            with mock.patch.object(sys,"argv",command),mock.patch.object(cli.importlib.util,"spec_from_file_location",return_value=spec),\
+                    mock.patch.object(cli.importlib.util,"module_from_spec",return_value=transport),\
+                    mock.patch.object(cli,"write_checkpoint_atomic",wraps=cli.write_checkpoint_atomic) as writer,redirect_stdout(stdout):
+                with self.assertRaisesRegex(ValueError,"unresolved"):
+                    cli.main()
+                writer.assert_not_called()
+            self.assertEqual(stdout.getvalue(),"")
+            self.assertEqual(output.read_bytes(),b"FICTIONAL_PRIOR_RECEIPT")
+            self.assertEqual(session.fetched,[ROOT,page(2)])
+            session.close.assert_called_once()
 
 
 if __name__ == "__main__":
