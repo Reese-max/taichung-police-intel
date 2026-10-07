@@ -116,7 +116,11 @@ def pager_controls(body, base_url):
             loose_hint = (any(re.search(r"下一[頁页]|下[頁页]|最後一頁|最后一页|末[頁页]|第一[頁页]|上一[頁页]|\b(?:next|last|first|prev(?:ious)?)(?:\s+page)?\b", label)
                               for label in labels) or any("next" in value for value in classes))
             article = bool(re.search(oc.NEWS_LIST_SOURCES["S-032"]["id_pattern"], href))
-            if loose_hint and not article:
+            # An article-shaped link inside a pager can still be a malformed
+            # control; dropping it could manufacture a terminal page.
+            in_pager = any(set(parent.get("class", [])) & {"page", "pagination", "pager", "paginator"}
+                           for parent in (node, *node.parents) if getattr(parent, "attrs", None) is not None)
+            if loose_hint and (not article or in_pager):
                 raise ValueError("ambiguous pagination role; acquisition blocked")
             continue
         if len(roles) != 1 or len(numbers) > 1:

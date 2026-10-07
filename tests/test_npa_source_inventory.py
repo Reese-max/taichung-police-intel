@@ -68,6 +68,63 @@ class NpaSourceInventoryTests(unittest.TestCase):
             with self.subTest(url=url):
                 self.assertEqual(inventory_script._resource_id(url), resource_id)
 
+    def test_resource_id_normalizes_unreserved_percent_encoding_once(self):
+        urls = [
+            'https://example.test/resource/abc/resource/%61bc/download',
+            'https://example.test/resource/%61bc/download?rid=abc',
+            'https://example.test/resource/abc/download?rid=%61bc',
+            'https://example.test/resource/%61bc/download?%72id=%61bc',
+            'https://example.test/resource/api/dataset/fictional/resource/%61bc/resource/abc/download?rid=a%62c',
+            'https://example.test/download?rid=%61bc',
+        ]
+        for url in urls:
+            with self.subTest(url=url):
+                self.assertEqual(inventory_script._resource_id(url), 'abc')
+        self.assertEqual(inventory_script._resource_id(
+            'https://example.test/resource/abc-._~/resource/%61%62%63%2D%2e%5F%7e/download'),
+            'abc-._~')
+        url = 'https://example.test/resource/abc/resource/%61bc/download'
+        receipt = inventory_script._resource_receipt({'resourceDownloadUrl': url})
+        self.assertEqual(receipt['resource_id'], 'abc')
+        self.assertEqual(receipt['resource_url'], url)
+
+    def test_resource_id_preserves_reserved_path_escapes(self):
+        for identity in ['abc%2Fdef', '%2561bc']:
+            for suffix in [f'/resource/{identity}/download',
+                           f'/resource/{identity}/download?rid={identity.replace("%", "%25")}']:
+                with self.subTest(identity=identity, suffix=suffix):
+                    self.assertEqual(inventory_script._resource_id('https://example.test' + suffix),
+                                     identity)
+
+    def test_resource_id_retains_query_form_decoding_and_blank_duplicate_checks(self):
+        query_identities = {
+            '%72id=%61bc': 'abc',
+            'rid=fictional+id': 'fictional id',
+            'rid=fictional%20id': 'fictional id',
+            'rid=abc%2Fdef': 'abc/def',
+            'rid=%2561bc': '%61bc',
+        }
+        for query, identity in query_identities.items():
+            with self.subTest(query=query):
+                self.assertEqual(inventory_script._resource_id('https://example.test/download?' + query),
+                                 identity)
+        for query in ['rid=', '%72id=%20', 'rid=+', 'rid=abc&%72id=abc']:
+            with self.subTest(query=query):
+                with self.assertRaisesRegex(ValueError, 'ambiguous'):
+                    inventory_script._resource_id('https://example.test/download?' + query)
+
+    def test_resource_id_reserved_or_double_encoded_ids_do_not_collapse(self):
+        urls = [
+            'https://example.test/resource/abc%2Fdef/resource/abc/def/download',
+            'https://example.test/resource/%2561bc/resource/abc/download',
+            'https://example.test/resource/abc%2Fdef/download?rid=abc/def',
+            'https://example.test/resource/%2561bc/download?rid=abc',
+        ]
+        for url in urls:
+            with self.subTest(url=url):
+                with self.assertRaisesRegex(ValueError, 'ambiguous'):
+                    inventory_script._resource_id(url)
+
     def test_inventory_covers_batches_and_catalog_bindings(self):
         summary = inventory_script.validate_inventory(self.inventory, self.catalog)
         self.assertGreaterEqual(summary["batch_counts"]["BATCH_1"], 5)

@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
+import re
 from urllib.parse import parse_qs, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 from typing import Any
@@ -38,6 +39,16 @@ def _canonical(value: Any) -> bytes:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
 
+def _normalize_path_id(value: str) -> str:
+    """Decode unreserved escapes once; reserved bytes remain opaque."""
+    def decode(match):
+        character = chr(int(match.group(1), 16))
+        unreserved = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"
+        return character if character in unreserved else match.group(0)
+
+    return re.sub(r"%([0-9a-fA-F]{2})", decode, value)
+
+
 def _resource_id(url: str) -> str | None:
     """Preserve publisher IDs in nested API paths and download rid queries.
 
@@ -48,10 +59,11 @@ def _resource_id(url: str) -> str | None:
     parsed = urlsplit(url)
     parts = [part for part in parsed.path.split("/") if part]
     path_ids = {
-        parts[index + 1]
+        _normalize_path_id(parts[index + 1])
         for index, part in enumerate(parts[:-1])
-        if part == "resource" and parts[index + 1] != "api"
+        if part == "resource"
     }
+    path_ids.discard("api")
     if len(path_ids) > 1:
         raise ValueError("ambiguous resource path identity")
     path_id = next(iter(path_ids), None)

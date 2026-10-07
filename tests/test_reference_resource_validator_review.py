@@ -1,9 +1,13 @@
 """Independent review regressions; all plan/CSV fixtures FICTIONAL_OFFLINE_ONLY."""
+import csv
 import hashlib
 import importlib.util
+import io
 from pathlib import Path
+import struct
 import tempfile
 import unittest
+import zipfile
 
 spec = importlib.util.spec_from_file_location('reference_validator_review', Path(__file__).resolve().parents[1] / 'scripts/reference-resource-validator.py')
 m = importlib.util.module_from_spec(spec)
@@ -81,6 +85,50 @@ class IndependentValidatorReviewTests(unittest.TestCase):
         plan = self.plan(body)
         plan.update(schema=['PK\x03\x04id', 'period'],
                     id_fields=['PK\x03\x04id'], coordinate_fields=[])
+        receipt = m.validate(plan=plan, resource_bytes=body)
+        self.assertFalse(receipt['completeness'], receipt)
+        self.assertIn('NON_CSV_HTML_OR_ERROR_PAYLOAD', receipt['completeness_failures'])
+        self.assertFalse(receipt['original_bytes_acquired'])
+        self.assertIsNone(receipt['resource_rows'])
+
+    def test_valid_empty_and_spanned_zip_rejected_with_matching_csv_plan(self):
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, 'w') as archive:
+            archive.comment = b'\nfictional-id\n'
+        empty_archive = buffer.getvalue()
+        self.assertTrue(empty_archive.startswith(b'PK\x05\x06'))
+        for marker in [b'', b'PK\x07\x08']:
+            with self.subTest(marker=marker):
+                body = marker + empty_archive
+                with zipfile.ZipFile(io.BytesIO(body)) as archive:
+                    self.assertEqual(archive.namelist(), [])
+                    self.assertEqual(archive.comment, b'\nfictional-id\n')
+                # The genuine ZIP header and newline comment form an otherwise
+                # matching one-column CSV, not merely a fabricated signature.
+                header = body.decode('utf-8').split('\n', 1)[0]
+                plan = self.plan(body)
+                plan.update(schema=[header], id_fields=[header], coordinate_fields=[],
+                            period_evidence={'field': header, 'value': 'fictional-id'})
+                receipt = m.validate(plan=plan, resource_bytes=body)
+                self.assertFalse(receipt['completeness'], receipt)
+                self.assertIn('NON_CSV_HTML_OR_ERROR_PAYLOAD', receipt['completeness_failures'])
+                self.assertFalse(receipt['original_bytes_acquired'])
+                self.assertIsNone(receipt['resource_rows'])
+
+    def test_valid_empty_zip64_rejected_with_matching_csv_plan(self):
+        comment = b'\nfictional-id,fictional\n'
+        body = (struct.pack('<4sQ2H2L4Q', b'PK\x06\x06', 44, 45, 45, 0, 0, 0, 0, 0, 0)
+                + struct.pack('<4sLQL', b'PK\x06\x07', 0, 0, 1)
+                + struct.pack('<4s4H2LH', b'PK\x05\x06', 0, 0, 0, 0, 0, 0, len(comment))
+                + comment)
+        with zipfile.ZipFile(io.BytesIO(body)) as archive:
+            self.assertEqual(archive.namelist(), [])
+            self.assertEqual(archive.comment, comment)
+        header = next(csv.reader(io.StringIO(body.decode('utf-8')), strict=True))
+        self.assertEqual(len(header), 2)
+        plan = self.plan(body)
+        plan.update(schema=header, id_fields=[header[0]], coordinate_fields=[],
+                    period_evidence={'field': header[1], 'value': 'fictional'})
         receipt = m.validate(plan=plan, resource_bytes=body)
         self.assertFalse(receipt['completeness'], receipt)
         self.assertIn('NON_CSV_HTML_OR_ERROR_PAYLOAD', receipt['completeness_failures'])
