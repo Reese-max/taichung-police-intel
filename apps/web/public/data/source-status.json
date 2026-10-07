@@ -62,18 +62,18 @@
         "NO_LAST_KNOWN_GOOD",
         "NO_DATA_AS_OF"
       ],
-      "last_checked_at": "2026-10-07T00:52:54+08:00",
+      "last_checked_at": "2026-10-07T09:45:19+08:00",
       "last_known_good": null,
       "last_known_good_age": {
         "age_hours": null,
         "completed_at": null,
-        "observed_at": "2026-10-06T16:52:54.782473+00:00",
+        "observed_at": "2026-10-07T01:45:19.373964+00:00",
         "reason": "NO_LAST_KNOWN_GOOD",
         "status": "UNKNOWN"
       },
       "last_success_at": null,
       "manifest_sha256": null,
-      "next_update_at": "2026-10-07T06:30:00+08:00",
+      "next_update_at": "2026-10-07T18:30:00+08:00",
       "pagination": null,
       "promotion_eligible": false,
       "result": "FAILED",
@@ -98,18 +98,18 @@
         "NO_LAST_KNOWN_GOOD",
         "VERY_STALE_DATA"
       ],
-      "last_checked_at": "2026-10-07T00:53:03+08:00",
+      "last_checked_at": "2026-10-07T09:45:27+08:00",
       "last_known_good": null,
       "last_known_good_age": {
         "age_hours": null,
         "completed_at": null,
-        "observed_at": "2026-10-06T16:53:03.675006+00:00",
+        "observed_at": "2026-10-07T01:45:27.348366+00:00",
         "reason": "NO_LAST_KNOWN_GOOD",
         "status": "UNKNOWN"
       },
       "last_success_at": null,
       "manifest_sha256": "6e14d434006b014ef105cf4c7f8f549cf5e07cf3cbe104cc62a1df43d3c5d8e3",
-      "next_update_at": "2026-10-07T06:30:00+08:00",
+      "next_update_at": "2026-10-07T18:30:00+08:00",
       "pagination": {
         "complete": false,
         "page_limit": 4,
@@ -139,18 +139,18 @@
         "NO_LAST_KNOWN_GOOD",
         "VERY_STALE_DATA"
       ],
-      "last_checked_at": "2026-10-07T00:53:07+08:00",
+      "last_checked_at": "2026-10-07T09:45:31+08:00",
       "last_known_good": null,
       "last_known_good_age": {
         "age_hours": null,
         "completed_at": null,
-        "observed_at": "2026-10-06T16:53:07.303126+00:00",
+        "observed_at": "2026-10-07T01:45:31.145293+00:00",
         "reason": "NO_LAST_KNOWN_GOOD",
         "status": "UNKNOWN"
       },
       "last_success_at": null,
       "manifest_sha256": "d7546729b97c855f0aacfe8b4f962f602441af0e60875b0c298809222beb2042",
-      "next_update_at": "2026-10-07T06:30:00+08:00",
+      "next_update_at": "2026-10-07T18:30:00+08:00",
       "pagination": {
         "complete": false,
         "page_limit": 4,
@@ -167,16 +167,16 @@
       "source_role": "PRIMARY_EVENT",
       "source_url": "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,20",
       "window_completeness": "PARTIAL",
-      "window_item_count": 14
+      "window_item_count": 10
     }
   ],
-  "generated_at": "2026-10-07T00:53:07+08:00",
+  "generated_at": "2026-10-07T09:45:31+08:00",
   "latest_collection_run": {
-    "collection_run_id": "CR-DEMO-20261006-EVENING-SCHEDULE",
-    "finished_at": "2026-10-07T00:53:07+08:00",
-    "scheduled_for": "2026-10-06T18:30:00+08:00",
-    "slot": "EVENING",
-    "slot_date": "2026-10-06",
+    "collection_run_id": "CR-DEMO-20261007-MORNING-SCHEDULE",
+    "finished_at": "2026-10-07T09:45:31+08:00",
+    "scheduled_for": "2026-10-07T06:30:00+08:00",
+    "slot": "MORNING",
+    "slot_date": "2026-10-07",
     "source_policy": {
       "active_source_ids": [
         "S-004",
@@ -189,12 +189,12 @@
       "policy_hash": "3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501",
       "policy_version": 1
     },
-    "started_at": "2026-10-07T00:52:11+08:00",
+    "started_at": "2026-10-07T09:44:36+08:00",
     "status": "PARTIAL",
     "trigger": "SCHEDULE"
   },
   "mode": "COMPETITION_DEMO",
-  "next_update_at": "2026-10-07T06:30:00+08:00",
+  "next_update_at": "2026-10-07T18:30:00+08:00",
   "schema_version": 1,
   "source_policy": {
     "active_source_ids": [
@@ -210,29 +210,29 @@
   },
   "sources": [
     {
-      "current_source_run_id": "SR-DEMO-20261006-EVENING-004",
+      "current_source_run_id": "SR-DEMO-20261007-MORNING-004",
       "data_as_of": "2026-10-02T00:00:00+08:00",
       "freshness_status": "FRESH",
       "integration_status": "PRODUCTION_ACTIVE",
       "intelligence_gaps": [],
-      "last_checked_at": "2026-10-07T00:52:17+08:00",
+      "last_checked_at": "2026-10-07T09:44:41+08:00",
       "last_known_good": {
-        "completed_at": "2026-10-07T00:52:17+08:00",
+        "completed_at": "2026-10-07T09:44:41+08:00",
         "manifest_sha256": "60376b77531ff0aa07e77a424d676b750e151cd6d239de090a92b60ad9466ac2",
         "snapshot_count": 3,
         "snapshot_item_count": 1,
-        "source_run_id": "SR-DEMO-20261006-EVENING-004"
+        "source_run_id": "SR-DEMO-20261007-MORNING-004"
       },
       "last_known_good_age": {
-        "age_hours": 0.00014960527777777778,
-        "completed_at": "2026-10-07T00:52:17+08:00",
-        "observed_at": "2026-10-06T16:52:17.538579+00:00",
+        "age_hours": 0.00023723833333333334,
+        "completed_at": "2026-10-07T09:44:41+08:00",
+        "observed_at": "2026-10-07T01:44:41.854058+00:00",
         "reason": null,
         "status": "KNOWN"
       },
-      "last_success_at": "2026-10-07T00:52:17+08:00",
+      "last_success_at": "2026-10-07T09:44:41+08:00",
       "manifest_sha256": "60376b77531ff0aa07e77a424d676b750e151cd6d239de090a92b60ad9466ac2",
-      "next_update_at": "2026-10-07T06:30:00+08:00",
+      "next_update_at": "2026-10-07T18:30:00+08:00",
       "result": "NO_NEW_ITEM",
       "snapshot_count": 3,
       "snapshot_item_count": 1,
@@ -245,7 +245,7 @@
       "window_item_count": 1
     },
     {
-      "current_source_run_id": "SR-DEMO-20261006-EVENING-006",
+      "current_source_run_id": "SR-DEMO-20261007-MORNING-006",
       "data_as_of": "2026-09-01T00:00:00+08:00",
       "data_as_of_basis": "OFFICIAL_DOCUMENT_REVISION_DATE",
       "data_as_of_evidence": {
@@ -262,24 +262,24 @@
         "WINDOW_PARTIAL",
         "VERY_STALE_DATA"
       ],
-      "last_checked_at": "2026-10-07T00:52:24+08:00",
+      "last_checked_at": "2026-10-07T09:44:49+08:00",
       "last_known_good": {
-        "completed_at": "2026-10-07T00:52:24+08:00",
+        "completed_at": "2026-10-07T09:44:49+08:00",
         "manifest_sha256": "6f6c76f0be306ca3ad99448bc8d73bed704c04a1a67fa8346f52e7769fc7c997",
         "snapshot_count": 15,
         "snapshot_item_count": 7,
-        "source_run_id": "SR-DEMO-20261006-EVENING-006"
+        "source_run_id": "SR-DEMO-20261007-MORNING-006"
       },
       "last_known_good_age": {
-        "age_hours": 6.286361111111111e-05,
-        "completed_at": "2026-10-07T00:52:24+08:00",
-        "observed_at": "2026-10-06T16:52:24.226309+00:00",
+        "age_hours": 0.00011428944444444444,
+        "completed_at": "2026-10-07T09:44:49+08:00",
+        "observed_at": "2026-10-07T01:44:49.411442+00:00",
         "reason": null,
         "status": "KNOWN"
       },
-      "last_success_at": "2026-10-07T00:52:24+08:00",
+      "last_success_at": "2026-10-07T09:44:49+08:00",
       "manifest_sha256": "6f6c76f0be306ca3ad99448bc8d73bed704c04a1a67fa8346f52e7769fc7c997",
-      "next_update_at": "2026-10-07T06:30:00+08:00",
+      "next_update_at": "2026-10-07T18:30:00+08:00",
       "result": "PARTIAL",
       "snapshot_count": 15,
       "snapshot_item_count": 7,
@@ -292,7 +292,7 @@
       "window_item_count": 0
     },
     {
-      "current_source_run_id": "SR-DEMO-20261006-EVENING-007",
+      "current_source_run_id": "SR-DEMO-20261007-MORNING-007",
       "data_as_of": "2026-05-27T01:12:00+08:00",
       "data_as_of_basis": "OFFICIAL_API_RECORD_DATE",
       "data_as_of_scope": "OBSERVED_API_PAGE",
@@ -301,24 +301,24 @@
       "intelligence_gaps": [
         "STALE_DATA"
       ],
-      "last_checked_at": "2026-10-07T00:52:36+08:00",
+      "last_checked_at": "2026-10-07T09:45:00+08:00",
       "last_known_good": {
-        "completed_at": "2026-10-07T00:52:36+08:00",
+        "completed_at": "2026-10-07T09:45:00+08:00",
         "manifest_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "snapshot_count": 2,
         "snapshot_item_count": 0,
-        "source_run_id": "SR-DEMO-20261006-EVENING-007"
+        "source_run_id": "SR-DEMO-20261007-MORNING-007"
       },
       "last_known_good_age": {
-        "age_hours": 0.00019378166666666666,
-        "completed_at": "2026-10-07T00:52:36+08:00",
-        "observed_at": "2026-10-06T16:52:36.697614+00:00",
+        "age_hours": 1.9806666666666668e-05,
+        "completed_at": "2026-10-07T09:45:00+08:00",
+        "observed_at": "2026-10-07T01:45:00.071304+00:00",
         "reason": null,
         "status": "KNOWN"
       },
-      "last_success_at": "2026-10-07T00:52:36+08:00",
+      "last_success_at": "2026-10-07T09:45:00+08:00",
       "manifest_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "next_update_at": "2026-10-07T06:30:00+08:00",
+      "next_update_at": "2026-10-07T18:30:00+08:00",
       "result": "NO_NEW_ITEM",
       "snapshot_count": 2,
       "snapshot_item_count": 0,
@@ -331,7 +331,7 @@
       "window_item_count": 0
     },
     {
-      "current_source_run_id": "SR-DEMO-20261006-EVENING-009",
+      "current_source_run_id": "SR-DEMO-20261007-MORNING-009",
       "data_as_of": null,
       "freshness_status": "NO_DATA",
       "integration_status": "PRODUCTION_ACTIVE",
@@ -339,24 +339,24 @@
         "WINDOW_PARTIAL",
         "NO_DATA_AS_OF"
       ],
-      "last_checked_at": "2026-10-07T00:52:37+08:00",
+      "last_checked_at": "2026-10-07T09:45:01+08:00",
       "last_known_good": {
-        "completed_at": "2026-10-07T00:52:37+08:00",
+        "completed_at": "2026-10-07T09:45:01+08:00",
         "manifest_sha256": "d74de2631cff63316fb4ba717e1c63de412bb6d3ae2fdf32c3bba68fc4957490",
         "snapshot_count": 1,
         "snapshot_item_count": 108,
-        "source_run_id": "SR-DEMO-20261006-EVENING-009"
+        "source_run_id": "SR-DEMO-20261007-MORNING-009"
       },
       "last_known_good_age": {
-        "age_hours": 0.000197565,
-        "completed_at": "2026-10-07T00:52:37+08:00",
-        "observed_at": "2026-10-06T16:52:37.711234+00:00",
+        "age_hours": 5.721666666666667e-06,
+        "completed_at": "2026-10-07T09:45:01+08:00",
+        "observed_at": "2026-10-07T01:45:01.020598+00:00",
         "reason": null,
         "status": "KNOWN"
       },
-      "last_success_at": "2026-10-07T00:52:37+08:00",
+      "last_success_at": "2026-10-07T09:45:01+08:00",
       "manifest_sha256": "d74de2631cff63316fb4ba717e1c63de412bb6d3ae2fdf32c3bba68fc4957490",
-      "next_update_at": "2026-10-07T06:30:00+08:00",
+      "next_update_at": "2026-10-07T18:30:00+08:00",
       "result": "PARTIAL",
       "snapshot_count": 1,
       "snapshot_item_count": 108,
@@ -369,31 +369,31 @@
       "window_item_count": 0
     },
     {
-      "current_source_run_id": "SR-DEMO-20261006-EVENING-029",
+      "current_source_run_id": "SR-DEMO-20261007-MORNING-029",
       "data_as_of": "2026-07-24T00:00:00+08:00",
       "freshness_status": "STALE",
       "integration_status": "PRODUCTION_ACTIVE",
       "intelligence_gaps": [
         "STALE_DATA"
       ],
-      "last_checked_at": "2026-10-07T00:52:44+08:00",
+      "last_checked_at": "2026-10-07T09:45:08+08:00",
       "last_known_good": {
-        "completed_at": "2026-10-07T00:52:44+08:00",
+        "completed_at": "2026-10-07T09:45:08+08:00",
         "manifest_sha256": "a427ebfe37643d830711f30d02d1ef1ee0adea55ddaf713925c4fb121aa3ce05",
         "snapshot_count": 4,
         "snapshot_item_count": 19,
-        "source_run_id": "SR-DEMO-20261006-EVENING-029"
+        "source_run_id": "SR-DEMO-20261007-MORNING-029"
       },
       "last_known_good_age": {
-        "age_hours": 8.611416666666666e-05,
-        "completed_at": "2026-10-07T00:52:44+08:00",
-        "observed_at": "2026-10-06T16:52:44.310011+00:00",
+        "age_hours": 0.00024076555555555554,
+        "completed_at": "2026-10-07T09:45:08+08:00",
+        "observed_at": "2026-10-07T01:45:08.866756+00:00",
         "reason": null,
         "status": "KNOWN"
       },
-      "last_success_at": "2026-10-07T00:52:44+08:00",
+      "last_success_at": "2026-10-07T09:45:08+08:00",
       "manifest_sha256": "a427ebfe37643d830711f30d02d1ef1ee0adea55ddaf713925c4fb121aa3ce05",
-      "next_update_at": "2026-10-07T06:30:00+08:00",
+      "next_update_at": "2026-10-07T18:30:00+08:00",
       "result": "NO_NEW_ITEM",
       "snapshot_count": 4,
       "snapshot_item_count": 19,
