@@ -13,16 +13,32 @@ class ReferenceCsvAuditTests(unittest.TestCase):
         body = content.encode()
         return m.audit(body, source_id=source, expected_sha256=hashlib.sha256(body).hexdigest())
 
-    def assembly(self, rows):
-        return ','.join(m.HEADERS['S-036']) + '\n' + rows
+    def assembly(self, rows, *, description=True):
+        labels = ','.join(m.ASSEMBLY_LABELS) + '\n' if description else ''
+        return ','.join(m.HEADERS['S-036']) + '\n' + labels + rows
 
     def test_exact_description_only_skipped(self):
-        result = self.run_audit(self.assembly(','.join(m.ASSEMBLY_LABELS) + '\n2026/10/01 10:00,2026/10/01 11:00,fictional,fictional,fictional\n'))
+        result = self.run_audit(self.assembly('2026/10/01 10:00,2026/10/01 11:00,fictional,fictional,fictional\n'))
         self.assertEqual(result['data_rows'], 1)
         self.assertEqual(result['description_rows'], 1)
         self.assertFalse(result['production_active'])
         self.assertEqual(result['source_timezone'], 'UNKNOWN')
         self.assertEqual(result['business_scope_completeness'], 'NOT_VERIFIED')
+
+    def test_assembly_requires_one_exact_description_row_immediately_after_header(self):
+        row = '2026/10/01 10:00,2026/10/01 11:00,fictional,fictional,fictional\n'
+        labels = ','.join(m.ASSEMBLY_LABELS) + '\n'
+        changed_labels = ','.join([*m.ASSEMBLY_LABELS[:-1], 'fictional-label']) + '\n'
+        invalid_rows = {
+            'missing': row,
+            'changed': changed_labels + row,
+            'misplaced': row + labels,
+            'duplicated': labels + labels + row,
+        }
+        for case, rows in invalid_rows.items():
+            with self.subTest(case=case):
+                with self.assertRaisesRegex(ValueError, 'description row'):
+                    self.run_audit(self.assembly(rows, description=False))
 
     def test_hash_mismatch_fails(self):
         with self.assertRaisesRegex(ValueError, 'SHA256 mismatch'):

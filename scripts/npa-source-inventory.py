@@ -41,18 +41,20 @@ def _canonical(value: Any) -> bytes:
 def _resource_id(url: str) -> str | None:
     """Preserve publisher IDs in nested API paths and download rid queries.
 
-    The MOI route contains an earlier /resource/api segment; the final
-    /resource/<id> identifies the downloaded resource. Ambiguous identities
+    The MOI route contains an earlier /resource/api segment; consistent
+    /resource/<id> segments identify the downloaded resource. Ambiguous identities
     must never silently bind a receipt to the wrong original resource.
     """
     parsed = urlsplit(url)
     parts = [part for part in parsed.path.split("/") if part]
-    indices = [index for index, part in enumerate(parts) if part == "resource"]
-    path_id = None
-    if indices:
-        index = indices[-1]
-        if index + 1 < len(parts) and parts[index + 1] != "api":
-            path_id = parts[index + 1]
+    path_ids = {
+        parts[index + 1]
+        for index, part in enumerate(parts[:-1])
+        if part == "resource" and parts[index + 1] != "api"
+    }
+    if len(path_ids) > 1:
+        raise ValueError("ambiguous resource path identity")
+    path_id = next(iter(path_ids), None)
     query_ids = parse_qs(parsed.query, keep_blank_values=True).get("rid", [])
     if len(query_ids) > 1 or (query_ids and not query_ids[0].strip()):
         raise ValueError("ambiguous resource rid query")
