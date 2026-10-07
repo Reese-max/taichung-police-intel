@@ -271,8 +271,9 @@ class ListFirstGatingTests(unittest.TestCase):
             <a href="javascript:list(2,1)">下一頁</a>
             """
         )
-        second = _page('<li><a href="home.jsp?mcustomize=news_view.jsp&dataserno=3">115-08-30 更早</a></li>')
         second_url = oc.NEWS_LIST_SOURCES["S-001"]["list_url"] + "&page=2&intpage=1"
+        second = _page('<li><a href="home.jsp?mcustomize=news_view.jsp&dataserno=3">115-08-30 更早</a></li>'
+            f'<a href="{second_url}">Last page</a>')
         result, session = _collect("S-001", first, max_details=0, **{second_url: second})
         self.assertEqual(result["window_completeness"], "COMPLETE_WITH_ITEMS")
         self.assertEqual(session.fetched[-1], second_url)
@@ -305,6 +306,7 @@ class ListFirstGatingTests(unittest.TestCase):
         second_url = "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,20&page=2"
         second = _page(
             '<li><a href="index-1.asp?Parser=9,4,20,,,,21748">更早 2026-08-30</a></li>'
+            f'<a href="{second_url}">Last page</a>'
         )
         with mock.patch.object(oc, "MAX_NEWS_LIST_PAGES", 1):
             first_only, session = _collect("S-032", first, max_details=0)

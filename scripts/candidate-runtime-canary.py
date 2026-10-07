@@ -45,7 +45,10 @@ def candidate_source_ids(collector) -> tuple[str, ...]:
 class BoundedSession:
     """Allow only same-host HTTPS requests with small call and body budgets."""
 
-    def __init__(self, source_url, transport=None):
+    def __init__(self, source_url, transport=None, *, max_calls=6):
+        if type(max_calls) is not int or not 1 <= max_calls <= 64:
+            raise ValueError("max_calls must be an integer between 1 and 64")
+        self.max_calls = max_calls
         if transport is None:
             from online_collect import http_session
 
@@ -87,7 +90,7 @@ class BoundedSession:
                 or parts.port not in (None, 443)
             ):
                 raise ValueError("unapproved candidate source URL")
-            if self.calls >= 6:
+            if self.calls >= self.max_calls:
                 raise RuntimeError("candidate HTTP budget exhausted")
             self.calls += 1
             kwargs.pop("allow_redirects", None)
@@ -121,7 +124,9 @@ class BoundedSession:
         self.transport.close()
 
 
-def run_canary(collector, sources, now, *, session_factory=BoundedSession, existing_items=None):
+def run_canary(collector, sources, now, *, session_factory=BoundedSession, existing_items=None, max_list_pages=None):
+    if max_list_pages is not None and (type(max_list_pages) is not int or not 1 <= max_list_pages <= 40):
+        raise ValueError("max_list_pages must be an integer between 1 and 40")
     allowed = set(candidate_source_ids(collector))
     if not sources or len(sources) != len(set(sources)) or any(source not in allowed for source in sources):
         raise ValueError("select a nonempty unique subset of catalog-approved candidate IDs")
@@ -162,6 +167,9 @@ def run_canary(collector, sources, now, *, session_factory=BoundedSession, exist
             # Unchanged list rows are diffed against the previous observation so
             # only new/changed stable IDs cost a detail-page request.
             existing = dict(existing_items.get(source_id) or {})
+            list_options = {}
+            if max_list_pages is not None and collector.NEWS_LIST_SOURCES[source_id].get("format") != "fire_live":
+                list_options["max_list_pages"] = max_list_pages
             result = collector.collect_source(
                 session,
                 source_id,
@@ -169,6 +177,7 @@ def run_canary(collector, sources, now, *, session_factory=BoundedSession, exist
                 now.date(),
                 existing,
                 max_details=1,
+                **list_options,
             )
             manifest = result.get("manifest_sha256", "")
             if not re.fullmatch(r"[0-9a-f]{64}", manifest):
@@ -195,6 +204,7 @@ def run_canary(collector, sources, now, *, session_factory=BoundedSession, exist
                     and item["payload"].get("detail") == "unchanged-skipped"
                 ),
                 "pagination": result.get("pagination"),
+                "list_traversal": result.get("list_traversal"),
                 "manifest_sha256": manifest,
                 "coverage_independently_verified": False,
             })
@@ -304,12 +314,18 @@ def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--source", action="append")
     parser.add_argument("--output", required=True)
+    parser.add_argument("--list-page-limit", type=int, default=None, help="Opt-in bounded traversal, 1–40 HTML pages; default 4.")
+    parser.add_argument("--http-call-limit", type=int, default=6, help="Actual attempts including redirects, 1–64; default 6.")
     parser.add_argument(
         "--existing",
         type=Path,
         help="Previous observation report whose item_state seeds the incremental diff.",
     )
     args = parser.parse_args(argv)
+    if args.list_page_limit is not None and not 1 <= args.list_page_limit <= 40:
+        parser.error("--list-page-limit must be between 1 and 40")
+    if not 1 <= args.http_call_limit <= 64:
+        parser.error("--http-call-limit must be between 1 and 64")
     sys.path.insert(0, str(ROOT))
     import online_collect as collector
 
@@ -318,7 +334,10 @@ def main(argv=None):
         args.source or list(candidate_source_ids(collector)),
         datetime.now(collector.TZ),
         existing_items=load_existing_items(args.existing),
+        max_list_pages=args.list_page_limit,
+        session_factory=lambda url: BoundedSession(url, max_calls=args.http_call_limit),
     )
+    report["request_budgets"] = {"html_list_pages": args.list_page_limit or 4, "actual_http_attempts": args.http_call_limit, "detail_pages": 1}
     path = Path(args.output)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

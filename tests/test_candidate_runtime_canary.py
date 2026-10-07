@@ -95,6 +95,43 @@ class CanaryContractTests(unittest.TestCase):
             session.get("https://evil.example.test/")
         self.assertEqual(session.calls, 0)
 
+    def test_explicit_list_budget_forwarded_and_gate_remains_closed(self):
+        fixture = collector()
+        original = fixture.collect_source
+        observed = []
+        def collect(*args, max_list_pages, **kwargs):
+            observed.append(max_list_pages)
+            return original(*args, **kwargs)
+        fixture.collect_source = collect
+        report = module.run_canary(fixture, ["S-019"], NOW, session_factory=FakeSession, max_list_pages=25)
+        self.assertEqual(observed, [25])
+        self.assertEqual(report["failed_count"], 0)
+        self.assertFalse(report["sources"][0]["coverage_independently_verified"])
+        self.assertFalse(report["sources"][0]["promotion_eligible"])
+
+    def test_invalid_list_budget_rejected_before_session_creation(self):
+        for value in (0, -1, True, 1.5, "6", 41):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                module.run_canary(collector(), ["S-019"], NOW, session_factory=lambda _: self.fail("unexpected session"), max_list_pages=value)
+
+    def test_explicit_http_budget_is_bounded_and_enforced(self):
+        from unittest import mock
+        response = mock.Mock(status_code=200, headers={"content-type": "text/html"}, url="https://official.example.test/")
+        response.iter_content.return_value = [b"ok"]
+        transport = mock.Mock(headers={}, adapters={})
+        transport.get.return_value = response
+        session = module.BoundedSession("https://official.example.test/", transport, max_calls=2)
+        session.get("https://official.example.test/")
+        session.get("https://official.example.test/")
+        with self.assertRaisesRegex(RuntimeError, "budget exhausted"):
+            session.get("https://official.example.test/")
+        self.assertEqual(transport.get.call_count, 2)
+
+    def test_invalid_http_budget_rejected_before_transport_creation(self):
+        for value in (0, -1, True, 1.5, "6", 65):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                module.BoundedSession("https://official.example.test/", max_calls=value)
+
     def test_default_transport_preserves_runtime_proxy_and_ca_settings(self):
         session = module.BoundedSession("https://official.example.test/")
         try:
