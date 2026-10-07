@@ -30,8 +30,8 @@
   ],
   "baseline_established_at": "2026-08-27T12:13:22+08:00",
   "candidate_source_context": {
-    "collection_run_id": "CR-DEMO-20261007-MORNING-MANUAL",
-    "generated_at": "2026-10-07T15:38:21+08:00",
+    "collection_run_id": "CR-DEMO-20261007-EVENING-SCHEDULE",
+    "generated_at": "2026-10-08T01:29:30+08:00",
     "integration_status": "CANDIDATE",
     "items": [
       {
@@ -212,7 +212,7 @@
           "NO_LAST_KNOWN_GOOD",
           "NO_DATA_AS_OF"
         ],
-        "last_checked_at": "2026-10-07T15:38:01+08:00",
+        "last_checked_at": "2026-10-08T01:29:20+08:00",
         "pagination": null,
         "promotion_eligible": false,
         "source_health": "FAILED",
@@ -229,7 +229,7 @@
           "NO_LAST_KNOWN_GOOD",
           "VERY_STALE_DATA"
         ],
-        "last_checked_at": "2026-10-07T15:38:17+08:00",
+        "last_checked_at": "2026-10-08T01:29:26+08:00",
         "pagination": {
           "complete": false,
           "page_limit": 4,
@@ -244,14 +244,14 @@
         "window_completeness": "PARTIAL"
       },
       {
-        "freshness_status": "STALE",
+        "freshness_status": "VERY_STALE",
         "integration_status": "CANDIDATE",
         "intelligence_gaps": [
           "WINDOW_PARTIAL",
           "NO_LAST_KNOWN_GOOD",
-          "STALE_DATA"
+          "VERY_STALE_DATA"
         ],
-        "last_checked_at": "2026-10-07T15:38:21+08:00",
+        "last_checked_at": "2026-10-08T01:29:30+08:00",
         "pagination": {
           "complete": false,
           "page_limit": 4,
@@ -267,7 +267,7 @@
       }
     ]
   },
-  "generated_at": "2026-10-07T15:38:21+08:00",
+  "generated_at": "2026-10-08T01:29:30+08:00",
   "generator_version": 2,
   "mode": "V2_SHADOW",
   "other_changes": [],
@@ -357,7 +357,7 @@
   ],
   "schema_version": 1,
   "snapshot_complete": false,
-  "source_collection_run_id": "CR-DEMO-20261007-MORNING-MANUAL",
+  "source_collection_run_id": "CR-DEMO-20261007-EVENING-SCHEDULE",
   "source_health": {
     "failed_count": 0,
     "gap_count": 6,
@@ -377,7 +377,7 @@
     "policy_hash": "3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501",
     "policy_version": 1
   },
-  "source_status_generated_at": "2026-10-07T15:38:21+08:00",
+  "source_status_generated_at": "2026-10-08T01:29:30+08:00",
   "status_message": "本期未偵測到可確認的新增或修正；歷史資料保留於資料庫。",
   "tracking_items": []
 }
