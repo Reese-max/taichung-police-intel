@@ -6,6 +6,8 @@
 
 ## 實際證據
 
+以下單頁與兩批檔案是 V1 時期的實際歷史觀察，保留當時的版本與 hash；不是 V2 續跑鏈。V2 修復沒有新增 HTTP 請求，也沒有把較早的 82 頁／814 項列表 metadata 或 V1 續跑收據重新標成 V2 實測。V1 checkpoint 現在須由官方原入口重新開始，不能用舊第 9 頁游標直接接上 V2。
+
 08:02:22 UTC 對原官方第 82 頁進行一次 HTTP GET，取得 86 個導航控制：Last=82、Next=82、First=1、Previous=81，所有數字控制一致。新 parser 判定該頁導航已到末頁，控制 metadata replay 得到相同結果；7 項列表日期均可辨識。原 body 未保存，詳情與附件未蒐集。完整 metadata 與原 bytes hash 見 [單頁收據](s032-terminal-navigation-observation-20261007.json)。這次單頁觀察不等於重新蒐集 82 頁。
 
 另實際跑兩個最終版本的預設批次，每批 4 頁、4 次 HTTP（每批 HTTP 上限仍為 6），累積 8 頁、79 個唯一 ID、36 個指定日期窗口的列表項，續跑游標為第 9 頁。只保存 hash、導航、ID、日期及聚合收據，不保存 HTML、文章標題、正文或附件。聚合證據見 [兩批實際收據](s032-resume-live-batches-20261007.json)。先前開發版本的兩批 8 次請求另外列為 superseded，並未混入最終續跑鏈。
@@ -14,7 +16,11 @@
 
 `scripts/news-list-resume.py` 限定 S032，每次最多 40 頁，預設 4 頁；沿用有界 canary transport，每次預設最多 6 次 HTTP，每個 redirect 也計數、停用隱藏重試、每個 body 上限 2 MiB。需要更大批次時必須明確設定頁數與足夠的 HTTP 預算。每次有 120 秒批次期限，頁間至少 0.3 秒。一次工具執行只處理一個批次。
 
-首批必須由官方原入口開始。續跑 checkpoint 綁定來源、入口、窗口、Parser 合約與程式 hash；每頁含原 bytes SHA256、時間、控制 metadata 及列表 ID／日期／list hash。批次由前一批 hash 串接，整個 checkpoint 另計 hash，續跑 CLI 要求另外提供前次保留的 expected hash。驗證拒絕中段冒充首批、缺頁、重複頁、跨站游標、redirect 游標、末頁後追加、Last 宣告改變、跨批相同 ID 的內容改變及 source／window／parser 變更。
+目前是 `schema_version=2`、`S032_COMMA_PARSER_V2`。首批必須由官方原入口開始。續跑 checkpoint 綁定來源、入口、窗口及完整相關程式模組：`online_collect.py`、`collect.py`、checkpoint 模組、續跑 CLI 及有界 transport；這涵蓋 stable key／日期的 row extraction、其 helpers 與 `list_sha256` metadata 產生方式。另綁執行中的核心 callable 指紋、S032 row config／ID pattern 及角色規則，拒絕同一程序中的 parser 或設定替換。任何綁定變更都要求由官方原入口重新蒐集，沒有 V1 遷移或自動重算 hash 的捷徑。
+
+每頁含原 bytes SHA256、時間及列表 ID／日期／list hash。控制投影前先要求精確導航角色及合法原官方列表 cursor，只保存 `role` 與有界整數 `target_page`；可用角色是 FIRST、PREVIOUS、NEXT、LAST、NUMBERED。官方 URL 從既定入口與頁碼重建，不保存來源 label、title、aria-label、raw class 或 raw href。`next-story` 等文章連結不會因 class 或文字包含 next 而落入 checkpoint；矛盾角色、導航目標帶額外 query／錯 origin 或含糊的 pager 都會停止。
+
+批次由前一批 hash 串接，整個 checkpoint 另計 hash，續跑 CLI 要求另外提供前次保留的 expected hash。驗證拒絕中段冒充首批、缺頁、重複頁、跨站游標、redirect 游標、末頁後追加、Last 宣告改變、跨批相同 ID 的內容改變及 source／window／parser 變更。`next_url=null` 且 `has_next=true` 是 unresolved pagination，collect 與 validator 都拒絕；CLI 不回成功、不寫新 checkpoint、不覆寫既有輸出。只有有末頁控制證據的 `has_next=false` 才能結束本地頁鏈。
 
 Checkpoint 採 compact JSON，writer 與 reader 使用相同的 2 MiB 限制；整個續跑鏈最多 256 頁／20,000 項列觀察。超過任何限制時停止，不能靠提高預設上限或跳過檢查取得完成宣告。
 
@@ -37,3 +43,7 @@ python scripts/news-list-resume.py --start 2026-09-01 --end 2026-10-07 \
 有真實 86 控制寬度的虛構 82 頁 receipt 用來驗證 compact writer／reader 往返；該測試不是實際來源蒐集。新測試加上既有列表、canary 及有界 transport 回歸，共 110 項通過。測試中的虛構內容與固定 hash 不作正式站或來源驗收證據。
 
 CLI另加5項有界檔案IO回歸：拒絕FIFO／非regular input與相同resolved input/output，讀取最多2MiB，mkstemp0600＋fsync／atomic replace，固定.tmp衝突與destination hardlink均不修改原inode。該followup未進行HTTP。
+
+V2 另加 13 項回歸，重現並修正 PR #173 的三項後續 review：row parser／metadata binding 遺漏、unresolved pager 被當成功及 loose control 投影原文。第一組 8 個紅測試原有 9 個失敗案例，修正後通過；其餘測試驗證完整 module byte 變更、runtime row projection／ID pattern 替換、V1 即使重算 hash 也須 restart、原始 control 格式不能藉重新綁定轉成 V2，以及 CLI 在 unresolved 時不寫檔且關閉 transport。現在 checkpoint 31 項，連同 Parser／列表／canary／transport 相容回歸共 128 項通過，未進行新版 HTTP 實测。
+
+Root 後續整合時另外做了 5 次 bounded 官方 HTTP 相容檢查：新版首個預設批次 4 頁／39 IDs，以及單獨官方第 82 頁末頁檢查。這段實際新版觀察見 [V2 相容收據](s032-v2-compatibility-observation-20261007.json)；前述「未進行新版 HTTP」只描述分頁修復代理交付時。它不是全 82 頁新版重蒐集，不補出權利或獨立完整性。

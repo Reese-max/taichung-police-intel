@@ -7,6 +7,7 @@ import json
 import os
 import re
 import stat
+import tempfile
 from datetime import date
 from pathlib import Path
 from urllib.parse import parse_qsl, unquote, urljoin, urlsplit
@@ -122,6 +123,43 @@ def read_bounded_regular_file(path):
         return raw
     finally:
         os.close(descriptor)
+
+
+def reject_output_input_alias(input_path, output_path):
+    """The metadata destination must not replace any path to the raw evidence."""
+    input_path, output_path = Path(input_path), Path(output_path)
+    if output_path.resolve() == input_path.resolve():
+        raise ValueError("metadata output aliases the original input")
+    try:
+        if output_path.samefile(input_path):
+            raise ValueError("metadata output aliases the original input inode")
+    except FileNotFoundError:
+        # A fresh destination is allowed; missing input still fails the reader.
+        pass
+
+
+def write_metadata_atomic(output_path, text, input_path):
+    """Private fresh inode, atomic replace, and no fixed temporary symlink path."""
+    output_path = Path(output_path)
+    reject_output_input_alias(input_path, output_path)
+    descriptor, temporary = tempfile.mkstemp(prefix="." + output_path.name + "-", dir=output_path.parent)
+    try:
+        os.fchmod(descriptor, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            descriptor = None
+            handle.write(text)
+            handle.flush()
+            os.fsync(handle.fileno())
+        # Recheck aliases before commit, without following the destination inode.
+        reject_output_input_alias(input_path, output_path)
+        os.replace(temporary, output_path)
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+        try:
+            os.unlink(temporary)
+        except FileNotFoundError:
+            pass
 
 
 def parse_current_drafts(raw, official_url, *, http_status=200, final_url=None):
@@ -340,6 +378,8 @@ def main():
     parser.add_argument("--final-url")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
+    if args.output:
+        reject_output_input_alias(args.input, args.output)
     raw = read_bounded_regular_file(args.input)
     options = {"http_status": args.http_status, "final_url": args.final_url}
     if args.source_id == "S-026":
@@ -351,7 +391,7 @@ def main():
         parser.error("video current indexes require separate enumeration evidence")
     text = json.dumps(result, ensure_ascii=False, indent=2, allow_nan=False) + "\n"
     if args.output:
-        args.output.write_text(text, encoding="utf-8")
+        write_metadata_atomic(args.output, text, args.input)
     else:
         print(text, end="")
     return 0 if not result["reason_codes"] else 2

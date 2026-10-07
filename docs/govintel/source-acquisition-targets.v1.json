@@ -207,22 +207,28 @@
       "model_transmission_allowed": false,
       "promotion_eligible": false,
       "human_review": null,
-      "next_action": "末頁控制已修復且實際驗證；預設兩批走完8頁，可由第9頁續跑。82頁814項是較早列表metadata觀察；新checkpoint不是獨立官方認證，詳頁、附件、修訂和正式窗口完整性仍待核對",
+      "next_action": "10/7 V1實際續跑82頁814 ID，末頁一致、窗口36列表項；此歷史觀察保留PARTIAL、不作V2認證或自動遷移。V2改動需從官方入口新建checkpoint；詳頁／附件／修訂／獨立覆蓋與權利仍待核對。",
       "actual_valid_days_in_this_two_day_batch": [
         "2026-10-06",
         "2026-10-07"
       ],
-      "evidence": "s032-resume-live-batches-20261007.json",
+      "evidence": "s032-v1-terminal-resume-observation-20261007.json",
       "list_pages_observed": 82,
       "unique_list_items_observed": 814,
       "window_list_items_observed": 36,
-      "bounded_resume_pages_verified": 8,
-      "bounded_resume_unique_ids": 79,
+      "bounded_resume_pages_verified": 82,
+      "bounded_resume_unique_ids": 814,
       "additional_evidence": [
         "s032-terminal-navigation-observation-20261007.json",
         "s032-archive-metadata-observation-20261007.json"
       ],
-      "checkpoint_validation_scope": "LOCAL_TRAVERSAL_RECEIPT_ONLY"
+      "checkpoint_validation_scope": "LOCAL_TRAVERSAL_RECEIPT_ONLY",
+      "bounded_resume_contract_version": "S032_COMMA_PARSER_V1_HISTORICAL_OBSERVATION",
+      "v2_compatibility_evidence": "s032-v2-compatibility-observation-20261007.json",
+      "v2_bounded_prefix_pages_verified": 4,
+      "v2_bounded_prefix_unique_ids": 39,
+      "v2_standalone_terminal_page_verified": 82,
+      "v2_whole_chain_reacquired": false
     },
     {
       "source_id": "S-033",
@@ -354,7 +360,7 @@
     }
   ],
   "last_iteration_date": "2026-10-07",
-  "iteration_evidence": "source-unfinished-repair-20261007.json",
-  "last_iteration_base_code_sha": "45e9c2ba562265923727e299ea3b6b094275d89c",
+  "iteration_evidence": "source-checkpoint-reviewfix-20261007.json",
+  "last_iteration_base_code_sha": "ea73e93ef3f7105e7435778f0e71be89e2d3f404",
   "rights_review_packet": "source-rights-review-packet-20261007.json"
 }

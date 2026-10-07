@@ -1,6 +1,10 @@
 import importlib.util
+import hashlib
 import json
 import os
+import stat
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -181,6 +185,102 @@ class BoundedFileTests(unittest.TestCase):
                 scope.read_bounded_regular_file(fifo)
             with self.assertRaisesRegex(ValueError, 'bounded regular'):
                 scope.read_bounded_regular_file(temp)
+
+
+class MetadataOutputTests(unittest.TestCase):
+    def run_cli(self, source, output):
+        return subprocess.run([sys.executable, str(Path(scope.__file__)), '--source-id', 'S-026',
+                               '--kind', 'current', '--url', CURRENT, '--input', str(source),
+                               '--output', str(output)], capture_output=True, text=True, timeout=8)
+
+    def test_cli_rejects_same_path_and_resolved_alias_without_changing_original(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            source = directory / 'original.html'
+            (directory / 'nested').mkdir()
+            before = hashlib.sha256(EMPTY).hexdigest()
+            for output in [source, directory / 'nested' / '..' / 'original.html']:
+                with self.subTest(output=output):
+                    source.write_bytes(EMPTY)
+                    result = self.run_cli(source, output)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertEqual(hashlib.sha256(source.read_bytes()).hexdigest(), before)
+                    self.assertEqual(sorted(p.name for p in directory.iterdir()), ['nested', 'original.html'])
+
+    def test_cli_rejects_symlink_and_hardlink_alias_without_changing_original(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            source = directory / 'original.html'
+            source.write_bytes(EMPTY)
+            symlink = directory / 'symbolic.json'
+            symlink.symlink_to(source)
+            hardlink = directory / 'hard.json'
+            os.link(source, hardlink)
+            before = hashlib.sha256(source.read_bytes()).hexdigest()
+            for output in [symlink, hardlink]:
+                with self.subTest(output=output):
+                    source.write_bytes(EMPTY)
+                    result = self.run_cli(source, output)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertEqual(hashlib.sha256(source.read_bytes()).hexdigest(), before)
+                    self.assertEqual(hashlib.sha256(output.read_bytes()).hexdigest(), before)
+            self.assertTrue(symlink.is_symlink())
+            self.assertEqual(source.stat().st_ino, hardlink.stat().st_ino)
+
+    def test_distinct_output_is_private_atomic_replacement(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            source = directory / 'original.html'
+            source.write_bytes(EMPTY)
+            output = directory / 'metadata.json'
+            output.write_text('prior metadata')
+            os.chmod(output, 0o666)
+            # A retained hardlink proves that the old output inode is not edited.
+            previous = directory / 'previous.json'
+            os.link(output, previous)
+            fixed = directory / 'metadata.json.tmp'
+            fixed.symlink_to(source)
+            result = self.run_cli(source, output)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(json.loads(output.read_text())['current_snapshot_count'], 0)
+            self.assertEqual(stat.S_IMODE(output.stat().st_mode), 0o600)
+            self.assertEqual(previous.read_text(), 'prior metadata')
+            self.assertEqual(source.read_bytes(), EMPTY)
+            self.assertTrue(fixed.is_symlink())
+            self.assertEqual(fixed.read_bytes(), EMPTY)
+            self.assertEqual(sorted(p.name for p in directory.iterdir()),
+                             ['metadata.json', 'metadata.json.tmp', 'original.html', 'previous.json'])
+
+    def test_symlink_to_unrelated_target_is_replaced_without_following_it(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            source = directory / 'original.html'
+            source.write_bytes(EMPTY)
+            target = directory / 'unrelated.txt'
+            target.write_text('keep unrelated inode')
+            output = directory / 'metadata.json'
+            output.symlink_to(target)
+            result = self.run_cli(source, output)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertFalse(output.is_symlink())
+            self.assertEqual(target.read_text(), 'keep unrelated inode')
+            self.assertEqual(json.loads(output.read_text())['current_snapshot_count'], 0)
+            self.assertEqual(source.read_bytes(), EMPTY)
+
+    def test_output_directory_error_preserves_original_and_cleans_temporary_files(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            source = directory / 'original.html'
+            source.write_bytes(EMPTY)
+            output = directory / 'metadata'
+            output.mkdir()
+            (output / 'keep.txt').write_text('keep')
+            before_names = sorted(p.name for p in directory.iterdir())
+            result = self.run_cli(source, output)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(source.read_bytes(), EMPTY)
+            self.assertEqual((output / 'keep.txt').read_text(), 'keep')
+            self.assertEqual(sorted(p.name for p in directory.iterdir()), before_names)
 
 
 if __name__ == "__main__":

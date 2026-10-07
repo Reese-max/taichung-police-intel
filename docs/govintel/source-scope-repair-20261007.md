@@ -21,6 +21,8 @@ python scripts/source-scope-contracts.py --source-id S-026 --kind current \
   --url https://law.taichung.gov.tw/DraftForum.aspx --input /private/current-snapshot.html
 ```
 
-27項回歸覆蓋缺表、隱藏或多個activepane、history／private selector、衝突可見草案、登入／維護、無效日期、隱藏日期cell及內層span、跨草案或跨origin附件、未知／重複query、任意播放器字串與有界檔案讀取。實際私人原件也通過同一parser；HTTP狀態與URL來自獨立hash-bound收據，不由HTML parser自行證明。
+32項回歸覆蓋缺表、隱藏或多個activepane、history／private selector、衝突可見草案、登入／維護、無效日期、隱藏日期cell及內層span、跨草案或跨origin附件、未知／重複query、任意播放器字串與有界檔案讀取。實際私人原件也通過同一parser；HTTP狀態與URL來自獨立hash-bound收據，不由HTML parser自行證明。
+
+CLI的 `--output` 必須與 `--input` 是獨立的metadata目的地：相同resolved path、symlink指向原件或samefile inode（含hardlink）都在寫入前拒絕。允許的輸出以fresh0600 `mkstemp` 寫入後atomic replace；不使用固定 `.tmp`，不沿output symlink改寫其target。失敗時清理新暫存檔。實際CLI regressions以合成原件SHA invariant核對各種alias拒絕、原output inode保留、無關symlink target不變、0600權限及output directory錯誤清理，未使用新官方資料。
 
 [權利review packet](source-rights-review-packet-20261007.json) 已列出15項取得目標和5項目前active query來源，共20項；所有真人reviewer、審查時間、decision及逐用途批准均保留null。它沒有被接入正式批准管線。仍需真實審查者提供適用條款及版本/hash、來源欄位／origin、metadata／summary／全文或節錄／provider傳輸的分別決策，以及保存期限、敏感欄位與撤回／purge證據。D1已有固定112Y12M授權聲明與來源證據，仍未代填正式審查決策。真人效益試驗另需真實同意參與者、兩位獨立標註者及20事件／60文件的權利清楚holdout；模型不能代簽這些資料。
