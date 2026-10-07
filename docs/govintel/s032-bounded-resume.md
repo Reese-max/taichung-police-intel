@@ -16,9 +16,9 @@
 
 `scripts/news-list-resume.py` 限定 S032，每次最多 40 頁，預設 4 頁；沿用有界 canary transport，每次預設最多 6 次 HTTP，每個 redirect 也計數、停用隱藏重試、每個 body 上限 2 MiB。需要更大批次時必須明確設定頁數與足夠的 HTTP 預算。每次有 120 秒批次期限，頁間至少 0.3 秒。一次工具執行只處理一個批次。
 
-目前是 `schema_version=2`、`S032_COMMA_PARSER_V2`。首批必須由官方原入口開始。續跑 checkpoint 綁定來源、入口、窗口及完整相關程式模組：`online_collect.py`、`collect.py`、checkpoint 模組、續跑 CLI 及有界 transport；這涵蓋 stable key／日期的 row extraction、其 helpers 與 `list_sha256` metadata 產生方式。另綁執行中的核心 callable 指紋、S032 row config／ID pattern 及角色規則，拒絕同一程序中的 parser 或設定替換。任何綁定變更都要求由官方原入口重新蒐集，沒有 V1 遷移或自動重算 hash 的捷徑。
+目前是 `schema_version=2`、`S032_COMMA_PARSER_V2`。首批必須由官方原入口開始。續跑 checkpoint 綁定來源、入口、窗口及完整相關程式模組：`online_collect.py`、`collect.py`、checkpoint 模組、續跑 CLI 及有界 transport；這涵蓋 stable key／日期的 row extraction、其 helpers 與 `list_sha256` metadata 產生方式。新增 `intel_v2/checkpoint_code_binding.py`，使用實際 loaded bytecode、遞迴 constants、literal defaults、Python runtime 版本等指紋，不依 `inspect.getsource()` unwrap。對明確註冊的 row/date/navigation、checkpoint 全部 helper 及 code-binding helper，比對當前檔案 compile 結果；只 compile／parse，不執行來源。Wrapper、陳舊 import、來源不一致與 unsupported callable 拒絕於下一次 GET 之前。另綁 S032 row config／ID pattern、角色規則與本地上限。這是註冊程式／設定的一致性檢查，不涵蓋任意第三方 library 或未註冊 global 改寫。任何綁定變更都要求由官方原入口重新蒐集，沒有 V1 遷移或自動重算 hash 的捷徑。
 
-每頁含原 bytes SHA256、時間及列表 ID／日期／list hash。控制投影前先要求精確導航角色及合法原官方列表 cursor，只保存 `role` 與有界整數 `target_page`；可用角色是 FIRST、PREVIOUS、NEXT、LAST、NUMBERED。官方 URL 從既定入口與頁碼重建，不保存來源 label、title、aria-label、raw class 或 raw href。`next-story` 等文章連結不會因 class 或文字包含 next 而落入 checkpoint；矛盾角色、導航目標帶額外 query／錯 origin 或含糊的 pager 都會停止。
+每頁含原 bytes SHA256、時間及列表 ID／日期／list hash。CP 啟用 `strict_same_page_ids=True`，在去重前拒絕同頁 ID 的不同 title／日期／detail URL；相同 metadata 重複仍接受。其他一般 collector 保持原預設去重行為。控制投影前先要求精確導航角色及合法原官方列表 cursor，只保存 `role` 與有界整數 `target_page`；可用角色是 FIRST、PREVIOUS、NEXT、LAST、NUMBERED。官方 URL 從既定入口與頁碼重建，不保存來源 label、title、aria-label、raw class 或 raw href。`next-story` 等文章連結不會因 class 或文字包含 next 而落入 checkpoint；矛盾角色、同一非 NUMBERED 角色的不同目標、導航目標帶額外 query／錯 origin 或含糊的 pager 都會停止。FIRST 必須為 1，PREVIOUS 必須為相鄰前頁（首頁 clamp=1 可接受），LAST 不可早於本頁。相同角色／目標的重複控制可接受。
 
 批次由前一批 hash 串接，整個 checkpoint 另計 hash，續跑 CLI 要求另外提供前次保留的 expected hash。驗證拒絕中段冒充首批、缺頁、重複頁、跨站游標、redirect 游標、末頁後追加、Last 宣告改變、跨批相同 ID 的內容改變及 source／window／parser 變更。`next_url=null` 且 `has_next=true` 是 unresolved pagination，collect 與 validator 都拒絕；CLI 不回成功、不寫新 checkpoint、不覆寫既有輸出。只有有末頁控制證據的 `has_next=false` 才能結束本地頁鏈。
 
@@ -47,3 +47,7 @@ CLI另加5項有界檔案IO回歸：拒絕FIFO／非regular input與相同resolv
 V2 另加 13 項回歸，重現並修正 PR #173 的三項後續 review：row parser／metadata binding 遺漏、unresolved pager 被當成功及 loose control 投影原文。第一組 8 個紅測試原有 9 個失敗案例，修正後通過；其餘測試驗證完整 module byte 變更、runtime row projection／ID pattern 替換、V1 即使重算 hash 也須 restart、原始 control 格式不能藉重新綁定轉成 V2，以及 CLI 在 unresolved 時不寫檔且關閉 transport。現在 checkpoint 31 項，連同 Parser／列表／canary／transport 相容回歸共 128 項通過，未進行新版 HTTP 實测。
 
 Root 後續整合時另外做了 5 次 bounded 官方 HTTP 相容檢查：新版首個預設批次 4 頁／39 IDs，以及單獨官方第 82 頁末頁檢查。這段實際新版觀察見 [V2 相容收據](s032-v2-compatibility-observation-20261007.json)；前述「未進行新版 HTTP」只描述分頁修復代理交付時。它不是全 82 頁新版重蒐集，不補出權利或獨立完整性。
+
+## Claude 實際覆核後續修復
+
+2026-10-07 Claude Code 已完成一次真正的公開程式碼覆核，登入與供應商呼叫收據、基線重播／已拒絕反例，以及新版驗證範圍見 [後續證據](claude-code-followup-20261007.md)。舊 V1、較早 V2 收據仍保留原 binding／code／時間，不遷移或重算為本版權威。

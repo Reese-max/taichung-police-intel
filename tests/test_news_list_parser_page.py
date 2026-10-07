@@ -66,6 +66,18 @@ class ParserPageTests(unittest.TestCase):
         body+=f'<link rel="FIRST" href="{page(2)}">'.encode()
         self.assertEqual(oc.next_news_list_page(body,page(82),"S-032"),(None,True))
 
+    def test_previous_must_be_adjacent_and_distinct_conflicts_stay_partial(self):
+        for links in ((("上一頁",page(1)),), (("上一頁",page(1)),("上一頁",page(2)))):
+            with self.subTest(links=links):
+                self.assertEqual(self.parse(*links,("下一頁",page(3)),("最末頁",page(3)),current=3),(None,True))
+
+    def test_first_page_clamped_previous_is_legitimate(self):
+        self.assertEqual(self.parse(("上一頁",ROOT),("下一頁",page(2)),("最末頁",page(2)),current=1),(page(2),True))
+        self.assertEqual(self.parse(("上一頁",ROOT),("下一頁",ROOT),("最末頁",ROOT),current=1),(None,False))
+
+    def test_identical_previous_controls_are_allowed_at_terminal(self):
+        self.assertEqual(self.parse(("上一頁",page(81)),("上一頁",page(81)),("下一頁",page(82)),("最末頁",page(82))),(None,False))
+
 
 if __name__ == "__main__":
     unittest.main()
