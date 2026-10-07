@@ -51,3 +51,7 @@ Root 後續整合時另外做了 5 次 bounded 官方 HTTP 相容檢查：新版
 ## Claude 實際覆核後續修復
 
 2026-10-07 Claude Code 已完成一次真正的公開程式碼覆核，登入與供應商呼叫收據、基線重播／已拒絕反例，以及新版驗證範圍見 [後續證據](claude-code-followup-20261007.md)。舊 V1、較早 V2 收據仍保留原 binding／code／時間，不遷移或重算為本版權威。
+
+## 程式檔 IO 與 Python 3.14 追加驗證
+
+2026-10-07補修slice常數與有界程式檔reader，前後兩次module hash及compile來源均先限制regular file／4MiB並只read(limit+1)。10 helper的前置defaults guard採嚴格原生型別比較、不呼叫自訂equality。實際3.14.7、112項與3.12、180項測試及歷史82頁新版鏈的範圍见[追加修復證據](source-code-io-compatibility-20261007.md)。本次binding再次改變，歷史82頁2a48c4a證據不重hash或遷移；新binding僅另做原入口4頁＋單獨82末頁5GET相容檢查。

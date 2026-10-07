@@ -2,10 +2,12 @@
 from contextlib import contextmanager
 import functools
 import importlib.util
+import os
 from pathlib import Path
+import stat
 import sys
 import tempfile
-from types import FunctionType
+from types import FunctionType, SimpleNamespace
 import unittest
 from unittest import mock
 
@@ -86,7 +88,13 @@ class CodeBindingTests(unittest.TestCase):
         with fictional_module() as (module, path):
             original = module.project.__code__
             nested = next(value for value in original.co_consts if isinstance(value, type(original)) and value.co_name == "nested")
-            altered = nested.replace(co_consts=tuple(2 if type(value) is int and value == 1 else value for value in nested.co_consts))
+            # CPython 3.14 can embed a literal in LOAD_SMALL_INT; changing
+            # co_consts alone then leaves that operand unchanged. Compile
+            # the changed nested body so this really
+            # mutates executing bytecode on every supported Python version.
+            changed = compile(SOURCE.replace("item + 1", "item + 2"), str(path), "exec", dont_inherit=True)
+            project = next(value for value in changed.co_consts if isinstance(value, type(original)) and value.co_name == "project")
+            altered = next(value for value in project.co_consts if isinstance(value, type(original)) and value.co_name == "nested")
             before = cb.runtime_code_fingerprint(module.project)
             module.project.__code__ = original.replace(co_consts=tuple(altered if value is nested else value for value in original.co_consts))
             self.assertEqual(module.project([1]), [3])
@@ -223,6 +231,100 @@ class CodeBindingTests(unittest.TestCase):
             self.assertEqual(first, cb.runtime_code_fingerprint(module.project))
             module.project.__kwdefaults__["strict"]["a"] = 1
             self.assertNotEqual(first, cb.runtime_code_fingerprint(module.project))
+
+    def test_compiler_slice_fixture_binds_current_source(self):
+        # Python 3.14 folds this literal slice into a slice-valued co_consts
+        # entry; earlier supported versions produce equivalent BUILD_SLICE.
+        source = "def project(value):\n    return value[:3]\n"
+        with fictional_module(source) as (module, path):
+            self.assertEqual(module.project([1, 2, 3, 4]), [1, 2, 3])
+            self.assertRegex(self.fingerprint(module, path), r"^[0-9a-f]{64}$")
+
+    def test_slice_constant_code_normalization_is_deterministic_and_typed(self):
+        with fictional_module('def project():\n    return "FICTIONAL_SLICE"\n') as (module, path):
+            original = module.project.__code__
+            def code_with_slice(value):
+                return original.replace(co_consts=tuple(value if item == "FICTIONAL_SLICE" else item for item in original.co_consts))
+            module.project.__code__ = code_with_slice(slice(None, 3, None))
+            self.assertEqual(module.project(), slice(None, 3, None))
+            first = cb.runtime_code_fingerprint(module.project)
+            module.project.__code__ = code_with_slice(slice(None, 3, None))
+            self.assertEqual(first, cb.runtime_code_fingerprint(module.project))
+            for changed in (slice(0, 3, None), slice(None, 4, None), slice(None, 3, 1), slice(None, True, None)):
+                module.project.__code__ = code_with_slice(changed)
+                self.assertNotEqual(first, cb.runtime_code_fingerprint(module.project))
+
+    def test_slice_values_keep_cycle_and_depth_bounds(self):
+        cycle = []
+        value = slice(cycle, None, None)
+        cycle.append(value)
+        with self.assertRaises(ValueError):
+            cb._normalize(value)
+        nested = None
+        for _ in range(cb.MAX_VALUE_DEPTH + 1):
+            nested = slice(nested, None, None)
+        with self.assertRaises(ValueError):
+            cb._normalize(nested)
+
+    def test_regular_source_reader_accepts_exact_size_boundary(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "fictional.py"
+            path.write_bytes(b"FICTIONAL")
+            with mock.patch.object(cb, "MAX_SOURCE_BYTES", 9):
+                self.assertEqual(cb.read_source_bounded(path), b"FICTIONAL")
+
+    def test_sparse_oversized_source_is_rejected_without_reading(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "fictional.py"
+            with path.open("wb") as stream:
+                stream.truncate(cb.MAX_SOURCE_BYTES + 1)
+            with mock.patch.object(cb.os, "fdopen", side_effect=AssertionError("must reject before read")) as reader:
+                with self.assertRaises(ValueError):
+                    cb.read_source_bounded(path)
+                reader.assert_not_called()
+
+    def test_growth_after_stat_cannot_read_more_than_limit_plus_one(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "fictional.py"
+            path.write_bytes(b"FICTIONAL_SOURCE_GREW_PAST_THE_BOUND")
+            sizes = []
+            real_fdopen = cb.os.fdopen
+            def observed_fdopen(descriptor, mode):
+                stream = real_fdopen(descriptor, mode)
+                class ObservedReader:
+                    def __enter__(self):
+                        return self
+                    def read(self, size):
+                        sizes.append(size)
+                        return stream.read(size)
+                    def __exit__(self, *args):
+                        stream.close()
+                return ObservedReader()
+            with mock.patch.object(cb, "MAX_SOURCE_BYTES", 16), \
+                    mock.patch.object(cb.os, "fstat", return_value=SimpleNamespace(st_mode=stat.S_IFREG, st_size=1)), \
+                    mock.patch.object(cb.os, "fdopen", side_effect=observed_fdopen):
+                with self.assertRaises(ValueError):
+                    cb.read_source_bounded(path)
+            self.assertEqual(sizes, [17])
+
+    def test_fifo_source_is_rejected_nonblocking_without_reading(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "fictional.fifo"
+            os.mkfifo(path)
+            original_open = cb.os.open
+            with mock.patch.object(cb.os, "open", wraps=original_open) as opener, \
+                    mock.patch.object(cb.os, "fdopen", side_effect=AssertionError("FIFO must not be read")) as reader:
+                with self.assertRaises(ValueError):
+                    cb.read_source_bounded(path)
+                self.assertTrue(opener.call_args.args[1] & os.O_NONBLOCK)
+                reader.assert_not_called()
+
+    def test_directory_source_is_rejected_before_reading(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with mock.patch.object(cb.os, "fdopen", side_effect=AssertionError("directory must not be read")) as reader:
+                with self.assertRaises(ValueError):
+                    cb.read_source_bounded(Path(directory))
+                reader.assert_not_called()
 
     def test_registry_compiles_each_file_once_and_rereads_on_every_call(self):
         source = SOURCE + "\ndef helper(value):\n    return value\n"

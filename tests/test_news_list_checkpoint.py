@@ -346,16 +346,21 @@ class CheckpointV2Tests(unittest.TestCase):
         session=FakeSession(bodies)
         checkpoint,_=cp.collect_batch(session,START,END,max_list_pages=1)
         session.fetched.clear()
-        original_read=Path.read_bytes
-        def changed_module_bytes(path):
-            body=original_read(path)
-            if path.name=="online_collect.py":
-                self.assertIn(b'"published": roc_date(row_text)',body)
-                return body.replace(b'"published": roc_date(row_text)',b'"published": None')
-            return body
-        with mock.patch.object(Path,"read_bytes",autospec=True,side_effect=changed_module_bytes):
-            with self.assertRaisesRegex(ValueError,"binding changed.*restart"):
-                cp.collect_batch(session,START,END,checkpoint=checkpoint,max_list_pages=1)
+        source_path=Path(cp.oc.__file__).resolve()
+        body=cp.cb.read_source_bounded(source_path)
+        self.assertIn(b'"published": roc_date(row_text)',body)
+        original_open=cp.cb.os.open
+        with tempfile.TemporaryDirectory() as directory:
+            changed_source=Path(directory)/"changed-source.py"
+            changed_source.write_bytes(body.replace(b'"published": roc_date(row_text)',b'"published": None'))
+            def changed_module_descriptor(path, flags, *args, **kwargs):
+                target=changed_source if Path(path).resolve()==source_path else path
+                return original_open(target,flags,*args,**kwargs)
+            # Redirect the actual bounded file primitive to altered source;
+            # never replace the registered checker or mutate the real module.
+            with mock.patch.object(cp.cb.os,"open",side_effect=changed_module_descriptor):
+                with self.assertRaisesRegex(ValueError,"binding changed.*restart"):
+                    cp.collect_batch(session,START,END,checkpoint=checkpoint,max_list_pages=1)
         self.assertEqual(session.fetched,[])
 
     def test_runtime_row_metadata_projection_change_also_invalidates_checkpoint(self):

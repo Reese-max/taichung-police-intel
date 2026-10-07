@@ -114,3 +114,41 @@ class RuntimeBindingIntegrationTests(TestCase):
             with self.assertRaisesRegex(ValueError, "binding.*restart"):
                 cp.collect_batch(session, START, END, max_list_pages=1)
         self.assertEqual(session.fetched, [])
+
+    def test_bool_for_integer_helper_default_blocks_before_source_read(self):
+        _, bodies = fixtures()
+        session = FakeSession(bodies)
+        # Ordinary equality considers False equal to the registered int 0;
+        # the bootstrap must reject its changed type before invoking helpers.
+        with mock.patch.dict(cb._normalize.__kwdefaults__, {"depth": False}), \
+                mock.patch.object(cb.os, "open", wraps=cb.os.open) as source_open:
+            with self.assertRaisesRegex(ValueError, "binding.*restart"):
+                cp.collect_batch(session, START, END, max_list_pages=1)
+            source_open.assert_not_called()
+        self.assertEqual(session.fetched, [])
+
+    def test_unsupported_equality_default_never_runs_hook_or_source_reader(self):
+        _, bodies = fixtures()
+        session = FakeSession(bodies)
+        equality_hook = mock.Mock()
+
+        class EqualZero:
+            def __eq__(self, other):
+                equality_hook(other)
+                return other == 0
+
+            def __gt__(self, other):
+                return False
+
+            def __add__(self, other):
+                return other
+
+        # This fictional object can masquerade as 0 to a loose comparison.
+        # Reject its unsupported type without dispatching its equality hook.
+        with mock.patch.dict(cb._normalize.__kwdefaults__, {"depth": EqualZero()}), \
+                mock.patch.object(cb.os, "open", wraps=cb.os.open) as source_open:
+            with self.assertRaisesRegex(ValueError, "binding.*restart"):
+                cp.collect_batch(session, START, END, max_list_pages=1)
+            equality_hook.assert_not_called()
+            source_open.assert_not_called()
+        self.assertEqual(session.fetched, [])
