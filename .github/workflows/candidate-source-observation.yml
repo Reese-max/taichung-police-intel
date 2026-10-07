@@ -34,9 +34,19 @@ jobs:
           key: candidate-observation-${{ matrix.source }}-${{ github.run_id }}
           restore-keys: candidate-observation-${{ matrix.source }}-
       - name: Observe ${{ matrix.source }}
+        shell: bash
+        env:
+          GOVINTEL_CANDIDATE_SOURCE: ${{ matrix.source }}
         run: |
+          budget_args=()
+          # S019's official 25-page archive was actually traversed Oct 7.
+          # Bound its daily verification explicitly; other sources keep defaults.
+          if [[ "$GOVINTEL_CANDIDATE_SOURCE" == "S-019" ]]; then
+            budget_args=(--list-page-limit 30 --http-call-limit 32)
+          fi
           python -X utf8 scripts/candidate-runtime-canary.py \
-            --source "${{ matrix.source }}" \
+            --source "$GOVINTEL_CANDIDATE_SOURCE" \
+            "${budget_args[@]}" \
             --existing candidate-source-observation.previous.json \
             --output candidate-source-observation.json
           cp candidate-source-observation.json candidate-source-observation.previous.json

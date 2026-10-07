@@ -26,7 +26,13 @@
     "status": "PASS",
     "test_log_sha256": "2e039697ae13a8e7b2d34e758e31c75fce9f44f247716088654fc7adab321400",
     "gate0": "PASS",
-    "required_pr_ci": "PENDING_AT_RECEIPT_CREATION"
+    "required_pr_ci": "PENDING_AT_RECEIPT_CREATION",
+    "workflow_followup_tests": {
+      "test_count": 32,
+      "status": "PASS",
+      "scope": "CANDIDATE_RUNTIME_AND_OBSERVATION_WINDOW_AFTER_EXPLICIT_S019_SCHEDULE_BUDGET",
+      "overlaps_focused_tests": true
+    }
   },
   "manual_canary": {
     "schema_version": 1,
@@ -153,5 +159,9 @@
   "public_evidence_policy": "Aggregates, URLs, hashes and schema only. No original records, CLI auth, raw CLI logs or private plans.",
   "newly_admitted_sources": 0,
   "human_reviews_fabricated": 0,
-  "new_business_scope_complete_sources": 0
+  "new_business_scope_complete_sources": 0,
+  "additional_evidence": [
+    "source-loop-s019-documents-20261007.json",
+    "source-metadata-loop-round2-20261007.json"
+  ]
 }

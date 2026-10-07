@@ -1,0 +1,289 @@
+{
+  "source_id": "S-019",
+  "scope": "FOUR_WINDOW_LIST_ENTRIES_DETAIL_AND_ATTACHMENT_CANDIDATES",
+  "requested_start": "2026-09-01",
+  "requested_end": "2026-10-07",
+  "rights_approved": false,
+  "whole_history_completeness": "UNKNOWN",
+  "independent_coverage_verified": false,
+  "body_saved": false,
+  "max_http_calls": 20,
+  "max_bytes_per_response": 16777216,
+  "details": [
+    {
+      "stable_key": "3377338",
+      "official_list_date": "2026-09-23",
+      "detail": {
+        "url": "https://www.rdec.taichung.gov.tw/3377338/post",
+        "kind": "DETAIL",
+        "attempt": 2,
+        "observed_at": "2026-10-07T07:20:13.886809+00:00",
+        "redirects_followed": false,
+        "http_status": 200,
+        "content_type": "text/html; charset=utf-8",
+        "status": "RETRIEVED",
+        "bytes": 88343,
+        "sha256": "a038d4d7eade560e8a82d119adbcc245c3ff8b1e9d9a0efb89b0a305a3d1a053"
+      },
+      "attachments": [
+        {
+          "url": "https://www.rdec.taichung.gov.tw/media/1469752/1150915第733次市政會議紀錄-定稿.pdf",
+          "download": {
+            "url": "https://www.rdec.taichung.gov.tw/media/1469752/1150915第733次市政會議紀錄-定稿.pdf",
+            "kind": "ATTACHMENT",
+            "attempt": 3,
+            "observed_at": "2026-10-07T07:20:14.695553+00:00",
+            "redirects_followed": false,
+            "http_status": 200,
+            "content_type": "application/pdf",
+            "status": "RETRIEVED",
+            "bytes": 143996,
+            "sha256": "5c3e296b3e961a66acfa903ad3c5b2e71bebd003dc4031d8847dacc291b77900"
+          },
+          "document_version_sha256": "5c3e296b3e961a66acfa903ad3c5b2e71bebd003dc4031d8847dacc291b77900",
+          "version_semantics": "CONTENT_BYTES_ONLY_NOT_SIGNATURE_OR_OFFICIAL_VERSION_ID",
+          "file_magic": "PDF"
+        },
+        {
+          "url": "https://www.rdec.taichung.gov.tw/media/1469751/1150915第733次市政會議紀錄-定稿.odt",
+          "download": {
+            "url": "https://www.rdec.taichung.gov.tw/media/1469751/1150915第733次市政會議紀錄-定稿.odt",
+            "kind": "ATTACHMENT",
+            "attempt": 4,
+            "observed_at": "2026-10-07T07:20:15.415167+00:00",
+            "redirects_followed": false,
+            "http_status": 200,
+            "content_type": "application/vnd.oasis.opendocument.text",
+            "status": "RETRIEVED",
+            "bytes": 48910,
+            "sha256": "35c8ace8805c8fc57e02646f1ef9587a829796d01bca31b910f13710cb512960"
+          },
+          "document_version_sha256": "35c8ace8805c8fc57e02646f1ef9587a829796d01bca31b910f13710cb512960",
+          "version_semantics": "CONTENT_BYTES_ONLY_NOT_SIGNATURE_OR_OFFICIAL_VERSION_ID",
+          "file_magic": "ZIP_CONTAINER"
+        }
+      ],
+      "attachment_candidates_complete": "NOT_VERIFIED",
+      "meeting_id": null,
+      "version_identifier": null,
+      "attachment_scope_selector": "main#center",
+      "attachment_candidate_count": 2,
+      "explicit_revision_labels_found": [],
+      "revision_semantics": "UNVERIFIED_LABEL_PRESENCE_ONLY"
+    },
+    {
+      "stable_key": "3372111",
+      "official_list_date": "2026-09-16",
+      "detail": {
+        "url": "https://www.rdec.taichung.gov.tw/3372111/post",
+        "kind": "DETAIL",
+        "attempt": 5,
+        "observed_at": "2026-10-07T07:20:15.887928+00:00",
+        "redirects_followed": false,
+        "http_status": 200,
+        "content_type": "text/html; charset=utf-8",
+        "status": "RETRIEVED",
+        "bytes": 88717,
+        "sha256": "05eaef3c13dff6a2a6d1360b812077271f576321896a4e9a167a47cfdf6d0b04"
+      },
+      "attachments": [
+        {
+          "url": "https://www.rdec.taichung.gov.tw/media/1466861/1150908第732次市政會議紀錄-定稿.pdf",
+          "download": {
+            "url": "https://www.rdec.taichung.gov.tw/media/1466861/1150908第732次市政會議紀錄-定稿.pdf",
+            "kind": "ATTACHMENT",
+            "attempt": 6,
+            "observed_at": "2026-10-07T07:20:16.541959+00:00",
+            "redirects_followed": false,
+            "http_status": 200,
+            "content_type": "application/pdf",
+            "status": "RETRIEVED",
+            "bytes": 154319,
+            "sha256": "7a59f8b6156a9643acfcd1473d0012dfcdd457487adf0e708450e38a27f4a067"
+          },
+          "document_version_sha256": "7a59f8b6156a9643acfcd1473d0012dfcdd457487adf0e708450e38a27f4a067",
+          "version_semantics": "CONTENT_BYTES_ONLY_NOT_SIGNATURE_OR_OFFICIAL_VERSION_ID",
+          "file_magic": "PDF"
+        },
+        {
+          "url": "https://www.rdec.taichung.gov.tw/media/1466860/1150908第732次市政會議紀錄-定稿.odt",
+          "download": {
+            "url": "https://www.rdec.taichung.gov.tw/media/1466860/1150908第732次市政會議紀錄-定稿.odt",
+            "kind": "ATTACHMENT",
+            "attempt": 7,
+            "observed_at": "2026-10-07T07:20:17.229444+00:00",
+            "redirects_followed": false,
+            "http_status": 200,
+            "content_type": "application/vnd.oasis.opendocument.text",
+            "status": "RETRIEVED",
+            "bytes": 48690,
+            "sha256": "b50b61d7a06acd36296a1f57082d2b8890163390e16e96d848f3e26be71ce11e"
+          },
+          "document_version_sha256": "b50b61d7a06acd36296a1f57082d2b8890163390e16e96d848f3e26be71ce11e",
+          "version_semantics": "CONTENT_BYTES_ONLY_NOT_SIGNATURE_OR_OFFICIAL_VERSION_ID",
+          "file_magic": "ZIP_CONTAINER"
+        }
+      ],
+      "attachment_candidates_complete": "NOT_VERIFIED",
+      "meeting_id": null,
+      "version_identifier": null,
+      "attachment_scope_selector": "main#center",
+      "attachment_candidate_count": 2,
+      "explicit_revision_labels_found": [],
+      "revision_semantics": "UNVERIFIED_LABEL_PRESENCE_ONLY"
+    },
+    {
+      "stable_key": "3367065",
+      "official_list_date": "2026-09-10",
+      "detail": {
+        "url": "https://www.rdec.taichung.gov.tw/3367065/post",
+        "kind": "DETAIL",
+        "attempt": 8,
+        "observed_at": "2026-10-07T07:20:18.365776+00:00",
+        "redirects_followed": false,
+        "http_status": 200,
+        "content_type": "text/html; charset=utf-8",
+        "status": "RETRIEVED",
+        "bytes": 88384,
+        "sha256": "428771c9e50a1a625e838178539bb5e06f818ce887ecfad606dfa275ba03f655"
+      },
+      "attachments": [
+        {
+          "url": "https://www.rdec.taichung.gov.tw/media/1463895/1150901第731次市政會議紀錄.pdf",
+          "download": {
+            "url": "https://www.rdec.taichung.gov.tw/media/1463895/1150901第731次市政會議紀錄.pdf",
+            "kind": "ATTACHMENT",
+            "attempt": 9,
+            "observed_at": "2026-10-07T07:20:18.829920+00:00",
+            "redirects_followed": false,
+            "http_status": 200,
+            "content_type": "application/pdf",
+            "status": "RETRIEVED",
+            "bytes": 177525,
+            "sha256": "ca1bcee1e58e6d72f9fc30d98cd5367be832ff427d4c8d3029b11a04c6ce2701"
+          },
+          "document_version_sha256": "ca1bcee1e58e6d72f9fc30d98cd5367be832ff427d4c8d3029b11a04c6ce2701",
+          "version_semantics": "CONTENT_BYTES_ONLY_NOT_SIGNATURE_OR_OFFICIAL_VERSION_ID",
+          "file_magic": "PDF"
+        },
+        {
+          "url": "https://www.rdec.taichung.gov.tw/media/1463894/1150901第731次市政會議紀錄-定稿.odt",
+          "download": {
+            "url": "https://www.rdec.taichung.gov.tw/media/1463894/1150901第731次市政會議紀錄-定稿.odt",
+            "kind": "ATTACHMENT",
+            "attempt": 10,
+            "observed_at": "2026-10-07T07:20:19.864106+00:00",
+            "redirects_followed": false,
+            "http_status": 200,
+            "content_type": "application/vnd.oasis.opendocument.text",
+            "status": "RETRIEVED",
+            "bytes": 30810,
+            "sha256": "5bdd2e85414c0fa036b2095a33acb58d23ec4149812823cf94157dae598c77cc"
+          },
+          "document_version_sha256": "5bdd2e85414c0fa036b2095a33acb58d23ec4149812823cf94157dae598c77cc",
+          "version_semantics": "CONTENT_BYTES_ONLY_NOT_SIGNATURE_OR_OFFICIAL_VERSION_ID",
+          "file_magic": "ZIP_CONTAINER"
+        }
+      ],
+      "attachment_candidates_complete": "NOT_VERIFIED",
+      "meeting_id": null,
+      "version_identifier": null,
+      "attachment_scope_selector": "main#center",
+      "attachment_candidate_count": 2,
+      "explicit_revision_labels_found": [],
+      "revision_semantics": "UNVERIFIED_LABEL_PRESENCE_ONLY"
+    },
+    {
+      "stable_key": "3362693",
+      "official_list_date": "2026-09-04",
+      "detail": {
+        "url": "https://www.rdec.taichung.gov.tw/3362693/post",
+        "kind": "DETAIL",
+        "attempt": 11,
+        "observed_at": "2026-10-07T07:20:20.384141+00:00",
+        "redirects_followed": false,
+        "http_status": 200,
+        "content_type": "text/html; charset=utf-8",
+        "status": "RETRIEVED",
+        "bytes": 88596,
+        "sha256": "3ac23eab53af104c8ef56026d3c6307e4e6b8cffe1daf7305325522ebcda904b"
+      },
+      "attachments": [
+        {
+          "url": "https://www.rdec.taichung.gov.tw/media/1461464/1150825第730次市政會議紀錄-定稿.pdf",
+          "download": {
+            "url": "https://www.rdec.taichung.gov.tw/media/1461464/1150825第730次市政會議紀錄-定稿.pdf",
+            "kind": "ATTACHMENT",
+            "attempt": 12,
+            "observed_at": "2026-10-07T07:20:21.052644+00:00",
+            "redirects_followed": false,
+            "http_status": 200,
+            "content_type": "application/pdf",
+            "status": "RETRIEVED",
+            "bytes": 191237,
+            "sha256": "0d9b84ef8b27f7e9c9cc785dcc9e88e3bc99794cdd2564c995be195d3b08809d"
+          },
+          "document_version_sha256": "0d9b84ef8b27f7e9c9cc785dcc9e88e3bc99794cdd2564c995be195d3b08809d",
+          "version_semantics": "CONTENT_BYTES_ONLY_NOT_SIGNATURE_OR_OFFICIAL_VERSION_ID",
+          "file_magic": "PDF"
+        },
+        {
+          "url": "https://www.rdec.taichung.gov.tw/media/1461463/1150825第730次市政會議紀錄-定稿.odt",
+          "download": {
+            "url": "https://www.rdec.taichung.gov.tw/media/1461463/1150825第730次市政會議紀錄-定稿.odt",
+            "kind": "ATTACHMENT",
+            "attempt": 13,
+            "observed_at": "2026-10-07T07:20:21.604094+00:00",
+            "redirects_followed": false,
+            "http_status": 200,
+            "content_type": "application/vnd.oasis.opendocument.text",
+            "status": "RETRIEVED",
+            "bytes": 52137,
+            "sha256": "d4d1e45fe6277d11616075ff71f7af0ff6d1213be88d0e0b8af70a2bd13a2861"
+          },
+          "document_version_sha256": "d4d1e45fe6277d11616075ff71f7af0ff6d1213be88d0e0b8af70a2bd13a2861",
+          "version_semantics": "CONTENT_BYTES_ONLY_NOT_SIGNATURE_OR_OFFICIAL_VERSION_ID",
+          "file_magic": "ZIP_CONTAINER"
+        }
+      ],
+      "attachment_candidates_complete": "NOT_VERIFIED",
+      "meeting_id": null,
+      "version_identifier": null,
+      "attachment_scope_selector": "main#center",
+      "attachment_candidate_count": 2,
+      "explicit_revision_labels_found": [],
+      "revision_semantics": "UNVERIFIED_LABEL_PRESENCE_ONLY"
+    }
+  ],
+  "first_page": {
+    "url": "https://www.rdec.taichung.gov.tw/12047/12142/12186",
+    "kind": "ONE_LIST_PAGE",
+    "attempt": 1,
+    "observed_at": "2026-10-07T07:20:12.523301+00:00",
+    "redirects_followed": false,
+    "http_status": 200,
+    "content_type": "text/html; charset=utf-8",
+    "status": "RETRIEVED",
+    "bytes": 105319,
+    "sha256": "fa741555b40f57f92bfa9a8c895ff575dc3ccc48aa3fbfdb26f06d59e35a668f"
+  },
+  "first_page_parsed_rows": 30,
+  "selected_entry_count": 4,
+  "http_calls": 13,
+  "explicit_denial_encountered": false,
+  "details_retrieved": 4,
+  "attachment_candidates": 8,
+  "attachments_retrieved": 8,
+  "result": "DETAIL_AND_ATTACHMENT_METADATA_OBSERVED_NOT_FULL_SOURCE_VERIFIED",
+  "collector_code_commit": "be2bcdaddbb0e439b0efba1585db4dadc4268092",
+  "attachment_bytes_retrieved": 847624,
+  "details_bytes_retrieved": 354040,
+  "attachment_format_counts": {
+    "PDF": 4,
+    "ODT": 4
+  },
+  "meeting_identifier_verification": "NOT_PERFORMED_FILENAME_OR_PRIOR_TITLE_NOT_USED_AS_ID",
+  "official_revision_history_complete": false,
+  "promotion_eligible": false,
+  "script_sha256": "78f82b79f5e8eeecef41cb0e594c55c86df70e74c10d8f2bb3e1fcd71dd9e959"
+}

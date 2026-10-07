@@ -8,7 +8,7 @@
 - 針對已含明確 `Page` 的列表 URL，只有官方「最後一頁」連結與目前頁數相同、同 HTTPS origin／路徑／其餘查詢參數，且其他頁碼控制不矛盾、沒有 Next 控制，才可證明末頁。未知總頁數、重複參數、不同路徑／參數／origin 或消失的分頁控制仍不能證明完整。未分頁原始 URL 的既有判定不在本次改寫範圍。
 - 官方 Page25 的 `section.function` 另含「回上一頁／javascript:history.back()」瀏覽器工具，不是 `section.page` 的真正上一頁。只排除這個已觀察到的精確工具與位置；真正 pager 內的相同 JavaScript、未知 JavaScript 或矛盾頁码不被忽略。
 - `collect_news_list`／`collect_source` 可明確指定 `max_list_pages`（1–40）；預設仍為 4。每次請求仍通過來源 URL 與重新導向限制。完整遍歷判定必須到達可解析的末頁；遇到頁數上限、循環或無法解析的分頁仍為 `PARTIAL`。
-- 候選 CLI 可指定 `--list-page-limit` 與 `--http-call-limit`（1–64，預設 6），實際 HTTP 嘗試包含重新導向，禁止隱藏重試。這是一次執行的明確預算，不自動增加正式排程預算。
+- 候選 CLI 可指定 `--list-page-limit` 與 `--http-call-limit`（1–64，預設 6），實際 HTTP 嘗試包含重新導向，禁止隱藏重試。程式預設不增加；每日候選 workflow 對已實際驗證的 S019 25 頁列表，明確指定 30 頁／32 次 HTTP 上限，其他來源仍使用原預算。
 - 新增 `list_traversal` 收據：要求起訖、停下原因、觀察日期上下界、日期是否完整、順序觀察、詳頁是否全取得。`whole_history_completeness` 一律 `UNKNOWN`，`attachments_downloaded` 一律 false；RSS 是快照，不是全部歷史。
 
 ## 使用
