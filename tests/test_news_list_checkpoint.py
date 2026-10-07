@@ -310,6 +310,18 @@ class CheckpointV2Tests(unittest.TestCase):
         self.assertNotIn("FICTIONAL_PRIVATE",json.dumps(checkpoint))
         self.assertTrue(all(set(control)=={"role","target_page"} for control in checkpoint["batches"][0]["pages"][0]["controls"]))
 
+    def test_decorated_article_next_in_actual_pager_cannot_manufacture_terminal(self):
+        for container in ("page", "pagination", "pager", "paginator"):
+            body = (f'<meta charset="utf-8"><li><a href="index-1.asp?Parser=9,4,20,,,,999">Fixture 2026-09-19</a></li>'
+                    f'<nav class="{container}"><a href="{ROOT}">最末頁</a>'
+                    '<a href="index-1.asp?Parser=9,4,20,,,,888">下一頁 — FICTIONAL_PAGER_LABEL</a></nav>').encode()
+            original_navigation = cp.oc._traffic_news_list_next(cp.BeautifulSoup(body.decode(), "html.parser"), ROOT)
+            self.assertEqual(original_navigation, (None, True))
+            session = FakeSession({ROOT: body})
+            with self.subTest(container=container), self.assertRaisesRegex(ValueError, "pagination"):
+                cp.collect_batch(session, START, END, max_list_pages=1)
+            self.assertEqual(session.fetched, [ROOT])
+
     def test_exact_navigation_with_private_attributes_projects_only_role_and_target(self):
         _, bodies=fixtures()
         bodies[ROOT]=bodies[ROOT].replace(b'>\xe4\xb8\x8b\xe4\xb8\x80\xe9\xa0\x81</a>',b' title="FICTIONAL_PRIVATE_TITLE" class="FICTIONAL_PRIVATE_CLASS">\xe4\xb8\x8b\xe4\xb8\x80\xe9\xa0\x81</a>')

@@ -142,7 +142,7 @@ def looks_like_non_csv_payload(body: bytes) -> bool:
     if head.startswith(b"\xef\xbb\xbf"):
         head = head[3:].lstrip()
     # Binary signatures must be checked before folding textual payload case.
-    if head.startswith(b"PK\x03\x04"):
+    if head.startswith((b"PK\x03\x04", b"PK\x05\x06", b"PK\x07\x08", b"PK\x06\x06")):
         return True
     head = head.lower()
     if head.startswith((b"[", b"{")):
