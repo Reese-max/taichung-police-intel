@@ -33,16 +33,20 @@ def audit(body, *, source_id, expected_sha256):
     reader = csv.reader(io.StringIO(body.decode('utf-8-sig')), strict=True)
     if next(reader, None) != HEADERS[source_id]:
         raise ValueError('original CSV schema changed')
+    description = 0
+    if source_id == 'S-036':
+        if next(reader, None) != ASSEMBLY_LABELS:
+            raise ValueError('S-036 description row missing or changed')
+        description = 1
     seen = Counter()
     periods = Counter()
     earliest = latest = None
-    invalid_times = end_before = empty = description = invalid_periods = count = 0
-    for position, row in enumerate(reader):
+    invalid_times = end_before = empty = invalid_periods = count = 0
+    for row in reader:
         if len(row) != len(HEADERS[source_id]):
             raise ValueError('original CSV row width changed')
-        if source_id == 'S-036' and position == 0 and row == ASSEMBLY_LABELS:
-            description += 1
-            continue
+        if source_id == 'S-036' and row == ASSEMBLY_LABELS:
+            raise ValueError('S-036 description row duplicated')
         count += 1
         # Hash identities in memory rather than retaining incident/domain text.
         seen[hashlib.sha256(json.dumps(row, ensure_ascii=False).encode()).hexdigest()] += 1

@@ -48,6 +48,26 @@ class NpaSourceInventoryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "ambiguous"):
             inventory_script._resource_id("https://example.test/resource/one/download?rid=two")
 
+    def test_resource_id_distinct_path_candidates_fail_closed(self):
+        urls = [
+            "https://example.test/resource/fictional-one/resource/fictional-two/download",
+            "https://example.test/resource/api/dataset/fictional/resource/fictional-one/resource/fictional-two/download?rid=fictional-two",
+        ]
+        for url in urls:
+            with self.subTest(url=url):
+                with self.assertRaisesRegex(ValueError, "ambiguous"):
+                    inventory_script._resource_id(url)
+
+    def test_resource_id_repeated_same_path_candidate_is_unambiguous(self):
+        resource_id = "fictional-one"
+        urls = [
+            f"https://example.test/resource/{resource_id}/resource/{resource_id}/download",
+            f"https://example.test/resource/api/dataset/fictional/resource/{resource_id}/resource/{resource_id}/download?rid={resource_id}",
+        ]
+        for url in urls:
+            with self.subTest(url=url):
+                self.assertEqual(inventory_script._resource_id(url), resource_id)
+
     def test_inventory_covers_batches_and_catalog_bindings(self):
         summary = inventory_script.validate_inventory(self.inventory, self.catalog)
         self.assertGreaterEqual(summary["batch_counts"]["BATCH_1"], 5)

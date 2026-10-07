@@ -74,6 +74,34 @@ class IndependentValidatorReviewTests(unittest.TestCase):
                 'schema':['["id"]'],'id_fields':['["id"]'],'expected_row_count':1,'period_evidence':{'field':'["id"]','value':'["fictional"]'}}
         self.assertFalse(m.validate(plan=plan,resource_bytes=body)['completeness'])
 
+    def test_zip_magic_rejected_even_when_caller_schema_and_rows_match(self):
+        # FICTIONAL signature-bearing bytes, not an acquired archive. Everything
+        # after the ZIP local-file signature deliberately satisfies the CSV plan.
+        body = b'PK\x03\x04id,period\nfictional-id,fictional\n'
+        plan = self.plan(body)
+        plan.update(schema=['PK\x03\x04id', 'period'],
+                    id_fields=['PK\x03\x04id'], coordinate_fields=[])
+        receipt = m.validate(plan=plan, resource_bytes=body)
+        self.assertFalse(receipt['completeness'], receipt)
+        self.assertIn('NON_CSV_HTML_OR_ERROR_PAYLOAD', receipt['completeness_failures'])
+        self.assertFalse(receipt['original_bytes_acquired'])
+        self.assertIsNone(receipt['resource_rows'])
+
+    def test_utf8_bom_json_rejected_even_when_caller_schema_and_rows_match(self):
+        # These are valid JSON documents. The caller can otherwise reinterpret
+        # each closing delimiter as one CSV row and satisfy its own period plan.
+        for opening, closing in [('[', ']'), ('{', '}')]:
+            with self.subTest(opening=opening):
+                body = b'\xef\xbb\xbf' + f'{opening}\n{closing}\n'.encode('utf-8')
+                plan = self.plan(body)
+                plan.update(schema=[opening], id_fields=[opening], coordinate_fields=[],
+                            period_evidence={'field': opening, 'value': closing})
+                receipt = m.validate(plan=plan, resource_bytes=body)
+                self.assertFalse(receipt['completeness'], receipt)
+                self.assertIn('NON_CSV_HTML_OR_ERROR_PAYLOAD', receipt['completeness_failures'])
+                self.assertFalse(receipt['original_bytes_acquired'])
+                self.assertIsNone(receipt['resource_rows'])
+
     def test_boolean_schema_version_rejected(self):
         body = b'id,period,POINT_X,POINT_Y\na,fictional,121,24\n';plan=self.plan(body);plan['schema_version']=True
         with self.assertRaises(ValueError):m.validate(plan=plan,resource_bytes=body)
@@ -81,6 +109,48 @@ class IndependentValidatorReviewTests(unittest.TestCase):
     def test_blank_data_rows_cannot_be_silently_removed(self):
         body=b'id,period,POINT_X,POINT_Y\na,fictional,121,24\n,,,\n'
         self.assertFalse(m.validate(plan=self.plan(body),resource_bytes=body)['completeness'])
+
+    def test_empty_logical_records_cannot_be_silently_removed(self):
+        header = 'id,period,POINT_X,POINT_Y'
+        first = 'a,fictional,121,24'
+        second = 'b,fictional,121,24'
+        for newline in ['\n', '\r\n']:
+            for position, records, expected_rows in [
+                ('after-header', [header, '', first], 1),
+                ('between-data', [header, first, '', second], 2),
+                ('after-data', [header, first, ''], 1),
+            ]:
+                with self.subTest(newline=repr(newline), position=position):
+                    body = (newline.join(records) + newline).encode('utf-8')
+                    plan = self.plan(body)
+                    # Match the rows left after DictReader discards []. Merely
+                    # matching this caller declaration must not hide corruption.
+                    plan['expected_row_count'] = expected_rows
+                    receipt = m.validate(plan=plan, resource_bytes=body)
+                    self.assertFalse(receipt['completeness'], receipt)
+                    self.assertTrue(receipt['completeness_failures'])
+
+    def test_normal_line_endings_and_one_terminal_newline_remain_valid(self):
+        for newline in ['\n', '\r\n']:
+            for terminal_newline in ['', newline]:
+                with self.subTest(newline=repr(newline), terminal=bool(terminal_newline)):
+                    body = ('id,period,POINT_X,POINT_Y' + newline
+                            + 'a,fictional,121,24' + terminal_newline).encode('utf-8')
+                    receipt = m.validate(plan=self.plan(body), resource_bytes=body)
+                    self.assertTrue(receipt['completeness'], receipt)
+                    self.assertEqual(receipt['resource_rows'], 1)
+
+    def test_blank_physical_line_inside_quoted_multiline_cell_remains_valid(self):
+        for newline in ['\n', '\r\n']:
+            with self.subTest(newline=repr(newline)):
+                body = (f'id,period,POINT_X,POINT_Y,notes{newline}'
+                        f'a,fictional,121,24,"fictional first{newline}'
+                        f'{newline}fictional last"{newline}').encode('utf-8')
+                plan = self.plan(body)
+                plan['schema'] = [*plan['schema'], 'notes']
+                receipt = m.validate(plan=plan, resource_bytes=body)
+                self.assertTrue(receipt['completeness'], receipt)
+                self.assertEqual(receipt['resource_rows'], 1)
 
     def test_unclosed_quote_rejected(self):
         body=b'id,period,POINT_X,POINT_Y\n"a,fictional,121,24\n'

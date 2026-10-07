@@ -138,8 +138,14 @@ def require_string_list(value: Any, name: str, *, allow_empty: bool = False) -> 
 
 
 def looks_like_non_csv_payload(body: bytes) -> bool:
-    head = body.lstrip().lower()
-    if head.startswith((b"[", b"{", b"PK\x03\x04")):
+    head = body.lstrip()
+    if head.startswith(b"\xef\xbb\xbf"):
+        head = head[3:].lstrip()
+    # Binary signatures must be checked before folding textual payload case.
+    if head.startswith(b"PK\x03\x04"):
+        return True
+    head = head.lower()
+    if head.startswith((b"[", b"{")):
         return True
     if head.startswith((b"<!doctype", b"<html", b"<head", b"<body")):
         return True
@@ -255,14 +261,15 @@ def _acquisition(plan: dict[str, Any]) -> dict[str, Any]:
 
 
 def _parse_csv(body: str, schema: list[str]) -> tuple[list[dict[str, str]] | None, bool, list[str]]:
-    reader = csv.DictReader(io.StringIO(body), strict=True)
-    if reader.fieldnames is None or list(reader.fieldnames) != schema:
+    reader = csv.reader(io.StringIO(body), strict=True)
+    if next(reader, None) != schema:
         return None, False, ["SCHEMA_MISMATCH"]
     rows: list[dict[str, str]] = []
-    for row in reader:
-        if set(row) != set(schema) or any(value is None for value in row.values()):
+    for values in reader:
+        # Preserve empty logical records; DictReader silently skips them.
+        if len(values) != len(schema):
             return None, False, ["SCHEMA_MISMATCH"]
-        rows.append({field: row[field] for field in schema})
+        rows.append(dict(zip(schema, values)))
     return rows, True, []
 
 
