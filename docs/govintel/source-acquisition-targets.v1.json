@@ -30,8 +30,8 @@
       "model_transmission_allowed": false,
       "promotion_eligible": false,
       "human_review": null,
-      "next_action": "原官方網址503／Actions失敗；待官方可用後正常重試，不推定失敗原因",
-      "evidence": "source-loop-first-iteration-20261007.json"
+      "next_action": "10/7 07:57 UTC 正常原網址仍503；等待官方正常可用後按有界流程重試，不推定原因或繞行",
+      "evidence": "source-scope-repair-20261007.json"
     },
     {
       "source_id": "S-010",
@@ -40,20 +40,24 @@
       "priority": "P2",
       "completeness_scope": "VIDEO_INVENTORY",
       "acceptance_target": "指定期間完整場次索引、會議日期、影片與時間軸；字幕另需真人覆核",
-      "acquisition_status": "OFFICIAL_INDEX_LIST_AND_ONE_DETAIL_METADATA_ACQUIRED",
+      "acquisition_status": "RECENT_LIST_THREE_PAGES_13_IDS_AND_ONE_DETAIL_METADATA",
       "scope_completeness": "NOT_VERIFIED",
       "rights_admission": "UNKNOWN",
       "model_transmission_allowed": false,
       "promotion_eligible": false,
       "human_review": null,
-      "next_action": "完整枚舉官方iframe索引／篩選／末頁，核對場次ID、日期角色與影片時間軸；未下載影音、未驗播放或字幕，用途須分開覆核",
-      "evidence": "source-metadata-loop-round2-20261007.json",
+      "next_action": "recent三頁13項已枚舉；archive／指定窗口完整性未證明。單詳頁明確會議日10/1和1播放器embed，未請求播放器、未驗時間軸／播放／字幕／版本",
+      "evidence": "source-scope-repair-20261007.json",
       "requested_window": {
         "start": "2026-09-01",
         "end": "2026-10-07",
         "timezone": "Asia/Taipei",
         "purpose": "BOUNDED_PILOT_METADATA_DISCOVERY_NOT_ALL_HISTORY"
-      }
+      },
+      "recent_list_pages_observed": 3,
+      "recent_unique_ids_observed": 13,
+      "sample_meeting_date": "2026-10-01",
+      "sample_visible_player_embeds": 1
     },
     {
       "source_id": "S-011",
@@ -62,20 +66,24 @@
       "priority": "P2",
       "completeness_scope": "VIDEO_INVENTORY",
       "acceptance_target": "會議—影片對應、完整場次列表、可播放與版本",
-      "acquisition_status": "OFFICIAL_INDEX_LIST_AND_ONE_DETAIL_METADATA_ACQUIRED",
+      "acquisition_status": "RECENT_LIST_AND_ARCHIVE_FIRST_PAGE_ONE_DETAIL_METADATA",
       "scope_completeness": "NOT_VERIFIED",
       "rights_admission": "UNKNOWN",
       "model_transmission_allowed": false,
       "promotion_eligible": false,
       "human_review": null,
-      "next_action": "完整枚舉官方iframe索引／篩選／末頁，核對場次ID、日期角色與影片時間軸；未下載影音、未驗播放或字幕，用途須分開覆核",
-      "evidence": "source-metadata-loop-round2-20261007.json",
+      "next_action": "archive第一頁宣告19頁，尚未枚舉全頁與窗口；recent篩選／archive對應仍待核對。單詳頁明確會議日10/6與2播放器embed，未驗播放／時間軸／字幕／版本",
+      "evidence": "source-scope-repair-20261007.json",
       "requested_window": {
         "start": "2026-09-01",
         "end": "2026-10-07",
         "timezone": "Asia/Taipei",
         "purpose": "BOUNDED_PILOT_METADATA_DISCOVERY_NOT_ALL_HISTORY"
-      }
+      },
+      "archive_declared_pages": 19,
+      "archive_pages_observed": 1,
+      "sample_meeting_date": "2026-10-06",
+      "sample_visible_player_embeds": 2
     },
     {
       "source_id": "S-019",
@@ -114,20 +122,36 @@
       "priority": "P1",
       "completeness_scope": "LEGAL_WINDOW",
       "acceptance_target": "指定期間草案、狀態、發布／截止日、所有附件與歷史版本",
-      "acquisition_status": "BOUNDED_SNAPSHOT_AND_ONE_ATTACHMENT_ACQUIRED",
+      "acquisition_status": "HISTORY_INDEX_785_ENUMERATED_CURRENT_EMPTY_CONTRACT_ONE_DRAFT_TWO_ATTACHMENTS",
       "scope_completeness": "NOT_VERIFIED",
       "rights_admission": "UNKNOWN",
       "model_transmission_allowed": false,
       "promotion_eligible": false,
       "human_review": null,
-      "next_action": "定義current空態契約；79頁僅抽查1/2/79共25項，不能宣稱近期零筆；對帳公告／截止／版本與每個附件",
-      "evidence": "source-metadata-loop-round2-20261007.json",
+      "next_action": "當次current空態僅指10/7預告中列表；完整79頁785項是歷史索引。112569公告日8/25、預告區間8/26–9/1與pilot首日重疊，不能把publication零筆當pilot無草案；785詳頁／全附件／版本仍待取得",
+      "evidence": "source-scope-repair-20261007.json",
       "requested_window": {
         "start": "2026-09-01",
         "end": "2026-10-07",
         "timezone": "Asia/Taipei",
         "purpose": "BOUNDED_PILOT_METADATA_DISCOVERY_NOT_ALL_HISTORY"
-      }
+      },
+      "history_list_pages_verified": 79,
+      "history_unique_draft_ids": 785,
+      "current_snapshot_count": 0,
+      "current_snapshot_scope": "OFFICIAL_CURRENT_PRE_NOTICE_LIST_AT_OBSERVATION_ONLY",
+      "pilot_history_publication_count": 0,
+      "pilot_activity_or_deadline_count": null,
+      "detail_sample_id": "112569",
+      "sample_publication_date": "2026-08-25",
+      "sample_pre_notice_interval": [
+        "2026-08-26",
+        "2026-09-01"
+      ],
+      "sample_visible_attachments_acquired": 2,
+      "additional_evidence": [
+        "s026-history-enumeration-20261007.json"
+      ]
     },
     {
       "source_id": "S-028",
@@ -136,16 +160,19 @@
       "priority": "P2",
       "completeness_scope": "RESOURCE_PERIOD",
       "acceptance_target": "固定期別／分局、統計口徑、全列數與合計",
-      "acquisition_status": "CURRENT_DECLARED_RESOURCES_ACQUIRED_QUALITY_REVIEW_PENDING",
+      "acquisition_status": "DECLARATION_BOUND_COLLECTION_AUDITED_QUALITY_ISSUES",
       "scope_completeness": "NOT_VERIFIED",
       "rights_admission": "UNKNOWN",
       "model_transmission_allowed": false,
       "promotion_eligible": false,
       "human_review": null,
-      "next_action": "核對統計口徑／分局／合計；2026-05未在本次資源集合出現，不能記作零",
-      "evidence": "reference-source-loop-20261007.json",
+      "next_action": "18/18原件綁metadata資源宣告、下載收據與SHA/schema；集合observed-span缺2026-05，只限本次集合，並非零案件。分局身分、統計口徑與合計仍待核對",
+      "evidence": "reference-quality-disposition-20261007.json",
       "acquired_resources": 18,
-      "acquired_data_rows": 27040
+      "acquired_data_rows": 27040,
+      "observed_span_missing_periods": [
+        "2026-05"
+      ]
     },
     {
       "source_id": "S-031",
@@ -174,18 +201,28 @@
       "priority": "P0",
       "completeness_scope": "NEWS_WINDOW",
       "acceptance_target": "指定期間公告、路段／每日時段與修訂，完整官方分頁",
-      "acquisition_status": "OBSERVED_SCOPE_PENDING",
+      "acquisition_status": "ARCHIVE_LIST_METADATA_OBSERVED_TERMINAL_PARSER_FIXED_BOUNDED_RESUME_VERIFIED",
       "scope_completeness": "NOT_VERIFIED",
       "rights_admission": "UNKNOWN",
       "model_transmission_allowed": false,
       "promotion_eligible": false,
       "human_review": null,
-      "next_action": "官方82頁超过本次40頁硬上限；先定义日期窗口覆盖證明／分批受控取得，不以舊日期提前停止",
+      "next_action": "末頁控制已修復且實際驗證；預設兩批走完8頁，可由第9頁續跑。82頁814項是較早列表metadata觀察；新checkpoint不是獨立官方認證，詳頁、附件、修訂和正式窗口完整性仍待核對",
       "actual_valid_days_in_this_two_day_batch": [
         "2026-10-06",
         "2026-10-07"
       ],
-      "evidence": "source-loop-first-iteration-20261007.json"
+      "evidence": "s032-resume-live-batches-20261007.json",
+      "list_pages_observed": 82,
+      "unique_list_items_observed": 814,
+      "window_list_items_observed": 36,
+      "bounded_resume_pages_verified": 8,
+      "bounded_resume_unique_ids": 79,
+      "additional_evidence": [
+        "s032-terminal-navigation-observation-20261007.json",
+        "s032-archive-metadata-observation-20261007.json"
+      ],
+      "checkpoint_validation_scope": "LOCAL_TRAVERSAL_RECEIPT_ONLY"
     },
     {
       "source_id": "S-033",
@@ -246,15 +283,19 @@
       "priority": "P1",
       "completeness_scope": "RESOURCE_PERIOD",
       "acceptance_target": "原資源完整bytes／列數、活動身分、日期範圍與變更；不把文件更新當單一活動更新",
-      "acquisition_status": "CURRENT_DECLARED_RESOURCES_ACQUIRED_QUALITY_REVIEW_PENDING",
+      "acquisition_status": "ORIGINAL_PRESERVED_STRUCTURAL_QUARANTINE_INDEX_CREATED",
       "scope_completeness": "NOT_VERIFIED",
       "rights_admission": "UNKNOWN",
       "model_transmission_allowed": false,
       "promotion_eligible": false,
       "human_review": null,
-      "next_action": "468重複列、10空值、8起訖倒置隔離標記；保留原日期，不猜時區，核對活动身分／官方期間總數",
-      "evidence": "reference-source-loop-20261007.json",
-      "acquired_data_rows": 77624
+      "next_action": "17列結構異常隔離（9列含10空值、8列起訖倒置），77607列只是未覆核候選。468重複額外列／353群保留multiplicity；仍須核對活動身分、時區、來源期間總數、權利",
+      "evidence": "reference-quality-disposition-20261007.json",
+      "acquired_data_rows": 77624,
+      "quarantined_rows": 17,
+      "candidate_unreviewed_rows": 77607,
+      "exact_duplicate_extra_rows": 468,
+      "exact_duplicate_groups": 353
     },
     {
       "source_id": "S-037",
@@ -279,16 +320,17 @@
       "priority": "P1",
       "completeness_scope": "RESOURCE_PERIOD",
       "acceptance_target": "固定資源期別與完整行政區代碼，對照D1定義／期間差異",
-      "acquisition_status": "CURRENT_DECLARED_RESOURCES_ACQUIRED_QUALITY_REVIEW_PENDING",
+      "acquisition_status": "DECLARATION_BOUND_COLLECTION_AUDITED_CROSS_RESOURCE_DUPLICATES",
       "scope_completeness": "NOT_VERIFIED",
       "rights_admission": "UNKNOWN",
       "model_transmission_allowed": false,
       "promotion_eligible": false,
       "human_review": null,
-      "next_action": "標記2023年跨資源261重複列，核對年週期及行政區代码；不得替代D1固定期人口",
-      "evidence": "reference-source-loop-20261007.json",
+      "next_action": "6/6原件已綁宣告與下載收據；2023兩原件bytes相同、261重複額外列保留。仍需核對行政區代碼／期別與D1定義差異，不替代固定期人口",
+      "evidence": "reference-quality-disposition-20261007.json",
       "acquired_resources": 6,
-      "acquired_data_rows": 1566
+      "acquired_data_rows": 1566,
+      "exact_cross_resource_duplicate_extra_rows": 261
     },
     {
       "source_id": "CTX-165",
@@ -297,17 +339,22 @@
       "priority": "P2",
       "completeness_scope": "RESOURCE_PERIOD",
       "acceptance_target": "完整官方CSV bytes／列數、期別／更新日、重複與撤除",
-      "acquisition_status": "CURRENT_DECLARED_RESOURCES_ACQUIRED_QUALITY_REVIEW_PENDING",
+      "acquisition_status": "ORIGINAL_PRESERVED_EXACT_DUPLICATE_INDEX_CREATED",
       "scope_completeness": "NOT_VERIFIED",
       "rights_admission": "UNKNOWN",
       "model_transmission_allowed": false,
       "promotion_eligible": false,
       "human_review": null,
-      "next_action": "7183重複列先標記；核對網域身分、撤除與期别，禁止转称本地案件數",
-      "evidence": "reference-source-loop-20261007.json",
-      "acquired_data_rows": 93839
+      "next_action": "7183重複額外列／7163群已標記並保留原multiplicity；仍須核對網域身分、撤除與期別，不轉稱本地案件數",
+      "evidence": "reference-quality-disposition-20261007.json",
+      "acquired_data_rows": 93839,
+      "candidate_unreviewed_rows": 93839,
+      "exact_duplicate_extra_rows": 7183,
+      "exact_duplicate_groups": 7163
     }
   ],
   "last_iteration_date": "2026-10-07",
-  "iteration_evidence": "source-loop-first-iteration-20261007.json"
+  "iteration_evidence": "source-unfinished-repair-20261007.json",
+  "last_iteration_base_code_sha": "45e9c2ba562265923727e299ea3b6b094275d89c",
+  "rights_review_packet": "source-rights-review-packet-20261007.json"
 }

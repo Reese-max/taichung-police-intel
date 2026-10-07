@@ -623,9 +623,101 @@ def _list_page_identity(url: str) -> tuple[tuple, int] | None:
     return identity, int(pages[0][1])
 
 
+def _traffic_list_page_identity(url: str) -> tuple[tuple, int] | None:
+    """S032's exact list Parser grammar; article Parsers are not list cursors."""
+    parts = urllib.parse.urlsplit(url)
+    configured = urllib.parse.urlsplit(NEWS_LIST_SOURCES["S-032"]["list_url"])
+    try:
+        safe_origin = (parts.scheme, parts.hostname, parts.port or 443, parts.path)
+    except ValueError:
+        return None
+    if safe_origin != ("https", configured.hostname, 443, configured.path) or parts.username or parts.password or parts.fragment:
+        return None
+    query = urllib.parse.parse_qsl(parts.query, keep_blank_values=True)
+    if len(query) != 1 or query[0][0] != "Parser":
+        return None
+    fields = query[0][1].split(",")
+    if fields == ["9", "4", "20"]:
+        number = 1
+    elif (len(fields) == 11 and fields[:3] == ["9", "4", "20"]
+          and all(value == "" for value in fields[3:10])
+          and re.fullmatch(r"[1-9]\d{0,5}", fields[10])):
+        number = int(fields[10])
+    else:
+        return None
+    return safe_origin + ("Parser=9,4,20",), number
+
+
+def _traffic_news_list_next(soup: BeautifulSoup, base_url: str) -> tuple[str | None, bool]:
+    """Resolve every S032 pager control before trusting a clamped last-page Next."""
+    current = _traffic_list_page_identity(base_url)
+    assert current is not None
+    next_targets = []
+    last_numbers = set()
+    controls = []
+    for control in soup.find_all(["a", "link", "button"]):
+        labels = [" ".join(control.stripped_strings).strip().lower(),
+                  str(control.get("title") or "").strip().lower(),
+                  str(control.get("aria-label") or "").strip().lower()]
+        rel = {str(value).lower() for value in control.get("rel", [])}
+        classes = {str(value).lower() for value in control.get("class", [])}
+        is_next = ("next" in rel or any("next" in value for value in classes)
+            or any(any(token in value for token in ("下一頁", "下一页", "下頁", "下页"))
+                   or re.search(r"\bnext(?:\s+page)?\b", value) for value in labels if value))
+        is_last = "last" in rel or any(any(token in value for token in ("最後一頁", "最后一页", "末頁", "末页"))
+            or re.search(r"\blast(?:\s+page)?\b", value) for value in labels if value)
+        is_first = "first" in rel or any("第一頁" in value or "第一页" in value or re.search(r"\bfirst(?:\s+page)?\b", value)
+            for value in labels if value)
+        is_previous = bool(rel & {"prev", "previous"}) or any("上一頁" in value or "上一页" in value or re.search(r"\bprev(?:ious)?(?:\s+page)?\b", value)
+            for value in labels if value)
+        numbered = [value for value in labels if re.fullmatch(r"(?:第\s*)?\d{1,4}\s*(?:頁|页)?", value)]
+        if not (is_next or is_last or is_first or is_previous or numbered):
+            continue
+        href = str(control.get("href") or "").strip()
+        target_url = urllib.parse.urljoin(base_url, href) if href else None
+        target = _traffic_list_page_identity(target_url) if target_url else None
+        if target is None or target[0] != current[0]:
+            return None, True
+        if any(int(re.search(r"\d+", label).group()) != target[1] for label in numbered):
+            return None, True
+        if is_first and target[1] != 1 or is_previous and target[1] > current[1]:
+            return None, True
+        controls.append(target[1])
+        if is_last:
+            last_numbers.add(target[1])
+        if is_next:
+            next_targets.append((target_url, target[1]))
+    if len(last_numbers) > 1:
+        return None, True
+    last = next(iter(last_numbers), None)
+    if last is not None and (last < current[1] or any(number > last for number in controls)):
+        return None, True
+    if next_targets:
+        numbers = {number for _, number in next_targets}
+        if numbers == {current[1]} and last == current[1]:
+            return None, False
+        if numbers == {current[1] + 1}:
+            return next_targets[0][0], True
+        return None, True
+    if last == current[1]:
+        return None, False
+    return None, True
+
+
 def next_news_list_page(html: bytes, base_url: str, source_id: str) -> tuple[str | None, bool]:
     """Return a safe next-page URL and whether pagination needs accounting for."""
     soup = BeautifulSoup(html, "html.parser")
+    traffic_page = _traffic_list_page_identity(base_url) if source_id == "S-032" else None
+    # Preserve the generic explicit-Page parser for historical/alternate list
+    # contracts. The comma contract is activated by an explicit comma cursor
+    # or at least one same-list Parser control on the entry page.
+    has_parser_control = traffic_page and any(
+        _traffic_list_page_identity(urllib.parse.urljoin(base_url, str(control.get("href") or ""))) is not None
+        for control in soup.find_all(["a", "link", "button"], href=True)
+    )
+    explicit_comma_cursor = traffic_page is not None and urllib.parse.parse_qsl(urllib.parse.urlsplit(base_url).query)[0][1] != "9,4,20"
+    if traffic_page is not None and (explicit_comma_cursor or has_parser_control):
+        return _traffic_news_list_next(soup, base_url)
     current_page = _list_page_identity(base_url)
     # An explicitly paginated URL needs terminal evidence even if controls
     # disappeared. Absence of Next is not proof that the final page was served.
@@ -713,7 +805,7 @@ def next_news_list_page(html: bytes, base_url: str, source_id: str) -> tuple[str
         return urllib.parse.urljoin(base_url, href), True
     if last_page_seen and terminal_controls_consistent:
         return None, False
-    return None, pagination_hint
+    return None, pagination_hint or traffic_page is not None
 
 
 def parse_news_rss(xml: bytes, base_url: str) -> list[dict]:

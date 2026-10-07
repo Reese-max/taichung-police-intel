@@ -1,0 +1,964 @@
+{
+  "source_id": "S-032",
+  "validation_scope": "LIVE_SINGLE_TERMINAL_PAGE_NAVIGATION_ONLY",
+  "observed_at": "2026-10-07T08:02:22.024877+00:00",
+  "requested_url": "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,20,,,,,,,,82",
+  "response_url": "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,20,,,,,,,,82",
+  "http_status": 200,
+  "http_attempts": 1,
+  "byte_count": 86926,
+  "body_sha256": "7fa53d31b8c3c597c29a43edd86c8d88b36b1d0dbccde20340897fbca8ca65ca",
+  "parser_version": "S032_COMMA_PARSER_V1",
+  "controls": [
+    {
+      "tag": "a",
+      "label": "第一頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,1",
+      "title": "第一頁",
+      "aria-label": "",
+      "rel": [],
+      "class": []
+    },
+    {
+      "tag": "a",
+      "label": "上一頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,81",
+      "title": "上一頁",
+      "aria-label": "",
+      "rel": [],
+      "class": []
+    },
+    {
+      "tag": "a",
+      "label": "下一頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,82",
+      "title": "下一頁",
+      "aria-label": "",
+      "rel": [],
+      "class": []
+    },
+    {
+      "tag": "a",
+      "label": "最末頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,82",
+      "title": "最末頁",
+      "aria-label": "",
+      "rel": [],
+      "class": []
+    },
+    {
+      "tag": "a",
+      "label": "第 1 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,1",
+      "title": "第1頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 2 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,2",
+      "title": "第2頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 3 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,3",
+      "title": "第3頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 4 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,4",
+      "title": "第4頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 5 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,5",
+      "title": "第5頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 6 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,6",
+      "title": "第6頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 7 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,7",
+      "title": "第7頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 8 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,8",
+      "title": "第8頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 9 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,9",
+      "title": "第9頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 10 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,10",
+      "title": "第10頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 11 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,11",
+      "title": "第11頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 12 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,12",
+      "title": "第12頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 13 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,13",
+      "title": "第13頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 14 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,14",
+      "title": "第14頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 15 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,15",
+      "title": "第15頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 16 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,16",
+      "title": "第16頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 17 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,17",
+      "title": "第17頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 18 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,18",
+      "title": "第18頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 19 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,19",
+      "title": "第19頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 20 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,20",
+      "title": "第20頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 21 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,21",
+      "title": "第21頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 22 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,22",
+      "title": "第22頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 23 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,23",
+      "title": "第23頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 24 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,24",
+      "title": "第24頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 25 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,25",
+      "title": "第25頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 26 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,26",
+      "title": "第26頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 27 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,27",
+      "title": "第27頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 28 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,28",
+      "title": "第28頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 29 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,29",
+      "title": "第29頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 30 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,30",
+      "title": "第30頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 31 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,31",
+      "title": "第31頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 32 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,32",
+      "title": "第32頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 33 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,33",
+      "title": "第33頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 34 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,34",
+      "title": "第34頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 35 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,35",
+      "title": "第35頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 36 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,36",
+      "title": "第36頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 37 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,37",
+      "title": "第37頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 38 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,38",
+      "title": "第38頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 39 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,39",
+      "title": "第39頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 40 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,40",
+      "title": "第40頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 41 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,41",
+      "title": "第41頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 42 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,42",
+      "title": "第42頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 43 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,43",
+      "title": "第43頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 44 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,44",
+      "title": "第44頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 45 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,45",
+      "title": "第45頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 46 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,46",
+      "title": "第46頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 47 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,47",
+      "title": "第47頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 48 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,48",
+      "title": "第48頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 49 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,49",
+      "title": "第49頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 50 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,50",
+      "title": "第50頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 51 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,51",
+      "title": "第51頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 52 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,52",
+      "title": "第52頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 53 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,53",
+      "title": "第53頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 54 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,54",
+      "title": "第54頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 55 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,55",
+      "title": "第55頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 56 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,56",
+      "title": "第56頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 57 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,57",
+      "title": "第57頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 58 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,58",
+      "title": "第58頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 59 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,59",
+      "title": "第59頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 60 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,60",
+      "title": "第60頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 61 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,61",
+      "title": "第61頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 62 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,62",
+      "title": "第62頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 63 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,63",
+      "title": "第63頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 64 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,64",
+      "title": "第64頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 65 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,65",
+      "title": "第65頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 66 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,66",
+      "title": "第66頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 67 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,67",
+      "title": "第67頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 68 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,68",
+      "title": "第68頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 69 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,69",
+      "title": "第69頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 70 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,70",
+      "title": "第70頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 71 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,71",
+      "title": "第71頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 72 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,72",
+      "title": "第72頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 73 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,73",
+      "title": "第73頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 74 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,74",
+      "title": "第74頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 75 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,75",
+      "title": "第75頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 76 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,76",
+      "title": "第76頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 77 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,77",
+      "title": "第77頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 78 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,78",
+      "title": "第78頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 79 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,79",
+      "title": "第79頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 80 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,80",
+      "title": "第80頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 81 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,81",
+      "title": "第81頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    },
+    {
+      "tag": "a",
+      "label": "第 82 頁",
+      "href": "/news/index.asp?Parser=9,4,20,,,,,,,,82",
+      "title": "第82頁",
+      "aria-label": "",
+      "rel": [],
+      "class": [
+        "link_brown"
+      ]
+    }
+  ],
+  "new_next_url": null,
+  "new_has_next_hint": false,
+  "control_metadata_replay_matches": true,
+  "parsed_rows": 7,
+  "unknown_dates": 0,
+  "raw_body_saved": false,
+  "detail_pages_fetched": 0,
+  "attachments_downloaded": false,
+  "whole_history_completeness": "UNKNOWN",
+  "coverage_independently_verified": false,
+  "rights_approved": false,
+  "promotion_eligible": false
+}
