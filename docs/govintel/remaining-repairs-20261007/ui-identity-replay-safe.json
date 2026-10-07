@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "scope": "FICTIONAL_OFFLINE_UI_ONLY",
+  "before_expected_rows": 2,
+  "before_actual_rows": 0,
+  "before_exit_code": 1,
+  "before_log_sha256": "9a89994af2ff75c41897ded5479ff276a8dcbb30ea9a7abbf370b4f907a47952",
+  "after_suite_count": 13,
+  "after_suite_status": "PASS",
+  "unknown_identity_placeholder": "來源身分未知",
+  "raw_invalid_identity_projected": false,
+  "source_http_requests": 0,
+  "model_requests": 0
+}

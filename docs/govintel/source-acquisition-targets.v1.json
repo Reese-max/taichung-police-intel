@@ -118,7 +118,9 @@
       "meeting_metadata_evidence": "source-s019-odt-meeting-metadata-20261007.json",
       "sample_list_window_document_count": 4,
       "sample_meeting_window_count": 3,
-      "meeting_date_basis": "EXPLICIT_LABELED_ODT_BODY_MEETING_DATE_NOT_LIST_DATE"
+      "meeting_date_basis": "EXPLICIT_LABELED_ODT_BODY_MEETING_DATE_NOT_LIST_DATE",
+      "meeting_metadata_parser_provenance": "source-s019-parser-provenance-20261007.json",
+      "sample_metadata_version_scope": "ACTUAL_HISTORICAL_OBSERVED_PARSER_BYTES_PRESERVED_NOT_REPARSED_WITH_LATER_FIXES"
     },
     {
       "source_id": "S-026",

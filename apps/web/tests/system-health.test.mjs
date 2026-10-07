@@ -47,6 +47,20 @@ test("current saved health actions are inspectable without raw source data", asy
   assert.ok(actions.every((row) => row.next_actions.length > 0));
 });
 
+test("identity gaps remain visible and reference IDs retain their bounded label", () => {
+  const rows = [null, 19, "<private malformed identity>", "CTX-POP"].map((source_id) => ({
+    source_id, reasons: ["SOURCE_COVERAGE_OR_COLLECTION_GAP"],
+    next_actions: ["核對來源身分。"],
+  }));
+  const actions = sourceActionEntries({operator_summary: {source_actions: rows}});
+  assert.equal(actions.length, rows.length);
+  assert.deepEqual(actions.map((row) => row.source_id), [
+    "來源身分未知", "來源身分未知", "來源身分未知", "CTX-POP",
+  ]);
+  assert.ok(actions.every((row) => row.next_actions[0] === "核對來源身分。"));
+  assert.ok(!JSON.stringify(actions).includes("private malformed identity"));
+});
+
 test("system health receipt exposes lane and stage evidence", async () => {
   const health = JSON.parse(await readFile(healthUrl, "utf8"));
   assert.equal(health.schema_version, 1);

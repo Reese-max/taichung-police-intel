@@ -217,6 +217,37 @@ class SystemHealthTests(unittest.TestCase):
                 self.assertEqual(len(result["operator_summary"]["source_actions"]), 1)
                 self.assertEqual(status, before)
 
+    def test_official_freshness_warning_precedes_unreliable_collection_success_time(self):
+        for freshness, expected_outcome, expected_reason in (
+            ("STALE", "STALE", "SOURCE_FRESHNESS_STALE"),
+            ("VERY_STALE", "STALE", "SOURCE_FRESHNESS_STALE"),
+            ("UNKNOWN", "UNKNOWN", "SOURCE_FRESHNESS_UNKNOWN"),
+            ("NO_DATA", "UNKNOWN", "SOURCE_FRESHNESS_UNKNOWN"),
+        ):
+            for last_success in ("2026-09-11T08:23:26", "not-a-time", None):
+                with self.subTest(freshness=freshness, last_success=last_success):
+                    status, brief = controlled_publication_inputs()
+                    time_id = status["sources"][0]["source_id"]
+                    date_id = status["sources"][1]["source_id"]
+                    status["sources"][0]["last_success_at"] = last_success
+                    status["sources"][1]["freshness_status"] = freshness
+                    before = deepcopy(status)
+                    stages = health.current_publication_stages(status, brief)
+                    collection = next(row for row in stages if row["stage"] == "collection")
+                    self.assertEqual(collection["outcome"], expected_outcome)
+                    self.assertEqual(collection["error_class"], expected_reason)
+                    self.assertIsNone(collection["last_success_at"])
+                    self.assertEqual(collection["gap_count"], 0)
+                    warnings = {row["source_id"]: row for row in collection["source_warnings"]}
+                    self.assertEqual(warnings[time_id]["reasons"], ["SOURCE_LAST_SUCCESS_UNKNOWN"])
+                    self.assertEqual(warnings[date_id]["reasons"], [expected_reason])
+                    result = health.build_health(stages, context={"sources": status["sources"]})
+                    actions = {row["source_id"]: row for row in result["operator_summary"]["source_actions"]}
+                    self.assertEqual(result["lanes"]["publication"], expected_outcome)
+                    self.assertEqual(actions[time_id]["reasons"], ["SOURCE_LAST_SUCCESS_UNKNOWN"])
+                    self.assertEqual(actions[date_id]["reasons"], [expected_reason])
+                    self.assertEqual(status, before)
+
     def test_stale_brief_from_another_run_is_not_validation_success(self):
         status, brief = controlled_publication_inputs()
         status["latest_collection_run"]["status"] = "SUCCEEDED"

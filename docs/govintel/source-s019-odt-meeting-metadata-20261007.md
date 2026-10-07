@@ -21,4 +21,8 @@
 
 後續僅以虛構資料修正明確民國紀年與西元年衝突、以及正文星期與日曆不符的兩個邊界，新增兩項回歸使 suite 為 26 項；明確民國搭配 `2026` 不再被當成西元 `2026`，星期衝突保留 UNKNOWN。修正後 module SHA-256 為 `9e86f878243ad8d03ba3c5de9b662f995d707bef1431e66ef5f678350df4ba07`。以上四份實際 ODT 收據仍綁先前 module `02db66a3...`，未重標、重新取件或用新 parser 解析原件；body 沒有保存，收據也沒有保存正文星期 token。四個已存 ISO 日期可離線算出都是星期二，但這不能證明原正文星期與日期一致，也不能將虛構回歸稱為四份原件的新驗證。
 
+另一輪 public-code review 的三項建議均以虛構文件重現並修正：隱藏表格列與隱藏整段標記不供 metadata（XML boolean `true`／`1` 隱藏、`false`／`0` 保留）；獨立的完整 clock／clock-range 時間欄位不再否決有效會議日期，未定、空白、參考文字、含日期或日期角色欄位仍 fail closed；XML 文字改以有界 chunk 的 character callbacks 計數，避免 child end 事件尚未填妥 tail 漏掉文字上限。新增六項測試使 suite 為 32 項；初次五項回歸重現 15 個 failure cases，XML boolean 回歸另重現四個，修後全數通過。此輪 module SHA-256 為 `d84333e84f820edf102ba3bddb5b961374df86420e99ee42954e6290a6bd69cc`；沒有新增 HTTP，也沒有修改原四份實際 receipt 的 hash 或驗證範圍。
+
 來源及指定期間的 business scope、完整附件、PDF／ODT 跨格式內容一致性、修訂歷史與獨立完整性仍未驗證；`rights_approved`／`promotion_eligible`／`model_transmission_allowed` false，真人 review null，窗口 `PARTIAL`、全歷史 `UNKNOWN`。本輪不增加候選資格日或來源准入，也不改寫 S032 歷史 receipt。
+
+原取得版本的 [完整 parser 程式 bytes](source-reviews/2026-10-07/s019-observed-parser-v1.py) 已公開保存，SHA-256 與上述原收據一致；[provenance](source-s019-parser-provenance-20261007.json)連結原收據及原本地 commit。該本地 commit 不宣稱在遠端 Git history 可達；archived parser 不用於新取得，也未保存原正文或重新解析四原件。

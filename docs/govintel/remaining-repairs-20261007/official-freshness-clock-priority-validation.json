@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "scope": "OFFLINE_OFFICIAL_FRESHNESS_CLOCK_PRIORITY_REGRESSION_ONLY",
+  "observed_at": "2026-10-07T14:29:52.169868+00:00",
+  "base_code_sha": "764ced9640fceeb2aa0ae380a4d3e96c3e1a4cb0",
+  "code_sha": "76be8d3be29a2025a816aba077528d22ffa59467",
+  "tree_sha": "030f328cf5da1bdcb8ff3c0391db9fcc0ff354a1",
+  "worktree_clean": true,
+  "changed_files": [
+    "scripts/system-health.py",
+    "tests/test_system_health.py"
+  ],
+  "tests": {
+    "command": "python -m unittest discover -s tests -p test_system_health.py -v",
+    "test_functions": 46,
+    "passed": 46,
+    "failed": 0,
+    "skipped": 0,
+    "new_regression_subcases": 12,
+    "before_fix_new_regression_subcase_failures": 12,
+    "before_fix_previous_test_functions_passed": 45
+  },
+  "fixed_behavior": {
+    "STALE_or_VERY_STALE_plus_naive_invalid_or_null_collection_clock": "STALE/SOURCE_FRESHNESS_STALE",
+    "UNKNOWN_or_NO_DATA_official_freshness_plus_naive_invalid_or_null_clock": "UNKNOWN/SOURCE_FRESHNESS_UNKNOWN",
+    "unreliable_collection_clock_last_success_at": null,
+    "official_date_and_clock_warnings_retained_in_source_actions": true,
+    "acquisition_gap_priority_preserved": true,
+    "clock_only_unknown_semantics_preserved": true,
+    "timestamps_or_timezone_substituted": false
+  },
+  "unchanged_input_and_health_sha256": {
+    "apps/web/public/data/source-status.json": "493ce6e4ac3c279bfdc08c9d1510302c6bf44ef19560a3391e6ed1409e6f6380",
+    "apps/web/public/data/intelligence-feed.json": "edcb5598259ede1df32bda239b1d348556d33c6032887e3a49e19a9af2e370e9",
+    "apps/web/public/data/v2-daily-brief.json": "3df565c29622ae729f0f053712f513eddacf6e014aeec227ddd664dd00b38448",
+    "apps/web/public/data/public-event-demo.json": "63bdd8c33d70d7ee5e7ece517ae53865bdb4c54b5189ed02d6730af3210bc23f",
+    "apps/web/public/data/system-health.json": "4b44de66a5e32fc4c642985dfc512b7031d9007fdffc4d4c560174c0f15f819c"
+  },
+  "health_regeneration_needed": false,
+  "model_network_calls_by_this_agent": 0,
+  "source_http_calls": 0,
+  "human_participants": 0,
+  "source_admission_changed": false,
+  "rights_approved": false,
+  "production_provider_enabled": false,
+  "file_sha256": {
+    "scripts/system-health.py": "3956236b00d56c7cecbd77017fa9caeb37fe4bedbc2d7eecdfc63aa982295a61",
+    "tests/test_system_health.py": "c22165802a0e339f14e5f077cf41e15f96dd1b5e6a77357ec28efca57b2336bf"
+  }
+}

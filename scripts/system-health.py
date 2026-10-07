@@ -917,10 +917,7 @@ def current_publication_stages(
     if policy is None:
         collect_outcome = "UNKNOWN"
         collect_error = "SOURCE_POLICY_UNAVAILABLE"
-    elif run_status == "SUCCEEDED" and exact_coverage and not has_source_gap and has_unknown_success_time:
-        collect_outcome = "UNKNOWN"
-        collect_error = "SOURCE_LAST_SUCCESS_UNKNOWN"
-    elif run_status == "SUCCEEDED" and exact_coverage and not has_source_gap and not has_unknown_freshness and not has_stale_source:
+    elif run_status == "SUCCEEDED" and exact_coverage and not has_source_gap and not has_unknown_freshness and not has_stale_source and not has_unknown_success_time:
         collect_outcome = "SUCCESS"
         collect_error = None
     elif run_status == "SUCCEEDED" and exact_coverage and not has_source_gap and has_stale_source and not has_unknown_freshness:
@@ -929,6 +926,11 @@ def current_publication_stages(
     elif run_status == "SUCCEEDED" and exact_coverage and not has_source_gap and has_unknown_freshness:
         collect_outcome = "UNKNOWN"
         collect_error = "SOURCE_FRESHNESS_UNKNOWN"
+    elif run_status == "SUCCEEDED" and exact_coverage and not has_source_gap and has_unknown_success_time:
+        # An unreliable collection clock does not erase an already evidenced
+        # official-date warning; both still appear in source_warnings below.
+        collect_outcome = "UNKNOWN"
+        collect_error = "SOURCE_LAST_SUCCESS_UNKNOWN"
     elif run_status in {"FAILED", "ERROR"}:
         collect_outcome = "FAILED"
         collect_error = "COLLECTION_RUN_FAILED"

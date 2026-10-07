@@ -1,0 +1,405 @@
+{
+  "schema_version": 1,
+  "status": "PASS",
+  "created_at": "2026-10-07T14:41:09.929582+00:00",
+  "scope": "INDEPENDENT_AGENT_FICTIONAL_REPLAY_OF_FIVE_ACTUAL_CLAUDE_PUBLIC_CODE_FINDINGS_ONLY",
+  "pr_number": 178,
+  "claude_origin_head_sha": "55c118a901d083e7333392abd14f24c3a7bd0844",
+  "claude_invocation_receipt_sha256": "e6772148fc80440c3d11454882a6de61f49ffb5f7c5efe3baebea792e77cea06",
+  "reviewed_commit": "920d984c1ddb6b2b1ed191c316f433c1741f7b12",
+  "reviewed_module_byte_sha256": {
+    "intel_v2/s019_meeting_metadata.py": "d84333e84f820edf102ba3bddb5b961374df86420e99ee42954e6290a6bd69cc",
+    "scripts/evaluate-free-model-synthetic.py": "c86c090aff039e3804215e36fdd7f0992228d35cba716738923174448b94df2b",
+    "scripts/reference-json-collection-audit.py": "7e7413a68360faf767b1add7ebad8efb58f7a6c2878f37430cc8290979cd0caf",
+    "scripts/system-health.py": "3956236b00d56c7cecbd77017fa9caeb37fe4bedbc2d7eecdfc63aa982295a61",
+    "apps/web/lib/system-health-view.mjs": "14b7f1bdb4d02eafb8573bf5d1cebccd65cafcfd1ebf0f9df357333ebdb9b137",
+    "apps/web/components/V2DailyDashboard.js": "d7950926ee84a3223075153a16cc7354fba41ded39f6bb33525c5dfc8201d867"
+  },
+  "dependency_module_byte_sha256": {
+    "scripts/evaluate-govintel.py": "04e3df2d0c3479644aa331a2e517da04870e89a476f30876e9113644124dbd69"
+  },
+  "findings": [
+    {
+      "id": "CLAUDE-1",
+      "mechanism": "FRESHNESS_WARNING_MASKED_BY_UNKNOWN_COLLECTION_CLOCK",
+      "status": "PASS",
+      "assessment": "Verified official freshness outcome and error priority plus source actions. The separate failure-count wording was not adopted; actual stale publication lane remains STALE."
+    },
+    {
+      "id": "CLAUDE-2",
+      "mechanism": "EXPLICIT_HIDDEN_ODF_ROWS_AND_PARAGRAPHS_SUPPLIED_METADATA",
+      "status": "PASS",
+      "assessment": "Explicit collapse/filter rows and hidden paragraphs no longer provide or conflict with header dates. XML boolean true/1 and false/0 parity verified; unknown explicit flag cannot provide metadata. Rendering and style-dependent visibility remain outside this parser scope."
+    },
+    {
+      "id": "CLAUDE-3",
+      "mechanism": "SEPARATE_CLOCK_ONLY_TIME_LABEL_VETOED_VALID_DATE",
+      "status": "PASS",
+      "assessment": "Only full recognized clock or clock-range values under TIME/MEETING_TIME labels are neutral. Such lines never invent a date, and date labels, empty, unresolved, or historical-reference time values still veto date inference."
+    },
+    {
+      "id": "CLAUDE-4",
+      "mechanism": "ITERPARSE_CHUNK_PENDING_TAIL_ESCAPED_XML_TEXT_LIMIT",
+      "status": "PASS",
+      "assessment": "Chunk-spanning XML character data now fails at the text limit even inside skipped annotations. The lowered-limit probe reproduces the same mechanism without large allocation or confounding ZIP/block limits."
+    },
+    {
+      "id": "CLAUDE-5",
+      "mechanism": "SOURCE_ACTIONS_SILENTLY_DROPPED_UNKNOWN_OR_CONTEXT_IDENTITIES",
+      "status": "PASS",
+      "assessment": "Null, numeric, or invalid source IDs retain an action under an unknown-identity label. CTX-POP and canonical S-019 are preserved, without projecting malformed identity text."
+    }
+  ],
+  "remaining_findings": [],
+  "probes": [
+    {
+      "probe": "freshness_warning_survives_missing_success_time",
+      "status": "PASS",
+      "cases": [
+        {
+          "freshness": "STALE",
+          "outcome": "STALE",
+          "error_class": "SOURCE_FRESHNESS_STALE",
+          "publication_lane": "STALE",
+          "last_success_at": null
+        },
+        {
+          "freshness": "UNKNOWN",
+          "outcome": "UNKNOWN",
+          "error_class": "SOURCE_FRESHNESS_UNKNOWN",
+          "publication_lane": "UNKNOWN",
+          "last_success_at": null
+        },
+        {
+          "freshness": "FRESH",
+          "outcome": "UNKNOWN",
+          "error_class": "SOURCE_LAST_SUCCESS_UNKNOWN",
+          "publication_lane": "UNKNOWN",
+          "last_success_at": null
+        }
+      ]
+    },
+    {
+      "probe": "gap_and_run_failure_priority_compatibility",
+      "status": "PASS",
+      "run_status": "SUCCEEDED",
+      "freshness": "STALE",
+      "outcome": "PARTIAL",
+      "error_class": "SOURCE_COVERAGE_OR_COLLECTION_GAP",
+      "all_three_warning_reasons_retained": true
+    },
+    {
+      "probe": "gap_and_run_failure_priority_compatibility",
+      "status": "PASS",
+      "run_status": "SUCCEEDED",
+      "freshness": "UNKNOWN",
+      "outcome": "PARTIAL",
+      "error_class": "SOURCE_COVERAGE_OR_COLLECTION_GAP",
+      "all_three_warning_reasons_retained": true
+    },
+    {
+      "probe": "gap_and_run_failure_priority_compatibility",
+      "status": "PASS",
+      "run_status": "FAILED",
+      "freshness": "STALE",
+      "outcome": "FAILED",
+      "error_class": "COLLECTION_RUN_FAILED",
+      "all_three_warning_reasons_retained": true
+    },
+    {
+      "probe": "gap_and_run_failure_priority_compatibility",
+      "status": "PASS",
+      "run_status": "FAILED",
+      "freshness": "UNKNOWN",
+      "outcome": "FAILED",
+      "error_class": "COLLECTION_RUN_FAILED",
+      "all_three_warning_reasons_retained": true
+    },
+    {
+      "probe": "explicit_hidden_table_row",
+      "status": "PASS",
+      "visibility": "collapse",
+      "meeting_date": null
+    },
+    {
+      "probe": "hidden_row_cannot_conflict_with_visible_header",
+      "status": "PASS",
+      "visibility": "collapse",
+      "meeting_date": "2026-10-07"
+    },
+    {
+      "probe": "explicit_hidden_table_row",
+      "status": "PASS",
+      "visibility": "filter",
+      "meeting_date": null
+    },
+    {
+      "probe": "hidden_row_cannot_conflict_with_visible_header",
+      "status": "PASS",
+      "visibility": "filter",
+      "meeting_date": "2026-10-07"
+    },
+    {
+      "probe": "hidden_paragraph_boolean_parity",
+      "status": "PASS",
+      "flag": "true",
+      "meeting_date": null
+    },
+    {
+      "probe": "hidden_paragraph_boolean_parity",
+      "status": "PASS",
+      "flag": "1",
+      "meeting_date": null
+    },
+    {
+      "probe": "hidden_paragraph_boolean_parity",
+      "status": "PASS",
+      "flag": "not-a-boolean",
+      "meeting_date": null
+    },
+    {
+      "probe": "hidden_paragraph_boolean_parity",
+      "status": "PASS",
+      "flag": "false",
+      "meeting_date": "2026-10-07"
+    },
+    {
+      "probe": "hidden_paragraph_boolean_parity",
+      "status": "PASS",
+      "flag": "0",
+      "meeting_date": "2026-10-07"
+    },
+    {
+      "probe": "direct_hidden_title_boolean_parity",
+      "status": "PASS",
+      "flag": "true",
+      "meeting_date": null
+    },
+    {
+      "probe": "direct_hidden_title_boolean_parity",
+      "status": "PASS",
+      "flag": "1",
+      "meeting_date": null
+    },
+    {
+      "probe": "direct_hidden_title_boolean_parity",
+      "status": "PASS",
+      "flag": "false",
+      "meeting_date": "2026-10-07"
+    },
+    {
+      "probe": "direct_hidden_title_boolean_parity",
+      "status": "PASS",
+      "flag": "0",
+      "meeting_date": "2026-10-07"
+    },
+    {
+      "probe": "separate_clock_only_line_preserves_explicit_date",
+      "status": "PASS",
+      "label_role": "TIME",
+      "meeting_date": "2026-10-07"
+    },
+    {
+      "probe": "clock_only_line_cannot_supply_date",
+      "status": "PASS",
+      "label_role": "TIME",
+      "meeting_date": null
+    },
+    {
+      "probe": "separate_clock_only_line_preserves_explicit_date",
+      "status": "PASS",
+      "label_role": "MEETING_TIME",
+      "meeting_date": "2026-10-07"
+    },
+    {
+      "probe": "clock_only_line_cannot_supply_date",
+      "status": "PASS",
+      "label_role": "MEETING_TIME",
+      "meeting_date": null
+    },
+    {
+      "probe": "separate_clock_only_line_preserves_explicit_date",
+      "status": "PASS",
+      "label_role": "MEETING_TIME",
+      "meeting_date": "2026-10-07"
+    },
+    {
+      "probe": "clock_only_line_cannot_supply_date",
+      "status": "PASS",
+      "label_role": "MEETING_TIME",
+      "meeting_date": null
+    },
+    {
+      "probe": "unresolved_or_date_role_label_still_vetoes_date",
+      "status": "PASS",
+      "label_role": "DATE",
+      "fixture_kind": "generic_date_clock",
+      "meeting_date": null
+    },
+    {
+      "probe": "unresolved_or_date_role_label_still_vetoes_date",
+      "status": "PASS",
+      "label_role": "MEETING_DATE",
+      "fixture_kind": "generic_date_clock",
+      "meeting_date": null
+    },
+    {
+      "probe": "unresolved_or_date_role_label_still_vetoes_date",
+      "status": "PASS",
+      "label_role": "TIME",
+      "fixture_kind": "empty",
+      "meeting_date": null
+    },
+    {
+      "probe": "unresolved_or_date_role_label_still_vetoes_date",
+      "status": "PASS",
+      "label_role": "TIME",
+      "fixture_kind": "unresolved_time",
+      "meeting_date": null
+    },
+    {
+      "probe": "unresolved_or_date_role_label_still_vetoes_date",
+      "status": "PASS",
+      "label_role": "TIME",
+      "fixture_kind": "unresolved_time",
+      "meeting_date": null
+    },
+    {
+      "probe": "unresolved_or_date_role_label_still_vetoes_date",
+      "status": "PASS",
+      "label_role": "TIME",
+      "fixture_kind": "unresolved_time",
+      "meeting_date": null
+    },
+    {
+      "probe": "chunk_spanning_hidden_xml_tail_is_bounded",
+      "status": "PASS",
+      "tail_chars": 65536,
+      "lowered_text_limit": 32768,
+      "rejection": "XML_TEXT_LIMIT"
+    },
+    {
+      "probe": "bounded_hidden_tail_compatibility",
+      "status": "PASS",
+      "meeting_date": "2026-10-07"
+    },
+    {
+      "probe": "bounded_hidden_tail_compatibility",
+      "status": "PASS",
+      "meeting_date": "2026-10-07"
+    },
+    {
+      "probe": "ui_source_identity_actions",
+      "status": "PASS",
+      "inputs": 5,
+      "outputs": 5,
+      "unknown_labels": 3,
+      "reference_id_preserved": true,
+      "canonical_id_preserved": true,
+      "invalid_identity_not_projected": true,
+      "syntax_check": "PASS"
+    },
+    {
+      "probe": "partial_diff_evaluator_dependency_is_present",
+      "status": "PASS",
+      "validate_cases_exists": true,
+      "duplicate_input_ids_rejected": true,
+      "report_fields_confirmed": [
+        "evaluation_status",
+        "case_denominator",
+        "evaluated_cases",
+        "missing_prediction_count",
+        "missing_prediction_ids"
+      ],
+      "case_denominator": 12,
+      "evaluated_cases": 1,
+      "missing_prediction_count": 11,
+      "transport_invocations": 0
+    },
+    {
+      "probe": "previous_date_fix_compatibility",
+      "status": "PASS",
+      "fixture_kind": "era",
+      "rejection": "ERA_YEAR_MISMATCH"
+    },
+    {
+      "probe": "previous_date_fix_compatibility",
+      "status": "PASS",
+      "fixture_kind": "weekday",
+      "rejection": "MEETING_WEEKDAY_CONFLICT"
+    },
+    {
+      "probe": "metadata_privacy_and_scope_compatibility",
+      "status": "PASS",
+      "body_marker_not_projected": true,
+      "business_scope_completeness": "NOT_VERIFIED",
+      "whole_history_completeness": "UNKNOWN",
+      "rights_approved": false,
+      "promotion_eligible": false,
+      "model_transmission_allowed": false
+    },
+    {
+      "probe": "historical_actual_odt_receipt_unchanged",
+      "status": "PASS",
+      "historical_receipt_sha256": "54f5d349d41a2a91d7feed129735b88eea9ba775927ea41263928f88353948c6",
+      "parser_module_sha256": "02db66a3e7b326ea8ac6b8c4ec5fd99c62b2af44f22c557fbf1bfb8d4a729c8e",
+      "new_original_document_requests": 0,
+      "new_original_document_reparse": false
+    }
+  ],
+  "probe_count": 39,
+  "historical_s019_fictional_baseline": {
+    "reviewed_commit": "965e044071757cc88485d5e127c0a5d25c73796a",
+    "reviewed_module_byte_sha256": {
+      "intel_v2/s019_meeting_metadata.py": "9e86f878243ad8d03ba3c5de9b662f995d707bef1431e66ef5f678350df4ba07"
+    },
+    "status": "FIXES_REQUIRED",
+    "actual_fictional_probes": [
+      {
+        "probe": "explicit_hidden_table_row",
+        "visibility": "collapse",
+        "meeting_date": "2026-10-07",
+        "reason_codes": []
+      },
+      {
+        "probe": "explicit_hidden_table_row",
+        "visibility": "filter",
+        "meeting_date": "2026-10-07",
+        "reason_codes": []
+      },
+      {
+        "probe": "explicit_hidden_paragraph",
+        "meeting_date": "2026-10-07",
+        "reason_codes": []
+      },
+      {
+        "probe": "separate_clock_only_line",
+        "meeting_date": null,
+        "reason_codes": [
+          "EXPLICIT_MEETING_DATE_NOT_VERIFIED"
+        ]
+      },
+      {
+        "probe": "chunk_spanning_hidden_xml_tail",
+        "lowered_text_limit": 32768,
+        "tail_chars": 65536,
+        "meeting_date": "2026-10-07",
+        "reason_codes": []
+      }
+    ]
+  },
+  "source_http_requests": 0,
+  "model_provider_invocations": 0,
+  "credentials_read": false,
+  "official_original_document_reparse": false,
+  "full_suite_rerun": false,
+  "scope_limits": [
+    "No new source acquisition or source admissions.",
+    "No original-document verification under the final corrected parser.",
+    "No rendering/style-dependent visibility verification.",
+    "No official registry/version, business-window, or whole-history completeness claim.",
+    "Rights, promotion, and production model transmission remain unapproved.",
+    "This agent replay is not a new Claude invocation or formal product AI/human trial.",
+    "Only six listed public modules are byte-bound; this receipt does not certify the entire working tree."
+  ]
+}

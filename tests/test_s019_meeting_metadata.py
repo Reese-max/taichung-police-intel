@@ -1,7 +1,9 @@
 """Fictional ODT tests; no official documents, source HTTP or provider calls."""
 from html import escape
+import base64
 import io
 import json
+import random
 import struct
 import unittest
 from unittest import mock
@@ -163,6 +165,74 @@ class S019OdtMetadataTests(unittest.TestCase):
         result = self.parse(header + hidden + agenda)
         self.assertEqual(result['meeting_number'], 749)
         self.assertEqual(result['meeting_date'], '2026-09-21')
+
+    def test_hidden_table_rows_do_not_supply_or_conflict_with_header(self):
+        visible = paragraph('臺中市政府第749次市政會議紀錄') + paragraph('會議日期：115/10/7(星期三)')
+        for visibility in ('collapse', 'filter'):
+            hidden = '<table:table><table:table-row table:visibility="' + visibility + '"><table:table-cell>' + paragraph('臺中市政府第750次市政會議紀錄') + '</table:table-cell></table:table-row><table:table-row table:visibility="' + visibility + '"><table:table-cell>' + paragraph('會議日期：115/10/8') + '</table:table-cell></table:table-row></table:table>'
+            with self.subTest(hidden_only=visibility):
+                result = self.parse(hidden)
+                self.assertIsNone(result['meeting_number'])
+                self.assertIsNone(result['meeting_date'])
+            with self.subTest(visible_control=visibility):
+                result = self.parse(visible + hidden)
+                self.assertEqual(result['meeting_number'], 749)
+                self.assertEqual(result['meeting_date'], '2026-10-07')
+
+    def test_explicit_hidden_paragraph_marker_hides_the_whole_paragraph(self):
+        visible = paragraph('臺中市政府第749次市政會議紀錄') + paragraph('會議日期：115/10/7(星期三)')
+        for condition in ('true', 'true()', 'ooow:true()'):
+            marker = '<text:hidden-paragraph text:condition="' + condition + '"/>'
+            hidden = '<text:p>臺中市政府第750次市政會議紀錄' + marker + '</text:p><text:p>時間：115/10/8' + marker + '</text:p>'
+            with self.subTest(hidden_only=condition):
+                result = self.parse(hidden)
+                self.assertIsNone(result['meeting_number'])
+                self.assertIsNone(result['meeting_date'])
+            with self.subTest(visible_control=condition):
+                self.assertEqual(self.parse(visible + hidden)['meeting_date'], '2026-10-07')
+        false_marker = '<text:p>會議日期：115/10/7(星期三)<text:hidden-paragraph text:condition="false"/></text:p>'
+        self.assertEqual(self.parse(paragraph('臺中市政府第749次市政會議紀錄') + false_marker)['meeting_date'], '2026-10-07')
+
+    def test_xml_boolean_hidden_values_do_not_supply_metadata(self):
+        title = '臺中市政府第749次市政會議紀錄'
+        for state in ('true', '1', 'FICTIONAL_UNKNOWN_BOOLEAN'):
+            with self.subTest(hidden_attribute=state):
+                hidden = '<text:p text:is-hidden="' + state + '">' + title + '</text:p>'
+                self.assertIsNone(self.parse(hidden + paragraph('會議日期：115/10/7'))['meeting_number'])
+            with self.subTest(hidden_marker=state):
+                hidden = '<text:p>' + title + '<text:hidden-paragraph text:is-hidden="' + state + '"/></text:p>'
+                self.assertIsNone(self.parse(hidden + paragraph('會議日期：115/10/7'))['meeting_number'])
+        for state in ('false', '0'):
+            with self.subTest(visible=state):
+                visible = '<text:p text:is-hidden="' + state + '">' + title + '<text:hidden-paragraph text:is-hidden="' + state + '"/></text:p>'
+                self.assertEqual(self.parse(visible + paragraph('會議日期：115/10/7'))['meeting_date'], '2026-10-07')
+
+    def test_separate_clock_only_time_line_does_not_veto_explicit_date(self):
+        header = paragraph('臺中市政府第749次市政會議紀錄') + paragraph('會議日期：115/10/7(星期三)')
+        for label, value in (('時間', '上午9時30分'), ('會議時間', '09:30'), ('開會時間', '上午9時至11時30分'), ('時間', '09:30-11:00')):
+            with self.subTest(label=label, clock=value):
+                result = self.parse(header + paragraph(label + '：' + value))
+                self.assertEqual(result['meeting_date'], '2026-10-07')
+        # A clock alone still cannot create a calendar date.
+        self.assertIsNone(self.parse(paragraph('臺中市政府第749次市政會議紀錄') + paragraph('時間：上午9時30分'))['meeting_date'])
+
+    def test_unresolved_or_date_role_values_are_not_ignored_as_clock_lines(self):
+        header = paragraph('臺中市政府第749次市政會議紀錄') + paragraph('會議日期：115/10/7(星期三)')
+        for label, value in (('時間', ''), ('時間', '未定'), ('時間', '上午9時30分（前次會議）'), ('時間', '上午9時30分至'), ('時間', '115/10/8'), ('日期', '上午9時30分')):
+            with self.subTest(label=label, unresolved=value):
+                self.assertIsNone(self.parse(header + paragraph(label + '：' + value))['meeting_date'])
+
+    def test_xml_tail_character_limit_covers_text_after_child_end_event(self):
+        # A child end event precedes its completed tail. Deterministic high
+        # entropy avoids hitting ZIP ratio/raw-byte guards before the XML cap.
+        size = parser.MAX_XML_TEXT_CHARS + 105000
+        tail = base64.b64encode(random.Random(178).randbytes(size * 3 // 4 + 3)).decode()[:size]
+        header = paragraph('臺中市政府第749次市政會議紀錄') + paragraph('時間：115年9月21日') + paragraph('二、報告事項')
+        body = header + '<text:p><text:span>FICTIONAL_TAIL_ANCHOR</text:span>' + tail + '</text:p>'
+        raw = odt(body)
+        self.assertLess(len(raw), parser.MAX_RAW_BYTES)
+        result = parser.parse_odt_meeting_metadata(raw)
+        self.assertEqual(result['reason_codes'], ['XML_TEXT_LIMIT'])
 
     def test_private_body_text_is_never_projected(self):
         result = self.parse(paragraph('臺中市政府第749次市政會議紀錄') + paragraph('時間：115年9月21日') + paragraph('FICTIONAL_PRIVATE_BODY_MARKER'))

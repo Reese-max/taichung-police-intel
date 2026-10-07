@@ -32,43 +32,15 @@ TABLE = "urn:oasis:names:tc:opendocument:xmlns:table:1.0"
 MIMETYPE = b"application/vnd.oasis.opendocument.text"
 TITLE = re.compile(r"^(?:臺中市政府)?(?:第([0-9]{1,5})次市政會議|市政會議第([0-9]{1,5})次)(?:會議紀錄|紀錄|記錄|議程)?(?:\((?:定稿|草案|修正版)\))?$")
 DATE_LABEL = re.compile(r"^(?:[一二三四五六七八九十壹貳參肆伍陸柒捌玖拾0-9]+[、.])?(會議日期|會議時間|開會時間|時間|日期):(.*)$")
-DATE_TOKEN = re.compile(r"(?<![0-9])(中華民國|民國)?(1[0-9]{2}|20[0-9]{2})(?:年([0-9]{1,2})月([0-9]{1,2})日|[./-]([0-9]{1,2})[./-]([0-9]{1,2}))(?![0-9])")
+DATE_TOKEN = re.compile(r"(?<![0-9])(?:中華民國|民國)?(1[0-9]{2}|20[0-9]{2})(?:年([0-9]{1,2})月([0-9]{1,2})日|[./-]([0-9]{1,2})[./-]([0-9]{1,2}))(?![0-9])")
 DATE_ROLES = {"會議日期": "MEETING_DATE", "會議時間": "MEETING_TIME", "開會時間": "MEETING_TIME", "時間": "TIME", "日期": "DATE"}
 CLOCK = r"(?:上午|下午|早上|晚上|中午)?(?:[01]?[0-9]|2[0-3])(?:時(?:[0-5]?[0-9]分)?|:[0-5][0-9])(?:整)?"
-CLOCK_VALUE = re.compile(CLOCK + r"(?:[至到~～-]" + CLOCK + r")?$")
-DATE_SUFFIX = re.compile(r"(?:\((?:星期|週|周|禮拜)([一二三四五六日天])\))?(?:" + CLOCK + r"(?:[至到~～-]" + CLOCK + r")?)?$")
-WEEKDAYS = {"一": 0, "二": 1, "三": 2, "四": 3, "五": 4, "六": 5, "日": 6, "天": 6}
-SKIP_TAGS = {f"{{{OFFICE}}}annotation", f"{{{TEXT}}}tracked-changes", f"{{{TEXT}}}deletion", f"{{{TEXT}}}hidden-text", f"{{{TEXT}}}conditional-text", f"{{{TEXT}}}hidden-paragraph"}
+DATE_SUFFIX = re.compile(r"(?:\((?:星期|週|周|禮拜)[一二三四五六日天]\))?(?:" + CLOCK + r"(?:[至到~～-]" + CLOCK + r")?)?$")
+SKIP_TAGS = {f"{{{OFFICE}}}annotation", f"{{{TEXT}}}tracked-changes", f"{{{TEXT}}}deletion", f"{{{TEXT}}}hidden-text", f"{{{TEXT}}}conditional-text"}
 
 
 class _Rejected(ValueError):
     pass
-
-
-class _BoundedTreeBuilder(ET.TreeBuilder):
-    """Count character callbacks before storing text, including unfinished tails."""
-    def __init__(self):
-        super().__init__()
-        self.nodes = self.depth = self.text_chars = 0
-
-    def start(self, tag, attrs):
-        self.nodes += 1
-        self.depth += 1
-        if self.depth > MAX_XML_DEPTH:
-            raise _Rejected("XML_DEPTH_LIMIT")
-        if self.nodes > MAX_XML_NODES:
-            raise _Rejected("XML_NODE_LIMIT")
-        return super().start(tag, attrs)
-
-    def end(self, tag):
-        self.depth -= 1
-        return super().end(tag)
-
-    def data(self, value):
-        self.text_chars += len(value)
-        if self.text_chars > MAX_XML_TEXT_CHARS:
-            raise _Rejected("XML_TEXT_LIMIT")
-        super().data(value)
 
 
 def _member_bytes(raw, archive, info, limit):
@@ -143,40 +115,32 @@ def _xml_tree(raw):
         raise _Rejected("XML_ENCODING_UNSUPPORTED")
     if re.search(r"<!\s*(?:DOCTYPE|ENTITY)\b", xml_text, re.I):
         raise _Rejected("XML_DTD_OR_ENTITY_DECLARATION")
-    parser = ET.XMLParser(target=_BoundedTreeBuilder())
-    for offset in range(0, len(xml), 16384):
-        parser.feed(xml[offset:offset + 16384])
-    root = parser.close()
-    if root.tag != f"{{{OFFICE}}}document-content":
+    count = text_chars = depth = 0
+    parser = ET.iterparse(io.BytesIO(xml), events=("start", "end"))
+    for event, node in parser:
+        if event == "start":
+            count += 1
+            depth += 1
+            if depth > MAX_XML_DEPTH:
+                raise _Rejected("XML_DEPTH_LIMIT")
+            if count > MAX_XML_NODES:
+                raise _Rejected("XML_NODE_LIMIT")
+        else:
+            depth -= 1
+            text_chars += len(node.text or "") + len(node.tail or "")
+            if text_chars > MAX_XML_TEXT_CHARS:
+                raise _Rejected("XML_TEXT_LIMIT")
+    if parser.root.tag != f"{{{OFFICE}}}document-content":
         raise _Rejected("ODT_DOCUMENT_ROOT_UNRECOGNIZED")
-    bodies = root.findall(f"{{{OFFICE}}}body/{{{OFFICE}}}text")
+    bodies = parser.root.findall(f"{{{OFFICE}}}body/{{{OFFICE}}}text")
     if len(bodies) != 1:
         raise _Rejected("ODT_TEXT_BODY_UNRECOGNIZED")
     return bodies[0]
 
 
-def _has_hidden_paragraph_marker(node):
-    for child in node:
-        if child.tag == f"{{{TEXT}}}hidden-paragraph":
-            condition = re.sub(r"\s+", "", child.get(f"{{{TEXT}}}condition", "")).casefold()
-            # Do not evaluate arbitrary formulas. Explicit false is visible;
-            # true or unresolved conditional visibility cannot supply metadata.
-            false_values = {"false", "false()", "ooow:false()", "of:false()", "0"}
-            hidden_flag = child.get(f"{{{TEXT}}}is-hidden")
-            if (hidden_flag is not None and hidden_flag.strip() not in {"false", "0"}
-                    or condition and condition not in false_values):
-                return True
-        elif child.tag not in SKIP_TAGS and _has_hidden_paragraph_marker(child):
-            return True
-    return False
-
-
 def _hidden(node):
-    hidden_flag = node.get(f"{{{TEXT}}}is-hidden")
     return (node.tag in SKIP_TAGS or node.get(f"{{{TEXT}}}display") in {"none", "condition"}
-            or hidden_flag is not None and hidden_flag.strip() not in {"false", "0"}
-            or node.tag == f"{{{TABLE}}}table-row" and node.get(f"{{{TABLE}}}visibility") in {"collapse", "filter"}
-            or node.tag in {f"{{{TEXT}}}p", f"{{{TEXT}}}h"} and _has_hidden_paragraph_marker(node))
+            or node.get(f"{{{TEXT}}}is-hidden") == "true")
 
 
 def _flatten(node):
@@ -248,7 +212,6 @@ def parse_odt_meeting_metadata(raw):
         body = _xml_tree(raw)
         numbers, dates, roles = set(), set(), set()
         invalid_date = date_range = unresolved_date = False
-        era_year_mismatch = weekday_conflict = False
         for index, block in enumerate(_blocks(body)):
             if index >= MAX_HEADER_BLOCKS:
                 break
@@ -265,11 +228,6 @@ def parse_odt_meeting_metadata(raw):
                 continue
             roles.add(DATE_ROLES[labeled.group(1)])
             value = labeled.group(2)
-            if DATE_ROLES[labeled.group(1)] in {"TIME", "MEETING_TIME"} and CLOCK_VALUE.fullmatch(value):
-                # Separate clock-only time fields add no calendar evidence.
-                # Empty, unresolved, referential or date-bearing values still
-                # go through the strict date checks below and can veto a date.
-                continue
             date_range |= bool(re.search(r"日(?:至|到|及|、|與|[-~～])(?:[0-9]{1,4}年)?(?:[0-9]{1,2}月)?[0-9]{1,2}日", value))
             matches = list(DATE_TOKEN.finditer(value))
             date_range |= len(matches) > 1
@@ -277,23 +235,13 @@ def parse_odt_meeting_metadata(raw):
                 unresolved_date = True
                 continue
             match = matches[0]
-            suffix = DATE_SUFFIX.fullmatch(value[match.end():])
-            if not suffix:
+            if not DATE_SUFFIX.fullmatch(value[match.end():]):
                 unresolved_date = True
                 date_range |= bool(re.match(r"[至到~～-]", value[match.end():]))
-            for match_index, match in enumerate(matches):
-                era, year, month, day, slash_month, slash_day = match.groups()
-                # An explicit ROC era cannot be silently reinterpreted as a
-                # Gregorian four-digit year. Unprefixed supported 1xx years
-                # follow the source's ROC convention; 20xx is Gregorian.
-                if era is not None and len(year) != 3:
-                    era_year_mismatch = True
-                    continue
+            for match in matches:
+                year, month, day, slash_month, slash_day = match.groups()
                 try:
-                    calendar_date = date(int(year) + (1911 if len(year) == 3 else 0), int(month or slash_month), int(day or slash_day))
-                    dates.add(calendar_date.isoformat())
-                    if match_index == 0 and suffix and suffix.group(1) is not None:
-                        weekday_conflict |= calendar_date.weekday() != WEEKDAYS[suffix.group(1)]
+                    dates.add(date(int(year) + (1911 if len(year) == 3 else 0), int(month or slash_month), int(day or slash_day)).isoformat())
                 except ValueError:
                     invalid_date = True
         result["explicit_date_label_roles"] = sorted(roles)
@@ -301,10 +249,10 @@ def parse_odt_meeting_metadata(raw):
             result.update(meeting_number=next(iter(numbers)), meeting_number_role="EXPLICIT_BODY_MEETING_SERIAL_NOT_REGISTRY_ID")
         else:
             result["reason_codes"].append("AMBIGUOUS_MEETING_NUMBER" if numbers else "EXPLICIT_MEETING_TITLE_MISSING")
-        if len(numbers) == 1 and len(dates) == 1 and not invalid_date and not date_range and not unresolved_date and not era_year_mismatch and not weekday_conflict:
+        if len(numbers) == 1 and len(dates) == 1 and not invalid_date and not date_range and not unresolved_date:
             result.update(meeting_date=next(iter(dates)), meeting_date_role="EXPLICIT_LABELED_BODY_MEETING_DATE")
         else:
-            result["reason_codes"].append("ERA_YEAR_MISMATCH" if era_year_mismatch else "MEETING_WEEKDAY_CONFLICT" if weekday_conflict else "INVALID_MEETING_DATE" if invalid_date else "AMBIGUOUS_MEETING_DATE" if len(dates) > 1 or date_range else "EXPLICIT_MEETING_DATE_NOT_VERIFIED")
+            result["reason_codes"].append("INVALID_MEETING_DATE" if invalid_date else "AMBIGUOUS_MEETING_DATE" if len(dates) > 1 or date_range else "EXPLICIT_MEETING_DATE_NOT_VERIFIED")
         result["status"] = "STRUCTURED_MEETING_METADATA_OBSERVED" if not result["reason_codes"] else "PARTIAL_METADATA"
     except _Rejected as error:
         result["reason_codes"] = [str(error)]
