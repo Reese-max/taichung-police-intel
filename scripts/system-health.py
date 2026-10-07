@@ -9,6 +9,7 @@ about current public visibility.
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 from datetime import datetime
 import importlib.util
 import json
@@ -185,6 +186,7 @@ FAILURE_STAGE_CLASSIFICATION: dict[str, tuple[str, str, str]] = {
     "SOURCE_COVERAGE_OR_COLLECTION_GAP": ("publication", "collection", "FAILED"),
     "SOURCE_FRESHNESS_STALE": ("publication", "collection", "FAILED"),
     "SOURCE_FRESHNESS_UNKNOWN": ("publication", "collection", "FAILED"),
+    "SOURCE_LAST_SUCCESS_UNKNOWN": ("publication", "collection", "UNKNOWN"),
     "PARSER_OUTPUT_PARTIAL": ("publication", "parsing", "PARTIAL"),
     "PARSER_OUTPUT_INVALID": ("publication", "parsing", "FAILED"),
     "NO_PARSING_RECEIPT_IN_CANONICAL_ARTIFACT": ("publication", "parsing", "FAILED"),
@@ -562,6 +564,14 @@ def operator_summary(overall: str, stages: list[dict[str, Any]]) -> dict[str, An
             if primary is not None else None
         ),
         "attention_count": len(attention),
+        # Collection gaps and official-date warnings can coexist. Keep the
+        # per-source work visible even when one aggregate error takes priority.
+        "source_actions": [
+            {key: warning.get(key) for key in ("source_id", "reasons", "next_actions")}
+            for stage in stages if stage.get("stage") == "collection"
+            for warning in (stage.get("source_warnings") if isinstance(stage.get("source_warnings"), list) else [])
+            if isinstance(warning, dict)
+        ],
     }
 
 
@@ -789,9 +799,16 @@ def _source_coverage(sources: Any, required_source_ids: set[str]) -> tuple[list[
     return sources, exact
 
 
-def aggregate_last_success_at(sources: list[dict[str, Any]]) -> str | None:
+def parse_aware_time(value: Any) -> datetime | None:
+    parsed = parse_time(value)
+    return parsed if parsed is not None and parsed.tzinfo is not None else None
+
+
+def aggregate_last_success_at(sources: list[dict[str, Any]], required_source_ids: set[str] | None = None) -> str | None:
+    if required_source_ids is not None and not _source_coverage(sources, required_source_ids)[1]:
+        return None
     values = [source.get("last_success_at") for source in sources]
-    parsed = [parse_time(value) for value in values]
+    parsed = [parse_aware_time(value) for value in values]
     if not sources or any(value is None for value in parsed):
         return None
     return values[parsed.index(min(parsed))]
@@ -804,6 +821,58 @@ def normalize_source_freshness(value: Any, source_policy: Any | None = None) -> 
         return "UNKNOWN"
     normalized = str(value).strip().upper()
     return normalized or "UNKNOWN"
+
+
+def collection_source_warnings(
+    sources: list[dict[str, Any]], source_policy: Any = None,
+    required_source_ids: set[str] | None = None,
+) -> list[dict[str, Any]]:
+    """Project acquisition and official-date gaps without changing source facts."""
+    warnings = []
+    observed_ids = Counter(source["source_id"] for source in sources if isinstance(source.get("source_id"), str))
+    for source in sources:
+        reasons = []
+        actions = []
+        freshness = normalize_source_freshness(source.get("freshness_status"), source_policy)
+        source_id = source.get("source_id")
+        identity_gap = required_source_ids is not None and (
+            not isinstance(source_id, str) or source_id not in required_source_ids or observed_ids[source_id] != 1
+        )
+        if identity_gap or source.get("source_health") != "PASS" or source.get("window_completeness") not in COMPLETE_SOURCE_WINDOWS:
+            reasons.append("SOURCE_COVERAGE_OR_COLLECTION_GAP")
+            actions.append(
+                "核對核准來源身分與唯一 source_id；完成對帳前保留 UNKNOWN／LKG。" if identity_gap
+                else "確認原來源取得結果與缺漏範圍，保留 LKG；受拒路徑停止重試。"
+            )
+        if freshness in STALE_SOURCE_STATES:
+            reasons.append("SOURCE_FRESHNESS_STALE")
+            actions.append("核對官方發布／修訂日期；取得成功時間不能取代官方日期。")
+        elif freshness not in FRESH_SOURCE_STATES:
+            reasons.append("SOURCE_FRESHNESS_UNKNOWN")
+            actions.append("查核官方日期角色與可用證據；沒有可靠日期時保留未知。")
+        if parse_aware_time(source.get("last_success_at")) is None:
+            reasons.append("SOURCE_LAST_SUCCESS_UNKNOWN")
+            actions.append("核對取得成功時間及明示時區；缺少可靠證據時保留未知，不代填產生時間或時區。")
+        if reasons:
+            warnings.append({
+                "source_id": source_id if isinstance(source_id, str) else None,
+                "source_health": source.get("source_health"),
+                "window_completeness": source.get("window_completeness"),
+                "freshness_status": freshness,
+                "reasons": reasons,
+                "next_actions": actions,
+            })
+    for source_id in sorted((required_source_ids or set()) - set(observed_ids)):
+        warnings.append({
+            "source_id": source_id,
+            "receipt_status": "MISSING",
+            "source_health": "UNKNOWN",
+            "window_completeness": "UNKNOWN",
+            "freshness_status": "UNKNOWN",
+            "reasons": ["SOURCE_COVERAGE_OR_COLLECTION_GAP"],
+            "next_actions": ["補齊此核准來源的取得收據並核對來源身分與涵蓋範圍；缺件時保留 UNKNOWN／LKG。"],
+        })
+    return warnings
 
 
 def current_publication_stages(
@@ -839,6 +908,7 @@ def current_publication_stages(
         state not in FRESH_SOURCE_STATES | STALE_SOURCE_STATES
         for state in freshness_states
     )
+    has_unknown_success_time = any(parse_aware_time(source.get("last_success_at")) is None for source in sources)
     has_source_gap = (not exact_coverage) or any(
         source.get("source_health") != "PASS"
         or source.get("window_completeness") not in {"COMPLETE_ZERO", "COMPLETE_WITH_ITEMS"}
@@ -847,13 +917,16 @@ def current_publication_stages(
     if policy is None:
         collect_outcome = "UNKNOWN"
         collect_error = "SOURCE_POLICY_UNAVAILABLE"
+    elif run_status == "SUCCEEDED" and exact_coverage and not has_source_gap and has_unknown_success_time:
+        collect_outcome = "UNKNOWN"
+        collect_error = "SOURCE_LAST_SUCCESS_UNKNOWN"
     elif run_status == "SUCCEEDED" and exact_coverage and not has_source_gap and not has_unknown_freshness and not has_stale_source:
         collect_outcome = "SUCCESS"
         collect_error = None
-    elif run_status == "SUCCEEDED" and exact_coverage and has_stale_source and not has_unknown_freshness:
+    elif run_status == "SUCCEEDED" and exact_coverage and not has_source_gap and has_stale_source and not has_unknown_freshness:
         collect_outcome = "STALE"
         collect_error = "SOURCE_FRESHNESS_STALE"
-    elif run_status == "SUCCEEDED" and exact_coverage and has_unknown_freshness:
+    elif run_status == "SUCCEEDED" and exact_coverage and not has_source_gap and has_unknown_freshness:
         collect_outcome = "UNKNOWN"
         collect_error = "SOURCE_FRESHNESS_UNKNOWN"
     elif run_status in {"FAILED", "ERROR"}:
@@ -865,9 +938,8 @@ def current_publication_stages(
     else:
         collect_outcome = "UNKNOWN"
         collect_error = "COLLECTION_RECEIPT_INCOMPLETE"
-    collection_last_success_at = aggregate_last_success_at(sources)
-    if collection_last_success_at is None and collect_outcome == "SUCCESS":
-        collection_last_success_at = generated_at
+    collection_last_success_at = aggregate_last_success_at(sources, required_source_ids if policy else None)
+    source_warnings = collection_source_warnings(sources, source_policy, required_source_ids if policy else None)
 
     publication_status = brief.get("publication_status")
     snapshot_complete = brief.get("snapshot_complete") is True
@@ -901,9 +973,9 @@ def current_publication_stages(
             "ended_at": generated_at,
             "last_success_at": collection_last_success_at,
             "item_count": len(sources) if isinstance(status.get("sources"), list) else None,
-            "gap_count": sum(1 for row in sources if row.get("source_health") != "PASS"
-                             or row.get("window_completeness") not in COMPLETE_SOURCE_WINDOWS)
-            if isinstance(status.get("sources"), list) else None,
+            "gap_count": sum("SOURCE_COVERAGE_OR_COLLECTION_GAP" in warning["reasons"] for warning in source_warnings)
+            if policy or isinstance(status.get("sources"), list) else None,
+            "source_warnings": source_warnings,
             "error_class": collect_error,
             "receipt_ref": "apps/web/public/data/source-status.json",
             **binding,

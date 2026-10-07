@@ -188,6 +188,117 @@ class ReferenceJsonCollectionTests(unittest.TestCase):
         self.assertEqual(result['business_scope_completeness'], 'NOT_VERIFIED')
         self.assertNotIn('population_total', result)
 
+    def test_item_count_change_explains_rows_without_dropping_measures_or_granting_sum(self):
+        first, second = [], []
+        for item in ('FICTIONAL_FIRST_MEASURE', 'FICTIONAL_SECOND_MEASURE', 'FICTIONAL_THIRD_MEASURE'):
+            for column in ('FICTIONAL_COLUMN_A', 'FICTIONAL_COLUMN_B'):
+                row = self.row()
+                row.update({'項目': item, '欄位名稱': column})
+                first.append(row)
+                if item == 'FICTIONAL_FIRST_MEASURE':
+                    second.append(dict(row, 資料時間日期='2026-02-01T00:00:00'))
+        self.resource(first)
+        self.resource(second)
+        result = self.audit()
+        profile = result['candidate_grain_profile']
+        self.assertEqual(result['data_rows'], 8)
+        self.assertEqual(result['candidate_unreviewed_rows'], 8)
+        self.assertEqual(result['duplicate_full_rows'], 0)
+        self.assertEqual(profile['distinct_observed_item_sets'], 2)
+        self.assertEqual(profile['distinct_observed_column_sets'], 1)
+        self.assertTrue(profile['structural_variation_observed'])
+        self.assertEqual([p['distinct_items'] for p in profile['periods']], [3, 1])
+        self.assertEqual([p['item_column_count_histogram'] for p in profile['periods']], [{2: 3}, {2: 1}])
+        self.assertTrue(all(p['all_items_share_same_column_set'] for p in profile['periods']))
+        self.assertFalse(profile['periods'][1]['item_set_equals_first_observed_period'])
+        self.assertEqual(result['aggregation_guard']['status'], 'NOT_ALLOWED')
+        self.assertFalse(result['aggregation_guard']['within_period_aggregation_allowed'])
+        self.assertFalse(result['aggregation_guard']['cross_period_aggregation_allowed'])
+        self.assertFalse(result['aggregation_guard']['deduplication_allowed'])
+        self.assertEqual(result['business_identity'], 'UNKNOWN')
+        self.assertNotIn('FICTIONAL_FIRST_MEASURE', json.dumps(result))
+        self.assertNotIn('FICTIONAL_COLUMN_A', json.dumps(result))
+
+    def test_same_candidate_key_distinguishes_identical_rows_from_conflicting_values(self):
+        row = self.row()
+        self.resource([row, row, dict(row, 數值='43')])
+        result = self.audit()
+        profile = result['candidate_grain_profile']
+        self.assertEqual(result['data_rows'], 3)
+        self.assertEqual(result['duplicate_full_rows'], 1)
+        self.assertEqual(profile['duplicate_candidate_key_rows'], 2)
+        self.assertEqual(profile['conflicting_value_candidate_key_groups'], 1)
+        self.assertEqual(profile['periods'][0]['candidate_key_multiplicity_histogram'], {3: 1})
+        self.assertEqual(result['quality_status'], 'QUALITY_ISSUES')
+        self.assertFalse(result['aggregation_guard']['deduplication_allowed'])
+
+    def test_conflicting_key_without_exact_duplicates_is_quality_issue_and_not_numeric_coercion(self):
+        row = self.row(value='42')
+        self.resource([row, dict(row, 數值='42.0')])
+        result = self.audit()
+        self.assertEqual(result['duplicate_full_rows'], 0)
+        self.assertEqual(result['candidate_grain_profile']['conflicting_value_candidate_key_groups'], 1)
+        self.assertEqual(result['quality_status'], 'QUALITY_ISSUES')
+        self.assertIn('NO_NUMERIC_COERCION', result['candidate_grain_profile']['value_comparison'])
+
+    def test_candidate_grain_keeps_exact_dates_separate_from_month_grouping(self):
+        # Direct helper contract: grouping for presentation must not remove a
+        # declared key field, even when callers supply two dates in one month.
+        candidates = {
+            '2026-01': {
+                ('2026-01-01T00:00:00', 'FICTIONAL_REGION', 'FICTIONAL_ITEM', 'FICTIONAL_COLUMN'): {'42': 1},
+                ('2026-01-02T00:00:00', 'FICTIONAL_REGION', 'FICTIONAL_ITEM', 'FICTIONAL_COLUMN'): {'43': 1},
+            },
+        }
+        profile = m.candidate_grain_profile(candidates)
+        self.assertEqual(profile['candidate_key_fields'], list(m.CANDIDATE_KEY_FIELDS))
+        self.assertEqual(profile['periods'][0]['candidate_rows'], 2)
+        self.assertEqual(profile['periods'][0]['candidate_key_groups'], 2)
+        self.assertEqual(profile['duplicate_candidate_key_rows'], 0)
+        self.assertEqual(profile['conflicting_value_candidate_key_groups'], 0)
+        self.assertEqual(profile['periods'][0]['candidate_key_multiplicity_histogram'], {1: 2})
+        self.assertNotIn('2026-01-02', json.dumps(profile))
+
+    def test_unicode_digits_quarantined_without_canonicalizing_into_same_key(self):
+        for malformed in ('2026-01-0١T00:00:00', '２０２６-01-01T00:00:00', '2026-01-01T00:00:0٠'):
+            with self.subTest(date=malformed):
+                self.declaration['resources'] = []
+                self.declaration['resource_count'] = 0
+                self.receipts = []
+                self.resource([self.row(value='42'), self.row(malformed, value='43')])
+                result = self.audit()
+                self.assertEqual(result['data_rows'], 2)
+                self.assertEqual(result['candidate_unreviewed_rows'], 1)
+                self.assertEqual(result['quarantined_rows'], 1)
+                self.assertEqual(result['quarantine_reason_rows'], {'INVALID_COLLECTION_PERIOD': 1})
+                self.assertEqual(result['observed_period_rows'], {'2026-01': 1})
+                self.assertEqual(result['candidate_grain_profile']['periods'][0]['candidate_key_groups'], 1)
+                self.assertEqual(result['candidate_grain_profile']['conflicting_value_candidate_key_groups'], 0)
+                self.assertEqual(result['quality_status'], 'QUALITY_ISSUES')
+                self.assertFalse(result['aggregation_guard']['within_period_aggregation_allowed'])
+                self.assertNotIn(malformed, json.dumps(result))
+
+    def test_cross_resource_candidate_duplicates_retain_provenance_and_quarantine_scope(self):
+        self.source = 'CTX-POP'
+        self.declaration['inventory_id'] = self.source
+        row = self.row('2023-01-01T00:00:00', cycle='年')
+        self.resource([row, dict(row, 數值='')])
+        self.resource([row])
+        result = self.audit()
+        profile = result['candidate_grain_profile']
+        self.assertEqual(result['data_rows'], 3)
+        self.assertEqual(result['candidate_unreviewed_rows'], 2)
+        self.assertEqual(result['quarantined_rows'], 1)
+        self.assertEqual(result['cross_resource_exact_duplicate_rows'], 1)
+        self.assertEqual(profile['periods'][0]['candidate_rows'], 2)
+        self.assertEqual(profile['periods'][0]['candidate_key_groups'], 1)
+        self.assertEqual(profile['duplicate_candidate_key_rows'], 1)
+        self.assertEqual(profile['conflicting_value_candidate_key_groups'], 0)
+        self.assertEqual(profile['periods'][0]['candidate_key_multiplicity_histogram'], {2: 1})
+        self.assertEqual(len(result['resources']), 2)
+        self.assertTrue(result['multiplicity_retained'])
+        self.assertFalse(result['aggregation_guard']['deduplication_allowed'])
+
     def test_resource_symlink_escape_rejected(self):
         path = self.resource()
         path.unlink()

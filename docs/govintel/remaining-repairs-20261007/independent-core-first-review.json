@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "status": "FIXES_REQUIRED",
+  "scope": "INDEPENDENT_READ_ONLY_PUBLIC_CODE_REVIEW_AND_FICTIONAL_OFFLINE_REPLAYS",
+  "observed_at": "2026-10-07T13:53:05.506576+00:00",
+  "reviewed_commit": "777fdc5d6277730673504d472e0f3512a241a39e",
+  "source_code_sha256": {
+    "scripts/reference-json-collection-audit.py": "47d914d5610446479f2847bcf659cd24ad04150c60167ec329c096e416db33df",
+    "scripts/evaluate-free-model-synthetic.py": "6e4181d54117d22be861bc29d38b4b8dc14df46d31e97f44c5a6ba6d658ab19d",
+    "scripts/evaluate-govintel.py": "04e3df2d0c3479644aa331a2e517da04870e89a476f30876e9113644124dbd69",
+    "scripts/system-health.py": "22efaf45b7b88a79dbb1105782bb2c20f17efb7306df39bebc0ac725168f01eb"
+  },
+  "source_http_requests": 0,
+  "model_provider_invocations": 0,
+  "credentials_read": false,
+  "repository_code_modified": false,
+  "full_test_suite_run": false,
+  "findings": [
+    {
+      "id": "INPUT_CASE_ID_DUPLICATION",
+      "priority": "P1",
+      "file": "scripts/evaluate-free-model-synthetic.py",
+      "mechanism": "prepare does not validate input case ID uniqueness before model transport",
+      "observed": {
+        "fictional_input_rows": 2,
+        "unique_input_ids": 1,
+        "prediction_objects": 1,
+        "exit_code": 0,
+        "receipt_status": "EVALUATED",
+        "evaluated_cases": 2
+      },
+      "required_fix": "Reject duplicate or invalid input case IDs before transport; preserve evaluator input-schema contract."
+    },
+    {
+      "id": "EXACT_DATE_KEY_UNICODE_NORMALIZATION_COLLISION",
+      "priority": "P2",
+      "file": "scripts/reference-json-collection-audit.py",
+      "mechanism": "Unicode digit year accepted by date regex/strptime; two different declared date strings normalize to one period and candidate key",
+      "observed": {
+        "fictional_rows": 2,
+        "different_raw_date_strings": 2,
+        "quarantined_rows": 0,
+        "candidate_key_groups": 1,
+        "conflicting_value_groups": 1
+      },
+      "required_fix": "Require canonical ASCII date grammar or retain the exact declared date string in candidate key comparisons; do not claim exact schema keys while silently normalizing them."
+    },
+    {
+      "id": "ABSENT_ACTIVE_SOURCE_NOT_PROJECTED",
+      "priority": "P1",
+      "file": "scripts/system-health.py",
+      "mechanism": "exact coverage failure is detected, but warnings/gap counts only inspect provided rows",
+      "observed": {
+        "omitted_active_source_id": "S-029",
+        "collection_outcome": "PARTIAL",
+        "error_class": "SOURCE_COVERAGE_OR_COLLECTION_GAP",
+        "gap_count": 0,
+        "source_warnings": 0,
+        "source_actions": 0,
+        "aggregate_last_success_populated_from_incomplete_set": true
+      },
+      "required_fix": "Project missing required source IDs as actionable unknown gaps; count them and do not derive a complete-source last-success timestamp from the incomplete set."
+    },
+    {
+      "id": "MIXED_TIMESTAMP_AWARENESS_CRASH",
+      "priority": "P2",
+      "file": "scripts/system-health.py",
+      "mechanism": "aggregate_last_success_at compares a naive parsed timestamp against aware values",
+      "observed": {
+        "exception_type": "TypeError",
+        "health_receipt_built": false
+      },
+      "required_fix": "Treat missing/naive/invalid last-success timestamps as unknown or reject them explicitly without an uncontrolled comparison failure."
+    }
+  ],
+  "passing_replays": [
+    {
+      "scope": "unknown and duplicate output prediction IDs",
+      "result": "FAILED receipts with exit code 1"
+    },
+    {
+      "scope": "SUCCEEDED acquisition summary plus FAILED source and STALE or UNKNOWN official date",
+      "result": "collection PARTIAL with acquisition-gap priority; both warning reasons/actions retained; historical LKG timestamp unchanged"
+    },
+    {
+      "scope": "FAILED acquisition run plus FAILED source and STALE or UNKNOWN official date",
+      "result": "collection FAILED with COLLECTION_RUN_FAILED; both warning reasons/actions retained; historical LKG timestamp unchanged"
+    }
+  ],
+  "privacy_review": {
+    "candidate_profile_contains_dimension_counts_only": true,
+    "exact_value_comparison_avoids_numeric_coercion": true,
+    "raw_labels_contacts_originals_or_row_hash_positions_included_in_this_receipt": false
+  },
+  "unchanged_limits": {
+    "source_business_scope": "NOT_VERIFIED",
+    "source_rights": "UNKNOWN_OR_PENDING",
+    "production_provider_enabled": false,
+    "human_trial": "NOT_RUN",
+    "formal_product_semantic_ai_trial": "NOT_RUN"
+  }
+}

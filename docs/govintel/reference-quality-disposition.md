@@ -17,6 +17,20 @@
 
 S036 時間沒有 timezone；只比較來源本地時間字串，維持 `source_timezone=UNKNOWN`。JSON 日期欄的月／年邊界檢查只對照當下已下載資源集合；`period_semantics=NOT_VERIFIED`。缺期計算只在已觀察最早至最晚期別之間，不證明之前、之後或指定業務期間完整。
 
+## S028／CTXPOP 候選粒度對帳
+
+[新增離線結構對帳](reference-grain-reconciliation-20261007.json) 使用同一組 24 個 JSON 原件及既有下載收據；沒有重新下載，24 個 before/after SHA256 均相同。原有品質收據及逐列索引沒有改寫。兩組實際 CLI 仍 exit 2／`QUALITY_ISSUES`，下載宣告、原件 byte/schema 驗證及原先缺期／重複判斷均保留。
+
+S028 的 3,120 與 1,040 列差異已能由原件結構解釋：14 個已觀察月份各含 1 個「項目」與 1,040 個「欄位名稱」；2026-01、2026-02、2026-06、2026-07 各含 3 個「項目」，每個項目各有相同的 1,040 個欄位名稱，因此各 3,120 列。18 個月的欄位名稱集合完全相同，項目集合有兩種。27,040 列在 `資料時間日期＋地區＋項目＋欄位名稱` 的候選鍵上皆唯一，沒有同鍵數值字串衝突。這只解釋資料列結構，不證明三個項目可以相加、為何某月只提供一個項目，或哪些項目代表發生／破獲等官方統計口徑。2026-05 仍是已觀察集合缺期，不能填零。
+
+CTXPOP 的五個已觀察年度均有 29 個地區、2 個項目、9 個欄位名稱；兩個項目各包含 3 與 6 個欄位名稱。2023 年保留兩個 byte-identical 原件的全部 522 列，候選鍵有 261 組、每組 multiplicity 2，同鍵數值字串無衝突。其餘年度各 261 列、候選鍵皆唯一。這不授權刪除 2023 年原件或自行選定正式版本，也不代表 261 種統計欄位可合計成人口數。
+
+JSON audit 現在輸出 `candidate_grain_profile`，只含上述特定 schema 欄位的 distinct counts、multiplicity histograms、欄位／項目集合是否相同與同鍵數值字串衝突數；不輸出實際分類標籤、數值、row hashes 或位置。profile 只包含已通過本地結構檢查的 `CANDIDATE_UNREVIEWED` 列。候選鍵不是已確認的官方統計粒度；數值只做精確解碼字串比較，不把 `42` 和 `42.0` 自動視為同值。同鍵有不同數值字串會標記 `QUALITY_ISSUES`，原件仍保持 byte/schema 已驗證狀態。
+
+工具同時回傳 `aggregation_guard.status=NOT_ALLOWED`，期內加總、跨期加總及去重皆為 false；此欄位記錄 audit 的使用限制，不會對其他程式提供權利或改動正式來源准入。`business_identity=UNKNOWN`、官方期間語意／量值可加性尚未核對、`rights_review=PENDING`、`production_active=false`、`model_transmission_allowed=false` 持續保留。
+
+候選鍵會保留完整、未轉換的 `資料時間日期` 字串；月／年 period 只用於報告分組，不取代鍵中的日期欄位。預期 ISO 日期契約限定 ASCII 數字；Unicode 數字日期列標記 `INVALID_COLLECTION_PERIOD` 並分隔，不能自動轉成同月份或同鍵。[完整日期鍵與 ASCII 契約的追加離線收據](reference-grain-reconciliation-v2-20261007.json) 保留前一份收據的 SHA256；原收據沒有改寫，實際 24 個原件的結構彙總與品質判斷沒有改變，原件 SHA256 仍全部相同。
+
 ## CSV 單一解析路徑
 
 `scripts/reference-csv-audit.py` 保持原有 schema、SHA、64 MiB、UTF-8 與 CSV width 檢查，新增逐列 reason codes：

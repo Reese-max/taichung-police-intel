@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "status": "PASS",
+  "artifact_sha256": "98e9334be0d9dc7b8e290ab941810ce45398a016dee40367af98cb28931f69e7",
+  "artifact_id": 11479132144,
+  "artifact_bytes": 28272786,
+  "ci_run_id": 37613929260,
+  "ci_checkout_sha": "d07761a91c5d22981dfe85cab233b886aa1b8d55",
+  "reviewed_tree_sha": "ab558724063d9d6827416b9687b90a698467e938",
+  "pr_head_sha": "ab201b96586cc64b7bd84ef00d79825e160d7b15",
+  "runtime_receipt_status": "PASS",
+  "research_browser_receipt_status": "PASS",
+  "expected_sabotage_receipt_status": "FAIL",
+  "scope": "ACTUAL_EXACT_TREE_CURRENT_CHECKOUT_BUILD_ONLY_NOT_PRODUCTION"
+}

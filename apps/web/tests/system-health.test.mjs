@@ -9,9 +9,43 @@ import {
   formatSloMetric,
   sloMetricEntries,
   stageModelEntries,
+  sourceActionEntries,
   upstreamOperatingStateLabel,
 } from "../lib/system-health-view.mjs";
 const measured = metric => metric && metric.measured === true && typeof metric.value === "number";
+
+test("source actions preserve simultaneous coverage and official-date warnings", () => {
+  const health = {operator_summary: {source_actions: [{
+    source_id: "S-007",
+    reasons: ["SOURCE_COVERAGE_OR_COLLECTION_GAP", "SOURCE_FRESHNESS_STALE"],
+    next_actions: ["核對原來源取得結果。", "核對官方日期，保留陳舊狀態。"],
+  }]}};
+  assert.deepEqual(sourceActionEntries(health), [{
+    source_id: "S-007",
+    reasons: ["來源取得或涵蓋有缺口", "官方資料日期陳舊"],
+    next_actions: ["核對原來源取得結果。", "核對官方日期，保留陳舊狀態。"],
+  }]);
+});
+
+test("older and malformed optional actions do not break health presentation", () => {
+  for (const health of [null, {}, {operator_summary: {}}, {operator_summary: {source_actions: "UNKNOWN"}}]) {
+    assert.deepEqual(sourceActionEntries(health), []);
+  }
+  const bad = {operator_summary: {source_actions: [null, {}, {
+    source_id: "S-007", reasons: ["SOURCE_FRESHNESS_STALE"], next_actions: [{}],
+  }, {
+    source_id: "S-007", reasons: null, next_actions: ["核對日期。"],
+  }]}};
+  assert.deepEqual(sourceActionEntries(bad), []);
+});
+
+test("current saved health actions are inspectable without raw source data", async () => {
+  const health = JSON.parse(await readFile(healthUrl, "utf8"));
+  const actions = sourceActionEntries(health);
+  assert.ok(actions.length > 0);
+  assert.ok(actions.some((row) => row.reasons.includes("官方資料日期陳舊")));
+  assert.ok(actions.every((row) => row.next_actions.length > 0));
+});
 
 test("system health receipt exposes lane and stage evidence", async () => {
   const health = JSON.parse(await readFile(healthUrl, "utf8"));

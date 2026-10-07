@@ -1,6 +1,12 @@
 # GovIntel AI－驗證紀錄與未完成閘門
 
-## 2026-10-06 最新日期化驗收
+## 2026-10-07 PR #177 日期化驗收
+
+[固定驗收包](closure-20261007-pr177/README.md)對應已合併 `b6a602580fddf8b4a634dbdf64fc255678495412`、發布 `37615111747`：三個必要 CI job、合併後 CI、公開五檔 hash、checkpoint、Gateway 與 15 項正式 Chromium 皆通過。部署時間來源是實際成功 deploy job 完成時間，不是未取得的 Pages deployment status timestamp。CODE_ONLY 不新增來源觀察日；RIGHTS_BLOCKED／provider DISABLED／產品 AI 與真人 NOT_RUN 保留。
+
+Claude 官方登入與公開程式碼覆核完成，但評測診斷、來源完整性與產品成果是不同範圍。之後新增修復須依自己的 CI／部署 receipt 驗收，不能沿用本包作新程式認證。
+
+## 2026-10-06 日期化歷史驗收
 
 固定版本 `5e2298c8db12ec2631dbd8dac11c14599133dcc6` 已由 [run 37472606240](https://github.com/Reese-max/taichung-police-intel/actions/runs/37472606240)發布；[本輪證據包](closure-20261006/README.md)保存必要 CI exact tree、匿名五檔 bytes/hash、Gateway release/refusal、15 項正式 browser，以及真實隔離 artifact 失敗→恢復與 #20 通知送達／API body hash 回讀。`deployment_verified=true`、正式 `production_verified=false`／`RIGHTS_BLOCKED`；來源仍 PARTIAL，schema drift BLOCKED。
 

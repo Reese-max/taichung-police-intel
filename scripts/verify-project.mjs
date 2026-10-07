@@ -375,6 +375,7 @@ if (["quick", "full"].includes(mode) && !failures.length) {
       ["checkpoint-code-binding-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_checkpoint_code_binding.py", "-v"]],
       ["news-list-runtime-binding-integration-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_news_list_runtime_binding_integration.py", "-v"]],
       ["source-scope-contract-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_source_scope_contracts.py", "-v"]],
+      ["s019-meeting-metadata-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_s019_meeting_metadata.py", "-v"]],
       ["reference-csv-audit-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_reference_csv_audit.py", "-v"]],
       ["reference-json-collection-audit-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_reference_json_collection_audit.py", "-v"]],
       ["reference-resource-validator-review-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_reference_resource_validator_review.py", "-v"]],

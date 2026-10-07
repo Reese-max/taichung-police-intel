@@ -27,6 +27,13 @@ Inputs:
 '''
 
 
+def load_evaluator():
+    spec = importlib.util.spec_from_file_location("govintel_seed_evaluator", ROOT / "scripts/evaluate-govintel.py")
+    evaluator = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(evaluator)
+    return evaluator
+
+
 def prepare(manifest_path: Path):
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     if manifest.get("dataset_type") != "SYNTHETIC_REGRESSION_SEED":
@@ -35,8 +42,13 @@ def prepare(manifest_path: Path):
     if not path.is_relative_to(manifest_path.parent.resolve()):
         raise ValueError("case file must stay within its manifest directory")
     all_cases = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
-    if not all_cases or any(case.get("synthetic") is not True for case in all_cases):
+    if not all_cases or any(not isinstance(case, dict) or case.get("synthetic") is not True for case in all_cases):
         raise ValueError("every case must explicitly be synthetic before transport")
+    if any(not isinstance(case.get("case_id"), str) or not case["case_id"].strip() for case in all_cases):
+        raise ValueError("case_id must be a nonempty string")
+    # Validate the entire input corpus before transport or creating an attempt
+    # directory. Repeated IDs can otherwise let one prediction score twice.
+    load_evaluator().validate_cases(all_cases, manifest)
     cases = [case for case in all_cases if case.get("task") in TASKS]
     if not cases:
         raise ValueError("no supported synthetic cases")
@@ -98,13 +110,24 @@ def main():
         (output / "private-cli-stderr.txt").write_text(result.stderr, encoding="utf-8")
         receipt.update(exit_code=result.returncode, events_sha256=hashlib.sha256(result.stdout.encode()).hexdigest())
         predictions, steps = parse_response(result.stdout, result.returncode)
-        spec = importlib.util.spec_from_file_location("govintel_seed_evaluator", ROOT / "scripts/evaluate-govintel.py")
-        evaluator = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(evaluator)
+        evaluator = load_evaluator()
         report = evaluator.evaluate(manifest, cases, evaluator.index_predictions(predictions))
         (output / "predictions.jsonl").write_text("".join(json.dumps(row, ensure_ascii=False)+"\n" for row in predictions), encoding="utf-8")
         (output / "evaluation-report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
-        receipt.update(status="EVALUATED", evaluated_cases=report["evaluated_cases"],
+        # A normal provider stop does not establish that every requested case was
+        # answered. Preserve the partial report, but do not signal a successful
+        # diagnostic while its evaluator explicitly reports missing predictions.
+        complete = (
+            report["evaluation_status"] == "COMPLETE"
+            and report["evaluated_cases"] == report["case_denominator"] == len(cases)
+            and report["missing_prediction_count"] == 0
+            and report["missing_prediction_ids"] == []
+        )
+        receipt.update(status="EVALUATED" if complete else "INCOMPLETE",
+                       evaluation_status=report["evaluation_status"],
+                       evaluated_cases=report["evaluated_cases"],
+                       missing_prediction_count=report["missing_prediction_count"],
+                       missing_prediction_ids=report["missing_prediction_ids"],
                        exact_case_matches=report["exact_case_match_count"], tool_calls=0, provider_reported_steps=steps)
     except subprocess.TimeoutExpired as error:
         (output / "private-cli-events.jsonl").write_bytes(error.stdout or b"")

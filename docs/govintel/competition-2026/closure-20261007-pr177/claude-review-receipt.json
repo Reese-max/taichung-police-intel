@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "started_at": "2026-10-07T10:25:03.196087+00:00",
+  "scope": "ACTUAL_CLAUDE_CLI_PUBLIC_CODE_ONLY_REVIEW",
+  "code_sha": "85260b938b51e9a24ec3aabbb851e2263bd88356",
+  "version": "2.1.292 (Claude Code)",
+  "logged_in": true,
+  "auth_method": "claude.ai",
+  "source_code_sha256": "524edbc6e56227af8bfe72bf3fa822e1207eae87b52d583597627c851b7f18bf",
+  "prompt_sha256": "3cd66bee60fc00b21d80313e1ca6cf1246554dc1af46fe7119d8875d11e0ee43",
+  "tools_enabled": [],
+  "official_source_bodies_sent": false,
+  "credentials_sent_in_prompt": false,
+  "formal_product_ai_trial": "NOT_RUN",
+  "new_source_admissions": 0,
+  "source_rights_approved": false,
+  "exit_code": 0,
+  "response_type": "result",
+  "response_subtype": "success",
+  "provider_error": false,
+  "status": "COMPLETED",
+  "models": [
+    "claude-opus-5-5"
+  ],
+  "finished_at": "2026-10-07T10:26:35.435982+00:00",
+  "elapsed_seconds": 92.23
+}

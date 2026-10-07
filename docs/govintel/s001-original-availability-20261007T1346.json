@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "source_id": "S-001",
+  "code_commit": "b6a602580fddf8b4a634dbdf64fc255678495412",
+  "requested_url": "https://www.police.taichung.gov.tw/ch/home.jsp?id=1&parentpath=0&mcustomize=news_list.jsp",
+  "started_at": "2026-10-07T13:46:19.013775+00:00",
+  "http_call_limit": 1,
+  "body_captured": false,
+  "body_bytes": null,
+  "body_sha256": null,
+  "redirects_followed": 0,
+  "raw_bodies_saved": false,
+  "raw_bodies_transmitted_to_model": false,
+  "new_source_admissions": 0,
+  "rights_approved": false,
+  "whole_history_completeness": "UNKNOWN",
+  "window_completeness": "PARTIAL",
+  "status": "REQUEST_FAILED",
+  "http_status": 503,
+  "error_category": "UPSTREAM_HTTP_ERROR",
+  "http_attempts": 1,
+  "completed_at": "2026-10-07T13:46:25.817012+00:00"
+}
