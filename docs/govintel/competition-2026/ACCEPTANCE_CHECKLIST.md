@@ -1,10 +1,12 @@
 # GovIntel AI－首期驗收清單
 
-核對日：2026-10-06。每項完成須有固定 code/data/policy／版本、實際操作與 receipt；[驗收包](closure-20261006/README.md)分開本地、CI、匿名正式回讀、合成與真人證據。下列工程勾選不自動通過完整產品／參賽 gate。
+核對日：2026-10-07。每項完成須有固定 code/data/policy／版本、實際操作與 receipt；[PR #177 固定驗收包](closure-20261007-pr177/README.md)與 [10/6 歷史包](closure-20261006/README.md)各自保留原始版本。本地、CI、匿名正式回讀、合成與真人證據分開；下列工程勾選不自動通過完整產品／參賽 gate。
 
 ## 已完成的工程與受限正式驗收
 
 - [x] PR #167／#168／#169 依必要 CI 與 Chromium 通過的程式樹合併；沒有繞過 main 保護或 force-push。
+- [x] PR #177 已發布 `b6a6025…`；三個必要 CI job、合併後 CI、公開五檔與精確 checkpoint、Gateway、15 項正式 Chromium 通過。CODE_ONLY 不增加資料觀察日；後續修復另驗 CI／發布。
+- [x] Claude 官方登入及公開程式碼覆核完成；Python 3.14 相容性與程式碼讀取上限已修復。這些結果不當成產品模型效益、來源權利或真人實測。
 - [x] 已發布 `5e2298c…` Pages／Worker；匿名五檔 bytes/hash 與精確 checkpoint 相符，Gateway release／generation／policy／hash 綁定通過。
 - [x] 正式受限查詢如實 `RIGHTS_BLOCKED`／UNKNOWN，不把零結果推成世界沒有事件；研究／文件／synthesis 未將未准入內容送模型。
 - [x] 正式 Chromium 15 項操作：日期／來源缺口、D1、資料回報入口、條件保存／修改／刷新／取消／清除、手機與 JavaScript 無錯誤。
@@ -19,7 +21,7 @@
 
 - [ ] #39 逐來源、欄位、用途與模型傳輸有真實覆核准入；legacy active 不等於 rights approval。
 - [ ] #161 正式核准官方原文正值查詢、真正關閉／重開瀏覽器、自然修訂／已讀後再修訂／明文解除的完整流程；受控副本分列 replay。
-- [ ] #14 四類候選每來源七個有效日、獨立完整性、PARTIAL／LKG、敏感欄位、policy promotion；消防 1 日、警政 0 日不得補造未來／歷史 guards。
+- [ ] #14 四類候選依各自日期化窗口核對七個有效日、獨立完整性、PARTIAL／LKG、敏感欄位、policy promotion；保留既有 S032／S033 七日資格歷史，新批次同日不增加自然日，警政原入口仍 503，未達標者不補造未來／歷史 guards。
 - [ ] #162 D2 原始官方資源、列數、欄位、CRS／單位／軸順序與真實用途；D1/D2 真人理解效益另測。
 - [ ] #48 最小真實官方文件／版本／exact locator、被准許的正值 research 及故障證據。
 - [ ] #33 兩名獨立實際人工覆核的事件保留集，約 20 事件／60 原件；正式模型／語意 off、經同意真人 A/B/C 計時與修正。85%／90%／30% 仍為目標。

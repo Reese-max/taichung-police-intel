@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "status": "FIXES_REQUIRED",
+  "scope": "INDEPENDENT_CODEX_AGENT_READ_ONLY_S019_METADATA_AND_BOUNDED_ZIP_XML_REVIEW",
+  "observed_at": "2026-10-07T14:14:07.596582+00:00",
+  "reviewed_commit": "c8841bf18ced0aa7052174de9a694c69affaee87",
+  "reviewed_module_byte_sha256": {
+    "intel_v2/s019_meeting_metadata.py": "02db66a3e7b326ea8ac6b8c4ec5fd99c62b2af44f22c557fbf1bfb8d4a729c8e",
+    "tests/test_s019_meeting_metadata.py": "367a14813b85174b72f7254012bf4b3ca8c91198dda4546de28d8ad8731fa4f8"
+  },
+  "entire_worktree_clean_claimed": false,
+  "reviewer": "CODEX_AGENT_INDEPENDENT_REVIEW",
+  "claude_provider_invoked": false,
+  "credentials_read": false,
+  "official_source_bodies_read_or_transmitted": false,
+  "official_receipts_transmitted_to_provider": false,
+  "source_http_requests": 0,
+  "model_provider_invocations": 0,
+  "repository_code_modified": false,
+  "full_test_suite_run": false,
+  "focused_existing_fictional_tests": {
+    "module": "tests.test_s019_meeting_metadata",
+    "passed": 24,
+    "failed": 0
+  },
+  "independent_probes": [
+    {
+      "probe": "valid_fictional_header_with_scope_guards",
+      "status": "PASS",
+      "business_scope_completeness": "NOT_VERIFIED",
+      "whole_history_completeness": "UNKNOWN",
+      "registry_identity": "NOT_VERIFIED",
+      "rights_or_promotion_granted": false
+    },
+    {
+      "probe": "declared_zip_bomb_before_any_selected_member_inflation",
+      "status": "PASS",
+      "reason_codes": [
+        "ZIP_COMPRESSION_BOUND"
+      ]
+    },
+    {
+      "probe": "truncated_deflate_eof_cannot_return_header_metadata",
+      "status": "PASS",
+      "reason_codes": [
+        "ZIP_DEFLATE_STREAM_MISMATCH"
+      ]
+    },
+    {
+      "probe": "actual_xml_text_character_bound",
+      "status": "PASS",
+      "reason_codes": [
+        "XML_TEXT_LIMIT"
+      ]
+    },
+    {
+      "probe": "body_content_never_projected_in_receipt",
+      "status": "PASS"
+    }
+  ],
+  "findings": [
+    {
+      "id": "EXPLICIT_ROC_PREFIX_GREGORIAN_LENGTH_YEAR",
+      "priority": "P2",
+      "fictional_label_value": "民國2026年9月21日",
+      "observed_status": "STRUCTURED_MEETING_METADATA_OBSERVED",
+      "observed_meeting_date": "2026-09-21",
+      "observed_reason_codes": [],
+      "required_behavior": "Reject calendar-era/year contract mismatch and retain UNKNOWN; do not discard explicit ROC prefix."
+    },
+    {
+      "id": "EXPLICIT_ROC_PREFIX_GREGORIAN_LENGTH_YEAR",
+      "priority": "P2",
+      "fictional_label_value": "中華民國2026/9/21",
+      "observed_status": "STRUCTURED_MEETING_METADATA_OBSERVED",
+      "observed_meeting_date": "2026-09-21",
+      "observed_reason_codes": [],
+      "required_behavior": "Reject calendar-era/year contract mismatch and retain UNKNOWN; do not discard explicit ROC prefix."
+    },
+    {
+      "id": "EXPLICIT_WEEKDAY_CALENDAR_CONFLICT",
+      "priority": "P2",
+      "fictional_label_value": "115年9月21日(星期二)",
+      "observed_status": "STRUCTURED_MEETING_METADATA_OBSERVED",
+      "observed_meeting_date": "2026-09-21",
+      "actual_gregorian_weekday": "MONDAY",
+      "declared_weekday": "TUESDAY",
+      "required_behavior": "Capture declared weekday and reject a calendar contradiction while preserving UNKNOWN."
+    }
+  ],
+  "unique_finding_mechanisms": 2,
+  "scope_assessment": {
+    "complete_business_scope_claimed": false,
+    "whole_history_complete_claimed": false,
+    "official_version_or_registry_identity_granted": false,
+    "rights_or_promotion_granted": false,
+    "human_review_granted": false,
+    "parser_network_requests": 0
+  }
+}

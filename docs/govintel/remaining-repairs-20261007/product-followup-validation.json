@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "scope": "OFFLINE_FOLLOWUP_REGRESSIONS_NOT_MODEL_OR_HUMAN_TRIAL",
+  "observed_at": "2026-10-07T13:58:58.039398+00:00",
+  "base_code_sha": "ebaa1b586ba21957cf9880424960aaf4200f14f7",
+  "code_sha": "764ced9640fceeb2aa0ae380a4d3e96c3e1a4cb0",
+  "tree_sha": "6f2feea52d4da0f377933226e563f0d7b5db3adb",
+  "worktree_clean": true,
+  "changed_files": [
+    "scripts/evaluate-free-model-synthetic.py",
+    "scripts/system-health.py",
+    "tests/test_free_model_synthetic.py",
+    "tests/test_system_health.py"
+  ],
+  "tests": [
+    {
+      "command": "python -m unittest discover -s tests -p test_free_model_synthetic.py -v",
+      "count": 8,
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "command": "python -m unittest discover -s tests -p test_system_health.py -v",
+      "count": 45,
+      "passed": 45,
+      "failed": 0,
+      "skipped": 0
+    }
+  ],
+  "before_fix_logs": {
+    "followup-input-repro-before.log": "26fd161ff78d9475e58705ba34c8325bbe139708e1bed869d3d27f892930ec36",
+    "followup-health-repro-before.log": "007c0b66d603ec91fecc6fb2f762ce25fdef2ff57b2fdaadc50072e5a90bad15"
+  },
+  "fixed_behaviors": {
+    "input_ids_canonical_validator_before_transport": true,
+    "duplicate_and_malformed_input_ids_transport_calls": 0,
+    "duplicate_and_malformed_input_ids_output_created": false,
+    "missing_approved_S029_gap_count": 1,
+    "missing_approved_S029_receipt_status": "MISSING",
+    "missing_active_source_aggregate_last_success_at": null,
+    "missing_and_failed_source_gap_count": 2,
+    "stale_warnings_preserved": true,
+    "naive_invalid_or_null_last_success_aggregate": null,
+    "naive_invalid_or_null_last_success_outcome": "UNKNOWN",
+    "last_success_unknown_warning": "SOURCE_LAST_SUCCESS_UNKNOWN",
+    "generation_timestamp_or_timezone_substituted": false,
+    "committed_health_receipt_reproducibility_passed": true
+  },
+  "unchanged_input_and_health_sha256": {
+    "apps/web/public/data/source-status.json": "493ce6e4ac3c279bfdc08c9d1510302c6bf44ef19560a3391e6ed1409e6f6380",
+    "apps/web/public/data/intelligence-feed.json": "edcb5598259ede1df32bda239b1d348556d33c6032887e3a49e19a9af2e370e9",
+    "apps/web/public/data/v2-daily-brief.json": "3df565c29622ae729f0f053712f513eddacf6e014aeec227ddd664dd00b38448",
+    "apps/web/public/data/public-event-demo.json": "63bdd8c33d70d7ee5e7ece517ae53865bdb4c54b5189ed02d6730af3210bc23f",
+    "apps/web/public/data/system-health.json": "4b44de66a5e32fc4c642985dfc512b7031d9007fdffc4d4c560174c0f15f819c"
+  },
+  "health_regeneration_needed": false,
+  "model_network_calls": 0,
+  "source_http_calls": 0,
+  "human_participants": 0,
+  "source_admission_changed": false,
+  "rights_approved": false,
+  "production_provider_enabled": false,
+  "file_sha256": {
+    "scripts/evaluate-free-model-synthetic.py": "c86c090aff039e3804215e36fdd7f0992228d35cba716738923174448b94df2b",
+    "scripts/system-health.py": "0f2f0df2f9d67e5e07812493d607837307956e442d51e3c344b11c573c26d9a6",
+    "tests/test_free_model_synthetic.py": "63ed0b7887e299d678900984348f739455e505066eb3f181081b145017ceb319",
+    "tests/test_system_health.py": "b48686d39cf4c66df6cdb83157710d2def916d973c247b2a0bd22e18d56724ca"
+  }
+}

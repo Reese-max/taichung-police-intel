@@ -21,6 +21,35 @@
       "stage": "collection"
     },
     "requires_attention": true,
+    "source_actions": [
+      {
+        "next_actions": [
+          "核對官方發布／修訂日期；取得成功時間不能取代官方日期。"
+        ],
+        "reasons": [
+          "SOURCE_FRESHNESS_STALE"
+        ],
+        "source_id": "S-004"
+      },
+      {
+        "next_actions": [
+          "核對官方發布／修訂日期；取得成功時間不能取代官方日期。"
+        ],
+        "reasons": [
+          "SOURCE_FRESHNESS_STALE"
+        ],
+        "source_id": "S-007"
+      },
+      {
+        "next_actions": [
+          "核對官方發布／修訂日期；取得成功時間不能取代官方日期。"
+        ],
+        "reasons": [
+          "SOURCE_FRESHNESS_STALE"
+        ],
+        "source_id": "S-029"
+      }
+    ],
     "status": "STALE"
   },
   "overall": "STALE",
@@ -388,6 +417,44 @@
       "policy_hash": "3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501",
       "policy_version": 1,
       "receipt_ref": "apps/web/public/data/source-status.json",
+      "source_warnings": [
+        {
+          "freshness_status": "STALE",
+          "next_actions": [
+            "核對官方發布／修訂日期；取得成功時間不能取代官方日期。"
+          ],
+          "reasons": [
+            "SOURCE_FRESHNESS_STALE"
+          ],
+          "source_health": "PASS",
+          "source_id": "S-004",
+          "window_completeness": "COMPLETE_ZERO"
+        },
+        {
+          "freshness_status": "STALE",
+          "next_actions": [
+            "核對官方發布／修訂日期；取得成功時間不能取代官方日期。"
+          ],
+          "reasons": [
+            "SOURCE_FRESHNESS_STALE"
+          ],
+          "source_health": "PASS",
+          "source_id": "S-007",
+          "window_completeness": "COMPLETE_ZERO"
+        },
+        {
+          "freshness_status": "STALE",
+          "next_actions": [
+            "核對官方發布／修訂日期；取得成功時間不能取代官方日期。"
+          ],
+          "reasons": [
+            "SOURCE_FRESHNESS_STALE"
+          ],
+          "source_health": "PASS",
+          "source_id": "S-029",
+          "window_completeness": "COMPLETE_ZERO"
+        }
+      ],
       "stage": "collection",
       "started_at": null,
       "upstream_hash": null

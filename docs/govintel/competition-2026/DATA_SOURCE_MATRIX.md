@@ -1,6 +1,6 @@
 # GovIntel AI－資料來源與取得狀態
 
-文件更新 2026-10-06。active 來源以[核准 policy](../source-policy.approved.json)為準，catalog、入口可取得與 fixture 不代表正式啟用。最新具日期的 production 觀察見[CURRENT_STATUS](CURRENT_STATUS.md)。
+文件更新 2026-10-07。active 來源以[核准 policy](../source-policy.approved.json)為準，catalog、入口可取得與 fixture 不代表正式啟用。最新具日期的 production 觀察見[CURRENT_STATUS](CURRENT_STATUS.md)。
 
 ## 已核准基線
 
@@ -10,7 +10,7 @@
 | S-006 | [臺中市議會質詢順序](https://www.tccc.gov.tw/wb_download13.asp?uno=&cno=50) | `PRODUCTION_ACTIVE`；單源結果不能代表所有公共公告。 |
 | S-007 | [議事錄 API](https://yishi.tccc.gov.tw/api/ProceedingsBackWeb/FrontList) | `PRODUCTION_ACTIVE`；這是需參數的 API endpoint，直接無參數 GET 回 400，不是可點開的文件；參數化 collector receipt 為`STALE`，不因 HTTP 成功改成新鮮。 |
 | S-009 | [各項提案 API](https://yishi.tccc.gov.tw/api/Proposal/FrontList) | `PRODUCTION_ACTIVE`；這是需參數的 API endpoint，直接無參數 GET 回 400；保留缺日期、窗口與查詢範圍限制。 |
-| S-029 | [市府議會專案報告](https://www.rdec.taichung.gov.tw/12047/12142/12145) | `PRODUCTION_ACTIVE`；本輪`FAILED`／`STALE`，LKG 不是最新內容，不能宣稱零新事件。 |
+| S-029 | [市府議會專案報告](https://www.rdec.taichung.gov.tw/12047/12142/12145) | `PRODUCTION_ACTIVE`；10/7 固定回讀 PASS／STALE，官方資料截至 2026-07-24；成功取得不代表官方近期更新或現況沒有事件。 |
 | S-010 | [市議會官方影音](https://www.tccc.gov.tw/) | 既有 evidence navigation，不是第六個定期 collector；transcript 只作導航。 |
 
 五來源的 publication 仍`PARTIAL`。2026-10-05 01:13 Asia/Taipei 的公開觀察對應 generation `CR-DEMO-20261004-EVENING-SCHEDULE`，generated `2026-10-04T23:26:28+08:00`。這是時間化快照，不是完整涵蓋證明。
@@ -47,3 +47,7 @@ D1 由官方固定期別頁的原生 CSV 下載流程取得；同頁 JSON open s
 [真實手動晚間蒐集](closure-20261006/evening-collection.json)已取得 S-029 原 WWW 資源，source health PASS／COMPLETE_ZERO；官方日期仍 2026-07-24／STALE，不把取得時間冒成更新。較早 FAILED／LKG receipt 不改寫。S-019 的 schema probe HTTP 200／NO_DRIFT 只算一次實際連線；有效 canary 日數仍依另存原始 observation 驗算。S-001 未恢復。Gateway 初次 503／workflow failure 與後來完整匿名回讀 PASS 分別留證，不以 HTTP 200 取代版本／hash。
 
 10/6 22:06 Asia/Taipei 的[新一輪真實 canary](closure-20261006/current-candidate-observation.json)已獨立留證：S-019 有第一個有效當地日；S-031 仍只有同一天的 1 日，重跑不增加日數。S-032／33 仍需權利及獨立完整性，S-001 失敗；全部未 promotion。較早七日窗口及其失敗不改寫，S-019 至少還需六個未來實際有效日。
+
+## 2026-10-07 有界取得進度
+
+[PR #177 五檔及日期回讀](closure-20261007-pr177/production-bytes.json)保留未知首次發布日期與陳舊限制；[15 項目標](../source-acquisition-targets.v1.json)區分列表、詳頁／附件、粒度、權利與業務完整性。[S028／人口結構對帳](../reference-grain-reconciliation-v2-20261007.json)只核對候選 schema 鍵與值字串，不允許自行加總／去重。S034／D2 的拒絕路徑不繞行，candidate 仍未 promotion。

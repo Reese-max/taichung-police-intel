@@ -15,9 +15,10 @@ MAX_RESOURCES = 128
 FIELDS = frozenset(('地區', '項目', '欄位名稱', '數值', '資料時間日期', '資料週期',
                     '郵遞區號', '機關代碼', '電子郵件', '行動電話', '市話', '縣市別代碼', '行政區域代碼'))
 SOURCE_CYCLES = {'S-028': '月', 'CTX-POP': '年'}
+CANDIDATE_KEY_FIELDS = ('資料時間日期', '地區', '項目', '欄位名稱')
 UUID = re.compile(r'[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}')
 SHA256 = re.compile(r'[0-9a-f]{64}')
-DATE = re.compile(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}')
+DATE = re.compile(r'[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}')
 _spec = importlib.util.spec_from_file_location('inventory_identity', Path(__file__).with_name('npa-source-inventory.py'))
 _inventory = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_inventory)
@@ -49,6 +50,59 @@ def decode(body):
 
 def positive_int(value):
     return type(value) is int and value > 0
+
+
+def candidate_grain_profile(period_candidates):
+    """Aggregate exact schema fields without exposing labels or assigning official grain."""
+    profiles = []
+    item_sets, column_sets = set(), set()
+    first_items = first_columns = None
+    conflicts = duplicates = 0
+    for period, candidates in sorted(period_candidates.items()):
+        regions, items, columns = set(), set(), set()
+        columns_by_item = defaultdict(set)
+        for key in candidates:
+            _exact_date, region, item, column = key
+            regions.add(region)
+            items.add(item)
+            columns.add(column)
+            columns_by_item[item].add(column)
+        items, columns = frozenset(items), frozenset(columns)
+        item_sets.add(items)
+        column_sets.add(columns)
+        if first_items is None:
+            first_items, first_columns = items, columns
+        multiplicities = [sum(values.values()) for values in candidates.values()]
+        local_conflicts = sum(len(values) > 1 for values in candidates.values())
+        local_duplicates = sum(count - 1 for count in multiplicities)
+        conflicts += local_conflicts
+        duplicates += local_duplicates
+        profiles.append({
+            'period': period, 'candidate_rows': sum(multiplicities),
+            'distinct_regions': len(regions), 'distinct_items': len(items),
+            'distinct_columns': len(columns),
+            'distinct_item_column_pairs': sum(len(values) for values in columns_by_item.values()),
+            'candidate_key_groups': len(candidates),
+            'duplicate_candidate_key_rows': local_duplicates,
+            'conflicting_value_candidate_key_groups': local_conflicts,
+            'candidate_key_multiplicity_histogram': dict(sorted(Counter(multiplicities).items())),
+            'item_column_count_histogram': dict(sorted(Counter(len(values) for values in columns_by_item.values()).items())),
+            'all_items_share_same_column_set': len({frozenset(values) for values in columns_by_item.values()}) == 1,
+            'item_set_equals_first_observed_period': items == first_items,
+            'column_set_equals_first_observed_period': columns == first_columns,
+        })
+    return {
+        'scope': 'CANDIDATE_UNREVIEWED_ROWS_IN_VERIFIED_RESOURCES_ONLY',
+        'candidate_key_fields': list(CANDIDATE_KEY_FIELDS),
+        'candidate_key_semantics': 'EXACT_DECLARED_SCHEMA_FIELDS_ONLY_NOT_OFFICIAL_STATISTICAL_GRAIN',
+        'candidate_key_comparison': 'EXACT_FULL_DATE_AND_LABEL_STRINGS_PERIOD_GROUPING_DOES_NOT_REPLACE_KEY_FIELDS',
+        'value_comparison': 'EXACT_DECODED_STRING_ONLY_NO_NUMERIC_COERCION',
+        'raw_dimension_labels_included': False, 'row_hashes_or_positions_included': False,
+        'distinct_observed_item_sets': len(item_sets), 'distinct_observed_column_sets': len(column_sets),
+        'duplicate_candidate_key_rows': duplicates, 'conflicting_value_candidate_key_groups': conflicts,
+        'structural_variation_observed': len(item_sets) > 1 or len(column_sets) > 1,
+        'periods': profiles,
+    }
 
 
 def audit_collection(*, source_id, declaration, receipts, resource_root,
@@ -99,6 +153,7 @@ def audit_collection(*, source_id, declaration, receipts, resource_root,
     results, positions, disposition_rows = [], defaultdict(list), []
     periods, quarantine_reasons, file_hashes = Counter(), Counter(), defaultdict(list)
     candidate_hashes, count = Counter(), 0
+    period_candidates = defaultdict(lambda: defaultdict(Counter))
     acquired = quarantined = 0
     for rid, resource in sorted(declared.items()):
         item = {'resource_id': rid, 'status': 'REJECTED', 'resource_rows': None}
@@ -175,6 +230,8 @@ def audit_collection(*, source_id, declaration, receipts, resource_root,
                 quarantine_reasons.update(reasons)
             else:
                 candidate_hashes[row_hash] += 1
+                key = tuple(row[field] for field in CANDIDATE_KEY_FIELDS)
+                period_candidates[period][key][row['數值']] += 1
             if include_disposition_index:
                 disposition_rows.append({'resource_id': rid, 'resource_sha256': actual_hash,
                                          'json_row_number': ordinal, 'row_sha256': row_hash,
@@ -204,6 +261,7 @@ def audit_collection(*, source_id, declaration, receipts, resource_root,
     cross_duplicates = sum(len(refs) - max(Counter(ref['resource_id'] for ref in refs).values())
                            for refs in cross_groups.values())
     duplicates = sum(len(refs) - 1 for refs in duplicate_groups.values())
+    grain_profile = candidate_grain_profile(period_candidates)
     result = {
         'schema_version': 1, 'source_id': source_id,
         'validation_scope': 'LOCAL_CURRENT_METADATA_RESOURCE_SET_ONLY',
@@ -224,11 +282,19 @@ def audit_collection(*, source_id, declaration, receipts, resource_root,
         'observed_period_rows': dict(sorted(periods.items())), 'missing_observed_span_periods': missing_periods,
         'gap_scope': 'OBSERVED_COLLECTION_SPAN_ONLY_NOT_WORLD_ZERO_OR_EXPECTED_BUSINESS_COVERAGE',
         'source_timezone': 'UNKNOWN', 'period_semantics': 'NOT_VERIFIED',
+        'candidate_grain_profile': grain_profile,
+        'aggregation_guard': {
+            'status': 'NOT_ALLOWED', 'within_period_aggregation_allowed': False,
+            'cross_period_aggregation_allowed': False, 'deduplication_allowed': False,
+            'reason_codes': ['OFFICIAL_STATISTICAL_GRAIN_NOT_VERIFIED',
+                             'MEASURE_ADDITIVITY_NOT_VERIFIED', 'RIGHTS_REVIEW_PENDING'],
+        },
         'business_scope_completeness': 'NOT_VERIFIED', 'business_identity': 'UNKNOWN',
         'rights_review': 'PENDING', 'production_active': False, 'multiplicity_retained': True,
         'original_bytes_modified': False, 'model_transmission_allowed': False,
         'row_hash_index_anonymization_approved': False,
-        'quality_status': 'QUALITY_ISSUES' if (duplicates or quarantined or missing_periods) else 'CONTRACT_CHECKS_PASS',
+        'quality_status': 'QUALITY_ISSUES' if (duplicates or quarantined or missing_periods
+                                             or grain_profile['conflicting_value_candidate_key_groups']) else 'CONTRACT_CHECKS_PASS',
     }
     if acquired != len(declared):
         result['quality_status'] = 'RESOURCE_CONTRACT_BLOCKED'

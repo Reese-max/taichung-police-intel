@@ -1,0 +1,151 @@
+{
+  "schema_version": 1,
+  "status": "PASS",
+  "scope": "INDEPENDENT_REPLAY_OF_FOUR_PRIOR_FINDINGS_AND_BOUNDED_FICTIONAL_COMPATIBILITY_PROBES_ONLY",
+  "observed_at": "2026-10-07T14:03:18.251244+00:00",
+  "reviewed_commit": "ec24f73df1a56693e6d3798885055a0731eb1936",
+  "reviewed_module_byte_sha256": {
+    "scripts/reference-json-collection-audit.py": "7e7413a68360faf767b1add7ebad8efb58f7a6c2878f37430cc8290979cd0caf",
+    "scripts/evaluate-free-model-synthetic.py": "c86c090aff039e3804215e36fdd7f0992228d35cba716738923174448b94df2b",
+    "scripts/evaluate-govintel.py": "04e3df2d0c3479644aa331a2e517da04870e89a476f30876e9113644124dbd69",
+    "scripts/system-health.py": "0f2f0df2f9d67e5e07812493d607837307956e442d51e3c344b11c573c26d9a6"
+  },
+  "module_bytes_unchanged_during_review": true,
+  "entire_worktree_clean_claimed": false,
+  "source_http_requests": 0,
+  "model_provider_invocations": 0,
+  "credentials_read": false,
+  "repository_code_modified": false,
+  "full_test_suite_run": false,
+  "corrected_findings": [
+    {
+      "finding_id": "INPUT_CASE_ID_DUPLICATION",
+      "status": "PASS",
+      "observed": {
+        "exception_type": "ValueError",
+        "rejected_before_transport": true,
+        "attempt_output_directory_created": false,
+        "duplicate_input_ids": 1
+      }
+    },
+    {
+      "finding_id": "EXACT_DATE_KEY_UNICODE_NORMALIZATION_COLLISION",
+      "status": "PASS",
+      "observed": {
+        "data_rows": 2,
+        "quarantined_rows": 1,
+        "candidate_rows": 1,
+        "conflicting_candidate_key_groups": 0,
+        "invalid_period_reason_count": 1,
+        "original_bytes_unchanged": true,
+        "raw_private_fixture_labels_absent": true
+      }
+    },
+    {
+      "finding_id": "ABSENT_ACTIVE_SOURCE_NOT_PROJECTED",
+      "status": "PASS",
+      "observed": {
+        "omitted_active_source_id": "S-029",
+        "collection_outcome": "PARTIAL",
+        "gap_count": 1,
+        "receipt_status": "MISSING",
+        "source_action_present": true,
+        "aggregate_last_success_at": null,
+        "input_status_unchanged": true,
+        "publication_lane": "PARTIAL"
+      }
+    },
+    {
+      "finding_id": "MIXED_TIMESTAMP_AWARENESS_CRASH",
+      "status": "PASS",
+      "observed": {
+        "health_receipt_built": true,
+        "collection_outcome": "UNKNOWN",
+        "error_class": "SOURCE_LAST_SUCCESS_UNKNOWN",
+        "aggregate_last_success_at": null,
+        "timestamp_or_timezone_substituted": false,
+        "input_status_unchanged": true,
+        "publication_lane": "UNKNOWN"
+      }
+    }
+  ],
+  "compatibility_probes": [
+    {
+      "probe": "unknown_output",
+      "status": "PASS",
+      "receipt_status": "FAILED",
+      "exit_code": 1,
+      "provider_requests": 0
+    },
+    {
+      "probe": "duplicate_output",
+      "status": "PASS",
+      "receipt_status": "FAILED",
+      "exit_code": 1,
+      "provider_requests": 0
+    },
+    {
+      "probe": "missing_output",
+      "status": "PASS",
+      "receipt_status": "INCOMPLETE",
+      "exit_code": 1,
+      "provider_requests": 0
+    },
+    {
+      "probe": "complete_output",
+      "status": "PASS",
+      "receipt_status": "EVALUATED",
+      "exit_code": 0,
+      "provider_requests": 0
+    },
+    {
+      "probe": "source_failed_plus_date_warning",
+      "run_status": "SUCCEEDED",
+      "freshness": "STALE",
+      "status": "PASS",
+      "collection_outcome": "PARTIAL",
+      "primary_error": "SOURCE_COVERAGE_OR_COLLECTION_GAP",
+      "publication_lane": "PARTIAL",
+      "both_warning_reasons_and_actions_preserved": true,
+      "historical_lkg_timestamp_unchanged": true
+    },
+    {
+      "probe": "source_failed_plus_date_warning",
+      "run_status": "SUCCEEDED",
+      "freshness": "UNKNOWN",
+      "status": "PASS",
+      "collection_outcome": "PARTIAL",
+      "primary_error": "SOURCE_COVERAGE_OR_COLLECTION_GAP",
+      "publication_lane": "PARTIAL",
+      "both_warning_reasons_and_actions_preserved": true,
+      "historical_lkg_timestamp_unchanged": true
+    },
+    {
+      "probe": "source_failed_plus_date_warning",
+      "run_status": "FAILED",
+      "freshness": "STALE",
+      "status": "PASS",
+      "collection_outcome": "FAILED",
+      "primary_error": "COLLECTION_RUN_FAILED",
+      "publication_lane": "BLOCKED",
+      "both_warning_reasons_and_actions_preserved": true,
+      "historical_lkg_timestamp_unchanged": true
+    },
+    {
+      "probe": "source_failed_plus_date_warning",
+      "run_status": "FAILED",
+      "freshness": "UNKNOWN",
+      "status": "PASS",
+      "collection_outcome": "FAILED",
+      "primary_error": "COLLECTION_RUN_FAILED",
+      "publication_lane": "BLOCKED",
+      "both_warning_reasons_and_actions_preserved": true,
+      "historical_lkg_timestamp_unchanged": true
+    }
+  ],
+  "s019_parser_reviewed": false,
+  "source_business_scope": "NOT_VERIFIED",
+  "source_rights": "UNKNOWN_OR_PENDING",
+  "formal_product_semantic_ai_trial": "NOT_RUN",
+  "human_trial": "NOT_RUN"
+}

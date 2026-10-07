@@ -1,4 +1,5 @@
 import importlib.util
+from copy import deepcopy
 import json
 import os
 from pathlib import Path
@@ -152,6 +153,101 @@ class SystemHealthTests(unittest.TestCase):
         self.assertEqual(collection["outcome"], "PARTIAL")
         self.assertEqual(collection["error_class"], "SOURCE_COVERAGE_OR_COLLECTION_GAP")
 
+    def test_missing_approved_source_has_a_counted_gap_and_operator_action(self):
+        status, brief = controlled_publication_inputs()
+        status["sources"] = [row for row in status["sources"] if row["source_id"] != "S-029"]
+        before = deepcopy(status)
+        stages = health.current_publication_stages(status, brief)
+        collection = next(row for row in stages if row["stage"] == "collection")
+        self.assertEqual(collection["outcome"], "PARTIAL")
+        self.assertEqual(collection["error_class"], "SOURCE_COVERAGE_OR_COLLECTION_GAP")
+        self.assertEqual(collection["item_count"], len(status["sources"]))
+        self.assertEqual(collection["gap_count"], 1)
+        self.assertIsNone(collection["last_success_at"])
+        self.assertEqual(len(collection["source_warnings"]), 1)
+        warning = collection["source_warnings"][0]
+        self.assertEqual(warning["source_id"], "S-029")
+        self.assertEqual(warning["receipt_status"], "MISSING")
+        self.assertEqual(warning["source_health"], "UNKNOWN")
+        self.assertEqual(warning["reasons"], ["SOURCE_COVERAGE_OR_COLLECTION_GAP"])
+        self.assertIn("核准來源", warning["next_actions"][0])
+        result = health.build_health(stages, context={"sources": status["sources"]})
+        self.assertEqual(result["operator_summary"]["source_actions"], [
+            {key: warning[key] for key in ("source_id", "reasons", "next_actions")}
+        ])
+        self.assertEqual(result["lanes"]["publication"], "PARTIAL")
+        self.assertEqual(status, before)
+
+    def test_missing_source_and_failed_or_stale_present_sources_keep_all_gaps(self):
+        status, brief = controlled_publication_inputs()
+        status["sources"] = [row for row in status["sources"] if row["source_id"] != "S-029"]
+        failed_id, stale_id = [row["source_id"] for row in status["sources"][:2]]
+        status["sources"][0].update(source_health="FAILED", window_completeness="PARTIAL_WINDOW")
+        status["sources"][1]["freshness_status"] = "STALE"
+        collection = next(row for row in health.current_publication_stages(status, brief) if row["stage"] == "collection")
+        self.assertEqual(collection["outcome"], "PARTIAL")
+        self.assertEqual(collection["gap_count"], 2)
+        warnings = {row["source_id"]: row for row in collection["source_warnings"]}
+        self.assertEqual(set(warnings), {"S-029", failed_id, stale_id})
+        self.assertEqual(warnings[failed_id]["source_health"], "FAILED")
+        self.assertEqual(warnings[stale_id]["reasons"], ["SOURCE_FRESHNESS_STALE"])
+        self.assertIsNone(collection["last_success_at"])
+
+    def test_invalid_last_success_time_is_unknown_without_timezone_or_generation_substitution(self):
+        for value in ("2026-09-11T08:23:26", "not-a-time", None):
+            with self.subTest(value=value):
+                status, brief = controlled_publication_inputs()
+                source_id = status["sources"][0]["source_id"]
+                status["sources"][0]["last_success_at"] = value
+                before = deepcopy(status)
+                stages = health.current_publication_stages(status, brief)
+                collection = next(row for row in stages if row["stage"] == "collection")
+                self.assertEqual(collection["outcome"], "UNKNOWN")
+                self.assertEqual(collection["error_class"], "SOURCE_LAST_SUCCESS_UNKNOWN")
+                self.assertIsNone(collection["last_success_at"])
+                self.assertIsNone(health.aggregate_last_success_at(status["sources"]))
+                self.assertEqual(collection["gap_count"], 0)
+                warnings = collection["source_warnings"]
+                self.assertEqual(len(warnings), 1)
+                self.assertEqual(warnings[0]["source_id"], source_id)
+                self.assertEqual(warnings[0]["reasons"], ["SOURCE_LAST_SUCCESS_UNKNOWN"])
+                self.assertIn("時區", warnings[0]["next_actions"][0])
+                result = health.build_health(stages)
+                self.assertEqual(result["lanes"]["publication"], "UNKNOWN")
+                self.assertEqual(len(result["operator_summary"]["source_actions"]), 1)
+                self.assertEqual(status, before)
+
+    def test_official_freshness_warning_precedes_unreliable_collection_success_time(self):
+        for freshness, expected_outcome, expected_reason in (
+            ("STALE", "STALE", "SOURCE_FRESHNESS_STALE"),
+            ("VERY_STALE", "STALE", "SOURCE_FRESHNESS_STALE"),
+            ("UNKNOWN", "UNKNOWN", "SOURCE_FRESHNESS_UNKNOWN"),
+            ("NO_DATA", "UNKNOWN", "SOURCE_FRESHNESS_UNKNOWN"),
+        ):
+            for last_success in ("2026-09-11T08:23:26", "not-a-time", None):
+                with self.subTest(freshness=freshness, last_success=last_success):
+                    status, brief = controlled_publication_inputs()
+                    time_id = status["sources"][0]["source_id"]
+                    date_id = status["sources"][1]["source_id"]
+                    status["sources"][0]["last_success_at"] = last_success
+                    status["sources"][1]["freshness_status"] = freshness
+                    before = deepcopy(status)
+                    stages = health.current_publication_stages(status, brief)
+                    collection = next(row for row in stages if row["stage"] == "collection")
+                    self.assertEqual(collection["outcome"], expected_outcome)
+                    self.assertEqual(collection["error_class"], expected_reason)
+                    self.assertIsNone(collection["last_success_at"])
+                    self.assertEqual(collection["gap_count"], 0)
+                    warnings = {row["source_id"]: row for row in collection["source_warnings"]}
+                    self.assertEqual(warnings[time_id]["reasons"], ["SOURCE_LAST_SUCCESS_UNKNOWN"])
+                    self.assertEqual(warnings[date_id]["reasons"], [expected_reason])
+                    result = health.build_health(stages, context={"sources": status["sources"]})
+                    actions = {row["source_id"]: row for row in result["operator_summary"]["source_actions"]}
+                    self.assertEqual(result["lanes"]["publication"], expected_outcome)
+                    self.assertEqual(actions[time_id]["reasons"], ["SOURCE_LAST_SUCCESS_UNKNOWN"])
+                    self.assertEqual(actions[date_id]["reasons"], [expected_reason])
+                    self.assertEqual(status, before)
+
     def test_stale_brief_from_another_run_is_not_validation_success(self):
         status, brief = controlled_publication_inputs()
         status["latest_collection_run"]["status"] = "SUCCEEDED"
@@ -193,6 +289,58 @@ class SystemHealthTests(unittest.TestCase):
             if row["stage"] == "collection"
         )
         self.assertEqual(collection["outcome"], "STALE")
+
+    def test_acquisition_gap_takes_priority_without_erasing_per_source_date_warnings(self):
+        for freshness in ("STALE", "UNKNOWN"):
+            with self.subTest(freshness=freshness):
+                status, brief = controlled_publication_inputs()
+                failed_id = status["sources"][0]["source_id"]
+                date_id = status["sources"][1]["source_id"]
+                status["sources"][0].update(source_health="FAILED", window_completeness="PARTIAL_WINDOW")
+                status["sources"][1]["freshness_status"] = freshness
+                before = deepcopy(status)
+                stages = health.current_publication_stages(status, brief)
+                collection = next(row for row in stages if row["stage"] == "collection")
+                self.assertEqual(collection["outcome"], "PARTIAL")
+                self.assertEqual(collection["error_class"], "SOURCE_COVERAGE_OR_COLLECTION_GAP")
+                self.assertEqual(collection["gap_count"], 1)
+                self.assertEqual(collection["last_success_at"], health.aggregate_last_success_at(status["sources"]))
+                warnings = {row["source_id"]: row for row in collection["source_warnings"]}
+                self.assertEqual(set(warnings), {failed_id, date_id})
+                self.assertEqual(warnings[failed_id]["reasons"], ["SOURCE_COVERAGE_OR_COLLECTION_GAP"])
+                self.assertEqual(warnings[date_id]["reasons"], [f"SOURCE_FRESHNESS_{freshness}"])
+                self.assertEqual(warnings[failed_id]["source_health"], "FAILED")
+                self.assertEqual(warnings[failed_id]["window_completeness"], "PARTIAL_WINDOW")
+                self.assertIn("保留 LKG", warnings[failed_id]["next_actions"][0])
+                self.assertIn("官方", warnings[date_id]["next_actions"][0])
+                self.assertEqual(status, before)
+
+                result = health.build_health(stages, context={"sources": status["sources"]})
+                actions = {row["source_id"]: row for row in result["operator_summary"]["source_actions"]}
+                self.assertEqual(result["lanes"]["publication"], "PARTIAL")
+                self.assertEqual(actions[failed_id]["reasons"], warnings[failed_id]["reasons"])
+                self.assertEqual(actions[date_id]["reasons"], warnings[date_id]["reasons"])
+                self.assertEqual(actions[date_id]["next_actions"], warnings[date_id]["next_actions"])
+                stale_ratio = result["slo"]["metrics"]["stale_source_ratio"]["value"]
+                self.assertEqual(stale_ratio, 1 / len(status["sources"]) if freshness == "STALE" else 0)
+
+    def test_failed_stale_source_retains_both_reasons_and_actions(self):
+        status, brief = controlled_publication_inputs()
+        status["sources"][0].update(source_health="FAILED", window_completeness="PARTIAL_WINDOW", freshness_status="STALE")
+        collection = next(row for row in health.current_publication_stages(status, brief) if row["stage"] == "collection")
+        self.assertEqual(collection["outcome"], "PARTIAL")
+        self.assertEqual(len(collection["source_warnings"]), 1)
+        warning = collection["source_warnings"][0]
+        self.assertEqual(warning["reasons"], ["SOURCE_COVERAGE_OR_COLLECTION_GAP", "SOURCE_FRESHNESS_STALE"])
+        self.assertEqual(len(warning["next_actions"]), 2)
+
+    def test_fresh_complete_sources_have_no_source_attention_actions(self):
+        status, brief = controlled_publication_inputs()
+        stages = health.current_publication_stages(status, brief)
+        collection = next(row for row in stages if row["stage"] == "collection")
+        self.assertEqual(collection["outcome"], "SUCCESS")
+        self.assertEqual(collection["source_warnings"], [])
+        self.assertEqual(health.build_health(stages)["operator_summary"]["source_actions"], [])
 
     def test_collection_keeps_last_known_success_when_current_sources_are_stale(self):
         status, brief = controlled_publication_inputs()

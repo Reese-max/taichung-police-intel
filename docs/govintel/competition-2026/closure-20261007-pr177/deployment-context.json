@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "id": null,
+  "code_sha": "b6a602580fddf8b4a634dbdf64fc255678495412",
+  "run_id": 37615111747,
+  "run_attempt": 1,
+  "deployed_at": "2026-10-07T11:40:32Z",
+  "deployed_at_basis": "GITHUB_ACTIONS_DEPLOY_JOB_COMPLETED_AT",
+  "deployment_job_id": 112773069767,
+  "log_url": "https://github.com/Reese-max/taichung-police-intel/actions/runs/37615111747/attempts/1",
+  "environment_url": "https://reese-max.github.io/taichung-police-intel/",
+  "exact_pages_deployment_status_timestamp_observed": false,
+  "scope": "ACTUAL_SUCCESSFUL_EXACT_SHA_GITHUB_ACTIONS_PAGES_DEPLOY_JOB_COMPLETION"
+}

@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "scope": "HISTORICAL_ACQUISITION_PARSER_BYTE_PRESERVATION_ONLY",
+  "original_observation_receipt": "source-s019-odt-meeting-metadata-20261007.json",
+  "original_observation_receipt_sha256": "54f5d349d41a2a91d7feed129735b88eea9ba775927ea41263928f88353948c6",
+  "recorded_local_parser_commit": "4a7a968fd1d77b980ddcdf27087bf233d4501a86",
+  "original_local_commit_remote_reachability_claimed": false,
+  "archived_parser_path": "source-reviews/2026-10-07/s019-observed-parser-v1.py",
+  "archived_parser_sha256": "02db66a3e7b326ea8ac6b8c4ec5fd99c62b2af44f22c557fbf1bfb8d4a729c8e",
+  "archived_bytes_match_original_observed_parser": true,
+  "active_parser_path": "intel_v2/s019_meeting_metadata.py",
+  "archive_used_for_new_acquisition": false,
+  "original_bodies_retained": false,
+  "original_observation_reparsed": false,
+  "additional_http_requests": 0,
+  "official_signature_or_independent_coverage_claimed": false
+}

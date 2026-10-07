@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "scope": "ACTUAL_CLAUDE_CLI_PUBLIC_CODE_ONLY_REVIEW",
+  "started_at": "2026-10-07T14:23:28.140628+00:00",
+  "code_sha": "55c118a901d083e7333392abd14f24c3a7bd0844",
+  "local_head_sha": "a58960cb521c62ecf683a38dd54297e0f6c937fb",
+  "tree_sha": "f5d9e716d6cd5701e8b5edf1e55a7b956a107a3c",
+  "pr_number": 178,
+  "logged_in": true,
+  "auth_method": "claude.ai",
+  "version": "2.1.292 (Claude Code)",
+  "prompt_sha256": "9e2ae4d9990d0b0a0ea6b7050bf9c012751159bd0092c59e4ebbeaeed75b5f91",
+  "reviewed_public_files_sha256": {
+    "intel_v2/s019_meeting_metadata.py": "9e86f878243ad8d03ba3c5de9b662f995d707bef1431e66ef5f678350df4ba07",
+    "scripts/evaluate-free-model-synthetic.py": "c86c090aff039e3804215e36fdd7f0992228d35cba716738923174448b94df2b",
+    "scripts/reference-json-collection-audit.py": "7e7413a68360faf767b1add7ebad8efb58f7a6c2878f37430cc8290979cd0caf",
+    "scripts/system-health.py": "0f2f0df2f9d67e5e07812493d607837307956e442d51e3c344b11c573c26d9a6",
+    "apps/web/lib/system-health-view.mjs": "082b30237e3ee404fc1b433e3c64a9451d6363e92c356e76ca5d0a5fcee6e9be",
+    "apps/web/components/V2DailyDashboard.js": "d7950926ee84a3223075153a16cc7354fba41ded39f6bb33525c5dfc8201d867"
+  },
+  "tools_enabled": [],
+  "official_source_bodies_sent": false,
+  "credentials_sent_in_prompt": false,
+  "formal_product_ai_trial": "NOT_RUN",
+  "new_source_admissions": 0,
+  "source_rights_approved": false,
+  "exit_code": 0,
+  "status": "COMPLETED",
+  "response_type": "result",
+  "response_subtype": "success",
+  "provider_error": false,
+  "models": [
+    "claude-opus-5-5"
+  ],
+  "finished_at": "2026-10-07T14:26:19.609659+00:00",
+  "elapsed_seconds": 171.46
+}

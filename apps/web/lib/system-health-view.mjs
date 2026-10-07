@@ -36,3 +36,28 @@ export function upstreamOperatingStateLabel(health) {
   const state = health?.upstream?.upstream_operating_state;
   return typeof state === "string" && state ? state : "UNKNOWN";
 }
+
+const SOURCE_REASON_LABELS = {
+  SOURCE_COVERAGE_OR_COLLECTION_GAP: "來源取得或涵蓋有缺口",
+  SOURCE_FRESHNESS_STALE: "官方資料日期陳舊",
+  SOURCE_FRESHNESS_UNKNOWN: "官方資料日期未知",
+  SOURCE_LAST_SUCCESS_UNKNOWN: "取得成功時間或時區未知",
+};
+
+export function sourceActionEntries(health) {
+  const rows = health?.operator_summary?.source_actions;
+  if (!Array.isArray(rows)) return [];
+  return rows.slice(0, 64).flatMap((row) => {
+    if (!row || !Array.isArray(row.reasons) || !Array.isArray(row.next_actions)
+        || row.reasons.length === 0 || row.next_actions.length === 0
+        || row.reasons.some((value) => typeof value !== "string" || !value || value.length > 128)
+        || row.next_actions.some((value) => typeof value !== "string" || !value.trim() || value.length > 512)) return [];
+    return [{
+      source_id: typeof row.source_id === "string"
+        && /^(?:S-[0-9]{3}|CTX-[A-Z0-9][A-Z0-9-]{0,31})$/.test(row.source_id)
+        ? row.source_id : "來源身分未知",
+      reasons: row.reasons.slice(0, 8).map((reason) => SOURCE_REASON_LABELS[reason] || "來源狀態待查核"),
+      next_actions: row.next_actions.slice(0, 8),
+    }];
+  });
+}

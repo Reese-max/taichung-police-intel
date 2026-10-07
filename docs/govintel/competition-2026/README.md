@@ -4,7 +4,7 @@
 
 **首期任務：查公告 → 保存自己選擇的地區／議題／路段條件 → 再次開站看有原文依據的變更。**
 
-公開查詢與同瀏覽器追蹤已合併發布；2026-10-06 的匿名五檔 hash、Gateway 綁定與 15 項正式 browser 通過。正式來源正值查詢仍 RIGHTS_BLOCKED，模型／真人效果另需驗收。個人追蹤在同一瀏覽器保存；開站或重新整理才比對，不含關站背景推播或跨裝置帳號。
+公開查詢與同瀏覽器追蹤已合併發布；2026-10-07 PR #177 的匿名五檔 hash、Gateway 綁定與 15 項正式 browser 通過。正式來源正值查詢仍 RIGHTS_BLOCKED，模型／真人效果另需驗收。個人追蹤在同一瀏覽器保存；開站或重新整理才比對，不含關站背景推播或跨裝置帳號。
 
 ## 3–5 分鐘檢視
 
@@ -16,6 +16,7 @@
 
 ## 目前可說的結論
 
+- [2026-10-07 PR #177 固定驗收包](closure-20261007-pr177/README.md)保存三個必要 CI job、匿名五檔、Gateway 與 15 項正式 browser；後續修復另留 receipt。
 - [2026-10-06 驗收包](closure-20261006/README.md)固定已發布 `5e2298c…`、release、checkpoint、資料 generation、policy／hash 與 browser；本地、CI、正式發布及真人各自留證。
 - D1 固定 112Y12M 官方 CSV 與臺中 29 區已核對，正式 UI 值通過；不是目前人口或真人用途效益。D2 原檔 403、資料列／CRS 未驗證。
 - 真實隔離 artifact 失敗→恢復通知已送達 #20，API 回讀 body hash 一致；正式 source/deploy recovery、raw purge、負載與成本仍需逐項留證。

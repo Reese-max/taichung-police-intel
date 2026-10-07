@@ -6,6 +6,7 @@ import {
   formatSloMetric,
   sloMetricEntries,
   stageModelEntries,
+  sourceActionEntries,
   upstreamOperatingStateLabel,
 } from "../lib/system-health-view.mjs";
 import { isHealthyStaleSource } from "../lib/source-status.js";
@@ -283,6 +284,7 @@ function SystemHealthSummary({ health, localReview, onDecision, onFeedback, onEx
   if (!health || !health.lanes || !Array.isArray(health.stages)) return null;
   const stageIds = stageModelEntries(health);
   const sloMetrics = sloMetricEntries(health);
+  const sourceActions = sourceActionEntries(health);
   return (
     <details className="v2-system-health" data-testid="v2-system-health">
       <summary>端到端系統健康：{health.overall}</summary>
@@ -314,6 +316,16 @@ function SystemHealthSummary({ health, localReview, onDecision, onFeedback, onEx
             {health.operator_summary.primary_stage && ` · ${health.operator_summary.primary_stage.lane}/${health.operator_summary.primary_stage.stage}`}
             {health.operator_summary.primary_stage?.error_class && ` · ${health.operator_summary.primary_stage.error_class}`}
           </p>
+        )}
+        {sourceActions.length > 0 && (
+          <ul className="v2-health-stage-list" aria-label="來源檢查待辦">
+            {sourceActions.map((action, index) => (
+              <li key={`${action.source_id}-${index}`}>
+                <strong>{action.source_id} · {action.reasons.join("；")}</strong>
+                <p>{action.next_actions.join(" ")}</p>
+              </li>
+            ))}
+          </ul>
         )}
         <ul className="v2-health-stage-list">
           {health.stages.map((stage) => (

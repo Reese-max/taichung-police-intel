@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "scope": "LOCAL_OFFLINE_REGRESSION_ONLY_NOT_MODEL_HUMAN_OR_SOURCE_COMPLETENESS_TRIAL",
+  "base_code_sha": "b6a602580fddf8b4a634dbdf64fc255678495412",
+  "status": "PASS",
+  "suites": [
+    {
+      "suite": "synthetic",
+      "count": 8,
+      "passed": 8,
+      "failed": 0,
+      "skipped": 0,
+      "log_sha256": "563241091606f1e77b2fd858f64e65f561ce8713ec844bdfe5de3354cffd53f7"
+    },
+    {
+      "suite": "health",
+      "count": 46,
+      "passed": 46,
+      "failed": 0,
+      "skipped": 0,
+      "log_sha256": "73838fd539fe05be1c5656ebf132104a34167402131a0f40212906c6184b7006"
+    },
+    {
+      "suite": "grain",
+      "count": 24,
+      "passed": 24,
+      "failed": 0,
+      "skipped": 0,
+      "log_sha256": "60fa810b0cff4f8654363923328966ffa3bd30405ecb9c0f17677a7ad7f54255"
+    },
+    {
+      "suite": "s019",
+      "count": 32,
+      "passed": 32,
+      "failed": 0,
+      "skipped": 0,
+      "log_sha256": "65bab6837164880f6bdbf8165fe1db4ba129393b09fc2d564db797e917230c78"
+    },
+    {
+      "suite": "ui",
+      "count": 13,
+      "passed": 13,
+      "failed": 0,
+      "skipped": 0,
+      "log_sha256": "84c93db31d65f35f238c1db8dc82f746c4e071fc5ee995550e362ff7d4b309d6"
+    }
+  ],
+  "disjoint_total": 123,
+  "test_source_http_calls": 0,
+  "test_model_network_calls": 0,
+  "human_participants": 0,
+  "new_source_admissions": 0,
+  "rights_approved": false,
+  "product_semantic_ai_trial": "NOT_RUN",
+  "earlier_115_case_receipt_sha256": "a37d97e2e6a84ab71c6ea03846aa1a0c567dbc3fd57f1080bd311d803b10dad4"
+}

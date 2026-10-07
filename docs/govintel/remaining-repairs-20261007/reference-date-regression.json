@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "fixture_scope": "FICTIONAL_OFFLINE_ONLY_NO_OFFICIAL_AUTHORITY",
+  "baseline_commit": "a9e7d4ec2acda8ca8b0694d86aaf993cee3316fa",
+  "regression_fixture": "ASCII_DATE_PLUS_FULLWIDTH_YEAR_DATE_SAME_CANONICAL_MONTH_DIFFERENT_VALUE_STRINGS",
+  "before_false_conflicting_candidate_key_groups": 1,
+  "after_conflicting_candidate_key_groups": 0,
+  "before_quarantined_rows": 0,
+  "after_quarantined_rows": 1,
+  "all_original_rows_retained": true,
+  "candidate_key_includes_exact_date": true,
+  "iso_date_digits": "ASCII_ONLY",
+  "script_sha256": "7e7413a68360faf767b1add7ebad8efb58f7a6c2878f37430cc8290979cd0caf",
+  "targeted_suite_tests": 24,
+  "targeted_suite_result": "PASS",
+  "targeted_suite_log_sha256": "196f4fef46406a91390b1eebe14583c8082b80cb61c15bf13b24d6c03c524aa9",
+  "previous_safe_receipt_sha256": "5f59cf643156a46050d54ad5304db4e6aa9cb04d16da6304156c5159ac91c4dc",
+  "actual_safe_receipt_v2_sha256": "5b53c49a1bc3b34ab81600285c6c664373ee787ffec4d0db15f700482a4a900f"
+}
