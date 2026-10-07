@@ -1,0 +1,249 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-10-07T10:37:03.996216+00:00",
+  "status": "FIXES_IMPLEMENTED_FOCUSED_AND_COMPATIBILITY_PASS_RELEASE_RECEIPTS_SEPARATE",
+  "scope": "ACTUAL_CLAUDE_PUBLIC_CODE_REVIEW_PLUS_FICTIONAL_REPLAYS_ONLY",
+  "reviewed_code_sha": "85260b938b51e9a24ec3aabbb851e2263bd88356",
+  "actual_claude_review": {
+    "schema_version": 1,
+    "started_at": "2026-10-07T10:25:03.196087+00:00",
+    "finished_at": "2026-10-07T10:26:35.435982+00:00",
+    "scope": "ACTUAL_CLAUDE_CLI_PUBLIC_CODE_ONLY_REVIEW",
+    "status": "COMPLETED",
+    "code_sha": "85260b938b51e9a24ec3aabbb851e2263bd88356",
+    "version": "2.1.292 (Claude Code)",
+    "logged_in": true,
+    "auth_method": "claude.ai",
+    "source_code_sha256": "524edbc6e56227af8bfe72bf3fa822e1207eae87b52d583597627c851b7f18bf",
+    "prompt_sha256": "3cd66bee60fc00b21d80313e1ca6cf1246554dc1af46fe7119d8875d11e0ee43",
+    "models": [
+      "claude-opus-5-5"
+    ],
+    "elapsed_seconds": 92.23,
+    "tools_enabled": [],
+    "official_source_bodies_sent": false,
+    "credentials_sent_in_prompt": false,
+    "formal_product_ai_trial": "NOT_RUN",
+    "new_source_admissions": 0,
+    "source_rights_approved": false,
+    "exit_code": 0,
+    "response_type": "result",
+    "response_subtype": "success",
+    "provider_error": false
+  },
+  "first_attempt": {
+    "status": "INVOCATION_FAILED",
+    "exit_code": 1,
+    "models": [],
+    "started_at": "2026-10-07T10:22:36.905106+00:00",
+    "finished_at": "2026-10-07T10:22:37.393102+00:00",
+    "elapsed_seconds": 0.48,
+    "provider_error": true,
+    "cause": "CLI --bare omits OAuth/keychain authentication; the already logged-in status did not make this invocation authenticated.",
+    "resolution": "Removed --bare while explicitly disabling tools, hooks, plugin/MCP use, automatic memory and session persistence; the second invocation completed.",
+    "counts_as_completed_model_review": false
+  },
+  "input_limits": {
+    "published_repository_code_only": true,
+    "official_source_bodies_sent": false,
+    "credentials_or_oauth_links_sent": false,
+    "model_tools_enabled": [],
+    "external_source_rights_inferred": false
+  },
+  "findings": [
+    {
+      "id": "CF-01",
+      "origin": "ACTUAL_CLAUDE_CODE_REVIEW",
+      "claim": "Runtime parser wrappers can keep a source fingerprint while changing parsed rows.",
+      "replay_status": "CONFIRMED_BY_INDEPENDENT_AGENT",
+      "replay_scope": "Fictional HTML/FakeSession only; no official source GETs.",
+      "observed_before_fix": "functools.wraps caused inspect.getsource to unwrap to the original parser; two rows became one while binding was unchanged.",
+      "fix_status": "FIXED",
+      "verification_status": "PASS_FICTIONAL_REGRESSIONS_AND_INDEPENDENT_REVIEW"
+    },
+    {
+      "id": "CF-02",
+      "origin": "ACTUAL_CLAUDE_CODE_REVIEW",
+      "claim": "Stale imported bytecode can be fingerprinted using changed disk source.",
+      "replay_status": "CONFIRMED_BY_FICTIONAL_STALE_IMPORT_TEST",
+      "replay_scope": "Same-length source edit changes loaded-vs-disk bytecode; helper refuses without executing current source.",
+      "fix_status": "FIXED",
+      "verification_status": "PASS_FICTIONAL_REGRESSIONS_AND_INDEPENDENT_REVIEW"
+    },
+    {
+      "id": "CF-03",
+      "origin": "ACTUAL_CLAUDE_CODE_REVIEW",
+      "claim": "An image-alt Next plus Last pointing to a later page may seal a false terminal.",
+      "replay_status": "ALREADY_REJECTED_BY_BASELINE",
+      "replay_scope": "Fictional Next image-alt target 2 / Last target 9 at first page.",
+      "observed_before_fix": "Actual navigation helper returned unresolved=(None, true), and collection refused to seal a checkpoint.",
+      "fix_status": "NO_CONFIRMED_BUG_FOR_THIS_COUNTEREXAMPLE",
+      "verification_status": "BASELINE_REJECTION_PRESERVED_BY_COMPATIBILITY_TESTS"
+    },
+    {
+      "id": "CF-04",
+      "origin": "ACTUAL_CLAUDE_CODE_REVIEW",
+      "claim": "Two distinct Next targets may select one silently or issue an out-of-sequence request.",
+      "replay_status": "ALREADY_REJECTED_BY_BASELINE",
+      "replay_scope": "Fictional NEXT target 2 and NEXT target 3.",
+      "observed_before_fix": "Actual navigation helper returned unresolved and collector rejected before the next-page GET.",
+      "fix_status": "NO_CONFIRMED_BUG_FOR_THIS_COUNTEREXAMPLE",
+      "verification_status": "BASELINE_REJECTION_PRESERVED_BY_COMPATIBILITY_TESTS"
+    },
+    {
+      "id": "CF-05",
+      "origin": "ACTUAL_CLAUDE_CODE_REVIEW_AND_INDEPENDENT_REPLAY",
+      "claim": "Multiple targets for the same Previous role can be accepted.",
+      "replay_status": "CONFIRMED_BY_INDEPENDENT_AGENT",
+      "replay_scope": "Fictional page 3 with Previous targets 1/2, clamped Next target 3 and Last target 3.",
+      "observed_before_fix": "Normalizer accepted conflicting Previous targets; helper treated the page as terminal.",
+      "fix_status": "FIXED",
+      "verification_status": "PASS_FICTIONAL_REGRESSIONS_AND_INDEPENDENT_REVIEW"
+    },
+    {
+      "id": "CF-06",
+      "origin": "ADDITIONAL_INDEPENDENT_AGENT_FINDING",
+      "claim": "Same-page duplicate stable IDs with conflicting row metadata are silently reduced to the first row.",
+      "replay_status": "CONFIRMED_BY_INDEPENDENT_AGENT",
+      "replay_scope": "Fictional stable ID 999 with distinct title/date metadata on the same page.",
+      "observed_before_fix": "Baseline parse_news_list deduplicated by stable ID before recording metadata, hiding a conflict from checkpoint row guards.",
+      "fix_status": "FIXED",
+      "verification_status": "PASS_FICTIONAL_REGRESSIONS_AND_INDEPENDENT_REVIEW"
+    },
+    {
+      "id": "CF-07",
+      "origin": "INDEPENDENT_ROOT_INTEGRATION_REVIEW",
+      "claim": "The aggregate fingerprint helper can be replaced with a wrapper returning prior hashes before it validates itself.",
+      "replay_status": "CONFIRMED_BY_INDEPENDENT_AGENT",
+      "fix_status": "FIXED",
+      "resolution": "Import-time original helper object/code/default snapshots are checked with plain operations before calling aggregate checker; guard itself is registered.",
+      "scope_limit": "Local registered-callable consistency, not an integrity boundary against arbitrary interpreter or global changes.",
+      "verification_status": "PASS_FICTIONAL_REGRESSIONS_AND_INDEPENDENT_REVIEW"
+    }
+  ],
+  "unverified_reviewer_observations": [
+    {
+      "topic": "Third-party parser dependency versions",
+      "status": "NOT_VALIDATED_IN_THIS_REVIEW"
+    },
+    {
+      "topic": "Identical cross-page repeats and list drift",
+      "status": "NOT_AN_INDEPENDENT_COMPLETENESS_CHECK"
+    },
+    {
+      "topic": "Exception type consistency for invalid date fields",
+      "status": "NOT_REPLAYED_IN_THIS_EVIDENCE_DRAFT"
+    },
+    {
+      "topic": "Availability impact of pager-like CSS labels on article anchors",
+      "status": "NOT_REPLAYED_IN_THIS_EVIDENCE_DRAFT"
+    }
+  ],
+  "followup_validation": {
+    "status": "LOCAL_FOCUSED_AND_BOUNDED_COMPATIBILITY_PASS",
+    "functional_code_sha": "04e9df84fc740dd3368449a75471429d9fc3b9f9",
+    "focused_test_count": 170,
+    "disjoint_test_modules": {
+      "test_checkpoint_code_binding": 23,
+      "test_news_list_runtime_binding_integration": 7,
+      "test_news_list_checkpoint": 40,
+      "test_news_list_parser_page": 13,
+      "test_news_list_terminal_page": 11,
+      "test_news_list_collector": 30,
+      "test_news_list_budget": 8,
+      "test_candidate_runtime_canary": 19,
+      "test_live_canary_transport": 19
+    },
+    "focused_log_sha256": "417503d0149f75551654a292f22b85fd1cf2dea27c50cb22b6dbeedddbb0428a",
+    "root_baseline_red_runtime_tests": {
+      "tests": 3,
+      "failures": 3,
+      "errors": 0
+    },
+    "independent_integration_review": {
+      "schema_version": 1,
+      "status": "PASS",
+      "scope": "FICTIONAL_REGISTERED_RUNTIME_AND_PAGER_ROW_INTEGRATION_REVIEW",
+      "new_checker_bootstrap_regressions": 4,
+      "integration_tests": 7,
+      "all_integration_tests": "PASS",
+      "isolated_omitted_guard_counterexamples": {
+        "tests": 3,
+        "failures": 3,
+        "errors": 0,
+        "status": "EXPECTED_RED"
+      },
+      "root_baseline_runtime_red_tests": 3,
+      "source_http_calls": 0,
+      "credentials_read": false,
+      "provider_calls": 0,
+      "blocked_findings_remaining": 0,
+      "scope_limit": "Registered helper/runtime consistency; arbitrary interpreter changes and unregistered globals are outside this guarantee."
+    },
+    "full_gate": "REQUIRED_AFTER_THIS_DOCUMENTATION_COMMIT",
+    "required_ci": "REQUIRED_BEFORE_MERGE_EXACT_TREE_AND_CHROMIUM",
+    "publication": "SEPARATE_POSTMERGE_RECEIPT_REQUIRED",
+    "production_readback": "SEPARATE_LATEST_COHERENT_CHECKPOINT_AND_DEPLOYMENT_RECEIPT_REQUIRED"
+  },
+  "governance_limits": {
+    "window_completeness": "PARTIAL",
+    "coverage_independently_verified": false,
+    "detail_attachments_verified": false,
+    "all_15_source_business_scopes_complete": false,
+    "source_rights_approved": false,
+    "new_source_admissions": 0,
+    "model_transmission_allowed": false,
+    "promotion_eligible": false,
+    "formal_query": "RIGHTS_BLOCKED",
+    "provider_state": "DISABLED",
+    "formal_product_ai_trial": "NOT_RUN",
+    "human_trial": "NOT_RUN",
+    "additional_natural_days_claimed": 0,
+    "historical_checkpoints_migrated": false
+  },
+  "evidence_files": {
+    "actual_claude_review_receipt": {
+      "sha256": "d404aa28745ecbaa22215a34479fa236182b4bfce66813bcbfd104710b28fcee"
+    },
+    "first_failed_cli_attempt_receipt": {
+      "sha256": "2495429c3a188586186d646af274d6dbd39fc322933bf1d030b7478fb1676d65"
+    },
+    "bounded_compatibility_receipt": {
+      "sha256": "69b19f9bf1be2333946b367cdf4471c308f56cfd80c50db38694ed8652c42227"
+    }
+  },
+  "scope_limit": "A successful model review and replay can support public-code repairs. They do not establish source completeness, rights approval, product semantic AI acceptance, human acceptance or a deployed followup until separate receipts exist.",
+  "implementation_base_sha": "1d55c05935538131239196dcf4a2d0fb4365c3ed",
+  "implementation_base_note": "Preserves already merged PR175 pager/archive repairs; Claude reviewed earlier85260b9 code.",
+  "runtime_binding_scope": {
+    "registered_module_functions": true,
+    "loaded_bytecode_matches_current_compiled_source": true,
+    "source_execution_by_checker": false,
+    "source_path_or_line_position_in_runtime_hash": false,
+    "python_runtime_version_bound": true,
+    "thirdparty_dependencies_bound": false,
+    "arbitrary_interpreter_or_unregistered_globals_integrity_boundary": false
+  },
+  "bounded_live_compatibility": {
+    "status": "PASS",
+    "scope": "BOUNDED_V2_COMPATIBILITY_NOT_FULL_REACQUISITION_OR_COVERAGE",
+    "receipt": "s032-runtime-binding-compatibility-20261007.json",
+    "code_sha": "04e9df84fc740dd3368449a75471429d9fc3b9f9",
+    "started_at": "2026-10-07T10:48:33.883293+00:00",
+    "finished_at": "2026-10-07T10:48:40.987515+00:00",
+    "http_attempts": 5,
+    "prefix_pages": 4,
+    "prefix_unique_ids": 39,
+    "standalone_terminal_page": 82,
+    "full_82_page_reacquisition": false,
+    "window_completeness": "PARTIAL",
+    "earlier_pre_bootstrap_development_probe": {
+      "code_sha": "7fe5250868a8b42fa7cc26b007b56859db041b33",
+      "http_attempts": 5,
+      "status": "PASS_BEFORE_ADDITIONAL_CHECKER_FIX",
+      "not_final_code_acceptance": true
+    },
+    "actual_http_attempts_this_followup_total": 10,
+    "new_natural_days": 0
+  }
+}

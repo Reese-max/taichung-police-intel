@@ -574,8 +574,10 @@ def get_news_listing(session: requests.Session, source_id: str) -> requests.Resp
         return get(session, fallback_url, source_id=source_id)
 
 
-def parse_news_list(html: bytes, base_url: str, id_pattern: str) -> list[dict]:
-    """Extract stable IDs, titles, detail URLs, and row dates from a list page."""
+def parse_news_list(html: bytes, base_url: str, id_pattern: str, *, strict_same_page_ids: bool = False) -> list[dict]:
+    """Extract rows; opt-in strict receipts reject conflicting IDs before dedup."""
+    if type(strict_same_page_ids) is not bool:
+        raise ValueError("strict_same_page_ids must be boolean")
     soup = BeautifulSoup(html, "html.parser")
     pattern = re.compile(id_pattern)
     seen: dict[str, dict] = {}
@@ -590,13 +592,16 @@ def parse_news_list(html: bytes, base_url: str, id_pattern: str) -> list[dict]:
         stable_key = match.group(1)
         row = anchor.find_parent(["li", "tr", "dd", "div"]) or anchor.parent or anchor
         row_text = " ".join(row.stripped_strings)
+        candidate = {
+            "stable_key": stable_key,
+            "title": re.sub(r"\s+", " ", anchor.get_text(strip=True)),
+            "detail_url": urllib.parse.urljoin(base_url, anchor["href"]),
+            "published": roc_date(row_text),
+        }
         if stable_key not in seen:
-            seen[stable_key] = {
-                "stable_key": stable_key,
-                "title": re.sub(r"\s+", " ", anchor.get_text(strip=True)),
-                "detail_url": urllib.parse.urljoin(base_url, anchor["href"]),
-                "published": roc_date(row_text),
-            }
+            seen[stable_key] = candidate
+        elif strict_same_page_ids and candidate != seen[stable_key]:
+            raise ValueError("conflicting stable row within one list page")
     entries = list(seen.values())
     if not entries:
         raise ValueError("news list has no parseable entries")
@@ -680,7 +685,7 @@ def _traffic_news_list_next(soup: BeautifulSoup, base_url: str) -> tuple[str | N
             return None, True
         if any(int(re.search(r"\d+", label).group()) != target[1] for label in numbered):
             return None, True
-        if is_first and target[1] != 1 or is_previous and target[1] > current[1]:
+        if is_first and target[1] != 1 or is_previous and target[1] != max(1, current[1] - 1):
             return None, True
         controls.append(target[1])
         if is_last:

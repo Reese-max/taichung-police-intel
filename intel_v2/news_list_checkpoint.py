@@ -8,16 +8,17 @@ from __future__ import annotations
 from copy import deepcopy
 from datetime import date, datetime, timezone
 import hashlib
-import inspect
 import json
 from pathlib import Path
 import re
 import time
+from types import FunctionType
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
 import online_collect as oc
+from intel_v2 import checkpoint_code_binding as cb
 
 MAX_CHECKPOINT_BYTES = 2 * 1024 * 1024
 MAX_TOTAL_PAGES = 256
@@ -33,6 +34,29 @@ ROLE_LABELS = {
     "LAST": {"最後一頁", "最后一页", "末頁", "末页", "最末頁", "最末页", "last", "last page"},
 }
 REL_ROLES = {"first": "FIRST", "prev": "PREVIOUS", "previous": "PREVIOUS", "next": "NEXT", "last": "LAST"}
+CODE_BINDING_HELPERS = ("_encoded", "_normalize", "_code_payload", "_function_payload",
+                        "runtime_code_fingerprint", "_compiled_source", "_assert_source_coherent",
+                        "callable_fingerprints", "callable_fingerprint")
+# The checker cannot establish its own replacement's authenticity by calling
+# that replacement. Hold imported identities/code/defaults and check them with
+# plain operations before dispatch; current source coherence is then checked
+# by the original aggregate function below. These local snapshots are not a
+# security boundary against arbitrary changes to the interpreter or globals.
+_CODE_BINDING_SNAPSHOT = tuple((name, getattr(cb, name), getattr(cb, name).__code__,
+                               deepcopy(getattr(cb, name).__defaults__), deepcopy(getattr(cb, name).__kwdefaults__))
+                              for name in CODE_BINDING_HELPERS)
+
+
+def _assert_code_binding_runtime():
+    expected_path = Path(__file__).resolve().parent / "checkpoint_code_binding.py"
+    for name, expected_function, expected_code, expected_defaults, expected_kwdefaults in _CODE_BINDING_SNAPSHOT:
+        function = getattr(cb, name, None)
+        if (type(function) is not FunctionType or function is not expected_function
+                or function.__code__ is not expected_code or hasattr(function, "__wrapped__")
+                or function.__defaults__ != expected_defaults or function.__kwdefaults__ != expected_kwdefaults
+                or function.__name__ != name or function.__qualname__ != name or function.__module__ != cb.__name__
+                or function.__globals__ is not vars(cb) or Path(function.__code__.co_filename).resolve() != expected_path):
+            raise ValueError("parser code binding changed; restart from the official entrypoint")
 
 
 def digest(value):
@@ -50,20 +74,26 @@ def binding(start, end):
     if type(start) is not date or type(end) is not date or start > end:
         raise ValueError("valid ordered start/end dates required")
     root = Path(__file__).resolve().parents[1]
-    # Full modules cover helpers/constants as well as the row projection and
-    # transport. Live callable fingerprints also reject in-memory replacement
-    # of a core parser while an already-imported process is running.
+    _assert_code_binding_runtime()
+    # Current file bytes and loaded callable semantics must agree. Compiling
+    # source does not execute it; wrappers or stale imports require a restart.
+    # This binds registered code/config, not arbitrary interpreter or library
+    # changes, unregistered globals, or an independent completeness authority.
     modules = ("online_collect.py", "collect.py", "intel_v2/news_list_checkpoint.py",
-               "scripts/news-list-resume.py", "scripts/candidate-runtime-canary.py")
+               "intel_v2/checkpoint_code_binding.py", "scripts/news-list-resume.py",
+               "scripts/candidate-runtime-canary.py")
     module_hashes = {name: hashlib.sha256((root / name).read_bytes()).hexdigest() for name in modules}
-    functions = {"row_parser": oc.parse_news_list, "row_date_parser": oc.roc_date,
-                 "cursor_parser": oc._traffic_list_page_identity, "navigation_parser": oc._traffic_news_list_next,
-                 "row_projection": row_metadata, "canonical_digest": digest, "control_projection": pager_controls,
-                 "batch_projection": collect_batch}
-    try:
-        callable_hashes = {name: hashlib.sha256(inspect.getsource(function).encode()).hexdigest() for name, function in functions.items()}
-    except (TypeError, OSError) as error:
-        raise ValueError("parser code binding is unverifiable; restart from the official entrypoint") from error
+    registry = {name: (getattr(oc, name), root / "online_collect.py", name) for name in
+                ("parse_news_list", "roc_date", "_traffic_list_page_identity", "_traffic_news_list_next")}
+    registry.update({name: (globals()[name], root / "intel_v2/news_list_checkpoint.py", name) for name in
+                     ("_assert_code_binding_runtime", "binding", "digest", "encode_checkpoint", "seal", "new_checkpoint", "canonical_cursor",
+                      "pager_controls", "validated_control_targets", "control_html", "row_metadata",
+                      "validate_checkpoint", "collect_batch")})
+    registry.update({"code_binding." + name: (getattr(cb, name), root / "intel_v2/checkpoint_code_binding.py", name)
+                     for name in CODE_BINDING_HELPERS})
+    callable_hashes = cb.callable_fingerprints(registry)
+    if module_hashes != {name: hashlib.sha256((root / name).read_bytes()).hexdigest() for name in modules}:
+        raise ValueError("parser code binding changed; restart from the official entrypoint")
     return {
         "schema_version": 2, "source_id": "S-032", "source_url": oc.NEWS_LIST_SOURCES["S-032"]["list_url"],
         "requested_start": start.isoformat(), "requested_end": end.isoformat(),
@@ -71,6 +101,11 @@ def binding(start, end):
         "module_code_sha256": module_hashes, "callable_code_sha256": callable_hashes,
         "source_row_contract_sha256": digest(oc.NEWS_LIST_SOURCES["S-032"]),
         "control_contract_sha256": digest({"roles": sorted(ROLES), "labels": {role: sorted(values) for role, values in ROLE_LABELS.items()}, "rel_roles": REL_ROLES}),
+        "runtime_limits_sha256": digest({"checkpoint_bytes": MAX_CHECKPOINT_BYTES, "total_pages": MAX_TOTAL_PAGES,
+                                         "total_rows": MAX_TOTAL_ROWS, "controls": MAX_CONTROLS,
+                                         "default_list_pages": oc.MAX_NEWS_LIST_PAGES,
+                                         "hard_list_pages": oc.MAX_NEWS_LIST_PAGES_HARD_LIMIT,
+                                         "binding_source_bytes": cb.MAX_SOURCE_BYTES, "binding_value_depth": cb.MAX_VALUE_DEPTH}),
         "validation_scope": SCOPE,
     }
 
@@ -132,16 +167,39 @@ def pager_controls(body, base_url):
         if len(result) >= MAX_CONTROLS:
             raise ValueError("pagination metadata bound exceeded")
         result.append({"role": next(iter(roles)), "target_page": target[1]})
+    validated_control_targets(result, current[1])
     return result
 
 
-def control_html(controls):
+def validated_control_targets(controls, current_page=None):
+    """Require one target per role and consistent relative pager semantics."""
     if type(controls) is not list or len(controls) > MAX_CONTROLS:
         raise ValueError("invalid pager controls")
-    result = []
+    targets = {}
     for control in controls:
         if type(control) is not dict or set(control) != {"role", "target_page"} or type(control["role"]) is not str or control["role"] not in ROLES:
             raise ValueError("invalid normalized pager control shape")
+        canonical_cursor(control["target_page"])
+        role = control["role"]
+        if role != "NUMBERED":
+            if role in targets and targets[role] != control["target_page"]:
+                raise ValueError("conflicting targets for pagination role")
+            targets[role] = control["target_page"]
+    if "FIRST" in targets and targets["FIRST"] != 1:
+        raise ValueError("pagination first target must be page 1")
+    if current_page is not None:
+        canonical_cursor(current_page)
+        if "PREVIOUS" in targets and targets["PREVIOUS"] != max(1, current_page - 1):
+            raise ValueError("pagination previous target must be adjacent or clamped at the first page")
+        if "LAST" in targets and targets["LAST"] < current_page:
+            raise ValueError("pagination last target precedes the current page")
+    return targets
+
+
+def control_html(controls):
+    validated_control_targets(controls)
+    result = []
+    for control in controls:
         target = canonical_cursor(control["target_page"])
         role = control["role"]
         if role == "NUMBERED":
@@ -207,6 +265,7 @@ def validate_checkpoint(checkpoint, start, end, expected_sha256=None):
             if observed.tzinfo is None or (last_observed is not None and observed < last_observed):
                 raise ValueError("observation time must be aware and monotonic")
             last_observed = observed
+            validated_control_targets(page["controls"], identity[1])
             markup = control_html(page["controls"])
             following, has_next = oc._traffic_news_list_next(BeautifulSoup(markup.decode("utf-8"), "html.parser"), cursor)
             if following is None and has_next:
@@ -274,7 +333,7 @@ def collect_batch(session, start, end, *, checkpoint=None, expected_sha256=None,
         # A same-host redirect is not evidence of the requested list cursor.
         if response.url != cursor:
             raise ValueError("redirected list cursor requires review")
-        entries = oc.parse_news_list(response.content, cursor, oc.NEWS_LIST_SOURCES["S-032"]["id_pattern"])
+        entries = oc.parse_news_list(response.content, cursor, oc.NEWS_LIST_SOURCES["S-032"]["id_pattern"], strict_same_page_ids=True)
         controls = pager_controls(response.content, cursor)
         next_url, has_next = oc._traffic_news_list_next(BeautifulSoup(control_html(controls).decode("utf-8"), "html.parser"), cursor)
         if next_url is None and has_next:

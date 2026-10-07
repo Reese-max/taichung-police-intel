@@ -416,5 +416,79 @@ class CheckpointV2Tests(unittest.TestCase):
             session.close.assert_called_once()
 
 
+class CheckpointRowPagerTests(unittest.TestCase):
+    def test_same_page_id_conflicts_are_detected_before_dedup(self):
+        original='<li><a href="index-1.asp?Parser=9,4,20,,,,999">FICTIONAL TITLE</a><span>2026-09-19</span></li>'
+        variations=(original.replace("FICTIONAL TITLE","FICTIONAL DIFFERENT"),
+                    original.replace("2026-09-19","2026-09-18"),
+                    original.replace('999"','999&variant=1"'),
+                    original.replace('<span>2026-09-19</span>',""))
+        for changed in variations:
+            body=('<meta charset="utf-8">'+original+changed+f'<a href="{ROOT}">下一頁</a><a href="{ROOT}">最末頁</a>').encode()
+            session=FakeSession({ROOT:body})
+            with self.subTest(changed=changed),self.assertRaisesRegex(ValueError,"stable row.*list page"):
+                cp.collect_batch(session,START,END,max_list_pages=1)
+            self.assertEqual(session.fetched,[ROOT])
+
+    def test_identical_same_page_rows_remain_accepted(self):
+        original='<li><a href="index-1.asp?Parser=9,4,20,,,,999">FICTIONAL TITLE</a><span>2026-09-19</span></li>'
+        body=('<meta charset="utf-8">'+original+original+f'<a href="{ROOT}">下一頁</a><a href="{ROOT}">最末頁</a>').encode()
+        checkpoint,state=cp.collect_batch(FakeSession({ROOT:body}),START,END,max_list_pages=1)
+        self.assertEqual(len(checkpoint["batches"][0]["pages"][0]["rows"]),1)
+        self.assertTrue(state["prefix_to_declared_terminal_consistent"])
+        self.assertEqual(state["window_completeness"],"PARTIAL")
+        self.assertFalse(state["promotion_eligible"])
+
+    def test_each_nonnumbered_role_rejects_distinct_targets(self):
+        for role,label,targets in (("FIRST","第一頁",(1,2)),("PREVIOUS","上一頁",(1,2)),
+                                   ("NEXT","下一頁",(3,4)),("LAST","最末頁",(3,4))):
+            body=(''.join(f'<a href="{page(target)}">{label}</a>' for target in targets)).encode()
+            with self.subTest(role=role),self.assertRaisesRegex(ValueError,"role|target"):
+                cp.pager_controls(body,page(3))
+
+    def test_resealed_conflicting_role_metadata_is_rejected(self):
+        _,bodies=fixtures()
+        checkpoint,_=cp.collect_batch(FakeSession(bodies),START,END,max_list_pages=1)
+        record=checkpoint["batches"][0]["pages"][0]
+        record["controls"].append({"role":"NEXT","target_page":3})
+        with self.assertRaisesRegex(ValueError,"role|target"):
+            cp.validate_checkpoint(rebuild(checkpoint),START,END)
+
+    def test_resealed_nonadjacent_previous_metadata_is_rejected(self):
+        _,bodies=fixtures()
+        checkpoint,_=cp.collect_batch(FakeSession(bodies),START,END,max_list_pages=3)
+        record=checkpoint["batches"][0]["pages"][2]
+        record["controls"].append({"role":"PREVIOUS","target_page":1})
+        with self.assertRaisesRegex(ValueError,"previous|relative|pagination"):
+            cp.validate_checkpoint(rebuild(checkpoint),START,END)
+
+    def test_resealed_same_page_row_metadata_conflict_is_rejected(self):
+        _,bodies=fixtures()
+        checkpoint,_=cp.collect_batch(FakeSession(bodies),START,END,max_list_pages=1)
+        rows=checkpoint["batches"][0]["pages"][0]["rows"]
+        rows.append({**rows[0],"list_sha256":"a"*64})
+        with self.assertRaisesRegex(ValueError,"stable row changed"):
+            cp.validate_checkpoint(rebuild(checkpoint),START,END)
+
+    def test_identical_controls_and_multiple_numbered_targets_are_allowed(self):
+        _,bodies=fixtures()
+        extra=(f'<a href="{ROOT}">第一頁</a><a href="{ROOT}">上一頁</a><a href="{ROOT}">上一頁</a>'
+               f'<a href="{page(2)}">下一頁</a><a href="{page(6)}">最末頁</a>'
+               f'<a href="{ROOT}">1</a><a href="{page(2)}">2</a>')
+        bodies[ROOT]+=extra.encode()
+        checkpoint,state=cp.collect_batch(FakeSession(bodies),START,END,max_list_pages=1)
+        self.assertEqual(state["next_resume_url"],page(2))
+        self.assertEqual(cp.validate_checkpoint(checkpoint,START,END),state)
+        self.assertEqual(state["window_completeness"],"PARTIAL")
+
+    def test_same_page_strictness_is_explicit_for_receipts(self):
+        body=('<meta charset="utf-8"><li><a href="index-1.asp?Parser=9,4,20,,,,999">FICTIONAL FIRST 2026-09-19</a></li>'
+              '<li><a href="index-1.asp?Parser=9,4,20,,,,999">FICTIONAL CHANGED 2026-09-18</a></li>').encode()
+        pattern=cp.oc.NEWS_LIST_SOURCES["S-032"]["id_pattern"]
+        self.assertEqual(len(cp.oc.parse_news_list(body,ROOT,pattern)),1)
+        with self.assertRaisesRegex(ValueError,"stable row.*list page"):
+            cp.oc.parse_news_list(body,ROOT,pattern,strict_same_page_ids=True)
+
+
 if __name__ == "__main__":
     unittest.main()
