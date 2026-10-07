@@ -1,0 +1,1600 @@
+{
+  "schema_version": 1,
+  "status": "METADATA_RECHECK_ONLY_NOT_RESOURCE_ACQUIRED",
+  "observed_at": "2026-10-07T06:56:27+00:00",
+  "source_id": "S-037",
+  "dataset_id": "5958",
+  "metadata_receipt": {
+    "inventory_id": "REFERENCE-S037-D2",
+    "dataset_id": "5958",
+    "metadata_url": "https://data.gov.tw/api/v2/rest/dataset/5958",
+    "final_url": "https://data.gov.tw/api/v2/rest/dataset/5958",
+    "http_status": 200,
+    "content_type": "application/json",
+    "raw_bytes": 2524,
+    "raw_sha256": "0c08d96a8613dc794780822e6ecb07c574916e27f2ddf1658ab0b44c56b74d7a",
+    "title": "各縣(市)警察(分)局暨所屬分駐(派出)所地址資料",
+    "published_at": "2014-03-13",
+    "modified_at": "2026-10-01 23:32:05",
+    "resource_status": "PASS",
+    "resource_count": 1,
+    "resources": [
+      {
+        "resource_id": null,
+        "resource_url": "https://www.tgos.tw/tgos/VirtualDir/Product/9927eb8a-efed-40c0-8bc4-83121ad6834a/1150930.zip",
+        "format": "CSV",
+        "field_count": 7,
+        "metadata_sha256": "2444055f67be2b19eab448fcf075c3554351e3fae6621dce11060c809249c2d1"
+      }
+    ],
+    "observed_at": "2026-10-07T06:56:27+00:00",
+    "status": "PASS"
+  },
+  "metadata_matches_20261005": true,
+  "resource_download_attempted_this_loop": false,
+  "resource_state": "BLOCKED_FROM_PRIOR_ORIGINAL_RESOURCE_HTTP_403",
+  "resource_failure_observed_at": "2026-10-05T01:20:26.938110+08:00",
+  "resource_rows": null,
+  "coordinate_reference_system": "UNKNOWN",
+  "coordinate_validation": "NOT_RUN",
+  "production_active": false,
+  "rights_review": "PENDING",
+  "conclusions": [
+    "官方 metadata 內容與 10/5 收據一致；宣告一項 CSV，但資源網址為 ZIP。",
+    "未重試拒絕資源，未使用替代主機或鏡像；此輪 metadata 200 不是原件取得。",
+    "403 本身不足以區分登入需求、存取政策或原站限制；未確定歸因。",
+    "POINT_X/Y 欄名無法確認 CRS；官方聲明、units、軸順序與原件仍待取得。"
+  ],
+  "next_steps": [
+    "透過官方正常申請/客服途徑確認該資源可公開取得方式及 CRS 定義；不在本輪傳送訊息。",
+    "取得後解壓有界檔案，核對原始 ZIP 與 CSV hash、列數、schema、缺值、重複、地址電話與期別。"
+  ],
+  "resource_completeness": "NOT_VERIFIED",
+  "other_reference_metadata_receipts": [
+    {
+      "inventory_id": "S-028",
+      "dataset_id": "88147",
+      "metadata_url": "https://data.gov.tw/api/v2/rest/dataset/88147",
+      "final_url": "https://data.gov.tw/api/v2/rest/dataset/88147",
+      "http_status": 200,
+      "content_type": "application/json",
+      "raw_bytes": 32830,
+      "raw_sha256": "94d57674e75896e14b34288f6b333e0816d4295d4e20bbbbcf9526bef1102b71",
+      "title": "10952-01-01-2 臺中市受(處)理刑事案件-分局別",
+      "published_at": "2018-07-24",
+      "modified_at": "2026-09-06 03:49:15",
+      "resource_status": "PASS",
+      "resource_count": 18,
+      "resources": [
+        {
+          "resource_id": "09800419-4015-4223-a9f2-18d0b4e53e68",
+          "resource_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=09800419-4015-4223-a9f2-18d0b4e53e68",
+          "format": "JSON",
+          "field_count": 13,
+          "metadata_sha256": "4ca30f23ad6f40e71599f051bb02c6a8793f9dffd1c3260e54991a8e66e52f57"
+        },
+        {
+          "resource_id": "62b43956-448d-4433-981b-c655ca1fafa6",
+          "resource_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=62b43956-448d-4433-981b-c655ca1fafa6",
+          "format": "JSON",
+          "field_count": 13,
+          "metadata_sha256": "442f16cd836fb0084cddd8ca676bac0d040b94c43142adf254b864bc28c6b1b3"
+        },
+        {
+          "resource_id": "7428b5c5-9155-4639-92dc-659de87861f8",
+          "resource_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=7428b5c5-9155-4639-92dc-659de87861f8",
+          "format": "JSON",
+          "field_count": 13,
+          "metadata_sha256": "ab34a87699d39ac95a1d76e2d499c6cb561259f310e71e21331ad401720f9bd4"
+        },
+        {
+          "resource_id": "f6bc59d6-e0cd-4d59-a5fe-d420ead06985",
+          "resource_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=f6bc59d6-e0cd-4d59-a5fe-d420ead06985",
+          "format": "JSON",
+          "field_count": 13,
+          "metadata_sha256": "e479e3d5b31596d2a0d33fffaee41caa4c16c1ea62945a4cf4d773f58d32e236"
+        },
+        {
+          "resource_id": "06812ac2-b561-4ea2-9a32-9c6119cfc156",
+          "resource_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=06812ac2-b561-4ea2-9a32-9c6119cfc156",
+          "format": "JSON",
+          "field_count": 13,
+          "metadata_sha256": "4db166231345bd24316937d0fbfeed68aa711f21e29a62579ef53290a6984e42"
+        },
+        {
+          "resource_id": "bcfef94b-0822-4399-85a9-25f71d86c71e",
+          "resource_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=bcfef94b-0822-4399-85a9-25f71d86c71e",
+          "format": "JSON",
+          "field_count": 13,
+          "metadata_sha256": "5c86f91ec2857ed367561a2415bee7a9b5e1213d50d133990287c8544a855c69"
+        },
+        {
+          "resource_id": "a6c22610-daf9-4d15-8b9c-8562a36e22f1",
+          "resource_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=a6c22610-daf9-4d15-8b9c-8562a36e22f1",
+          "format": "JSON",
+          "field_count": 13,
+          "metadata_sha256": "da5be95a987a530f8ffd4e302f1f60c5baeda2f95b811d420f6c5f74ef4a052c"
+        },
+        {
+          "resource_id": "1b9f1144-1bdf-406c-951b-2c632abec9d4",
+          "resource_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=1b9f1144-1bdf-406c-951b-2c632abec9d4",
+          "format": "JSON",
+          "field_count": 13,
+          "metadata_sha256": "774baba9b411c4fdd6fe5400de750431afa93605b2275437c354466ef67b18be"
+        },
+        {
+          "resource_id": "261c0d15-b024-485e-8dcd-69a1e557f07f",
+          "resource_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=261c0d15-b024-485e-8dcd-69a1e557f07f",
+          "format": "JSON",
+          "field_count": 13,
+          "metadata_sha256": "512d16844a3cc278ef476abb47735a73ed5cde09551083920f097b0ed66bcdbd"
+        },
+        {
+          "resource_id": "8e059025-20d7-4570-8127-25b9af2ce3e5",
+          "resource_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=8e059025-20d7-4570-8127-25b9af2ce3e5",
+          "format": "JSON",
+          "field_count": 13,
+          "metadata_sha256": "506134d77fca59d3fc25cf2e8254208ee50299cb680895942b0398fc1faebc6c"
+        },
+        {
+          "resource_id": "30490512-75bc-49fc-bdfe-232afb70285e",
+          "resource_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=30490512-75bc-49fc-bdfe-232afb70285e",
+          "format": "JSON",
+          "field_count": 13,
+          "metadata_sha256": "335ed3d85a50decf4168aec6e2d984492068f1b1ba96b7ab93ff163709c11618"
+        },
+        {
+          "resource_id": "b0a3c633-6d1c-40eb-85da-bd1c7f6bdaa8",
+          "resource_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=b0a3c633-6d1c-40eb-85da-bd1c7f6bdaa8",
+          "format": "JSON",
+          "field_count": 13,
+          "metadata_sha256": "6d1208e3c13b02bfb08becca1fbc27a5159dc9a96113030e5546b4ff28d2188a"
+        },
+        {
+          "resource_id": "3db9ea5c-cdc7-469d-9899-fd1cf918bd1b",
+          "resource_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=3db9ea5c-cdc7-469d-9899-fd1cf918bd1b",
+          "format": "JSON",
+          "field_count": 13,
+          "metadata_sha256": "d4921966ec36eeb35690a37ee199a6b9ef09fefc143102b57d9720f0bb9bd3d5"
+        },
+        {
+          "resource_id": "c4360e14-6994-44af-ac74-90fd7213cfbf",
+          "resource_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=c4360e14-6994-44af-ac74-90fd7213cfbf",
+          "format": "JSON",
+          "field_count": 13,
+          "metadata_sha256": "9e417900b7f0be72ac6c81fcc6745ae64609bd5cdd0d5276142b607220adef57"
+        },
+        {
+          "resource_id": "8b8a0e89-d057-41e8-9724-7bfee5907cc1",
+          "resource_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=8b8a0e89-d057-41e8-9724-7bfee5907cc1",
+          "format": "JSON",
+          "field_count": 13,
+          "metadata_sha256": "edf7d1b02219ff11139f4efa6504a3aa79daba720a7a108d992876c8cf1472e6"
+        },
+        {
+          "resource_id": "051c8a43-43c7-4255-95c5-7f9f9f75ebf7",
+          "resource_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=051c8a43-43c7-4255-95c5-7f9f9f75ebf7",
+          "format": "JSON",
+          "field_count": 13,
+          "metadata_sha256": "49942c807349ccc6df16e5e4197fa3f19c0b1eda8e2111ed44e35d980307e07e"
+        },
+        {
+          "resource_id": "c5b469a1-0ef7-41d0-b858-e105d77d7a67",
+          "resource_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=c5b469a1-0ef7-41d0-b858-e105d77d7a67",
+          "format": "JSON",
+          "field_count": 13,
+          "metadata_sha256": "4af78fd4d3b889c32de81e7f1e7e5a1e875b9c199751ced22c27d144c5a15bc6"
+        },
+        {
+          "resource_id": "0c917a1b-a3cf-4a7e-a27f-f99bdc6368f5",
+          "resource_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=0c917a1b-a3cf-4a7e-a27f-f99bdc6368f5",
+          "format": "JSON",
+          "field_count": 13,
+          "metadata_sha256": "81ca42401cff58306c7b0fbc9c5e269b500d70127e063b41811a1ef8e050ecd8"
+        }
+      ],
+      "observed_at": "2026-10-07T06:57:14+00:00",
+      "status": "PASS"
+    },
+    {
+      "inventory_id": "S-036",
+      "dataset_id": "11307",
+      "metadata_url": "https://data.gov.tw/api/v2/rest/dataset/11307",
+      "final_url": "https://data.gov.tw/api/v2/rest/dataset/11307",
+      "http_status": 200,
+      "content_type": "application/json",
+      "raw_bytes": 2424,
+      "raw_sha256": "51e353dc8b68eea9ec2d80a449088226fd2a5c5a04181d50a490e8c8d03a1fd4",
+      "title": "集會遊行資訊",
+      "published_at": "2015-02-03",
+      "modified_at": "2026-10-06 15:03:07",
+      "resource_status": "PASS",
+      "resource_count": 1,
+      "resources": [
+        {
+          "resource_id": "C1D7B55C-FE56-4D8C-A79F-093F7A82BB0D",
+          "resource_url": "https://opdadm.moi.gov.tw/api/v1/no-auth/resource/api/dataset/2E2E281C-5E92-446F-B1E7-3A975C0AF0D1/resource/C1D7B55C-FE56-4D8C-A79F-093F7A82BB0D/download",
+          "format": "CSV",
+          "field_count": 5,
+          "metadata_sha256": "f4e15f7e1e0a8ed96295bf4a5a63c58434497680b11d9ddc3d49d1550d55d03e"
+        }
+      ],
+      "observed_at": "2026-10-07T06:57:14+00:00",
+      "status": "PASS"
+    },
+    {
+      "inventory_id": "CTX-POP",
+      "dataset_id": "103703",
+      "metadata_url": "https://data.gov.tw/api/v2/rest/dataset/103703",
+      "final_url": "https://data.gov.tw/api/v2/rest/dataset/103703",
+      "http_status": 200,
+      "content_type": "application/json",
+      "raw_bytes": 15430,
+      "raw_sha256": "0d99feaa6972122594e5f0dc3c04286c7af102befc3005ce0e3dc5809d5fcb5a",
+      "title": "10122-00-01-2 臺中市各區 戶數、人口數按戶別及性別分",
+      "published_at": "2019-06-19",
+      "modified_at": "2026-06-21 04:03:42",
+      "resource_status": "PASS",
+      "resource_count": 6,
+      "resources": [
+        {
+          "resource_id": "e2ec75c8-2866-4332-b5d5-a048bbb231d3",
+          "resource_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=e2ec75c8-2866-4332-b5d5-a048bbb231d3",
+          "format": "JSON",
+          "field_count": 13,
+          "metadata_sha256": "d391308a2e909e2ab2e76796c713b92f42b9be7894621e72d7f6358c949aeac4"
+        },
+        {
+          "resource_id": "3040f16e-4560-4eff-b1c9-1011705e5598",
+          "resource_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=3040f16e-4560-4eff-b1c9-1011705e5598",
+          "format": "JSON",
+          "field_count": 13,
+          "metadata_sha256": "06c64e9f8eaa3dac41c80122a2648fbc8f3c40d774d10fc1edf3d30d1e51b348"
+        },
+        {
+          "resource_id": "31918143-8f03-4476-8a55-70ae34962a95",
+          "resource_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=31918143-8f03-4476-8a55-70ae34962a95",
+          "format": "JSON",
+          "field_count": 13,
+          "metadata_sha256": "57ea0e536284fcd8298ac28a67eb0a3a6ba13185d2d9ddf6266ec34bfaeddb02"
+        },
+        {
+          "resource_id": "c64d12df-abe6-4eb0-98a9-fce0e3708f3a",
+          "resource_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=c64d12df-abe6-4eb0-98a9-fce0e3708f3a",
+          "format": "JSON",
+          "field_count": 13,
+          "metadata_sha256": "5ae6eb4408e1a762538a73c2f2a69f013d6825176b1a5e494cc0f46f95bbb993"
+        },
+        {
+          "resource_id": "5326ea90-907f-493d-bcb7-7016bbc30075",
+          "resource_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=5326ea90-907f-493d-bcb7-7016bbc30075",
+          "format": "JSON",
+          "field_count": 13,
+          "metadata_sha256": "61c14b79c63fe811287f772c922d6de8e8629d2ae487ac22341cf9f7d447646f"
+        },
+        {
+          "resource_id": "3b6fe911-d484-4991-b583-369d0b934da7",
+          "resource_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=3b6fe911-d484-4991-b583-369d0b934da7",
+          "format": "JSON",
+          "field_count": 13,
+          "metadata_sha256": "04d3de5281b3ea3a53c92272be289c357c26bfdb2cd1aa4852f0b3211fbdb2a2"
+        }
+      ],
+      "observed_at": "2026-10-07T06:57:14+00:00",
+      "status": "PASS"
+    },
+    {
+      "inventory_id": "CTX-165",
+      "dataset_id": "176455",
+      "metadata_url": "https://data.gov.tw/api/v2/rest/dataset/176455",
+      "final_url": "https://data.gov.tw/api/v2/rest/dataset/176455",
+      "http_status": 200,
+      "content_type": "application/json",
+      "raw_bytes": 2430,
+      "raw_sha256": "04c5cbdb1fcf0eccdda76ed6c46e38ad73b486b94a3a13aa797f8b7de9064dec",
+      "title": "165反詐騙諮詢專線_遭停止解析涉詐網站",
+      "published_at": "2026-01-07",
+      "modified_at": "2026-10-06 15:11:22",
+      "resource_status": "PASS",
+      "resource_count": 1,
+      "resources": [
+        {
+          "resource_id": "9C8EB07F-374C-4E7B-BB3D-03CB0152690F",
+          "resource_url": "https://opdadm.moi.gov.tw/api/v1/no-auth/resource/api/dataset/29E8E643-88ED-4952-B21E-BD42A3B7108C/resource/9C8EB07F-374C-4E7B-BB3D-03CB0152690F/download",
+          "format": "CSV",
+          "field_count": 5,
+          "metadata_sha256": "c3f3e56e2f4f77f19dfb6ad3235a59beba9ac8a96527878057d40dd61bf664b9"
+        }
+      ],
+      "observed_at": "2026-10-07T06:57:14+00:00",
+      "status": "PASS"
+    }
+  ],
+  "other_reference_resource_downloads_attempted": true,
+  "original_resource_receipts": [
+    {
+      "source_id": "S-036",
+      "requested_url": "https://opdadm.moi.gov.tw/api/v1/no-auth/resource/api/dataset/2E2E281C-5E92-446F-B1E7-3A975C0AF0D1/resource/C1D7B55C-FE56-4D8C-A79F-093F7A82BB0D/download",
+      "observed_at": "2026-10-07T06:58:59.470535+00:00",
+      "production_active": false,
+      "rights_review": "PENDING",
+      "scope_completeness": "NOT_VERIFIED",
+      "max_bytes": 67108864,
+      "http_status": 200,
+      "content_type": "text/csv;charset=UTF-8",
+      "final_url": "https://opdadm.moi.gov.tw/api/v1/no-auth/resource/api/dataset/2E2E281C-5E92-446F-B1E7-3A975C0AF0D1/resource/C1D7B55C-FE56-4D8C-A79F-093F7A82BB0D/download",
+      "bytes": 12126117,
+      "sha256": "8719423307dfa67931cf0d6d5884d7cb4a777bbf9a67e891e4057ffa82834314",
+      "status": "ACQUIRED_PARSE_ONLY_NOT_COMPLETE",
+      "headers": [
+        "actStTime",
+        "actEndTime",
+        "actCategory",
+        "placeOrRoute",
+        "authorities"
+      ],
+      "resource_rows": 77625,
+      "ragged_rows": 0,
+      "empty_cells": 10,
+      "duplicate_full_rows": 468,
+      "end_before_start_count": 8,
+      "first_start": "2015-07-01T00:00:00",
+      "last_start": "2026-12-05T10:00:00",
+      "event_identity_validation": "NOT_RUN",
+      "description_rows": 1,
+      "data_rows": 77624,
+      "event_time_format": "%Y/%m/%d %H:%M",
+      "valid_time_rows": 77624,
+      "invalid_time_rows": 0,
+      "duplicate_full_data_rows": 468,
+      "row_count_note": "resource_rows includes one exact Chinese description row; data_rows excludes it"
+    },
+    {
+      "source_id": "CTX-165",
+      "requested_url": "https://opdadm.moi.gov.tw/api/v1/no-auth/resource/api/dataset/29E8E643-88ED-4952-B21E-BD42A3B7108C/resource/9C8EB07F-374C-4E7B-BB3D-03CB0152690F/download",
+      "observed_at": "2026-10-07T06:58:59.470979+00:00",
+      "production_active": false,
+      "rights_review": "PENDING",
+      "scope_completeness": "NOT_VERIFIED",
+      "max_bytes": 67108864,
+      "http_status": 200,
+      "content_type": "text/csv;charset=UTF-8",
+      "final_url": "https://opdadm.moi.gov.tw/api/v1/no-auth/resource/api/dataset/29E8E643-88ED-4952-B21E-BD42A3B7108C/resource/9C8EB07F-374C-4E7B-BB3D-03CB0152690F/download",
+      "bytes": 10206212,
+      "sha256": "5964f56d1d89479d5b6fc163d885d2abecefcb597b0b1dc113ff8bf87ae61a54",
+      "status": "ACQUIRED_PARSE_ONLY_NOT_COMPLETE",
+      "headers": [
+        "民國年月",
+        "網域",
+        "網站性質",
+        "法律依據",
+        "聲請單位"
+      ],
+      "resource_rows": 93839,
+      "ragged_rows": 0,
+      "empty_cells": 0,
+      "duplicate_full_rows": 7183,
+      "observed_periods": [
+        "11412",
+        "11501",
+        "11502",
+        "11503",
+        "11504",
+        "11505",
+        "11506",
+        "11507",
+        "11508",
+        "11509"
+      ],
+      "period_format": "OBSERVED_NOT_ASSUMED",
+      "domain_identity_validation": "NOT_RUN"
+    }
+  ],
+  "full_acquisition_validation_note": "S036 與 CTX165 已完整接收至 EOF 並解析，但尚無官方期間總數對帳，未驗證唯一事件或網域語意；資源完整接收不等於業務範圍完整。",
+  "actual_local_quality_audits": [
+    {
+      "schema_version": 1,
+      "source_id": "S-036",
+      "resource_sha256": "8719423307dfa67931cf0d6d5884d7cb4a777bbf9a67e891e4057ffa82834314",
+      "resource_bytes": 12126117,
+      "data_rows": 77624,
+      "description_rows": 1,
+      "empty_cells": 10,
+      "duplicate_full_data_rows": 468,
+      "quality_status": "QUALITY_ISSUES",
+      "business_scope_completeness": "NOT_VERIFIED",
+      "rights_review": "PENDING",
+      "production_active": false,
+      "identity_semantics": "NOT_VERIFIED",
+      "invalid_time_rows": 0,
+      "end_before_start_count": 8,
+      "first_start": "2015-07-01T00:00:00",
+      "last_start": "2026-12-05T10:00:00",
+      "source_timezone": "UNKNOWN",
+      "time_comparison_scope": "SOURCE_LOCAL_STRINGS_ONLY"
+    },
+    {
+      "schema_version": 1,
+      "source_id": "CTX-165",
+      "resource_sha256": "5964f56d1d89479d5b6fc163d885d2abecefcb597b0b1dc113ff8bf87ae61a54",
+      "resource_bytes": 10206212,
+      "data_rows": 93839,
+      "description_rows": 0,
+      "empty_cells": 0,
+      "duplicate_full_data_rows": 7183,
+      "quality_status": "QUALITY_ISSUES",
+      "business_scope_completeness": "NOT_VERIFIED",
+      "rights_review": "PENDING",
+      "production_active": false,
+      "identity_semantics": "NOT_VERIFIED",
+      "invalid_period_rows": 0,
+      "observed_roc_periods": [
+        "11412",
+        "11501",
+        "11502",
+        "11503",
+        "11504",
+        "11505",
+        "11506",
+        "11507",
+        "11508",
+        "11509"
+      ],
+      "period_rows": {
+        "11412": 17894,
+        "11501": 25439,
+        "11502": 1346,
+        "11503": 3896,
+        "11504": 4342,
+        "11505": 5465,
+        "11506": 4832,
+        "11507": 6174,
+        "11508": 13947,
+        "11509": 10504
+      },
+      "local_case_count_allowed": false,
+      "domain_identity_validation": "NOT_RUN"
+    }
+  ],
+  "audit_exit_codes": {
+    "S-036": 2,
+    "CTX-165": 2
+  },
+  "original_json_resource_receipts": [
+    {
+      "source_id": "S-028",
+      "resource_id": "09800419-4015-4223-a9f2-18d0b4e53e68",
+      "requested_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=09800419-4015-4223-a9f2-18d0b4e53e68",
+      "observed_at": "2026-10-07T07:03:26.923000+00:00",
+      "production_active": false,
+      "rights_review": "PENDING",
+      "scope_completeness": "NOT_VERIFIED",
+      "max_bytes": 4194304,
+      "http_status": 200,
+      "content_type": "application/octet-stream",
+      "final_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=09800419-4015-4223-a9f2-18d0b4e53e68",
+      "bytes": 1272791,
+      "sha256": "de45807b7f6de97f2ce3ef31bd41daff97d136360b49f4e584dae0cf95977504",
+      "status": "ACQUIRED_PARSE_ONLY_NOT_COMPLETE",
+      "headers": [
+        "地區",
+        "市話",
+        "數值",
+        "機關代碼",
+        "欄位名稱",
+        "縣市別代碼",
+        "行動電話",
+        "行政區域代碼",
+        "資料時間日期",
+        "資料週期",
+        "郵遞區號",
+        "電子郵件",
+        "項目"
+      ],
+      "resource_rows": 3120,
+      "exact_duplicate_rows": 0,
+      "composite_identity_collisions": 0,
+      "observed_dates": [
+        "2026-07-01T00:00:00"
+      ],
+      "observed_cycles": [
+        "月"
+      ],
+      "period_semantics": "NOT_VERIFIED",
+      "empty_value_cells": 0
+    },
+    {
+      "source_id": "S-028",
+      "resource_id": "62b43956-448d-4433-981b-c655ca1fafa6",
+      "requested_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=62b43956-448d-4433-981b-c655ca1fafa6",
+      "observed_at": "2026-10-07T07:03:26.923706+00:00",
+      "production_active": false,
+      "rights_review": "PENDING",
+      "scope_completeness": "NOT_VERIFIED",
+      "max_bytes": 4194304,
+      "http_status": 200,
+      "content_type": "application/octet-stream",
+      "final_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=62b43956-448d-4433-981b-c655ca1fafa6",
+      "bytes": 1272776,
+      "sha256": "1d56a364de5eee8451590bbc00b74dcbe0a6c8122543c585f15f950df8984928",
+      "status": "ACQUIRED_PARSE_ONLY_NOT_COMPLETE",
+      "headers": [
+        "地區",
+        "市話",
+        "數值",
+        "機關代碼",
+        "欄位名稱",
+        "縣市別代碼",
+        "行動電話",
+        "行政區域代碼",
+        "資料時間日期",
+        "資料週期",
+        "郵遞區號",
+        "電子郵件",
+        "項目"
+      ],
+      "resource_rows": 3120,
+      "exact_duplicate_rows": 0,
+      "composite_identity_collisions": 0,
+      "observed_dates": [
+        "2026-06-01T00:00:00"
+      ],
+      "observed_cycles": [
+        "月"
+      ],
+      "period_semantics": "NOT_VERIFIED",
+      "empty_value_cells": 0
+    },
+    {
+      "source_id": "S-028",
+      "resource_id": "7428b5c5-9155-4639-92dc-659de87861f8",
+      "requested_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=7428b5c5-9155-4639-92dc-659de87861f8",
+      "observed_at": "2026-10-07T07:03:26.924312+00:00",
+      "production_active": false,
+      "rights_review": "PENDING",
+      "scope_completeness": "NOT_VERIFIED",
+      "max_bytes": 4194304,
+      "http_status": 200,
+      "content_type": "application/octet-stream",
+      "final_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=7428b5c5-9155-4639-92dc-659de87861f8",
+      "bytes": 424246,
+      "sha256": "5092d34c83a95239278c663909bbc97d7bde9084ab5e54a21104e49b2d2b91e1",
+      "status": "ACQUIRED_PARSE_ONLY_NOT_COMPLETE",
+      "headers": [
+        "地區",
+        "市話",
+        "數值",
+        "機關代碼",
+        "欄位名稱",
+        "縣市別代碼",
+        "行動電話",
+        "行政區域代碼",
+        "資料時間日期",
+        "資料週期",
+        "郵遞區號",
+        "電子郵件",
+        "項目"
+      ],
+      "resource_rows": 1040,
+      "exact_duplicate_rows": 0,
+      "composite_identity_collisions": 0,
+      "observed_dates": [
+        "2026-04-01T00:00:00"
+      ],
+      "observed_cycles": [
+        "月"
+      ],
+      "period_semantics": "NOT_VERIFIED",
+      "empty_value_cells": 0
+    },
+    {
+      "source_id": "S-028",
+      "resource_id": "f6bc59d6-e0cd-4d59-a5fe-d420ead06985",
+      "requested_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=f6bc59d6-e0cd-4d59-a5fe-d420ead06985",
+      "observed_at": "2026-10-07T07:03:26.924758+00:00",
+      "production_active": false,
+      "rights_review": "PENDING",
+      "scope_completeness": "NOT_VERIFIED",
+      "max_bytes": 4194304,
+      "http_status": 200,
+      "content_type": "application/octet-stream",
+      "final_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=f6bc59d6-e0cd-4d59-a5fe-d420ead06985",
+      "bytes": 424253,
+      "sha256": "4486a76535451ec1661fcbe98c50abcee72c9f1c5ac8e5a194a92075f1b550d0",
+      "status": "ACQUIRED_PARSE_ONLY_NOT_COMPLETE",
+      "headers": [
+        "地區",
+        "市話",
+        "數值",
+        "機關代碼",
+        "欄位名稱",
+        "縣市別代碼",
+        "行動電話",
+        "行政區域代碼",
+        "資料時間日期",
+        "資料週期",
+        "郵遞區號",
+        "電子郵件",
+        "項目"
+      ],
+      "resource_rows": 1040,
+      "exact_duplicate_rows": 0,
+      "composite_identity_collisions": 0,
+      "observed_dates": [
+        "2026-03-01T00:00:00"
+      ],
+      "observed_cycles": [
+        "月"
+      ],
+      "period_semantics": "NOT_VERIFIED",
+      "empty_value_cells": 0
+    },
+    {
+      "source_id": "S-028",
+      "resource_id": "06812ac2-b561-4ea2-9a32-9c6119cfc156",
+      "requested_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=06812ac2-b561-4ea2-9a32-9c6119cfc156",
+      "observed_at": "2026-10-07T07:03:27.895116+00:00",
+      "production_active": false,
+      "rights_review": "PENDING",
+      "scope_completeness": "NOT_VERIFIED",
+      "max_bytes": 4194304,
+      "http_status": 200,
+      "content_type": "application/octet-stream",
+      "final_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=06812ac2-b561-4ea2-9a32-9c6119cfc156",
+      "bytes": 1272672,
+      "sha256": "023bffe8cb3bdf60c56cb4c2ac95d0ca867da6b006294939ef09e993a1435d68",
+      "status": "ACQUIRED_PARSE_ONLY_NOT_COMPLETE",
+      "headers": [
+        "地區",
+        "市話",
+        "數值",
+        "機關代碼",
+        "欄位名稱",
+        "縣市別代碼",
+        "行動電話",
+        "行政區域代碼",
+        "資料時間日期",
+        "資料週期",
+        "郵遞區號",
+        "電子郵件",
+        "項目"
+      ],
+      "resource_rows": 3120,
+      "exact_duplicate_rows": 0,
+      "composite_identity_collisions": 0,
+      "observed_dates": [
+        "2026-02-01T00:00:00"
+      ],
+      "observed_cycles": [
+        "月"
+      ],
+      "period_semantics": "NOT_VERIFIED",
+      "empty_value_cells": 0
+    },
+    {
+      "source_id": "S-028",
+      "resource_id": "bcfef94b-0822-4399-85a9-25f71d86c71e",
+      "requested_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=bcfef94b-0822-4399-85a9-25f71d86c71e",
+      "observed_at": "2026-10-07T07:03:29.763918+00:00",
+      "production_active": false,
+      "rights_review": "PENDING",
+      "scope_completeness": "NOT_VERIFIED",
+      "max_bytes": 4194304,
+      "http_status": 200,
+      "content_type": "application/octet-stream",
+      "final_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=bcfef94b-0822-4399-85a9-25f71d86c71e",
+      "bytes": 1272746,
+      "sha256": "0e88beb804b2fedf29847d9e04c505cfd506c866909c54bde426128512d0505d",
+      "status": "ACQUIRED_PARSE_ONLY_NOT_COMPLETE",
+      "headers": [
+        "地區",
+        "市話",
+        "數值",
+        "機關代碼",
+        "欄位名稱",
+        "縣市別代碼",
+        "行動電話",
+        "行政區域代碼",
+        "資料時間日期",
+        "資料週期",
+        "郵遞區號",
+        "電子郵件",
+        "項目"
+      ],
+      "resource_rows": 3120,
+      "exact_duplicate_rows": 0,
+      "composite_identity_collisions": 0,
+      "observed_dates": [
+        "2026-01-01T00:00:00"
+      ],
+      "observed_cycles": [
+        "月"
+      ],
+      "period_semantics": "NOT_VERIFIED",
+      "empty_value_cells": 0
+    },
+    {
+      "source_id": "S-028",
+      "resource_id": "a6c22610-daf9-4d15-8b9c-8562a36e22f1",
+      "requested_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=a6c22610-daf9-4d15-8b9c-8562a36e22f1",
+      "observed_at": "2026-10-07T07:03:30.337701+00:00",
+      "production_active": false,
+      "rights_review": "PENDING",
+      "scope_completeness": "NOT_VERIFIED",
+      "max_bytes": 4194304,
+      "http_status": 200,
+      "content_type": "application/octet-stream",
+      "final_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=a6c22610-daf9-4d15-8b9c-8562a36e22f1",
+      "bytes": 424223,
+      "sha256": "9187b2874b4f418795508ea6f9b93302d2579f53853e08367dc7434392f58383",
+      "status": "ACQUIRED_PARSE_ONLY_NOT_COMPLETE",
+      "headers": [
+        "地區",
+        "市話",
+        "數值",
+        "機關代碼",
+        "欄位名稱",
+        "縣市別代碼",
+        "行動電話",
+        "行政區域代碼",
+        "資料時間日期",
+        "資料週期",
+        "郵遞區號",
+        "電子郵件",
+        "項目"
+      ],
+      "resource_rows": 1040,
+      "exact_duplicate_rows": 0,
+      "composite_identity_collisions": 0,
+      "observed_dates": [
+        "2025-12-01T00:00:00"
+      ],
+      "observed_cycles": [
+        "月"
+      ],
+      "period_semantics": "NOT_VERIFIED",
+      "empty_value_cells": 0
+    },
+    {
+      "source_id": "S-028",
+      "resource_id": "1b9f1144-1bdf-406c-951b-2c632abec9d4",
+      "requested_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=1b9f1144-1bdf-406c-951b-2c632abec9d4",
+      "observed_at": "2026-10-07T07:03:30.406569+00:00",
+      "production_active": false,
+      "rights_review": "PENDING",
+      "scope_completeness": "NOT_VERIFIED",
+      "max_bytes": 4194304,
+      "http_status": 200,
+      "content_type": "application/octet-stream",
+      "final_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=1b9f1144-1bdf-406c-951b-2c632abec9d4",
+      "bytes": 424242,
+      "sha256": "707f0485b9bd013771a05da46f7f93ae2990b208df3ef9690f47c2f28f7261b0",
+      "status": "ACQUIRED_PARSE_ONLY_NOT_COMPLETE",
+      "headers": [
+        "地區",
+        "市話",
+        "數值",
+        "機關代碼",
+        "欄位名稱",
+        "縣市別代碼",
+        "行動電話",
+        "行政區域代碼",
+        "資料時間日期",
+        "資料週期",
+        "郵遞區號",
+        "電子郵件",
+        "項目"
+      ],
+      "resource_rows": 1040,
+      "exact_duplicate_rows": 0,
+      "composite_identity_collisions": 0,
+      "observed_dates": [
+        "2025-11-01T00:00:00"
+      ],
+      "observed_cycles": [
+        "月"
+      ],
+      "period_semantics": "NOT_VERIFIED",
+      "empty_value_cells": 0
+    },
+    {
+      "source_id": "S-028",
+      "resource_id": "261c0d15-b024-485e-8dcd-69a1e557f07f",
+      "requested_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=261c0d15-b024-485e-8dcd-69a1e557f07f",
+      "observed_at": "2026-10-07T07:03:31.191940+00:00",
+      "production_active": false,
+      "rights_review": "PENDING",
+      "scope_completeness": "NOT_VERIFIED",
+      "max_bytes": 4194304,
+      "http_status": 200,
+      "content_type": "application/octet-stream",
+      "final_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=261c0d15-b024-485e-8dcd-69a1e557f07f",
+      "bytes": 424243,
+      "sha256": "975bd28edc50cd770bf2cf79677a3f79702e6dec5ae4b014f0941e5f2201890b",
+      "status": "ACQUIRED_PARSE_ONLY_NOT_COMPLETE",
+      "headers": [
+        "地區",
+        "市話",
+        "數值",
+        "機關代碼",
+        "欄位名稱",
+        "縣市別代碼",
+        "行動電話",
+        "行政區域代碼",
+        "資料時間日期",
+        "資料週期",
+        "郵遞區號",
+        "電子郵件",
+        "項目"
+      ],
+      "resource_rows": 1040,
+      "exact_duplicate_rows": 0,
+      "composite_identity_collisions": 0,
+      "observed_dates": [
+        "2025-10-01T00:00:00"
+      ],
+      "observed_cycles": [
+        "月"
+      ],
+      "period_semantics": "NOT_VERIFIED",
+      "empty_value_cells": 0
+    },
+    {
+      "source_id": "S-028",
+      "resource_id": "8e059025-20d7-4570-8127-25b9af2ce3e5",
+      "requested_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=8e059025-20d7-4570-8127-25b9af2ce3e5",
+      "observed_at": "2026-10-07T07:03:31.555792+00:00",
+      "production_active": false,
+      "rights_review": "PENDING",
+      "scope_completeness": "NOT_VERIFIED",
+      "max_bytes": 4194304,
+      "http_status": 200,
+      "content_type": "application/octet-stream",
+      "final_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=8e059025-20d7-4570-8127-25b9af2ce3e5",
+      "bytes": 424237,
+      "sha256": "c8746967f94145556fac1e95f401c5b706f2bdbd7b5589e5c5beac6b8e7fe5ae",
+      "status": "ACQUIRED_PARSE_ONLY_NOT_COMPLETE",
+      "headers": [
+        "地區",
+        "市話",
+        "數值",
+        "機關代碼",
+        "欄位名稱",
+        "縣市別代碼",
+        "行動電話",
+        "行政區域代碼",
+        "資料時間日期",
+        "資料週期",
+        "郵遞區號",
+        "電子郵件",
+        "項目"
+      ],
+      "resource_rows": 1040,
+      "exact_duplicate_rows": 0,
+      "composite_identity_collisions": 0,
+      "observed_dates": [
+        "2025-09-01T00:00:00"
+      ],
+      "observed_cycles": [
+        "月"
+      ],
+      "period_semantics": "NOT_VERIFIED",
+      "empty_value_cells": 0
+    },
+    {
+      "source_id": "S-028",
+      "resource_id": "30490512-75bc-49fc-bdfe-232afb70285e",
+      "requested_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=30490512-75bc-49fc-bdfe-232afb70285e",
+      "observed_at": "2026-10-07T07:03:31.791088+00:00",
+      "production_active": false,
+      "rights_review": "PENDING",
+      "scope_completeness": "NOT_VERIFIED",
+      "max_bytes": 4194304,
+      "http_status": 200,
+      "content_type": "application/octet-stream",
+      "final_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=30490512-75bc-49fc-bdfe-232afb70285e",
+      "bytes": 424240,
+      "sha256": "083561dcec03d6defb55e4206f77ec998e9ad7d7ee06f4b40742f08a03625460",
+      "status": "ACQUIRED_PARSE_ONLY_NOT_COMPLETE",
+      "headers": [
+        "地區",
+        "市話",
+        "數值",
+        "機關代碼",
+        "欄位名稱",
+        "縣市別代碼",
+        "行動電話",
+        "行政區域代碼",
+        "資料時間日期",
+        "資料週期",
+        "郵遞區號",
+        "電子郵件",
+        "項目"
+      ],
+      "resource_rows": 1040,
+      "exact_duplicate_rows": 0,
+      "composite_identity_collisions": 0,
+      "observed_dates": [
+        "2025-08-01T00:00:00"
+      ],
+      "observed_cycles": [
+        "月"
+      ],
+      "period_semantics": "NOT_VERIFIED",
+      "empty_value_cells": 0
+    },
+    {
+      "source_id": "S-028",
+      "resource_id": "b0a3c633-6d1c-40eb-85da-bd1c7f6bdaa8",
+      "requested_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=b0a3c633-6d1c-40eb-85da-bd1c7f6bdaa8",
+      "observed_at": "2026-10-07T07:03:32.092869+00:00",
+      "production_active": false,
+      "rights_review": "PENDING",
+      "scope_completeness": "NOT_VERIFIED",
+      "max_bytes": 4194304,
+      "http_status": 200,
+      "content_type": "application/octet-stream",
+      "final_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=b0a3c633-6d1c-40eb-85da-bd1c7f6bdaa8",
+      "bytes": 424241,
+      "sha256": "4b3ad09b419acc1b91a3059dd7836c6b9e1803af8666ae0f2dc2aaf22c77a65d",
+      "status": "ACQUIRED_PARSE_ONLY_NOT_COMPLETE",
+      "headers": [
+        "地區",
+        "市話",
+        "數值",
+        "機關代碼",
+        "欄位名稱",
+        "縣市別代碼",
+        "行動電話",
+        "行政區域代碼",
+        "資料時間日期",
+        "資料週期",
+        "郵遞區號",
+        "電子郵件",
+        "項目"
+      ],
+      "resource_rows": 1040,
+      "exact_duplicate_rows": 0,
+      "composite_identity_collisions": 0,
+      "observed_dates": [
+        "2025-07-01T00:00:00"
+      ],
+      "observed_cycles": [
+        "月"
+      ],
+      "period_semantics": "NOT_VERIFIED",
+      "empty_value_cells": 0
+    },
+    {
+      "source_id": "S-028",
+      "resource_id": "3db9ea5c-cdc7-469d-9899-fd1cf918bd1b",
+      "requested_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=3db9ea5c-cdc7-469d-9899-fd1cf918bd1b",
+      "observed_at": "2026-10-07T07:03:32.236786+00:00",
+      "production_active": false,
+      "rights_review": "PENDING",
+      "scope_completeness": "NOT_VERIFIED",
+      "max_bytes": 4194304,
+      "http_status": 200,
+      "content_type": "application/octet-stream",
+      "final_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=3db9ea5c-cdc7-469d-9899-fd1cf918bd1b",
+      "bytes": 424232,
+      "sha256": "de3c4ab047c2a98f50583a6a7e6ff067e6078c75d05bfd7459ed88e67f7fcde5",
+      "status": "ACQUIRED_PARSE_ONLY_NOT_COMPLETE",
+      "headers": [
+        "地區",
+        "市話",
+        "數值",
+        "機關代碼",
+        "欄位名稱",
+        "縣市別代碼",
+        "行動電話",
+        "行政區域代碼",
+        "資料時間日期",
+        "資料週期",
+        "郵遞區號",
+        "電子郵件",
+        "項目"
+      ],
+      "resource_rows": 1040,
+      "exact_duplicate_rows": 0,
+      "composite_identity_collisions": 0,
+      "observed_dates": [
+        "2025-06-01T00:00:00"
+      ],
+      "observed_cycles": [
+        "月"
+      ],
+      "period_semantics": "NOT_VERIFIED",
+      "empty_value_cells": 0
+    },
+    {
+      "source_id": "S-028",
+      "resource_id": "c4360e14-6994-44af-ac74-90fd7213cfbf",
+      "requested_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=c4360e14-6994-44af-ac74-90fd7213cfbf",
+      "observed_at": "2026-10-07T07:03:32.363634+00:00",
+      "production_active": false,
+      "rights_review": "PENDING",
+      "scope_completeness": "NOT_VERIFIED",
+      "max_bytes": 4194304,
+      "http_status": 200,
+      "content_type": "application/octet-stream",
+      "final_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=c4360e14-6994-44af-ac74-90fd7213cfbf",
+      "bytes": 424266,
+      "sha256": "2015541c1e65983526bd5cfaf7f9b6e3948fb296733c801fa274437c00023649",
+      "status": "ACQUIRED_PARSE_ONLY_NOT_COMPLETE",
+      "headers": [
+        "地區",
+        "市話",
+        "數值",
+        "機關代碼",
+        "欄位名稱",
+        "縣市別代碼",
+        "行動電話",
+        "行政區域代碼",
+        "資料時間日期",
+        "資料週期",
+        "郵遞區號",
+        "電子郵件",
+        "項目"
+      ],
+      "resource_rows": 1040,
+      "exact_duplicate_rows": 0,
+      "composite_identity_collisions": 0,
+      "observed_dates": [
+        "2025-05-01T00:00:00"
+      ],
+      "observed_cycles": [
+        "月"
+      ],
+      "period_semantics": "NOT_VERIFIED",
+      "empty_value_cells": 0
+    },
+    {
+      "source_id": "S-028",
+      "resource_id": "8b8a0e89-d057-41e8-9724-7bfee5907cc1",
+      "requested_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=8b8a0e89-d057-41e8-9724-7bfee5907cc1",
+      "observed_at": "2026-10-07T07:03:32.660495+00:00",
+      "production_active": false,
+      "rights_review": "PENDING",
+      "scope_completeness": "NOT_VERIFIED",
+      "max_bytes": 4194304,
+      "http_status": 200,
+      "content_type": "application/octet-stream",
+      "final_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=8b8a0e89-d057-41e8-9724-7bfee5907cc1",
+      "bytes": 424242,
+      "sha256": "2213df3fcb388e8f795da6776eb9815249a74812d495cba995f814bcbeb5dae2",
+      "status": "ACQUIRED_PARSE_ONLY_NOT_COMPLETE",
+      "headers": [
+        "地區",
+        "市話",
+        "數值",
+        "機關代碼",
+        "欄位名稱",
+        "縣市別代碼",
+        "行動電話",
+        "行政區域代碼",
+        "資料時間日期",
+        "資料週期",
+        "郵遞區號",
+        "電子郵件",
+        "項目"
+      ],
+      "resource_rows": 1040,
+      "exact_duplicate_rows": 0,
+      "composite_identity_collisions": 0,
+      "observed_dates": [
+        "2025-04-01T00:00:00"
+      ],
+      "observed_cycles": [
+        "月"
+      ],
+      "period_semantics": "NOT_VERIFIED",
+      "empty_value_cells": 0
+    },
+    {
+      "source_id": "S-028",
+      "resource_id": "051c8a43-43c7-4255-95c5-7f9f9f75ebf7",
+      "requested_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=051c8a43-43c7-4255-95c5-7f9f9f75ebf7",
+      "observed_at": "2026-10-07T07:03:32.948576+00:00",
+      "production_active": false,
+      "rights_review": "PENDING",
+      "scope_completeness": "NOT_VERIFIED",
+      "max_bytes": 4194304,
+      "http_status": 200,
+      "content_type": "application/octet-stream",
+      "final_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=051c8a43-43c7-4255-95c5-7f9f9f75ebf7",
+      "bytes": 424244,
+      "sha256": "53fa91732b22bd0eb5e4de93f0ae9d661ef23399a7c4c3872a8f930eb2ea030e",
+      "status": "ACQUIRED_PARSE_ONLY_NOT_COMPLETE",
+      "headers": [
+        "地區",
+        "市話",
+        "數值",
+        "機關代碼",
+        "欄位名稱",
+        "縣市別代碼",
+        "行動電話",
+        "行政區域代碼",
+        "資料時間日期",
+        "資料週期",
+        "郵遞區號",
+        "電子郵件",
+        "項目"
+      ],
+      "resource_rows": 1040,
+      "exact_duplicate_rows": 0,
+      "composite_identity_collisions": 0,
+      "observed_dates": [
+        "2025-03-01T00:00:00"
+      ],
+      "observed_cycles": [
+        "月"
+      ],
+      "period_semantics": "NOT_VERIFIED",
+      "empty_value_cells": 0
+    },
+    {
+      "source_id": "S-028",
+      "resource_id": "c5b469a1-0ef7-41d0-b858-e105d77d7a67",
+      "requested_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=c5b469a1-0ef7-41d0-b858-e105d77d7a67",
+      "observed_at": "2026-10-07T07:03:33.129243+00:00",
+      "production_active": false,
+      "rights_review": "PENDING",
+      "scope_completeness": "NOT_VERIFIED",
+      "max_bytes": 4194304,
+      "http_status": 200,
+      "content_type": "application/octet-stream",
+      "final_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=c5b469a1-0ef7-41d0-b858-e105d77d7a67",
+      "bytes": 424228,
+      "sha256": "cc86a4cb1486b366193c28cde4956f1da4ba349bea34ef21e7fac2600c101555",
+      "status": "ACQUIRED_PARSE_ONLY_NOT_COMPLETE",
+      "headers": [
+        "地區",
+        "市話",
+        "數值",
+        "機關代碼",
+        "欄位名稱",
+        "縣市別代碼",
+        "行動電話",
+        "行政區域代碼",
+        "資料時間日期",
+        "資料週期",
+        "郵遞區號",
+        "電子郵件",
+        "項目"
+      ],
+      "resource_rows": 1040,
+      "exact_duplicate_rows": 0,
+      "composite_identity_collisions": 0,
+      "observed_dates": [
+        "2025-02-01T00:00:00"
+      ],
+      "observed_cycles": [
+        "月"
+      ],
+      "period_semantics": "NOT_VERIFIED",
+      "empty_value_cells": 0
+    },
+    {
+      "source_id": "S-028",
+      "resource_id": "0c917a1b-a3cf-4a7e-a27f-f99bdc6368f5",
+      "requested_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=0c917a1b-a3cf-4a7e-a27f-f99bdc6368f5",
+      "observed_at": "2026-10-07T07:03:33.526099+00:00",
+      "production_active": false,
+      "rights_review": "PENDING",
+      "scope_completeness": "NOT_VERIFIED",
+      "max_bytes": 4194304,
+      "http_status": 200,
+      "content_type": "application/octet-stream",
+      "final_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=0c917a1b-a3cf-4a7e-a27f-f99bdc6368f5",
+      "bytes": 424215,
+      "sha256": "398fd5ae6cb1ec4d553396d81e8009954abc59b968d421574da791cae0435ea5",
+      "status": "ACQUIRED_PARSE_ONLY_NOT_COMPLETE",
+      "headers": [
+        "地區",
+        "市話",
+        "數值",
+        "機關代碼",
+        "欄位名稱",
+        "縣市別代碼",
+        "行動電話",
+        "行政區域代碼",
+        "資料時間日期",
+        "資料週期",
+        "郵遞區號",
+        "電子郵件",
+        "項目"
+      ],
+      "resource_rows": 1040,
+      "exact_duplicate_rows": 0,
+      "composite_identity_collisions": 0,
+      "observed_dates": [
+        "2025-01-01T00:00:00"
+      ],
+      "observed_cycles": [
+        "月"
+      ],
+      "period_semantics": "NOT_VERIFIED",
+      "empty_value_cells": 0
+    },
+    {
+      "source_id": "CTX-POP",
+      "resource_id": "e2ec75c8-2866-4332-b5d5-a048bbb231d3",
+      "requested_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=e2ec75c8-2866-4332-b5d5-a048bbb231d3",
+      "observed_at": "2026-10-07T07:03:33.768588+00:00",
+      "production_active": false,
+      "rights_review": "PENDING",
+      "scope_completeness": "NOT_VERIFIED",
+      "max_bytes": 4194304,
+      "http_status": 200,
+      "content_type": "application/octet-stream",
+      "final_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=e2ec75c8-2866-4332-b5d5-a048bbb231d3",
+      "bytes": 111339,
+      "sha256": "cbf6b57c03fe2da197c58b05613b7a5529cc070792644aae1865ae84014827fa",
+      "status": "ACQUIRED_PARSE_ONLY_NOT_COMPLETE",
+      "headers": [
+        "地區",
+        "市話",
+        "數值",
+        "機關代碼",
+        "欄位名稱",
+        "縣市別代碼",
+        "行動電話",
+        "行政區域代碼",
+        "資料時間日期",
+        "資料週期",
+        "郵遞區號",
+        "電子郵件",
+        "項目"
+      ],
+      "resource_rows": 261,
+      "exact_duplicate_rows": 0,
+      "composite_identity_collisions": 0,
+      "observed_dates": [
+        "2025-01-01T00:00:00"
+      ],
+      "observed_cycles": [
+        "年"
+      ],
+      "period_semantics": "NOT_VERIFIED",
+      "empty_value_cells": 0
+    },
+    {
+      "source_id": "CTX-POP",
+      "resource_id": "3040f16e-4560-4eff-b1c9-1011705e5598",
+      "requested_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=3040f16e-4560-4eff-b1c9-1011705e5598",
+      "observed_at": "2026-10-07T07:03:33.989363+00:00",
+      "production_active": false,
+      "rights_review": "PENDING",
+      "scope_completeness": "NOT_VERIFIED",
+      "max_bytes": 4194304,
+      "http_status": 200,
+      "content_type": "application/octet-stream",
+      "final_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=3040f16e-4560-4eff-b1c9-1011705e5598",
+      "bytes": 111334,
+      "sha256": "99477640ddeaa810aa61a8a010082d185a81ee329f892976aaac1d70731f1170",
+      "status": "ACQUIRED_PARSE_ONLY_NOT_COMPLETE",
+      "headers": [
+        "地區",
+        "市話",
+        "數值",
+        "機關代碼",
+        "欄位名稱",
+        "縣市別代碼",
+        "行動電話",
+        "行政區域代碼",
+        "資料時間日期",
+        "資料週期",
+        "郵遞區號",
+        "電子郵件",
+        "項目"
+      ],
+      "resource_rows": 261,
+      "exact_duplicate_rows": 0,
+      "composite_identity_collisions": 0,
+      "observed_dates": [
+        "2024-01-01T00:00:00"
+      ],
+      "observed_cycles": [
+        "年"
+      ],
+      "period_semantics": "NOT_VERIFIED",
+      "empty_value_cells": 0
+    },
+    {
+      "source_id": "CTX-POP",
+      "resource_id": "31918143-8f03-4476-8a55-70ae34962a95",
+      "requested_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=31918143-8f03-4476-8a55-70ae34962a95",
+      "observed_at": "2026-10-07T07:03:34.057927+00:00",
+      "production_active": false,
+      "rights_review": "PENDING",
+      "scope_completeness": "NOT_VERIFIED",
+      "max_bytes": 4194304,
+      "http_status": 200,
+      "content_type": "application/octet-stream",
+      "final_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=31918143-8f03-4476-8a55-70ae34962a95",
+      "bytes": 111333,
+      "sha256": "3d93e05b1d8577f5f7292718dad52f90ba78b2cd7290d1716f0706ffb17ae9c5",
+      "status": "ACQUIRED_PARSE_ONLY_NOT_COMPLETE",
+      "headers": [
+        "地區",
+        "市話",
+        "數值",
+        "機關代碼",
+        "欄位名稱",
+        "縣市別代碼",
+        "行動電話",
+        "行政區域代碼",
+        "資料時間日期",
+        "資料週期",
+        "郵遞區號",
+        "電子郵件",
+        "項目"
+      ],
+      "resource_rows": 261,
+      "exact_duplicate_rows": 0,
+      "composite_identity_collisions": 0,
+      "observed_dates": [
+        "2023-01-01T00:00:00"
+      ],
+      "observed_cycles": [
+        "年"
+      ],
+      "period_semantics": "NOT_VERIFIED",
+      "empty_value_cells": 0
+    },
+    {
+      "source_id": "CTX-POP",
+      "resource_id": "c64d12df-abe6-4eb0-98a9-fce0e3708f3a",
+      "requested_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=c64d12df-abe6-4eb0-98a9-fce0e3708f3a",
+      "observed_at": "2026-10-07T07:03:34.295734+00:00",
+      "production_active": false,
+      "rights_review": "PENDING",
+      "scope_completeness": "NOT_VERIFIED",
+      "max_bytes": 4194304,
+      "http_status": 200,
+      "content_type": "application/octet-stream",
+      "final_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=c64d12df-abe6-4eb0-98a9-fce0e3708f3a",
+      "bytes": 111333,
+      "sha256": "3d93e05b1d8577f5f7292718dad52f90ba78b2cd7290d1716f0706ffb17ae9c5",
+      "status": "ACQUIRED_PARSE_ONLY_NOT_COMPLETE",
+      "headers": [
+        "地區",
+        "市話",
+        "數值",
+        "機關代碼",
+        "欄位名稱",
+        "縣市別代碼",
+        "行動電話",
+        "行政區域代碼",
+        "資料時間日期",
+        "資料週期",
+        "郵遞區號",
+        "電子郵件",
+        "項目"
+      ],
+      "resource_rows": 261,
+      "exact_duplicate_rows": 0,
+      "composite_identity_collisions": 0,
+      "observed_dates": [
+        "2023-01-01T00:00:00"
+      ],
+      "observed_cycles": [
+        "年"
+      ],
+      "period_semantics": "NOT_VERIFIED",
+      "empty_value_cells": 0
+    },
+    {
+      "source_id": "CTX-POP",
+      "resource_id": "5326ea90-907f-493d-bcb7-7016bbc30075",
+      "requested_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=5326ea90-907f-493d-bcb7-7016bbc30075",
+      "observed_at": "2026-10-07T07:03:34.329046+00:00",
+      "production_active": false,
+      "rights_review": "PENDING",
+      "scope_completeness": "NOT_VERIFIED",
+      "max_bytes": 4194304,
+      "http_status": 200,
+      "content_type": "application/octet-stream",
+      "final_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=5326ea90-907f-493d-bcb7-7016bbc30075",
+      "bytes": 111328,
+      "sha256": "404a2bcdc92892674a225a39a234175311427a04a71325ffd7c379cfccb59869",
+      "status": "ACQUIRED_PARSE_ONLY_NOT_COMPLETE",
+      "headers": [
+        "地區",
+        "市話",
+        "數值",
+        "機關代碼",
+        "欄位名稱",
+        "縣市別代碼",
+        "行動電話",
+        "行政區域代碼",
+        "資料時間日期",
+        "資料週期",
+        "郵遞區號",
+        "電子郵件",
+        "項目"
+      ],
+      "resource_rows": 261,
+      "exact_duplicate_rows": 0,
+      "composite_identity_collisions": 0,
+      "observed_dates": [
+        "2022-01-01T00:00:00"
+      ],
+      "observed_cycles": [
+        "年"
+      ],
+      "period_semantics": "NOT_VERIFIED",
+      "empty_value_cells": 0
+    },
+    {
+      "source_id": "CTX-POP",
+      "resource_id": "3b6fe911-d484-4991-b583-369d0b934da7",
+      "requested_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=3b6fe911-d484-4991-b583-369d0b934da7",
+      "observed_at": "2026-10-07T07:03:34.466533+00:00",
+      "production_active": false,
+      "rights_review": "PENDING",
+      "scope_completeness": "NOT_VERIFIED",
+      "max_bytes": 4194304,
+      "http_status": 200,
+      "content_type": "application/octet-stream",
+      "final_url": "https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=3b6fe911-d484-4991-b583-369d0b934da7",
+      "bytes": 111327,
+      "sha256": "9f02d83490b0e974d5d29ea536714f526340c2c8ad3b3546009d2473e5439126",
+      "status": "ACQUIRED_PARSE_ONLY_NOT_COMPLETE",
+      "headers": [
+        "地區",
+        "市話",
+        "數值",
+        "機關代碼",
+        "欄位名稱",
+        "縣市別代碼",
+        "行動電話",
+        "行政區域代碼",
+        "資料時間日期",
+        "資料週期",
+        "郵遞區號",
+        "電子郵件",
+        "項目"
+      ],
+      "resource_rows": 261,
+      "exact_duplicate_rows": 0,
+      "composite_identity_collisions": 0,
+      "observed_dates": [
+        "2021-01-01T00:00:00"
+      ],
+      "observed_cycles": [
+        "年"
+      ],
+      "period_semantics": "NOT_VERIFIED",
+      "empty_value_cells": 0
+    }
+  ],
+  "json_resource_scope_note": "已完整下載當下 metadata 列出的18個S028與6個CTXPOP原件；所有原件解析為13欄JSON array，業務指定期別完整性與期間語意尚未對帳，不是D1固定112Y12M替代品。",
+  "json_source_aggregate_audits": [
+    {
+      "source_id": "S-028",
+      "acquired_resources": 18,
+      "data_rows": 27040,
+      "cross_resource_exact_duplicate_rows": 0,
+      "cross_resource_composite_identity_collisions": 0,
+      "period_rows": {
+        "2025-01-01T00:00:00": 1040,
+        "2025-02-01T00:00:00": 1040,
+        "2025-03-01T00:00:00": 1040,
+        "2025-04-01T00:00:00": 1040,
+        "2025-05-01T00:00:00": 1040,
+        "2025-06-01T00:00:00": 1040,
+        "2025-07-01T00:00:00": 1040,
+        "2025-08-01T00:00:00": 1040,
+        "2025-09-01T00:00:00": 1040,
+        "2025-10-01T00:00:00": 1040,
+        "2025-11-01T00:00:00": 1040,
+        "2025-12-01T00:00:00": 1040,
+        "2026-01-01T00:00:00": 3120,
+        "2026-02-01T00:00:00": 3120,
+        "2026-03-01T00:00:00": 1040,
+        "2026-04-01T00:00:00": 1040,
+        "2026-06-01T00:00:00": 3120,
+        "2026-07-01T00:00:00": 3120
+      },
+      "business_scope_completeness": "NOT_VERIFIED",
+      "production_active": false,
+      "observed_month_gap": "2026-05 absent from acquired current metadata resource set; not a world-zero result"
+    },
+    {
+      "source_id": "CTX-POP",
+      "acquired_resources": 6,
+      "data_rows": 1566,
+      "cross_resource_exact_duplicate_rows": 261,
+      "cross_resource_composite_identity_collisions": 261,
+      "period_rows": {
+        "2021-01-01T00:00:00": 261,
+        "2022-01-01T00:00:00": 261,
+        "2023-01-01T00:00:00": 522,
+        "2024-01-01T00:00:00": 261,
+        "2025-01-01T00:00:00": 261
+      },
+      "business_scope_completeness": "NOT_VERIFIED",
+      "production_active": false
+    }
+  ],
+  "S034_original_oas_receipt": {
+    "source_id": "S-034",
+    "requested_url": "https://datacenter.taichung.gov.tw/swagger/yaml/387130000C",
+    "observed_at": "2026-10-07T07:05:01.799955+00:00",
+    "scope": "OFFICIAL_OAS_METADATA_ONLY",
+    "production_active": false,
+    "resource_rows": null,
+    "business_scope_completeness": "NOT_VERIFIED",
+    "status": "BLOCKED_OR_FAILED",
+    "error_type": "URLError",
+    "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+  },
+  "cli_execution": {
+    "tool": "grok",
+    "version": "1.0.44 (5b807183dd79) stable",
+    "status": "PARTIAL_CANDIDATE_WALL_TIME_STOPPED",
+    "exit_code": 143,
+    "max_turns": 14,
+    "no_subagents": true,
+    "always_approve": true,
+    "disable_web_search": true,
+    "auth_error_observed": false,
+    "provider_private_source_payloads_sent": false,
+    "prompt_sha256": "4800d0e5e76ca5fcb9dbed1190cf48452a3e37d964e81e304e1c71ced86b0807",
+    "private_log_sha256": "bebddaee5f8ca19c0b5cd28b97c6ca566c710e5d2f0f7bb5b5ec5f7b3264aea3",
+    "partial_candidate_sha256": "86459dd0655db4d42809c4921ef27e813bcdb3693249ba893ab3fa20cd84caf7",
+    "independent_repair": "8 initial regressions reproduced; 12 repaired/expanded review tests PASS; generic supplied-plan scope only; no real human rights review"
+  },
+  "actual_d2_local_blocked_validation": {
+    "acquisition": "BLOCKED",
+    "acquisition_http_status": 403,
+    "actual_bytes_sha256": null,
+    "business_scope_completeness": "NOT_VERIFIED",
+    "bytes_match_declared": false,
+    "completeness": false,
+    "completeness_failures": [
+      "RESOURCE_ABSENT"
+    ],
+    "coordinate_numeric_validation": "NOT_RUN",
+    "coordinate_reference_system": "UNKNOWN",
+    "coordinate_validation": "NOT_RUN",
+    "crs_authenticity": "NOT_VERIFIED",
+    "crs_axis_order": null,
+    "crs_candidate_from_supplied_plan": null,
+    "crs_epsg": null,
+    "crs_units": null,
+    "declared_sha256": null,
+    "fixture_kind": null,
+    "metadata_http_status": 200,
+    "metadata_sha256": "0c08d96a8613dc794780822e6ecb07c574916e27f2ddf1658ab0b44c56b74d7a",
+    "metadata_status": "SUCCESS",
+    "original_bytes_acquired": false,
+    "period_ok": false,
+    "plan_sha256": "0d3327b9c5b6e08cb3cba960cff48b7af78aaead82e0086ac2bdba6dec5811aa",
+    "production_active": false,
+    "promotion": false,
+    "reasons": [
+      "CRS_FIELD_NAMES_ARE_NOT_EVIDENCE",
+      "METADATA_IS_NOT_ORIGINAL_BYTES",
+      "RESOURCE_ABSENT"
+    ],
+    "resource_rows": null,
+    "rights_decision": "PENDING",
+    "schema_ok": false,
+    "schema_version": 1,
+    "source_id": "S-037",
+    "source_input": "S-037",
+    "validation_scope": "LOCAL_SUPPLIED_PLAN_CONTRACT_ONLY"
+  },
+  "validation_summary": {
+    "metadata_identity_tests": 18,
+    "actual_schema_csv_audit_tests": 8,
+    "generic_plan_review_tests": 12,
+    "all_tests": "PASS",
+    "d2_blocked_cli_exit_code": 2,
+    "source036_actual_audit_exit_code": 2,
+    "CTX165_actual_audit_exit_code": 2
+  }
+}

@@ -32,6 +32,22 @@ class NpaSourceInventoryTests(unittest.TestCase):
         cls.inventory = json.loads(INVENTORY.read_text(encoding="utf-8"))
         cls.catalog = json.loads(CATALOG.read_text(encoding="utf-8"))
 
+    def test_nested_resource_route_uses_download_uuid_not_api_segment(self):
+        resource_id = "C1D7B55C-FE56-4D8C-A79F-093F7A82BB0D"
+        url = f"https://opdadm.moi.gov.tw/api/v1/no-auth/resource/api/dataset/fictional/resource/{resource_id}/download"
+        self.assertEqual(inventory_script._resource_id(url), resource_id)
+
+    def test_resource_download_query_preserves_rid(self):
+        resource_id = "09800419-4015-4223-a9f2-18d0b4e53e68"
+        url = f"https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid={resource_id}"
+        self.assertEqual(inventory_script._resource_id(url), resource_id)
+
+    def test_resource_id_ambiguous_queries_fail_closed(self):
+        with self.assertRaisesRegex(ValueError, "ambiguous"):
+            inventory_script._resource_id("https://example.test/download?rid=one&rid=two")
+        with self.assertRaisesRegex(ValueError, "ambiguous"):
+            inventory_script._resource_id("https://example.test/resource/one/download?rid=two")
+
     def test_inventory_covers_batches_and_catalog_bindings(self):
         summary = inventory_script.validate_inventory(self.inventory, self.catalog)
         self.assertGreaterEqual(summary["batch_counts"]["BATCH_1"], 5)

@@ -1,0 +1,188 @@
+{
+  "schema_version": 1,
+  "source_id": "S-019",
+  "scope": "ACTUAL_OFFICIAL_LIST_TRAVERSAL_ONLY",
+  "started_at": "2026-10-07T07:16:10.998487+00:00",
+  "raw_body_saved": false,
+  "details_requested": 0,
+  "independent_business_scope_verified": false,
+  "rights_admission": "UNKNOWN",
+  "promotion_eligible": false,
+  "status": "OBSERVED",
+  "pagination": {
+    "strategy": "next-link",
+    "pages_fetched": 25,
+    "page_limit": 30,
+    "complete": true
+  },
+  "list_traversal": {
+    "stop_reason": "TERMINAL_PAGE",
+    "requested_start": "2026-09-01",
+    "requested_end": "2026-10-07",
+    "reverse_chronological_observed": true,
+    "all_observed_dates_known": true,
+    "oldest_observed_date": "2010-10-27",
+    "newest_observed_date": "2026-09-23",
+    "whole_history_completeness": "UNKNOWN",
+    "detail_pages_complete": false,
+    "attachments_downloaded": false
+  },
+  "collector_window_claim": "COMPLETE_WITH_ITEMS",
+  "window_item_count": 4,
+  "unique_list_items": 734,
+  "manifest_sha256": "5c7cad242ef427f7448a9d71f496bfd247287b3492ec17efeee8e1440e9e051d",
+  "pages": [
+    {
+      "requested_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186",
+      "final_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186",
+      "http_status": 200,
+      "content_sha256": "fa741555b40f57f92bfa9a8c895ff575dc3ccc48aa3fbfdb26f06d59e35a668f"
+    },
+    {
+      "requested_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=2&PageSize=30&type=",
+      "final_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=2&PageSize=30&type=",
+      "http_status": 200,
+      "content_sha256": "44423a021443b9d8f9bc0e978350d4d20eb4d8e58a86624bc77cb698b43cd2cc"
+    },
+    {
+      "requested_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=3&PageSize=30&type=",
+      "final_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=3&PageSize=30&type=",
+      "http_status": 200,
+      "content_sha256": "18f198100c4089905b40361b196cbcee147bcc06523d17de10186a73b7653619"
+    },
+    {
+      "requested_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=4&PageSize=30&type=",
+      "final_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=4&PageSize=30&type=",
+      "http_status": 200,
+      "content_sha256": "b48da89629a211427ba268e564ce36de92ac92eb4cc930418e9cb5db52c3e5fe"
+    },
+    {
+      "requested_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=5&PageSize=30&type=",
+      "final_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=5&PageSize=30&type=",
+      "http_status": 200,
+      "content_sha256": "697e4bc3a238b94981333a96d515e26f154c4dfb4bc8f405a1e2d414020dafe8"
+    },
+    {
+      "requested_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=6&PageSize=30&type=",
+      "final_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=6&PageSize=30&type=",
+      "http_status": 200,
+      "content_sha256": "53d24f8e90091e355c533c2b24e11a537f9244f2e5c2907409222b92725cffd0"
+    },
+    {
+      "requested_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=7&PageSize=30&type=",
+      "final_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=7&PageSize=30&type=",
+      "http_status": 200,
+      "content_sha256": "7745db7229edcf78326cc25d4f4f20f4046f244c1358de38b9c440f29819439e"
+    },
+    {
+      "requested_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=8&PageSize=30&type=",
+      "final_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=8&PageSize=30&type=",
+      "http_status": 200,
+      "content_sha256": "d6d8db5a6b3a0dc9ce042f27b9c94c73225c3cf5599428d18da51ddbbce0e088"
+    },
+    {
+      "requested_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=9&PageSize=30&type=",
+      "final_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=9&PageSize=30&type=",
+      "http_status": 200,
+      "content_sha256": "5349f80551dd4611eca48fe4fd199c320ac487f64c5bbf85ca4cd26e008fa69c"
+    },
+    {
+      "requested_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=10&PageSize=30&type=",
+      "final_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=10&PageSize=30&type=",
+      "http_status": 200,
+      "content_sha256": "8c29dc101ea974b867d6993fba01ad8206ff7f380891845cbf560e9c9320652f"
+    },
+    {
+      "requested_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=11&PageSize=30&type=",
+      "final_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=11&PageSize=30&type=",
+      "http_status": 200,
+      "content_sha256": "be837db9093bdcb6046826e66cd1a9438302ea2b71620247deee15dd0d7bb537"
+    },
+    {
+      "requested_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=12&PageSize=30&type=",
+      "final_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=12&PageSize=30&type=",
+      "http_status": 200,
+      "content_sha256": "2cd9a466946a2ab7b5b5a1d04d1f4f80be73d982e3ed60c3c3aa369324cf01e4"
+    },
+    {
+      "requested_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=13&PageSize=30&type=",
+      "final_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=13&PageSize=30&type=",
+      "http_status": 200,
+      "content_sha256": "e6561a22a1d38500137bae8cd8fa8b3a3cec26671c912f8beab4c9860ca441fe"
+    },
+    {
+      "requested_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=14&PageSize=30&type=",
+      "final_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=14&PageSize=30&type=",
+      "http_status": 200,
+      "content_sha256": "f2f76c5fb200c1e69293f58337e1833054aa9eb85306f019395866fd3a071fc6"
+    },
+    {
+      "requested_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=15&PageSize=30&type=",
+      "final_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=15&PageSize=30&type=",
+      "http_status": 200,
+      "content_sha256": "087c9535e83891a65de4d743d2e405f6497d12c4975d50df050d4f7daa394935"
+    },
+    {
+      "requested_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=16&PageSize=30&type=",
+      "final_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=16&PageSize=30&type=",
+      "http_status": 200,
+      "content_sha256": "a725efd2dffcda19678858ba04cc878202900185ebbf97ac625b106b4eedc8bf"
+    },
+    {
+      "requested_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=17&PageSize=30&type=",
+      "final_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=17&PageSize=30&type=",
+      "http_status": 200,
+      "content_sha256": "a842ce57262cbf018087c17fbece76e217597403d254c233f504cff0dd5e583b"
+    },
+    {
+      "requested_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=18&PageSize=30&type=",
+      "final_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=18&PageSize=30&type=",
+      "http_status": 200,
+      "content_sha256": "6e2b52bc3bc3e784eeb85dbc4e3456999ec6e582a7e12dcee9bebb3dbe5bcb90"
+    },
+    {
+      "requested_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=19&PageSize=30&type=",
+      "final_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=19&PageSize=30&type=",
+      "http_status": 200,
+      "content_sha256": "83784842c2ec63a89b2b52cef2671ab53454dd27668bc97fb4cb191e53345efd"
+    },
+    {
+      "requested_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=20&PageSize=30&type=",
+      "final_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=20&PageSize=30&type=",
+      "http_status": 200,
+      "content_sha256": "59965685001b8e95439af23f80500a1a924ec4bb2500af70b3eb1c2d19677366"
+    },
+    {
+      "requested_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=21&PageSize=30&type=",
+      "final_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=21&PageSize=30&type=",
+      "http_status": 200,
+      "content_sha256": "65e6dc33f91988e674027daa38b71f2735bf38a13aa6b3a0d8b46fb6d201a76a"
+    },
+    {
+      "requested_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=22&PageSize=30&type=",
+      "final_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=22&PageSize=30&type=",
+      "http_status": 200,
+      "content_sha256": "a883b5470d3e6699eeae6b63f6bc47f7b88ae068ced278f2922221a8c1fa36e6"
+    },
+    {
+      "requested_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=23&PageSize=30&type=",
+      "final_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=23&PageSize=30&type=",
+      "http_status": 200,
+      "content_sha256": "aa44df57b08da9dfad26f28dc44b95804c8f54d89372211e8d36017f9094e5ca"
+    },
+    {
+      "requested_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=24&PageSize=30&type=",
+      "final_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=24&PageSize=30&type=",
+      "http_status": 200,
+      "content_sha256": "f60daa8f12689e03eed605326eac0ca4681a009e7f1fdb9254f4848e4279576f"
+    },
+    {
+      "requested_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=25&PageSize=30&type=",
+      "final_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=25&PageSize=30&type=",
+      "http_status": 200,
+      "content_sha256": "da616f746fe1de0493e08947b030e441956d7dc08a625d75d9da2685e205424c"
+    }
+  ],
+  "actual_http_calls": 25,
+  "completed_at": "2026-10-07T07:16:36.162006+00:00"
+}

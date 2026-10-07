@@ -1,0 +1,157 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-07",
+  "scope": "BOUNDED_FIRST_REPAIR_ITERATION_NOT_ALL_SOURCES_ACCEPTED",
+  "base_code_sha": "093c37f8b09f2513e05a8b133e5091440303bc98",
+  "cli_execution": {
+    "claude": {
+      "status": "NOT_INSTALLED_NOT_RUN"
+    },
+    "agy": {
+      "actual_invocation": true,
+      "status": "PRINT_TIMEOUT_PARTIAL_EMPTY_RESPONSE",
+      "completed_repair": false
+    },
+    "grok": {
+      "actual_invocation": true,
+      "status": "PARTIAL_CANDIDATE_WALL_TIME_STOPPED",
+      "exit_code": 143,
+      "completed_repair": false
+    },
+    "verified_engineering_by": "CODEX_AFTER_CLI_PARTIAL_RESULTS",
+    "source_rows_sent_to_these_cli_providers": false
+  },
+  "local_validation": {
+    "focused_test_count": 125,
+    "status": "PASS",
+    "test_log_sha256": "2e039697ae13a8e7b2d34e758e31c75fce9f44f247716088654fc7adab321400",
+    "gate0": "PASS",
+    "required_pr_ci": "PENDING_AT_RECEIPT_CREATION"
+  },
+  "manual_canary": {
+    "schema_version": 1,
+    "scope": "ACTUAL_20261007_MANUAL_CANARY_WITH_HASH_VERIFIED_ACTIONS_ARTIFACTS",
+    "run_id": 37584862016,
+    "workflow_conclusion": "failure",
+    "code_sha": "093c37f8b09f2513e05a8b133e5091440303bc98",
+    "observations": [
+      {
+        "source_id": "S-019",
+        "artifact_id": 11466063830,
+        "artifact_zip_sha256": "34ebc91bffde0a8161c98abb42ac25203b88b9cabd0a38e1eca759d6409a7df3",
+        "observed_at": "2026-10-07T15:02:17.410247+08:00",
+        "report_status": "OBSERVED",
+        "source_health": "PASS",
+        "collector_window_claim": "PARTIAL",
+        "snapshot_item_count": 153,
+        "schema_contract_status": "NO_DRIFT",
+        "one_day_validator_status": "PASS",
+        "promotion_eligible": false,
+        "coverage_independently_verified": false
+      },
+      {
+        "source_id": "S-032",
+        "artifact_id": 11465973954,
+        "artifact_zip_sha256": "02ffa92c2038088cce676a0f04fb993cf56314633612b18d4b02579e6395c6d7",
+        "observed_at": "2026-10-07T15:02:12.255287+08:00",
+        "report_status": "OBSERVED",
+        "source_health": "PASS",
+        "collector_window_claim": "PARTIAL",
+        "snapshot_item_count": 39,
+        "schema_contract_status": "NO_DRIFT",
+        "one_day_validator_status": "PASS",
+        "promotion_eligible": false,
+        "coverage_independently_verified": false
+      },
+      {
+        "source_id": "S-001",
+        "artifact_id": 11465939055,
+        "artifact_zip_sha256": "5955fa2e7b282f2dd830cc85951357be542c798439824e6ae6519341b28a3c2b",
+        "observed_at": "2026-10-07T15:02:09.352639+08:00",
+        "report_status": "FAILED",
+        "source_health": "FAILED",
+        "collector_window_claim": "PARTIAL",
+        "snapshot_item_count": null,
+        "schema_contract_status": "SOURCE_UNAVAILABLE",
+        "one_day_validator_status": "BLOCKED",
+        "promotion_eligible": false,
+        "coverage_independently_verified": false
+      },
+      {
+        "source_id": "S-033",
+        "artifact_id": 11465772946,
+        "artifact_zip_sha256": "df281e8b93545350d11c7de26cdcc047f78ada4ee389c3a5633cf3f7e6bbaf70",
+        "observed_at": "2026-10-07T15:02:10.455834+08:00",
+        "report_status": "OBSERVED",
+        "source_health": "PASS",
+        "collector_window_claim": "COMPLETE_WITH_ITEMS",
+        "snapshot_item_count": 500,
+        "schema_contract_status": "NO_DRIFT",
+        "one_day_validator_status": "PASS",
+        "promotion_eligible": false,
+        "coverage_independently_verified": false
+      },
+      {
+        "source_id": "S-031",
+        "artifact_id": 11465624748,
+        "artifact_zip_sha256": "3847c8370ea36cc22761b4d620ca526156172ccad894994252db5e1da9bf5941",
+        "observed_at": "2026-10-07T15:02:10.995172+08:00",
+        "report_status": "OBSERVED",
+        "source_health": "PASS",
+        "collector_window_claim": "PARTIAL",
+        "snapshot_item_count": 10,
+        "schema_contract_status": "NO_DRIFT",
+        "one_day_validator_status": "PASS",
+        "promotion_eligible": false,
+        "coverage_independently_verified": false
+      }
+    ],
+    "sources_promoted": 0,
+    "raw_reports_private": true,
+    "independent_human_review": false
+  },
+  "seven_day_check": {
+    "status": "BLOCKED",
+    "required_days": 7,
+    "source_days": {
+      "S-001": [],
+      "S-019": [
+        "2026-10-06",
+        "2026-10-07"
+      ],
+      "S-031": [
+        "2026-10-06",
+        "2026-10-07"
+      ],
+      "S-032": [
+        "2026-10-06",
+        "2026-10-07"
+      ],
+      "S-033": [
+        "2026-10-06",
+        "2026-10-07"
+      ]
+    },
+    "scope": "THE_TEN_HASH_VERIFIED_REPORTS_FROM_OCT6_AND_OCT7_ONLY",
+    "older_days_not_recomputed_in_this_receipt": true,
+    "promotion_eligible": false
+  },
+  "s001_original_request": {
+    "schema_version": 1,
+    "source_id": "S-001",
+    "requested_original_url": "https://www.police.taichung.gov.tw/ch/home.jsp?id=1&parentpath=0&mcustomize=news_list.jsp",
+    "observed_at": "2026-10-07T06:57:40.692744+00:00",
+    "bypass_used": false,
+    "alternate_host_tried": false,
+    "http_status": 503,
+    "content_type": "text/plain",
+    "redirect_present": false,
+    "response_bytes": 91,
+    "response_sha256": "2f85832e31ca57711e6107af6b142363351ae516adb71c69afc643fac26be7f6",
+    "status": "BLOCKED_OR_UPSTREAM_FAILURE"
+  },
+  "public_evidence_policy": "Aggregates, URLs, hashes and schema only. No original records, CLI auth, raw CLI logs or private plans.",
+  "newly_admitted_sources": 0,
+  "human_reviews_fabricated": 0,
+  "new_business_scope_complete_sources": 0
+}

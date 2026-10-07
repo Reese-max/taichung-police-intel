@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 from typing import Any
 
@@ -39,12 +39,27 @@ def _canonical(value: Any) -> bytes:
 
 
 def _resource_id(url: str) -> str | None:
-    parts = [part for part in urlsplit(url).path.split("/") if part]
-    try:
-        index = parts.index("resource")
-    except ValueError:
-        return None
-    return parts[index + 1] if index + 1 < len(parts) else None
+    """Preserve publisher IDs in nested API paths and download rid queries.
+
+    The MOI route contains an earlier /resource/api segment; the final
+    /resource/<id> identifies the downloaded resource. Ambiguous identities
+    must never silently bind a receipt to the wrong original resource.
+    """
+    parsed = urlsplit(url)
+    parts = [part for part in parsed.path.split("/") if part]
+    indices = [index for index, part in enumerate(parts) if part == "resource"]
+    path_id = None
+    if indices:
+        index = indices[-1]
+        if index + 1 < len(parts) and parts[index + 1] != "api":
+            path_id = parts[index + 1]
+    query_ids = parse_qs(parsed.query, keep_blank_values=True).get("rid", [])
+    if len(query_ids) > 1 or (query_ids and not query_ids[0].strip()):
+        raise ValueError("ambiguous resource rid query")
+    query_id = query_ids[0] if query_ids else None
+    if path_id and query_id and path_id != query_id:
+        raise ValueError("ambiguous resource path/query identity")
+    return path_id or query_id
 
 
 def _resource_receipt(resource: dict[str, Any]) -> dict[str, Any]:

@@ -61,6 +61,7 @@ API_S007 = "https://yishi.tccc.gov.tw/api/ProceedingsBackWeb/FrontList"
 API_S009 = "https://yishi.tccc.gov.tw/api/Proposal/FrontList"
 PARSER_VERSION = "p0-live-1"
 MAX_NEWS_LIST_PAGES = 4
+MAX_NEWS_LIST_PAGES_HARD_LIMIT = 40
 CANARY_MAX_DETAILS = 5
 SOURCE_ROWS = {
     source_id: (name, "PRIMARY_OFFICIAL", "PREP_CORE", "ACTIVE")
@@ -579,6 +580,10 @@ def parse_news_list(html: bytes, base_url: str, id_pattern: str) -> list[dict]:
     pattern = re.compile(id_pattern)
     seen: dict[str, dict] = {}
     for anchor in soup.find_all("a", href=True):
+        # Site navigation can contain article-shaped URLs (including the same
+        # ID as a dated list row). It is not evidence of a list item/date.
+        if anchor.find_parent(["nav", "header", "footer", "aside"]):
+            continue
         match = pattern.search(anchor["href"])
         if not match:
             continue
@@ -598,10 +603,35 @@ def parse_news_list(html: bytes, base_url: str, id_pattern: str) -> list[dict]:
     return entries
 
 
+def _list_page_identity(url: str) -> tuple[tuple, int] | None:
+    """Require an explicit, unique positive page and identical list parameters."""
+    parts = urllib.parse.urlsplit(url)
+    if parts.scheme != "https" or not parts.hostname or parts.username or parts.password or parts.fragment:
+        return None
+    try:
+        port = parts.port or 443
+    except ValueError:
+        return None
+    query = urllib.parse.parse_qsl(parts.query, keep_blank_values=True)
+    pages = [(key, value) for key, value in query if key.lower() == "page"]
+    if len(pages) != 1 or not re.fullmatch(r"[1-9]\d{0,5}", pages[0][1]):
+        return None
+    if len({key.lower() for key, _ in query}) != len(query):
+        return None
+    parameters = tuple(sorted((key, value) for key, value in query if key.lower() != "page"))
+    identity = (parts.scheme, parts.hostname.lower(), port, parts.path, pages[0][0], parameters)
+    return identity, int(pages[0][1])
+
+
 def next_news_list_page(html: bytes, base_url: str, source_id: str) -> tuple[str | None, bool]:
     """Return a safe next-page URL and whether pagination needs accounting for."""
     soup = BeautifulSoup(html, "html.parser")
-    pagination_hint = False
+    current_page = _list_page_identity(base_url)
+    # An explicitly paginated URL needs terminal evidence even if controls
+    # disappeared. Absence of Next is not proof that the final page was served.
+    pagination_hint = current_page is not None
+    last_page_seen = False
+    terminal_controls_consistent = current_page is not None
     for control in soup.find_all(["a", "link", "button"]):
         label = " ".join(control.stripped_strings).strip().lower()
         title = str(control.get("title") or "").strip().lower()
@@ -610,6 +640,20 @@ def next_news_list_page(html: bytes, base_url: str, source_id: str) -> tuple[str
         rel = {str(value).lower() for value in control.get("rel", [])}
         href = str(control.get("href") or "").strip()
         labels = (label, title, aria_label)
+        # S019's friendly utility bar says 回上一頁 but invokes browser history;
+        # it is not the list's 上一頁 control. Exclude only the observed exact
+        # utility, outside any actual pagination context; unknown JS stays unsafe.
+        in_pager = any(
+            set(parent.get("class", [])) & {"page", "pagination", "pager", "paginator"}
+            for parent in control.parents if getattr(parent, "attrs", None) is not None
+        )
+        if (
+            any(value == "回上一頁" for value in labels)
+            and re.fullmatch(r"javascript:\s*history\.back\(\)\s*;?", href, re.I)
+            and control.find_parent(["section", "div"], class_="function")
+            and not in_pager
+        ):
+            continue
         is_next = (
             any(any(token in value for token in ("下一頁", "下一页", "下頁", "下页")) for value in labels if value)
             or any(re.search(r"\bnext(?:\s+page)?\b", value) for value in labels if value)
@@ -621,6 +665,29 @@ def next_news_list_page(html: bytes, base_url: str, source_id: str) -> tuple[str
             for value in labels
             if value
         )
+        is_last = any(
+            any(token in value for token in ("最後一頁", "最后一页", "末頁", "末页"))
+            or re.search(r"\blast(?:\s+page)?\b", value)
+            for value in labels if value
+        ) or "last" in rel
+        is_boundary_control = is_last or numbered or any(
+            any(token in value for token in ("第一頁", "第一页", "上一頁", "上一页"))
+            or re.search(r"\b(?:first|prev(?:ious)?)(?:\s+page)?\b", value)
+            for value in labels if value
+        )
+        if is_boundary_control:
+            pagination_hint = True
+            target = _list_page_identity(urllib.parse.urljoin(base_url, href)) if href else None
+            if current_page is None or target is None or target[0] != current_page[0] or target[1] > current_page[1]:
+                terminal_controls_consistent = False
+            if numbered and target is not None:
+                numbered_labels = [value for value in labels if re.fullmatch(r"(?:第\s*)?\d{1,4}\s*(?:頁|页)?", value)]
+                if any(int(re.search(r"\d+", value).group()) != target[1] for value in numbered_labels):
+                    terminal_controls_consistent = False
+            if is_last:
+                last_page_seen = True
+                if target is None or current_page is None or target[1] != current_page[1]:
+                    terminal_controls_consistent = False
         if not is_next:
             if numbered and (
                 re.search(r"[?&](?:page|intpage)=\d+", href, re.I)
@@ -644,6 +711,8 @@ def next_news_list_page(html: bytes, base_url: str, source_id: str) -> tuple[str
             query.extend((("page", match.group(1)), ("intpage", match.group(2))))
             return urllib.parse.urlunsplit(parts._replace(query=urllib.parse.urlencode(query))), True
         return urllib.parse.urljoin(base_url, href), True
+    if last_page_seen and terminal_controls_consistent:
+        return None, False
     return None, pagination_hint
 
 
@@ -786,13 +855,19 @@ def collect_news_list(
     end: date,
     existing: dict[str, dict] | None = None,
     max_details: int | None = None,
+    *,
+    max_list_pages: int | None = None,
 ) -> dict:
-    """Collect a candidate list with bounded list and detail-page requests."""
+    """Collect a bounded list; an old row never proves an unseen page complete."""
+    list_budget = MAX_NEWS_LIST_PAGES if max_list_pages is None else max_list_pages
+    if type(list_budget) is not int or not 1 <= list_budget <= MAX_NEWS_LIST_PAGES_HARD_LIMIT:
+        raise ValueError("max_list_pages must be an integer between 1 and 40")
     config = NEWS_LIST_SOURCES[source_id]
     responses = []
     all_pages_seen = True
     is_rss = config.get("format") == "rss"
-    page_limit = 1 if is_rss else MAX_NEWS_LIST_PAGES
+    page_limit = 1 if is_rss else list_budget
+    stop_reason = "RSS_SNAPSHOT" if is_rss else "TERMINAL_PAGE"
     if is_rss:
         listing = get_news_listing(session, source_id)
         responses.append(snapshot(listing, "LIST"))
@@ -804,8 +879,9 @@ def collect_news_list(
         seen_keys = set()
         seen_pages = set()
         page_url = config["list_url"]
-        for _ in range(MAX_NEWS_LIST_PAGES):
+        for _ in range(list_budget):
             if page_url in seen_pages:
+                stop_reason = "PAGE_LOOP"
                 all_pages_seen = False
                 break
             seen_pages.add(page_url)
@@ -825,10 +901,12 @@ def collect_news_list(
             if not has_next:
                 break
             if not next_url or next_url in seen_pages:
+                stop_reason = "PAGE_LOOP" if next_url in seen_pages else "UNRESOLVED_PAGINATION"
                 all_pages_seen = False
                 break
             page_url = next_url
         else:
+            stop_reason = "PAGE_LIMIT"
             all_pages_seen = False
     existing = existing or {}
     details_fetched = 0
@@ -892,6 +970,18 @@ def collect_news_list(
             "page_limit": page_limit,
             "complete": all_pages_seen,
         },
+        "list_traversal": {
+            "stop_reason": stop_reason,
+            "requested_start": start.isoformat(),
+            "requested_end": end.isoformat(),
+            "reverse_chronological_observed": reverse_chronological,
+            "all_observed_dates_known": len(dated) == len(observed_entries),
+            "oldest_observed_date": min(dated).isoformat() if dated else None,
+            "newest_observed_date": max(dated).isoformat() if dated else None,
+            "whole_history_completeness": "UNKNOWN",
+            "detail_pages_complete": all(item["payload"].get("detail") == "fetched" for item in items),
+            "attachments_downloaded": False,
+        },
         "window_item_count": len(window_items),
         "snapshot_item_count": len(items),
         "items": items,
@@ -922,12 +1012,15 @@ def collect_source(
     existing: dict[str, dict] | None = None,
     *,
     max_details: int | None = None,
+    max_list_pages: int | None = None,
 ) -> dict:
     collector = COLLECTORS[source_id]
+    if max_list_pages is not None and collector is not collect_news_list:
+        raise ValueError(f"max_list_pages is only valid for list-news sources: {source_id}")
     if collector is collect_download_list:
         return collector(session, source_id, start, end)
     if collector is collect_news_list:
-        return collector(session, source_id, start, end, existing, max_details=max_details)
+        return collector(session, source_id, start, end, existing, max_details=max_details, max_list_pages=max_list_pages)
     if collector is collect_fire_live:
         return collector(session, start, end)
     if max_details is not None:
