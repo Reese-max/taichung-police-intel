@@ -189,10 +189,21 @@ def strip_derived_receipts(value: dict[str, Any]) -> dict[str, Any]:
     return {key: item for key, item in value.items() if key not in DERIVED_RECEIPT_KEYS}
 
 
+def _migration_schema_version(value: Any, label: str) -> int:
+    """Validate a declared version without adopting Python's numeric coercions."""
+    if not _declared_version_is_usable("schema_version", value):
+        raise ValueError(f"{label} must be a positive integer, not a boolean or coerced value")
+    registered = {version for edge in MIGRATION_REGISTRY for version in edge}
+    if value not in registered:
+        raise ValueError(f"{label} is not registered")
+    return value
+
+
 def validate_object(kind: str, item: dict[str, Any], expected_version: int = TARGET_SCHEMA_VERSION) -> None:
     if kind not in OBJECT_KEYS or not isinstance(item, dict):
         raise ValueError(f"unsupported {kind} object")
-    if item.get("schema_version") != expected_version:
+    expected_version = _migration_schema_version(expected_version, "target schema_version")
+    if _migration_schema_version(item.get("schema_version"), f"{kind} schema_version") != expected_version:
         raise ValueError(f"{kind} schema_version must be {expected_version}")
     for field in REQUIRED_FIELDS[kind]:
         if not isinstance(item.get(field), str) or not item[field].strip():
@@ -220,7 +231,8 @@ def _manual_hashes(bundle: dict[str, Any]) -> dict[str, str | None]:
 def migrate_bundle(bundle: dict[str, Any], *, target_version: int = TARGET_SCHEMA_VERSION) -> tuple[dict[str, Any] | None, dict[str, Any]]:
     if not isinstance(bundle, dict) or not isinstance(bundle.get("objects"), dict):
         raise ValueError("migration input must contain an objects object")
-    source_version = int(bundle.get("schema_version", 1))
+    target_version = _migration_schema_version(target_version, "target schema_version")
+    source_version = _migration_schema_version(bundle.get("schema_version", 1), "bundle schema_version")
     if source_version > target_version:
         raise ValueError(f"input schema_version {source_version} is newer than target {target_version}")
     observed_at = parse_timestamp(bundle.get("observed_at") or "2026-01-01T00:00:00+00:00")
@@ -253,7 +265,7 @@ def migrate_bundle(bundle: dict[str, Any], *, target_version: int = TARGET_SCHEM
         for index, item in enumerate(rows):
             try:
                 current = copy.deepcopy(item)
-                version = int(current.get("schema_version", source_version))
+                version = _migration_schema_version(current.get("schema_version", source_version), f"{kind} schema_version")
                 while version < target_version:
                     if (version, version + 1) not in MIGRATION_REGISTRY:
                         raise ValueError(f"no registry path {version}->{version + 1}")
@@ -528,6 +540,7 @@ def rehash_bundle(bundle: dict[str, Any], *, target_body_hash_version: str = BOD
     """
     if not isinstance(bundle, dict) or not isinstance(bundle.get("objects"), dict):
         raise ValueError("body hash migration input must contain an objects object")
+    _migration_schema_version(bundle.get("schema_version", 1), "bundle schema_version")
     if target_body_hash_version not in BODY_HASH_SEMANTICS:
         return None, {
             "schema_version": 1,
