@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import base64
 from contextlib import contextmanager
+import copy
 import csv
 import hashlib
 import importlib.util
@@ -849,6 +850,7 @@ def build_receipt(
         # `current` alone would silently drop RESOURCE_ID_CHANGED forever after
         # one failed probe.
         previous = old.get("last_known_good") or old.get("current")
+        previous_last_known_good = copy.deepcopy(old.get("last_known_good"))
         observation = observations_by_id.get(source_id)
         if observation:
             result = observe(contract, observation.get("body", b""), previous=previous, **{key: value for key, value in observation.items() if key not in {"source_id", "body"}})
@@ -867,7 +869,7 @@ def build_receipt(
                 "reasons": result["reasons"],
                 "observed_at": result["observed_at"],
                 "state": "OPEN",
-                "last_known_good": source_state.get("last_known_good"),
+                "last_known_good": previous_last_known_good,
             })
     statuses = {item["status"] for item in receipt_sources}
     overall = "BLOCKED" if "BREAKING_DRIFT" in statuses or "SOURCE_UNAVAILABLE" in statuses else "DEGRADED" if "ADDITIVE_COMPATIBLE" in statuses else "UNKNOWN" if statuses - {"NO_DRIFT"} else "HEALTHY"

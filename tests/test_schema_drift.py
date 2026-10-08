@@ -762,6 +762,7 @@ class SchemaDriftTests(unittest.TestCase):
         self.assertEqual(source["status"], "ADDITIVE_COMPATIBLE")
         self.assertTrue(source["review_required"])
         self.assertEqual(receipt["review_inbox"][0]["reasons"], ["RESOURCE_ID_CHANGED"])
+        self.assertEqual(receipt["review_inbox"][0]["last_known_good"]["resource_id"], "resource-A")
 
         # The baseline advances once the change is recorded, so the next swap is
         # detected on its own terms rather than escalating forever.
@@ -779,6 +780,29 @@ class SchemaDriftTests(unittest.TestCase):
         )
         self.assertFalse(unchanged["sources"][0]["resource_id_changed"])
         self.assertEqual(unchanged["sources"][0]["status"], "NO_DRIFT")
+
+    def test_resource_id_change_preserves_previous_last_known_good_in_review_inbox(self):
+        from intel_v2.review import schema_drift_candidates
+
+        rows = [{"項目": "x", "欄位名稱": "y", "數值": "1", "資料時間日期": "2026-09-01", "資料週期": "月"}]
+        body = json.dumps(rows)
+        contracts = {"S-028": drift.CONTRACTS["S-028"]}
+        _, state = drift.build_receipt(
+            [{"source_id": "S-028", "body": body, "content_type": "application/json", "resource_id": "resource-A", "observed_at": "2026-10-07T02:14:04+00:00"}],
+            contracts=contracts,
+        )
+        receipt, state = drift.build_receipt(
+            [{"source_id": "S-028", "body": body, "content_type": "application/json", "resource_id": "resource-B", "observed_at": "2026-10-08T14:46:10+00:00"}],
+            state=state,
+            contracts=contracts,
+        )
+        inbox = receipt["review_inbox"][0]
+        before = schema_drift_candidates(receipt)[0]["evidence"]["before"]
+        history_ids = [item.get("resource_id") for item in state["sources"]["S-028"]["history"]]
+        self.assertEqual(inbox["last_known_good"]["resource_id"], "resource-A")
+        self.assertEqual(before["resource_id"], "resource-A")
+        self.assertEqual(state["sources"]["S-028"]["last_known_good"]["resource_id"], "resource-B")
+        self.assertEqual(history_ids, ["resource-A"])
 
     def test_a_multi_page_declaration_is_never_a_complete_window(self):
         for declared_total, declared_pages in ((200, 9), (0, 9), (1, 1), (1, 2)):
