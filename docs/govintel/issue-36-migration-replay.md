@@ -3,6 +3,7 @@
 `scripts/migration_replay.py` 提供最小可重播流程：
 
 - `PublicEvent`、`ChangeEvent`、`EvidenceEnvelope` 使用 `schema_version` 1 → 2 → 3 migration registry。每個 registry entry 都必須有對應實作（`MIGRATION_STEPS`），只註冊未實作的 step 會 fail closed，不會被靜默跳過。
+- Bundle、每個 object 與 migration target 的版本宣告都必須是 registry 已登錄的正整數；boolean、浮點數、字串、null、非正數與未登錄版本會在遷移／寫入前拒絕，不以 `int()` 或 Python 的數值相等規則偷偷改寫版本。明確缺少宣告的 legacy bundle 仍預設版本 1，缺少 object 宣告仍沿用 bundle 版本；這個相容路徑不包含明確宣告 null 或錯誤型別。拒絕 apply／rehash 時既有 output 與 in-place input 保留原 bytes；合法的 migration、人工 state、重播及版本說明行為保持原契約。
 - `dry-run` 回報 input/output hash、affected/error count、object counts、實際執行的 registry path、版本 binding 與人工 state hash；任一 object collection 缺少、未知或有錯誤時 fail closed。`dry-run` 只寫報告，不寫 migrated bundle。
 - `apply` 只在整批無錯誤後寫入，並把 migration receipt 放進與 migrated data **同一個 atomic write**，所以 apply 中途 crash 不會留下「有資料但不知道是哪個版本產出」的狀態；既有 output 也不會被部分 migration 覆蓋。receipt 是 derived metadata，再跑一次 `apply` 時會先剝掉（`apply_receipt`、`body_hash_migration_receipt` 為保留 key），所以 migrated data 與 `output_sha256` 兩次一致；`input_sha256` 仍然記錄該次執行真正讀到的 bytes，因此是刻意不同。
 - `replay` 以相同 feed、previous state、parser/semantics/projection version 重建 deterministic state/event IDs，保留 `FIRST_SEEN` 語意。

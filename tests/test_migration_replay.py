@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import copy
 import json
 from pathlib import Path
 import tempfile
@@ -898,6 +899,133 @@ class CrashSafeApplyTests(unittest.TestCase):
             receipt = json.loads((Path(directory) / "query-store.migration-receipt.json").read_text(encoding="utf-8"))
             self.assertEqual(receipt["generation_id"], store["generation_id"])
             self.assertEqual(receipt["counts"]["publication_items"], store["counts"]["publication_items"])
+
+
+class MigrationSchemaVersionBoundaryTests(unittest.TestCase):
+    BAD_VERSIONS = (True, False, 1.9, 3.0, "1", "3", None, 0, -1, 4)
+
+    def test_bundle_schema_declarations_are_not_coerced_into_registered_versions(self):
+        for version in self.BAD_VERSIONS:
+            with self.subTest(version=version, value_type=type(version).__name__):
+                payload = bundle()
+                payload["schema_version"] = version
+                before = copy.deepcopy(payload)
+                with self.assertRaises(ValueError):
+                    mr.migrate_bundle(payload)
+                self.assertEqual(payload, before)
+
+    def test_each_object_rejects_bad_schema_declarations_without_partial_output(self):
+        for kind in mr.OBJECT_KEYS:
+            for version in self.BAD_VERSIONS:
+                with self.subTest(kind=kind, version=version, value_type=type(version).__name__):
+                    payload = bundle()
+                    payload["objects"][kind][0]["schema_version"] = version
+                    before = copy.deepcopy(payload)
+                    migrated, report = mr.migrate_bundle(payload)
+                    self.assertIsNone(migrated)
+                    self.assertGreater(report["error_count"], 0)
+                    self.assertIsNone(report["output_sha256"])
+                    self.assertEqual(payload, before)
+
+    def test_already_current_float_declarations_are_not_accepted_by_integer_equality(self):
+        current, _ = mr.migrate_bundle(bundle())
+        for kind in mr.OBJECT_KEYS:
+            with self.subTest(kind=kind):
+                invalid = copy.deepcopy(current)
+                invalid["objects"][kind][0]["schema_version"] = 3.0
+                before = copy.deepcopy(invalid)
+                migrated, report = mr.migrate_bundle(invalid)
+                self.assertIsNone(migrated)
+                self.assertGreater(report["error_count"], 0)
+                self.assertEqual(invalid, before)
+
+    def test_target_schema_versions_require_a_registered_integer(self):
+        for version in self.BAD_VERSIONS:
+            with self.subTest(version=version, value_type=type(version).__name__):
+                payload = bundle()
+                before = copy.deepcopy(payload)
+                with self.assertRaises(ValueError):
+                    mr.migrate_bundle(payload, target_version=version)
+                self.assertEqual(payload, before)
+
+    def test_missing_legacy_and_valid_intermediate_current_versions_still_migrate(self):
+        legacy = bundle()
+        legacy.pop("schema_version")
+        migrated, report = mr.migrate_bundle(legacy)
+        self.assertIsNotNone(migrated)
+        self.assertEqual(report["from_version"], 1)
+        self.assertEqual(report["error_count"], 0)
+        for kind in mr.OBJECT_KEYS:
+            self.assertIs(type(migrated["objects"][kind][0]["schema_version"]), int)
+        intermediate = copy.deepcopy(migrated)
+        intermediate["schema_version"] = 2
+        intermediate.pop("migration_history", None)
+        for kind in mr.OBJECT_KEYS:
+            intermediate["objects"][kind][0]["schema_version"] = 2
+        upgraded, report = mr.migrate_bundle(intermediate)
+        self.assertIsNotNone(upgraded)
+        self.assertEqual(report["error_count"], 0)
+        self.assertEqual(upgraded["schema_version"], 3)
+        unchanged, report = mr.migrate_bundle(upgraded)
+        self.assertEqual(unchanged, upgraded)
+        self.assertTrue(report["idempotent_at_target"])
+
+    def test_refused_apply_keeps_source_output_and_in_place_input_bytes(self):
+        for kind in (None, *mr.OBJECT_KEYS):
+            for version in self.BAD_VERSIONS:
+                for in_place in (False, True):
+                    with self.subTest(kind=kind, version=version, in_place=in_place):
+                        payload = bundle()
+                        if kind is None:
+                            payload["schema_version"] = version
+                        else:
+                            payload["objects"][kind][0]["schema_version"] = version
+                        with tempfile.TemporaryDirectory() as directory:
+                            root = Path(directory)
+                            source = root / "input.json"
+                            source.write_text(json.dumps(payload), encoding="utf-8")
+                            source_bytes = source.read_bytes()
+                            output = source if in_place else root / "out.json"
+                            if not in_place:
+                                output.write_bytes(b"previous durable output\n")
+                            output_bytes = output.read_bytes()
+                            with self.assertRaises(ValueError):
+                                mr.main(["apply", "--input", str(source), "--output", str(output)])
+                            self.assertEqual(source.read_bytes(), source_bytes)
+                            self.assertEqual(output.read_bytes(), output_bytes)
+                            self.assertEqual(sorted(p.name for p in root.iterdir()), ["input.json"] if in_place else ["input.json", "out.json"])
+
+
+    def test_rehash_rejects_bad_bundle_versions_before_deriving_or_mutating_data(self):
+        for version in self.BAD_VERSIONS:
+            with self.subTest(version=version, value_type=type(version).__name__):
+                payload = stale_bundle()
+                payload["schema_version"] = version
+                before = copy.deepcopy(payload)
+                with self.assertRaises(ValueError):
+                    mr.rehash_bundle(payload)
+                self.assertEqual(payload, before)
+
+    def test_refused_rehash_cli_keeps_existing_and_in_place_bytes(self):
+        for version in self.BAD_VERSIONS:
+            for in_place in (False, True):
+                with self.subTest(version=version, in_place=in_place):
+                    payload = stale_bundle()
+                    payload["schema_version"] = version
+                    with tempfile.TemporaryDirectory() as directory:
+                        root = Path(directory)
+                        source = root / "input.json"
+                        source.write_text(json.dumps(payload), encoding="utf-8")
+                        source_bytes = source.read_bytes()
+                        output = source if in_place else root / "out.json"
+                        if not in_place:
+                            output.write_bytes(b"previous durable output\n")
+                        output_bytes = output.read_bytes()
+                        with self.assertRaises(ValueError):
+                            mr.main(["rehash", "--input", str(source), "--output", str(output)])
+                        self.assertEqual(source.read_bytes(), source_bytes)
+                        self.assertEqual(output.read_bytes(), output_bytes)
+                        self.assertEqual(sorted(p.name for p in root.iterdir()), ["input.json"] if in_place else ["input.json", "out.json"])
 
 
 if __name__ == "__main__":
