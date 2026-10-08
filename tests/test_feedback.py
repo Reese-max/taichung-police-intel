@@ -1,6 +1,8 @@
 import copy
 import importlib.util
+import json
 from pathlib import Path
+import tempfile
 import unittest
 
 
@@ -698,6 +700,124 @@ class FeedbackTests(unittest.TestCase):
         self.assertEqual(summary["by_route"]["GOLD_DATASET"], 0)
         self.assertEqual(summary["by_effect_scope"], {"RELEVANCE_ONLY": 1, "TRUTH_CORRECTION": 1})
         self.assertEqual(sum(summary["by_route"].values()), 3)
+
+
+class FeedbackPrivateFieldBoundaryTests(unittest.TestCase):
+    PRIVATE_FIELDS = ("raw_prompt", "conversation", "full_text", "private_notes")
+
+    @staticmethod
+    def payload(field):
+        return {"locator": "fixture:owned-local", "details": [{"nested": {field: "SYNTHETIC private content"}}]}
+
+    @staticmethod
+    def stored_private_record(container, payload):
+        state, item, _ = make_feedback(corrected_expected_state={}, evidence_refs=[])
+        item[container] = payload
+        fingerprint = model.fingerprint_for(item["target"], item["reason"], item["original_output_sha256"],
+                                            item["corrected_expected_state"], item["evidence_refs"], item["linked_review_id"])
+        item["fingerprint"] = fingerprint
+        item["feedback_id"] = model.feedback_id_for(fingerprint)
+        item["audit"] = []
+        item["audit"] = [model._audit(item, "CREATED", item["created_at"], {"reason": item["reason"], "target": item["target"]})]
+        state["items"] = {item["feedback_id"]: item}
+        return state
+
+    def test_creation_refuses_known_private_keys_in_nested_corrections_and_locators(self):
+        for field in self.PRIVATE_FIELDS:
+            for spelling in (field, field.upper()):
+                for container in ("corrected_expected_state", "evidence_refs"):
+                    with self.subTest(field=spelling, container=container):
+                        payload = self.payload(spelling)
+                        value = [payload] if container == "evidence_refs" else payload
+                        original = copy.deepcopy(value)
+                        state = model.empty_state()
+                        with self.assertRaisesRegex(ValueError, "private field") as caught:
+                            make_feedback(state, **{container: value})
+                        self.assertNotIn("SYNTHETIC private content", str(caught.exception))
+                        self.assertEqual(value, original)
+                        self.assertEqual(state, model.empty_state())
+
+    def test_self_consistent_stored_private_records_are_refused_before_review_or_rewrite(self):
+        for field in self.PRIVATE_FIELDS:
+            for container in ("corrected_expected_state", "evidence_refs"):
+                with self.subTest(field=field, container=container):
+                    payload = self.payload(field)
+                    state = self.stored_private_record(container, [payload] if container == "evidence_refs" else payload)
+                    before = copy.deepcopy(state)
+                    for load in (model.validate_state, model.normalize_state):
+                        with self.assertRaisesRegex(ValueError, "private field"):
+                            load(state)
+                    identifier = next(iter(state["items"]))
+                    with self.assertRaisesRegex(ValueError, "private field"):
+                        model.review(state, identifier, "ACCEPTED", reviewer_ref="synthetic-reviewer", decided_at="2026-10-08T12:00:00+00:00")
+                    self.assertEqual(state, before)
+
+    def test_refused_cli_add_keeps_existing_state_and_does_not_create_missing_output(self):
+        for field in self.PRIVATE_FIELDS:
+            for container in ("corrected_expected_state", "evidence_refs"):
+                for existing in (False, True):
+                    with self.subTest(field=field, container=container, existing=existing):
+                        with tempfile.TemporaryDirectory() as directory:
+                            state_path = Path(directory) / "state.json"
+                            if existing:
+                                cli.write_state(state_path, model.empty_state())
+                            before = state_path.read_bytes() if existing else None
+                            payload = self.payload(field)
+                            option, value = ("--evidence-refs", [payload]) if container == "evidence_refs" else ("--corrected-state", payload)
+                            args = ["--state", str(state_path), "add", "--target-type", "ANSWER", "--target-id", "SYNTHETIC-PRIVATE",
+                                    "--target-version", "synthetic-v1", "--reason", "UNSUPPORTED_ANSWER", "--output-hash", "a" * 64,
+                                    option, json.dumps(value), "--at", "2026-10-08T12:00:00+00:00"]
+                            parsed = cli.parser().parse_args(args)
+                            with self.assertRaisesRegex(ValueError, "private field"):
+                                parsed.handler(parsed)
+                            self.assertEqual(state_path.read_bytes() if state_path.exists() else None, before)
+                            self.assertEqual(sorted(p.name for p in Path(directory).iterdir()), ["state.json"] if existing else [])
+
+    def test_refused_cli_load_does_not_overwrite_self_consistent_legacy_state(self):
+        for container in ("corrected_expected_state", "evidence_refs"):
+            with self.subTest(container=container), tempfile.TemporaryDirectory() as directory:
+                payload = self.payload("raw_prompt")
+                state = self.stored_private_record(container, [payload] if container == "evidence_refs" else payload)
+                state_path = Path(directory) / "legacy.json"
+                state_path.write_text(json.dumps(state), encoding="utf-8")
+                before = state_path.read_bytes()
+                identifier = next(iter(state["items"]))
+                args = cli.parser().parse_args(["--state", str(state_path), "review", "--feedback-id", identifier,
+                                              "--status", "ACCEPTED", "--reviewer-ref", "synthetic-reviewer"])
+                with self.assertRaisesRegex(ValueError, "private field"):
+                    args.handler(args)
+                self.assertEqual(state_path.read_bytes(), before)
+                self.assertEqual([p.name for p in Path(directory).iterdir()], ["legacy.json"])
+
+    def test_ordinary_expected_states_minimal_locators_and_necessary_snippets_remain_allowed(self):
+        corrected = {"same_event": False, "expected": [{"entity_id": "synthetic-entity", "excerpt": "ordinary necessary correction snippet"}]}
+        refs = ["fixture:owned-local", {"locator": "fixture:section-1", "ids": ["synthetic-evidence"]}]
+        state, item, _ = make_feedback(corrected_expected_state=corrected, evidence_refs=refs)
+        model.validate_state(state)
+        self.assertEqual(item["corrected_expected_state"], corrected)
+        self.assertEqual(item["evidence_refs"], refs)
+        accepted = model.review(state, item["feedback_id"], "ACCEPTED", reviewer_ref="synthetic-reviewer", decided_at="2026-10-08T12:00:00+00:00")
+        model.validate_state(accepted)
+        self.assertEqual(accepted["items"][item["feedback_id"]]["regression_fixture"]["expected"], corrected)
+
+    def test_json_serializable_tuple_does_not_bypass_nested_private_field_check(self):
+        with self.assertRaisesRegex(ValueError, "private field"):
+            make_feedback(corrected_expected_state={"expected": ({"raw_prompt": "SYNTHETIC private content"},)})
+
+    def test_self_consistent_nested_audit_payload_cannot_retain_private_fields(self):
+        for field in self.PRIVATE_FIELDS:
+            for spelling in (field, field.upper()):
+                with self.subTest(field=spelling):
+                    state, item, _ = make_feedback()
+                    entry = item["audit"][0]
+                    entry["payload"]["details"] = [{spelling: "SYNTHETIC private content"}]
+                    entry["audit_id"] = model._audit_id(entry)
+                    before = copy.deepcopy(state)
+                    with self.assertRaisesRegex(ValueError, "private field"):
+                        model.normalize_state(state)
+                    with self.assertRaisesRegex(ValueError, "private field"):
+                        model.review(state, item["feedback_id"], "ACCEPTED", reviewer_ref="synthetic-reviewer", decided_at="2026-10-08T12:00:00+00:00")
+                    self.assertEqual(state, before)
 
 
 if __name__ == "__main__":
