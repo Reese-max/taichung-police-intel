@@ -56,17 +56,72 @@ class SchemaDriftTests(unittest.TestCase):
                     final_url="https://official.test/list",
                 )
                 self.assertEqual(result["status"], "NO_DRIFT")
-                self.assertEqual(result["window_completeness"], "COMPLETE_WITH_ITEMS")
+                self.assertEqual(result["window_completeness"], "PARTIAL")
         result = drift.observe(
             drift.CONTRACTS["S-033"], RSS, content_type="application/xml", final_url="https://official.test/rss"
         )
         self.assertEqual(result["status"], "NO_DRIFT")
-        self.assertEqual(result["window_completeness"], "COMPLETE_WITH_ITEMS")
+        self.assertEqual(result["window_completeness"], "PARTIAL")
         result = drift.observe(
             drift.CONTRACTS["S-031"], FIRE_LIVE, content_type="text/html", final_url="https://official.test/caselist"
         )
         self.assertEqual(result["status"], "NO_DRIFT")
         self.assertEqual(result["window_completeness"], "PARTIAL")
+
+    def test_html_schema_samples_do_not_claim_a_complete_window_from_pager_shape(self):
+        fixtures = {
+            "S-001": '<li><a href="news_view.jsp?dataserno=1">警政新聞 115-09-10</a></li>',
+            "S-019": '<li><a href="/12047/12142/12186/873338/post">會議紀錄</a></li>',
+            "S-032": '<li><a href="index-1.asp?Parser=9,4,20,,,,21750">交通消息 115-09-10</a></li>',
+        }
+        pagers = (
+            '',  # A missing pager is not terminal coverage evidence.
+            '<a rel="next" href="?Page=2">下一頁</a>',
+            '<a class="next" href="javascript:changedPager(2)">下一頁</a>',
+            '<a rel="last" href="?Page=1">最後一頁</a>',
+        )
+        for source_id, listing in fixtures.items():
+            fingerprint = None
+            for pager in pagers:
+                with self.subTest(source_id=source_id, pager=pager):
+                    result = drift.observe(
+                        drift.CONTRACTS[source_id], listing + pager,
+                        content_type="text/html", final_url="https://official.test/list?Page=1",
+                    )
+                    self.assertEqual(result["status"], "NO_DRIFT")
+                    self.assertEqual(result["source_health"], "PASS")
+                    self.assertFalse(result["review_required"])
+                    self.assertEqual(result["window_completeness"], "PARTIAL")
+                    self.assertIn("LIST_WINDOW_NOT_PROVEN", result["reasons"])
+                    if fingerprint is None:
+                        fingerprint = result["observed_schema_fingerprint"]
+                    self.assertEqual(result["observed_schema_fingerprint"], fingerprint)
+
+    def test_rss_schema_sample_does_not_prove_history_or_follow_next_page(self):
+        for body in (
+            RSS,
+            RSS.replace(b'<channel>', b'<channel><link rel="next" href="https://official.test/rss?page=2"/>'),
+        ):
+            with self.subTest(body=body):
+                result = drift.observe(
+                    drift.CONTRACTS["S-033"], body,
+                    content_type="application/xml", final_url="https://official.test/rss",
+                )
+                self.assertEqual(result["status"], "NO_DRIFT")
+                self.assertEqual(result["source_health"], "PASS")
+                self.assertFalse(result["review_required"])
+                self.assertEqual(result["window_completeness"], "PARTIAL")
+                self.assertIn("LIST_WINDOW_NOT_PROVEN", result["reasons"])
+
+    def test_partial_news_sample_keeps_good_schema_baseline_without_drift_alert(self):
+        receipt, state = drift.build_receipt(
+            [{"source_id": "S-033", "body": RSS, "content_type": "application/xml"}],
+            contracts={"S-033": drift.CONTRACTS["S-033"]},
+        )
+        self.assertEqual(receipt["overall"], "HEALTHY")
+        self.assertEqual(receipt["sources"][0]["window_completeness"], "PARTIAL")
+        self.assertEqual(receipt["review_inbox"], [])
+        self.assertEqual(state["sources"]["S-033"]["last_known_good"]["status"], "NO_DRIFT")
 
     def test_rss_shape_break_is_fail_closed(self):
         result = drift.observe(

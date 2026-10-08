@@ -391,6 +391,19 @@ def _finish(result: dict[str, Any], signature: Any, status: str, reasons: list[s
     return result
 
 
+def _list_sample_coverage(result: dict[str, Any]) -> dict[str, Any]:
+    """A parsed list/feed proves its schema, not a complete collection window.
+
+    These probes observe one response, with no window bounds or terminal-page
+    proof. Keep their good schema verdict and baseline, while declining a
+    coverage claim even when a pager is absent or looks terminal.
+    """
+    if result["status"] in GOOD_STATUSES:
+        result["window_completeness"] = "PARTIAL"
+        result["reasons"] = sorted(set(result["reasons"]) | {"LIST_WINDOW_NOT_PROVEN"})
+    return result
+
+
 def _base_content_type(content_type: str) -> str:
     return (content_type or "").split(";", 1)[0].strip().lower()
 
@@ -505,7 +518,7 @@ def _observe_html(contract: dict[str, Any], body: bytes, result: dict[str, Any],
     elif contract.get("published_required", True) and date_coverage != len(entries):
         status = "BREAKING_DRIFT"
         reasons.append("REQUIRED_PUBLISHED_DATE_MISSING")
-    return _finish(result, signature, status, reasons)
+    return _list_sample_coverage(_finish(result, signature, status, reasons))
 
 
 def _observe_rss(contract: dict[str, Any], body: bytes, result: dict[str, Any], previous: dict[str, Any] | None) -> dict[str, Any]:
@@ -528,7 +541,7 @@ def _observe_rss(contract: dict[str, Any], body: bytes, result: dict[str, Any], 
         "date_coverage": _coverage_class(sum(entry.get("published") is not None for entry in entries), len(entries)),
     }
     missing = set(contract["required_fields"]) - set(fields)
-    return _finish(result, signature, "BREAKING_DRIFT" if missing else "NO_DRIFT", ["REQUIRED_FIELD_MISSING"] if missing else [])
+    return _list_sample_coverage(_finish(result, signature, "BREAKING_DRIFT" if missing else "NO_DRIFT", ["REQUIRED_FIELD_MISSING"] if missing else []))
 
 
 def _observe_fire_live(contract: dict[str, Any], body: bytes, result: dict[str, Any], previous: dict[str, Any] | None) -> dict[str, Any]:
@@ -1109,11 +1122,13 @@ def self_check() -> None:
     for source_id, html in html_by_source.items():
         result = observe(CONTRACTS[source_id], html, content_type="text/html; charset=utf-8", final_url="https://official.test/list")
         assert result["status"] == "NO_DRIFT", source_id
+        assert result["window_completeness"] == "PARTIAL" and "LIST_WINDOW_NOT_PROVEN" in result["reasons"], source_id
     rss = '''<?xml version="1.0"?><rss version="2.0"><channel>
     <item iCuItem="3375296"><title>Official item</title><link>https://official.test/3375296/post</link><pubDate>Mon, 21 Sep 2026 02:57:54 GMT</pubDate></item>
     </channel></rss>'''.encode("utf-8")
     rss_result = observe(CONTRACTS["S-033"], rss, content_type="application/xml", final_url="https://official.test/rss")
     assert rss_result["status"] == "NO_DRIFT"
+    assert rss_result["window_completeness"] == "PARTIAL" and "LIST_WINDOW_NOT_PROVEN" in rss_result["reasons"]
     fire_live = """<div class='update'>最後異動時間：2026-09-21 19:24:23</div>
     <ul class='list rwd-table'><li class='list_head'>標題</li><li>
     <span data-th='受理時間：'>2026/09/21 19:21:44</span>

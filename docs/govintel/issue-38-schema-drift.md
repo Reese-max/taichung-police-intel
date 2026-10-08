@@ -39,7 +39,7 @@
 - `--input` replay 的每筆 observation 會先驗證：欄位名稱必須是 `observe()` 接受的參數（`previous` 等內部參數、`body_base64` / `body_text` 這種檔案格式欄位不接受）、型別必須正確（`resource_id` / `requested_url` / `final_url` 允許 null）、metadata 字串不得超過 `MAX_OBSERVATION_TEXT`（4096，`body` 本身不算）、`observed_at` 必須是帶時區的 ISO-8601（`intel_v2.review` 拒絕 naive timestamp，會讓整個 Review Inbox 投影被丟掉），`source_id` 必須在 contract 內且不重複。任何違規都在寫入 state 或 receipt 之前就拒絕。
 - 進入 Review Inbox 的每一列都帶著該來源的 `last_known_good`，所以 `intel_v2.review` 投影出的 `evidence.before` 不再是 `null` — reviewer 從 inbox 就看得到「壞掉之前的契約指紋」。
 - 沒有當次 observation 的來源標成 `NO_CURRENT_OBSERVATION` 且 `review_required` 為 false：那是「這次沒看到」，不是來源有問題，沒有東西需要人工覆核；它只會把 `overall` 拉到 `UNKNOWN` 並讓 system health 的 `source_contracts` stage 變 `UNKNOWN`。
-- HTML / RSS 列表 contract（S-001、S-019、S-032、S-033）沒有宣告 pagination marker，`get_news_listing` 也只取列表端點回傳的那一頁，所以它們的 `window_completeness` 是「列表端點自己回報的完整度」，不是「整站所有分頁都抓完了」。要監測分頁需要先在 contract 宣告 marker，那是比這個 monitor 更大的改動；在此之前，這些來源的完整窗口定義就是那個端點。
+- HTML / RSS 列表 contract（S-001、S-019、S-032、S-033）只觀察一個列表／feed 回應，沒有查詢窗口或末頁覆蓋證據，因此 `window_completeness` 一律保持 `PARTIAL`，並加上 `LIST_WINDOW_NOT_PROVEN`。有下一頁、pager 改版、沒有 pager 或看似末頁，都不能讓這份 schema 樣本聲稱完整窗口；RSS 有合法 item 也不能證明完整歷史期間。欄位形狀正常仍是 `NO_DRIFT`／`source_health: PASS`，保留 good schema baseline、指紋與 history，不因此新增 drift alert 或 Review Inbox item。實際蒐集窗口完整度仍由既有 bounded collector／publication lane 的覆蓋證據決定；本修正不蒐集更多頁、不改候選准入、promotion 或來源權利。
 - 抓不到 HTTP 回應的失敗（TLS、timeout、連線錯誤）在 receipt 裡是 `http_status: 0` 加 `LIVE_FETCH_*` reason，而不是捏造一個伺服器狀態碼；真的拿到非 2xx 才會記錄該狀態碼。
 
 ## state 的寫入時機
