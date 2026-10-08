@@ -5,6 +5,7 @@
 - 9 類 reason：`FALSE_MERGE`、`MISSED_MERGE`、`WRONG_ENTITY`、`NOT_RELEVANT`、`MISSING_EVENT`、`WRONG_CHANGE_CLASSIFICATION`、`UNSUPPORTED_ANSWER`、`WRONG_STATISTIC_SCOPE`、`BAD_SOURCE_MAPPING`。
 - target 可指向 `EVENT`、`ENTITY`、`QUERY` 或 `ANSWER` 的 id/version，也可連結既有 Review Inbox item。
 - 原始輸出只保存 SHA-256，不保存私人對話、prompt 或全文；evidence/reference 以最小 ID／locator 保存。
+- canonical 建立與載入都會遞迴拒絕整筆回饋 record 中的 `raw_prompt`、`conversation`、`full_text`、`private_notes` 欄位（不分大小寫），包含 `corrected_expected_state`／`evidence_refs`／`audit.payload` 的巢狀 object／array；錯誤不輸出欄位值。既有檔案含這些欄位時 fail closed，不會自動刪除、改寫或接受。最小 IDs／locators、一般 expected state 與必要的普通片段（例如 `excerpt`）仍可使用；這是明確欄位名的邊界，不是任意自由文字的敏感內容偵測，操作者仍須只提供重現錯誤所需的最小資料。
 - 相同 fingerprint 去重；每筆保留 `model_version`、`parser_version`、`registry_hash`、audit 與 review status。
 - 載入狀態時會驗證 feedback ID／fingerprint、fingerprint 與記錄內容一致、audit sequence／hash binding 與 review decision 一致；被竄改或未完成 review 的記錄 fail closed。
 - record、target、trace、decision 與 fixture 都是封閉 schema（`RECORD_KEYS`／`TARGET_KEYS`／`TRACE_KEYS`／`DECISION_KEYS`／`FIXTURE_KEYS`），未知欄位（例如 `auto_apply`）一律不會載入；`ACCEPTED` 才會產生 `FEEDBACK_REGRESSION` link，且明確標成需要後續 gold promotion review；不會自動修改 entity registry、event fusion、evidence gate 或 production rule。`validate_record` 同時拒絕非 `ACCEPTED` 記錄掛著 regression fixture。

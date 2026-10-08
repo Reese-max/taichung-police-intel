@@ -88,6 +88,26 @@ TRACE_KEYS = frozenset({"model_version", "parser_version", "registry_hash"})
 DECISION_KEYS = frozenset({"status", "reviewer_ref", "decided_at"})
 AUDIT_KEYS = frozenset({"audit_id", "feedback_id", "sequence", "action", "at", "payload"})
 JSON_SCALARS = (str, int, float, bool)
+PRIVATE_KEYS = frozenset({"raw_prompt", "conversation", "full_text", "private_notes"})
+
+
+def _reject_private_fields(value: Any, label: str) -> None:
+    """Refuse explicit private fields in correction/locator JSON, without logging values."""
+    pending = [value]
+    seen: set[int] = set()
+    while pending:
+        current = pending.pop()
+        if not isinstance(current, (dict, list, tuple)) or id(current) in seen:
+            continue
+        seen.add(id(current))
+        if isinstance(current, dict):
+            for key, child in current.items():
+                if isinstance(key, str) and key.casefold() in PRIVATE_KEYS:
+                    raise ValueError(f"feedback {label} must not contain private field {key.casefold()}")
+                pending.append(child)
+        else:
+            # Python tuples also serialize as JSON arrays; they must not bypass this boundary.
+            pending.extend(current)
 
 
 def promotion_targets_for(reason: str) -> tuple[str, ...]:
@@ -254,9 +274,10 @@ def validate_state(state: dict[str, Any]) -> dict[str, Any]:
 def validate_record(item: dict[str, Any]) -> None:
     if not isinstance(item, dict):
         raise ValueError("feedback record must be an object")
-    for forbidden in ("raw_prompt", "conversation", "full_text", "private_notes"):
+    for forbidden in PRIVATE_KEYS:
         if forbidden in item:
             raise ValueError(f"feedback record must not contain {forbidden}")
+    _reject_private_fields(item, "record")
     unknown_record_fields = sorted(str(key)[:60] for key in set(item) - RECORD_KEYS)
     if unknown_record_fields:
         raise ValueError(f"feedback record has unsupported fields: {', '.join(unknown_record_fields)}")
@@ -430,12 +451,14 @@ def create_feedback(
     refs = [] if evidence_refs is None else copy.deepcopy(evidence_refs)
     if not isinstance(refs, list) or any(not isinstance(ref, (str, dict)) for ref in refs):
         raise ValueError("evidence_refs must be a string/object array")
+    _reject_private_fields(refs, "evidence_refs")
     stamp = timestamp(created_at)
     if linked_review_id is not None and (not isinstance(linked_review_id, str) or not linked_review_id.strip()):
         raise ValueError("linked_review_id must be a non-empty reference string or null")
     corrected = copy.deepcopy({} if corrected_expected_state is None else corrected_expected_state)
     if not isinstance(corrected, dict):
         raise ValueError("corrected_expected_state must be an object")
+    _reject_private_fields(corrected, "corrected_expected_state")
     _reject_truth_assertion(reason, corrected)
     _reject_truth_refs(reason, refs)
     fingerprint = fingerprint_for(
