@@ -30,8 +30,8 @@
   ],
   "baseline_established_at": "2026-08-27T12:13:22+08:00",
   "candidate_source_context": {
-    "collection_run_id": "CR-DEMO-20261008-EVENING-SCHEDULE",
-    "generated_at": "2026-10-09T01:28:31+08:00",
+    "collection_run_id": "CR-DEMO-20261009-MORNING-SCHEDULE",
+    "generated_at": "2026-10-09T10:28:16+08:00",
     "integration_status": "CANDIDATE",
     "items": [
       {
@@ -138,21 +138,6 @@
         "stable_key": "21790",
         "title": "台中出現巨無霸QR Code！交通局：智慧停車就地掃碼、繳費更方便",
         "window_completeness": "PARTIAL"
-      },
-      {
-        "change_type": "CANDIDATE_OBSERVATION",
-        "eligibility": "INELIGIBLE_CANDIDATE",
-        "integration_status": "CANDIDATE",
-        "official_url": "https://www.traffic.taichung.gov.tw/news/index-1.asp?Parser=9,4,20,,,,21788",
-        "promotion_eligible": false,
-        "published_at": "2026-10-01T00:00:00+08:00",
-        "source_health": "PASS",
-        "source_id": "S-032",
-        "source_name": "臺中市政府交通局最新消息",
-        "stable_id": "FEED-S-032-5e9afc602a0c9b1a",
-        "stable_key": "21788",
-        "title": "台中轉運中心啟用倒數！交通局邀業者試運轉 26條國道公路客運率先進駐",
-        "window_completeness": "PARTIAL"
       }
     ],
     "promotion_eligible": false,
@@ -167,7 +152,7 @@
           "NO_LAST_KNOWN_GOOD",
           "NO_DATA_AS_OF"
         ],
-        "last_checked_at": "2026-10-09T01:28:21+08:00",
+        "last_checked_at": "2026-10-09T10:28:05+08:00",
         "pagination": null,
         "promotion_eligible": false,
         "source_health": "FAILED",
@@ -184,7 +169,7 @@
           "NO_LAST_KNOWN_GOOD",
           "VERY_STALE_DATA"
         ],
-        "last_checked_at": "2026-10-09T01:28:25+08:00",
+        "last_checked_at": "2026-10-09T10:28:09+08:00",
         "pagination": {
           "complete": false,
           "page_limit": 4,
@@ -206,7 +191,7 @@
           "NO_LAST_KNOWN_GOOD",
           "VERY_STALE_DATA"
         ],
-        "last_checked_at": "2026-10-09T01:28:31+08:00",
+        "last_checked_at": "2026-10-09T10:28:16+08:00",
         "pagination": {
           "complete": false,
           "page_limit": 4,
@@ -222,7 +207,7 @@
       }
     ]
   },
-  "generated_at": "2026-10-09T01:28:31+08:00",
+  "generated_at": "2026-10-09T10:28:16+08:00",
   "generator_version": 2,
   "mode": "V2_SHADOW",
   "other_changes": [],
@@ -312,7 +297,7 @@
   ],
   "schema_version": 1,
   "snapshot_complete": false,
-  "source_collection_run_id": "CR-DEMO-20261008-EVENING-SCHEDULE",
+  "source_collection_run_id": "CR-DEMO-20261009-MORNING-SCHEDULE",
   "source_health": {
     "failed_count": 0,
     "gap_count": 6,
@@ -332,7 +317,7 @@
     "policy_hash": "3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501",
     "policy_version": 1
   },
-  "source_status_generated_at": "2026-10-09T01:28:31+08:00",
+  "source_status_generated_at": "2026-10-09T10:28:16+08:00",
   "status_message": "本期未偵測到可確認的新增或修正；歷史資料保留於資料庫。",
   "tracking_items": []
 }
