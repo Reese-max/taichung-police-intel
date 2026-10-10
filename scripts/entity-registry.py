@@ -251,6 +251,7 @@ def merge_entities(
     operator: str,
     decided_at: Any,
 ) -> dict[str, Any]:
+    validate_registry(registry)
     if target_id == source_id:
         raise ValueError("manual merge requires two distinct entity IDs")
     target = _find_entity(registry, target_id)
@@ -262,6 +263,18 @@ def merge_entities(
     result = copy.deepcopy(registry)
     merged = _find_entity(result, target_id)
     before = {"target": copy.deepcopy(target), "source": copy.deepcopy(source)}
+    redirects = result.setdefault("redirects", {})
+    incoming_before = {
+        retired_id: list(target_ids)
+        for retired_id, target_ids in redirects.items()
+        if source_id in target_ids
+    }
+    incoming_after = {
+        retired_id: list(dict.fromkeys(target_id if item == source_id else item for item in target_ids))
+        for retired_id, target_ids in incoming_before.items()
+    }
+    if incoming_before:
+        before["incoming_redirects"] = copy.deepcopy(incoming_before)
     names = [merged["canonical_label"], *merged["aliases"], source["canonical_label"], *source["aliases"]]
     merged["aliases"] = list(dict.fromkeys(names[1:]))
     merged["alias_evidence"] = [
@@ -269,12 +282,15 @@ def merge_entities(
         *copy.deepcopy(source.get("alias_evidence", [])),
     ]
     result["entities"] = [item for item in result["entities"] if item["entity_id"] != source_id]
-    result.setdefault("redirects", {})[source_id] = [target_id]
+    redirects.update(incoming_after)
+    redirects[source_id] = [target_id]
     after = {
         "target": copy.deepcopy(merged),
         "retired_entity": copy.deepcopy(source),
         "redirect_entity_ids": [target_id],
     }
+    if incoming_after:
+        after["incoming_redirects"] = copy.deepcopy(incoming_after)
     return _manual_change(result, "MERGE", operator, decided_at, before, after, evidence)
 
 
@@ -383,11 +399,30 @@ def revert_manual_change(
             raise ValueError("current registry no longer matches merge")
         if redirects.get(source_id) != [expected["entity_id"]]:
             raise ValueError("merge redirect is missing")
+        incoming_before = before.get("incoming_redirects", {})
+        incoming_after = after.get("incoming_redirects", {})
+        if (not isinstance(incoming_before, dict) or not isinstance(incoming_after, dict)
+                or set(incoming_before) != set(incoming_after)):
+            raise ValueError("merge incoming redirect snapshot is invalid")
+        for retired_id, target_ids in incoming_before.items():
+            if (not isinstance(retired_id, str) or retired_id in {source_id, target["entity_id"]}
+                    or not isinstance(target_ids, list) or not target_ids
+                    or any(not isinstance(item, str) or not item for item in target_ids)
+                    or len(target_ids) != len(set(target_ids)) or source_id not in target_ids):
+                raise ValueError("merge incoming redirect snapshot is invalid")
+            expected_targets = list(dict.fromkeys(
+                expected["entity_id"] if item == source_id else item for item in target_ids
+            ))
+            if incoming_after[retired_id] != expected_targets:
+                raise ValueError("merge incoming redirect snapshot is invalid")
+            if redirects.get(retired_id) != expected_targets:
+                raise ValueError("current registry no longer matches merge incoming redirects")
         result["entities"] = [
             target if entity["entity_id"] == target["entity_id"] else entity
             for entity in result["entities"]
         ] + [source]
         redirects.pop(source_id, None)
+        redirects.update(copy.deepcopy(incoming_before))
     else:
         expected_children = after.get("children")
         restored = before.get("entity")

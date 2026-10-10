@@ -472,5 +472,123 @@ class EntityRegistryTests(unittest.TestCase):
             )
 
 
+class EntityRegistryRedirectChainTests(unittest.TestCase):
+    """Inert, operator-approved fixture mappings; no production registry writes."""
+
+    @staticmethod
+    def registry():
+        return {
+            "schema_version": 1, "registry_version": 7, "updated_at": "2026-09-21",
+            "redirects": {}, "entities": [
+                {"entity_id": "agency:" + key, "kind": "agency",
+                 "canonical_label": name + "局", "aliases": [name], "jurisdiction": "臺中市",
+                 "status": "CONFIRMED", "evidence": "fixture:approved-" + key,
+                 "alias_evidence": [{"alias": name, "evidence": "fixture:approved-" + key}]}
+                for key, name in (("a", "甲"), ("b", "乙"), ("c", "丙"), ("d", "丁"))
+            ],
+        }
+
+    @staticmethod
+    def merge(registry, target, source, **kwargs):
+        approved = {"evidence": "fixture:operator-reviewed-merge", "operator": "fixture-reviewer",
+                    "decided_at": "2026-09-21T10:00:00+08:00"}
+        approved.update(kwargs)
+        return er.merge_entities(registry, target, source, **approved)
+
+    @staticmethod
+    def revert(registry, sequence):
+        return er.revert_manual_change(registry, sequence, evidence="fixture:operator-reviewed-revert",
+                                      operator="fixture-reviewer", decided_at="2026-09-21T10:01:00+08:00")
+
+    def test_chained_merge_preserves_historical_ids_alias_evidence_and_audit(self):
+        original = self.registry()
+        original_bytes = json.dumps(original, ensure_ascii=False, sort_keys=True)
+        first = self.merge(original, "agency:a", "agency:b")
+        changed = self.merge(first, "agency:c", "agency:a")
+        er.validate_registry(changed)
+        self.assertEqual(er.resolve_entity_id(changed, "agency:b")["redirect_entity_ids"], ["agency:c"])
+        self.assertEqual(er.resolve_entity_id(changed, "agency:a")["redirect_entity_ids"], ["agency:c"])
+        self.assertEqual(er.resolve(changed, "agency", "乙局", "臺中市")["entity_id"], "agency:c")
+        self.assertEqual(er.resolve(changed, "agency", "agency:b")["status"], "NO_MATCH")
+        target = next(row for row in changed["entities"] if row["entity_id"] == "agency:c")
+        self.assertEqual({row["evidence"] for row in target["alias_evidence"]},
+                         {"fixture:approved-a", "fixture:approved-b", "fixture:approved-c"})
+        self.assertEqual(changed["registry_version"], original["registry_version"] + 2)
+        self.assertEqual([row["sequence"] for row in changed["audit_history"]], [1, 2])
+        self.assertEqual([row["action"] for row in changed["audit_history"]], ["MERGE", "MERGE"])
+        self.assertEqual(changed["audit_history"][1]["payload"]["before"]["incoming_redirects"], {"agency:b": ["agency:a"]})
+        self.assertEqual(changed["audit_history"][1]["payload"]["after"]["incoming_redirects"], {"agency:b": ["agency:c"]})
+        self.assertEqual(json.dumps(original, ensure_ascii=False, sort_keys=True), original_bytes)
+
+    def test_chained_merge_reverts_in_reverse_order_without_losing_history(self):
+        original = self.registry()
+        first = self.merge(original, "agency:a", "agency:b")
+        changed = self.merge(first, "agency:c", "agency:a")
+        restored_first = self.revert(changed, 2)
+        self.assertEqual(restored_first["redirects"], first["redirects"])
+        self.assertEqual(sorted(restored_first["entities"], key=lambda row: row["entity_id"]),
+                         sorted(first["entities"], key=lambda row: row["entity_id"]))
+        restored = self.revert(restored_first, 1)
+        self.assertEqual(restored["redirects"], original["redirects"])
+        self.assertEqual(sorted(restored["entities"], key=lambda row: row["entity_id"]), original["entities"])
+        self.assertEqual(restored["registry_version"], original["registry_version"] + 4)
+        self.assertEqual([row["action"] for row in restored["audit_history"]], ["MERGE", "MERGE", "REVERT", "REVERT"])
+        self.assertEqual(changed["redirects"], {"agency:b": ["agency:c"], "agency:a": ["agency:c"]})
+        er.validate_registry(restored)
+
+    def test_merging_split_children_deduplicates_then_restores_redirect_targets(self):
+        original = {"schema_version": 1, "registry_version": 1, "redirects": {}, "entities": [
+            {"entity_id": "location:old", "kind": "location", "canonical_label": "甲路",
+             "aliases": ["乙路", "丙路"], "jurisdiction": "臺中市", "status": "CONFIRMED",
+             "evidence": "fixture:approved-road", "alias_evidence": [
+                 {"alias": "乙路", "evidence": "fixture:approved-alias-b"},
+                 {"alias": "丙路", "evidence": "fixture:approved-alias-c"}]}]}
+        first = er.split_entity(original, "location:old", [
+            {"entity_id": "location:a", "canonical_label": "甲路", "aliases": ["乙路"]},
+            {"entity_id": "location:c", "canonical_label": "丙路", "aliases": []}],
+            evidence="fixture:operator-reviewed-split", operator="fixture-reviewer",
+            decided_at="2026-09-21T10:00:00+08:00")
+        changed = self.merge(first, "location:c", "location:a")
+        self.assertEqual(changed["redirects"], {"location:old": ["location:c"], "location:a": ["location:c"]})
+        restored_first = self.revert(changed, 2)
+        self.assertEqual(restored_first["redirects"], {"location:old": ["location:a", "location:c"]})
+        restored = self.revert(restored_first, 1)
+        self.assertEqual(restored["entities"], original["entities"])
+        self.assertEqual(restored["redirects"], {})
+        self.assertEqual([row["action"] for row in restored["audit_history"]], ["SPLIT", "MERGE", "REVERT", "REVERT"])
+        er.validate_registry(restored)
+
+    def test_revert_refuses_a_changed_incoming_redirect(self):
+        first = self.merge(self.registry(), "agency:a", "agency:b")
+        changed = self.merge(first, "agency:c", "agency:a")
+        changed["redirects"]["agency:b"] = ["agency:d"]
+        er.validate_registry(changed)
+        before = json.dumps(changed, ensure_ascii=False, sort_keys=True)
+        with self.assertRaisesRegex(ValueError, "no longer matches merge incoming redirects"):
+            self.revert(changed, 2)
+        self.assertEqual(json.dumps(changed, ensure_ascii=False, sort_keys=True), before)
+
+    def test_one_hop_merge_keeps_legacy_audit_shape_and_revert(self):
+        original = self.registry()
+        changed = self.merge(original, "agency:a", "agency:b")
+        payload = changed["audit_history"][0]["payload"]
+        self.assertEqual(set(payload["before"]), {"target", "source"})
+        self.assertEqual(set(payload["after"]), {"target", "retired_entity", "redirect_entity_ids"})
+        restored = self.revert(changed, 1)
+        self.assertEqual(sorted(restored["entities"], key=lambda row: row["entity_id"]), original["entities"])
+        self.assertEqual(restored["redirects"], {})
+
+    def test_chained_merge_still_requires_manual_operator_evidence_and_time(self):
+        first = self.merge(self.registry(), "agency:a", "agency:b")
+        before = json.dumps(first, ensure_ascii=False, sort_keys=True)
+        for kwargs, message in (({"operator": ""}, "operator is required"),
+                                ({"evidence": ""}, "manual evidence is required"),
+                                ({"decided_at": "2026-09-21T10:00:00"}, "timezone-aware")):
+            with self.subTest(kwargs=kwargs):
+                with self.assertRaisesRegex(ValueError, message):
+                    self.merge(first, "agency:c", "agency:a", **kwargs)
+                self.assertEqual(json.dumps(first, ensure_ascii=False, sort_keys=True), before)
+
+
 if __name__ == "__main__":
     unittest.main()
