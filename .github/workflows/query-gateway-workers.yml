@@ -37,5 +37,5 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: '03d40efd3c60181edea80af8d927ddc1'
-          wranglerVersion: '4.147.0'
+          wranglerVersion: '4.149.0'
           command: deploy --config workers/query-gateway/wrangler.jsonc --tag ${{ github.sha }}
