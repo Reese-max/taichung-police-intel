@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "kind": "USER_REPORTED_AI_PRE_REVIEW_STATUS",
+  "status": "USER_REPORTED_COMPLETE_NOT_INDEPENDENTLY_VERIFIED",
+  "recorded_date": "2026-10-12",
+  "source_packet_ref": "docs/govintel/source-rights-review-packet-20261007.json",
+  "assertion": {
+    "provenance": "user_statement",
+    "text_zh": "使用者表示：20 筆來源均由 AI agent 審查，目前沒有真人審查者或正式決定。"
+  },
+  "source_count": 20,
+  "sources": [
+    {"source_id": "S-001", "ai_pre_review_status": "USER_REPORTED_COMPLETE", "agent_identity": null, "model": null, "review_artifact": null, "input_hashes": null, "human_reviewer": null, "decision": null, "rights_status": "UNKNOWN", "model_transmission_allowed": false, "promotion_eligible": false},
+    {"source_id": "S-004", "ai_pre_review_status": "USER_REPORTED_COMPLETE", "agent_identity": null, "model": null, "review_artifact": null, "input_hashes": null, "human_reviewer": null, "decision": null, "rights_status": "UNKNOWN", "model_transmission_allowed": false, "promotion_eligible": false},
+    {"source_id": "S-006", "ai_pre_review_status": "USER_REPORTED_COMPLETE", "agent_identity": null, "model": null, "review_artifact": null, "input_hashes": null, "human_reviewer": null, "decision": null, "rights_status": "UNKNOWN", "model_transmission_allowed": false, "promotion_eligible": false},
+    {"source_id": "S-007", "ai_pre_review_status": "USER_REPORTED_COMPLETE", "agent_identity": null, "model": null, "review_artifact": null, "input_hashes": null, "human_reviewer": null, "decision": null, "rights_status": "UNKNOWN", "model_transmission_allowed": false, "promotion_eligible": false},
+    {"source_id": "S-009", "ai_pre_review_status": "USER_REPORTED_COMPLETE", "agent_identity": null, "model": null, "review_artifact": null, "input_hashes": null, "human_reviewer": null, "decision": null, "rights_status": "UNKNOWN", "model_transmission_allowed": false, "promotion_eligible": false},
+    {"source_id": "S-010", "ai_pre_review_status": "USER_REPORTED_COMPLETE", "agent_identity": null, "model": null, "review_artifact": null, "input_hashes": null, "human_reviewer": null, "decision": null, "rights_status": "UNKNOWN", "model_transmission_allowed": false, "promotion_eligible": false},
+    {"source_id": "S-011", "ai_pre_review_status": "USER_REPORTED_COMPLETE", "agent_identity": null, "model": null, "review_artifact": null, "input_hashes": null, "human_reviewer": null, "decision": null, "rights_status": "UNKNOWN", "model_transmission_allowed": false, "promotion_eligible": false},
+    {"source_id": "S-019", "ai_pre_review_status": "USER_REPORTED_COMPLETE", "agent_identity": null, "model": null, "review_artifact": null, "input_hashes": null, "human_reviewer": null, "decision": null, "rights_status": "UNKNOWN", "model_transmission_allowed": false, "promotion_eligible": false},
+    {"source_id": "S-026", "ai_pre_review_status": "USER_REPORTED_COMPLETE", "agent_identity": null, "model": null, "review_artifact": null, "input_hashes": null, "human_reviewer": null, "decision": null, "rights_status": "UNKNOWN", "model_transmission_allowed": false, "promotion_eligible": false},
+    {"source_id": "S-028", "ai_pre_review_status": "USER_REPORTED_COMPLETE", "agent_identity": null, "model": null, "review_artifact": null, "input_hashes": null, "human_reviewer": null, "decision": null, "rights_status": "UNKNOWN", "model_transmission_allowed": false, "promotion_eligible": false},
+    {"source_id": "S-029", "ai_pre_review_status": "USER_REPORTED_COMPLETE", "agent_identity": null, "model": null, "review_artifact": null, "input_hashes": null, "human_reviewer": null, "decision": null, "rights_status": "UNKNOWN", "model_transmission_allowed": false, "promotion_eligible": false},
+    {"source_id": "S-031", "ai_pre_review_status": "USER_REPORTED_COMPLETE", "agent_identity": null, "model": null, "review_artifact": null, "input_hashes": null, "human_reviewer": null, "decision": null, "rights_status": "UNKNOWN", "model_transmission_allowed": false, "promotion_eligible": false},
+    {"source_id": "S-032", "ai_pre_review_status": "USER_REPORTED_COMPLETE", "agent_identity": null, "model": null, "review_artifact": null, "input_hashes": null, "human_reviewer": null, "decision": null, "rights_status": "UNKNOWN", "model_transmission_allowed": false, "promotion_eligible": false},
+    {"source_id": "S-033", "ai_pre_review_status": "USER_REPORTED_COMPLETE", "agent_identity": null, "model": null, "review_artifact": null, "input_hashes": null, "human_reviewer": null, "decision": null, "rights_status": "UNKNOWN", "model_transmission_allowed": false, "promotion_eligible": false},
+    {"source_id": "S-034", "ai_pre_review_status": "USER_REPORTED_COMPLETE", "agent_identity": null, "model": null, "review_artifact": null, "input_hashes": null, "human_reviewer": null, "decision": null, "rights_status": "UNKNOWN", "model_transmission_allowed": false, "promotion_eligible": false},
+    {"source_id": "S-035", "ai_pre_review_status": "USER_REPORTED_COMPLETE", "agent_identity": null, "model": null, "review_artifact": null, "input_hashes": null, "human_reviewer": null, "decision": null, "rights_status": "UNKNOWN", "model_transmission_allowed": false, "promotion_eligible": false},
+    {"source_id": "S-036", "ai_pre_review_status": "USER_REPORTED_COMPLETE", "agent_identity": null, "model": null, "review_artifact": null, "input_hashes": null, "human_reviewer": null, "decision": null, "rights_status": "UNKNOWN", "model_transmission_allowed": false, "promotion_eligible": false},
+    {"source_id": "S-037", "ai_pre_review_status": "USER_REPORTED_COMPLETE", "agent_identity": null, "model": null, "review_artifact": null, "input_hashes": null, "human_reviewer": null, "decision": null, "rights_status": "UNKNOWN", "model_transmission_allowed": false, "promotion_eligible": false},
+    {"source_id": "CTX-POP", "ai_pre_review_status": "USER_REPORTED_COMPLETE", "agent_identity": null, "model": null, "review_artifact": null, "input_hashes": null, "human_reviewer": null, "decision": null, "rights_status": "UNKNOWN", "model_transmission_allowed": false, "promotion_eligible": false},
+    {"source_id": "CTX-165", "ai_pre_review_status": "USER_REPORTED_COMPLETE", "agent_identity": null, "model": null, "review_artifact": null, "input_hashes": null, "human_reviewer": null, "decision": null, "rights_status": "UNKNOWN", "model_transmission_allowed": false, "promotion_eligible": false}
+  ],
+  "human_review_count": 0,
+  "formal_decision_count": 0,
+  "rights_decisions_changed": false,
+  "model_transmission_authorized": false,
+  "prior_model_transmission_audit_status": "UNKNOWN",
+  "promotion_enabled": false
+}
