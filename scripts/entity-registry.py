@@ -303,6 +303,7 @@ def split_entity(
     operator: str,
     decided_at: Any,
 ) -> dict[str, Any]:
+    validate_registry(registry)
     entity = _find_entity(registry, entity_id)
     if not isinstance(groups, list) or len(groups) < 2:
         raise ValueError("manual split requires at least two groups")
@@ -338,13 +339,32 @@ def split_entity(
         raise ValueError("manual split groups must partition every original name")
     result = copy.deepcopy(registry)
     before = {"entity": copy.deepcopy(entity)}
+    child_ids = [child["entity_id"] for child in children]
+    redirects = result.setdefault("redirects", {})
+    incoming_before = {
+        retired_id: list(target_ids)
+        for retired_id, target_ids in redirects.items()
+        if entity_id in target_ids
+    }
+    incoming_after = {
+        retired_id: list(dict.fromkeys(
+            target_id for item in target_ids
+            for target_id in (child_ids if item == entity_id else [item])
+        ))
+        for retired_id, target_ids in incoming_before.items()
+    }
+    if incoming_before:
+        before["incoming_redirects"] = copy.deepcopy(incoming_before)
     result["entities"] = [item for item in result["entities"] if item["entity_id"] != entity_id] + children
-    result.setdefault("redirects", {})[entity_id] = [child["entity_id"] for child in children]
+    redirects.update(incoming_after)
+    redirects[entity_id] = child_ids
     after = {
         "children": copy.deepcopy(children),
         "retired_entity": copy.deepcopy(entity),
-        "redirect_entity_ids": [child["entity_id"] for child in children],
+        "redirect_entity_ids": child_ids,
     }
+    if incoming_after:
+        after["incoming_redirects"] = copy.deepcopy(incoming_after)
     return _manual_change(result, "SPLIT", operator, decided_at, before, after, evidence)
 
 
@@ -433,10 +453,32 @@ def revert_manual_change(
             raise ValueError("current registry no longer matches split")
         if redirects.get(restored.get("entity_id")) != child_ids:
             raise ValueError("split redirect is missing")
+        incoming_before = before.get("incoming_redirects", {})
+        incoming_after = after.get("incoming_redirects", {})
+        if (not isinstance(incoming_before, dict) or not isinstance(incoming_after, dict)
+                or set(incoming_before) != set(incoming_after)):
+            raise ValueError("split incoming redirect snapshot is invalid")
+        for retired_id, target_ids in incoming_before.items():
+            if (not isinstance(retired_id, str) or not retired_id
+                    or retired_id in {restored["entity_id"], *child_ids}
+                    or not isinstance(target_ids, list) or not target_ids
+                    or any(not isinstance(item, str) or not item for item in target_ids)
+                    or len(target_ids) != len(set(target_ids)) or restored["entity_id"] not in target_ids
+                    or any(item in child_ids for item in target_ids)):
+                raise ValueError("split incoming redirect snapshot is invalid")
+            expected_targets = list(dict.fromkeys(
+                target_id for item in target_ids
+                for target_id in (child_ids if item == restored["entity_id"] else [item])
+            ))
+            if incoming_after[retired_id] != expected_targets:
+                raise ValueError("split incoming redirect snapshot is invalid")
+            if redirects.get(retired_id) != expected_targets:
+                raise ValueError("current registry no longer matches split incoming redirects")
         result["entities"] = [
             entity for entity in result["entities"] if entity["entity_id"] not in child_ids
         ] + [restored]
         redirects.pop(restored["entity_id"], None)
+        redirects.update(copy.deepcopy(incoming_before))
 
     return _manual_change(
         result,
