@@ -47,22 +47,22 @@ function formatDateTime(value) {
   });
 }
 
-function ConfirmedRow({ row }) {
+function ConfirmedRow({ row, fixtureOnly }) {
   return (
     <article className="v2-discovery-row">
       <strong>{row.headline}</strong>
       <small>
-        {AUTHORITY_LABELS[row.authority] || row.authority} · {row.publisher || "未知發佈者"} · {formatDateTime(row.event_time)}
+        {fixtureOnly ? "合成來源" : AUTHORITY_LABELS[row.authority] || row.authority} · {row.publisher || "未知發佈者"} · {formatDateTime(row.event_time)}
       </small>
       <div className="v2-discovery-evidence">
-        官方文件版本：{row.official_document_versions.join("、")}
+        {fixtureOnly ? "合成文件版本" : "官方文件版本"}：{row.official_document_versions.join("、")}
       </div>
       {row.public_event_ids.length > 0 && (
         <small>
           關聯事件：{row.public_event_ids.join("、")}{row.matched_existing ? "（既有事件）" : "（新建事件）"}
         </small>
       )}
-      {row.official_urls.length > 0 && (
+      {fixtureOnly ? <small>合成定位，沒有真實官方證據。</small> : row.official_urls.length > 0 && (
         <a href={row.official_urls[0]} target="_blank" rel="noreferrer">開啟官方證據</a>
       )}
     </article>
@@ -133,8 +133,9 @@ export default function DiscoverySignalsPanel() {
 
   const upstreamNote = UPSTREAM_MODE_NOTES[payload.upstream.signal_mode];
   const counts = payload.counts;
+  const fixtureOnly = payload.status === "FIXTURE_ONLY";
 
-  return (
+  const content = (
     <section className="v2-discovery" data-testid="discovery-signals" aria-labelledby="discovery-signals-title">
       <div className="v2-section-heading">
         <div>
@@ -146,6 +147,7 @@ export default function DiscoverySignalsPanel() {
         </span>
       </div>
       <p className="v2-fusion-note">
+        {fixtureOnly && "本區全部是合成訊號；「已確認」只示範流程，不代表官方確認或真實事件。"}
         媒體與外部訊號僅作為發現線索；回到原始官方文件驗證後才列入「已確認」。此區不寫入正式事件，也不進交班或快照重點。
       </p>
       {upstreamNote && (
@@ -154,9 +156,9 @@ export default function DiscoverySignalsPanel() {
 
       <div className="v2-discovery-grid">
         <section className="v2-discovery-confirmed" aria-label="已確認">
-          <h3>已確認（{counts.confirmed_count}）</h3>
+          <h3>{fixtureOnly ? "合成已確認示例" : "已確認"}（{counts.confirmed_count}）</h3>
           {payload.confirmed.length > 0 ? (
-            payload.confirmed.map((row) => <ConfirmedRow key={row.candidate_id} row={row} />)
+            payload.confirmed.map((row) => <ConfirmedRow key={row.candidate_id} row={row} fixtureOnly={fixtureOnly} />)
           ) : (
             <p>本期沒有已確認的外部發現。</p>
           )}
@@ -181,4 +183,7 @@ export default function DiscoverySignalsPanel() {
       </p>
     </section>
   );
+  return fixtureOnly ? <details className="v2-other-changes" data-testid="discovery-fixture-details">
+    <summary>合成 Discovery 流程示例（非真實訊號）</summary>{content}
+  </details> : content;
 }
