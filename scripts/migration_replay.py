@@ -107,6 +107,13 @@ def sha256(value: Any) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+def _safe_sha256(value: Any) -> tuple[str | None, str | None]:
+    try:
+        return sha256(value), None
+    except (TypeError, ValueError, OverflowError) as error:
+        return None, str(error)
+
+
 def parse_timestamp(value: Any) -> str:
     if not isinstance(value, str) or not value:
         raise ValueError("timestamp is required")
@@ -223,7 +230,7 @@ def validate_object(kind: str, item: dict[str, Any], expected_version: int = TAR
 
 def _manual_hashes(bundle: dict[str, Any]) -> dict[str, str | None]:
     return {
-        key: sha256(bundle[key]) if key in bundle else None
+        key: _safe_sha256(bundle[key])[0] if key in bundle else None
         for key in MANUAL_STATE_KEYS
     }
 
@@ -278,21 +285,24 @@ def migrate_bundle(bundle: dict[str, Any], *, target_version: int = TARGET_SCHEM
                     raise ValueError(f"duplicate {kind} identity: {identity}")
                 seen_identities.add(identity)
                 output_rows.append(current)
-            except (TypeError, ValueError, KeyError) as error:
+            except (TypeError, ValueError, KeyError, OverflowError) as error:
                 errors.append({"kind": kind, "index": index, "error": str(error)})
         migrated["objects"][kind] = output_rows
         object_counts[kind] = len(output_rows)
 
+    input_sha256, hash_error = _safe_sha256(bundle)
+    if hash_error and not errors:
+        errors.append({"kind": None, "index": None, "error": hash_error})
     history = list(bundle.get("migration_history", [])) if isinstance(bundle.get("migration_history", []), list) else []
     history_entry = {
         "from_version": source_version,
         "to_version": target_version,
         "registry": [f"{left}->{right}:{name}" for (left, right), name in MIGRATION_REGISTRY.items() if source_version <= left < target_version],
-        "input_sha256": sha256(bundle),
+        "input_sha256": input_sha256,
     }
-    if source_version < target_version and history_entry not in history:
+    if not errors and source_version < target_version and history_entry not in history:
         history.append(history_entry)
-    if history or "migration_history" in bundle:
+    if not errors and (history or "migration_history" in bundle):
         migrated["migration_history"] = history
     manual_before = _manual_hashes(bundle)
     manual_after = _manual_hashes(migrated)
@@ -302,7 +312,7 @@ def migrate_bundle(bundle: dict[str, Any], *, target_version: int = TARGET_SCHEM
         "from_version": source_version,
         "to_version": target_version,
         "migration_path": history_entry["registry"],
-        "input_sha256": sha256(bundle),
+        "input_sha256": input_sha256,
         "output_sha256": sha256(migrated) if not errors else None,
         "affected_count": affected,
         "error_count": len(errors),
@@ -403,13 +413,6 @@ def manual_state_reapply_plan(manual: dict[str, Any]) -> list[dict[str, Any]]:
             "reapply_via": MANUAL_STATE_REAPPLY.get(key),
         })
     return plan
-
-
-def _safe_sha256(value: Any) -> tuple[str | None, str | None]:
-    try:
-        return sha256(value), None
-    except (TypeError, ValueError) as error:
-        return None, str(error)
 
 
 def _value_is_encodable(value: Any) -> bool:
@@ -572,14 +575,14 @@ def rehash_bundle(bundle: dict[str, Any], *, target_body_hash_version: str = BOD
         for index, item in enumerate(rows):
             current = copy.deepcopy(item)
             try:
-                version = current.get("schema_version", TARGET_SCHEMA_VERSION)
-                validate_object(kind, current, int(version))
+                version = _migration_schema_version(current.get("schema_version", TARGET_SCHEMA_VERSION), f"{kind} schema_version")
+                validate_object(kind, current, version)
                 if kind not in HASHED_OBJECT_KEYS or current["body_hash_version"] == target_body_hash_version:
                     output_rows.append((index, current))
                     continue
                 seen_from.add(current["body_hash_version"])
                 content_sha256 = _retained_body_hash(target_body_hash_version, snapshots.get(current["source_snapshot_ref"]))
-            except (TypeError, ValueError, KeyError) as error:
+            except (TypeError, ValueError, KeyError, OverflowError) as error:
                 if "retained source snapshot" in str(error):
                     undetermined = True
                     errors.append({"kind": kind, "index": index, "error": str(error), "reason": MISSING_EVIDENCE_REASON})
@@ -593,7 +596,7 @@ def rehash_bundle(bundle: dict[str, Any], *, target_body_hash_version: str = BOD
             # the stable identity is re-derived from the new identity material.
             current.pop(IDENTITY_KEYS[kind], None)
             current[IDENTITY_KEYS[kind]] = _stable_identity(kind, current)
-            validate_object(kind, current, int(version))
+            validate_object(kind, current, version)
             affected += 1
             rehashed.append({
                 "kind": kind,
@@ -643,23 +646,26 @@ def rehash_bundle(bundle: dict[str, Any], *, target_body_hash_version: str = BOD
         # its own objects even when this run had nothing left to rehash.
         migrated["body_hash_version"] = target_body_hash_version
 
+    input_sha256, hash_error = _safe_sha256(bundle)
+    if hash_error and not errors:
+        errors.append({"kind": None, "index": None, "error": hash_error})
     history = list(bundle.get("body_hash_migration", [])) if isinstance(bundle.get("body_hash_migration", []), list) else []
     entry = {
         "from_body_hash_versions": sorted(seen_from),
         "to_body_hash_version": target_body_hash_version,
-        "input_sha256": sha256(bundle),
+        "input_sha256": input_sha256,
     }
-    if seen_from and entry not in history:
+    if not errors and seen_from and entry not in history:
         history.append(entry)
         migrated["body_hash_migration"] = history
-    elif seen_from:
+    elif not errors and seen_from:
         migrated["body_hash_migration"] = history
     report = {
         "schema_version": 1,
         "report_type": "BODY_HASH_MIGRATION_DRY_RUN",
         "target_body_hash_version": target_body_hash_version,
         "from_body_hash_versions": sorted(seen_from),
-        "input_sha256": sha256(bundle),
+        "input_sha256": input_sha256,
         "output_sha256": sha256(migrated) if not errors else None,
         "affected_count": affected,
         "identity_cascade_count": cascaded,
@@ -670,7 +676,7 @@ def rehash_bundle(bundle: dict[str, Any], *, target_body_hash_version: str = BOD
         "undetermined_body_hash_version": UNDETERMINED_BODY_HASH_VERSION if undetermined else None,
         "idempotent_at_target": not errors and not seen_from and migrated == bundle,
     }
-    return (None if errors else migrated), report
+    return (None if errors or undetermined else migrated), report
 
 
 def load_query_store_module() -> Any:

@@ -1027,6 +1027,64 @@ class MigrationSchemaVersionBoundaryTests(unittest.TestCase):
                         self.assertEqual(output.read_bytes(), output_bytes)
                         self.assertEqual(sorted(p.name for p in root.iterdir()), ["input.json"] if in_place else ["input.json", "out.json"])
 
+    def test_object_schema_version_overflow_float_refuses_rehash_and_apply_without_uncaught_exceptions(self):
+        # PublicEvent schema_version as JSON 1e309 (decoded to float('inf'))
+        stale = stale_bundle()
+        stale["objects"]["PublicEvent"][0]["schema_version"] = 111111
+        stale_text = json.dumps(stale).replace('"schema_version": 111111', '"schema_version": 1e309', 1)
+        stale_payload = json.loads(stale_text)
+        self.assertEqual(stale_payload["objects"]["PublicEvent"][0]["schema_version"], float("inf"))
+
+        # rehash_bundle should return (None, report) without uncaught OverflowError/ValueError
+        rehashed, rehash_report = mr.rehash_bundle(stale_payload)
+        self.assertIsNone(rehashed)
+        self.assertGreater(rehash_report["error_count"], 0)
+
+        # rehash CLI should exit 1, write .body-hash-report.json, and keep source/output unchanged
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "input.json"
+            out = root / "out.json"
+            source.write_text(stale_text, encoding="utf-8")
+            before_s = source.read_bytes()
+            out.write_bytes(b"previous durable output\n")
+            before_o = out.read_bytes()
+            exit_code = mr.main(["rehash", "--input", str(source), "--output", str(out)])
+            self.assertEqual(exit_code, 1)
+            self.assertEqual(source.read_bytes(), before_s)
+            self.assertEqual(out.read_bytes(), before_o)
+            side_report_path = root / "out.body-hash-report.json"
+            self.assertTrue(side_report_path.exists())
+            side_report = json.loads(side_report_path.read_text(encoding="utf-8"))
+            self.assertGreater(side_report["error_count"], 0)
+
+        # migrate_bundle should return (None, report) without uncaught ValueError
+        mig_bundle = bundle()
+        mig_bundle["objects"]["PublicEvent"][0]["schema_version"] = 111111
+        mig_text = json.dumps(mig_bundle).replace('"schema_version": 111111', '"schema_version": 1e309', 1)
+        mig_payload = json.loads(mig_text)
+        self.assertEqual(mig_payload["objects"]["PublicEvent"][0]["schema_version"], float("inf"))
+
+        migrated, mig_report = mr.migrate_bundle(mig_payload)
+        self.assertIsNone(migrated)
+        self.assertGreater(mig_report["error_count"], 0)
+
+        # apply CLI should refuse with structured ValueError, keep source/output unchanged, and not write receipt
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "input.json"
+            out = root / "out.json"
+            source.write_text(mig_text, encoding="utf-8")
+            before_s = source.read_bytes()
+            out.write_bytes(b"previous durable output\n")
+            before_o = out.read_bytes()
+            with self.assertRaises(ValueError) as caught:
+                mr.main(["apply", "--input", str(source), "--output", str(out)])
+            self.assertIn("migration refused with", str(caught.exception))
+            self.assertEqual(source.read_bytes(), before_s)
+            self.assertEqual(out.read_bytes(), before_o)
+            self.assertFalse((root / "out.migration-receipt.json").exists())
+
 
 if __name__ == "__main__":
     unittest.main()
