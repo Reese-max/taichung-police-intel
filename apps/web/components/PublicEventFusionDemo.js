@@ -155,15 +155,18 @@ export default function PublicEventFusionDemo() {
   const candidateStatus = candidateConfirmed ? "CONFIRMED" : candidate.fusion_status;
 
   return (
+    <details className="v2-other-changes" data-testid="public-event-fixture-details">
+      <summary>合成 PublicEvent 流程示例（非真實事件）</summary>
     <section className="v2-fusion-demo" data-testid="public-event-fusion-demo" aria-labelledby="public-event-fusion-title">
       <div className="v2-section-heading">
         <div>
           <p className="v2-eyebrow">公共事件融合 · 可重播示範</p>
-          <h2 id="public-event-fusion-title">三份官方文件 → 一個 PublicEvent</h2>
+          <h2 id="public-event-fusion-title">三份合成文件 → 一個示例 PublicEvent</h2>
         </div>
         <span className="v2-demo-badge">FIXTURE_ONLY · 未接 production</span>
       </div>
       <p className="v2-fusion-note">
+        所有事件與文件都是合成測試資料，不是官方公告或真實事件。
         這張卡重播 deterministic fusion、版本差異與保守衝突狀態；不把文件異動 ID 當成事件 ID，也不寫入公開 canonical state。
       </p>
 
@@ -171,7 +174,7 @@ export default function PublicEventFusionDemo() {
         <div className="v2-fusion-card-head">
           <div>
             <span className={statusClass(event.fusion_status)}>{statusLabel(event.fusion_status)}</span>
-            <span className="v2-fusion-source-count">{event.independent_source_count} 個獨立官方來源</span>
+            <span className="v2-fusion-source-count">{event.independent_source_count} 個模擬獨立來源</span>
           </div>
           <code>{event.public_event_id}</code>
         </div>
@@ -183,8 +186,8 @@ export default function PublicEventFusionDemo() {
           <div><dt>證據取得路徑</dt><dd>{event.source_provenance.map((source) => `${source.independent_source_id}: ${source.acquisition_paths.join("、")}`).join("；")}</dd></div>
         </dl>
 
-        <details className="v2-fusion-documents" open>
-          <summary>展開 {payload.documents.length} 份官方文件與版本</summary>
+        <details className="v2-fusion-documents">
+          <summary>展開 {payload.documents.length} 份合成文件與版本</summary>
           <div className="v2-fusion-document-list">
             {payload.documents.map((document) => {
               const changed = document.previous.document_version_id !== document.current.document_version_id;
@@ -192,7 +195,7 @@ export default function PublicEventFusionDemo() {
                 <article key={document.document_id} className="v2-fusion-document">
                   <div className="v2-fusion-document-head">
                     <strong>{sourceLabel(document)}</strong>
-                    <a href={document.official_url} target="_blank" rel="noreferrer">開啟官方證據</a>
+                    <span>合成文件定位，沒有真實官方證據</span>
                   </div>
                   <small>{document.document_id} · locator: {document.evidence_locator}</small>
                   <div className="v2-fusion-versions">
@@ -223,7 +226,7 @@ export default function PublicEventFusionDemo() {
           <p>
             {payload.background_preview.period} · {payload.background_preview.district} · {payload.background_preview.value.toLocaleString()}{payload.background_preview.unit}
           </p>
-          <small>{payload.background_preview.note} <a href={payload.background_preview.source_url} target="_blank" rel="noreferrer">官方資料入口</a></small>
+          <small>{payload.background_preview.note} <a href={payload.background_preview.source_url} target="_blank" rel="noreferrer">背景資料原始入口（不支持合成事件）</a></small>
         </div>
 
         <div className="v2-fusion-actions" aria-label="本機人工決策預覽">
@@ -262,5 +265,6 @@ export default function PublicEventFusionDemo() {
         {candidateConfirmed && <small>CONFIRMED 僅存在於此瀏覽器預覽，未改寫 canonical state。</small>}
       </article>
     </section>
+    </details>
   );
 }

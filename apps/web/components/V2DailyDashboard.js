@@ -905,8 +905,6 @@ export default function V2DailyDashboard() {
       </header>
 
       <QueryGatewayPanel onFeedback={handleReviewFeedback} feedbackReady={Boolean(localReview)} publicationGeneration={generationMixed ? null : publication?.source_collection_run_id} />
-      <PublicEventFusionDemo />
-      <DiscoverySignalsPanel />
 
       {loadState === "loading" && (
         <section className="v2-system-message" role="status">
@@ -1049,19 +1047,22 @@ export default function V2DailyDashboard() {
 
             </>
           )}
+        </>
+      )}
 
+          {/* The separately validated historical feed does not require a usable brief. */}
           <section className="v2-archive" aria-labelledby="v2-archive-title">
             <div className="v2-section-heading">
               <div>
                 <p className="v2-eyebrow">背景資料</p>
                 <h2 id="v2-archive-title">歷史資料庫</h2>
               </div>
-              <span>{overview.archive_total || 0} 筆索引</span>
+              <span>{archive ? `${archive.items.length} 筆歷史索引` : "歷史索引尚未取得"}</span>
             </div>
             <p className="v2-archive-note">
               以下資料是目前可查詢的官方歷史索引，不代表本期新增，也不會自動列入今日重點。
             </p>
-            <label className="v2-archive-search">
+            {archive && <label className="v2-archive-search">
               <span>搜尋歷史資料</span>
               <input
                 type="search"
@@ -1069,7 +1070,7 @@ export default function V2DailyDashboard() {
                 onChange={(event) => setArchiveQuery(event.target.value)}
                 placeholder="輸入分局、交通、警力、提案等關鍵字"
               />
-            </label>
+            </label>}
             {archive ? (
               <div className="v2-archive-list">
                 {filteredArchive.map((item) => (
@@ -1082,10 +1083,12 @@ export default function V2DailyDashboard() {
                 {filteredArchive.length === 0 && <p>找不到符合關鍵字的歷史資料。</p>}
               </div>
             ) : (
-              <p className="v2-archive-unavailable">歷史索引暫時無法載入；已載入的 V2 快照須依上方時效與缺口提示使用。</p>
+              <p className="v2-archive-unavailable">歷史索引尚未載入或暫不可用；這不是零筆資料，請稍後重試。</p>
             )}
           </section>
 
+      {loadState === "ready" && publication && (
+        <>
           <SystemHealthSummary
             health={systemHealth}
             localReview={localReview}
@@ -1111,6 +1114,8 @@ export default function V2DailyDashboard() {
           />
         </>
       )}
+      <PublicEventFusionDemo />
+      <DiscoverySignalsPanel />
     </main>
   );
 }
