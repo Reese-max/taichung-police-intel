@@ -1,3 +1,4 @@
+import copy
 import importlib.util
 import json
 from pathlib import Path
@@ -588,6 +589,245 @@ class EntityRegistryRedirectChainTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, message):
                     self.merge(first, "agency:c", "agency:a", **kwargs)
                 self.assertEqual(json.dumps(first, ensure_ascii=False, sort_keys=True), before)
+
+
+class EntityRegistrySplitRedirectChainTests(unittest.TestCase):
+    """Synthetic manual mappings only; no mutation of the runtime registry."""
+
+    @staticmethod
+    def row(entity_id, label, aliases):
+        return {"entity_id": entity_id, "kind": "location", "canonical_label": label,
+                "aliases": aliases, "jurisdiction": "臺中市", "status": "CONFIRMED",
+                "evidence": "fixture:" + entity_id,
+                "alias_evidence": [{"alias": alias, "evidence": "fixture:" + alias} for alias in aliases]}
+
+    @classmethod
+    def original(cls):
+        return {"schema_version": 1, "registry_version": 1, "redirects": {},
+                "entities": [cls.row("location:old", "甲路", ["乙路", "丙路", "丁路"])]}
+
+    @classmethod
+    def incoming_registry(cls):
+        return {"schema_version": 1, "registry_version": 1,
+                "entities": [cls.row("location:a", "甲路", ["乙路"]),
+                             cls.row("location:u", "丙路", ["戊路"]),
+                             cls.row("location:v", "丁路", ["庚路"])],
+                "redirects": {"location:r1": ["location:u", "location:a", "location:v"],
+                              "location:r2": ["location:a", "location:u"],
+                              "location:r3": ["location:v"]}}
+
+    @staticmethod
+    def split(registry, entity_id, groups, **overrides):
+        decision = {"evidence": "fixture:operator-reviewed-split", "operator": "fixture-reviewer",
+                    "decided_at": "2026-09-21T10:00:00+08:00"}
+        decision.update(overrides)
+        return er.split_entity(registry, entity_id, groups, **decision)
+
+    @classmethod
+    def first_split(cls, registry):
+        return cls.split(registry, "location:old", [
+            {"entity_id": "location:a", "canonical_label": "甲路", "aliases": ["乙路"]},
+            {"entity_id": "location:b", "canonical_label": "丙路", "aliases": ["丁路"]}])
+
+    @staticmethod
+    def child_groups():
+        return [{"entity_id": "location:a2", "canonical_label": "乙路", "aliases": []},
+                {"entity_id": "location:a1", "canonical_label": "甲路", "aliases": []}]
+
+    @staticmethod
+    def revert(registry, sequence):
+        return er.revert_manual_change(registry, sequence, evidence="fixture:operator-reviewed-revert",
+                                      operator="fixture-reviewer", decided_at="2026-09-21T10:01:00+08:00")
+
+    def assert_entities_equal(self, actual, expected):
+        self.assertEqual(sorted(actual["entities"], key=lambda row: row["entity_id"]),
+                         sorted(expected["entities"], key=lambda row: row["entity_id"]))
+
+    def test_split_expands_multiple_incoming_targets_in_place_and_keeps_alias_evidence(self):
+        original = self.incoming_registry()
+        snapshot = copy.deepcopy(original)
+        changed = self.split(original, "location:a", self.child_groups())
+        self.assertEqual(original, snapshot)
+        self.assertEqual(changed["redirects"], {
+            "location:r1": ["location:u", "location:a2", "location:a1", "location:v"],
+            "location:r2": ["location:a2", "location:a1", "location:u"],
+            "location:r3": ["location:v"], "location:a": ["location:a2", "location:a1"]})
+        payload = changed["audit_history"][0]["payload"]
+        self.assertEqual(payload["before"]["incoming_redirects"], {
+            key: original["redirects"][key] for key in ("location:r1", "location:r2")})
+        self.assertEqual(payload["after"]["incoming_redirects"], {
+            key: changed["redirects"][key] for key in ("location:r1", "location:r2")})
+        children = {row["entity_id"]: row for row in changed["entities"]}
+        self.assertEqual(children["location:a2"]["alias_evidence"], [{"alias": "乙路", "evidence": "fixture:乙路"}])
+        self.assertEqual(children["location:a2"]["evidence"], original["entities"][0]["evidence"])
+        self.assertEqual(er.resolve(changed, "location", "乙路", "臺中市")["entity_id"], "location:a2")
+        self.assertEqual(er.resolve(changed, "location", "location:a")["status"], "NO_MATCH")
+        active = set(children)
+        for retired_id, target_ids in changed["redirects"].items():
+            self.assertEqual(er.resolve_entity_id(changed, retired_id)["redirect_entity_ids"], target_ids)
+            self.assertEqual(len(target_ids), len(set(target_ids)))
+            self.assertTrue(set(target_ids) <= active)
+
+    def test_consecutive_splits_keep_historical_targets_active_and_inputs_unchanged(self):
+        original = self.original()
+        original_snapshot = copy.deepcopy(original)
+        first = self.first_split(original)
+        first_snapshot = copy.deepcopy(first)
+        changed = self.split(first, "location:a", self.child_groups())
+        self.assertEqual(original, original_snapshot)
+        self.assertEqual(first, first_snapshot)
+        self.assertEqual(changed["redirects"]["location:old"], ["location:a2", "location:a1", "location:b"])
+        self.assertEqual(changed["redirects"]["location:a"], ["location:a2", "location:a1"])
+        er.validate_registry(changed)
+        active = {row["entity_id"] for row in changed["entities"]}
+        self.assertTrue(all(set(row) <= active for row in changed["redirects"].values()))
+
+    def test_consecutive_splits_revert_in_reverse_order_with_append_only_audit(self):
+        original = self.original()
+        first = self.first_split(original)
+        changed = self.split(first, "location:a", self.child_groups())
+        history = copy.deepcopy(changed["audit_history"])
+        restored_first = self.revert(changed, 2)
+        self.assert_entities_equal(restored_first, first)
+        self.assertEqual(restored_first["redirects"], first["redirects"])
+        restored = self.revert(restored_first, 1)
+        self.assert_entities_equal(restored, original)
+        self.assertEqual(restored["redirects"], original["redirects"])
+        self.assertEqual(restored["audit_history"][:2], history)
+        self.assertEqual([row["action"] for row in restored["audit_history"]], ["SPLIT", "SPLIT", "REVERT", "REVERT"])
+        self.assertEqual(restored["registry_version"], original["registry_version"] + 4)
+
+    def test_merge_then_split_reverts_both_changes_and_preserves_alias_evidence(self):
+        original = {"schema_version": 1, "registry_version": 1, "redirects": {}, "entities": [
+            self.row("location:a", "甲路", ["乙路"]), self.row("location:b", "丙路", ["丁路"])]}
+        snapshot = copy.deepcopy(original)
+        merged = er.merge_entities(original, "location:a", "location:b", evidence="fixture:reviewed-merge",
+                                   operator="fixture-reviewer", decided_at="2026-09-21T10:00:00+08:00")
+        changed = self.split(merged, "location:a", [
+            {"entity_id": "location:c", "canonical_label": "甲路", "aliases": ["乙路"]},
+            {"entity_id": "location:d", "canonical_label": "丙路", "aliases": ["丁路"]}])
+        self.assertEqual(original, snapshot)
+        self.assertEqual(changed["redirects"], {"location:b": ["location:c", "location:d"],
+                                               "location:a": ["location:c", "location:d"]})
+        self.assertEqual(changed["audit_history"][1]["payload"]["before"]["incoming_redirects"], {"location:b": ["location:a"]})
+        self.assertEqual([row["alias_evidence"] for row in changed["entities"]],
+                         [row["alias_evidence"] for row in original["entities"]])
+        restored_merged = self.revert(changed, 2)
+        self.assert_entities_equal(restored_merged, merged)
+        self.assertEqual(restored_merged["redirects"], merged["redirects"])
+        restored = self.revert(restored_merged, 1)
+        self.assert_entities_equal(restored, original)
+        self.assertEqual(restored["redirects"], {})
+
+    def test_split_revert_refuses_reordered_changed_or_removed_incoming_redirects(self):
+        changed = self.split(self.incoming_registry(), "location:a", self.child_groups())
+        for targets in (["location:v", "location:a2", "location:a1", "location:u"],
+                        ["location:a2", "location:a1"], None):
+            with self.subTest(targets=targets):
+                altered = copy.deepcopy(changed)
+                if targets is None:
+                    altered["redirects"].pop("location:r1")
+                else:
+                    altered["redirects"]["location:r1"] = targets
+                er.validate_registry(altered)
+                snapshot = copy.deepcopy(altered)
+                with self.assertRaisesRegex(ValueError, "no longer matches split incoming redirects"):
+                    self.revert(altered, 1)
+                self.assertEqual(altered, snapshot)
+
+    def test_split_revert_refuses_later_child_changes_without_mutating_input(self):
+        changed = self.split(self.incoming_registry(), "location:a", self.child_groups())
+        altered = er.correct_alias(changed, "location:a1", "甲新路", evidence="fixture:later-alias",
+                                   operator="fixture-reviewer", decided_at="2026-09-21T10:02:00+08:00")
+        snapshot = copy.deepcopy(altered)
+        with self.assertRaisesRegex(ValueError, "no longer matches split"):
+            self.revert(altered, 1)
+        self.assertEqual(altered, snapshot)
+
+    def test_split_revert_refuses_new_redirect_dependencies_on_children(self):
+        changed = self.split(self.incoming_registry(), "location:a", self.child_groups())
+        changed["redirects"]["location:later"] = ["location:a1"]
+        er.validate_registry(changed)
+        snapshot = copy.deepcopy(changed)
+        with self.assertRaisesRegex(ValueError, "redirect targets are invalid: location:later"):
+            self.revert(changed, 1)
+        self.assertEqual(changed, snapshot)
+
+    def test_split_revert_preserves_unrelated_later_changes_and_can_revert_older_audit(self):
+        original = self.incoming_registry()
+        changed = self.split(original, "location:a", self.child_groups())
+        later = er.correct_alias(changed, "location:u", "丙新路", evidence="fixture:unrelated-alias",
+                                 operator="fixture-reviewer", decided_at="2026-09-21T10:02:00+08:00")
+        restored = self.revert(later, 1)
+        self.assertEqual(restored["redirects"], original["redirects"])
+        self.assertEqual(next(row for row in restored["entities"] if row["entity_id"] == "location:a"), original["entities"][0])
+        self.assertEqual(next(row for row in restored["entities"] if row["entity_id"] == "location:u"),
+                         next(row for row in later["entities"] if row["entity_id"] == "location:u"))
+        self.assertEqual([row["action"] for row in restored["audit_history"]], ["SPLIT", "CORRECTION", "REVERT"])
+        self.assertEqual(restored["registry_version"], later["registry_version"] + 1)
+
+    def test_one_hop_split_keeps_legacy_audit_shape_and_revert(self):
+        original = self.original()
+        changed = self.first_split(original)
+        history = copy.deepcopy(changed["audit_history"])
+        payload = history[0]["payload"]
+        self.assertEqual(set(payload["before"]), {"entity"})
+        self.assertEqual(set(payload["after"]), {"children", "retired_entity", "redirect_entity_ids"})
+        restored = self.revert(changed, 1)
+        self.assert_entities_equal(restored, original)
+        self.assertEqual(restored["redirects"], {})
+        self.assertEqual(restored["audit_history"][0], history[0])
+
+    def test_split_revert_validates_rehashed_incoming_snapshot_semantics(self):
+        changed = self.split(self.incoming_registry(), "location:a", self.child_groups())
+        mutations = [
+            lambda b, a: b.update(incoming_redirects=[]),
+            lambda b, a: a.update(incoming_redirects=[]),
+            lambda b, a: a["incoming_redirects"].pop("location:r2"),
+            lambda b, a: b["incoming_redirects"].update({"location:r1": []}),
+            lambda b, a: b["incoming_redirects"].update({"location:r1": ["location:u", "location:v"]}),
+            lambda b, a: b["incoming_redirects"].update({"location:r1": ["location:a", "location:a"]}),
+            lambda b, a: b["incoming_redirects"].update({"location:r1": [0, "location:a"]}),
+            lambda b, a: b["incoming_redirects"].update({"location:r2": ["location:a", "location:a1", "location:u"]}),
+            lambda b, a: a["incoming_redirects"].update({"location:r1": ["location:v", "location:a2", "location:a1", "location:u"]}),
+            lambda b, a: (b["incoming_redirects"].update({"location:a": ["location:a"]}), a["incoming_redirects"].update({"location:a": ["location:a2", "location:a1"]})),
+            lambda b, a: (b["incoming_redirects"].update({"": ["location:a"]}), a["incoming_redirects"].update({"": ["location:a2", "location:a1"]})),
+        ]
+        for index, mutate in enumerate(mutations):
+            with self.subTest(index=index):
+                altered = copy.deepcopy(changed)
+                record = altered["audit_history"][0]
+                mutate(record["payload"]["before"], record["payload"]["after"])
+                record["audit_id"] = er._audit_id(record)
+                er.validate_registry(altered)
+                snapshot = copy.deepcopy(altered)
+                with self.assertRaisesRegex(ValueError, "split incoming redirect snapshot is invalid"):
+                    self.revert(altered, 1)
+                self.assertEqual(altered, snapshot)
+
+    def test_split_rejects_invalid_duplicate_redirect_input_instead_of_laundering_it(self):
+        original = self.incoming_registry()
+        original["redirects"]["location:r1"] = ["location:u", "location:a", "location:u", "location:v"]
+        snapshot = copy.deepcopy(original)
+        with self.assertRaisesRegex(ValueError, "redirect targets are invalid: location:r1"):
+            self.split(original, "location:a", self.child_groups())
+        self.assertEqual(original, snapshot)
+
+    def test_split_with_incoming_redirects_keeps_manual_identity_and_partition_guards(self):
+        original = self.incoming_registry()
+        snapshot = copy.deepcopy(original)
+        for overrides, reason in (({"operator": ""}, "operator is required"),
+                                  ({"evidence": ""}, "manual evidence is required"),
+                                  ({"decided_at": "2026-09-21T10:00:00"}, "timezone-aware")):
+            with self.subTest(overrides=overrides):
+                with self.assertRaisesRegex(ValueError, reason):
+                    self.split(original, "location:a", self.child_groups(), **overrides)
+                self.assertEqual(original, snapshot)
+        with self.assertRaisesRegex(ValueError, "partition every original name"):
+            self.split(original, "location:a", [
+                {"entity_id": "location:a1", "canonical_label": "甲路", "aliases": []},
+                {"entity_id": "location:a2", "canonical_label": "未知路", "aliases": []}])
+        self.assertEqual(original, snapshot)
 
 
 if __name__ == "__main__":
