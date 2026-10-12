@@ -85,6 +85,9 @@ async function main() {
     await queryInput.fill("警察");
     await page.locator(".v2-query-form button").click();
     await page.waitForSelector(".v2-query-result", { timeout: 15000 });
+    const receiptDetails = page.locator(".v2-query-result > details").first();
+    record("query_technical_receipt_starts_folded", await receiptDetails.getAttribute("open") === null, "Technical receipt is an optional disclosure");
+    await receiptDetails.locator("summary").click();
     const queryText = await page.locator(".v2-query-result").innerText();
     record("browser_query_returns_typed_status", /STALE|RECENT|PARTIAL|UNKNOWN/.test(queryText), queryText.slice(0, 220));
     record("browser_query_exposes_publication_hash", /publication hash: [0-9a-f]{64}/i.test(queryText), queryText.slice(-100));

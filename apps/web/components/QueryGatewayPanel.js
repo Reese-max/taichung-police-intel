@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { FEEDBACK_REASONS } from "../lib/local-review.js";
 import { queryGateway } from "../lib/query-release-client.js";
-import { validateControlledAnswer, runControlledAnswerPipeline } from "../lib/controlled-answer-client.js";
+import { validateControlledAnswer } from "../lib/controlled-answer-client.js";
+import { indexQueryPresentation } from "../lib/query-presentation.js";
 
 const ENDPOINT = process.env.NEXT_PUBLIC_QUERY_GATEWAY_URL || "/query";
+const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
 const FEEDBACK_REASON_LABELS = {
   FALSE_MERGE: "誤合併",
   MISSED_MERGE: "漏合併",
@@ -88,14 +90,15 @@ function GatewayFeedbackForm({ response, targetType, onFeedback, disabled }) {
   );
 }
 
-function QueryResult({ response, onFeedback, feedbackReady, releaseContext, controlledAnswer }) {
+function QueryResult({ response, onFeedback, feedbackReady, releaseContext }) {
   const results = Array.isArray(response.results) ? response.results : [];
   const sources = Array.isArray(response.sources) ? response.sources : [];
   const brief = response.brief;
   const publicationReceipt = response.publication_receipt;
   const coverage = response.query_coverage;
-  const [answerState, setAnswerState] = useState(controlledAnswer ? "ready" : "idle");
-  const [answerResponse, setAnswerResponse] = useState(controlledAnswer || null);
+  const presentation = response.tool_name === "search_evidence" ? indexQueryPresentation(response) : null;
+  const [answerState, setAnswerState] = useState("idle");
+  const [answerResponse, setAnswerResponse] = useState(null);
   const [answerError, setAnswerError] = useState("");
 
   async function validateResults() {
@@ -115,6 +118,13 @@ function QueryResult({ response, onFeedback, feedbackReady, releaseContext, cont
 
   return (
     <div className="v2-query-result" role="status">
+      {presentation && <div className="v2-query-empty" data-testid={presentation.kind === "unavailable" ? "index-unavailable" : "index-query-state"}>
+        {presentation.kind === "unavailable" && <strong>公開索引暫不可用</strong>}
+        {presentation.message && <p>{presentation.message}</p>}
+        {presentation.kind === "unavailable" && <p>這不是零筆資料。<a href={`${BASE_PATH}/#v2-archive-title`}>閱讀既有歷史資料與原文</a>。</p>}
+      </div>}
+      <details className="v2-query-receipt"><summary>查看查詢與來源技術收據</summary>
+      <small>唯讀查詢 · publication metadata · Web / MCP 共用 Gateway</small>
       <div className="v2-query-result-heading">
         <strong>{response.freshness}</strong>
         <span>{response.result_type}</span>
@@ -146,6 +156,10 @@ function QueryResult({ response, onFeedback, feedbackReady, releaseContext, cont
           ))}
         </ul>
       )}
+      <small className="v2-query-receipt">publication hash: {response.publication_hash}</small>
+      <small className="v2-query-receipt" data-testid="query-generation">query generation: {response.query_generation_id}</small>
+      {response.retention && <small className="v2-query-receipt">公開投影：{response.retention.public_projection} · 權利狀態需審查</small>}
+      </details>
       {results.length > 0 ? (
         <ul className="v2-query-result-list">
           {results.map((item) => (
@@ -155,15 +169,12 @@ function QueryResult({ response, onFeedback, feedbackReady, releaseContext, cont
             </li>
           ))}
         </ul>
-      ) : response.result_type === "publication_metadata" ? (
-        <p className="v2-query-empty">
-          {response.answerable_no_match ? "核准快照內沒有符合條件的資料。" : "目前不能把零結果解讀成沒有事件，請先處理上方資料缺口。"}
-        </p>
       ) : null}
       {results.length > 0 && response.result_type === "publication_metadata" && (
         <section className="v2-query-answer-gate" aria-label="受控回答核對">
+          <p>索引已列出。摘要需另行逐句核對；核對失敗時保留上方索引，未核對的回答不顯示。</p>
           <button type="button" onClick={validateResults} disabled={answerState === "loading"}>
-            {answerState === "loading" ? "正在核對回答……" : "重新核對索引摘要"}
+            {answerState === "loading" ? "正在核對回答……" : "核對索引摘要"}
           </button>
           {answerState === "error" && <p className="v2-query-message error" role="alert">{answerError}</p>}
           {answerResponse && answerState === "ready" && (
@@ -183,11 +194,6 @@ function QueryResult({ response, onFeedback, feedbackReady, releaseContext, cont
             </div>
           )}
         </section>
-      )}
-      <small className="v2-query-receipt">publication hash: {response.publication_hash}</small>
-      <small className="v2-query-receipt" data-testid="query-generation">query generation: {response.query_generation_id}</small>
-      {response.retention && (
-        <small className="v2-query-receipt">公開投影：{response.retention.public_projection} · 權利狀態需審查</small>
       )}
       {onFeedback && (
         <div className="v2-query-feedback-list" aria-label="查詢 feedback">
@@ -214,7 +220,6 @@ function QueryResult({ response, onFeedback, feedbackReady, releaseContext, cont
 export default function QueryGatewayPanel({ onFeedback, feedbackReady = false, publicationGeneration }) {
   const [query, setQuery] = useState("");
   const [response, setResponse] = useState(null);
-  const [controlledAnswer, setControlledAnswer] = useState(null);
   const [state, setState] = useState("idle");
   const [error, setError] = useState("");
   const releaseContext = process.env.NEXT_PUBLIC_QUERY_GATEWAY_URL ? {
@@ -226,19 +231,14 @@ export default function QueryGatewayPanel({ onFeedback, feedbackReady = false, p
   async function run(tool, argumentsValue) {
     setState("loading");
     setError("");
-    setControlledAnswer(null);
     try {
-      if (tool === "search_evidence") {
-        const completed = await runControlledAnswerPipeline(ENDPOINT, argumentsValue, releaseContext);
-        setResponse(completed.response);
-        setControlledAnswer(completed.answer);
-      } else {
-        setResponse(await queryGateway(ENDPOINT, tool, argumentsValue, releaseContext));
-      }
+      const payload = await queryGateway(ENDPOINT, tool, argumentsValue, releaseContext);
+      if (tool === "search_evidence" && !Array.isArray(payload.results)) throw new Error("索引回應格式無法核對。");
+      setResponse(payload);
       setState("ready");
     } catch (reason) {
       setResponse(null);
-      setError("查詢服務目前無法連線；Dashboard 仍可使用。" + (reason?.message ? `（${reason.message}）` : ""));
+      setError(reason?.message || "查詢服務目前無法連線。");
       setState("error");
     }
   }
@@ -252,13 +252,14 @@ export default function QueryGatewayPanel({ onFeedback, feedbackReady = false, p
     <section className="v2-query" aria-labelledby="v2-query-title">
       <div className="v2-section-heading">
         <div>
-          <p className="v2-eyebrow">唯讀查詢 · publication metadata</p>
+          <p className="v2-eyebrow">公開索引關鍵字查詢</p>
           <h2 id="v2-query-title">Ask GovIntel</h2>
         </div>
-        <span>Web / MCP 共用 Gateway</span>
+        <span>標題與來源中介資料</span>
       </div>
       <p className="v2-query-note">
         只查核准的公開快照與來源健康狀態；目前不是全文搜尋，也不會把結果當成即時事件或勤務指令。
+        <a href={`${BASE_PATH}/#v2-archive-title`}>閱讀既有歷史資料與原文</a>。
       </p>
       <form className="v2-query-form" onSubmit={submit}>
         <label>
@@ -273,15 +274,15 @@ export default function QueryGatewayPanel({ onFeedback, feedbackReady = false, p
         </label>
         <button type="submit" disabled={state === "loading"}>查詢</button>
       </form>
-      <div className="v2-query-actions" aria-label="GovIntel 快速查詢">
+      <details className="v2-query-receipt"><summary>查看來源與發布狀態</summary><div className="v2-query-actions" aria-label="GovIntel 快速查詢">
         <button type="button" onClick={() => run("get_current_brief", {})} disabled={state === "loading"}>目前 Brief</button>
         <button type="button" onClick={() => run("get_publication_receipt", {})} disabled={state === "loading"}>發布收據</button>
         <button type="button" onClick={() => run("get_source_health", {})} disabled={state === "loading"}>來源健康</button>
-      </div>
+      </div></details>
       {state === "loading" && <p className="v2-query-message" role="status">正在核對公開快照……</p>}
-      {state === "error" && <p className="v2-query-message error" role="alert">{error}</p>}
+      {state === "error" && <div className="v2-query-message error" role="alert"><strong>索引查詢暫不可用</strong><p>這不是零筆資料；Dashboard 仍可使用。<a href={`${BASE_PATH}/#v2-archive-title`}>閱讀既有歷史資料與原文</a>。</p><details><summary>查看技術原因</summary><p>{error}</p></details></div>}
       {state === "ready" && response && (
-        <QueryResult key={response.query_id} response={response} onFeedback={onFeedback} feedbackReady={feedbackReady} releaseContext={releaseContext} controlledAnswer={controlledAnswer} />
+        <QueryResult key={response.query_id} response={response} onFeedback={onFeedback} feedbackReady={feedbackReady} releaseContext={releaseContext} />
       )}
     </section>
   );
