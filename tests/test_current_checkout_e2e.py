@@ -602,9 +602,51 @@ class SabotageTests(unittest.TestCase):
     def test_sabotaged_checkout_copy_fails_verification(self):
         with tempfile.TemporaryDirectory() as tmp:
             check = vc.run_sabotage_check(ROOT, Path(tmp))
+            manifest = json.loads((Path(tmp) / "sabotage-manifest.json").read_text(encoding="utf-8"))
         self.assertEqual(check["status"], "PASS")
         self.assertEqual(check["observed"], "FAIL")
         self.assertIn("query-store.py", check["sabotaged_module"])
+        self.assertEqual(check["expected_failed_check_id"], "candidate_context")
+        self.assertEqual(check["observed_failed_check_ids"], ["candidate_context"])
+        self.assertEqual(check["module_load_status"], "PASS")
+        self.assertNotEqual(check["source_sha256"], check["sabotaged_sha256"])
+        self.assertTrue(manifest["expected_failure_observed"])
+        self.assertEqual(manifest["observed_check_statuses"], {
+            "modules_loaded_from_checkout": "PASS",
+            "candidate_context": "FAIL",
+        })
+
+    def test_missing_import_closure_does_not_count_as_sabotage_detection(self):
+        receipt = {
+            "status": "FAIL",
+            "checks": [{
+                "id": "modules_loaded_from_checkout",
+                "status": "FAIL",
+                "detail": "ModuleNotFoundError: No module named 'intel_v2.review'",
+            }],
+        }
+        self.assertFalse(vc.sabotage_result_matches(1, receipt, "candidate_context"))
+
+    def test_unrelated_failure_does_not_count_as_expected_sabotage(self):
+        receipt = {
+            "status": "FAIL",
+            "checks": [
+                {"id": "modules_loaded_from_checkout", "status": "PASS"},
+                {"id": "candidate_context", "status": "FAIL"},
+                {"id": "unexpected_check", "status": "FAIL"},
+            ],
+        }
+        self.assertFalse(vc.sabotage_result_matches(1, receipt, "candidate_context"))
+
+    def test_success_exit_cannot_count_as_expected_sabotage(self):
+        receipt = {
+            "status": "FAIL",
+            "checks": [
+                {"id": "modules_loaded_from_checkout", "status": "PASS"},
+                {"id": "candidate_context", "status": "FAIL"},
+            ],
+        }
+        self.assertFalse(vc.sabotage_result_matches(0, receipt, "candidate_context"))
 
 
 class CliTests(unittest.TestCase):

@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "kind": "OFFICIAL_SOURCE_TERMS_OBSERVATION",
+  "status": "FETCHED_NOT_REVIEWED",
+  "source_id": "S-029",
+  "source_entrypoint": "https://www.rdec.taichung.gov.tw/12047/12142/12145",
+  "terms_page": {
+    "name_observed": "政府網站資料開放宣告",
+    "requested_url": "https://www.rdec.taichung.gov.tw/30103/30122/443962",
+    "final_url": "https://www.rdec.taichung.gov.tw/30103/30122/443962",
+    "redirect_chain": [],
+    "http_status": 200,
+    "content_type": "text/html; charset=utf-8",
+    "fetched_at": "2026-10-11T23:46:58.928524+00:00",
+    "bytes": 83349,
+    "raw_body_sha256": "9b9e3ecfb1995f34557193c12d84eda088f1af765539f7f8c443a12739e5e52e",
+    "raw_body_path": "runtime-evidence/source-reviews/2026-10-11/S029/rdec-website-open-declaration.html",
+    "locator": [
+      "第一節「授權方式及範圍」",
+      "第二節(一)至(三)",
+      "第三節",
+      "第四節",
+      "第五節"
+    ]
+  },
+  "observed_text_summary": {
+    "grant_language": "頁面稱著作權保護範圍內之網站資料與素材，以無償、非專屬、得再授權方式供公眾使用，並要求註明出處。",
+    "exceptions_or_conditions": [
+      "頁面排除著作權以外的智慧財產權利。",
+      "個人資料須另依個人資料保護規定處理。",
+      "部分影音、圖像、樂譜、專案撰文或其他特別聲明素材須另行同意。",
+      "須注意第三人著作人格權；不得惡意變更資料；利用成果不得造成代表機關認可或背書的誤認。"
+    ],
+    "explicit_open_data_license_identifier_observed": false
+  },
+  "previous_reported_fetch": {
+    "provenance": "user-provided GovIntel plan, HP evidence summary",
+    "fetched_at": "2026-10-11T18:43:39.976698+00:00",
+    "bytes": 88357,
+    "sha256": "8aed8b9ae933af1cda2e8c9b525a1c4f6350028b3e6ddb1a46804bf6b35daa48",
+    "current_raw_bytes_match": false,
+    "content_change_assessment": "NOT_ASSESSED; retain both observations for human comparison"
+  },
+  "review": {
+    "reviewer": null,
+    "reviewed_at": null,
+    "decision": null,
+    "rights_status": "UNKNOWN",
+    "review_required": true,
+    "individual_report_and_attachment_exceptions_reviewed": false,
+    "model_transmission_allowed": false,
+    "promotion_eligible": false,
+    "rights_decisions_changed": false
+  }
+}
