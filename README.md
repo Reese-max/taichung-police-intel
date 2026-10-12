@@ -346,3 +346,32 @@ The retained current-workspace Kiro records show Auto as `qdev::auto`: 10.254967
 ## License and data rights
 
 No repository software license has been selected. Do not assume reuse rights. Official source content remains subject to each publisher's terms; this project preserves provenance and links rather than claiming ownership.
+
+## Offline PDF candidate verification on Windows
+
+The fixture-only PDF bytes, page-text and citation replay increment is documented
+in [document evidence](docs/govintel/document-evidence.md). It is integrated on
+main `84078f2a58ab5f07711c7c1d00c3821c30a6b208`; the 23 PDF increment blobs match
+the independently reviewed `9495ef0b719e9f254362d0021f792d466d9dd8262f6a776fe6b74c379d4b67e2`
+patch exactly. Real source permissions, admission and source collectors are not
+changed. Synthetic permissions remain fixture-only.
+
+On this Windows candidate, document/research Node regression passed 164/164,
+real pinned-parser Python tests passed 12/12, and date-metadata plus M1 negative
+control predicate tests passed 9/9. These related results do not establish the
+complete project or cross-platform gate.
+
+The static web build used locked Next 16.3.8 from integrity-verified existing npm
+cache with an offline install. Prebuild reported source policy `changed=false`
+and completed evidence synchronization, but Turbopack stopped before compilation
+with Windows path canonicalization `os error 5` (access denied). No alternate
+bundler, elevation, network permission change or WSL route was used to bypass it.
+
+The coordinator also reported nine failure groups in the existing Windows full
+gate, including a 60-second query timeout and POSIX/symlink assumptions. Those
+unrelated platform failures were not rerun or hidden by modifying their checks.
+The coordinator's WSL attempt was rejected with `Wsl/E_ACCESSDENIED`; this task
+does not retry that route. Full build/project acceptance remains unconfirmed.
+Extra S-006 collector regression also needs an existing trusted `psycopg` runtime;
+the available general Python runtime lacks it, so that dependency gap is not
+reported as a passed test.

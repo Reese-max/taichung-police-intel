@@ -61,7 +61,7 @@ Document fields are closed:
 
 IDs/versions are bounded opaque identifiers, never filesystem paths. URLs must be canonical HTTPS URLs at the policy-approved origins; credentials, fragments, non-default ports, IP literals, noncanonical traversal, encoded path separators/traversal, and unsafe paths are rejected. Both requested and final URLs must be approved. URL strings are provenance only: the module never dereferences them.
 
-`content_sha256` is the hash of the exact supplied UTF-8 text. There is no normalization, HTML/PDF extraction, OCR, URL fetching, redirect handling, file reading, or private upload processing. A future binary-document adapter must separately preserve and validate original binary hashes and meaningful page/paragraph locators; these text offsets do not pretend to be PDF byte/page offsets.
+`content_sha256` is the hash of the exact supplied UTF-8 text. This foundation does no normalization, extraction, OCR, URL fetching, redirect handling, file reading, or private upload processing. The companion offline PDF adapter below preserves a separate original-byte hash and page map; the foundation's text offsets remain text offsets, never PDF byte offsets.
 
 ## Request and draft contracts
 
@@ -140,6 +140,129 @@ SHA-256 is integrity linkage, not a signature, license determination, remote pub
 6. Obtain separate deployment authorization. No fixture permissions are promoted into real governance
 
 No real permission validity, provider quality, live document acquisition, end-to-end deployed behavior, or independent semantic synthesis is established by the fixture suite.
+
+## Offline PDF bytes and citation replay
+
+`intel_v2/document_pdf.py` accepts already-held PDF **bytes**, extracts every page
+with exactly `pypdf==6.19.0` in a child process, and returns `{text, receipt}`.
+It does not call or change collectors. `collect_download_list` already retrieves
+attachments; S-006's existing `attachment_revision_evidence` reads the first page
+for a labelled revision date. Those collector outputs and their legacy binary
+hash fields are unchanged by this increment.
+
+The receipt has `schema_version: 1`, `extractor_version: document-pdf/1`, parser
+name/version, original `binary_sha256` and byte count, page count, exact text
+`content_sha256` and byte count, fixed `page_separator: "\n\f\n"`, page map,
+gaps, and `receipt_sha256`. The receipt hash uses the same sorted-key canonical
+JSON convention as document evidence, excluding only `receipt_sha256` itself.
+Page numbers start at one. Every page has exact UTF-8 and UTF-16 end-exclusive
+start/end ranges into the joined text, a page-text hash, and `TEXT` or
+`NO_EXTRACTABLE_TEXT` status. Separators lie **outside** the page ranges. Text is
+not normalized or silently trimmed; the parser's exact plain-mode output is
+preserved. Document metadata uses `parser_version: pdf-text-v1:pypdf-6.19.0`.
+
+Python and JavaScript classify blank text using the same closed 30-code-point
+set: `U+0009..000D`, `U+001C..001F`, `U+0020`, `U+0085`, `U+00A0`, `U+1680`,
+`U+2000..200A`, `U+2028`, `U+2029`, `U+202F`, `U+205F`, `U+3000`, `U+FEFF`.
+They do not use language-dependent `strip()` / `trim()` for this decision. All
+other characters remain significant data, including combining characters and
+U+200B; this classification does not establish semantic support or legibility.
+It never removes characters, normalizes text, or changes content/binary hashes.
+
+Blank or scanned pages create `PDF_PAGE_NO_EXTRACTABLE_TEXT` gaps in mixed PDFs.
+If **every** page has no nonblank extracted text, extraction and replay admission
+reject with `PDF_NO_EXTRACTABLE_TEXT`; joined separators cannot make an empty
+document usable. This code cannot distinguish an intentionally blank page from
+a scanned image or other unreadable content, and does not perform OCR. A page
+extraction error rejects the whole document; no partial extraction is returned.
+All encrypted PDFs (including empty-password envelopes), malformed PDFs, wrong
+or missing parser versions, and oversized PDFs reject explicitly. Empty PDFs
+and PDFs over 32 pages reject. An individual decompressed page may consume memory
+before its text-size check; timeout and output caps are not an OS memory sandbox.
+
+| Additional offline bound | Maximum |
+| --- | ---: |
+| Original bytes per PDF / all PDFs | 8 MiB / 32 MiB |
+| Pages per PDF | 32 |
+| Parser child duration / stdout / stderr | 10 seconds / 512 KiB / 16 KiB |
+| Receipt JSON / PDF replay JSON | 16 KiB each |
+| Fixture CLI outer duration / stdout / stderr | 12 seconds / 512 KiB / 16 KiB |
+
+The existing 16-document, 64-KiB-per-text-document and 256-KiB-text-corpus limits
+still apply. Caps reject the complete operation; they never silently truncate.
+The child command is fixed, uses the existing Python interpreter, and has no
+shell or document-supplied arguments. Source instructions remain inert text.
+
+`createDocumentPdfReplay({evidenceConfig, pdfs, expectedExtractionPins})` in
+`scripts/replay-document-pdf.mjs` is an offline adapter, not an HTTP constructor
+or a second permission schema. Each PDF supplies `{metadata, binary, extraction}`.
+`evidenceConfig` supplies the **unchanged** existing trusted store configuration
+(without `documents`). Each independent extraction pin contains the exact
+`document_binding_sha256`, `binary_sha256`, and `receipt_sha256`. All three must
+come from separately trusted offline configuration. The adapter checks the
+original bytes, text, complete page map, receipt hash, parser/version and pins,
+then calls the existing permission-gated store. Missing, stale, unadmitted,
+unapproved or differently pinned metadata still rejects. It never re-signs a
+permission manifest to accommodate newly extracted text.
+
+Retrieval uses the existing immutable store handle. Compilation returns
+`{compilation, pdf_replay}`. The original compilation and its existing citation
+hashes remain intact. The separate replay binds `compilation_sha256` and every
+`citation_sha256` / `document_binding_sha256` to the original binary hash,
+extraction receipt hash and quote's page-relative and document-relative ranges
+in both encodings. `replay_sha256` binds the whole replay. A quote crossing the
+separator lists only intersected `TEXT` pages and adds
+`PDF_QUOTE_INCLUDES_PAGE_SEPARATOR`; the separator is not attributed to a PDF
+page. Blank-only quotes reject, even when they occur in a matching passage. A
+quote containing blank-page text plus readable text keeps the exact quote but
+adds `PDF_QUOTE_INCLUDES_UNEXTRACTABLE_PAGE_TEXT`; blank-page ranges never appear
+as supporting page locators. Unreadable-page gaps remain explicit even when the
+quote is on a readable page. Renderers must display the replay's
+`text_completeness: INCOMPLETE` and page gaps for mixed PDFs. With no known page
+gaps it says `EXTRACTED_TEXT_ONLY`, never that all visual contents were recovered.
+Raw retrieval handles are search context, not final PDF citation replay output.
+These integrity hashes are not publisher signatures, proof of extraction
+accuracy or grants of real-source rights.
+
+`tests/fixtures/document-pdf` contains only original synthetic PDFs, deterministic
+fixed expected hashes/page maps and separately fixed fictional trust/pin JSON.
+Its deliberately invoked generator creates synthetic fixture approvals only;
+acceptance and the runner do **not** regenerate expected data or grant permissions.
+The small synthetic CID font is a parser fixture, not a publication font. The
+expected page maps must be checked against the real pinned parser before claiming
+PDF parser acceptance; Node receipt replay tests alone do not establish it.
+
+```sh
+python -B -m unittest tests.test_document_pdf
+node --test --test-concurrency=1 apps/web/tests/document-pdf.test.mjs
+node scripts/replay-document-pdf.mjs --python <existing-trusted-python-with-pypdf-6.19.0>
+```
+
+The Node test's real-parser integration uses `GOVINTEL_PDF_PYTHON`, then `PYTHON`,
+then `python`. Set it to the existing pinned interpreter; no acceptance test
+silently skips or substitutes another parser. Original and review fixtures cover
+real Unicode whitespace/mixed/32-page extraction, pure blank and image-only
+documents, a failed page after readable text, genuinely empty-password encryption,
+and corrupted/over-limit inputs. They are parsed by the actual child process, in addition
+to the independent fixed-receipt mutation and permission tests. The standalone
+Python test and fixture generator load the bytes module directly, without loading
+unrelated package semantics or their platform timezone-data dependency.
+The deliberate generator's `--review-only` mode creates the seven additional
+review originals and their separate `review-expected.json`; it never rewrites the
+original six PDFs, `expected.json`, or `trust.json`. Node controlled-child tests
+check its fixed outer timeout and stdout/stderr caps, including exact-cap and
+cap+1 cases. Receipt tests distinguish exact byte-cap contract rejection from
+cap+1 byte rejection; legal closed 32-page receipts are smaller than that envelope.
+Multi-page excerpts exercise a successful replay below the 16-KiB cap and complete
+rejection above it. No limit is exposed as a request override.
+
+The CLI reads only its closed self-authored fixture allowlist and fixed fictional
+trust JSON. It quotes the answer found only on page two and prints extraction,
+the existing evidence compilation and PDF replay JSON. It accepts no arbitrary
+file, URL, registry, upload, permission override or parser version override.
+There are no network/provider calls, installation, credentials, publication or
+live-source admission in this flow. Integrating real PDF ingestion and rights
+review remains separate work; this adapter is not wired to the research route.
 
 ## Executable acceptance
 
