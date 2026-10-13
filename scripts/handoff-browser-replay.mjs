@@ -76,7 +76,7 @@ const base = `http://127.0.0.1:${server.address().port}`;
 let browser;
 const checks = [], downloads = [];
 try {
-  browser = await chromium.launch({ executablePath: process.env.GOVINTEL_CHROME_PATH || "/usr/bin/chromium", args: ["--no-sandbox"], headless: true });
+  browser = await chromium.launch({ executablePath: process.env.GOVINTEL_CHROME_PATH || undefined, args: ["--no-sandbox"], headless: true });
   const context = await browser.newContext({ acceptDownloads: true, viewport: { width: 1280, height: 900 } });
   await context.route("**/*", (route) => new URL(route.request().url()).origin === base ? route.continue() : route.abort());
   await context.route((url) => docs.has(url.href), (route) => route.fulfill({ contentType: "text/html", body: docs.get(route.request().url()) }));
@@ -169,6 +169,18 @@ try {
   checks.push("source_updates_preserve_terminal_watch_statuses");
   const final = await state(); assert.equal(Object.keys(final.watch_items).length, 2); assert.equal(final.handoffs.length, 2);
   await writeFile(path.join(out, "final-state.json"), JSON.stringify(final, null, 2)); checks.push("resolve_and_dismiss_keep_audit_history");
+  phase = 4; await reopen();
+  await page.getByRole("button", { name: "加入追蹤", exact: true }).first().click();
+  await page.getByRole("button", { name: "加入追蹤", exact: true }).click();
+  await page.getByTestId("v2-tracking-list").getByText(/需重新核對/).first().waitFor();
+  await page.getByRole("button", { name: "確認／更新交班版本", exact: true }).click();
+  await page.getByRole("alert").getByText(/已知較新來源版本/).waitFor();
+  const readded = await state();
+  assert.ok(Object.values(readded.watch_items).every((watch) => watch.status === "NEEDS_REVIEW"));
+  assert.deepEqual(readded.handoffs, final.handoffs);
+  assert.equal((await download("JSON", "readded-retained-v2-needs-review")).review_warnings.length, 2);
+  await writeFile(path.join(out, "readded-state.json"), JSON.stringify(readded, null, 2));
+  checks.push("terminal_readd_retains_known_source_and_review_state");
   await writeFile(path.join(out, "source-fixtures.json"), JSON.stringify({ label: fixtureLabel, sources: [a1, a2, a3, b1, b2], docs: Object.fromEntries(docs) }, null, 2));
   await writeFile(path.join(out, "receipt.json"), JSON.stringify({ status: "PASS", code_sha: codeSha, scope: "SYNTHETIC_HISTORICAL_LOCAL_BROWSER_REPLAY", label: fixtureLabel, checks, downloads, provider_calls: 0, live_source_calls: 0, production_verified: false }, null, 2));
   console.log(`HANDOFF_BROWSER_REPLAY_OK checks=${checks.length} code_sha=${codeSha} output=${out}`);

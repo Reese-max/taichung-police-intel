@@ -169,8 +169,18 @@ export function addLocalWatch(state, item, createdAt = new Date()) {
   const existing = result.watch_items[watchId];
   if (existing && !["RESOLVED", "DISMISSED"].includes(existing.status)) return result;
   const at = stamp(createdAt);
+  if (existing) {
+    const known = knownSourceRef(existing, result);
+    bindKnownDocument(current, known);
+    const pending = existing.invalidations.some((entry) => !entry.resolved_in_handoff_id);
+    existing.status = pending || current.source_version !== known.version
+      || current.source_sha256 !== known.normalized_sha256
+      || current.source_document_version !== known.document_version_id ? "NEEDS_REVIEW" : "WATCHING";
+    existing.updated_at = at;
+    result.last_updated_at = at;
+    return result;
+  }
   result.watch_items[watchId] = {
-    ...(existing || {}),
     watch_id: watchId,
     ...current,
     created_at: at,
@@ -184,7 +194,7 @@ export function addLocalWatch(state, item, createdAt = new Date()) {
     last_reviewed_version: null,
     last_reviewed_sha256: null,
     last_handoff_id: null,
-    invalidations: existing?.invalidations || [],
+    invalidations: [],
   };
   result.last_updated_at = at;
   return result;

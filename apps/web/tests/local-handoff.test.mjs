@@ -130,14 +130,36 @@ for (const status of ["RESOLVED", "DISMISSED"]) test(`${status} watch stays outs
   assert.equal(synced.watch_items[watchId].invalidations.length, 1);
 });
 
-test("terminal watch can be re-added against a newer source version", () => {
+test("terminal watch can be re-added and then confirm a newly observed source version", () => {
   const watched = addLocalWatch(emptyLocalHandoff(), item(), T0);
   const watchId = Object.keys(watched.watch_items)[0];
   const resolved = setLocalWatchStatus(watched, watchId, "RESOLVED", T1);
   const reopened = addLocalWatch(resolved, item(2), T1);
-  assert.equal(reopened.watch_items[watchId].status, "WATCHING");
-  assert.equal(reopened.watch_items[watchId].tracked_version, 2);
-  assert.equal(reopened.watch_items[watchId].created_at, "2026-09-20T17:00:00.000Z");
+  assert.equal(reopened.watch_items[watchId].status, "NEEDS_REVIEW");
+  assert.equal(reopened.watch_items[watchId].tracked_version, 1);
+  assert.equal(reopened.watch_items[watchId].created_at, watched.watch_items[watchId].created_at);
+  const synced = syncLocalHandoff(reopened, [item(2)], publication(), T1);
+  const confirmed = confirmLocalHandoff(synced, [item(2)], publication(), T1);
+  assert.equal(confirmed.watch_items[watchId].status, "WATCHING");
+  assert.equal(confirmed.handoffs.at(-1).items[0].source_version, 2);
+});
+
+for (const status of ["RESOLVED", "DISMISSED"]) test(`re-adding ${status} with retained source preserves review and immutable history`, () => {
+  const confirmed = confirmLocalHandoff(addLocalWatch(emptyLocalHandoff(), item(), T0), [item()], publication(), T0);
+  const watchId = Object.keys(confirmed.watch_items)[0];
+  const terminal = setLocalWatchStatus(confirmed, watchId, status, T1);
+  const current = syncLocalHandoff(terminal, [item(3)], publication(), T1);
+  const before = JSON.stringify(current);
+  const reopened = addLocalWatch(current, item(2), T1);
+  assert.equal(reopened.watch_items[watchId].status, "NEEDS_REVIEW");
+  assert.equal(reopened.watch_items[watchId].tracked_version, 1);
+  assert.equal(reopened.watch_items[watchId].last_handoff_id, confirmed.handoffs[0].brief_id);
+  assert.deepEqual(reopened.handoffs, confirmed.handoffs);
+  assert.throws(() => confirmLocalHandoff(reopened, [item(2)], publication(), T1), /已知較新來源/);
+  assert.equal(JSON.parse(exportLocalHandoff(reopened, "json").content).review_warnings[0].latest_source_version, 3);
+  const reviewed = confirmLocalHandoff(reopened, [item(3)], publication(), T1);
+  assert.equal(reviewed.handoffs.at(-1).items[0].source_version, 3);
+  assert.equal(JSON.stringify(current), before);
 });
 
 test("local storage round-trip validates the same state", () => {

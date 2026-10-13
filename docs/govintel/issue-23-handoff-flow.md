@@ -19,9 +19,11 @@
 - 靜態 Web 以 `localStorage` 保存單一使用者的 watch／handoff 草稿，提供確認 v1/v2、已處理／停止追蹤與 Markdown/JSON 匯出；不寫入公開檔案或伺服器。
 - 來源 `FAILED`／`PARTIAL` 時，本機追蹤仍保留，卡片顯示該來源的擷取缺口。
 - 瀏覽器從實際收到的 brief response bytes 計算 SHA-256，保存為 handoff 的 `brief_sha256`；payload 自稱的 hash 不取代此 binding。`RESOLVED`／`DISMISSED` 不因後續來源更新自動回到首頁追蹤，異動與已確認版本仍保留於 audit history。
+- 重新加入已處理／停止追蹤的項目時，保留原 watch 的已接納來源、已確認版本與異動 audit；尚未核對的來源或舊清單重加仍顯示 `NEEDS_REVIEW`，不因重新加入而重置版本知識。
 - DB detail recheck 的 hash-only 結果可先送入 `scripts/review-inbox.py reconcile --input`；對已追蹤且已確認的 claim，明確執行 `scripts/handoff-state.py recheck --detail-rechecks <path>` 才會建立 idempotent invalidation、回開 `NEEDS_REVIEW` 並保留 affected claim。
 - `python scripts/handoff-state.py self-check` 重播「加入追蹤 → 跨日保留 → 來源 v2 → NEEDS_REVIEW → 確認 v2 → exact locator」流程。
 - 執行 `npm run check` 建立靜態頁面後，`node scripts/handoff-browser-replay.mjs /tmp/govintel-handoff-replay` 用實際 Chromium 操作同一個瀏覽器的加入追蹤、跨日／零異動保留、claim invalidation、JSON／Markdown 匯出、拒絕舊版本確認、來源缺口、確認 v2、重新載入歷史與終止追蹤。輸出 receipt、截圖、下載 artifact 與合成來源 fixture；兩版 evidence popup 的實際 response bytes 需符合匯出的雜湊。fixture 清楚標示為合成歷史／local-first replay，不呼叫外部來源或付費 provider，不代表現行官方公告、真實使用者或 production 驗收。
+- 重播預設使用 Playwright 已安裝的 Chromium；另有系統瀏覽器時可用 `GOVINTEL_CHROME_PATH` 指定。
 
 驗證結果：`HANDOFF_DEMO_OK cross_day=true invalidation=true versions=1->2 exact_locator=true export_warning=true`；handoff state tests 另驗證 claim 依賴回指。
 
