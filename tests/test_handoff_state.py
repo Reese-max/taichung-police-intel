@@ -3,9 +3,12 @@ import contextlib
 import importlib.util
 import io
 import json
+import hashlib
+import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from intel_v2.handoff import (
     add_watch,
@@ -669,6 +672,36 @@ class HandoffStateTests(unittest.TestCase):
                 "before": {"document_version_id": "DOCV-PREDECESSOR"}, "after": {"document_version_id": "DOCV-OLD"}}}], observed_at=later)
         self.assertEqual(len(retained["watch_items"][watch["watch_id"]]["invalidations"]), 1)
 
+    def test_unconfirmed_publication_and_detail_reversion_can_confirm_the_tracked_ref(self):
+        old = dict(item(), document_version_id="DOCV-OLD")
+        for path in ["publication", "detail"]:
+            for legacy in [False, True]:
+                with self.subTest(path=path, legacy=legacy):
+                    new = dict(old, document_version_id="DOCV-NEW",
+                        normalized_sha256="c" * 64 if path == "publication" else old["normalized_sha256"])
+                    state, watch, _ = add_watch(empty_state(), old, created_at=T0)
+                    state, first = confirm_handoff(state, current_items={old["identity"]: old}, publication={}, generated_at=T0, confirmed_at=T0)
+                    for current, previous, at in [(new, old, T1), (old, new, T2)]:
+                        if path == "publication":
+                            state = sync_with_publication(state, previous_items={previous["identity"]: previous},
+                                current_items={current["identity"]: current}, events=[], observed_at=at, collection_run_id="UNCONFIRMED")
+                        else:
+                            state = sync_with_detail_rechecks(state, [{"source_id": "S-001", "stable_key": "event-1", "classification": {
+                                "review_required": True, "status": "MATERIAL_CHANGE", "observed_at": at,
+                                "before": {"document_version_id": previous["document_version_id"]},
+                                "after": {"document_version_id": current["document_version_id"]}}}], observed_at=at)
+                        if legacy and at == T1:
+                            state["watch_items"][watch["watch_id"]].pop("known_source_ref", None)
+                    warnings = handoff_review_warnings(state, first)
+                    self.assertEqual(warnings[0]["latest_source_document_version"], "DOCV-OLD")
+                    self.assertEqual(warnings[0]["observed_change_source_ref"]["document_version_id"], "DOCV-NEW")
+                    final, second = confirm_handoff(state, current_items={old["identity"]: old}, publication={}, generated_at=T2, confirmed_at=T2)
+                    self.assertEqual(final["handoffs"][0], first)
+                    self.assertEqual(second["items"][0]["source_document_version"], "DOCV-OLD")
+                    revised = final["watch_items"][watch["watch_id"]]
+                    self.assertEqual(len(revised["invalidations"]), 2)
+                    self.assertTrue(all(row["resolved_in_handoff_id"] == second["brief_id"] for row in revised["invalidations"]))
+
     def test_warning_falls_back_to_the_invalidation_record_for_a_stored_claim(self):
         revised, first_handoff, _ = self._detail_recheck_revision()
         stripped = dict(first_handoff)
@@ -696,6 +729,93 @@ class HandoffStateTests(unittest.TestCase):
 
         self.assertEqual(handoff_review_warnings(state, find_handoff(state)), [])
         self.assertNotIn("NEEDS_REVIEW", handoff_markdown(handoff))
+
+    def _run_producer(self, root, feed, at):
+        feed_path, source, handoff, brief = (root / name for name in ["feed.json", "source.json", "handoff.json", "brief.json"])
+        feed["generated_at"] = at
+        feed_path.write_text(json.dumps(feed), encoding="utf-8")
+        argv = [str(SCRIPT), "--input", str(feed_path), "--source-status", str(root / "absent-status.json"),
+            "--state", str(source), "--handoff-state", str(handoff), "--output", str(brief)]
+        with patch.object(sys, "argv", argv), contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(build_v2.main(), 0)
+        return argparse.Namespace(feed=feed_path, source_state=source, handoff_state=handoff, brief=brief,
+            generated_at=None, confirmed_at=at, watch_id=None)
+
+    def _producer_feed(self, run="SYNTHETIC-HANDOFF-RUN-1"):
+        return {"schema_version": 1, "collection_run_id": run, "items": [{"source_id": "S-032",
+            "stable_id": "handoff-producer", "title": "合成歷史重播交通公告 17:00",
+            "official_url": "https://example.gov.tw/handoff-producer", "eligibility": "HOME_CANDIDATE"}]}
+
+    def test_actual_producer_uses_semantic_versions_for_cli_confirm_and_unchanged_runs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            feed = self._producer_feed()
+            args = self._run_producer(root, feed, T0)
+            sources = json.loads(args.source_state.read_text())["items"]
+            current = next(iter(sources.values()))
+            state, _, _ = add_watch(empty_state(), current, created_at=T0)
+            args.handoff_state.write_text(json.dumps(state))
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(handoff_cli.command_confirm(args), 0)
+            v1 = json.loads(args.handoff_state.read_text())["handoffs"][0]
+            feed["collection_run_id"] = "SYNTHETIC-HANDOFF-RUN-2"
+            feed["items"][0]["title"] = "合成歷史重播交通公告 16:00"
+            args = self._run_producer(root, feed, T1)
+            self.assertEqual(next(iter(json.loads(args.source_state.read_text())["items"].values()))["version_no"], 2)
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(handoff_cli.command_confirm(args), 0)
+            v2 = json.loads(args.handoff_state.read_text())["handoffs"][1]
+            self.assertEqual(v2["items"][0]["source_version"], 2)
+            self.assertEqual(v2["publication"]["brief_sha256"], hashlib.sha256(args.brief.read_bytes()).hexdigest())
+            feed["collection_run_id"] = "SYNTHETIC-HANDOFF-RUN-3"
+            args = self._run_producer(root, feed, T2)
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(handoff_cli.command_confirm(args), 0)
+            final = json.loads(args.handoff_state.read_text())
+            self.assertEqual(final["handoffs"][:2], [v1, v2])
+            self.assertEqual(final["handoffs"][2]["items"][0]["source_version"], 2)
+
+    def test_actual_producer_retains_accepted_body_document_through_list_only_metadata(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            feed = self._producer_feed()
+            args = self._run_producer(root, feed, T0)
+            current = next(iter(json.loads(args.source_state.read_text())["items"].values()))
+            state, _, _ = add_watch(empty_state(), current, created_at=T0)
+            state, first = confirm_handoff(state, current_items={current["identity"]: current}, publication={}, generated_at=T0, confirmed_at=T0)
+            state = sync_with_detail_rechecks(state, [{"source_id": current["source_id"], "stable_key": current["stable_key"], "classification": {
+                "review_required": True, "status": "MATERIAL_CHANGE", "observed_at": T1,
+                "before": {"document_version_id": first["items"][0]["source_document_version"]},
+                "after": {"document_version_id": "SYNTHETIC-BODY-DOC-NEW"}}}], observed_at=T1)
+            args.handoff_state.write_text(json.dumps(state))
+            feed["collection_run_id"] = "SYNTHETIC-HANDOFF-RUN-2"
+            args = self._run_producer(root, feed, T2)
+            source_bytes = args.source_state.read_bytes()
+            published_watch = json.loads(args.brief.read_text())["tracking_items"][0]
+            self.assertEqual(published_watch["source_document_version"], "SYNTHETIC-BODY-DOC-NEW")
+            self.assertEqual(published_watch["source_sha256"], current["normalized_sha256"])
+            with contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(handoff_cli.command_confirm(args), 0)
+            final = json.loads(args.handoff_state.read_text())
+            self.assertEqual(final["handoffs"][0], first)
+            self.assertEqual(final["handoffs"][1]["items"][0]["source_document_version"], "SYNTHETIC-BODY-DOC-NEW")
+            self.assertEqual(args.source_state.read_bytes(), source_bytes)
+
+    def test_cli_refuses_mixed_or_missing_publication_runs_without_state_writes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            feed = self._producer_feed()
+            args = self._run_producer(root, feed, T0)
+            current = next(iter(json.loads(args.source_state.read_text())["items"].values()))
+            state, _, _ = add_watch(empty_state(), current, created_at=T0)
+            args.handoff_state.write_text(json.dumps(state))
+            original = args.handoff_state.read_bytes()
+            for run in ["UNRELATED-RUN", None, ""]:
+                changed = dict(feed, collection_run_id=run)
+                args.feed.write_text(json.dumps(changed))
+                with self.assertRaisesRegex(ValueError, "same source collection run"):
+                    handoff_cli.command_confirm(args)
+                self.assertEqual(args.handoff_state.read_bytes(), original)
 
     def test_generator_projects_persistent_watch_items_into_brief(self):
         current = item()

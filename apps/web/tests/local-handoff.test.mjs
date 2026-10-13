@@ -226,6 +226,43 @@ test("later source recurrence creates a new receipt and repeated pending observa
   assert.equal(Object.values(final.watch_items)[0].invalidations[0].resolved_in_handoff_id, receipt);
 });
 
+test("unconfirmed correction can legitimately return to the tracked reference and be confirmed", () => {
+  const corrected = { ...item(1, "corrected-hash"), source_document_version: "DOCV-CORRECTED" };
+  const v1 = confirmLocalHandoff(addLocalWatch(emptyLocalHandoff(), item(), T0), [item()], publication(), T0);
+  const pending = syncLocalHandoff(v1, [corrected], publication(), T1);
+  const later = "2026-09-22T01:00:00+08:00";
+  for (const legacy of [false, true]) {
+    const input = JSON.parse(JSON.stringify(pending));
+    if (legacy) delete Object.values(input.watch_items)[0].known_source_ref;
+    const returned = syncLocalHandoff(input, [item()], publication(), later);
+    const exported = JSON.parse(exportLocalHandoff(returned, "json").content);
+    assert.deepEqual(exported.handoff, v1.handoffs[0]);
+    assert.equal(exported.review_warnings[0].latest_source_sha256, item().source_sha256);
+    assert.equal(exported.review_warnings[0].observed_change_source_ref.normalized_sha256, "corrected-hash");
+    const v2 = confirmLocalHandoff(returned, [item()], { ...publication(), generated_at: later }, later);
+    assert.deepEqual(v2.handoffs[0], v1.handoffs[0]);
+    assert.equal(v2.handoffs[1].items[0].source_sha256, item().source_sha256);
+    const watch = Object.values(v2.watch_items)[0];
+    assert.equal(watch.invalidations.length, 2);
+    assert.equal(watch.invalidations[1].before.normalized_sha256, "corrected-hash");
+    assert.ok(watch.invalidations.every((row) => row.resolved_in_handoff_id === v2.handoffs[1].brief_id));
+  }
+});
+
+test("unchanged list-only metadata retains and confirms the accepted document binding", () => {
+  const current = { ...item(), source_document_version: "DOCV-ACCEPTED-BODY" };
+  const known = addLocalWatch(emptyLocalHandoff(), current, T0);
+  for (const document of [null, current.source_sha256]) {
+    const listOnly = { ...current, source_document_version: document };
+    const input = JSON.stringify(listOnly);
+    const synced = syncLocalHandoff(known, [listOnly], publication(), T1);
+    const confirmed = confirmLocalHandoff(synced, [listOnly], publication(), T1);
+    assert.equal(confirmed.handoffs[0].items[0].source_document_version, "DOCV-ACCEPTED-BODY");
+    assert.equal(Object.values(confirmed.watch_items)[0].invalidations.length, 0);
+    assert.equal(JSON.stringify(listOnly), input);
+  }
+});
+
 test("failed or partial source shows a per-watch gap and never resolves local tracking", () => {
   const watched = addLocalWatch(emptyLocalHandoff(), item(), T0);
   const noChanges = syncLocalHandoff(watched, [], publication(), T1);

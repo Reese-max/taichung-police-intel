@@ -74,6 +74,29 @@ function itemsByIdentity(items) {
   );
 }
 
+function sourceRef(item) {
+  return { version: item.source_version, normalized_sha256: item.source_sha256,
+    document_version_id: item.source_document_version };
+}
+
+function knownSourceRef(watch) {
+  if (watch.known_source_ref) return watch.known_source_ref;
+  const tracked = { version: watch.tracked_version, normalized_sha256: watch.tracked_sha256 || null,
+    document_version_id: watch.tracked_document_version || watch.source_document_version || null };
+  const latest = watch.invalidations.at(-1);
+  if (latest && (!latest.resolved_in_handoff_id || latest.after?.version > tracked.version)) {
+    return { ...tracked, ...latest.after };
+  }
+  return tracked;
+}
+
+function bindKnownDocument(current, known) {
+  if (current.source_version === known.version && current.source_sha256 === known.normalized_sha256
+    && (!current.source_document_version || current.source_document_version === current.source_sha256)) {
+    current.source_document_version = known.document_version_id;
+  }
+}
+
 export function emptyLocalHandoff() {
   return {
     schema_version: 1,
@@ -142,6 +165,7 @@ export function addLocalWatch(state, item, createdAt = new Date()) {
     tracked_version: current.source_version,
     tracked_sha256: current.source_sha256,
     tracked_document_version: current.source_document_version,
+    known_source_ref: sourceRef(current),
     last_reviewed_version: null,
     last_reviewed_sha256: null,
     last_handoff_id: null,
@@ -160,6 +184,9 @@ export function syncLocalHandoff(state, items, publication = {}, observedAt = ne
   for (const watch of Object.values(result.watch_items)) {
     const current = currentItems.get(watch.identity);
     if (!current) continue;
+    const knownRef = knownSourceRef(watch);
+    bindKnownDocument(current, knownRef);
+    if (current.source_version < knownRef.version) continue;
     const knownObservedMs = Math.max(Date.parse(result.last_publication?.observed_at) || 0,
       Date.parse(watch.last_source_observed_at) || 0,
       ...watch.invalidations.map((entry) => Date.parse(entry.detected_at) || 0));
@@ -174,19 +201,14 @@ export function syncLocalHandoff(state, items, publication = {}, observedAt = ne
     // correction. A later observed publication may legitimately revert it.
     if (observedMs < knownObservedMs || (knownPredecessor && observedMs === knownObservedMs)) continue;
     watch.last_source_observed_at = at;
+    watch.known_source_ref = sourceRef(current);
     watch.title = current.title;
     watch.official_url = current.official_url;
     watch.source_version = current.source_version;
     watch.source_sha256 = current.source_sha256;
-    const versionChanged = current.source_version > (watch.tracked_version || 0);
-    const hashChanged = Boolean(
-      current.source_sha256
-      && watch.tracked_sha256
-      && current.source_sha256 !== watch.tracked_sha256,
-    );
-    const documentChanged = Boolean(current.source_document_version
-      && (watch.tracked_document_version || watch.source_document_version)
-      && current.source_document_version !== (watch.tracked_document_version || watch.source_document_version));
+    const versionChanged = current.source_version !== knownRef.version;
+    const hashChanged = current.source_sha256 !== knownRef.normalized_sha256;
+    const documentChanged = current.source_document_version !== knownRef.document_version_id;
     if (!versionChanged && !hashChanged && !documentChanged) continue;
     let invalidationId = invalidationIdFor(
       watch.watch_id,
@@ -210,9 +232,7 @@ export function syncLocalHandoff(state, items, publication = {}, observedAt = ne
         reason: "SOURCE_VERSION_CHANGED",
         detected_at: at,
         before: {
-          version: watch.tracked_version,
-          normalized_sha256: watch.tracked_sha256,
-          document_version_id: watch.tracked_document_version || watch.source_document_version,
+          ...knownRef,
         },
         after: {
           version: current.source_version,
@@ -287,18 +307,11 @@ export function confirmLocalHandoff(state, items, publication = {}, confirmedAt 
     if (!watch || !ACTIVE_STATUSES.has(watch.status) || !current) {
       throw new Error(`目前沒有可驗證的來源版本：${watchId}`);
     }
-    const revisions = watch.invalidations.map((entry) => entry.after || {});
-    const knownVersion = Math.max(watch.tracked_version || 0, watch.source_version || 0,
-      ...revisions.map((row) => Number.isInteger(row.version) ? row.version : 0));
-    const known = revisions.filter((row) => row.version === knownVersion).at(-1);
-    const knownHash = known?.normalized_sha256
-      || (watch.tracked_version === knownVersion ? watch.tracked_sha256 : null);
-    const knownDocument = known?.document_version_id
-      || (watch.tracked_version === knownVersion ? watch.tracked_document_version : null);
-    if (current.source_version < knownVersion
-      || (current.source_version === knownVersion && knownHash && current.source_sha256 !== knownHash)
-      || (current.source_version === knownVersion && knownDocument
-        && current.source_document_version !== knownDocument)) {
+    const known = knownSourceRef(watch);
+    bindKnownDocument(current, known);
+    if (current.source_version !== known.version
+      || current.source_sha256 !== known.normalized_sha256
+      || current.source_document_version !== known.document_version_id) {
       throw new Error(`已知較新來源版本或不同雜湊，請重新核對後再確認：${watchId}`);
     }
     return {
@@ -372,6 +385,7 @@ export function localHandoffReviewWarnings(state, handoff = latestHandoff(state)
   for (const item of handoff.items) {
     const watch = state.watch_items[item.watch_id];
     if (!watch || watch.identity !== item.identity) continue;
+    const latest = knownSourceRef(watch);
     for (const invalidation of watch.invalidations) {
       if (!invalidation || invalidation.resolved_in_handoff_id) continue;
       const before = invalidation.before || {};
@@ -394,12 +408,13 @@ export function localHandoffReviewWarnings(state, handoff = latestHandoff(state)
         confirmed_source_version: item.source_version,
         confirmed_source_document_version: item.source_document_version,
         confirmed_source_sha256: item.source_sha256,
-        latest_source_version: after.version || null,
-        latest_source_document_version: after.document_version_id || null,
-        latest_source_sha256: after.normalized_sha256 || null,
+        latest_source_version: latest.version || null,
+        latest_source_document_version: latest.document_version_id || null,
+        latest_source_sha256: latest.normalized_sha256 || null,
+        observed_change_source_ref: copy(after),
         evidence_locator: item.evidence?.locator || null,
         confirmed_evidence_url: item.evidence?.official_url || null,
-        latest_evidence_url: after.official_url || null,
+        latest_evidence_url: watch.official_url || after.official_url || null,
       });
     }
   }
