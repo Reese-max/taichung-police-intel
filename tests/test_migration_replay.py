@@ -829,10 +829,12 @@ class CrashSafeApplyTests(unittest.TestCase):
             invalid["objects"]["PublicEvent"][0].pop("raw_item_id")
             source.write_text(json.dumps(invalid), encoding="utf-8")
             output.write_text("sentinel\n", encoding="utf-8")
-            with self.assertRaises(ValueError):
-                mr.main(["apply", "--input", str(source), "--output", str(output)])
+            self.assertEqual(mr.main(["apply", "--input", str(source), "--output", str(output)]), 1)
             self.assertEqual(output.read_text(encoding="utf-8"), "sentinel\n")
-            self.assertEqual(sorted(path.name for path in root.iterdir()), ["input.json", "out.json"])
+            self.assertEqual(sorted(path.name for path in root.iterdir()), ["input.json", "out.json", "out.migration-receipt.json"])
+            refusal = json.loads((root / "out.migration-receipt.json").read_text(encoding="utf-8"))
+            self.assertGreater(refusal["error_count"], 0)
+            self.assertIsNone(refusal["output_sha256"])
 
     def test_dry_run_never_writes_the_migrated_bundle(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -989,11 +991,21 @@ class MigrationSchemaVersionBoundaryTests(unittest.TestCase):
                             if not in_place:
                                 output.write_bytes(b"previous durable output\n")
                             output_bytes = output.read_bytes()
-                            with self.assertRaises(ValueError):
-                                mr.main(["apply", "--input", str(source), "--output", str(output)])
+                            if kind is None:
+                                with self.assertRaises(ValueError):
+                                    mr.main(["apply", "--input", str(source), "--output", str(output)])
+                            else:
+                                self.assertEqual(mr.main(["apply", "--input", str(source), "--output", str(output)]), 1)
+                                receipt = output.with_name(f"{output.stem}.migration-receipt.json")
+                                refusal = json.loads(receipt.read_text(encoding="utf-8"))
+                                self.assertGreater(refusal["error_count"], 0)
+                                self.assertIsNone(refusal["output_sha256"])
                             self.assertEqual(source.read_bytes(), source_bytes)
                             self.assertEqual(output.read_bytes(), output_bytes)
-                            self.assertEqual(sorted(p.name for p in root.iterdir()), ["input.json"] if in_place else ["input.json", "out.json"])
+                            expected = ["input.json"] if in_place else ["input.json", "out.json"]
+                            if kind is not None:
+                                expected.append(receipt.name)
+                            self.assertEqual(sorted(p.name for p in root.iterdir()), sorted(expected))
 
 
     def test_rehash_rejects_bad_bundle_versions_before_deriving_or_mutating_data(self):
@@ -1026,6 +1038,35 @@ class MigrationSchemaVersionBoundaryTests(unittest.TestCase):
                         self.assertEqual(source.read_bytes(), source_bytes)
                         self.assertEqual(output.read_bytes(), output_bytes)
                         self.assertEqual(sorted(p.name for p in root.iterdir()), ["input.json"] if in_place else ["input.json", "out.json"])
+
+    def test_unhashable_manual_state_never_claims_hash_preservation(self):
+        for value in (float("inf"), float("nan"), float("-inf")):
+            with self.subTest(value=value):
+                payload = bundle()
+                payload["watch_state"] = {"bad_value": value}
+                migrated, report = mr.migrate_bundle(payload)
+                self.assertIsNone(migrated)
+                self.assertFalse(report["manual_state_hashes"]["preserved"])
+                self.assertIn("watch_state", report["manual_state_hashes"]["errors"]["before"])
+                self.assertIn("watch_state", report["manual_state_hashes"]["errors"]["after"])
+                self.assertGreater(report["error_count"], 0)
+
+    def test_refusal_receipt_path_cannot_overwrite_the_input(self):
+        for command, suffix in (("apply", "migration-receipt"), ("rehash", "body-hash-report")):
+            with self.subTest(command=command), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                source = root / f"out.{suffix}.json"
+                output = root / "out.json"
+                payload = stale_bundle()
+                payload["objects"]["PublicEvent"][0]["schema_version"] = 111111
+                raw = json.dumps(payload).replace('"schema_version": 111111', '"schema_version": 1e309', 1)
+                source.write_text(raw, encoding="utf-8")
+                output.write_bytes(b"previous durable output\n")
+                source_bytes, output_bytes = source.read_bytes(), output.read_bytes()
+                self.assertEqual(mr.main([command, "--input", str(source), "--output", str(output)]), 1)
+                self.assertEqual(source.read_bytes(), source_bytes)
+                self.assertEqual(output.read_bytes(), output_bytes)
+                self.assertEqual(sorted(p.name for p in root.iterdir()), sorted([source.name, output.name]))
 
     def test_object_schema_version_overflow_float_refuses_rehash_and_apply_without_uncaught_exceptions(self):
         # PublicEvent schema_version as JSON 1e309 (decoded to float('inf'))
@@ -1069,7 +1110,7 @@ class MigrationSchemaVersionBoundaryTests(unittest.TestCase):
         self.assertIsNone(migrated)
         self.assertGreater(mig_report["error_count"], 0)
 
-        # apply CLI should refuse with structured ValueError, keep source/output unchanged, and not write receipt
+        # apply CLI returns a refusal receipt without a traceback and leaves data bytes unchanged
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             source = root / "input.json"
@@ -1078,12 +1119,12 @@ class MigrationSchemaVersionBoundaryTests(unittest.TestCase):
             before_s = source.read_bytes()
             out.write_bytes(b"previous durable output\n")
             before_o = out.read_bytes()
-            with self.assertRaises(ValueError) as caught:
-                mr.main(["apply", "--input", str(source), "--output", str(out)])
-            self.assertIn("migration refused with", str(caught.exception))
+            self.assertEqual(mr.main(["apply", "--input", str(source), "--output", str(out)]), 1)
             self.assertEqual(source.read_bytes(), before_s)
             self.assertEqual(out.read_bytes(), before_o)
-            self.assertFalse((root / "out.migration-receipt.json").exists())
+            refusal = json.loads((root / "out.migration-receipt.json").read_text(encoding="utf-8"))
+            self.assertGreater(refusal["error_count"], 0)
+            self.assertIsNone(refusal["output_sha256"])
 
 
 if __name__ == "__main__":

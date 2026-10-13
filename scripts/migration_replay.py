@@ -235,6 +235,24 @@ def _manual_hashes(bundle: dict[str, Any]) -> dict[str, str | None]:
     }
 
 
+def _manual_state_receipt(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
+    hashes: dict[str, dict[str, str | None]] = {}
+    errors: dict[str, dict[str, str]] = {}
+    for side, value in (("before", before), ("after", after)):
+        hashes[side] = {}
+        errors[side] = {}
+        for key in MANUAL_STATE_KEYS:
+            digest, error = _safe_sha256(value[key]) if key in value else (None, None)
+            hashes[side][key] = digest
+            if error is not None:
+                errors[side][key] = error
+    return {
+        **hashes,
+        "errors": errors,
+        "preserved": not any(errors.values()) and hashes["before"] == hashes["after"],
+    }
+
+
 def migrate_bundle(bundle: dict[str, Any], *, target_version: int = TARGET_SCHEMA_VERSION) -> tuple[dict[str, Any] | None, dict[str, Any]]:
     if not isinstance(bundle, dict) or not isinstance(bundle.get("objects"), dict):
         raise ValueError("migration input must contain an objects object")
@@ -304,8 +322,6 @@ def migrate_bundle(bundle: dict[str, Any], *, target_version: int = TARGET_SCHEM
         history.append(history_entry)
     if not errors and (history or "migration_history" in bundle):
         migrated["migration_history"] = history
-    manual_before = _manual_hashes(bundle)
-    manual_after = _manual_hashes(migrated)
     report = {
         "schema_version": 1,
         "report_type": "MIGRATION_DRY_RUN",
@@ -324,7 +340,7 @@ def migrate_bundle(bundle: dict[str, Any], *, target_version: int = TARGET_SCHEM
             "projection_version": bundle.get("projection_version"),
             "body_hash_version": migrated.get("body_hash_version"),
         },
-        "manual_state_hashes": {"before": manual_before, "after": manual_after, "preserved": manual_before == manual_after},
+        "manual_state_hashes": _manual_state_receipt(bundle, migrated),
         "idempotent_at_target": not errors and source_version == target_version and migrated == bundle,
     }
     return (None if errors else migrated), report
@@ -880,6 +896,11 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     payload = json.loads(args.input.read_text(encoding="utf-8"))
     if args.command in {"dry-run", "apply"}:
+        if args.command == "apply":
+            report_path = args.output.with_name(f"{args.output.stem}.migration-receipt.json")
+            if report_path.resolve() == args.input.resolve():
+                print(f"MIGRATION_APPLY_FAILED reason=receipt_path_conflict output={args.output} (unchanged)")
+                return 1
         migrated, report = migrate_bundle(payload)
         if args.command == "dry-run":
             atomic_write(args.output, report)
@@ -887,7 +908,12 @@ def main(argv: list[str] | None = None) -> int:
             print(f"MIGRATION_DRY_RUN_{status} errors={report['error_count']} affected={report['affected_count']} output={args.output}")
             return 0 if report["error_count"] == 0 else 1
         if migrated is None:
-            raise ValueError(f"migration refused with {report['error_count']} errors; existing output was not changed")
+            # Refusal is a CLI result with an inspectable receipt, not a traceback.
+            # The durable data path stays intact just as it does for rehash.
+            report_path = args.output.with_name(f"{args.output.stem}.migration-receipt.json")
+            atomic_write(report_path, report)
+            print(f"MIGRATION_APPLY_FAILED errors={report['error_count']} output={args.output} (unchanged)")
+            return 1
         # The audit receipt travels inside the same atomic write as the migrated data, so a
         # crash can never leave migrated objects whose producing versions are unknown.
         applied = {**migrated, "apply_receipt": report}
@@ -901,7 +927,11 @@ def main(argv: list[str] | None = None) -> int:
         if report["error_count"] or rehashed is None:
             # A refused body-hash migration never touches the data path; the report goes
             # beside it so the reason stays auditable and the previous data stays intact.
-            atomic_write(args.output.with_name(f"{args.output.stem}.body-hash-report.json"), report)
+            report_path = args.output.with_name(f"{args.output.stem}.body-hash-report.json")
+            if report_path.resolve() == args.input.resolve():
+                print(f"BODY_HASH_MIGRATION_FAILED reason=receipt_path_conflict output={args.output} (unchanged)")
+                return 1
+            atomic_write(report_path, report)
             print(f"BODY_HASH_MIGRATION_FAILED errors={report['error_count']} undetermined={report['undetermined_body_hash_version']} output={args.output} (unchanged)")
             return 1
         atomic_write(args.output, {**rehashed, "body_hash_migration_receipt": report})
