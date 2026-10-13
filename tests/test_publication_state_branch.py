@@ -396,11 +396,43 @@ class PublicationStateBranchTests(unittest.TestCase):
         before = self.head()
         def verify(url, data):
             return module.verify_public_files(url, data, attempts=1, allow_loopback=True)
-        with self.assertRaisesRegex(RuntimeError, "verification failed"):
+        with self.assertRaisesRegex(RuntimeError, "public data hash mismatch") as raised:
             module.acknowledge(self.work, "publication-state", before,
                                marker["generation_id"], base, verifier=verify)
+        message = str(raised.exception)
+        self.assertIn("body_bytes=", message)
+        self.assertIn("expected_sha256=", message)
+        self.assertIn("observed_sha256=", message)
+        self.assertNotIn("old-site-version", message)
         self.assertEqual(self.head(), before)
         self.assertEqual(self.checkpoint()[1]["state"], "PENDING_PUBLICATION")
+
+    def test_http_status_mismatch_reports_only_status_without_response_body(self):
+        bundle = module.read_working_bundle(self.work)
+        base, directory = self.serve(bundle)
+        (directory / "data/source-status.json").unlink()
+
+        with self.assertRaisesRegex(
+                RuntimeError, r"HTTP status mismatch: data/source-status.json status=404") as raised:
+            module.verify_public_files(base, bundle, attempts=1, allow_loopback=True)
+
+        message = str(raised.exception)
+        self.assertNotIn("Not Found", message)
+        self.assertNotIn("<!DOCTYPE", message)
+
+    def test_oversized_http_body_reports_bounded_byte_count_without_body(self):
+        bundle = module.read_working_bundle(self.work)
+        base, _ = self.serve(bundle)
+
+        with mock.patch.object(module, "MAX_FILE_BYTES", 8):
+            with self.assertRaisesRegex(
+                    RuntimeError,
+                    r"public data body too large: data/source-status.json body_bytes_at_least=9 max_bytes=8") as raised:
+                module.verify_public_files(base, bundle, attempts=1, allow_loopback=True)
+
+        message = str(raised.exception)
+        self.assertNotIn("baseline:", message)
+        self.assertNotIn("source-status.json\\n", message)
 
     def test_retry_of_exact_acknowledged_pending_commit_rechecks_real_http_without_new_commit(self):
         self.save_pending()

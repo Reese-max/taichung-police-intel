@@ -17,7 +17,7 @@ import subprocess
 import tempfile
 import time
 from datetime import datetime, timezone
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, build_opener
 
@@ -280,16 +280,40 @@ def verify_public_files(base_url, bundle, *, attempts=3, delay=2, allow_loopback
         try:
             for relative, wanted in expected.items():
                 suffix = relative.removeprefix("apps/web/public/")
-                with opener.open(base_url.rstrip("/") + "/" + suffix, timeout=15) as response:
+                try:
+                    response = opener.open(base_url.rstrip("/") + "/" + suffix, timeout=15)
+                except HTTPError as error:
+                    error.close()
+                    raise RuntimeError(
+                        f"public data HTTP status mismatch: {suffix} status={error.code}"
+                    ) from None
+                with response:
+                    if response.status != 200:
+                        raise RuntimeError(
+                            f"public data HTTP status mismatch: {suffix} status={response.status}"
+                        )
                     data = response.read(MAX_FILE_BYTES + 1)
-                    if response.status != 200 or len(data) > MAX_FILE_BYTES or digest(data) != wanted:
-                        raise RuntimeError(f"public data hash/status mismatch: {suffix}")
-                    verified[relative] = digest(data)
+                    if len(data) > MAX_FILE_BYTES:
+                        raise RuntimeError(
+                            f"public data body too large: {suffix} "
+                            f"body_bytes_at_least={len(data)} max_bytes={MAX_FILE_BYTES}"
+                        )
+                    observed = digest(data)
+                    if observed != wanted:
+                        raise RuntimeError(
+                            f"public data hash mismatch: {suffix} body_bytes={len(data)} "
+                            f"expected_sha256={wanted} observed_sha256={observed}"
+                        )
+                    verified[relative] = observed
             return {"generation_id": generation(bundle), "verified_files": verified,
                     "verified_at": datetime.now(timezone.utc).isoformat(),
                     "base_url": base_url, "attempt": attempt + 1}
-        except (OSError, URLError, RuntimeError) as error:
+        except RuntimeError as error:
             last_error = str(error)
+            if attempt + 1 < attempts:
+                time.sleep(delay)
+        except (OSError, URLError) as error:
+            last_error = f"public data request failed: {type(error).__name__}"
             if attempt + 1 < attempts:
                 time.sleep(delay)
     raise RuntimeError(f"public data verification failed: {last_error}")
