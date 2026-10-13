@@ -4,11 +4,11 @@
 
 **First-phase task:** help people query public notices, save their chosen area, topic, road or keywords in the same browser, and see supported changes when reopening the site. The deployed baseline remains the five-source Taichung council／government evidence journey. Public query and personal tracking are deployed; formal content admission and measured benefit require separate evidence.
 
-## Current GovIntel state (2026-10-06)
+## Last dated production verification (2026-10-07)
 
-The [competition entry](./docs/govintel/competition-2026/README.md), [current status](./docs/govintel/competition-2026/CURRENT_STATUS.md) and [dated acceptance bundle](./docs/govintel/competition-2026/closure-20261006/README.md) distinguish deployment, data admission, model quality and human results.
+The [competition entry](./docs/govintel/competition-2026/README.md), [dated status](./docs/govintel/competition-2026/CURRENT_STATUS.md) and [PR #177 acceptance bundle](./docs/govintel/competition-2026/closure-20261007-pr177/README.md) distinguish deployment, data admission, model quality and human results. The earlier [2026-10-06 release package](./docs/govintel/competition-2026/closure-20261006/README.md) remains a separate historical snapshot. After PR #177, [PR #178](https://github.com/Reese-max/taichung-police-intel/pull/178) merged at `768aaa1`; its [publication run 37639619665](https://github.com/Reese-max/taichung-police-intel/actions/runs/37639619665) completed successfully. These are dated receipts, not a readback of today's live service.
 
-Public query and browser-only tracking are deployed. The `5e2298c…` release has anonymous five-file hash readback, Pages/Worker binding and 15 actual Chromium production checks. Formal source admission remains **RIGHTS_BLOCKED**: `deployment_verified=true` and `production_verified=false`. Correct refusals do not establish a positive official-content query or semantic AI benefit.
+Public query and browser-only tracking are deployed. The pinned PR #177 acceptance records code `b6a6025…`, anonymous five-file hash readback, Pages/Worker binding and 15 actual Chromium production checks. At that acceptance, formal source admission was **RIGHTS_BLOCKED** (`deployment_verified=true`, `production_verified=false`). PR #178 explicitly claims no new source admission, rights approval, semantic-AI trial or human trial; its successful publication run does not establish those outcomes. Correct refusals do not establish a positive official-content query or semantic AI benefit.
 
 D1's fixed 112Y12M/2023-12 CSV and all 29 Taichung districts are verified; production UI values are accepted as historical background. D2 metadata is readable, but its official resource bytes return 403; records and CRS remain unknown. Police/traffic/city/fire candidates are unpromoted; seven valid observation days alone do not approve rights or independent coverage.
 
