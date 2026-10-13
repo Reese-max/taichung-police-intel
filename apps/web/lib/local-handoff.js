@@ -161,10 +161,11 @@ export function syncLocalHandoff(state, items, publication = {}, observedAt = ne
     const current = currentItems.get(watch.identity);
     if (!current) continue;
     const knownObservedMs = Math.max(Date.parse(result.last_publication?.observed_at) || 0,
+      Date.parse(watch.last_source_observed_at) || 0,
       ...watch.invalidations.map((entry) => Date.parse(entry.detected_at) || 0));
     const knownPredecessor = watch.invalidations.some((entry) => {
       const before = entry.before || {};
-      return entry.resolved_in_handoff_id && before.version === current.source_version
+      return before.version === current.source_version
         && (before.normalized_sha256 || before.document_version_id)
         && (!before.normalized_sha256 || before.normalized_sha256 === current.source_sha256)
         && (!before.document_version_id || before.document_version_id === current.source_document_version);
@@ -172,6 +173,7 @@ export function syncLocalHandoff(state, items, publication = {}, observedAt = ne
     // A retained predecessor at the same observation time is not a new source
     // correction. A later observed publication may legitimately revert it.
     if (observedMs < knownObservedMs || (knownPredecessor && observedMs === knownObservedMs)) continue;
+    watch.last_source_observed_at = at;
     watch.title = current.title;
     watch.official_url = current.official_url;
     watch.source_version = current.source_version;
@@ -186,12 +188,21 @@ export function syncLocalHandoff(state, items, publication = {}, observedAt = ne
       && (watch.tracked_document_version || watch.source_document_version)
       && current.source_document_version !== (watch.tracked_document_version || watch.source_document_version));
     if (!versionChanged && !hashChanged && !documentChanged) continue;
-    const invalidationId = invalidationIdFor(
+    let invalidationId = invalidationIdFor(
       watch.watch_id,
       current.source_version,
       current.source_sha256,
       current.source_document_version,
     );
+    const latest = watch.invalidations.at(-1);
+    if (latest && !latest.resolved_in_handoff_id
+      && latest.after?.version === current.source_version
+      && latest.after?.normalized_sha256 === current.source_sha256
+      && latest.after?.document_version_id === current.source_document_version) {
+      invalidationId = latest.invalidation_id;
+    } else if (watch.invalidations.some((entry) => entry.invalidation_id === invalidationId)) {
+      invalidationId = `${invalidationId}|${encodeURIComponent(at)}`;
+    }
     if (!watch.invalidations.some((entry) => entry.invalidation_id === invalidationId)) {
       watch.invalidations.push({
         invalidation_id: invalidationId,

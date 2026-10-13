@@ -600,6 +600,75 @@ class HandoffStateTests(unittest.TestCase):
         self.assertEqual(final["handoffs"][:2], [first, second])
         self.assertEqual(third["items"][0]["source_document_version"], "DOCV-OLD")
 
+    def test_equal_time_detail_predecessor_cannot_clear_pending_review(self):
+        pending, first, watch = self._detail_recheck_revision()
+        old = dict(item(), document_version_id="DOCV-OLD")
+        original = json.dumps(pending, sort_keys=True)
+        retained = sync_with_detail_rechecks(pending, [{"source_id": "S-001", "stable_key": "event-1",
+            "classification": {"review_required": True, "status": "MATERIAL_CHANGE", "observed_at": T1,
+                "before": {"document_version_id": "DOCV-PREDECESSOR"}, "after": {"document_version_id": "DOCV-OLD"}}}], observed_at=T1)
+        self.assertEqual(json.dumps(pending, sort_keys=True), original)
+        self.assertEqual(len(retained["watch_items"][watch["watch_id"]]["invalidations"]), 1)
+        with self.assertRaisesRegex(ValueError, "known document revision"):
+            confirm_handoff(retained, current_items={old["identity"]: old}, publication={}, generated_at=T2, confirmed_at=T2)
+
+    def test_unchanged_publication_advances_the_detail_replay_clock(self):
+        revised, _, watch = self._detail_recheck_revision()
+        current = dict(item(), document_version_id="DOCV-NEW")
+        reviewed, _ = confirm_handoff(revised, current_items={current["identity"]: current}, publication={}, generated_at=T1, confirmed_at=T1)
+        later = "2026-09-04T09:00:00+08:00"
+        observed = sync_with_publication(reviewed, previous_items={current["identity"]: current}, current_items={current["identity"]: current}, events=[], observed_at=later, collection_run_id="UNCHANGED")
+        retained = sync_with_detail_rechecks(observed, [{"source_id": "S-001", "stable_key": "event-1",
+            "classification": {"review_required": True, "status": "MATERIAL_CHANGE", "observed_at": T2,
+                "before": {"document_version_id": "DOCV-PREDECESSOR"}, "after": {"document_version_id": "DOCV-OLD"}}}], observed_at=later)
+        self.assertEqual(len(retained["watch_items"][watch["watch_id"]]["invalidations"]), 1)
+        old = dict(item(), document_version_id="DOCV-OLD")
+        with self.assertRaisesRegex(ValueError, "known document revision"):
+            confirm_handoff(retained, current_items={old["identity"]: old}, publication={}, generated_at=later, confirmed_at=later)
+
+    def test_later_publication_and_detail_recurrences_coalesce_only_pending_observations(self):
+        old = dict(item(), document_version_id="DOCV-OLD")
+        new = dict(item(digest="c" * 64), document_version_id="DOCV-NEW")
+        for path in ["publication", "detail"]:
+            with self.subTest(path=path):
+                new = dict(new, normalized_sha256="c" * 64 if path == "publication" else old["normalized_sha256"])
+                state, watch, _ = add_watch(empty_state(), old, created_at=T0)
+                state, _ = confirm_handoff(state, current_items={old["identity"]: old}, publication={}, generated_at=T0, confirmed_at=T0)
+                def observe(current, previous, at):
+                    if path == "publication":
+                        return sync_with_publication(state, previous_items={previous["identity"]: previous}, current_items={current["identity"]: current}, events=[], observed_at=at, collection_run_id="CYCLE")
+                    return sync_with_detail_rechecks(state, [{"source_id": "S-001", "stable_key": "event-1", "classification": {
+                        "review_required": True, "status": "MATERIAL_CHANGE", "observed_at": at,
+                        "before": {"document_version_id": previous["document_version_id"]}, "after": {"document_version_id": current["document_version_id"]}}}], observed_at=at)
+                for current, previous, at in [(new, old, T1), (old, new, T2)]:
+                    state = observe(current, previous, at)
+                    state, _ = confirm_handoff(state, current_items={current["identity"]: current}, publication={}, generated_at=at, confirmed_at=at)
+                original_handoffs = json.loads(json.dumps(state["handoffs"]))
+                first_receipt = state["watch_items"][watch["watch_id"]]["invalidations"][0]["resolved_in_handoff_id"]
+                later = "2026-09-04T09:00:00+08:00"
+                repeated = "2026-09-05T09:00:00+08:00"
+                state = observe(new, old, later)
+                state = observe(new, old, repeated)
+                self.assertEqual(len(state["watch_items"][watch["watch_id"]]["invalidations"]), 3)
+                final, handoff = confirm_handoff(state, current_items={new["identity"]: new}, publication={}, generated_at=repeated, confirmed_at=repeated)
+                self.assertEqual(final["handoffs"][:3], original_handoffs)
+                self.assertEqual(handoff["items"][0]["source_document_version"], "DOCV-NEW")
+                self.assertEqual(final["watch_items"][watch["watch_id"]]["invalidations"][0]["resolved_in_handoff_id"], first_receipt)
+
+    def test_unchanged_bound_detail_advances_the_retained_receipt_clock(self):
+        revised, _, watch = self._detail_recheck_revision()
+        current = dict(item(), document_version_id="DOCV-NEW")
+        reviewed, _ = confirm_handoff(revised, current_items={current["identity"]: current}, publication={}, generated_at=T1, confirmed_at=T1)
+        later = "2026-09-04T09:00:00+08:00"
+        observed = sync_with_detail_rechecks(reviewed, [{"source_id": "S-001", "stable_key": "event-1",
+            "classification": {"review_required": False, "status": "UNCHANGED", "observed_at": later,
+                "before": {"document_version_id": "DOCV-NEW"}, "after": {"document_version_id": "DOCV-NEW"}}}], observed_at=later)
+        self.assertEqual(observed["watch_items"][watch["watch_id"]]["last_source_observed_at"], later)
+        retained = sync_with_detail_rechecks(observed, [{"source_id": "S-001", "stable_key": "event-1",
+            "classification": {"review_required": True, "status": "MATERIAL_CHANGE", "observed_at": T2,
+                "before": {"document_version_id": "DOCV-PREDECESSOR"}, "after": {"document_version_id": "DOCV-OLD"}}}], observed_at=later)
+        self.assertEqual(len(retained["watch_items"][watch["watch_id"]]["invalidations"]), 1)
+
     def test_warning_falls_back_to_the_invalidation_record_for_a_stored_claim(self):
         revised, first_handoff, _ = self._detail_recheck_revision()
         stripped = dict(first_handoff)

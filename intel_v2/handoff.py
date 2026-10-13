@@ -178,6 +178,8 @@ def _retained_predecessor(watch: dict[str, Any], version: int, digest: str | Non
                           document: str | None, observed_at: str, publication_at: str | None = None) -> bool:
     revisions = watch.get("invalidations", [])
     known_times = [row["detected_at"] for row in revisions if row.get("detected_at")]
+    if watch.get("last_source_observed_at"):
+        known_times.append(watch["last_source_observed_at"])
     if publication_at:
         known_times.append(publication_at)
     if not known_times:
@@ -192,7 +194,7 @@ def _retained_predecessor(watch: dict[str, Any], version: int, digest: str | Non
         before = row.get("before") or {}
         before_version = before.get("version", row.get("source_version", watch.get("tracked_version")))
         known_hash, known_document = before.get("normalized_sha256"), before.get("document_version_id")
-        if (row.get("resolved_in_handoff_id") and before_version == version
+        if (before_version == version
                 and (known_hash or known_document)
                 and (not known_hash or digest is None or known_hash == digest)
                 and (not known_document or known_document == document)):
@@ -234,6 +236,8 @@ def sync_with_publication(
         if current and _retained_predecessor(watch, current_version, current.get("normalized_sha256"),
                 current.get("document_version_id"), stamp, publication_at):
             continue
+        if current:
+            watch["last_source_observed_at"] = stamp
         if current_version == tracked_version:
             changed = changed or bool(current.get("normalized_sha256") and watch.get("tracked_sha256")
                 and current["normalized_sha256"] != watch["tracked_sha256"])
@@ -251,6 +255,15 @@ def sync_with_publication(
                  (current or {}).get("document_version_id")]
             ).upper()[:20]
             known = {entry.get("invalidation_id") for entry in watch["invalidations"]}
+            latest = watch["invalidations"][-1] if watch["invalidations"] else None
+            latest_after = (latest or {}).get("after") or {}
+            if (latest and not latest.get("resolved_in_handoff_id")
+                    and latest_after.get("version") == after_version
+                    and latest_after.get("normalized_sha256") == after_hash
+                    and latest_after.get("document_version_id") == (current or {}).get("document_version_id")):
+                invalidation_id = latest["invalidation_id"]
+            elif invalidation_id in known:
+                invalidation_id = "INV-" + _sha([invalidation_id, stamp]).upper()[:20]
             if invalidation_id not in known:
                 before = previous_items.get(identity) or {}
                 watch["invalidations"].append(
@@ -361,6 +374,16 @@ def sync_with_detail_rechecks(
         if not isinstance(classification, dict):
             raise ValueError("detail recheck classification is required")
         if not classification.get("review_required"):
+            identity = f"{outcome.get('source_id')}:{outcome.get('stable_key')}"
+            watch = next((item for item in result["watch_items"].values() if item.get("identity") == identity), None)
+            after = classification.get("after") or {}
+            latest = (watch.get("invalidations") or [{}])[-1] if watch else {}
+            known_document = (latest.get("after") or {}).get("document_version_id") or (watch or {}).get("tracked_document_version")
+            if watch and isinstance(after, dict) and known_document and after.get("document_version_id") == known_document:
+                observed = _timestamp(classification.get("observed_at") or stamp)
+                if not _retained_predecessor(watch, watch.get("tracked_version"), None, known_document, observed,
+                        (result.get("last_publication") or {}).get("observed_at")):
+                    watch["last_source_observed_at"] = observed
             continue
         source_id = outcome.get("source_id")
         stable_key = outcome.get("stable_key")
@@ -378,10 +401,18 @@ def sync_with_detail_rechecks(
         if not isinstance(after_version, str) or not after_version.strip():
             raise ValueError("detail recheck after document version is required")
         detail_observed = _timestamp(classification.get("observed_at") or stamp)
-        if _retained_predecessor(watch, watch.get("tracked_version"), None, after_version, detail_observed):
+        if _retained_predecessor(watch, watch.get("tracked_version"), None, after_version, detail_observed,
+                (result.get("last_publication") or {}).get("observed_at")):
             continue
+        watch["last_source_observed_at"] = detail_observed
         invalidation_id = "INV-" + _sha([watch["watch_id"], "DETAIL_RECHECK", after_version]).upper()[:20]
         known = {entry.get("invalidation_id") for entry in watch["invalidations"]}
+        latest = watch["invalidations"][-1] if watch["invalidations"] else None
+        if (latest and not latest.get("resolved_in_handoff_id")
+                and (latest.get("after") or {}).get("document_version_id") == after_version):
+            invalidation_id = latest["invalidation_id"]
+        elif invalidation_id in known:
+            invalidation_id = "INV-" + _sha([invalidation_id, detail_observed]).upper()[:20]
         if invalidation_id not in known:
             watch["invalidations"].append(
                 {

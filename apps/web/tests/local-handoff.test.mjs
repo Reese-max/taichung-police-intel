@@ -207,6 +207,25 @@ for (const corrected of [item(1, "corrected-hash"), { ...item(), source_document
   });
 }
 
+test("later source recurrence creates a new receipt and repeated pending observations coalesce", () => {
+  const corrected = { ...item(1, "corrected-hash"), source_document_version: "DOCV-CORRECTED" };
+  let state = confirmLocalHandoff(addLocalWatch(emptyLocalHandoff(), item(), T0), [item()], publication(), T0);
+  for (const [row, at] of [[corrected, T1], [item(), "2026-09-22T01:00:00+08:00"]]) {
+    state = confirmLocalHandoff(syncLocalHandoff(state, [row], publication(), at), [row], { ...publication(), generated_at: at }, at);
+  }
+  const receipt = Object.values(state.watch_items)[0].invalidations[0].resolved_in_handoff_id;
+  const at = "2026-09-23T01:00:00+08:00", later = "2026-09-24T01:00:00+08:00";
+  const pending = syncLocalHandoff(state, [corrected], publication(), at);
+  const repeated = syncLocalHandoff(pending, [corrected], publication(), later);
+  const retained = syncLocalHandoff(repeated, [item()], publication(), at);
+  assert.equal(Object.values(retained.watch_items)[0].invalidations.length, 3);
+  assert.throws(() => confirmLocalHandoff(retained, [item()], publication(), later), /較新|版本|雜湊/);
+  const final = confirmLocalHandoff(retained, [corrected], { ...publication(), generated_at: later }, later);
+  assert.deepEqual(final.handoffs.slice(0, 3), state.handoffs);
+  assert.equal(final.handoffs[3].items[0].source_sha256, "corrected-hash");
+  assert.equal(Object.values(final.watch_items)[0].invalidations[0].resolved_in_handoff_id, receipt);
+});
+
 test("failed or partial source shows a per-watch gap and never resolves local tracking", () => {
   const watched = addLocalWatch(emptyLocalHandoff(), item(), T0);
   const noChanges = syncLocalHandoff(watched, [], publication(), T1);
