@@ -10,6 +10,7 @@ import {
   upstreamOperatingStateLabel,
 } from "../lib/system-health-view.mjs";
 import { isHealthyStaleSource } from "../lib/source-status.js";
+import { fetchBoundPublication } from "../lib/publication-response.js";
 import {
   addLocalWatch,
   confirmLocalHandoff,
@@ -627,7 +628,7 @@ export default function V2DailyDashboard() {
   useEffect(() => {
     let cancelled = false;
 
-    fetchJson(BRIEF_URL)
+    fetchBoundPublication(BRIEF_URL)
       .then((data) => {
         if (cancelled) return;
         if (
@@ -722,7 +723,7 @@ export default function V2DailyDashboard() {
     ? activeView.tracking_items.slice(0, 5)
     : [];
   const localTrackingItems = localHandoff
-    ? projectLocalTracking(localHandoff, currentItems)
+    ? projectLocalTracking(localHandoff, currentItems, sourceStatus)
     : [];
   const localByWatchId = new Map(localTrackingItems.map((item) => [item.watch_id, item]));
   const trackingItems = [

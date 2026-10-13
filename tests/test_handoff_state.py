@@ -15,6 +15,7 @@ from intel_v2.handoff import (
     find_handoff,
     handoff_markdown,
     handoff_review_warnings,
+    set_watch_status,
     sync_with_publication,
     sync_with_detail_rechecks,
     tracking_projection,
@@ -60,6 +61,28 @@ class HandoffStateTests(unittest.TestCase):
         self.assertFalse(created_again)
         self.assertEqual(first["watch_id"], second["watch_id"])
         self.assertEqual(len(same_state["watch_items"]), 1)
+
+    def test_terminal_watch_status_survives_publication_and_detail_changes(self):
+        for status in ["RESOLVED", "DISMISSED"]:
+            with self.subTest(status=status):
+                first = dict(item(), document_version_id="DOCV-OLD")
+                state, watch, _ = add_watch(empty_state(), first, created_at=T0)
+                state, confirmed = confirm_handoff(state, current_items={first["identity"]: first},
+                    publication={}, generated_at=T0, confirmed_at=T0)
+                terminal = set_watch_status(state, watch["watch_id"], status, updated_at=T1)
+                current = dict(item(version=2), document_version_id="DOCV-NEW")
+                synced = sync_with_publication(terminal, previous_items={first["identity"]: first},
+                    current_items={current["identity"]: current}, events=[], observed_at=T1, collection_run_id="RUN-2")
+                self.assertEqual(synced["watch_items"][watch["watch_id"]]["status"], status)
+                detailed = sync_with_detail_rechecks(synced, [{"source_id": first["source_id"],
+                    "stable_key": first["stable_key"], "classification": {"review_required": True,
+                    "status": "MATERIAL_CHANGE", "before": {"document_version_id": "DOCV-NEW"},
+                    "after": {"document_version_id": "DOCV-LATER"}}}], observed_at=T2)
+                self.assertEqual(detailed["watch_items"][watch["watch_id"]]["status"], status)
+                rows, total = tracking_projection(detailed, current_items={current["identity"]: current}, events=[], source_status={})
+                self.assertEqual((rows, total), ([], 0))
+                self.assertEqual(detailed["handoffs"], [confirmed])
+                self.assertEqual(len(detailed["watch_items"][watch["watch_id"]]["invalidations"]), 2)
 
     def test_source_revision_preserves_before_after_and_reopens_review(self):
         state, watch, _ = add_watch(empty_state(), item(), created_at=T0)
@@ -364,6 +387,7 @@ class HandoffStateTests(unittest.TestCase):
         self.assertEqual(warnings[0]["watch_id"], watch["watch_id"])
         markdown = handoff_markdown(first_handoff, warnings)
         self.assertIn("c" * 64, markdown)
+        self.assertIn("a" * 64, markdown)
         self.assertIn("NEEDS_REVIEW", markdown)
         self.assertIn(claim_id_for(item()["identity"], 1), markdown)
 
@@ -383,6 +407,18 @@ class HandoffStateTests(unittest.TestCase):
         self.assertEqual(handoff_review_warnings(confirmed_v2, second_handoff), [])
         self.assertEqual(confirmed_v2["handoffs"][0]["items"][0]["source_version"], 1)
         self.assertEqual(second_handoff["items"][0]["source_version"], 2)
+
+    def test_retained_source_cannot_confirm_away_a_known_newer_version_or_hash(self):
+        revised, first_handoff, changed, _ = self._confirmed_then_revised()
+        original = json.dumps(revised, sort_keys=True)
+        for retained in [item(), dict(changed, normalized_sha256="c" * 64)]:
+            with self.subTest(version=retained["version_no"]):
+                with self.assertRaisesRegex(ValueError, "known source revision"):
+                    confirm_handoff(revised, current_items={retained["identity"]: retained},
+                        publication={"collection_run_id": "RETAINED"}, generated_at=T2, confirmed_at=T2)
+                self.assertEqual(json.dumps(revised, sort_keys=True), original)
+                self.assertEqual(revised["handoffs"][0], first_handoff)
+                self.assertEqual(len(handoff_review_warnings(revised, first_handoff)), 1)
 
     def test_export_command_publishes_warning_and_exact_evidence(self):
         revised, first_handoff, _, _ = self._confirmed_then_revised()
@@ -475,6 +511,40 @@ class HandoffStateTests(unittest.TestCase):
         self.assertNotIn("vNone", markdown)
         self.assertIn("DOCV-NEW", markdown)
         self.assertIn("source v1", markdown)
+
+    def test_retained_document_version_cannot_clear_a_detail_recheck(self):
+        revised, first_handoff, _ = self._detail_recheck_revision()
+        old = dict(item(), document_version_id="DOCV-OLD")
+        original = json.dumps(revised, sort_keys=True)
+        with self.assertRaisesRegex(ValueError, "known document revision"):
+            confirm_handoff(revised, current_items={old["identity"]: old}, publication={},
+                generated_at=T2, confirmed_at=T2)
+        self.assertEqual(json.dumps(revised, sort_keys=True), original)
+        current = dict(old, document_version_id="DOCV-NEW")
+        confirmed, latest = confirm_handoff(revised, current_items={current["identity"]: current},
+            publication={}, generated_at=T2, confirmed_at=T2)
+        self.assertEqual(latest["items"][0]["source_document_version"], "DOCV-NEW")
+        self.assertEqual(confirmed["handoffs"][0], first_handoff)
+
+    def test_reviewed_document_revision_still_refuses_retained_old_document(self):
+        revised, first_handoff, watch = self._detail_recheck_revision()
+        current = dict(item(), document_version_id="DOCV-NEW")
+        confirmed, second = confirm_handoff(revised, current_items={current["identity"]: current},
+            publication={}, generated_at=T2, confirmed_at=T2)
+        original = json.dumps(confirmed, sort_keys=True)
+        old = dict(current, document_version_id="DOCV-OLD")
+        with self.assertRaisesRegex(ValueError, "known document revision"):
+            confirm_handoff(confirmed, current_items={old["identity"]: old}, publication={},
+                generated_at=T2, confirmed_at=T2)
+        self.assertEqual(json.dumps(confirmed, sort_keys=True), original)
+        later = dict(item(version=2), document_version_id="DOCV-LATER")
+        synced = sync_with_publication(confirmed, previous_items={current["identity"]: current},
+            current_items={later["identity"]: later}, events=[], observed_at=T2, collection_run_id="RUN-3")
+        updated, third = confirm_handoff(synced, current_items={later["identity"]: later},
+            publication={}, generated_at=T2, confirmed_at=T2)
+        self.assertEqual(third["items"][0]["source_document_version"], "DOCV-LATER")
+        self.assertEqual(updated["handoffs"][:2], [first_handoff, second])
+        self.assertEqual(updated["watch_items"][watch["watch_id"]]["invalidations"][0]["resolved_in_handoff_id"], second["brief_id"])
 
     def test_warning_falls_back_to_the_invalidation_record_for_a_stored_claim(self):
         revised, first_handoff, _ = self._detail_recheck_revision()

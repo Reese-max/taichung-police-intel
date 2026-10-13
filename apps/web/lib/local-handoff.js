@@ -60,8 +60,8 @@ function claimIdFor(identity, version) {
   return `CLAIM-${encodeURIComponent(`${identity}#v${version}`)}`;
 }
 
-function invalidationIdFor(watchId, version, sourceHash) {
-  return `INV-${encodeURIComponent(`${watchId}|${version}|${sourceHash || "UNKNOWN"}`)}`;
+function invalidationIdFor(watchId, version, sourceHash, documentVersion) {
+  return `INV-${encodeURIComponent(`${watchId}|${version}|${sourceHash || "UNKNOWN"}|${documentVersion || "UNKNOWN"}`)}`;
 }
 
 function itemsByIdentity(items) {
@@ -141,6 +141,7 @@ export function addLocalWatch(state, item, createdAt = new Date()) {
     reason_code: "MANUAL",
     tracked_version: current.source_version,
     tracked_sha256: current.source_sha256,
+    tracked_document_version: current.source_document_version,
     last_reviewed_version: null,
     last_reviewed_sha256: null,
     last_handoff_id: null,
@@ -167,11 +168,15 @@ export function syncLocalHandoff(state, items, publication = {}, observedAt = ne
       && watch.tracked_sha256
       && current.source_sha256 !== watch.tracked_sha256,
     );
-    if (!versionChanged && !hashChanged) continue;
+    const documentChanged = Boolean(current.source_document_version
+      && (watch.tracked_document_version || watch.source_document_version)
+      && current.source_document_version !== (watch.tracked_document_version || watch.source_document_version));
+    if (!versionChanged && !hashChanged && !documentChanged) continue;
     const invalidationId = invalidationIdFor(
       watch.watch_id,
       current.source_version,
       current.source_sha256,
+      current.source_document_version,
     );
     if (!watch.invalidations.some((entry) => entry.invalidation_id === invalidationId)) {
       watch.invalidations.push({
@@ -182,15 +187,17 @@ export function syncLocalHandoff(state, items, publication = {}, observedAt = ne
         before: {
           version: watch.tracked_version,
           normalized_sha256: watch.tracked_sha256,
+          document_version_id: watch.tracked_document_version || watch.source_document_version,
         },
         after: {
           version: current.source_version,
           normalized_sha256: current.source_sha256,
+          document_version_id: current.source_document_version,
           official_url: current.official_url,
         },
       });
     }
-    watch.status = "NEEDS_REVIEW";
+    if (ACTIVE_STATUSES.has(watch.status)) watch.status = "NEEDS_REVIEW";
     watch.updated_at = at;
   }
   result.last_publication = {
@@ -201,13 +208,22 @@ export function syncLocalHandoff(state, items, publication = {}, observedAt = ne
   return result;
 }
 
-export function projectLocalTracking(state, items) {
+export function projectLocalTracking(state, items, sourceStatus = {}) {
   const currentItems = itemsByIdentity(items);
+  const sources = new Map((Array.isArray(sourceStatus?.sources) ? sourceStatus.sources : [])
+    .filter((source) => source && typeof source.source_id === "string")
+    .map((source) => [source.source_id, source]));
   return Object.values(validateLocalHandoff(state).watch_items)
     .filter((watch) => ACTIVE_STATUSES.has(watch.status))
     .map((watch) => {
       const current = currentItems.get(watch.identity) || watch;
       const invalidation = watch.invalidations.at(-1) || null;
+      const source = sources.get(watch.source_id);
+      const gaps = Array.isArray(source?.intelligence_gaps)
+        ? source.intelligence_gaps.filter((gap) => typeof gap === "string") : [];
+      const action = watch.status === "NEEDS_REVIEW"
+        ? "核對新舊官方版本，再確認是否建立下一版交班摘要。"
+        : "確認目前官方內容與業管狀態，必要時建立交班版本。";
       return {
         ...watch,
         tracking_id: `TRACK-${watch.watch_id}`,
@@ -215,9 +231,9 @@ export function projectLocalTracking(state, items) {
         what_changed: watch.status === "NEEDS_REVIEW"
           ? "官方來源版本已變更，需重新核對；既有交班版本仍保留。"
           : "此項由承辦人加入跨日追蹤，尚未標記為已處理。",
-        recommended_action: watch.status === "NEEDS_REVIEW"
-          ? "核對新舊官方版本，再確認是否建立下一版交班摘要。"
-          : "確認目前官方內容與業管狀態，必要時建立交班版本。",
+        recommended_action: gaps.length ? `來源資料缺口：${gaps.join("；")}。${action}` : action,
+        source_health: source?.source_health || null,
+        source_gaps: gaps,
         watch_status: watch.status,
         official_url: current.official_url || watch.official_url,
         source_version: current.source_version || watch.tracked_version,
@@ -245,6 +261,20 @@ export function confirmLocalHandoff(state, items, publication = {}, confirmedAt 
     const current = currentItems.get(watch?.identity);
     if (!watch || !ACTIVE_STATUSES.has(watch.status) || !current) {
       throw new Error(`目前沒有可驗證的來源版本：${watchId}`);
+    }
+    const revisions = watch.invalidations.map((entry) => entry.after || {});
+    const knownVersion = Math.max(watch.tracked_version || 0, watch.source_version || 0,
+      ...revisions.map((row) => Number.isInteger(row.version) ? row.version : 0));
+    const known = revisions.filter((row) => row.version === knownVersion).at(-1);
+    const knownHash = known?.normalized_sha256
+      || (watch.tracked_version === knownVersion ? watch.tracked_sha256 : null);
+    const knownDocument = known?.document_version_id
+      || (watch.tracked_version === knownVersion ? watch.tracked_document_version : null);
+    if (current.source_version < knownVersion
+      || (current.source_version === knownVersion && knownHash && current.source_sha256 !== knownHash)
+      || (current.source_version === knownVersion && knownDocument
+        && current.source_document_version !== knownDocument)) {
+      throw new Error(`已知較新來源版本或不同雜湊，請重新核對後再確認：${watchId}`);
     }
     return {
       watch_id: watchId,
@@ -284,10 +314,11 @@ export function confirmLocalHandoff(state, items, publication = {}, confirmedAt 
     watch.updated_at = confirmed;
     watch.tracked_version = entry.source_version;
     watch.tracked_sha256 = entry.source_sha256;
+    watch.tracked_document_version = currentItems.get(entry.identity).source_document_version;
     watch.last_reviewed_version = entry.source_version;
     watch.last_reviewed_sha256 = entry.source_sha256;
     watch.last_handoff_id = briefId;
-    for (const invalidation of watch.invalidations) invalidation.resolved_in_handoff_id = briefId;
+    for (const invalidation of watch.invalidations) invalidation.resolved_in_handoff_id ||= briefId;
   }
   result.last_updated_at = confirmed;
   return result;
@@ -309,7 +340,49 @@ export function latestHandoff(state) {
   return valid.handoffs.at(-1) || null;
 }
 
-export function handoffMarkdown(handoff) {
+export function localHandoffReviewWarnings(state, handoff = latestHandoff(state)) {
+  validateLocalHandoff(state);
+  if (!handoff) return [];
+  const warnings = [];
+  for (const item of handoff.items) {
+    const watch = state.watch_items[item.watch_id];
+    if (!watch || watch.identity !== item.identity) continue;
+    for (const invalidation of watch.invalidations) {
+      if (!invalidation || invalidation.resolved_in_handoff_id) continue;
+      const before = invalidation.before || {};
+      const after = invalidation.after || {};
+      if (before.version !== item.source_version) continue;
+      if (before.normalized_sha256 && item.source_sha256
+        && before.normalized_sha256 !== item.source_sha256) continue;
+      if (before.document_version_id && item.source_document_version
+        && before.document_version_id !== item.source_document_version) continue;
+      warnings.push({
+        warning: "NEEDS_REVIEW",
+        brief_id: handoff.brief_id,
+        brief_version: handoff.brief_version,
+        claim_id: item.claim_id,
+        watch_id: item.watch_id,
+        identity: item.identity,
+        invalidation_id: invalidation.invalidation_id,
+        reason: invalidation.reason,
+        detected_at: invalidation.detected_at,
+        confirmed_source_version: item.source_version,
+        confirmed_source_document_version: item.source_document_version,
+        confirmed_source_sha256: item.source_sha256,
+        latest_source_version: after.version || null,
+        latest_source_document_version: after.document_version_id || null,
+        latest_source_sha256: after.normalized_sha256 || null,
+        evidence_locator: item.evidence?.locator || null,
+        confirmed_evidence_url: item.evidence?.official_url || null,
+        latest_evidence_url: after.official_url || null,
+      });
+    }
+  }
+  return warnings.sort((left, right) => left.claim_id.localeCompare(right.claim_id)
+    || left.invalidation_id.localeCompare(right.invalidation_id));
+}
+
+export function handoffMarkdown(handoff, warnings = []) {
   if (!handoff) throw new Error("尚未確認交班版本");
   const lines = [
     `# GovIntel AI 本機交班摘要 v${handoff.brief_version}`,
@@ -318,6 +391,7 @@ export function handoffMarkdown(handoff) {
     `- generated_at: \`${handoff.generated_at}\``,
     `- confirmed_at: \`${handoff.confirmed_at}\``,
     `- collection_run_id: \`${handoff.publication?.collection_run_id || "UNKNOWN"}\``,
+    `- brief_sha256: \`${handoff.publication?.brief_sha256 || "UNKNOWN"}\``,
     "",
     "## 追蹤項目",
     "",
@@ -328,10 +402,26 @@ export function handoffMarkdown(handoff) {
       `- watch_id: \`${item.watch_id}\``,
       `- claim_id: \`${item.claim_id}\``,
       `- source version: \`v${item.source_version}\``,
+      `- source document version: \`${item.source_document_version || "UNKNOWN"}\``,
+      `- source_sha256: \`${item.source_sha256 || "UNKNOWN"}\``,
       `- evidence: [${item.evidence.official_url}](${item.evidence.official_url})`,
       `- locator: \`${item.evidence.locator}\``,
       "",
     );
+  }
+  if (warnings.length) {
+    lines.push("## 交班前提醒（來源更新，尚未重新確認）", "",
+      "以下提醒由目前追蹤狀態衍生；已確認的本版內容與證據沒有被改寫。", "");
+    for (const warning of warnings) {
+      lines.push(
+        `- \`${warning.warning}\` \`${warning.claim_id}\`（${warning.identity}）：本版記載 source v${warning.confirmed_source_version}，來源已更新至 v${warning.latest_source_version ?? "UNKNOWN"}，請核對後建立新版本。`,
+        `- confirmed source_sha256: \`${warning.confirmed_source_sha256 || "UNKNOWN"}\``,
+        `- latest source_sha256: \`${warning.latest_source_sha256 || "UNKNOWN"}\``,
+        `- latest source document version: \`${warning.latest_source_document_version || "UNKNOWN"}\``,
+        `- locator: \`${warning.evidence_locator || "UNKNOWN"}\``,
+        "",
+      );
+    }
   }
   return lines.join("\n");
 }
@@ -339,15 +429,16 @@ export function handoffMarkdown(handoff) {
 export function exportLocalHandoff(state, format = "markdown") {
   const handoff = latestHandoff(state);
   if (!handoff) throw new Error("尚未確認交班版本");
+  const review_warnings = localHandoffReviewWarnings(state, handoff);
   if (format === "json") {
     return {
-      content: JSON.stringify(handoff, null, 2),
+      content: JSON.stringify({ handoff, review_warnings }, null, 2),
       filename: `${handoff.brief_id}.json`,
       mime: "application/json",
     };
   }
   return {
-    content: handoffMarkdown(handoff),
+    content: handoffMarkdown(handoff, review_warnings),
     filename: `${handoff.brief_id}.md`,
     mime: "text/markdown;charset=utf-8",
   };
