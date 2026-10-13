@@ -1,0 +1,113 @@
+{
+  "as_of": "2026-10-05T12:00:00Z",
+  "evidenceConfig": {
+    "expectedPermissionsHash": "cd0e1c50b5a5409889485b67c2fae3027067603a4b8e2c9899a8bf6e2f3d6c76",
+    "expectedSourcePolicyHash": "ac10896d39249cad564cbc154ea20aff137fe2ca54ae4544a95c1295b787dcfb",
+    "formalAdmission": {
+      "blocked_sources": [],
+      "governance_hash": "9bc319e6099d04e33185788938dc2936c6ca70996bb3a160d0223c85cafec833",
+      "per_source": {},
+      "reason": null,
+      "status": "ADMITTED"
+    },
+    "sourcePolicy": {
+      "active_source_ids": [
+        "PDF-FIXTURE"
+      ],
+      "active_sources": [
+        {
+          "approved_origins": [
+            "https://pdf.example.invalid"
+          ],
+          "rights_retention_public_policy_refs": {
+            "excerpt_allowed": false,
+            "full_text_allowed": false,
+            "public_fields": [
+              "source_id",
+              "official_url"
+            ],
+            "review_required": false,
+            "rights_status": "VERIFIED_METADATA_PERMISSION"
+          },
+          "role": "PRIMARY_REFERENCE",
+          "source_id": "PDF-FIXTURE",
+          "status": "PRODUCTION_ACTIVE"
+        }
+      ],
+      "governance_binding": {
+        "governance_hash": "9bc319e6099d04e33185788938dc2936c6ca70996bb3a160d0223c85cafec833",
+        "prohibited_public_fields": [
+          "full_text",
+          "body",
+          "personal_data"
+        ]
+      },
+      "policy_hash": "ac10896d39249cad564cbc154ea20aff137fe2ca54ae4544a95c1295b787dcfb",
+      "policy_version": 1,
+      "schema_version": 2
+    },
+    "trustedPermissions": {
+      "approved_documents": [
+        {
+          "content_sha256": "a798ab412ef8b29a8c06ec5e93bb2f705bfc00343fe97e276d868784f13211b6",
+          "document_id": "ORIGINAL-PDF-FIXTURE",
+          "document_version": "v1",
+          "evidence_type": "WRITTEN_OFFICIAL",
+          "fetched_at": "2026-10-05T08:00:00Z",
+          "official_url": "https://pdf.example.invalid/original.pdf",
+          "origin": "https://pdf.example.invalid",
+          "parser_version": "pdf-text-v1:pypdf-6.19.0",
+          "published_at": "2026-10-04T08:00:00Z",
+          "requested_url": "https://pdf.example.invalid/original.pdf",
+          "schema_version": 1,
+          "source_id": "PDF-FIXTURE"
+        }
+      ],
+      "expires_at": "2026-10-06T09:00:00Z",
+      "governance_hash": "9bc319e6099d04e33185788938dc2936c6ca70996bb3a160d0223c85cafec833",
+      "policy_hash": "cd0e1c50b5a5409889485b67c2fae3027067603a4b8e2c9899a8bf6e2f3d6c76",
+      "policy_id": "FICTIONAL_OFFLINE_PDF_RIGHTS",
+      "policy_version": 1,
+      "reviewed_at": "2026-10-05T09:00:00Z",
+      "schema_version": 1,
+      "source_policy_hash": "ac10896d39249cad564cbc154ea20aff137fe2ca54ae4544a95c1295b787dcfb",
+      "sources": [
+        {
+          "derived_usage_allowed": true,
+          "excerpt_allowed": true,
+          "full_text_allowed": true,
+          "model_transmission_allowed": false,
+          "review_id": "FICTIONAL-PDF-REVIEW",
+          "review_required": false,
+          "reviewed_at": "2026-10-05T08:00:00Z",
+          "rights_status": "VERIFIED_DOCUMENT_PERMISSION",
+          "source_id": "PDF-FIXTURE",
+          "status": "APPROVED"
+        }
+      ]
+    }
+  },
+  "extractionPins": [
+    {
+      "binary_sha256": "95d062f2397fb22d035ad9f6c7b3a117de17eb8f066d5c410757b0b54dda7c50",
+      "document_binding_sha256": "79acf56b31b5369aedaa7a2b1e730039d6619606b34bcc7c3e313e52c7829434",
+      "receipt_sha256": "c5191dc33aa99c9ee6e1459c94c8f06144c4d10631e8ae57d26ec2b1870e6db6"
+    }
+  ],
+  "fixture_type": "ORIGINAL_SYNTHETIC_OFFLINE_ONLY",
+  "metadata": {
+    "content_sha256": "a798ab412ef8b29a8c06ec5e93bb2f705bfc00343fe97e276d868784f13211b6",
+    "document_id": "ORIGINAL-PDF-FIXTURE",
+    "document_version": "v1",
+    "evidence_type": "WRITTEN_OFFICIAL",
+    "fetched_at": "2026-10-05T08:00:00Z",
+    "official_url": "https://pdf.example.invalid/original.pdf",
+    "origin": "https://pdf.example.invalid",
+    "parser_version": "pdf-text-v1:pypdf-6.19.0",
+    "published_at": "2026-10-04T08:00:00Z",
+    "requested_url": "https://pdf.example.invalid/original.pdf",
+    "schema_version": 1,
+    "source_id": "PDF-FIXTURE"
+  },
+  "quote": "The offline answer is 16:00."
+}

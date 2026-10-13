@@ -51,7 +51,9 @@ SABOTAGE_FILES = (
     + ["scripts/verify-current-checkout.py",
        "docs/govintel/source-catalog.v2.json",
        "state/v2-shadow-state.json",
-       "requirements.txt"]
+       "requirements.txt",
+       "intel_v2/__init__.py",
+       "intel_v2/review.py"]
 )
 UNAVAILABLE_CAPABILITIES = (
     "event_fusion", "entity_registry", "answer_evidence_gate",
@@ -835,47 +837,124 @@ def run_browser_lanes(ctx: dict[str, Any], base: str, evidence: Path, chrome_pat
             run_v6_browser_checks(ctx, base, evidence / "v6-browser", chrome_path)], []
 
 
+def sabotage_result_matches(result_returncode: int, inner_receipt: dict[str, Any] | None,
+                            expected_failure_id: str) -> bool:
+    """Require the intended sabotage to fail after the verifier imports cleanly."""
+    if result_returncode == 0 or not isinstance(inner_receipt, dict):
+        return False
+    if inner_receipt.get("status") != "FAIL":
+        return False
+    checks = inner_receipt.get("checks")
+    if not isinstance(checks, list):
+        return False
+    statuses: dict[str, str] = {}
+    for check in checks:
+        if not isinstance(check, dict):
+            return False
+        check_id, status = check.get("id"), check.get("status")
+        if not isinstance(check_id, str) or not isinstance(status, str) or check_id in statuses:
+            return False
+        statuses[check_id] = status
+    failed_ids = {check_id for check_id, status in statuses.items() if status == "FAIL"}
+    return (
+        statuses.get("modules_loaded_from_checkout") == "PASS"
+        and statuses.get(expected_failure_id) == "FAIL"
+        and failed_ids == {expected_failure_id}
+    )
+
+
 def run_sabotage_check(root: Path, evidence_dir: Path) -> dict[str, Any]:
     tmp = Path(tempfile.mkdtemp(prefix="govintel-sabotage-"))
     evidence_dir.mkdir(parents=True, exist_ok=True)
     try:
-        for relative in SABOTAGE_FILES:
+        copied_file_hashes: dict[str, str] = {}
+        source_files = list(SABOTAGE_FILES)
+        support_package = root / "intel_v2"
+        if support_package.is_dir():
+            source_files.extend(
+                str(path.relative_to(root)) for path in support_package.rglob("*.py")
+            )
+        for relative in sorted(set(source_files)):
             source = root / relative
             if not source.is_file():
                 continue
             target = tmp / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
+            copied_file_hashes[relative] = sha256_bytes(source.read_bytes())
         for artifact in (root / "apps" / "web" / "public" / "data").iterdir():
             if artifact.is_file():
                 target = tmp / "apps" / "web" / "public" / "data" / artifact.name
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(artifact, target)
         victim = tmp / "scripts" / "query-store.py"
-        text = victim.read_text(encoding="utf-8")
+        original_bytes = victim.read_bytes()
+        text = original_bytes.decode("utf-8")
         marker = 'SOURCE_POLICY = ROOT / "scripts/source-policy.py"'
-        if marker not in text:
-            return check_record("sabotage_detection", False, "SOURCE_POLICY anchor not found in query-store.py copy")
-        victim.write_text(text.replace(marker, 'SOURCE_POLICY = ROOT / "scripts/source-policy-sabotaged.py"', 1), encoding="utf-8")
+        marker_count = text.count(marker)
+        if marker_count != 1:
+            return check_record("sabotage_detection", False,
+                                f"expected one SOURCE_POLICY anchor in query-store.py copy, found {marker_count}")
+        sabotaged_text = text.replace(marker, 'SOURCE_POLICY = ROOT / "scripts/source-policy-sabotaged.py"', 1)
+        victim.write_text(sabotaged_text, encoding="utf-8")
+        original_sha256 = sha256_bytes(original_bytes)
+        sabotaged_sha256 = sha256_bytes(victim.read_bytes())
         inner_out = tmp / "evidence"
         result = run([sys.executable, "-X", "utf8", str(tmp / "scripts" / "verify-current-checkout.py"),
                       "--mode", "core", "--skip-sabotage", "--output", str(inner_out)],
                      tmp, timeout=MAX_SABOTAGE_SECONDS)
         observed = "FAIL" if result.returncode != 0 else "PASS"
         receipt_path = inner_out / "receipt.json"
+        inner_receipt = None
         receipt_status = None
-        inner_failures: list[str] = []
+        inner_checks: list[dict[str, Any]] = []
+        receipt_error = None
         if receipt_path.is_file():
-            inner_receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
-            receipt_status = inner_receipt.get("status")
-            inner_failures = [c["id"] for c in inner_receipt.get("checks", []) if c.get("status") == "FAIL"]
             shutil.copy2(receipt_path, evidence_dir / "sabotage-receipt.json")
+            try:
+                inner_receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+                receipt_status = inner_receipt.get("status")
+                raw_checks = inner_receipt.get("checks", [])
+                inner_checks = raw_checks if isinstance(raw_checks, list) else []
+            except (OSError, json.JSONDecodeError) as error:
+                receipt_error = f"{type(error).__name__}: {error}"
         (evidence_dir / "sabotage-run.log").write_text(result.stdout + "\n" + result.stderr, encoding="utf-8")
-        ok = result.returncode != 0 and receipt_status == "FAIL" and bool(inner_failures)
+        expected_failure_id = "candidate_context"
+        ok = sabotage_result_matches(result.returncode, inner_receipt, expected_failure_id)
+        check_statuses = {
+            check.get("id"): check.get("status")
+            for check in inner_checks
+            if isinstance(check, dict) and isinstance(check.get("id"), str)
+        }
+        inner_failures = sorted(
+            check_id for check_id, status in check_statuses.items() if status == "FAIL"
+        )
+        source_commit = run(["git", "-C", str(root), "rev-parse", "HEAD"], root, timeout=30)
+        write_json(evidence_dir / "sabotage-manifest.json", {
+            "schema_version": 1,
+            "kind": "GOVINTEL_SABOTAGE_NEGATIVE_CONTROL",
+            "source_commit": source_commit.stdout.strip() if source_commit.returncode == 0 else None,
+            "copied_file_sha256": copied_file_hashes,
+            "tampered_file": "scripts/query-store.py",
+            "pre_tamper_sha256": original_sha256,
+            "post_tamper_sha256": sabotaged_sha256,
+            "replacement_count": marker_count,
+            "expected_failed_check_id": expected_failure_id,
+            "observed_check_statuses": check_statuses,
+            "inner_exit_code": result.returncode,
+            "inner_receipt_status": receipt_status,
+            "expected_failure_observed": ok,
+            "receipt_parse_error": receipt_error,
+        })
         return check_record("sabotage_detection", ok,
-                            f"sabotaged copy exit={result.returncode}, inner receipt={receipt_status}, failed checks={inner_failures}",
+                            f"sabotaged copy exit={result.returncode}, inner receipt={receipt_status}, failed checks={inner_failures}; expected only {expected_failure_id}",
                             sabotaged_module="scripts/query-store.py", expected="FAIL",
-                            observed=observed, log="sabotage-run.log")
+                            observed=observed, expected_failed_check_id=expected_failure_id,
+                            observed_failed_check_ids=inner_failures,
+                            module_load_status=check_statuses.get("modules_loaded_from_checkout"),
+                            source_sha256=original_sha256, sabotaged_sha256=sabotaged_sha256,
+                            receipt_parse_error=receipt_error,
+                            log="sabotage-run.log", manifest="sabotage-manifest.json")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

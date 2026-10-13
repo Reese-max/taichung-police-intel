@@ -68,6 +68,9 @@ async function replayQuery(target, snapshot = "R1") {
   await target.locator("#pq-mode").selectOption("replay");
   await target.locator('#pq-snapshot option[value="R1"]').waitFor({ state: "attached" });
   await target.locator("#pq-snapshot").selectOption(snapshot);
+  const filters = target.locator("form details").filter({ has: target.locator("#pq-road") });
+  assert.equal(await filters.getAttribute("open"), null);
+  await filters.locator("summary").click();
 }
 async function roadFilters(target) {
   await target.locator("#pq-road").fill("測試路 A 至 B");
@@ -79,6 +82,8 @@ async function roadFilters(target) {
 async function submit(target) {
   await target.locator('form button[type="submit"]').click();
   await target.locator(".pq-result-meta, .pq-error").first().waitFor({ state: "visible" });
+  const errorDetails = target.locator(".pq-error > details");
+  if (await errorDetails.count()) await errorDetails.locator("summary").click();
 }
 async function tracking(target, snapshot = "R1", { navigate = false } = {}) {
   if (navigate) await target.goto(`${root}/tracking/`);
@@ -209,6 +214,7 @@ try {
   });
   for (const [snapshot, label] of [["R4", "FAILED"], ["R5", "PARTIAL"]]) await check(`13-query-${snapshot}-source-gap`, validation, async () => {
     await replayQuery(validation, snapshot); await validation.locator("#pq-road").fill("測試路 A 至 B"); await submit(validation);
+    await validation.getByText("查看來源涵蓋與限制", { exact: true }).click();
     await validation.locator(".pq-gaps").waitFor({ state: "visible" });
     assert.match(await validation.locator(".pq-gaps").textContent(), new RegExp(label));
     return { snapshot, source_gap_label: label, cached_records_not_complete_source_success: true };
