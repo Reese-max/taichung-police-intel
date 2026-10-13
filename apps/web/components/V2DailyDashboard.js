@@ -942,7 +942,7 @@ export default function V2DailyDashboard() {
           <section className="v2-metrics" aria-label="本期情報摘要">
             <Metric value={overview.current_change_count || 0} label="快照記錄變更" emphasis />
             <Metric value={overview.priority_count || 0} label="快照重點" />
-            <Metric value={overview.tracking_count || 0} label="持續追蹤" />
+            <Metric value={overview.tracking_count || 0} label="發布快照追蹤" />
             <Metric value={overview.archive_total || 0} label="歷史資料" />
           </section>
 
@@ -992,7 +992,7 @@ export default function V2DailyDashboard() {
                 <span>最多 5 件</span>
               </div>
               <div className="v2-handoff-toolbar" data-testid="local-handoff-toolbar">
-                <span>本機保存 · 不會寫入公開網站</span>
+                <span>本機追蹤與交班 · 本機保存 · 不會寫入公開網站</span>
                 <div>
                   <button type="button" onClick={handleConfirmHandoff} disabled={!localTrackingItems.length}>
                     確認／更新交班版本

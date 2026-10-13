@@ -103,6 +103,8 @@ try {
   await page.getByRole("button", { name: "加入追蹤", exact: true }).first().click();
   await page.getByRole("button", { name: "加入追蹤", exact: true }).click();
   assert.equal(Object.keys((await state()).watch_items).length, 2);
+  assert.ok((await page.locator(".v2-metrics").innerText()).includes("發布快照追蹤"));
+  assert.ok((await page.getByTestId("local-handoff-toolbar").innerText()).includes("本機追蹤與交班"));
   await page.getByRole("button", { name: "確認／更新交班版本", exact: true }).click();
   await page.waitForFunction((k) => JSON.parse(localStorage.getItem(k)).handoffs.length === 1, key);
   const v1 = clone((await state()).handoffs[0]);
