@@ -47,10 +47,16 @@ function packet() {
     status_message: fixtureLabel,
   };
   const status = { ...clone(baseStatus), generated_at, latest_collection_run: { ...baseStatus.latest_collection_run, collection_run_id: run },
-    sources: baseStatus.sources.map((row) => row.source_id === "S-032"
-      ? { ...row, source_health: health, intelligence_gaps: health === "PASS" ? [] : ["合成重播：來源擷取缺口"] } : row),
+    sources: [{ ...clone(baseStatus.sources[0]), source_id: "S-032", source_name: `合成歷史重播 S-032（${fixtureLabel}）`,
+      source_url: a1.official_url, current_source_run_id: `${run}-SOURCE-032`,
+      source_health: health === "PARTIAL" ? "DEGRADED" : health,
+      result: health === "PASS" ? "SUCCESS" : health,
+      window_completeness: health === "PASS" ? "COMPLETE" : health,
+      intelligence_gaps: health === "PASS" ? [] : ["合成重播：來源擷取缺口"],
+    }],
   };
-  return { brief, status };
+  const feed = { schema_version: 1, generated_at, collection_run_id: run, items: [], fixture_label: fixtureLabel };
+  return { brief, status, feed };
 }
 await mkdir(out, { recursive: true });
 await readFile(path.join(site, "index.html"));
@@ -76,6 +82,7 @@ try {
   await context.route((url) => docs.has(url.href), (route) => route.fulfill({ contentType: "text/html", body: docs.get(route.request().url()) }));
   await context.route("**/data/v2-daily-brief.json", (route) => route.fulfill({ json: packet().brief }));
   await context.route("**/data/source-status.json", (route) => route.fulfill({ json: packet().status }));
+  await context.route("**/data/intelligence-feed.json", (route) => route.fulfill({ json: packet().feed }));
   const page = await context.newPage(); page.setDefaultTimeout(10000);
   const state = () => page.evaluate((storageKey) => JSON.parse(localStorage.getItem(storageKey)), key);
   let receivedBriefHash;
@@ -128,7 +135,7 @@ try {
     health = status; await reopen();
     await page.getByTestId("v2-tracking-list").getByText(/合成重播：來源擷取缺口/).first().waitFor();
     assert.ok(Object.values((await state()).watch_items).every((watch) => watch.status !== "RESOLVED"));
-    assert.ok((await page.getByTestId("v2-tracking-list").innerText()).includes(status));
+    assert.ok((await page.getByTestId("v2-tracking-list").innerText()).includes(status === "PARTIAL" ? "DEGRADED" : status));
     checks.push(`${status.toLowerCase()}_source_retains_watch_and_gap`);
   }
   phase = 4; health = "PASS"; await reopen();

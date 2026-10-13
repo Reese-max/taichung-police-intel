@@ -188,7 +188,7 @@ test("document-only correction remains known after resolution and permits a late
 test("failed or partial source shows a per-watch gap and never resolves local tracking", () => {
   const watched = addLocalWatch(emptyLocalHandoff(), item(), T0);
   const noChanges = syncLocalHandoff(watched, [], publication(), T1);
-  for (const source_health of ["FAILED", "PARTIAL"]) {
+  for (const source_health of ["FAILED", "DEGRADED"]) {
     const rows = projectLocalTracking(noChanges, [], { sources: [{
       source_id: "S-032", source_health, intelligence_gaps: ["replay fetch unavailable"],
     }] });
