@@ -1,0 +1,563 @@
+{
+  "label": "Synthetic historical local-first fixtures, produced by the immutable original main helpers; not live official data.",
+  "producer_commit": "d176eeaa74910a6776e0e2f0db236303763e923a",
+  "python_pending_metadata_revision": {
+    "state": {
+      "schema_version": 1,
+      "mode": "V2_HANDOFF",
+      "watch_items": {
+        "WATCH-0A0E33B053D93A8AE176": {
+          "watch_id": "WATCH-0A0E33B053D93A8AE176",
+          "identity": "S-001:event-1",
+          "source_id": "S-001",
+          "stable_key": "event-1",
+          "title": "合成歷史測試公告",
+          "official_url": "https://example.gov.tw/event-1",
+          "created_at": "2026-09-01T09:00:00+08:00",
+          "updated_at": "2026-09-02T09:00:00+08:00",
+          "status": "NEEDS_REVIEW",
+          "reason_code": "MANUAL",
+          "tracked_version": 1,
+          "tracked_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "last_reviewed_version": 1,
+          "last_reviewed_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "last_handoff_id": "HANDOFF-0993405E349FB59C08CC",
+          "invalidations": [
+            {
+              "invalidation_id": "INV-75A3A4E7364BF56798CC",
+              "event_id": null,
+              "reason": "SOURCE_VERSION_CHANGED",
+              "detected_at": "2026-09-02T09:00:00+08:00",
+              "changed_fields": [],
+              "before": {
+                "version": 1,
+                "normalized_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "official_url": "https://example.gov.tw/event-1"
+              },
+              "after": {
+                "version": 2,
+                "normalized_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "official_url": "https://example.gov.tw/event-1"
+              },
+              "affected_claims": [
+                {
+                  "brief_id": "HANDOFF-0993405E349FB59C08CC",
+                  "brief_version": 1,
+                  "claim_id": "CLAIM-CC830C802C470A98024F",
+                  "source_version": 1,
+                  "source_document_version": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                  "evidence_locator": "S-001:event-1#v1"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "handoffs": [
+        {
+          "brief_id": "HANDOFF-0993405E349FB59C08CC",
+          "brief_version": 1,
+          "generated_at": "2026-09-01T09:00:00+08:00",
+          "confirmed_at": "2026-09-01T09:00:00+08:00",
+          "confirmation_state": "CONFIRMED",
+          "publication": {
+            "collection_run_id": "SYNTHETIC-LEGACY-1",
+            "brief_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+          },
+          "items": [
+            {
+              "watch_id": "WATCH-0A0E33B053D93A8AE176",
+              "identity": "S-001:event-1",
+              "title": "合成歷史測試公告",
+              "source_version": 1,
+              "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "claim_id": "CLAIM-CC830C802C470A98024F",
+              "source_document_version": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "evidence": {
+                "official_url": "https://example.gov.tw/event-1",
+                "locator": "S-001:event-1#v1"
+              }
+            }
+          ]
+        }
+      ],
+      "last_updated_at": "2026-09-02T09:00:00+08:00",
+      "last_publication": {
+        "collection_run_id": "SYNTHETIC-LEGACY-2",
+        "observed_at": "2026-09-02T09:00:00+08:00"
+      }
+    },
+    "current_item": {
+      "identity": "S-001:event-1",
+      "source_id": "S-001",
+      "stable_key": "event-1",
+      "title": "合成歷史測試公告",
+      "official_url": "https://example.gov.tw/event-1",
+      "version_no": 2,
+      "normalized_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "date_status": "KNOWN"
+    }
+  },
+  "python_confirmed_document": {
+    "state": {
+      "schema_version": 1,
+      "mode": "V2_HANDOFF",
+      "watch_items": {
+        "WATCH-0A0E33B053D93A8AE176": {
+          "watch_id": "WATCH-0A0E33B053D93A8AE176",
+          "identity": "S-001:event-1",
+          "source_id": "S-001",
+          "stable_key": "event-1",
+          "title": "合成歷史測試公告",
+          "official_url": "https://example.gov.tw/event-1",
+          "created_at": "2026-09-01T09:00:00+08:00",
+          "updated_at": "2026-09-03T09:00:00+08:00",
+          "status": "WATCHING",
+          "reason_code": "MANUAL",
+          "tracked_version": 1,
+          "tracked_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "last_reviewed_version": 1,
+          "last_reviewed_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "last_handoff_id": "HANDOFF-E7BEAD3420383F05BDEA",
+          "invalidations": []
+        }
+      },
+      "handoffs": [
+        {
+          "brief_id": "HANDOFF-E7BEAD3420383F05BDEA",
+          "brief_version": 1,
+          "generated_at": "2026-09-01T09:00:00+08:00",
+          "confirmed_at": "2026-09-03T09:00:00+08:00",
+          "confirmation_state": "CONFIRMED",
+          "publication": {
+            "collection_run_id": "SYNTHETIC-LEGACY-1",
+            "brief_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+          },
+          "items": [
+            {
+              "watch_id": "WATCH-0A0E33B053D93A8AE176",
+              "identity": "S-001:event-1",
+              "title": "合成歷史測試公告",
+              "source_version": 1,
+              "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "claim_id": "CLAIM-CC830C802C470A98024F",
+              "source_document_version": "DOC-ACCEPTED",
+              "evidence": {
+                "official_url": "https://example.gov.tw/event-1",
+                "locator": "S-001:event-1#v1"
+              }
+            }
+          ]
+        }
+      ],
+      "last_updated_at": "2026-09-03T09:00:00+08:00"
+    },
+    "current_item": {
+      "identity": "S-001:event-1",
+      "source_id": "S-001",
+      "stable_key": "event-1",
+      "title": "合成歷史測試公告",
+      "official_url": "https://example.gov.tw/event-1",
+      "version_no": 1,
+      "normalized_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "date_status": "KNOWN",
+      "document_version_id": "DOC-ACCEPTED"
+    }
+  },
+  "browser_confirmed_revision": {
+    "state": {
+      "schema_version": 1,
+      "mode": "V2_HANDOFF",
+      "watch_items": {
+        "WATCH-S-001%3Aevent-1": {
+          "watch_id": "WATCH-S-001%3Aevent-1",
+          "identity": "S-001:event-1",
+          "source_id": "S-001",
+          "stable_key": "event-1",
+          "title": "合成歷史測試公告",
+          "official_url": "https://example.gov.tw/event-1",
+          "source_version": 2,
+          "source_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "source_document_version": "DOC-OLD",
+          "event_id": null,
+          "created_at": "2026-09-01T01:00:00.000Z",
+          "updated_at": "2026-09-02T01:00:00.000Z",
+          "status": "WATCHING",
+          "reason_code": "MANUAL",
+          "tracked_version": 2,
+          "tracked_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "last_reviewed_version": 2,
+          "last_reviewed_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "last_handoff_id": "HANDOFF-2-2%7C2026-09-02T01%3A00%3A00.000Z%7CS-001%3Aevent-1%40v2",
+          "invalidations": [
+            {
+              "invalidation_id": "INV-WATCH-S-001%253Aevent-1%7C2%7Cbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "event_id": null,
+              "reason": "SOURCE_VERSION_CHANGED",
+              "detected_at": "2026-09-02T01:00:00.000Z",
+              "before": {
+                "version": 1,
+                "normalized_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+              },
+              "after": {
+                "version": 2,
+                "normalized_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "official_url": "https://example.gov.tw/event-1"
+              },
+              "resolved_in_handoff_id": "HANDOFF-2-2%7C2026-09-02T01%3A00%3A00.000Z%7CS-001%3Aevent-1%40v2"
+            }
+          ]
+        }
+      },
+      "handoffs": [
+        {
+          "brief_id": "HANDOFF-1-1%7C2026-09-01T01%3A00%3A00.000Z%7CS-001%3Aevent-1%40v1",
+          "brief_version": 1,
+          "generated_at": "2026-09-01T01:00:00.000Z",
+          "confirmed_at": "2026-09-01T01:00:00.000Z",
+          "confirmation_state": "CONFIRMED",
+          "publication": {
+            "collection_run_id": "SYNTHETIC-LEGACY-1",
+            "brief_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+          },
+          "items": [
+            {
+              "watch_id": "WATCH-S-001%3Aevent-1",
+              "identity": "S-001:event-1",
+              "title": "合成歷史測試公告",
+              "source_version": 1,
+              "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "claim_id": "CLAIM-S-001%3Aevent-1%23v1",
+              "source_document_version": "DOC-OLD",
+              "evidence": {
+                "official_url": "https://example.gov.tw/event-1",
+                "locator": "S-001:event-1#v1"
+              }
+            }
+          ]
+        },
+        {
+          "brief_id": "HANDOFF-2-2%7C2026-09-02T01%3A00%3A00.000Z%7CS-001%3Aevent-1%40v2",
+          "brief_version": 2,
+          "generated_at": "2026-09-02T01:00:00.000Z",
+          "confirmed_at": "2026-09-02T01:00:00.000Z",
+          "confirmation_state": "CONFIRMED",
+          "publication": {
+            "collection_run_id": "SYNTHETIC-LEGACY-1",
+            "brief_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+          },
+          "items": [
+            {
+              "watch_id": "WATCH-S-001%3Aevent-1",
+              "identity": "S-001:event-1",
+              "title": "合成歷史測試公告",
+              "source_version": 2,
+              "source_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "claim_id": "CLAIM-S-001%3Aevent-1%23v2",
+              "source_document_version": "DOC-NEW",
+              "evidence": {
+                "official_url": "https://example.gov.tw/event-1",
+                "locator": "S-001:event-1#v2"
+              }
+            }
+          ]
+        }
+      ],
+      "last_publication": {
+        "collection_run_id": "SYNTHETIC-LEGACY-1",
+        "observed_at": "2026-09-02T01:00:00.000Z"
+      },
+      "last_updated_at": "2026-09-02T01:00:00.000Z"
+    },
+    "current_item": {
+      "identity": "S-001:event-1",
+      "source_id": "S-001",
+      "stable_key": "event-1",
+      "title": "合成歷史測試公告",
+      "official_url": "https://example.gov.tw/event-1",
+      "source_version": 2,
+      "source_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "source_document_version": "DOC-NEW"
+    }
+  },
+  "browser_confirmed_document": {
+    "state": {
+      "schema_version": 1,
+      "mode": "V2_HANDOFF",
+      "watch_items": {
+        "WATCH-S-001%3Aevent-1": {
+          "watch_id": "WATCH-S-001%3Aevent-1",
+          "identity": "S-001:event-1",
+          "source_id": "S-001",
+          "stable_key": "event-1",
+          "title": "合成歷史測試公告",
+          "official_url": "https://example.gov.tw/event-1",
+          "source_version": 1,
+          "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "source_document_version": "DOC-ACCEPTED",
+          "event_id": null,
+          "created_at": "2026-09-01T01:00:00.000Z",
+          "updated_at": "2026-09-03T01:00:00.000Z",
+          "status": "WATCHING",
+          "reason_code": "MANUAL",
+          "tracked_version": 1,
+          "tracked_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "last_reviewed_version": 1,
+          "last_reviewed_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "last_handoff_id": "HANDOFF-1-1%7C2026-09-01T01%3A00%3A00.000Z%7CS-001%3Aevent-1%40v1",
+          "invalidations": []
+        }
+      },
+      "handoffs": [
+        {
+          "brief_id": "HANDOFF-1-1%7C2026-09-01T01%3A00%3A00.000Z%7CS-001%3Aevent-1%40v1",
+          "brief_version": 1,
+          "generated_at": "2026-09-01T01:00:00.000Z",
+          "confirmed_at": "2026-09-03T01:00:00.000Z",
+          "confirmation_state": "CONFIRMED",
+          "publication": {
+            "collection_run_id": "SYNTHETIC-LEGACY-1",
+            "brief_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+          },
+          "items": [
+            {
+              "watch_id": "WATCH-S-001%3Aevent-1",
+              "identity": "S-001:event-1",
+              "title": "合成歷史測試公告",
+              "source_version": 1,
+              "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "claim_id": "CLAIM-S-001%3Aevent-1%23v1",
+              "source_document_version": "DOC-ACCEPTED",
+              "evidence": {
+                "official_url": "https://example.gov.tw/event-1",
+                "locator": "S-001:event-1#v1"
+              }
+            }
+          ]
+        }
+      ],
+      "last_publication": null,
+      "last_updated_at": "2026-09-03T01:00:00.000Z"
+    },
+    "current_item": {
+      "identity": "S-001:event-1",
+      "source_id": "S-001",
+      "stable_key": "event-1",
+      "title": "合成歷史測試公告",
+      "official_url": "https://example.gov.tw/event-1",
+      "source_version": 1,
+      "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "source_document_version": "DOC-ACCEPTED"
+    }
+  },
+  "python_same_hash_document_revision": {
+    "state": {
+      "schema_version": 1,
+      "mode": "V2_HANDOFF",
+      "watch_items": {
+        "WATCH-0A0E33B053D93A8AE176": {
+          "watch_id": "WATCH-0A0E33B053D93A8AE176",
+          "identity": "S-001:event-1",
+          "source_id": "S-001",
+          "stable_key": "event-1",
+          "title": "合成歷史測試公告",
+          "official_url": "https://example.gov.tw/event-1",
+          "created_at": "2026-09-01T09:00:00+08:00",
+          "updated_at": "2026-09-03T09:00:00+08:00",
+          "status": "WATCHING",
+          "reason_code": "MANUAL",
+          "tracked_version": 1,
+          "tracked_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "last_reviewed_version": 1,
+          "last_reviewed_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "last_handoff_id": "HANDOFF-0615ED4336D175E8FAE5",
+          "invalidations": []
+        }
+      },
+      "handoffs": [
+        {
+          "brief_id": "HANDOFF-018A5CB20A7057309FA5",
+          "brief_version": 1,
+          "generated_at": "2026-09-01T09:00:00+08:00",
+          "confirmed_at": "2026-09-01T09:00:00+08:00",
+          "confirmation_state": "CONFIRMED",
+          "publication": {},
+          "items": [
+            {
+              "watch_id": "WATCH-0A0E33B053D93A8AE176",
+              "identity": "S-001:event-1",
+              "title": "合成歷史測試公告",
+              "source_version": 1,
+              "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "claim_id": "CLAIM-CC830C802C470A98024F",
+              "source_document_version": "DOC-OLD",
+              "evidence": {
+                "official_url": "https://example.gov.tw/event-1",
+                "locator": "S-001:event-1#v1"
+              }
+            }
+          ]
+        },
+        {
+          "brief_id": "HANDOFF-0615ED4336D175E8FAE5",
+          "brief_version": 2,
+          "generated_at": "2026-09-02T09:00:00+08:00",
+          "confirmed_at": "2026-09-03T09:00:00+08:00",
+          "confirmation_state": "CONFIRMED",
+          "publication": {},
+          "items": [
+            {
+              "watch_id": "WATCH-0A0E33B053D93A8AE176",
+              "identity": "S-001:event-1",
+              "title": "合成歷史測試公告",
+              "source_version": 1,
+              "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "claim_id": "CLAIM-CC830C802C470A98024F",
+              "source_document_version": "DOC-NEW",
+              "evidence": {
+                "official_url": "https://example.gov.tw/event-1",
+                "locator": "S-001:event-1#v1"
+              }
+            }
+          ]
+        }
+      ],
+      "last_updated_at": "2026-09-03T09:00:00+08:00",
+      "last_publication": {
+        "collection_run_id": "SYNTHETIC-LEGACY-2",
+        "observed_at": "2026-09-02T09:00:00+08:00"
+      }
+    },
+    "current_item": {
+      "identity": "S-001:event-1",
+      "source_id": "S-001",
+      "stable_key": "event-1",
+      "title": "合成歷史測試公告",
+      "official_url": "https://example.gov.tw/event-1",
+      "version_no": 1,
+      "normalized_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "date_status": "KNOWN",
+      "document_version_id": "DOC-NEW"
+    },
+    "predecessor_item": {
+      "identity": "S-001:event-1",
+      "source_id": "S-001",
+      "stable_key": "event-1",
+      "title": "合成歷史測試公告",
+      "official_url": "https://example.gov.tw/event-1",
+      "version_no": 1,
+      "normalized_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "date_status": "KNOWN",
+      "document_version_id": "DOC-OLD"
+    }
+  },
+  "browser_same_hash_document_revision": {
+    "state": {
+      "schema_version": 1,
+      "mode": "V2_HANDOFF",
+      "watch_items": {
+        "WATCH-S-001%3Aevent-1": {
+          "watch_id": "WATCH-S-001%3Aevent-1",
+          "identity": "S-001:event-1",
+          "source_id": "S-001",
+          "stable_key": "event-1",
+          "title": "合成歷史測試公告",
+          "official_url": "https://example.gov.tw/event-1",
+          "source_version": 1,
+          "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "source_document_version": "DOC-OLD",
+          "event_id": null,
+          "created_at": "2026-09-01T01:00:00.000Z",
+          "updated_at": "2026-09-03T01:00:00.000Z",
+          "status": "WATCHING",
+          "reason_code": "MANUAL",
+          "tracked_version": 1,
+          "tracked_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "last_reviewed_version": 1,
+          "last_reviewed_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "last_handoff_id": "HANDOFF-2-2%7C2026-09-02T01%3A00%3A00.000Z%7CS-001%3Aevent-1%40v1",
+          "invalidations": []
+        }
+      },
+      "handoffs": [
+        {
+          "brief_id": "HANDOFF-1-1%7C2026-09-01T01%3A00%3A00.000Z%7CS-001%3Aevent-1%40v1",
+          "brief_version": 1,
+          "generated_at": "2026-09-01T01:00:00.000Z",
+          "confirmed_at": "2026-09-01T01:00:00.000Z",
+          "confirmation_state": "CONFIRMED",
+          "publication": {
+            "collection_run_id": null,
+            "brief_sha256": null
+          },
+          "items": [
+            {
+              "watch_id": "WATCH-S-001%3Aevent-1",
+              "identity": "S-001:event-1",
+              "title": "合成歷史測試公告",
+              "source_version": 1,
+              "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "claim_id": "CLAIM-S-001%3Aevent-1%23v1",
+              "source_document_version": "DOC-OLD",
+              "evidence": {
+                "official_url": "https://example.gov.tw/event-1",
+                "locator": "S-001:event-1#v1"
+              }
+            }
+          ]
+        },
+        {
+          "brief_id": "HANDOFF-2-2%7C2026-09-02T01%3A00%3A00.000Z%7CS-001%3Aevent-1%40v1",
+          "brief_version": 2,
+          "generated_at": "2026-09-02T01:00:00.000Z",
+          "confirmed_at": "2026-09-03T01:00:00.000Z",
+          "confirmation_state": "CONFIRMED",
+          "publication": {
+            "collection_run_id": null,
+            "brief_sha256": null
+          },
+          "items": [
+            {
+              "watch_id": "WATCH-S-001%3Aevent-1",
+              "identity": "S-001:event-1",
+              "title": "合成歷史測試公告",
+              "source_version": 1,
+              "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "claim_id": "CLAIM-S-001%3Aevent-1%23v1",
+              "source_document_version": "DOC-NEW",
+              "evidence": {
+                "official_url": "https://example.gov.tw/event-1",
+                "locator": "S-001:event-1#v1"
+              }
+            }
+          ]
+        }
+      ],
+      "last_publication": {
+        "collection_run_id": null,
+        "observed_at": "2026-09-02T01:00:00.000Z"
+      },
+      "last_updated_at": "2026-09-03T01:00:00.000Z"
+    },
+    "current_item": {
+      "identity": "S-001:event-1",
+      "source_id": "S-001",
+      "stable_key": "event-1",
+      "title": "合成歷史測試公告",
+      "official_url": "https://example.gov.tw/event-1",
+      "source_version": 1,
+      "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "source_document_version": "DOC-NEW"
+    },
+    "predecessor_item": {
+      "identity": "S-001:event-1",
+      "source_id": "S-001",
+      "stable_key": "event-1",
+      "title": "合成歷史測試公告",
+      "official_url": "https://example.gov.tw/event-1",
+      "source_version": 1,
+      "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "source_document_version": "DOC-OLD"
+    }
+  }
+}

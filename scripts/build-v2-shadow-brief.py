@@ -385,7 +385,7 @@ def main() -> int:
     handoff_state = sync_with_publication(
         handoff_state,
         previous_items=(previous_state or {}).get("items", {}),
-        current_items={item.identity: item.to_state() for item in current_items},
+        current_items={item.identity: state["items"][item.identity] for item in current_items},
         events=events,
         observed_at=observed_at,
         collection_run_id=feed.get("collection_run_id"),

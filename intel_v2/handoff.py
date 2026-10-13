@@ -58,11 +58,16 @@ def claim_id_for(identity: str, source_version: int) -> str:
     return f"CLAIM-{_sha([identity, source_version]).upper()[:20]}"
 
 
-def _affected_claims(state: dict[str, Any], identity: str, source_version: int) -> list[dict[str, Any]]:
+def _affected_claims(state: dict[str, Any], identity: str, source_version: int,
+                     source_hash: str | None = None, document_version: str | None = None) -> list[dict[str, Any]]:
     rows = []
     for handoff in state["handoffs"]:
         for entry in handoff["items"]:
             if entry.get("identity") != identity or entry.get("source_version") != source_version:
+                continue
+            if source_hash and entry.get("source_sha256") != source_hash:
+                continue
+            if document_version and entry.get("source_document_version") != document_version:
                 continue
             evidence = entry.get("evidence") if isinstance(entry.get("evidence"), dict) else {}
             rows.append(
@@ -154,6 +159,8 @@ def add_watch(
         "reason_code": reason_code.strip() or "MANUAL",
         "tracked_version": version,
         "tracked_sha256": str(item.get("normalized_sha256") or ""),
+        "tracked_document_version": item.get("document_version_id"),
+        "known_source_ref": _source_ref(item),
         "last_reviewed_version": None,
         "last_reviewed_sha256": None,
         "last_handoff_id": None,
@@ -168,6 +175,103 @@ def _event_dict(event: Any) -> dict[str, Any]:
     return _as_dict(event)
 
 
+def _source_ref(item: dict[str, Any]) -> dict[str, Any]:
+    return {"version": item.get("version_no"), "normalized_sha256": item.get("normalized_sha256") or None,
+            "document_version_id": item.get("document_version_id") or item.get("normalized_sha256") or None}
+
+
+def _matching_confirmed_source(watch: dict[str, Any], state: dict[str, Any] | None) -> tuple[dict[str, Any], dict[str, Any]] | None:
+    for record in (state or {}).get("handoffs", []):
+        if record.get("brief_id") != watch.get("last_handoff_id"):
+            continue
+        for entry in record.get("items", []):
+            if (entry.get("watch_id") == watch.get("watch_id") and entry.get("identity") == watch.get("identity")
+                    and entry.get("source_version") == watch.get("tracked_version")
+                    and (entry.get("source_sha256") or None) == (watch.get("tracked_sha256") or None)):
+                return record, entry
+    return None
+
+
+def _known_source_ref(watch: dict[str, Any], state: dict[str, Any] | None = None) -> dict[str, Any]:
+    if watch.get("known_source_ref"):
+        return dict(watch["known_source_ref"])
+    tracked = {"version": watch.get("tracked_version"), "normalized_sha256": watch.get("tracked_sha256") or None,
+               "document_version_id": watch.get("tracked_document_version") or watch.get("tracked_sha256") or None}
+    confirmed = _matching_confirmed_source(watch, state)
+    if confirmed:
+        tracked["document_version_id"] = confirmed[1].get("source_document_version") or tracked["document_version_id"]
+    latest = (watch.get("invalidations") or [{}])[-1]
+    after = latest.get("after") or {}
+    version = after.get("version", latest.get("source_version", tracked["version"]))
+    if version >= tracked["version"] and (not latest.get("resolved_in_handoff_id") or version > tracked["version"] or not tracked["document_version_id"]):
+        tracked["version"] = version
+        if "normalized_sha256" in after:
+            tracked["normalized_sha256"] = after["normalized_sha256"] or None
+        if "document_version_id" in after:
+            if after["document_version_id"]:
+                tracked["document_version_id"] = after["document_version_id"]
+            elif version != watch.get("tracked_version") or tracked["normalized_sha256"] != (watch.get("tracked_sha256") or None):
+                tracked["document_version_id"] = tracked["normalized_sha256"]
+        elif version != watch.get("tracked_version") or tracked["normalized_sha256"] != (watch.get("tracked_sha256") or None):
+            tracked["document_version_id"] = tracked["normalized_sha256"]
+    return tracked
+
+
+def bind_known_documents(state: dict[str, Any], current_items: dict[str, Any]) -> dict[str, Any]:
+    """Enrich unchanged list-only rows with an already accepted document binding."""
+    result = json.loads(json.dumps(current_items))
+    for watch in state.get("watch_items", {}).values():
+        current = result.get(watch["identity"])
+        known = _known_source_ref(watch, state)
+        if (current and not current.get("document_version_id") and known["document_version_id"]
+                and current.get("version_no") == known["version"]
+                and (current.get("normalized_sha256") or None) == known["normalized_sha256"]):
+            current["document_version_id"] = known["document_version_id"]
+    return result
+
+
+def _retained_predecessor(watch: dict[str, Any], version: int, digest: str | None,
+                          document: str | None, observed_at: str, publication_at: str | None = None,
+                          state: dict[str, Any] | None = None) -> bool:
+    revisions = watch.get("invalidations", [])
+    known_times = [row["detected_at"] for row in revisions if row.get("detected_at")]
+    if watch.get("last_source_observed_at"):
+        known_times.append(watch["last_source_observed_at"])
+    if publication_at:
+        known_times.append(publication_at)
+    confirmed = _matching_confirmed_source(watch, state)
+    if not watch.get("last_source_observed_at") and confirmed and confirmed[0].get("generated_at"):
+        known_times.append(confirmed[0]["generated_at"])
+    if not known_times:
+        return False
+    observed = datetime.fromisoformat(_timestamp(observed_at))
+    latest = max(datetime.fromisoformat(_timestamp(value)) for value in known_times)
+    if observed < latest:
+        return True
+    if observed > latest:
+        return False
+    for row in revisions:
+        before = row.get("before") or {}
+        before_version = before.get("version", row.get("source_version", watch.get("tracked_version")))
+        known_hash, known_document = before.get("normalized_sha256"), before.get("document_version_id")
+        if (before_version == version
+                and (known_hash or known_document)
+                and (not known_hash or digest is None or known_hash == digest)
+                and (not known_document or known_document == document)):
+            return True
+    known = _known_source_ref(watch, state)
+    for record in (state or {}).get("handoffs", []):
+        for entry in record.get("items", []):
+            if (entry.get("watch_id") == watch.get("watch_id") and entry.get("identity") == watch.get("identity")
+                    and entry.get("source_version") == version
+                    and (digest is None or entry.get("source_sha256") == digest)
+                    and entry.get("source_document_version") == document
+                    and {"version": entry.get("source_version"), "normalized_sha256": entry.get("source_sha256"),
+                         "document_version_id": entry.get("source_document_version")} != known):
+                return True
+    return False
+
+
 def sync_with_publication(
     state: dict[str, Any] | None,
     *,
@@ -179,6 +283,9 @@ def sync_with_publication(
 ) -> dict[str, Any]:
     result = copy_state(state)
     stamp = _timestamp(observed_at)
+    publication_at = (result.get("last_publication") or {}).get("observed_at")
+    if publication_at and datetime.fromisoformat(stamp) < datetime.fromisoformat(publication_at):
+        return result
     previous_items = previous_items or {}
     event_by_identity: dict[str, dict[str, Any]] = {}
     for raw_event in events:
@@ -193,9 +300,23 @@ def sync_with_publication(
         event = event_by_identity.get(identity)
         previous_url = watch.get("official_url")
         current_version = current.get("version_no") if current else None
+        known_ref = _known_source_ref(watch, result)
+        if current_version is not None and current_version < known_ref["version"]:
+            continue
         tracked_version = watch.get("tracked_version") or 0
         after_version = event.get("after_version") if event else current_version
-        changed = isinstance(after_version, int) and after_version > tracked_version
+        changed = isinstance(after_version, int) and after_version > known_ref["version"]
+        if current and _retained_predecessor(watch, current_version, current.get("normalized_sha256"),
+                current.get("document_version_id"), stamp, publication_at, result):
+            continue
+        if current:
+            watch["last_source_observed_at"] = stamp
+            current_ref = _source_ref(current)
+            if (not current.get("document_version_id") and current_ref["version"] == known_ref["version"]
+                    and current_ref["normalized_sha256"] == known_ref["normalized_sha256"]):
+                current_ref["document_version_id"] = known_ref["document_version_id"]
+            changed = current_ref != known_ref
+            watch["known_source_ref"] = current_ref
         if current and current.get("official_url", "").startswith("https://"):
             watch["title"] = current.get("title") or watch["title"]
             watch["official_url"] = current["official_url"]
@@ -204,9 +325,19 @@ def sync_with_publication(
         if changed:
             after_hash = str((current or {}).get("normalized_sha256") or "")
             invalidation_id = "INV-" + _sha(
-                [watch["watch_id"], event.get("event_id") if event else None, after_version, after_hash]
+                [watch["watch_id"], event.get("event_id") if event else None, after_version, after_hash,
+                 (current or {}).get("document_version_id")]
             ).upper()[:20]
             known = {entry.get("invalidation_id") for entry in watch["invalidations"]}
+            latest = watch["invalidations"][-1] if watch["invalidations"] else None
+            latest_after = (latest or {}).get("after") or {}
+            if (latest and not latest.get("resolved_in_handoff_id")
+                    and latest_after.get("version") == after_version
+                    and latest_after.get("normalized_sha256") == after_hash
+                    and latest_after.get("document_version_id") == (current or {}).get("document_version_id")):
+                invalidation_id = latest["invalidation_id"]
+            elif invalidation_id in known:
+                invalidation_id = "INV-" + _sha([invalidation_id, stamp]).upper()[:20]
             if invalidation_id not in known:
                 before = previous_items.get(identity) or {}
                 watch["invalidations"].append(
@@ -217,20 +348,20 @@ def sync_with_publication(
                         "detected_at": event.get("detected_at") if event else stamp,
                         "changed_fields": list(event.get("changed_fields") or []) if event else [],
                         "before": {
-                            "version": tracked_version,
-                            "normalized_sha256": watch.get("tracked_sha256")
-                            or before.get("normalized_sha256"),
+                            **known_ref,
                             "official_url": before.get("official_url") or previous_url,
                         },
                         "after": {
-                            "version": after_version,
-                            "normalized_sha256": after_hash,
+                            **(watch["known_source_ref"] if current else {"version": after_version,
+                                "normalized_sha256": after_hash or None, "document_version_id": None}),
                             "official_url": (current or {}).get("official_url") or watch["official_url"],
                         },
-                        "affected_claims": _affected_claims(result, identity, tracked_version),
+                        "affected_claims": _affected_claims(result, identity, known_ref["version"],
+                            known_ref["normalized_sha256"], known_ref["document_version_id"]),
                     }
                 )
-            watch["status"] = "NEEDS_REVIEW"
+            if watch["status"] in ACTIVE_WATCH_STATUSES:
+                watch["status"] = "NEEDS_REVIEW"
             watch["updated_at"] = stamp
     result["last_publication"] = {
         "collection_run_id": collection_run_id,
@@ -313,6 +444,15 @@ def sync_with_detail_rechecks(
         if not isinstance(classification, dict):
             raise ValueError("detail recheck classification is required")
         if not classification.get("review_required"):
+            identity = f"{outcome.get('source_id')}:{outcome.get('stable_key')}"
+            watch = next((item for item in result["watch_items"].values() if item.get("identity") == identity), None)
+            after = classification.get("after") or {}
+            known_document = _known_source_ref(watch, result)["document_version_id"] if watch else None
+            if watch and isinstance(after, dict) and known_document and after.get("document_version_id") == known_document:
+                observed = _timestamp(classification.get("observed_at") or stamp)
+                if not _retained_predecessor(watch, watch.get("tracked_version"), None, known_document, observed,
+                        (result.get("last_publication") or {}).get("observed_at"), result):
+                    watch["last_source_observed_at"] = observed
             continue
         source_id = outcome.get("source_id")
         stable_key = outcome.get("stable_key")
@@ -329,22 +469,39 @@ def sync_with_detail_rechecks(
         after_version = after.get("document_version_id")
         if not isinstance(after_version, str) or not after_version.strip():
             raise ValueError("detail recheck after document version is required")
+        detail_observed = _timestamp(classification.get("observed_at") or stamp)
+        known_ref = _known_source_ref(watch, result)
+        if _retained_predecessor(watch, known_ref["version"], None, after_version, detail_observed,
+                (result.get("last_publication") or {}).get("observed_at"), result):
+            continue
+        watch["last_source_observed_at"] = detail_observed
+        watch["known_source_ref"] = {**known_ref, "document_version_id": after_version}
+        if known_ref["document_version_id"] == after_version:
+            continue
         invalidation_id = "INV-" + _sha([watch["watch_id"], "DETAIL_RECHECK", after_version]).upper()[:20]
         known = {entry.get("invalidation_id") for entry in watch["invalidations"]}
+        latest = watch["invalidations"][-1] if watch["invalidations"] else None
+        if (latest and not latest.get("resolved_in_handoff_id")
+                and (latest.get("after") or {}).get("document_version_id") == after_version):
+            invalidation_id = latest["invalidation_id"]
+        elif invalidation_id in known:
+            invalidation_id = "INV-" + _sha([invalidation_id, detail_observed]).upper()[:20]
         if invalidation_id not in known:
             watch["invalidations"].append(
                 {
                     "invalidation_id": invalidation_id,
                     "event_id": outcome.get("event_id"),
                     "reason": classification.get("status") or "DETAIL_RECHECK",
+                    "source_version": known_ref["version"],
                     "detected_at": classification.get("observed_at") or stamp,
                     "changed_fields": list(classification.get("changed_fields") or []),
                     "before": _detail_version(before),
                     "after": _detail_version(after),
-                    "affected_claims": _detail_claims(result, identity, before),
+                    "affected_claims": _detail_claims(result, identity, {"document_version_id": known_ref["document_version_id"]}),
                 }
             )
-        watch["status"] = "NEEDS_REVIEW"
+        if watch["status"] in ACTIVE_WATCH_STATUSES:
+            watch["status"] = "NEEDS_REVIEW"
         watch["updated_at"] = stamp
     result["last_updated_at"] = stamp
     return result
@@ -388,10 +545,12 @@ def tracking_projection(
                 "source_name": watch.get("source_id"),
                 "headline": current.get("title") or watch.get("title"),
                 "what_changed": (
-                    f"官方來源版本由 v{invalidation['before']['version']} 更新至 "
-                    f"v{invalidation['after']['version']}，需重新核對。"
-                    if needs_review and invalidation
-                    else "此項保留於跨日追蹤，尚未標記為已處理。"
+                    (f"官方來源版本由 v{invalidation['before']['version']} 更新至 "
+                     f"v{invalidation['after']['version']}，需重新核對。"
+                     if (invalidation.get("before") or {}).get("version") is not None
+                     and (invalidation.get("after") or {}).get("version") is not None
+                     else f"官方來源文件版本更新至 {(invalidation.get('after') or {}).get('document_version_id') or '待核對'}，需重新核對。")
+                    if needs_review and invalidation else "此項保留於跨日追蹤，尚未標記為已處理。"
                 ),
                 "why_it_matters": "此項由承辦人加入跨日交班追蹤，來源後續修正不會靜默覆蓋。",
                 "recommended_action": (
@@ -411,6 +570,8 @@ def tracking_projection(
                 "watch_status": watch.get("status"),
                 "reason_code": watch.get("reason_code"),
                 "source_version": current.get("version_no") or watch.get("tracked_version"),
+                "source_sha256": current.get("normalized_sha256") or _known_source_ref(watch, candidate)["normalized_sha256"],
+                "source_document_version": _known_source_ref(watch, candidate)["document_version_id"],
                 "last_reviewed_version": watch.get("last_reviewed_version"),
                 "last_handoff_id": watch.get("last_handoff_id"),
                 "source_health": source.get("source_health", "UNKNOWN"),
@@ -421,6 +582,14 @@ def tracking_projection(
         )
     rows.sort(key=lambda row: (0 if row["watch_status"] == "NEEDS_REVIEW" else 1, row["watch_id"]))
     return rows[: max(0, limit)], len(rows)
+
+
+def _assert_known_source_current(watch: dict[str, Any], current: dict[str, Any], state: dict[str, Any]) -> None:
+    known = _known_source_ref(watch, state)
+    if current["version_no"] != known["version"] or (current.get("normalized_sha256") or None) != known["normalized_sha256"]:
+        raise ValueError(f"current item is older than or differs from the known source revision: {watch['watch_id']}")
+    if _source_ref(current)["document_version_id"] != known["document_version_id"]:
+        raise ValueError(f"current item differs from the known document revision: {watch['watch_id']}")
 
 
 def confirm_handoff(
@@ -448,8 +617,9 @@ def confirm_handoff(
         if watch is None or watch.get("status") not in ACTIVE_WATCH_STATUSES:
             raise ValueError(f"watch is not active: {watch_id}")
         current = _as_dict(current_items.get(watch["identity"], {}))
-        if not isinstance(current.get("version_no"), int) or not current.get("official_url", "").startswith("https://"):
+        if type(current.get("version_no")) is not int or current["version_no"] < 1 or not current.get("official_url", "").startswith("https://"):
             raise ValueError(f"current source version is unavailable: {watch_id}")
+        _assert_known_source_current(watch, current, result)
         entries.append(
             {
                 "watch_id": watch_id,
@@ -491,6 +661,7 @@ def confirm_handoff(
         watch["updated_at"] = confirmed
         watch["tracked_version"] = entry["source_version"]
         watch["tracked_sha256"] = entry["source_sha256"]
+        watch["tracked_document_version"] = _as_dict(current_items[entry["identity"]]).get("document_version_id")
         watch["last_reviewed_version"] = entry["source_version"]
         watch["last_reviewed_sha256"] = entry["source_sha256"]
         watch["last_handoff_id"] = brief_id
@@ -549,6 +720,7 @@ def handoff_review_warnings(
     }
     rows = []
     for watch in state.get("watch_items", {}).values():
+        latest = _known_source_ref(watch, state)
         for invalidation in watch.get("invalidations", []):
             if invalidation.get("resolved_in_handoff_id"):
                 continue
@@ -575,8 +747,10 @@ def handoff_review_warnings(
                             if entry is not None
                             else affected.get("source_version")
                         ),
-                        "latest_source_version": after.get("version"),
-                        "latest_source_document_version": after.get("document_version_id"),
+                        "latest_source_version": latest["version"] if after.get("version") is not None else None,
+                        "latest_source_document_version": latest["document_version_id"],
+                        "latest_source_sha256": latest["normalized_sha256"],
+                        "observed_change_source_ref": json.loads(json.dumps(after)),
                         "evidence_locator": (
                             (entry.get("evidence") or {}).get("locator")
                             if entry is not None
@@ -620,6 +794,7 @@ def handoff_markdown(
                 f"- claim_id: `{item.get('claim_id') or claim_id_for(item['identity'], item['source_version'])}`",
                 f"- source version: `v{item['source_version']}`",
                 f"- source document version: `{item.get('source_document_version') or 'UNKNOWN'}`",
+                f"- source sha256: `{item.get('source_sha256') or 'UNKNOWN'}`",
                 f"- evidence: [{evidence['official_url']}]({evidence['official_url']})",
                 f"- locator: `{evidence['locator']}`",
                 "",

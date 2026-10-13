@@ -18,6 +18,7 @@ if str(ROOT) not in sys.path:
 
 from intel_v2.handoff import (
     add_watch,
+    bind_known_documents,
     confirm_handoff,
     empty_state,
     find_handoff,
@@ -63,12 +64,15 @@ def source_items(path: Path) -> dict:
     return value["items"]
 
 
-def publication(feed_path: Path, brief_path: Path) -> dict:
+def publication(feed_path: Path, brief_path: Path, raw_brief: bytes | None = None) -> dict:
     feed = load_json(feed_path)
-    brief = load_json(brief_path)
-    raw_brief = brief_path.read_bytes()
+    raw_brief = brief_path.read_bytes() if raw_brief is None else raw_brief
+    brief = json.loads(raw_brief)
+    run = feed.get("collection_run_id")
+    if not isinstance(run, str) or not run.strip() or brief.get("source_collection_run_id") != run:
+        raise ValueError("feed and brief must identify the same source collection run")
     return {
-        "collection_run_id": feed.get("collection_run_id"),
+        "collection_run_id": run,
         "brief_sha256": hashlib.sha256(raw_brief).hexdigest(),
         "source_status_generated_at": brief.get("source_status_generated_at"),
     }
@@ -93,12 +97,13 @@ def command_watch(args: argparse.Namespace) -> int:
 
 def command_confirm(args: argparse.Namespace) -> int:
     state = load_state(args.handoff_state)
-    current_items = source_items(args.source_state)
-    brief = load_json(args.brief)
+    current_items = bind_known_documents(state, source_items(args.source_state))
+    raw_brief = args.brief.read_bytes()
+    brief = json.loads(raw_brief)
     updated, handoff = confirm_handoff(
         state,
         current_items=current_items,
-        publication=publication(args.feed, args.brief),
+        publication=publication(args.feed, args.brief, raw_brief),
         generated_at=args.generated_at or brief.get("generated_at") or now(),
         confirmed_at=args.confirmed_at or now(),
         watch_ids=args.watch_id,
