@@ -58,11 +58,16 @@ def claim_id_for(identity: str, source_version: int) -> str:
     return f"CLAIM-{_sha([identity, source_version]).upper()[:20]}"
 
 
-def _affected_claims(state: dict[str, Any], identity: str, source_version: int) -> list[dict[str, Any]]:
+def _affected_claims(state: dict[str, Any], identity: str, source_version: int,
+                     source_hash: str | None = None, document_version: str | None = None) -> list[dict[str, Any]]:
     rows = []
     for handoff in state["handoffs"]:
         for entry in handoff["items"]:
             if entry.get("identity") != identity or entry.get("source_version") != source_version:
+                continue
+            if source_hash and entry.get("source_sha256") != source_hash:
+                continue
+            if document_version and entry.get("source_document_version") != document_version:
                 continue
             evidence = entry.get("evidence") if isinstance(entry.get("evidence"), dict) else {}
             rows.append(
@@ -169,6 +174,32 @@ def _event_dict(event: Any) -> dict[str, Any]:
     return _as_dict(event)
 
 
+def _retained_predecessor(watch: dict[str, Any], version: int, digest: str | None,
+                          document: str | None, observed_at: str, publication_at: str | None = None) -> bool:
+    revisions = watch.get("invalidations", [])
+    known_times = [row["detected_at"] for row in revisions if row.get("detected_at")]
+    if publication_at:
+        known_times.append(publication_at)
+    if not known_times:
+        return False
+    observed = datetime.fromisoformat(_timestamp(observed_at))
+    latest = max(datetime.fromisoformat(_timestamp(value)) for value in known_times)
+    if observed < latest:
+        return True
+    if observed > latest:
+        return False
+    for row in revisions:
+        before = row.get("before") or {}
+        before_version = before.get("version", row.get("source_version", watch.get("tracked_version")))
+        known_hash, known_document = before.get("normalized_sha256"), before.get("document_version_id")
+        if (row.get("resolved_in_handoff_id") and before_version == version
+                and (known_hash or known_document)
+                and (not known_hash or digest is None or known_hash == digest)
+                and (not known_document or known_document == document)):
+            return True
+    return False
+
+
 def sync_with_publication(
     state: dict[str, Any] | None,
     *,
@@ -180,6 +211,9 @@ def sync_with_publication(
 ) -> dict[str, Any]:
     result = copy_state(state)
     stamp = _timestamp(observed_at)
+    publication_at = (result.get("last_publication") or {}).get("observed_at")
+    if publication_at and datetime.fromisoformat(stamp) < datetime.fromisoformat(publication_at):
+        return result
     previous_items = previous_items or {}
     event_by_identity: dict[str, dict[str, Any]] = {}
     for raw_event in events:
@@ -197,6 +231,14 @@ def sync_with_publication(
         tracked_version = watch.get("tracked_version") or 0
         after_version = event.get("after_version") if event else current_version
         changed = isinstance(after_version, int) and after_version > tracked_version
+        if current and _retained_predecessor(watch, current_version, current.get("normalized_sha256"),
+                current.get("document_version_id"), stamp, publication_at):
+            continue
+        if current_version == tracked_version:
+            changed = changed or bool(current.get("normalized_sha256") and watch.get("tracked_sha256")
+                and current["normalized_sha256"] != watch["tracked_sha256"])
+            changed = changed or bool(current.get("document_version_id") and watch.get("tracked_document_version")
+                and current["document_version_id"] != watch["tracked_document_version"])
         if current and current.get("official_url", "").startswith("https://"):
             watch["title"] = current.get("title") or watch["title"]
             watch["official_url"] = current["official_url"]
@@ -205,7 +247,8 @@ def sync_with_publication(
         if changed:
             after_hash = str((current or {}).get("normalized_sha256") or "")
             invalidation_id = "INV-" + _sha(
-                [watch["watch_id"], event.get("event_id") if event else None, after_version, after_hash]
+                [watch["watch_id"], event.get("event_id") if event else None, after_version, after_hash,
+                 (current or {}).get("document_version_id")]
             ).upper()[:20]
             known = {entry.get("invalidation_id") for entry in watch["invalidations"]}
             if invalidation_id not in known:
@@ -221,6 +264,7 @@ def sync_with_publication(
                             "version": tracked_version,
                             "normalized_sha256": watch.get("tracked_sha256")
                             or before.get("normalized_sha256"),
+                            "document_version_id": watch.get("tracked_document_version"),
                             "official_url": before.get("official_url") or previous_url,
                         },
                         "after": {
@@ -229,7 +273,8 @@ def sync_with_publication(
                             "document_version_id": (current or {}).get("document_version_id"),
                             "official_url": (current or {}).get("official_url") or watch["official_url"],
                         },
-                        "affected_claims": _affected_claims(result, identity, tracked_version),
+                        "affected_claims": _affected_claims(result, identity, tracked_version,
+                            watch.get("tracked_sha256"), watch.get("tracked_document_version")),
                     }
                 )
             if watch["status"] in ACTIVE_WATCH_STATUSES:
@@ -332,6 +377,9 @@ def sync_with_detail_rechecks(
         after_version = after.get("document_version_id")
         if not isinstance(after_version, str) or not after_version.strip():
             raise ValueError("detail recheck after document version is required")
+        detail_observed = _timestamp(classification.get("observed_at") or stamp)
+        if _retained_predecessor(watch, watch.get("tracked_version"), None, after_version, detail_observed):
+            continue
         invalidation_id = "INV-" + _sha([watch["watch_id"], "DETAIL_RECHECK", after_version]).upper()[:20]
         known = {entry.get("invalidation_id") for entry in watch["invalidations"]}
         if invalidation_id not in known:

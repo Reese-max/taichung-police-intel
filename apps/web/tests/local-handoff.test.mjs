@@ -185,6 +185,28 @@ test("document-only correction remains known after resolution and permits a late
     Object.values(v2.watch_items)[0].invalidations[0].resolved_in_handoff_id);
 });
 
+for (const corrected of [item(1, "corrected-hash"), { ...item(), source_document_version: "DOCV-CORRECTED" }]) {
+  test(`retained publication after resolution cannot reverse ${corrected.source_sha256}/${corrected.source_document_version}`, () => {
+    const v1 = confirmLocalHandoff(addLocalWatch(emptyLocalHandoff(), item(), T0), [item()], publication(), T0);
+    const synced = syncLocalHandoff(v1, [corrected], publication(), T1);
+    const v2 = confirmLocalHandoff(synced, [corrected], { ...publication(), generated_at: T1 }, T1);
+    for (const observed of [T0, T1]) {
+      const replay = syncLocalHandoff(v2, [item()], publication(), observed);
+      const original = JSON.stringify(replay);
+      assert.throws(() => confirmLocalHandoff(replay, [item()], publication(), T1), /較新|版本|雜湊/);
+      assert.equal(JSON.stringify(replay), original);
+      assert.deepEqual(replay.handoffs, v2.handoffs);
+      assert.equal(Object.values(replay.watch_items)[0].invalidations.length, 1);
+    }
+    const later = "2026-09-22T01:00:00+08:00";
+    const reverted = syncLocalHandoff(v2, [item()], publication(), later);
+    assert.equal(Object.values(reverted.watch_items)[0].status, "NEEDS_REVIEW");
+    const v3 = confirmLocalHandoff(reverted, [item()], { ...publication(), generated_at: later }, later);
+    assert.deepEqual(v3.handoffs.slice(0, 2), v2.handoffs);
+    assert.equal(v3.handoffs[2].items[0].source_document_version, item().source_document_version);
+  });
+}
+
 test("failed or partial source shows a per-watch gap and never resolves local tracking", () => {
   const watched = addLocalWatch(emptyLocalHandoff(), item(), T0);
   const noChanges = syncLocalHandoff(watched, [], publication(), T1);

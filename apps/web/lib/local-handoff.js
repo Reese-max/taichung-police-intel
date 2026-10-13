@@ -155,9 +155,23 @@ export function syncLocalHandoff(state, items, publication = {}, observedAt = ne
   const result = copy(validateLocalHandoff(state));
   const currentItems = itemsByIdentity(items);
   const at = stamp(observedAt);
+  const observedMs = Date.parse(at);
+  if (observedMs < Date.parse(result.last_publication?.observed_at)) return result;
   for (const watch of Object.values(result.watch_items)) {
     const current = currentItems.get(watch.identity);
     if (!current) continue;
+    const knownObservedMs = Math.max(Date.parse(result.last_publication?.observed_at) || 0,
+      ...watch.invalidations.map((entry) => Date.parse(entry.detected_at) || 0));
+    const knownPredecessor = watch.invalidations.some((entry) => {
+      const before = entry.before || {};
+      return entry.resolved_in_handoff_id && before.version === current.source_version
+        && (before.normalized_sha256 || before.document_version_id)
+        && (!before.normalized_sha256 || before.normalized_sha256 === current.source_sha256)
+        && (!before.document_version_id || before.document_version_id === current.source_document_version);
+    });
+    // A retained predecessor at the same observation time is not a new source
+    // correction. A later observed publication may legitimately revert it.
+    if (observedMs < knownObservedMs || (knownPredecessor && observedMs === knownObservedMs)) continue;
     watch.title = current.title;
     watch.official_url = current.official_url;
     watch.source_version = current.source_version;
