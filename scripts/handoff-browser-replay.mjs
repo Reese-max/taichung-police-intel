@@ -50,8 +50,8 @@ function packet() {
     sources: [{ ...clone(baseStatus.sources[0]), source_id: "S-032", source_name: `合成歷史重播 S-032（${fixtureLabel}）`,
       source_url: a1.official_url, current_source_run_id: `${run}-SOURCE-032`,
       source_health: health === "PARTIAL" ? "DEGRADED" : health,
-      result: health === "PASS" ? "SUCCESS" : health,
-      window_completeness: health === "PASS" ? "COMPLETE" : health,
+      result: health === "PASS" ? "NEW_ITEMS" : health,
+      window_completeness: health === "PASS" ? "COMPLETE_WITH_ITEMS" : health === "FAILED" ? "NOT_RUN" : "PARTIAL",
       intelligence_gaps: health === "PASS" ? [] : ["合成重播：來源擷取缺口"],
     }],
   };
