@@ -13,6 +13,7 @@
 - `known_source_ref` 保存最新接納的來源 version／hash／document reference，與人工核對的 `tracked_*` 分開；觀察來源又回復成已核對的舊內容時，仍會保存真實 NEW → OLD 異動，且可確認目前的 OLD。確認須完全匹配最新已接納 reference。舊的 schema v1 watch 可由其 tracked reference 與未解決的 invalidation 載入，無須覆寫已確認 history。
 - 匯出警告的 `latest_source_*` 回指最新已接納來源；`observed_change_source_ref` 保留該筆未核對異動當時的 after evidence。來源變更後又回復時，不會把較早的異動版本誤稱為現在最新來源。
 - 產生器將 `compare_snapshot` 後的 canonical semantic version 傳入 handoff sync；不使用 parser 初始的 v1。未提供 document metadata 的相同 version／hash 清單列保留已接納的文件 reference，CLI 與瀏覽器可由該既有 binding 補齊匯出，不新增擷取或修改 source state。tracking projection 也保存來源 hash／document reference；detail-only invalidation 不會因缺少數字版本而中斷 rebuild。
+- 重新載入原有 schema v1 state 時，從該 watch 的最後已確認 handoff 中，核對 watch、identity、version 與 hash 後恢復文件 reference；不改寫舊交班版本。若舊 state 尚未保存來源觀測時間，該 handoff 的 `generated_at` 與既有 publication／invalidation 時間提供來源時間下限，不使用較晚的人工作業 `confirmed_at`。同時檢查已確認 history 中的 predecessor，避免舊版未產生 invalidation 的文件修正被同時間重播反轉。原有 pending 異動若更新 version／hash 卻未提供 document metadata，使用新來源 hash 作為既有清單 evidence reference，不沿用舊 hash。測試 fixture 由原 main `d176eeaa` 的實際 helpers 產生，涵蓋原有 metadata-only 與已確認文件的 restart／repeat 流程。
 - CLI 確認先核對 feed collection run 與 brief source collection run，缺漏或混版時不寫 state；brief 的解析、產生時間與 SHA-256 使用同一份已讀 bytes。
 - 變更事件現在投影 canonical identity、來源版本、內容雜湊與 deterministic `watch_id`；V2 Web 可由重點卡加入本機追蹤，跨頁載入時重播版本變更並回開 `NEEDS_REVIEW`。
 - 靜態 Web 以 `localStorage` 保存單一使用者的 watch／handoff 草稿，提供確認 v1/v2、已處理／停止追蹤與 Markdown/JSON 匯出；不寫入公開檔案或伺服器。

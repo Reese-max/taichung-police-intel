@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
@@ -36,6 +37,49 @@ function publication() {
     publication_hash: "a".repeat(64),
   };
 }
+
+test("original-main browser history recovers the confirmed document after restart", () => {
+  const fixture = JSON.parse(readFileSync(new URL("../../../tests/fixtures/handoff-original-main-d176.json", import.meta.url), "utf8"));
+  const { state, current_item: current } = fixture.browser_confirmed_revision;
+  const original = JSON.stringify(state);
+  const repeated = confirmLocalHandoff(state, [current], publication(), T1);
+  const payload = JSON.parse(exportLocalHandoff(repeated, "json").content);
+  assert.equal(payload.handoff.items[0].source_version, 2);
+  assert.equal(payload.handoff.items[0].source_sha256, "b".repeat(64));
+  assert.equal(payload.handoff.items[0].source_document_version, "DOC-NEW");
+  assert.deepEqual(payload.review_warnings, []);
+  assert.deepEqual(repeated.handoffs.slice(0, 2), state.handoffs);
+  assert.equal(Object.values(repeated.watch_items)[0].invalidations[0].resolved_in_handoff_id,
+    Object.values(state.watch_items)[0].invalidations[0].resolved_in_handoff_id);
+  assert.equal(JSON.stringify(state), original);
+});
+
+test("original-main confirmation recovers source time without using later human confirmation time", () => {
+  const fixture = JSON.parse(readFileSync(new URL("../../../tests/fixtures/handoff-original-main-d176.json", import.meta.url), "utf8"));
+  const { state, current_item: current } = fixture.browser_confirmed_document;
+  const original = JSON.stringify(state);
+  const changed = { ...current, source_document_version: "DOC-LATER" };
+  const retained = syncLocalHandoff(state, [changed], {}, "2026-08-31T09:00:00+08:00");
+  assert.deepEqual(retained.watch_items, state.watch_items);
+  assert.deepEqual(retained.handoffs, state.handoffs);
+  const later = syncLocalHandoff(state, [changed], {}, "2026-09-02T09:00:00+08:00");
+  const repeated = confirmLocalHandoff(later, [changed], { generated_at: "2026-09-02T09:00:00+08:00" }, T1);
+  assert.equal(repeated.handoffs.at(-1).items[0].source_document_version, "DOC-LATER");
+  assert.deepEqual(repeated.handoffs.slice(0, 1), state.handoffs);
+  assert.equal(JSON.stringify(state), original);
+});
+
+test("original-main document history refuses an equal-time predecessor and allows a later reversion", () => {
+  const fixture = JSON.parse(readFileSync(new URL("../../../tests/fixtures/handoff-original-main-d176.json", import.meta.url), "utf8"));
+  const { state, predecessor_item: old } = fixture.browser_same_hash_document_revision;
+  const retained = syncLocalHandoff(state, [old], {}, "2026-09-02T09:00:00+08:00");
+  assert.deepEqual(retained.watch_items, state.watch_items);
+  assert.throws(() => confirmLocalHandoff(retained, [old], publication(), T1), /已知較新來源/);
+  const later = syncLocalHandoff(state, [old], {}, "2026-09-03T09:00:00+08:00");
+  const result = confirmLocalHandoff(later, [old], { generated_at: "2026-09-03T09:00:00+08:00" }, T1);
+  assert.equal(result.handoffs.at(-1).items[0].source_document_version, "DOC-OLD");
+  assert.deepEqual(result.handoffs.slice(0, 2), state.handoffs);
+});
 
 test("local watch is persistent and idempotent", () => {
   const first = addLocalWatch(emptyLocalHandoff(), item(), T0);

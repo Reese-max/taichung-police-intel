@@ -79,13 +79,28 @@ function sourceRef(item) {
     document_version_id: item.source_document_version };
 }
 
-function knownSourceRef(watch) {
+function matchingConfirmedSource(watch, state) {
+  const record = state?.handoffs?.find((entry) => entry.brief_id === watch.last_handoff_id);
+  const item = record?.items?.find((entry) => entry.watch_id === watch.watch_id && entry.identity === watch.identity
+    && entry.source_version === watch.tracked_version
+    && (entry.source_sha256 || null) === (watch.tracked_sha256 || null));
+  return item ? { record, item } : null;
+}
+
+function knownSourceRef(watch, state = null) {
   if (watch.known_source_ref) return watch.known_source_ref;
   const tracked = { version: watch.tracked_version, normalized_sha256: watch.tracked_sha256 || null,
     document_version_id: watch.tracked_document_version || watch.source_document_version || null };
+  const confirmed = matchingConfirmedSource(watch, state)?.item;
+  if (confirmed?.source_document_version) tracked.document_version_id = confirmed.source_document_version;
   const latest = watch.invalidations.at(-1);
   if (latest && (!latest.resolved_in_handoff_id || latest.after?.version > tracked.version)) {
-    return { ...tracked, ...latest.after };
+    const known = { ...tracked, ...latest.after };
+    if (!latest.after?.document_version_id && (known.version !== tracked.version
+      || known.normalized_sha256 !== tracked.normalized_sha256)) {
+      known.document_version_id = known.normalized_sha256 || null;
+    }
+    return known;
   }
   return tracked;
 }
@@ -184,11 +199,12 @@ export function syncLocalHandoff(state, items, publication = {}, observedAt = ne
   for (const watch of Object.values(result.watch_items)) {
     const current = currentItems.get(watch.identity);
     if (!current) continue;
-    const knownRef = knownSourceRef(watch);
+    const knownRef = knownSourceRef(watch, result);
     bindKnownDocument(current, knownRef);
     if (current.source_version < knownRef.version) continue;
     const knownObservedMs = Math.max(Date.parse(result.last_publication?.observed_at) || 0,
       Date.parse(watch.last_source_observed_at) || 0,
+      !watch.last_source_observed_at ? Date.parse(matchingConfirmedSource(watch, result)?.record.generated_at) || 0 : 0,
       ...watch.invalidations.map((entry) => Date.parse(entry.detected_at) || 0));
     const knownPredecessor = watch.invalidations.some((entry) => {
       const before = entry.before || {};
@@ -196,7 +212,12 @@ export function syncLocalHandoff(state, items, publication = {}, observedAt = ne
         && (before.normalized_sha256 || before.document_version_id)
         && (!before.normalized_sha256 || before.normalized_sha256 === current.source_sha256)
         && (!before.document_version_id || before.document_version_id === current.source_document_version);
-    });
+    }) || result.handoffs.some((record) => record.items.some((entry) => entry.watch_id === watch.watch_id
+      && entry.identity === watch.identity && entry.source_version === current.source_version
+      && (entry.source_sha256 || null) === current.source_sha256
+      && entry.source_document_version === current.source_document_version
+      && (knownRef.version !== entry.source_version || knownRef.normalized_sha256 !== entry.source_sha256
+        || knownRef.document_version_id !== entry.source_document_version)));
     // A retained predecessor at the same observation time is not a new source
     // correction. A later observed publication may legitimately revert it.
     if (observedMs < knownObservedMs || (knownPredecessor && observedMs === knownObservedMs)) continue;
@@ -307,7 +328,7 @@ export function confirmLocalHandoff(state, items, publication = {}, confirmedAt 
     if (!watch || !ACTIVE_STATUSES.has(watch.status) || !current) {
       throw new Error(`目前沒有可驗證的來源版本：${watchId}`);
     }
-    const known = knownSourceRef(watch);
+    const known = knownSourceRef(watch, result);
     bindKnownDocument(current, known);
     if (current.source_version !== known.version
       || current.source_sha256 !== known.normalized_sha256
@@ -385,7 +406,7 @@ export function localHandoffReviewWarnings(state, handoff = latestHandoff(state)
   for (const item of handoff.items) {
     const watch = state.watch_items[item.watch_id];
     if (!watch || watch.identity !== item.identity) continue;
-    const latest = knownSourceRef(watch);
+    const latest = knownSourceRef(watch, state);
     for (const invalidation of watch.invalidations) {
       if (!invalidation || invalidation.resolved_in_handoff_id) continue;
       const before = invalidation.before || {};

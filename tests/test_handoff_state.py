@@ -12,6 +12,7 @@ from unittest.mock import patch
 
 from intel_v2.handoff import (
     add_watch,
+    bind_known_documents,
     claim_id_for,
     confirm_handoff,
     empty_state,
@@ -56,6 +57,83 @@ def item(version=1, identity="S-001:event-1", digest=None):
 
 
 class HandoffStateTests(unittest.TestCase):
+    def test_original_main_pending_metadata_revision_uses_current_hash_document(self):
+        fixture = json.loads((Path(__file__).parent / "fixtures/handoff-original-main-d176.json").read_text())
+        state = fixture["python_pending_metadata_revision"]["state"]
+        current = fixture["python_pending_metadata_revision"]["current_item"]
+        original = json.dumps(state, sort_keys=True)
+        bound = bind_known_documents(state, {current["identity"]: current})
+        result, record = confirm_handoff(state, current_items=bound, publication={}, generated_at=T2, confirmed_at=T2)
+        self.assertEqual(record["items"][0]["source_version"], 2)
+        self.assertEqual(record["items"][0]["source_sha256"], "b" * 64)
+        self.assertEqual(record["items"][0]["source_document_version"], "b" * 64)
+        self.assertEqual(result["handoffs"][:-1], state["handoffs"])
+        self.assertEqual(handoff_review_warnings(result, record), [])
+        self.assertEqual(json.dumps(state, sort_keys=True), original)
+
+    def test_original_main_confirmed_document_survives_restart_and_repeat(self):
+        fixture = json.loads((Path(__file__).parent / "fixtures/handoff-original-main-d176.json").read_text())
+        state = fixture["python_confirmed_document"]["state"]
+        current = fixture["python_confirmed_document"]["current_item"]
+        original = json.dumps(state, sort_keys=True)
+        list_only = {key: value for key, value in current.items() if key != "document_version_id"}
+        bound = bind_known_documents(state, {current["identity"]: list_only})
+        result, record = confirm_handoff(state, current_items=bound, publication={}, generated_at=T2, confirmed_at=T2)
+        self.assertEqual(record["items"][0]["source_document_version"], "DOC-ACCEPTED")
+        self.assertEqual(record["items"][0]["source_sha256"], "a" * 64)
+        self.assertEqual(result["handoffs"][:-1], state["handoffs"])
+        self.assertEqual(json.dumps(state, sort_keys=True), original)
+        _, explicit = confirm_handoff(state, current_items={current["identity"]: current}, publication={},
+            generated_at=T2, confirmed_at=T2)
+        self.assertEqual(explicit["items"][0]["source_document_version"], "DOC-ACCEPTED")
+
+    def test_original_main_source_clock_refuses_old_receipt_and_allows_later_source(self):
+        fixture = json.loads((Path(__file__).parent / "fixtures/handoff-original-main-d176.json").read_text())
+        state = fixture["python_confirmed_document"]["state"]
+        current = fixture["python_confirmed_document"]["current_item"]
+        original = json.dumps(state, sort_keys=True)
+        changed = dict(current, document_version_id="DOC-LATER")
+        for path in ["publication", "detail"]:
+            with self.subTest(path=path):
+                def observe(at):
+                    if path == "publication":
+                        return sync_with_publication(state, previous_items={}, current_items={current["identity"]: changed},
+                            events=[], observed_at=at, collection_run_id="SYNTHETIC-LEGACY-LATER")
+                    return sync_with_detail_rechecks(state, [{"source_id": current["source_id"], "stable_key": current["stable_key"],
+                        "classification": {"review_required": True, "before": {"document_version_id": "UNSEEN-PREDECESSOR"},
+                            "after": {"document_version_id": "DOC-LATER"}}}], observed_at=at)
+                retained = observe("2026-08-31T09:00:00+08:00")
+                self.assertEqual(retained["watch_items"], state["watch_items"])
+                self.assertEqual(retained["handoffs"], state["handoffs"])
+                later = observe(T1)
+                result, record = confirm_handoff(later, current_items={current["identity"]: changed}, publication={},
+                    generated_at=T1, confirmed_at=T2)
+                self.assertEqual(record["items"][0]["source_document_version"], "DOC-LATER")
+                self.assertEqual(result["handoffs"][:-1], state["handoffs"])
+        self.assertEqual(json.dumps(state, sort_keys=True), original)
+
+    def test_original_main_document_history_refuses_equal_time_predecessor_and_allows_later_reversion(self):
+        fixture = json.loads((Path(__file__).parent / "fixtures/handoff-original-main-d176.json").read_text())
+        case = fixture["python_same_hash_document_revision"]
+        state, old = case["state"], case["predecessor_item"]
+        for path in ["publication", "detail"]:
+            with self.subTest(path=path):
+                def observe(at):
+                    if path == "publication":
+                        return sync_with_publication(state, previous_items={}, current_items={old["identity"]: old},
+                            events=[], observed_at=at, collection_run_id="SYNTHETIC-LEGACY-REVERSION")
+                    return sync_with_detail_rechecks(state, [{"source_id": old["source_id"], "stable_key": old["stable_key"],
+                        "classification": {"review_required": True, "before": {"document_version_id": "DOC-NEW"},
+                            "after": {"document_version_id": "DOC-OLD"}}}], observed_at=at)
+                retained = observe(T1)
+                self.assertEqual(retained["watch_items"], state["watch_items"])
+                with self.assertRaisesRegex(ValueError, "known document revision"):
+                    confirm_handoff(retained, current_items={old["identity"]: old}, publication={}, generated_at=T1, confirmed_at=T2)
+                result, record = confirm_handoff(observe(T2), current_items={old["identity"]: old}, publication={},
+                    generated_at=T2, confirmed_at=T2)
+                self.assertEqual(record["items"][0]["source_document_version"], "DOC-OLD")
+                self.assertEqual(result["handoffs"][:-1], state["handoffs"])
+
     def test_add_watch_is_idempotent(self):
         state, first, created = add_watch(empty_state(), item(), created_at=T0)
         same_state, second, created_again = add_watch(state, item(), created_at=T1)
