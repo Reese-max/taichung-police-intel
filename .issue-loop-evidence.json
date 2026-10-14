@@ -1,33 +1,12 @@
 {
-  "schema_version": 1,
-  "status": "failed",
   "repo": "Reese-max/taichung-police-intel",
-  "issue": 29,
-  "base_sha": "2c660cef6f1b1fbf86b141306e54d06e0511c9f9",
-  "created_at": "2026-10-06T05:11:59.498475Z",
-  "gates": {
-    "baseline": "pass",
-    "tdd": "pass",
-    "review": "fail"
-  },
-  "commands": [],
-  "candidate_sha": "eb53499854c92ddf170abc874978cb4fa55e9e77",
-  "changed_files": [
-    ".issue-loop-context.json",
-    ".issue-loop-evidence.json",
-    ".issue-loop-prompt.md",
-    ".issue-loop-red.json",
-    ".issue-loop-review.json",
-    "tests/test_chat_turn_worker.py",
-    "workers/query-gateway/src/index.js"
-  ],
-  "red_proof": {
-    "repo": "Reese-max/taichung-police-intel",
-    "issue": 29,
-    "base_sha": "2c660cef6f1b1fbf86b141306e54d06e0511c9f9",
-    "command": "python -X utf8 -c \"import sys; ws='workers/query-gateway/src/index.js'; source=open(ws).read(); allowed_start=source.find('const allowed = {'); allowed_section=source[allowed_start:source.find('}', allowed_start+1)]; print('RED' if 'chat_turn' not in allowed_section else 'GREEN'); sys.exit(1 if 'chat_turn' not in allowed_section else 0)\"",
-    "exit": 1
-  },
-  "review": null,
-  "failure_reason": "review_sha_mismatch"
+  "issue": 162,
+  "base_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+  "red_proof": "Before implementation, the validator regression command exited 1. FAIL: test_cli_rejects_output_aliases_and_preserves_plan_and_original_bytes (test_reference_resource_validator_review.IndependentValidatorReviewTests.test_cli_rejects_output_aliases_and_preserves_plan_and_original_bytes) (input='plan.json', alias='same')\n    self.assertEqual(result.returncode, 2, result.stdout + result.stderr)\nAssertionError: 0 != 2 : {\nRan 22 tests in 1.629s\nFAILED (failures=7, skipped=3)",
+  "test_command": "python -X utf8 -m unittest discover -s tests -p test_reference_resource_validator_review.py -v && python -X utf8 -m unittest discover -s tests -p test_live_canary_transport.py -v && node --test apps/web/tests/population-background.test.mjs",
+  "test_exit": 0,
+  "tests_passed": 40,
+  "tests_failed": 0,
+  "summary": "Protected the background-resource validator's plan and original CSV bytes from --out aliases using the existing source-scope alias guard and CSV audit atomic writer. Added CLI regressions for same/relative/hardlinked inputs, safe receipt replacement, and honest blocked-D2 receipts with null rows and UNKNOWN CRS; retained existing fixed-112Y12M D1 checks. The validator regression suite grew from 19 to 22 test methods; relevant runs cover 43 methods with zero failures and three Windows symlink-permission subcase skips (conservative passed count excludes those skips). Updated the issue acceptance mapping and validator documentation without changing source data or granting production admission.",
+  "not_done": "Issue #162 remains partial: no new official D2 bytes, rows/schema, agency/address/phone, CRS/unit/axis or geographic verification; the recorded original 403 was not retried or bypassed. No #39 rights/use approval, #33 human study, #25/#62 external synchronization, source promotion, deployment, push or PR. Three actual symlink subcases are unverified on this Windows account (WinError 1314). Full-suite verification is not green: existing checkpoint code requires os.O_NONBLOCK, absent on Windows; a minimal failing test was also reproduced from the admitted base SHA. Existing CSV-audit POSIX permission assertions also fail on Windows. Full-suite logs are under runtime-evidence/issue-162; missing lint/coverage/CRAP/mutation tooling was not installed. Full Python run: exit 1, 1539 tests, 17 failures, 86 errors, 15 skips; other observed failures include installed pypdf 6.18.0 versus pinned 6.19.0, cp950 subprocess encoding, symlink privileges, and pre-commit dirty-tree rejection. Only the O_NONBLOCK minimal reproducer was independently rerun against the admitted base; other full-suite failures were not all revalidated there. npm run check completed with exit 1 (web: 800 tests, 797 passed, 3 failed; ten failing sub-gates). Its Next.js production build succeeded, and npm run check:gate0 passed with required=164 specs=4 secrets=0; neither replaces the failing full gates."
 }
