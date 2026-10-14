@@ -1,33 +1,12 @@
 {
-  "schema_version": 1,
-  "status": "failed",
   "repo": "Reese-max/taichung-police-intel",
-  "issue": 29,
-  "base_sha": "2c660cef6f1b1fbf86b141306e54d06e0511c9f9",
-  "created_at": "2026-10-06T05:11:59.498475Z",
-  "gates": {
-    "baseline": "pass",
-    "tdd": "pass",
-    "review": "fail"
-  },
-  "commands": [],
-  "candidate_sha": "eb53499854c92ddf170abc874978cb4fa55e9e77",
-  "changed_files": [
-    ".issue-loop-context.json",
-    ".issue-loop-evidence.json",
-    ".issue-loop-prompt.md",
-    ".issue-loop-red.json",
-    ".issue-loop-review.json",
-    "tests/test_chat_turn_worker.py",
-    "workers/query-gateway/src/index.js"
-  ],
-  "red_proof": {
-    "repo": "Reese-max/taichung-police-intel",
-    "issue": 29,
-    "base_sha": "2c660cef6f1b1fbf86b141306e54d06e0511c9f9",
-    "command": "python -X utf8 -c \"import sys; ws='workers/query-gateway/src/index.js'; source=open(ws).read(); allowed_start=source.find('const allowed = {'); allowed_section=source[allowed_start:source.find('}', allowed_start+1)]; print('RED' if 'chat_turn' not in allowed_section else 'GREEN'); sys.exit(1 if 'chat_turn' not in allowed_section else 0)\"",
-    "exit": 1
-  },
-  "review": null,
-  "failure_reason": "review_sha_mismatch"
+  "issue": 165,
+  "base_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+  "red_proof": "FAIL: test_cost_and_workload_denominators_stay_explicit (test_capacity_plan.CapacityPlanTests.test_cost_and_workload_denominators_stay_explicit)\r\n----------------------------------------------------------------------\r\nTraceback (most recent call last):\r\n  File \"C:\\Users\\Administrator\\issue-loop\\worktrees\\Reese-max_taichung-police-intel-issue-165\\tests\\test_capacity_plan.py\", line 16, in setUp\r\n    self.assertTrue(PLAN.is_file(), \"#165 capacity planning input register is missing\")\r\nAssertionError: False is not true : #165 capacity planning input register is missing\n\nRan 4 tests in 0.001s\r\n\r\nFAILED (failures=4)",
+  "test_command": "python -X utf8 tests/test_capacity_plan.py -v && python -X utf8 -m unittest discover -s tests -p \"test_commute_reopen_replay.py\" -v",
+  "test_exit": 0,
+  "tests_passed": 114,
+  "tests_failed": 0,
+  "summary": "新增 #165 人力、六週相依時程及成本輸入文件，沿用既有 #33／#35 收據，未提供的真人承諾、日期、費率與負荷維持 null／未排定。同步 v6 p7／p9 對照及驗收清單，加入 4 項回歸檢查與完整 gate 入口；文件逐項列出七項驗收的本地交付、前置 gate 與 cutoff 縮小交付。官方公告窗口已回查，但本地規劃整理不代表 #165 已達正式關閉條件。",
+  "not_done": "#165 尚未完成：未取得真人角色／每週工時與相容性確認、團隊實際起訖／里程碑日期與最新主辦通知、核准約 60 原件及逐版處理／模型／資源／人工紀錄、當期費率／免費限制與月負荷、團隊預算上限及實際量測／處置責任；七日有效觀察、授權／完整性、D2 原件、官方版本案例及真人安排仍沿用未通過 gate。僅同步 repo 的 #25／#62 對照文件，未重交構想書或更新外部 issues。npm run check 完整執行但 exit 1，10 個失敗群組為 web-tests、schema-drift-tests、news-list-checkpoint-tests、checkpoint-code-binding-tests、news-list-runtime-binding-integration-tests、source-scope-contract-tests、reference-csv-audit-tests、reference-json-collection-audit-tests、current-checkout-tests、source-transport-recovery-tests；包含既有 Windows O_NONBLOCK／mkfifo／檔案權限假設與隔離 Python 缺 pypdf，相關檔案與 admitted base 相同。Next.js 靜態建置及輸出三檔存在檢查通過；完整專案 acceptance 未通過，完整輸出保留本機 runtime-evidence/issue-165/full-gate.log。Repo 沒有設定獨立 lint／coverage ratchet／CRAP／mutation gate，未新增。未 push、未建立 PR、未改其他分支、未部署、未啟用來源／模型、未付費／招募／對外發送。"
 }
