@@ -1,10 +1,30 @@
 # Issue #162 — 驗收 D1 歷史人口與 D2 警察機關名錄、座標系及背景用途
 
-驗收基準（本單工作樹基底）：`main@2c660cef6f1b1fbf86b141306e54d06e0511c9f9`
+本次工作樹基底：`c629f82a8b16825d5d89c204c7035dcba500a9ac`（2026-10-14）；下列官方取件與部署紀錄保留其原觀察時間，本次沒有重新取件或部署。
 
-本單為 v6 D1 歷史人口與 D2 警察機關名錄的驗收子項；沿用已有 D1 核對結果，不重建事件融合，亦不以其他人口期別替換計畫範圍。驗收結果分列 D1（已完成）與 D2（資源未取得）兩節。
+本單為 v6 D1 歷史人口與 D2 警察機關名錄的驗收子項；沿用已有 D1 核對結果，不重建事件融合，亦不以其他人口期別替換計畫範圍。D1 固定樣本的技術驗證已具備；來源權利、用途核准與真人效益仍需獨立驗收，整張 issue 尚未完成。D2 原始資源未取得，仍無法驗收。
 
-## D1：固定期別 SEGIS 人口統計（已完成驗收）
+## 本次修正：驗證收據不得覆寫原件
+
+`reference-resource-validator.py --out` 原可指向 `--plan` 或 `--resource`，驗證成功後將輸入覆寫成 JSON。新增 CLI 回歸測試先重現 7 個失敗案例，再重用 `source-scope-contracts.py` 的 alias 檢查及 `reference-csv-audit.py` 的原子 JSON 寫入，拒絕同路徑、`..`、symlink 與 hardlink 輸入別名，保留原始 bytes／hash；其他檔案連到舊收據時亦不被連帶修改。
+
+| 本次驗收項目 | 機制與界限 |
+|---|---|
+| 保存原件與取得驗證計畫 | 輸入 alias 回傳 2、stdout 無收據、兩份輸入 bytes 不變；distinct output 原子替換。 |
+| D2 失敗收據與來源缺口一致 | metadata 200／原件 BLOCKED 403 的離線案例仍輸出 `resource_rows=null`、`completeness=false`、CRS `UNKNOWN`，回傳 2。 |
+| D1 固定歷史身分 | 沿用既有 112Y12M／29 區／西屯人戶數與期別、hash、防 promotion 測試，沒有修改人口資料或公開收據。 |
+| D2 真實機關資料與座標、權利與真人用途 | 尚未完成；離線 fictional fixture 不構成取得、CRS、用途或正式站驗收證據。 |
+| #25／#62 同步 | 本地文件保留成功與 blocked 清單；外部 issue 更新由 driver 處理，本次未對外寫入。 |
+
+TDD 指令：`python -X utf8 -m unittest discover -s tests -p test_reference_resource_validator_review.py -v`。修正前：`Ran 22 tests`、`FAILED (failures=7, skipped=3)`；修正後：`Ran 22 tests`、`OK (skipped=3)`。跳過的是 Windows 無建立 symlink 權限的 3 個子案例（WinError 1314）；同路徑、相對路徑與 hardlink 已實際執行。D1 web 2 項亦通過；完整驗證結果見本次 `.issue-loop-evidence.json`。
+
+相關測試以 evidence 的 Git Bash 指令實際重跑，exit 0：validator 22 項、transport／人口 19 項、web 人口 2 項，0 failures，另有上述 3 個 symlink 子案例跳過。validator 測試數由 19 增至 22。`git diff --check` 與兩個變更 Python 檔案的 `py_compile` 均 exit 0；獨立 diff review 無阻擋發現。
+
+完整 Python 測試指令 `python -X utf8 -m unittest discover -s tests -p "test_*.py" -v` 為 exit 1：1539 項、17 failures、86 errors、15 skips。失敗包含既有 Windows 缺少 `os.O_NONBLOCK`／symlink 權限／POSIX mode、子程序 cp950 編碼、安裝的 pypdf 6.18.0 與專案固定 6.19.0 不符，以及尚未提交的工作樹被 current-checkout gate 拒絕；未宣稱每項失敗均已在基底完整重跑。`test_binding_helpers_themselves_match_their_compiled_current_source` 在 admitted base 的獨立 `git archive` 副本亦重現缺少 `os.O_NONBLOCK`（exit 1），未更動任何其他分支。這些全套驗證限制不以相關測試的 exit 0 掩蓋，亦未擴大本單修改其他模組或共用 Python 環境。
+
+`npm run check` 已完整執行並以 exit 1 結束：web 800 項中 797 通過、3 失敗（current-checkout 與兩個 PDF parser 案例）；其餘 Python 子 gate 的錯誤保留於 `runtime-evidence/issue-162/full-gate.log`。其中 Next.js production build 成功完成靜態頁面產生；不將 build 成功當成完整 gate 通過。`npm run check:gate0` 為 exit 0：`VERIFY_OK mode=gate0 required=164 specs=4 secrets=0`。專案沒有提供的 lint／coverage ratchet／CRAP／mutation 工具未另行安裝。
+
+## D1：固定期別 SEGIS 人口統計（固定樣本技術驗證）
 
 - 來源 ID：S-035，內政部統計處 SEGIS 112 年 12 月行政區人口統計（鄉鎮市區）
 - 期別：112Y12M（2023 年 12 月），官方固定期別查詢頁的原生 CSV 下載按鈕取得

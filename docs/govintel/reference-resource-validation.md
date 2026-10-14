@@ -15,6 +15,8 @@ python scripts/reference-resource-validator.py --plan /path/to/plan.json \
 
 Exit 0 means only `LOCAL_SUPPLIED_PLAN_CONTRACT_ONLY` passed. Expected rows/period originate in the caller's plan and are not independently authenticated official totals. `business_scope_completeness=NOT_VERIFIED`, `promotion=false`, `production_active=false`, `rights_decision=PENDING` remain true for all results. Exit 2 means invalid plan or contract incomplete; a blocked source still produces its JSON receipt when the plan is valid.
 
+`--out` must be distinct from both the plan and the original resource, including resolved relative paths, symlinks and hardlinks. Input aliases are rejected with exit 2 before validation or output; neither input is changed and stdout contains no receipt. A distinct destination is replaced atomically using the existing CSV audit writer, preserving other files linked to an older receipt. Output errors also return 2 without a success receipt. The file and stdout carry the same JSON object; key order is not part of the contract.
+
 ### Coordinate evidence
 
 POINT_X/Y names and a literal `authority=AUTHORITATIVE_METADATA` in a plan do not prove an official CRS. The script preserves supported candidate EPSG/units/axis information separately, may perform a requested numeric diagnostic against that candidate, but always keeps official `coordinate_reference_system=UNKNOWN`, `crs_authenticity=NOT_VERIFIED`, `coordinate_validation=NOT_RUN` where coordinates exist. Requested coordinate contracts cannot become complete without actual independently verified official metadata. Projected coordinate diagnostics check finite numbers only, not projection transformation or geospatial accuracy. No distance or jurisdiction inference is allowed.
