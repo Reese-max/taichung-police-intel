@@ -1,33 +1,12 @@
 {
-  "schema_version": 1,
-  "status": "failed",
   "repo": "Reese-max/taichung-police-intel",
-  "issue": 29,
-  "base_sha": "2c660cef6f1b1fbf86b141306e54d06e0511c9f9",
-  "created_at": "2026-10-06T05:11:59.498475Z",
-  "gates": {
-    "baseline": "pass",
-    "tdd": "pass",
-    "review": "fail"
-  },
-  "commands": [],
-  "candidate_sha": "eb53499854c92ddf170abc874978cb4fa55e9e77",
-  "changed_files": [
-    ".issue-loop-context.json",
-    ".issue-loop-evidence.json",
-    ".issue-loop-prompt.md",
-    ".issue-loop-red.json",
-    ".issue-loop-review.json",
-    "tests/test_chat_turn_worker.py",
-    "workers/query-gateway/src/index.js"
-  ],
-  "red_proof": {
-    "repo": "Reese-max/taichung-police-intel",
-    "issue": 29,
-    "base_sha": "2c660cef6f1b1fbf86b141306e54d06e0511c9f9",
-    "command": "python -X utf8 -c \"import sys; ws='workers/query-gateway/src/index.js'; source=open(ws).read(); allowed_start=source.find('const allowed = {'); allowed_section=source[allowed_start:source.find('}', allowed_start+1)]; print('RED' if 'chat_turn' not in allowed_section else 'GREEN'); sys.exit(1 if 'chat_turn' not in allowed_section else 0)\"",
-    "exit": 1
-  },
-  "review": null,
-  "failure_reason": "review_sha_mismatch"
+  "issue": 163,
+  "base_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+  "red_proof": "Before implementation: node --test apps/web/tests/registration-docs.test.mjs (exit 1)\n✖ demo separates supplement receipt from unresolved registration gates (#163)\nℹ tests 1\nℹ pass 0\nℹ fail 1\nAssertionError [ERR_ASSERTION]: The input did not match the regular expression /補件收妥/. Input:\nOriginal input included: 補件寄送完成，主辦受理／更名仍未確認。",
+  "test_command": "node --test apps/web/tests/registration-docs.test.mjs",
+  "test_exit": 0,
+  "tests_passed": 1,
+  "tests_failed": 0,
+  "summary": "Corrected the current competition demo to reflect the existing October 5 supplement receipt and rejected rename, linking the dated registration verification record. Added one Node standard-library regression test that preserves unresolved title, representative eligibility and cover/resubmission instructions and keeps the #163 checklist unchecked. This repairs the local public-document consistency portion of acceptance criterion 6 without changing source policy, data, application behavior or historical receipts. This is a partial documentation repair; the administrative acceptance criteria are not complete.",
+  "not_done": "AC1: no private registration title/contest number/date verification. AC2: no new organizer instructions, cover revision or resubmission. AC3: no verification of actual members, units, representative eligibility, contact roles or consent. AC4: no official OR/AND clarification, new D1/D2 admission or missing D2 resource/CRS verification. AC5: no cross-unit/scoring confirmation. AC6: #25/#62 administrative approval remains unverified; public receipt/qualification statements are aligned only. No private mail/forms/PDFs were accessed, no mail sent, no signing, no push, no PR, no deployment and no CI run. The pre-commit full gate npm run check exited 1: web tests 798 passed/3 failed, with dirty-worktree refusal plus existing Windows os.O_NONBLOCK/symlink/permission limitations and unavailable isolated pypdf; production build succeeded. Admitted-base source reproduced the os.O_NONBLOCK failure; those sources were not changed. No dedicated lint/coverage/CRAP/mutation setup was found or installed."
 }
