@@ -15,7 +15,7 @@
 | p5–6 媒體發現 | 固定 fixture 可 replay；正式畫面清楚標示示例 | Taiwan Intel live、授權、14 日 shadow 未驗。72h／200 項／256KB 是交換上限，非每日新增量。 |
 | p7–8 人工標註、A／B／C 及語意 off | [評測協定](EVALUATION.md)與 [真人 protocol](human-study-protocol.v1.json)已備妥 | 實際事件／原件／兩名獨立覆核及同意試用人數為 0；訪談、答案與計時未執行。 |
 | p8 85%／90%／30% | 仍是目標，零分母以 null 表示 | 不以工程測試數或 prompt 調整填成達成。 |
-| p9 六週、人力、負荷、成本與備援 | [資源觀察](closure-20261006/resource-observation.json)、[固定新舊差異](OLD_VS_NEW.md)、離線 replay | 真實成員工時、起訖、預算、60 原件處理、負載與單位成本待輸入；備援不是持續最新服務。 |
+| p7／p9 六週、人力、負荷、成本與備援 | [#165 人力、時程與成本輸入](CAPACITY_PLAN.md)、[資源觀察](closure-20261006/resource-observation.json)、[固定新舊差異](OLD_VS_NEW.md)、離線 replay | 六週相依草案保留未排定；真實成員工時、起訖、預算、60 原件處理、負載與單位成本待輸入；未通過時採 cutoff 離線交付，備援不是持續最新服務。 |
 | p9–10 告警、恢復與更正 | [真實 upload drill](closure-20261006/alert-drill.json)、送達／hash 回讀與靜態資料回報入口已驗 | 實際 deploy 故障、raw purge、來源恢復及維運接案人員仍待驗；通知送達不等於真人閱讀。 |
 | p6／p10 作品、引用、資格與權利 | [依賴清單](closure-20261006/dependency-license-inventory.json)、[報名核對](registration-verification-20261006.md)、[新舊差異](closure-20261006/old-new-file-delta.json) | 原題名、代表資格、資料「或／與」、獲獎史、權利人同意待確認。原始 PDF 沒有 hyperlink annotations，新工作稿可補，未獲指示不重交。 |
 
