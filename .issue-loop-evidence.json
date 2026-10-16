@@ -1,33 +1,12 @@
 {
-  "schema_version": 1,
-  "status": "failed",
   "repo": "Reese-max/taichung-police-intel",
-  "issue": 29,
-  "base_sha": "2c660cef6f1b1fbf86b141306e54d06e0511c9f9",
-  "created_at": "2026-10-06T05:11:59.498475Z",
-  "gates": {
-    "baseline": "pass",
-    "tdd": "pass",
-    "review": "fail"
-  },
-  "commands": [],
-  "candidate_sha": "eb53499854c92ddf170abc874978cb4fa55e9e77",
-  "changed_files": [
-    ".issue-loop-context.json",
-    ".issue-loop-evidence.json",
-    ".issue-loop-prompt.md",
-    ".issue-loop-red.json",
-    ".issue-loop-review.json",
-    "tests/test_chat_turn_worker.py",
-    "workers/query-gateway/src/index.js"
-  ],
-  "red_proof": {
-    "repo": "Reese-max/taichung-police-intel",
-    "issue": 29,
-    "base_sha": "2c660cef6f1b1fbf86b141306e54d06e0511c9f9",
-    "command": "python -X utf8 -c \"import sys; ws='workers/query-gateway/src/index.js'; source=open(ws).read(); allowed_start=source.find('const allowed = {'); allowed_section=source[allowed_start:source.find('}', allowed_start+1)]; print('RED' if 'chat_turn' not in allowed_section else 'GREEN'); sys.exit(1 if 'chat_turn' not in allowed_section else 0)\"",
-    "exit": 1
-  },
-  "review": null,
-  "failure_reason": "review_sha_mismatch"
+  "issue": 161,
+  "base_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+  "red_proof": "test at apps\\web\\tests\\query-release-client.test.mjs:50:1\n✖ same release labels cannot hide missing or changed data and policy bindings (3.1943ms)\n  AssertionError [ERR_ASSERTION]: Missing expected rejection.\n\nℹ tests 47\nℹ pass 41\nℹ fail 6\nRed command exited 1 before implementation; full output retained in runtime-evidence/issue-161/red.log.",
+  "test_command": "node --test --test-concurrency=1 apps/web/tests/query-release-client.test.mjs apps/web/tests/research-client.test.mjs apps/web/tests/controlled-answer-client.test.mjs apps/web/tests/controlled-answer-pipeline.test.mjs",
+  "test_exit": 0,
+  "tests_passed": 63,
+  "tests_failed": 0,
+  "summary": "補強 #161 generation/hash 不符拒答的工程缺口：公開查詢與研究 transport 共用完整 release 綁定檢查，並各自核對 query envelope、receipt、policy 或研究 generation。不完整 manifest 在 POST 前阻擋，同標籤下的混版回應以 PENDING_UPDATE 拒絕；沿用既有 canonical JSON、Worker manifest builder、查詢與追蹤服務。新增失敗優先回歸及離線瀏覽器混版案例，並在既有驗收文件逐項列出 #161 對應與尚缺證據；63 個目標與實際 Worker 串接測試通過。",
+  "not_done": "完整 issue #161 尚未完成，維持 BLOCKED_BY_SOURCE_ADMISSION：此 checkout 的核准 policy 為 legacy schema 1，五來源 formal admission 均為 UNKNOWN / APPROVED_GOVERNANCE_MISSING。未進行正式已准入官方正值查詢、匿名原文完整回查、真正關閉重開、自然修訂、已讀後再修訂、明文解除或真人成效驗收；離線 fixture/browser 不能替代這些 gate。未改動來源權利、promotion、正式資料或既有追蹤語意，未部署、push、建立 PR 或對外同步 #25/#62。專案未配置獨立 lint、coverage ratchet、CRAP 或 mutation gate，沒有新增這些工具。 完整 npm run check 為 exit 1：八組既有 Python gate 涉及 Windows 缺少 O_NONBLOCK、Unix deadline、目錄 fsync、symlink/0600 權限語意；三個最小失敗已在乾淨 admitted base 重現，未擴修這些題外模組。正式鍵盤成功流程尚未驗收。"
 }
