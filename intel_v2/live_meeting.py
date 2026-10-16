@@ -392,9 +392,13 @@ def append_segment(
     result = _copy(state)
     if result["status"] not in {"LIVE", "DEGRADED"}:
         raise ValueError("segments can only be appended while LIVE or DEGRADED")
+    if result["transport_status"] == "BUDGET_STOP":
+        raise ValueError("transport stopped at its budget; start a new explicit session")
     if isinstance(sequence, bool) or not isinstance(sequence, int) or sequence < 0:
         raise ValueError("sequence must be a non-negative integer")
     start, end = _check_interval(start_seconds, end_seconds, result["max_duration_seconds"])
+    if result["budget_seconds"] is None or end > result["budget_seconds"]:
+        raise ValueError("segment exceeds the authorized budget")
     text = _text(text, "transcript text")
     if confidence is not None and not 0 <= _number(confidence, "confidence") <= 1:
         raise ValueError("confidence must be between 0 and 1")
@@ -417,10 +421,10 @@ def append_segment(
         revision = current["revision"] + 1
         history = list(current["revision_history"])
         history.append({
-            key: current[key]
+            key: current.get(key)
             for key in (
                 "revision", "text", "content_sha256", "received_at", "finalized", "partial",
-                "confidence", "speaker_label", "profile_relevance",
+                "confidence", "speaker_label", "profile_relevance", "finalized_at",
             )
         })
         segments.remove(current)
@@ -446,6 +450,9 @@ def append_segment(
             "language": result["asr_contract"]["language"],
             "asr_contract": dict(result["asr_contract"]),
             "received_at": _stamp(received_at),
+            "finalized_at": _stamp(received_at) if finalized else None,
+            "evidence_state": PROVISIONAL_EVIDENCE_STATE,
+            "provisional": True,
             "finalized": finalized,
             "partial": partial,
             "profile_relevance": profile_relevance,
@@ -483,6 +490,8 @@ def resume_session(state: dict[str, Any], *, resumed_at: str | datetime) -> dict
         raise ValueError("only DEGRADED or FAILED sessions can be resumed")
     if result["budget_seconds"] is None:
         raise ValueError("cannot resume a session that was never activated with a bounded budget")
+    if result["transport_status"] == "BUDGET_STOP":
+        raise ValueError("transport stopped at its budget; start a new explicit session")
     result["status"] = "LIVE"
     result["transport_status"] = "READY"
     result["termination_reason"] = None
@@ -764,10 +773,17 @@ def reconcile_session(
         if outcome not in RECONCILIATION_OUTCOMES:
             raise ValueError(f"unsupported reconciliation outcome: {outcome}")
         official = None
-        if outcome in {"CONFIRMED_BY_OFFICIAL_MEDIA", "CONFIRMED_BY_MINUTES"}:
+        if outcome in {"CONFIRMED_BY_OFFICIAL_MEDIA", "CONFIRMED_BY_MINUTES"} or candidate.get("official_url") is not None:
             official_source_id = candidate.get("official_source_id") or result["source_id"]
+            source_type = candidate.get("official_source_type") or ("MINUTES" if outcome == "CONFIRMED_BY_MINUTES" else "OFFICIAL_MEDIA")
+            if source_type not in {"OFFICIAL_MEDIA", "MINUTES", "AGENDA"} or (
+                outcome in {"CONFIRMED_BY_OFFICIAL_MEDIA", "CONFIRMED_BY_MINUTES"}
+                and source_type != ("MINUTES" if outcome == "CONFIRMED_BY_MINUTES" else "OFFICIAL_MEDIA")
+            ):
+                raise ValueError("official source type cannot confirm this outcome")
             official = {
                 "source_id": official_source_id,
+                "source_type": source_type,
                 "official_url": _official_url(official_source_id, candidate.get("official_url")),
                 "locator": _text(candidate.get("official_locator"), "official_locator", max_length=300),
                 "document_version": _text(candidate.get("official_document_version"), "official_document_version", max_length=160),
@@ -804,7 +820,9 @@ def reconcile_session(
                 "reconciler": {
                     "name": "intel_v2.live_meeting",
                     "schema_version": SCHEMA_VERSION,
+                    "parser_version": "live-meeting-reconcile-v1",
                 },
+                "verification_status": "OFFICIAL_RECONCILED" if outcome in {"CONFIRMED_BY_OFFICIAL_MEDIA", "CONFIRMED_BY_MINUTES"} else "PROVISIONAL_UNRESOLVED",
                 "reconciled_at": _stamp(reconciled_at),
                 "session_revision": result["session_revision"],
             }
@@ -867,6 +885,7 @@ def mark_receipt_stale(
     if observed_official_sha256.lower() == official["text_sha256"].lower():
         return result
     receipt["stale"] = True
+    receipt["verification_status"] = "STALE_NEEDS_REVIEW"
     receipt["stale_reason"] = "SOURCE_REVISED"
     receipt["stale_marked_at"] = _stamp(marked_at)
     current = set(result["current_reconciliations"].values())
@@ -887,6 +906,8 @@ def mark_receipt_stale(
 
 def formal_candidates(state: dict[str, Any]) -> list[dict[str, Any]]:
     validate_session(state)
+    if state.get("provider_usage", {}).get("mode") == "FIXTURE_ONLY":
+        return []
     receipts = {receipt["receipt_id"]: receipt for receipt in state["reconciliation_receipts"]}
     result = []
     for candidate_id, receipt_id in state["current_reconciliations"].items():
@@ -952,6 +973,29 @@ def validate_session(state: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("bookmarks and reconciliation_receipts must be arrays")
     if not isinstance(state.get("current_reconciliations"), dict):
         raise ValueError("current_reconciliations must be an object")
+    usage = state.get("provider_usage")
+    if usage is not None:
+        if not isinstance(usage, dict) or usage.get("mode") not in {"FIXTURE_ONLY", "GROQ_RECORDED_AUDIO"}:
+            raise ValueError("provider usage mode is invalid")
+        calls = usage.get("calls")
+        if not isinstance(calls, list) or usage.get("adapter_version") != "recorded-chunk-v1":
+            raise ValueError("provider usage ledger is invalid")
+        reserved = _number(usage.get("reserved_seconds"), "provider usage reserved_seconds")
+        total = 0.0
+        for index, call in enumerate(calls, 1):
+            if not isinstance(call, dict) or call.get("call_id") != index or call.get("status") not in {"PENDING", "SUCCEEDED", "FAILED"}:
+                raise ValueError("provider usage call is invalid")
+            start, end = _check_interval(call.get("start_seconds"), call.get("end_seconds"), state["max_duration_seconds"])
+            if not 1 <= end - start <= 60:
+                raise ValueError("provider usage chunk duration is invalid")
+            if not isinstance(call.get("audio_sha256"), str) or not SHA256_HEX.fullmatch(call["audio_sha256"]):
+                raise ValueError("provider usage audio hash is invalid")
+            _stamp(call.get("requested_at"))
+            if call.get("latency_seconds") is not None:
+                _number(call["latency_seconds"], "provider usage latency_seconds")
+            total += end - start
+        if reserved != round(total, 3) or state["budget_seconds"] is None or reserved > state["budget_seconds"]:
+            raise ValueError("provider usage exceeds or disagrees with its reserved budget")
     if not isinstance(state.get("session_revision"), int) or state["session_revision"] < 1:
         raise ValueError("session_revision must be positive")
     seen_sequences: set[int] = set()
@@ -969,7 +1013,15 @@ def validate_session(state: dict[str, Any]) -> dict[str, Any]:
         seen_sequences.add(segment["sequence"])
         segment_ids.add(segment["segment_id"])
         start, end = _check_interval(segment.get("start_seconds"), segment.get("end_seconds"), state["max_duration_seconds"])
+        if state["budget_seconds"] is None or end > state["budget_seconds"]:
+            raise ValueError("segment exceeds the authorized budget")
         text = _text(segment.get("text"), "segment text")
+        if segment.get("evidence_state", PROVISIONAL_EVIDENCE_STATE) != PROVISIONAL_EVIDENCE_STATE or segment.get("provisional", True) is not True:
+            raise ValueError("live segments must remain provisional")
+        if segment.get("verification_status") == "AUTO_PASS" or segment.get("evidence_type") in {"ORAL_OFFICIAL", "WRITTEN_OFFICIAL"}:
+            raise ValueError("live segments cannot carry formal evidence status")
+        if segment.get("finalized_at") is not None:
+            _stamp(segment["finalized_at"])
         if segment.get("asr_contract") != contract:
             raise ValueError("segment ASR contract mismatch")
         if isinstance(segment.get("revision"), bool) or not isinstance(segment.get("revision"), int) or segment["revision"] < 1:
@@ -1054,7 +1106,10 @@ def validate_session(state: dict[str, Any]) -> dict[str, Any]:
             raise ValueError("bookmark note cannot contain obvious personal identifiers")
         relevance = bookmark.get("profile_relevance")
         if relevance is not None:
-            matching = [row for row in selected if row.get("profile_relevance") == relevance]
+            matching = [
+                revision for row in selected for revision in [row, *row["revision_history"]]
+                if revision.get("profile_relevance") == relevance
+            ]
             if not matching:
                 raise ValueError("bookmark profile relevance is not bound to its segments")
             _validate_profile_relevance(relevance, matching[0]["text"])
@@ -1093,10 +1148,12 @@ def validate_session(state: dict[str, Any]) -> dict[str, Any]:
             raise ValueError("receipt session_revision must be a positive integer")
         reconciled_at = _stamp(receipt.get("reconciled_at"))
         official = receipt.get("official")
-        if outcome in {"CONFIRMED_BY_OFFICIAL_MEDIA", "CONFIRMED_BY_MINUTES"}:
+        if outcome in {"CONFIRMED_BY_OFFICIAL_MEDIA", "CONFIRMED_BY_MINUTES"} or official is not None:
             if not isinstance(official, dict):
                 raise ValueError("confirmed receipt requires official source evidence")
             official_source_id = official.get("source_id")
+            if official.get("source_type", "OFFICIAL_MEDIA") not in {"OFFICIAL_MEDIA", "MINUTES", "AGENDA"}:
+                raise ValueError("receipt official source type is invalid")
             if official_source_id not in ALLOWED_SOURCE_HOSTS:
                 raise ValueError("receipt official source is not allowlisted")
             _official_url(official_source_id, official.get("official_url"))
@@ -1104,8 +1161,6 @@ def validate_session(state: dict[str, Any]) -> dict[str, Any]:
             _text(official.get("document_version"), "receipt official document_version", max_length=160)
             if not isinstance(official.get("text_sha256"), str) or not SHA256_HEX.fullmatch(official["text_sha256"]):
                 raise ValueError("receipt official text_sha256 must be a SHA-256 hex digest")
-        elif official is not None:
-            raise ValueError("a non-confirmed receipt cannot carry an official binding")
         material = {
             "session_id": state["session_id"],
             "candidate_id": candidate_id,
