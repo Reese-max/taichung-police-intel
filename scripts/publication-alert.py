@@ -155,6 +155,17 @@ def deliver(health, *, scope, request=api):
         lines.append("失敗／取消階段：" + "、".join(f"`{phase}`" for phase in failures) + "。")
     else:
         lines.append(f"對應先前告警 comment `{previous['id']}`；只核對上述範圍的恢復。")
+    for key, length in (("state_commit", 40), ("generation_id", 64)):
+        value = health.get(key)
+        if isinstance(value, str) and re.fullmatch(r"[0-9a-f]{" + str(length) + "}", value):
+            lines.append(f"{key}：`{value}`。")
+    url = health.get("evidence_url")
+    prefix = f"https://github.com/{REPOSITORY}/actions/runs/{health['run_id']}/artifacts/"
+    if (health["phase_results"]["EVIDENCE"] == "success" and isinstance(url, str) and
+            re.fullmatch(re.escape(prefix) + r"[0-9]{1,20}", url)):
+        lines.append(f"已保存的 evidence artifact：<{url}>。")
+    else:
+        lines.append("未取得成功上傳的 evidence artifact 連結；請由上述 workflow 檢查日誌。")
     lines.append("API 送達後另行精確回讀；真人確認維持未知。來源、授權、資料時效及真人驗收不由本告警批准。")
     body = "\n\n".join(lines) + "\n"
     if existing and (existing[0].get("body") != body or existing[0].get("user", {}).get("login") != "github-actions[bot]"):
