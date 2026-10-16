@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import copy
 import json
+import subprocess
+import sys
 import tempfile
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from intel_v2.discovery_adapter import (
@@ -20,6 +22,7 @@ from intel_v2.discovery_adapter import (
     verify_candidate,
 )
 from intel_v2.entity_binding import registry_runtime
+from intel_v2 import discovery_adapter as adapter
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -33,7 +36,7 @@ class DiscoveryAdapterTests(unittest.TestCase):
         self.feed = load_feed(str(FEED_PATH))
         self.documents = json.loads(DOC_PATH.read_text(encoding="utf-8"))
 
-    def test_three_step_media_to_official_and_existing_new_event_receipt(self):
+    def test_index_attaches_official_provenance_without_fusing_events(self):
         result = ingest_feed(self.feed, official_documents=self.documents, now=NOW)
         receipt = result["receipt"]
         self.assertEqual(receipt["relevant_count"], 3)
@@ -372,6 +375,205 @@ class DiscoveryAdapterTests(unittest.TestCase):
         self.assertEqual(report["status_counts"]["UNKNOWN"], 1)
         self.assertEqual(sum(report["status_counts"].values()), report["run_count"])
         self.assertEqual(report["canonical_change_count"], 0)
+
+    def test_late_official_match_and_conflict_refresh_an_unchanged_feed(self):
+        first = ingest_feed(self.feed, official_documents=[], now=NOW)
+        later = NOW + timedelta(hours=1)
+        matched = ingest_feed(self.feed, previous_state=first["state"],
+                              official_documents=self.documents, now=later)
+        self.assertFalse(matched["replayed"])
+        self.assertEqual(matched["receipt"]["official_match_count"], 2)
+        self.assertEqual(matched["receipt"]["confirmation_latency_seconds"], [3600, 3600])
+        media = next(row for row in matched["candidates"] if row["authority"] == "media")
+        self.assertEqual(media["verification_status"], "DISCOVERY_UNVERIFIED")
+        conflict = {**self.documents[0], "document_id": "ROAD-OTHER",
+                    "document_version_id": "ROAD-OTHER:v1", "fact_fingerprint": "disagrees"}
+        refreshed = ingest_feed(self.feed, previous_state=matched["state"],
+                                official_documents=[*self.documents, conflict], now=later)
+        self.assertEqual(refreshed["receipt"]["conflict_count"], 1)
+        self.assertEqual(refreshed["receipt"]["confirmation_latency_seconds"], [])
+
+    def test_same_envelope_with_changed_items_is_not_a_cached_replay(self):
+        first = ingest_feed(self.feed, official_documents=self.documents, now=NOW)
+        changed = copy.deepcopy(self.feed)
+        changed["items"][0]["title"] = "臺中市道路管制範圍變更"
+        result = ingest_feed(changed, previous_state=first["state"], now=NOW)
+        self.assertFalse(result["replayed"])
+        self.assertIn("gd-1111111111111111", result["receipt"]["verification_calls"])
+
+    def test_relevance_requires_a_supported_category_and_public_service_impact(self):
+        for category, title, region, expected in (
+            ("娛樂", "臺中市演唱會花絮", "臺中市", 0),
+            ("社會", "臺中市藝人生活近況", "臺中市", 0),
+            ("社會", "臺中市警察反詐宣導", "臺中市", 1),
+            ("交通", "全國道路交通政策適用各縣市", "臺北市", 1),
+            ("交通", "道路施工消息", None, 0),
+        ):
+            with self.subTest(category=category, title=title):
+                feed = copy.deepcopy(self.feed)
+                item = {**feed["items"][0], "category": category, "title": title,
+                        "region": region, "summary": None, "topic": None}
+                feed.update(items=[item], item_count=1)
+                self.assertEqual(ingest_feed(feed, now=NOW)["receipt"]["relevant_count"], expected)
+
+    def test_cap_and_replay_do_not_erase_canary_denominators(self):
+        first = ingest_feed(self.feed, official_documents=self.documents, now=NOW, max_candidates=1)
+        self.assertEqual(first["receipt"]["relevant_count"], 3)
+        self.assertEqual(first["receipt"]["candidate_admitted_count"], 1)
+        replay = ingest_feed(self.feed, previous_state=first["state"], now=NOW, max_candidates=1)
+        report = summarize_canary([first["receipt"], replay["receipt"], {"status": "PUBLISH_FAILED"}])
+        self.assertEqual(report["run_count"], 3)
+        self.assertEqual(report["replayed_run_count"], 1)
+        self.assertEqual(report["feed_item_count"], 4)
+        self.assertEqual(report["relevant_count"], 3)
+        self.assertEqual(report["candidate_admitted_count"], 1)
+        self.assertEqual(report["official_match_count"], 1)
+        self.assertEqual(report["actionable_change_count"], 0)
+        self.assertEqual(report["tracking_count"], 0)
+        self.assertEqual(report["false_positive_count"], 0)
+        self.assertEqual(report["confirmation_latency_seconds"], {"count": 1, "total": 0, "mean": 0})
+        self.assertEqual(report["missing_denominator_run_count"], 1)
+
+    def test_renewed_generated_at_cannot_revive_expired_source_data(self):
+        feed = copy.deepcopy(self.feed)
+        feed["generated_at"] = "2026-09-25T00:00:00Z"
+        result = ingest_feed(feed, official_documents=self.documents,
+                             now=datetime(2026, 9, 25, tzinfo=timezone.utc))
+        self.assertEqual(result["receipt"]["expired_candidate_count"], 3)
+        self.assertEqual(result["receipt"]["official_match_count"], 0)
+        self.assertEqual(result["receipt"]["verification_calls"], [])
+
+    def test_official_index_requires_nonempty_identity_and_original_https_url(self):
+        for field, value in (("document_id", ""), ("document_version_id", None),
+                             ("source_id", []), ("official_url", "http://example.test/news")):
+            with self.subTest(field=field), self.assertRaises(DiscoveryFeedError):
+                ingest_feed(self.feed, official_documents=[{**self.documents[0], field: value}], now=NOW)
+
+    def test_media_to_official_versions_to_new_and_existing_public_event(self):
+        documents = json.loads((ROOT / "tests/fixtures/discovery/event-documents.v1.json").read_text(encoding="utf-8"))
+        original_documents = copy.deepcopy(documents)
+        discovery = ingest_feed(self.feed, official_documents=[], now=NOW)
+        matched = ingest_feed(self.feed, previous_state=discovery["state"],
+                              official_documents=documents, now=NOW + timedelta(hours=1))
+        linked = adapter.link_official_events(matched, documents)
+        self.assertEqual(linked["receipt"]["new_public_event_count"], 1)
+        self.assertEqual(linked["receipt"]["canonical_change_count"], 0)
+        event = linked["public_events"][0]
+        self.assertEqual(event["fusion_status"], "CONFIRMED")
+        self.assertEqual(event["independent_source_count"], 2)
+        self.assertEqual(len(event["linked_document_versions"]), 2)
+        self.assertEqual(event["source_provenance"][0]["acquisition_paths"],
+                         ["DIRECT_OFFICIAL", "taiwan-intel-dashboard"])
+        media = next(row for row in linked["candidates"] if row["candidate_id"] == "gd-1111111111111111")
+        self.assertEqual(media["public_event_ids"], [event["public_event_id"]])
+        self.assertEqual(media["verification_status"], "DISCOVERY_UNVERIFIED")
+        self.assertFalse(media["canonical_write"])
+        existing = copy.deepcopy(linked["public_events"])
+        again = adapter.link_official_events(matched, documents, existing_public_events=existing)
+        self.assertEqual(again["receipt"]["new_public_event_count"], 0)
+        self.assertEqual(again["receipt"]["existing_event_match_count"], 1)
+        self.assertEqual(existing, linked["public_events"])
+        self.assertEqual(documents, original_documents)
+        self.assertEqual(matched["receipt"]["new_public_event_count"], 0)
+
+    def test_event_link_rejects_unmatched_or_changed_official_document_identity(self):
+        documents = json.loads((ROOT / "tests/fixtures/discovery/event-documents.v1.json").read_text(encoding="utf-8"))
+        result = ingest_feed(self.feed, official_documents=documents, now=NOW)
+        forged = copy.deepcopy(documents)
+        forged[0]["official_url"] = "https://another.example.test/changed"
+        with self.assertRaises(DiscoveryFeedError):
+            adapter.link_official_events(result, forged)
+        without_match = ingest_feed(self.feed, official_documents=[], now=NOW)
+        self.assertEqual(adapter.link_official_events(without_match, documents)["public_events"], [])
+
+    def test_official_conflict_reaches_event_preview_without_promoting_media(self):
+        documents = json.loads((ROOT / "tests/fixtures/discovery/event-documents.v1.json").read_text(encoding="utf-8"))
+        documents[1]["event_end_at"] = "2026-09-20T23:00:00+08:00"
+        documents[1]["fact_fingerprint"] = "official-time-disagrees"
+        result = ingest_feed(self.feed, official_documents=documents, now=NOW)
+        linked = adapter.link_official_events(result, documents)
+        self.assertEqual(linked["public_events"][0]["fusion_status"], "CONFLICT")
+        media = next(row for row in linked["candidates"] if row["candidate_id"] == "gd-1111111111111111")
+        self.assertEqual(media["official_match_status"], "CONFLICT")
+        self.assertEqual(media["verification_status"], "DISCOVERY_UNVERIFIED")
+
+    def test_event_preview_preserves_official_conflicts_beyond_time_location_fields(self):
+        documents = json.loads((ROOT / "tests/fixtures/discovery/event-documents.v1.json").read_text(encoding="utf-8"))
+        for conflict_fields in ({"fact_fingerprint": "different-official-claim"}, {"conflict": True}):
+            with self.subTest(conflict_fields=conflict_fields):
+                conflicting = [documents[0], {**documents[1], **conflict_fields}]
+                result = ingest_feed(self.feed, official_documents=conflicting, now=NOW)
+                linked = adapter.link_official_events(result, conflicting)
+                self.assertEqual(linked["public_events"][0]["fusion_status"], "CONFLICT")
+                self.assertIn("official_provenance", linked["public_events"][0]["conflict_fields"])
+
+    def test_existing_document_version_ownership_survives_manual_event_identity_change(self):
+        documents = json.loads((ROOT / "tests/fixtures/discovery/event-documents.v1.json").read_text(encoding="utf-8"))
+        result = ingest_feed(self.feed, official_documents=documents, now=NOW)
+        baseline = adapter.link_official_events(result, documents)
+        existing = copy.deepcopy(baseline["public_events"])
+        existing[0]["public_event_id"] = "PE-canonical-manual-merge"
+        existing[0]["fusion_status"] = "CONFLICT"
+        existing[0]["conflict_fields"] = ["status"]
+        original_existing = copy.deepcopy(existing)
+        linked = adapter.link_official_events(result, documents, existing_public_events=existing)
+        media = next(row for row in linked["candidates"] if row["candidate_id"] == "gd-1111111111111111")
+        self.assertEqual(media["public_event_ids"], ["PE-canonical-manual-merge"])
+        self.assertTrue(media["matched_existing"])
+        self.assertEqual(linked["receipt"]["new_public_event_count"], 0)
+        self.assertEqual(linked["receipt"]["existing_event_match_count"], 1)
+        self.assertEqual(linked["public_events"][0]["fusion_status"], "CONFLICT")
+        self.assertEqual(existing, original_existing)
+        ambiguous = [*existing, {**existing[0], "public_event_id": "PE-other-owner"}]
+        with self.assertRaisesRegex(DiscoveryFeedError, "ambiguous"):
+            adapter.link_official_events(result, documents, existing_public_events=ambiguous)
+
+    def test_canary_counts_only_the_requested_calendar_window(self):
+        receipts = []
+        for day in range(16):
+            receipts.append({"consumed_at": (NOW + timedelta(days=day)).isoformat(),
+                             "status": "INGESTED", "feed_item_count": 4, "relevant_count": 3,
+                             "candidate_admitted_count": 3, "official_match_count": 1,
+                             "no_official_match_count": 2, "confirmation_latency_seconds": [120]})
+        report = summarize_canary(receipts, window_days=14)
+        self.assertEqual(report["run_count"], 14)
+        self.assertEqual(report["feed_item_count"], 56)
+        self.assertEqual(report["relevant_count"], 42)
+        self.assertEqual(report["official_match_count"], 14)
+        self.assertEqual(report["no_official_match_count"], 28)
+        self.assertEqual(report["observed_day_count"], 14)
+        self.assertEqual(report["coverage_start"], "2026-09-23")
+        self.assertEqual(report["coverage_end"], "2026-10-06")
+        self.assertTrue(report["window_complete"])
+        self.assertFalse(report["production_verified"])
+        self.assertEqual(report["confirmation_latency_seconds"], {"count": 14, "total": 1680, "mean": 120})
+        incomplete = summarize_canary([receipts[-1], {"status": "FAILED"}])
+        self.assertFalse(incomplete["window_complete"])
+        self.assertEqual(incomplete["missing_timestamp_run_count"], 1)
+
+    def test_cli_replays_event_link_and_writes_canary_report(self):
+        script = str(ROOT / "scripts/discovery-adapter.py")
+        documents = str(ROOT / "tests/fixtures/discovery/event-documents.v1.json")
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "ingested.json"
+            process = subprocess.run([sys.executable, "-X", "utf8", script, "ingest", "--feed", str(FEED_PATH),
+                                      "--official-documents", documents, "--event-documents", documents,
+                                      "--now", NOW.isoformat(), "--output", str(output)],
+                                     capture_output=True, text=True, encoding="utf-8")
+            self.assertEqual(process.returncode, 0, process.stderr)
+            result = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(len(result["public_events"]), 1)
+            receipts = Path(directory) / "receipts.json"
+            receipts.write_text(json.dumps([result["receipt"]]), encoding="utf-8")
+            report_path = Path(directory) / "report.json"
+            process = subprocess.run([sys.executable, "-X", "utf8", script, "canary-report", "--receipts", str(receipts),
+                                      "--window-days", "14", "--output", str(report_path)],
+                                     capture_output=True, text=True, encoding="utf-8")
+            self.assertEqual(process.returncode, 0, process.stderr)
+            report = json.loads(report_path.read_text(encoding="utf-8"))
+            self.assertEqual(report["feed_item_count"], 4)
+            self.assertEqual(report["new_public_event_count"], 1)
+            self.assertFalse(report["window_complete"])
 
 
 if __name__ == "__main__":
