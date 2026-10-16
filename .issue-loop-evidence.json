@@ -1,33 +1,12 @@
 {
-  "schema_version": 1,
-  "status": "failed",
   "repo": "Reese-max/taichung-police-intel",
-  "issue": 29,
-  "base_sha": "2c660cef6f1b1fbf86b141306e54d06e0511c9f9",
-  "created_at": "2026-10-06T05:11:59.498475Z",
-  "gates": {
-    "baseline": "pass",
-    "tdd": "pass",
-    "review": "fail"
-  },
-  "commands": [],
-  "candidate_sha": "eb53499854c92ddf170abc874978cb4fa55e9e77",
-  "changed_files": [
-    ".issue-loop-context.json",
-    ".issue-loop-evidence.json",
-    ".issue-loop-prompt.md",
-    ".issue-loop-red.json",
-    ".issue-loop-review.json",
-    "tests/test_chat_turn_worker.py",
-    "workers/query-gateway/src/index.js"
-  ],
-  "red_proof": {
-    "repo": "Reese-max/taichung-police-intel",
-    "issue": 29,
-    "base_sha": "2c660cef6f1b1fbf86b141306e54d06e0511c9f9",
-    "command": "python -X utf8 -c \"import sys; ws='workers/query-gateway/src/index.js'; source=open(ws).read(); allowed_start=source.find('const allowed = {'); allowed_section=source[allowed_start:source.find('}', allowed_start+1)]; print('RED' if 'chat_turn' not in allowed_section else 'GREEN'); sys.exit(1 if 'chat_turn' not in allowed_section else 0)\"",
-    "exit": 1
-  },
-  "review": null,
-  "failure_reason": "review_sha_mismatch"
+  "issue": 20,
+  "base_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+  "red_proof": "python -X utf8 -m unittest discover -s tests -p 'test_publication_alert.py' -v\nFAIL: test_failed_evidence_upload_keeps_checkpoint_without_a_download_link\nAssertionError: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' not found in '<!-- govintel-publication-alert:v1:PRODUCTION_PUBLICATION:123:1:FAILURE -->...'\nFAIL: test_failure_alert_locates_retained_evidence_and_exact_checkpoint (phase='PRESERVE')\nAssertionError: None != 'https://github.com/Reese-max/taichung-po[37 chars]/456'\nRan 12 tests in 0.135s\nFAILED (failures=5)\nexit=1",
+  "test_command": "python -X utf8 -m unittest discover -s tests -p 'test_publication_alert.py' -v && python -X utf8 -m unittest discover -s tests -p 'test_publication_outcome.py' -v",
+  "test_exit": 0,
+  "tests_passed": 40,
+  "tests_failed": 0,
+  "summary": "Publication outcome reporting now reuses a single successful-upload URL validator to retain the evidence artifact URL in both the summary and runtime health receipt. Failure and recovery alerts include validated checkpoint/generation identifiers and an artifact link bound to the exact repository and workflow run; failed uploads explicitly report that no trusted link is available. Producer-to-alert regression tests cover PRESERVE, PAGES_UPLOAD, PAGES_DEPLOY and PUBLIC_VERIFY failures, exact readback/deduplication, and credential/URL injection boundaries (37 existing relevant tests to 40 passing tests). The operations document maps all seven acceptance criteria to local mechanisms and outstanding production gates.",
+  "not_done": "No push, PR, merge, issue closure, deployment, GitHub comment, remote branch/protection/token change, or other external write was performed. Natural MORNING/EVENING runs, real isolated state-server/Pages rejection and complete LKG/pending/diff recovery, production anonymous HTTPS/hash readback, and real notification/human acknowledgement remain unverified. The full npm run check exited 1 with 10 failing verification groups (web 797 passed/3 failed; static build succeeded) in this Windows environment: admitted-base os.O_NONBLOCK failure was reproduced, and existing symlink-privilege/PDF-subprocess failures and the pre-commit dirty-checkout guard were observed; unrelated platform code was not changed."
 }
