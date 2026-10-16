@@ -1,33 +1,12 @@
 {
-  "schema_version": 1,
-  "status": "failed",
   "repo": "Reese-max/taichung-police-intel",
-  "issue": 29,
-  "base_sha": "2c660cef6f1b1fbf86b141306e54d06e0511c9f9",
-  "created_at": "2026-10-06T05:11:59.498475Z",
-  "gates": {
-    "baseline": "pass",
-    "tdd": "pass",
-    "review": "fail"
-  },
-  "commands": [],
-  "candidate_sha": "eb53499854c92ddf170abc874978cb4fa55e9e77",
-  "changed_files": [
-    ".issue-loop-context.json",
-    ".issue-loop-evidence.json",
-    ".issue-loop-prompt.md",
-    ".issue-loop-red.json",
-    ".issue-loop-review.json",
-    "tests/test_chat_turn_worker.py",
-    "workers/query-gateway/src/index.js"
-  ],
-  "red_proof": {
-    "repo": "Reese-max/taichung-police-intel",
-    "issue": 29,
-    "base_sha": "2c660cef6f1b1fbf86b141306e54d06e0511c9f9",
-    "command": "python -X utf8 -c \"import sys; ws='workers/query-gateway/src/index.js'; source=open(ws).read(); allowed_start=source.find('const allowed = {'); allowed_section=source[allowed_start:source.find('}', allowed_start+1)]; print('RED' if 'chat_turn' not in allowed_section else 'GREEN'); sys.exit(1 if 'chat_turn' not in allowed_section else 0)\"",
-    "exit": 1
-  },
-  "review": null,
-  "failure_reason": "review_sha_mismatch"
+  "issue": 25,
+  "base_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+  "red_proof": "node --test apps/web/tests/competition-docs.test.mjs (exit 1, before implementation)\n✔ judge entry links resolve locally, including preserved historical evidence (33.6173ms)\n✖ claim table uses all five fixed statuses and keeps publication blockers visible (1.2994ms)\n✖ four-minute demo specifies a built loopback replay and every saved snapshot (0.8206ms)\n✖ current overview and demo agree on dated deployment and organizer evidence (0.5122ms)\nℹ tests 4\nℹ suites 0\nℹ pass 1\nℹ fail 3\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 145.2265\nAssertionError [ERR_ASSERTION]: Missing claim/evidence status: PRODUCTION_ACTIVE",
+  "test_command": "node --test apps/web/tests/competition-docs.test.mjs && python -X utf8 scripts/replay-commute-reopen.py --self-check",
+  "test_exit": 0,
+  "tests_passed": 4,
+  "tests_failed": 0,
+  "summary": "補齊 README 與參賽入口的固定 Claim/Status/Evidence、#20／RIGHTS_BLOCKED 限制，保留原始公開驗收版本及歷史競賽界線。沿用既有 domain、合成 fixture 與 UI driver，提供靜態 loopback 展示、R1–R9 操作及確切篩選條件。新增四項文件回歸測試完成紅轉綠；27 個外部連結已唯讀核對，靜態 build 與 22 項有限 Chromium UI 操作通過，驗收對照及全專案失敗另記於 VERIFICATION.md。",
+  "not_done": "未 push、開 PR、部署、對外發送、改動其他 branch、來源政策或正式資料。完整 npm run check 退出碼 1（10 個失敗群組；含 Windows/POSIX／符號連結、已在 admitted base 重現的環境失敗、pypdf 6.18.0 與要求 6.19.0 不符，以及提交前 dirty-worktree gate）；未宣稱全專案通過。有限 browser 的 served_release_binding 為 NOT_RUN。正式原文正值／權利准入、D2 原始資源與 CRS、候選 promotion、正式語意 AI／保留集／真人 A/B/C、工時成本、主辦題名／資格／重交指示及私有新版 10 頁 A4 工作稿仍待外部證據，沒有以文件或合成測試代填；issue 不應據此關閉。"
 }
