@@ -5,13 +5,19 @@ import { validateControlledAnswer } from "../lib/controlled-answer-client.js";
 
 const endpoint = "https://gateway.example/query";
 const context = { codeSha: "a".repeat(40), publicationGeneration: "run-62" };
-const release = { code_sha: context.codeSha, publication_generation: context.publicationGeneration, release_id: "b".repeat(64) };
+const release = {
+  schema_version: 1, code_sha: context.codeSha, publication_generation: context.publicationGeneration, release_id: "b".repeat(64),
+  publication_hash: "c".repeat(64), artifact_hashes: { feed: "d".repeat(64), status: "e".repeat(64), brief: "c".repeat(64) },
+  source_policy_hash: "f".repeat(64), query_generation: "1".repeat(64), evidence_catalog_hash: "2".repeat(64), built_at: "2026-10-01T00:00:00Z",
+};
 const query = {
-  query_generation_id: "query-62", publication_hash: "c".repeat(64),
+  query_generation_id: release.query_generation, publication_hash: release.publication_hash,
   results: [{ canonical_id: "official-62", title: "官方公告" }],
 };
 const answer = {
   release, query_generation_id: query.query_generation_id, publication_hash: query.publication_hash,
+  publication_id: release.publication_generation, policy: { policy_hash: release.source_policy_hash },
+  receipt: { publication_hash: release.publication_hash, query_generation_id: release.query_generation },
   gate_status: "PASS", answer: ["已核對官方公告"], answer_evidence_receipt: {
     schema_version: 1, validator_version: "answer-evidence-gate/3", renderer_version: "controlled-answer-renderer/1",
     gate_status: "PASS", publication_hash: query.publication_hash,

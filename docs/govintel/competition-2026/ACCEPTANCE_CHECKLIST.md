@@ -37,3 +37,30 @@
 若准入／原件／真人仍未取得，可交明示版本、截止與真實／合成分類的離線公開查詢及追蹤重播包；不得包裝成持續最新、全部完整或已測效益。未完成 gate 保留 open，詳見 [#62](https://github.com/Reese-max/taichung-police-intel/issues/62)。
 
 10/6 22:06 Asia/Taipei 的[新一輪真實 canary](closure-20261006/current-candidate-observation.json)已獨立留證：S-019 有第一個有效當地日；S-031 仍只有同一天的 1 日，重跑不增加日數。S-032／33 仍需權利及獨立完整性，S-001 失敗；全部未 promotion。較早七日窗口及其失敗不改寫，S-019 至少還需六個未來實際有效日。
+
+## #161 本機混版拒答補強（2026-10-17）
+
+`issue-loop/issue-161` 以 `c629f82a8b16825d5d89c204c7035dcba500a9ac` 為基準，只補瀏覽器端的發布綁定核對。沿用 Worker `createReleaseManifest` 與正式驗證器的欄位契約：query／research 共用完整 release 比對；query 另核對頂層 publication／generation／policy 與 receipt，research 核對自身 generation。缺漏或混版回應以 `PENDING_UPDATE` 拒答；不完整 manifest 在 POST 前阻擋。Worker 部署資訊與 artifact 欄位順序不造成誤拒。
+
+TDD 先得到 47 個測試中 6 個失敗（`Missing expected rejection`，以及未攔下 POST 的 `2 !== 1`），修正後同批 47/47 通過。重跑指令：
+
+```bash
+node --test --test-concurrency=1 apps/web/tests/query-release-client.test.mjs apps/web/tests/research-client.test.mjs apps/web/tests/controlled-answer-client.test.mjs
+```
+
+加入既有實際 Worker pipeline 回歸後為 63/63、exit 0；鎖定依賴與 UTF-8 的完整 Web suite 為 807/807、build 成功，離線 Chrome 腳本 12 項通過且 live provider calls 為 0。Node 原生 coverage 在兩個變更模組的行／分支覆蓋率為 99.74%／94.12%，未新增工具或門檻。完整 `npm run check` 為 exit 1：八組既有 Python gate 涉及 Windows 缺少 `O_NONBLOCK`、Unix deadline、目錄 fsync、symlink／0600 權限語意；三個最小案例在乾淨 admitted base 同樣得到 2 errors／1 failure。本次不將完整 gate 記為通過。
+
+| #161 驗收條件 | 本次對應與剩餘 gate |
+|---|---|
+| 正式核准結果、canonical IDs、原文與 receipt | 待逐來源准入及正式正值回讀；未以離線 fixture 代替。 |
+| 文件／版本／locator／日期／缺口與 metadata 界線 | 保留既有契約；正式原件與版本核對待辦。 |
+| 加入／預覽／修改／保存及真正關閉重開、baseline | 保留既有本機追蹤；正式瀏覽器重開驗收待辦。 |
+| 真實官方新版本未讀更新 | 待自然修訂；受控副本仍只能列 replay。 |
+| 受影響欄位、排版去重、快取不混版 | 補強 transport 發布標籤與 generation／hash／receipt 一致性；真實修訂差異與內容驗收待辦。 |
+| 展示版本已讀、後續修訂與取消 | 沿用既有精確版本已讀與取消；正式完整流程待辦。 |
+| 明文解除、失敗／消失／到期不能推定解除 | 保留既有追蹤語意；正式明文解除待辦。 |
+| 故障、混版、LKG／storage 回饋與不外傳 | 本次測試補混版拒答及送出前 manifest gate；既有故障／storage 回歸另跑，正式故障 trace 待辦。 |
+| 桌面／390px／鍵盤及固定版本證據 | 離線 browser 腳本新增同 release 的 policy／generation 篡改；桌面／390px 通過，正式鍵盤與成功流程待辦。 |
+| 同步 #25／#62、與 #33 分列 | 本頁提供 driver 可引用的工程紀錄；未對外留言或更新 issue，真人成效仍獨立待辦。 |
+
+完整 #161 保持 **BLOCKED_BY_SOURCE_ADMISSION**。此 checkout 的核准 policy 仍是沒有 governance binding 的 legacy schema 1；工程測試沒有授予權利、promotion、部署或正式驗收，也未改寫歷史 receipt。
