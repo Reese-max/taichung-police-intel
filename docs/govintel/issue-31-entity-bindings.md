@@ -11,7 +11,7 @@ audited operations; discovery or query code cannot perform them.
 
 | Consumer | Binding | Limit |
 | --- | --- | --- |
-| #24 PublicEvent fusion | Binds agency/location labels and dated named-event labels before fusion; emits `entity_registry` version/hash on each event. | A named event must have explicit jurisdiction and date; an official reschedule still needs a stable occurrence ID or reviewed relation. |
+| #24 PublicEvent fusion | CLI loads the canonical registry by default (`--entity-registry` overrides it); binds labels before fusion and emits `entity_registry` version/hash on each event. Existing agency/location/district IDs must match any explicit document jurisdiction. | A named event must have explicit jurisdiction and date; an official reschedule still needs a stable occurrence ID or reviewed relation. |
 | #27 discovery adapter | Annotates radar candidates with approved agency/location IDs and a registry receipt. Same feed generation is rebound when the registry changes. | Candidate IDs are never official evidence, an official match key, or a canonical write. Ambiguous hints remain unresolved. |
 | #29 optional Python event gateway | Requires one uniform event-store registry receipt; resolves query aliases against that exact registry for Web and MCP. | A missing binding accepts only literal IDs; a stale binding or unknown alias fails closed. The production Worker and statistics store do not yet use this entity contract. |
 
@@ -19,6 +19,13 @@ The synthetic fixture `tests/fixtures/entity-registry/false-positives.v1.json`
 covers two cities sharing a road name, an acronym collision across
 jurisdictions, 台/臺 normalization, and two events with the same name on
 different dates. It is test data and supplies no production alias evidence.
+
+`test_default_fusion_cli_discovery_web_and_mcp_share_registry_identity` replays
+synthetic official documents through the default fusion CLI, feeds equivalent
+aliases to discovery, and queries the resulting event store through Python Web
+and MCP. All receipts must reference the same production registry version/hash;
+the discovery item remains unverified and cannot write canonical facts. Its
+governance permission is an isolated fictional fixture, not production approval.
 
 ## Remaining acceptance work
 

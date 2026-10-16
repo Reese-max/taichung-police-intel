@@ -1,33 +1,12 @@
 {
-  "schema_version": 1,
-  "status": "failed",
   "repo": "Reese-max/taichung-police-intel",
-  "issue": 29,
-  "base_sha": "2c660cef6f1b1fbf86b141306e54d06e0511c9f9",
-  "created_at": "2026-10-06T05:11:59.498475Z",
-  "gates": {
-    "baseline": "pass",
-    "tdd": "pass",
-    "review": "fail"
-  },
-  "commands": [],
-  "candidate_sha": "eb53499854c92ddf170abc874978cb4fa55e9e77",
-  "changed_files": [
-    ".issue-loop-context.json",
-    ".issue-loop-evidence.json",
-    ".issue-loop-prompt.md",
-    ".issue-loop-red.json",
-    ".issue-loop-review.json",
-    "tests/test_chat_turn_worker.py",
-    "workers/query-gateway/src/index.js"
-  ],
-  "red_proof": {
-    "repo": "Reese-max/taichung-police-intel",
-    "issue": 29,
-    "base_sha": "2c660cef6f1b1fbf86b141306e54d06e0511c9f9",
-    "command": "python -X utf8 -c \"import sys; ws='workers/query-gateway/src/index.js'; source=open(ws).read(); allowed_start=source.find('const allowed = {'); allowed_section=source[allowed_start:source.find('}', allowed_start+1)]; print('RED' if 'chat_turn' not in allowed_section else 'GREEN'); sys.exit(1 if 'chat_turn' not in allowed_section else 0)\"",
-    "exit": 1
-  },
-  "review": null,
-  "failure_reason": "review_sha_mismatch"
+  "issue": 31,
+  "base_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+  "red_proof": "FAIL: test_direct_entity_ids_respect_explicit_document_jurisdiction (test_public_event_fusion.PublicEventFusionTests.test_direct_entity_ids_respect_explicit_document_jurisdiction) (field='agency_ids', scope='agency_jurisdiction')\r\n----------------------------------------------------------------------\r\nTraceback (most recent call last):\r\n  File \"C:\\Users\\Administrator\\issue-loop\\worktrees\\Reese-max_taichung-police-intel-issue-31\\tests\\test_public_event_fusion.py\", line 243, in test_direct_entity_ids_respect_explicit_document_jurisdiction\r\n    with self.assertRaisesRegex(ValueError, \"conflicts with document jurisdiction\"):\r\nAssertionError: ValueError not raised\n\nRan 1 test in 0.009s\nFAILED (failures=6)\n\ntest_default_fusion_cli_discovery_web_and_mcp_share_registry_identity (test_query_gateway_domain.QueryGatewayDomainTests.test_default_fusion_cli_discovery_web_and_mcp_share_registry_identity) ... FAIL\r\n\r\n======================================================================\r\nFAIL: test_default_fusion_cli_discovery_web_and_mcp_share_registry_identity (test_query_gateway_domain.QueryGatewayDomainTests.test_default_fusion_cli_discovery_web_and_mcp_share_registry_identity)\r\n----------------------------------------------------------------------\r\nTraceback (most recent call last):\r\n  File \"C:\\Users\\Administrator\\issue-loop\\worktrees\\Reese-max_taichung-police-intel-issue-31\\tests\\test_query_gateway_domain.py\", line 150, in test_default_fusion_cli_discovery_web_and_mcp_share_registry_identity\r\n    self.assertEqual(events[0].get(\"entity_registry\"), receipt)\r\nAssertionError: None != {'registry_version': 1, 'registry_hash': [62 chars]7b8'}\r\n\r\n----------------------------------------------------------------------\r\nRan 1 test in 0.895s\r\n\r\nFAILED (failures=1)\r\n",
+  "test_command": "python -X utf8 -m unittest discover -s tests -p test_entity_registry.py -v && python -X utf8 -m unittest discover -s tests -p test_public_event_fusion.py -v && python -X utf8 -m unittest discover -s tests -p test_discovery_adapter.py -v && python -X utf8 -m unittest discover -s tests -p test_query_domain.py -v && python -X utf8 -m unittest discover -s tests -p test_query_gateway_domain.py -v",
+  "test_exit": 0,
+  "tests_passed": 127,
+  "tests_failed": 0,
+  "summary": "The fusion CLI now uses the existing canonical entity registry by default, and direct agency/location/district IDs are resolved against any explicit document jurisdiction. A fixture-only city-government agency completes the core agency fixture, while a synthetic replay verifies identical IDs and registry version/hash through fusion, discovery, the event store, and Python Web/MCP queries without promoting discovery candidates. Existing cross-city, dated-event, normalization, manual-audit, and unconfirmed-mapping regressions remain covered; the local acceptance mapping is recorded in docs/govintel/issue-31-entity-registry.md.",
+  "not_done": "No push, PR, deployment, production registry edit, or issue closure. Official per-alias review, production named-event evidence, deployed consumer bindings, and a live end-to-end receipt remain unverified. Full npm test exits 1: Node 798/800 pass (two PDF_PARSER_UNAVAILABLE failures), nine Python groups fail including existing Windows os.O_NONBLOCK incompatibilities, and migration self-check lacks installed pg. No full-suite or web-build success is claimed; dedicated lint/coverage/CRAP/mutation gates are not configured."
 }

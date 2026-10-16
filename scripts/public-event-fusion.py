@@ -61,11 +61,15 @@ def bind_document_entities(document: dict[str, Any], registry: dict[str, Any]) -
         }
         if any(item not in known_ids for item in existing):
             raise ValueError(f"unknown {kind} entity ID")
+        jurisdiction = result.get(f"{kind}_jurisdiction") or result.get("jurisdiction")
+        if jurisdiction is not None and any(
+            module.resolve(registry, kind, item, jurisdiction)["status"] != "RESOLVED" for item in existing
+        ):
+            raise ValueError(f"{kind} entity ID conflicts with document jurisdiction")
         if labels is None:
             continue
         if not isinstance(labels, list) or any(not isinstance(label, str) or not label.strip() for label in labels):
             raise ValueError(f"{label_field} must be a string array")
-        jurisdiction = result.get(f"{kind}_jurisdiction") or result.get("jurisdiction")
         if not isinstance(jurisdiction, str) or not jurisdiction.strip():
             raise ValueError(f"{label_field} requires an explicit jurisdiction")
         resolved = []
@@ -113,6 +117,9 @@ def bind_document_entities(document: dict[str, Any], registry: dict[str, Any]) -
         active_locations = {entity["entity_id"] for entity in registry["entities"] if entity["kind"] == "location"}
         if district_id not in active_locations:
             raise ValueError("unknown district entity ID")
+        jurisdiction = result.get("location_jurisdiction") or result.get("jurisdiction")
+        if jurisdiction is not None and module.resolve(registry, "location", district_id, jurisdiction)["status"] != "RESOLVED":
+            raise ValueError("district entity ID conflicts with document jurisdiction")
     result["entity_registry"] = module.registry_receipt(registry)
     return result
 
@@ -895,7 +902,7 @@ def main() -> int:
     documents = payload.get("documents") if isinstance(payload, dict) else None
     if not isinstance(documents, list):
         raise SystemExit("input must be an object with a documents array")
-    registry = load_entity_registry(args.entity_registry) if args.entity_registry else None
+    registry = load_entity_registry(args.entity_registry)
     output = {"schema_version": 1, "public_events": fuse_documents(documents, entity_registry=registry)}
     text = json.dumps(output, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     if args.output:

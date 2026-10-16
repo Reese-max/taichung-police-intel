@@ -297,6 +297,7 @@ class EntityRegistryTests(unittest.TestCase):
     # Shipped-fixture regressions: the false positives the registry exists to
     # prevent must be present in the shipped data, not only in synthetic rows.
     CORE_AGENCIES = {
+        "agency:tc-government": ("臺中市政府", "中市府"),
         "agency:tc-police": ("臺中市政府警察局", "中市警"),
         "agency:tc-traffic": ("臺中市政府交通局", "中市交通局"),
         "agency:tc-fire": ("臺中市政府消防局", "中市消防局"),
@@ -339,6 +340,7 @@ class EntityRegistryTests(unittest.TestCase):
         ],
     }
     SEEDED_FIXTURE_ENTITY_IDS = (
+        "agency:tc-government",
         "location:tc-zhongzheng-road",
         "location:nt-zhongzheng-road",
         "location:tc-zhongshan-road",
