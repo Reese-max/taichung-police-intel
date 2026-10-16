@@ -16,8 +16,12 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
+import sys
 from typing import Any
 from zoneinfo import ZoneInfo
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from intel_v2.npa_source_adapters import assert_public_canonical_allowed
 
 
 TZ = ZoneInfo("Asia/Taipei")
@@ -232,6 +236,11 @@ def validate_document(document: dict[str, Any]) -> None:
     required = ("document_id", "document_version_id", "source_id", "title", "event_type")
     if not isinstance(document, dict):
         raise ValueError("document must be an object")
+    assert_public_canonical_allowed(document)
+    if (document.get("role") in {"PRIMARY_REFERENCE", "ENRICHMENT"}
+            or document.get("realtime_allowed") is False
+            or document.get("public_event_allowed") is False):
+        raise ValueError("reference/enrichment cannot enter canonical PublicEvent fusion")
     for field in required:
         if not isinstance(document.get(field), str) or not document[field].strip():
             raise ValueError(f"document missing {field}")
@@ -626,6 +635,12 @@ def reconcile_public_events(
     for previous in previous_events:
         if not isinstance(previous, dict) or not previous.get("public_event_id"):
             continue
+        assert_public_canonical_allowed(previous)
+        for source_id in previous.get("independent_source_ids", []):
+            assert_public_canonical_allowed({"source_id": source_id})
+        for record in (previous.get("linked_document_versions", [])
+                       + previous.get("background", []) + previous.get("source_provenance", [])):
+            assert_public_canonical_allowed(record)
         for link in previous.get("linked_document_versions", []):
             document_version_id = link.get("document_version_id") if isinstance(link, dict) else None
             if document_version_id:
@@ -791,6 +806,7 @@ def split_public_event(
 
 
 def attach_background(event: dict[str, Any], record: dict[str, Any]) -> dict[str, Any]:
+    assert_public_canonical_allowed(record)
     if event.get("fusion_status") != "CONFIRMED":
         raise ValueError("background enrichment requires a CONFIRMED public event")
     event_district = event.get("district_id")
