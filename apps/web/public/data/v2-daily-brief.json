@@ -30,8 +30,8 @@
   ],
   "baseline_established_at": "2026-08-27T12:13:22+08:00",
   "candidate_source_context": {
-    "collection_run_id": "CR-DEMO-20261017-MORNING-SCHEDULE",
-    "generated_at": "2026-10-17T08:44:41+08:00",
+    "collection_run_id": "CR-DEMO-20261017-EVENING-SCHEDULE",
+    "generated_at": "2026-10-17T21:50:40+08:00",
     "integration_status": "CANDIDATE",
     "items": [
       {
@@ -167,7 +167,7 @@
           "NO_LAST_KNOWN_GOOD",
           "NO_DATA_AS_OF"
         ],
-        "last_checked_at": "2026-10-17T08:44:26+08:00",
+        "last_checked_at": "2026-10-17T21:50:22+08:00",
         "pagination": null,
         "promotion_eligible": false,
         "source_health": "FAILED",
@@ -184,7 +184,7 @@
           "NO_LAST_KNOWN_GOOD",
           "VERY_STALE_DATA"
         ],
-        "last_checked_at": "2026-10-17T08:44:35+08:00",
+        "last_checked_at": "2026-10-17T21:50:31+08:00",
         "pagination": {
           "complete": false,
           "page_limit": 4,
@@ -206,7 +206,7 @@
           "NO_LAST_KNOWN_GOOD",
           "VERY_STALE_DATA"
         ],
-        "last_checked_at": "2026-10-17T08:44:41+08:00",
+        "last_checked_at": "2026-10-17T21:50:40+08:00",
         "pagination": {
           "complete": false,
           "page_limit": 4,
@@ -222,14 +222,14 @@
       }
     ]
   },
-  "generated_at": "2026-10-17T08:44:41+08:00",
+  "generated_at": "2026-10-17T21:50:40+08:00",
   "generator_version": 2,
   "mode": "V2_SHADOW",
   "other_changes": [],
   "overview": {
     "archive_total": 118,
     "current_change_count": 0,
-    "legacy_home_candidate_count": 2,
+    "legacy_home_candidate_count": 3,
     "other_change_count": 0,
     "priority_count": 0,
     "tracking_count": 0,
@@ -300,7 +300,7 @@
   "quality_issues": [
     {
       "code": "LEGACY_CONFIRMED_AS_CURRENT",
-      "count": 2,
+      "count": 3,
       "severity": "HIGH"
     },
     {
@@ -312,11 +312,11 @@
   ],
   "schema_version": 1,
   "snapshot_complete": false,
-  "source_collection_run_id": "CR-DEMO-20261017-MORNING-SCHEDULE",
+  "source_collection_run_id": "CR-DEMO-20261017-EVENING-SCHEDULE",
   "source_health": {
-    "failed_count": 4,
-    "gap_count": 12,
-    "pass_count": 1,
+    "failed_count": 0,
+    "gap_count": 6,
+    "pass_count": 5,
     "stale_count": 3,
     "status": "PARTIAL"
   },
@@ -332,7 +332,7 @@
     "policy_hash": "3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501",
     "policy_version": 1
   },
-  "source_status_generated_at": "2026-10-17T08:44:41+08:00",
+  "source_status_generated_at": "2026-10-17T21:50:40+08:00",
   "status_message": "本期未偵測到可確認的新增或修正；歷史資料保留於資料庫。",
   "tracking_items": []
 }
