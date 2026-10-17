@@ -51,7 +51,7 @@
   "candidate_sources": [
     {
       "catalog_status": "AUDITED_EXISTING",
-      "current_source_run_id": "SR-CAND-20261015-001",
+      "current_source_run_id": "SR-CAND-20261017-001",
       "data_as_of": null,
       "error_code": "CONNECTIONERROR",
       "freshness_status": "NO_DATA",
@@ -62,18 +62,18 @@
         "NO_LAST_KNOWN_GOOD",
         "NO_DATA_AS_OF"
       ],
-      "last_checked_at": "2026-10-15T23:10:45+08:00",
+      "last_checked_at": "2026-10-17T08:44:26+08:00",
       "last_known_good": null,
       "last_known_good_age": {
         "age_hours": null,
         "completed_at": null,
-        "observed_at": "2026-10-15T15:10:45.467157+00:00",
+        "observed_at": "2026-10-17T00:44:26.970150+00:00",
         "reason": "NO_LAST_KNOWN_GOOD",
         "status": "UNKNOWN"
       },
       "last_success_at": null,
       "manifest_sha256": null,
-      "next_update_at": "2026-10-16T06:30:00+08:00",
+      "next_update_at": "2026-10-17T18:30:00+08:00",
       "pagination": null,
       "promotion_eligible": false,
       "result": "FAILED",
@@ -89,7 +89,7 @@
     },
     {
       "catalog_status": "AUDITED_EXISTING",
-      "current_source_run_id": "SR-CAND-20261015-019",
+      "current_source_run_id": "SR-CAND-20261017-019",
       "data_as_of": "2026-09-23T00:00:00+08:00",
       "freshness_status": "VERY_STALE",
       "integration_status": "CANDIDATE",
@@ -98,18 +98,18 @@
         "NO_LAST_KNOWN_GOOD",
         "VERY_STALE_DATA"
       ],
-      "last_checked_at": "2026-10-15T23:10:49+08:00",
+      "last_checked_at": "2026-10-17T08:44:35+08:00",
       "last_known_good": null,
       "last_known_good_age": {
         "age_hours": null,
         "completed_at": null,
-        "observed_at": "2026-10-15T15:10:49.323339+00:00",
+        "observed_at": "2026-10-17T00:44:35.570091+00:00",
         "reason": "NO_LAST_KNOWN_GOOD",
         "status": "UNKNOWN"
       },
       "last_success_at": null,
       "manifest_sha256": "671c149f77a7ec3732b21dc2540edaf4d1fc25bf107d10854ebd63a35a41edd5",
-      "next_update_at": "2026-10-16T06:30:00+08:00",
+      "next_update_at": "2026-10-17T18:30:00+08:00",
       "pagination": {
         "complete": false,
         "page_limit": 4,
@@ -130,27 +130,27 @@
     },
     {
       "catalog_status": "VERIFIED_CANDIDATE",
-      "current_source_run_id": "SR-CAND-20261015-032",
-      "data_as_of": "2026-10-15T00:00:00+08:00",
-      "freshness_status": "STALE",
+      "current_source_run_id": "SR-CAND-20261017-032",
+      "data_as_of": "2026-10-16T00:00:00+08:00",
+      "freshness_status": "VERY_STALE",
       "integration_status": "CANDIDATE",
       "intelligence_gaps": [
         "WINDOW_PARTIAL",
         "NO_LAST_KNOWN_GOOD",
-        "STALE_DATA"
+        "VERY_STALE_DATA"
       ],
-      "last_checked_at": "2026-10-15T23:10:55+08:00",
+      "last_checked_at": "2026-10-17T08:44:41+08:00",
       "last_known_good": null,
       "last_known_good_age": {
         "age_hours": null,
         "completed_at": null,
-        "observed_at": "2026-10-15T15:10:55.507223+00:00",
+        "observed_at": "2026-10-17T00:44:41.401417+00:00",
         "reason": "NO_LAST_KNOWN_GOOD",
         "status": "UNKNOWN"
       },
       "last_success_at": null,
-      "manifest_sha256": "394c05c8db01c65f207ffbf345c6e174ba2b0646c60e26da9f36f7aa8e658a37",
-      "next_update_at": "2026-10-16T06:30:00+08:00",
+      "manifest_sha256": "8071704b61275f616f96a57897df86448886f77677dc9b9d001ba4c74c839dfb",
+      "next_update_at": "2026-10-17T18:30:00+08:00",
       "pagination": {
         "complete": false,
         "page_limit": 4,
@@ -167,16 +167,16 @@
       "source_role": "PRIMARY_EVENT",
       "source_url": "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,20",
       "window_completeness": "PARTIAL",
-      "window_item_count": 6
+      "window_item_count": 8
     }
   ],
-  "generated_at": "2026-10-15T23:10:55+08:00",
+  "generated_at": "2026-10-17T08:44:41+08:00",
   "latest_collection_run": {
-    "collection_run_id": "CR-DEMO-20261015-EVENING-SCHEDULE",
-    "finished_at": "2026-10-15T23:10:55+08:00",
-    "scheduled_for": "2026-10-15T18:30:00+08:00",
-    "slot": "EVENING",
-    "slot_date": "2026-10-15",
+    "collection_run_id": "CR-DEMO-20261017-MORNING-SCHEDULE",
+    "finished_at": "2026-10-17T08:44:41+08:00",
+    "scheduled_for": "2026-10-17T06:30:00+08:00",
+    "slot": "MORNING",
+    "slot_date": "2026-10-17",
     "source_policy": {
       "active_source_ids": [
         "S-004",
@@ -189,12 +189,12 @@
       "policy_hash": "3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501",
       "policy_version": 1
     },
-    "started_at": "2026-10-15T23:09:45+08:00",
+    "started_at": "2026-10-17T08:42:04+08:00",
     "status": "PARTIAL",
     "trigger": "SCHEDULE"
   },
   "mode": "COMPETITION_DEMO",
-  "next_update_at": "2026-10-16T06:30:00+08:00",
+  "next_update_at": "2026-10-17T18:30:00+08:00",
   "schema_version": 1,
   "source_policy": {
     "active_source_ids": [
@@ -210,12 +210,16 @@
   },
   "sources": [
     {
-      "current_source_run_id": "SR-DEMO-20261015-EVENING-004",
+      "current_source_run_id": "SR-DEMO-20261017-MORNING-004",
       "data_as_of": "2026-10-02T00:00:00+08:00",
+      "error_code": "CONNECTIONERROR",
       "freshness_status": "FRESH",
       "integration_status": "PRODUCTION_ACTIVE",
-      "intelligence_gaps": [],
-      "last_checked_at": "2026-10-15T23:09:50+08:00",
+      "intelligence_gaps": [
+        "SOURCE_FAILED",
+        "WINDOW_PARTIAL"
+      ],
+      "last_checked_at": "2026-10-17T08:42:34+08:00",
       "last_known_good": {
         "completed_at": "2026-10-15T23:09:50+08:00",
         "manifest_sha256": "60376b77531ff0aa07e77a424d676b750e151cd6d239de090a92b60ad9466ac2",
@@ -224,28 +228,28 @@
         "source_run_id": "SR-DEMO-20261015-EVENING-004"
       },
       "last_known_good_age": {
-        "age_hours": 0.00021437055555555558,
+        "age_hours": 33.54578979611111,
         "completed_at": "2026-10-15T23:09:50+08:00",
-        "observed_at": "2026-10-15T15:09:50.771734+00:00",
+        "observed_at": "2026-10-17T00:42:34.843266+00:00",
         "reason": null,
         "status": "KNOWN"
       },
       "last_success_at": "2026-10-15T23:09:50+08:00",
-      "manifest_sha256": "60376b77531ff0aa07e77a424d676b750e151cd6d239de090a92b60ad9466ac2",
-      "next_update_at": "2026-10-16T06:30:00+08:00",
-      "result": "NO_NEW_ITEM",
-      "snapshot_count": 3,
+      "manifest_sha256": null,
+      "next_update_at": "2026-10-17T18:30:00+08:00",
+      "result": "FAILED",
+      "snapshot_count": null,
       "snapshot_item_count": 1,
-      "source_health": "PASS",
+      "source_health": "FAILED",
       "source_id": "S-004",
       "source_name": "臺中市議會議事日程",
       "source_role": "PRIMARY_EVENT",
       "source_url": "https://www.tccc.gov.tw/wb_download13.asp?uno=&cno=49",
-      "window_completeness": "COMPLETE_ZERO",
-      "window_item_count": 0
+      "window_completeness": "PARTIAL",
+      "window_item_count": null
     },
     {
-      "current_source_run_id": "SR-DEMO-20261015-EVENING-006",
+      "current_source_run_id": "SR-DEMO-20261017-MORNING-006",
       "data_as_of": "2026-09-01T00:00:00+08:00",
       "data_as_of_basis": "OFFICIAL_DOCUMENT_REVISION_DATE",
       "data_as_of_evidence": {
@@ -256,13 +260,15 @@
         "page_number": 1
       },
       "data_as_of_scope": "LATEST_EVIDENCED_DOCUMENT_VERSION",
+      "error_code": "CONNECTIONERROR",
       "freshness_status": "VERY_STALE",
       "integration_status": "PRODUCTION_ACTIVE",
       "intelligence_gaps": [
+        "SOURCE_FAILED",
         "WINDOW_PARTIAL",
         "VERY_STALE_DATA"
       ],
-      "last_checked_at": "2026-10-15T23:09:59+08:00",
+      "last_checked_at": "2026-10-17T08:43:06+08:00",
       "last_known_good": {
         "completed_at": "2026-10-15T23:09:59+08:00",
         "manifest_sha256": "6f6c76f0be306ca3ad99448bc8d73bed704c04a1a67fa8346f52e7769fc7c997",
@@ -271,37 +277,40 @@
         "source_run_id": "SR-DEMO-20261015-EVENING-006"
       },
       "last_known_good_age": {
-        "age_hours": 6.083111111111111e-05,
+        "age_hours": 33.55202306138889,
         "completed_at": "2026-10-15T23:09:59+08:00",
-        "observed_at": "2026-10-15T15:09:59.218992+00:00",
+        "observed_at": "2026-10-17T00:43:06.283021+00:00",
         "reason": null,
         "status": "KNOWN"
       },
       "last_success_at": "2026-10-15T23:09:59+08:00",
-      "manifest_sha256": "6f6c76f0be306ca3ad99448bc8d73bed704c04a1a67fa8346f52e7769fc7c997",
-      "next_update_at": "2026-10-16T06:30:00+08:00",
-      "result": "PARTIAL",
-      "snapshot_count": 15,
+      "manifest_sha256": null,
+      "next_update_at": "2026-10-17T18:30:00+08:00",
+      "result": "FAILED",
+      "snapshot_count": null,
       "snapshot_item_count": 7,
-      "source_health": "PASS",
+      "source_health": "FAILED",
       "source_id": "S-006",
       "source_name": "臺中市議會質詢順序表",
       "source_role": "PRIMARY_EVENT",
       "source_url": "https://www.tccc.gov.tw/wb_download13.asp?uno=&cno=50",
       "window_completeness": "PARTIAL",
-      "window_item_count": 0
+      "window_item_count": null
     },
     {
-      "current_source_run_id": "SR-DEMO-20261015-EVENING-007",
+      "current_source_run_id": "SR-DEMO-20261017-MORNING-007",
       "data_as_of": "2026-05-27T01:12:00+08:00",
       "data_as_of_basis": "OFFICIAL_API_RECORD_DATE",
       "data_as_of_scope": "OBSERVED_API_PAGE",
+      "error_code": "CONNECTIONERROR",
       "freshness_status": "STALE",
       "integration_status": "PRODUCTION_ACTIVE",
       "intelligence_gaps": [
+        "SOURCE_FAILED",
+        "WINDOW_PARTIAL",
         "STALE_DATA"
       ],
-      "last_checked_at": "2026-10-15T23:10:21+08:00",
+      "last_checked_at": "2026-10-17T08:43:38+08:00",
       "last_known_good": {
         "completed_at": "2026-10-15T23:10:21+08:00",
         "manifest_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
@@ -310,36 +319,38 @@
         "source_run_id": "SR-DEMO-20261015-EVENING-007"
       },
       "last_known_good_age": {
-        "age_hours": 5.0042222222222225e-05,
+        "age_hours": 33.55474351555556,
         "completed_at": "2026-10-15T23:10:21+08:00",
-        "observed_at": "2026-10-15T15:10:21.180152+00:00",
+        "observed_at": "2026-10-17T00:43:38.076656+00:00",
         "reason": null,
         "status": "KNOWN"
       },
       "last_success_at": "2026-10-15T23:10:21+08:00",
-      "manifest_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "next_update_at": "2026-10-16T06:30:00+08:00",
-      "result": "NO_NEW_ITEM",
-      "snapshot_count": 2,
+      "manifest_sha256": null,
+      "next_update_at": "2026-10-17T18:30:00+08:00",
+      "result": "FAILED",
+      "snapshot_count": null,
       "snapshot_item_count": 0,
-      "source_health": "PASS",
+      "source_health": "FAILED",
       "source_id": "S-007",
       "source_name": "臺中市議會議事資訊系統－議事錄",
       "source_role": "PRIMARY_EVENT",
       "source_url": "https://yishi.tccc.gov.tw/api/ProceedingsBackWeb/FrontList",
-      "window_completeness": "COMPLETE_ZERO",
-      "window_item_count": 0
+      "window_completeness": "PARTIAL",
+      "window_item_count": null
     },
     {
-      "current_source_run_id": "SR-DEMO-20261015-EVENING-009",
+      "current_source_run_id": "SR-DEMO-20261017-MORNING-009",
       "data_as_of": null,
+      "error_code": "CONNECTIONERROR",
       "freshness_status": "NO_DATA",
       "integration_status": "PRODUCTION_ACTIVE",
       "intelligence_gaps": [
+        "SOURCE_FAILED",
         "WINDOW_PARTIAL",
         "NO_DATA_AS_OF"
       ],
-      "last_checked_at": "2026-10-15T23:10:22+08:00",
+      "last_checked_at": "2026-10-17T08:44:04+08:00",
       "last_known_good": {
         "completed_at": "2026-10-15T23:10:22+08:00",
         "manifest_sha256": "d74de2631cff63316fb4ba717e1c63de412bb6d3ae2fdf32c3bba68fc4957490",
@@ -348,52 +359,52 @@
         "source_run_id": "SR-DEMO-20261015-EVENING-009"
       },
       "last_known_good_age": {
-        "age_hours": 3.319472222222222e-05,
+        "age_hours": 33.56169634138889,
         "completed_at": "2026-10-15T23:10:22+08:00",
-        "observed_at": "2026-10-15T15:10:22.119501+00:00",
+        "observed_at": "2026-10-17T00:44:04.106829+00:00",
         "reason": null,
         "status": "KNOWN"
       },
       "last_success_at": "2026-10-15T23:10:22+08:00",
-      "manifest_sha256": "d74de2631cff63316fb4ba717e1c63de412bb6d3ae2fdf32c3bba68fc4957490",
-      "next_update_at": "2026-10-16T06:30:00+08:00",
-      "result": "PARTIAL",
-      "snapshot_count": 1,
+      "manifest_sha256": null,
+      "next_update_at": "2026-10-17T18:30:00+08:00",
+      "result": "FAILED",
+      "snapshot_count": null,
       "snapshot_item_count": 108,
-      "source_health": "PASS",
+      "source_health": "FAILED",
       "source_id": "S-009",
       "source_name": "臺中市議會議事資訊系統－各項提案",
       "source_role": "PRIMARY_EVENT",
       "source_url": "https://yishi.tccc.gov.tw/api/Proposal/FrontList",
       "window_completeness": "PARTIAL",
-      "window_item_count": 0
+      "window_item_count": null
     },
     {
-      "current_source_run_id": "SR-DEMO-20261015-EVENING-029",
+      "current_source_run_id": "SR-DEMO-20261017-MORNING-029",
       "data_as_of": "2026-07-24T00:00:00+08:00",
       "freshness_status": "STALE",
       "integration_status": "PRODUCTION_ACTIVE",
       "intelligence_gaps": [
         "STALE_DATA"
       ],
-      "last_checked_at": "2026-10-15T23:10:34+08:00",
+      "last_checked_at": "2026-10-17T08:44:16+08:00",
       "last_known_good": {
-        "completed_at": "2026-10-15T23:10:34+08:00",
+        "completed_at": "2026-10-17T08:44:16+08:00",
         "manifest_sha256": "a427ebfe37643d830711f30d02d1ef1ee0adea55ddaf713925c4fb121aa3ce05",
         "snapshot_count": 4,
         "snapshot_item_count": 19,
-        "source_run_id": "SR-DEMO-20261015-EVENING-029"
+        "source_run_id": "SR-DEMO-20261017-MORNING-029"
       },
       "last_known_good_age": {
-        "age_hours": 0.00017980027777777778,
-        "completed_at": "2026-10-15T23:10:34+08:00",
-        "observed_at": "2026-10-15T15:10:34.647281+00:00",
+        "age_hours": 0.0001778886111111111,
+        "completed_at": "2026-10-17T08:44:16+08:00",
+        "observed_at": "2026-10-17T00:44:16.640399+00:00",
         "reason": null,
         "status": "KNOWN"
       },
-      "last_success_at": "2026-10-15T23:10:34+08:00",
+      "last_success_at": "2026-10-17T08:44:16+08:00",
       "manifest_sha256": "a427ebfe37643d830711f30d02d1ef1ee0adea55ddaf713925c4fb121aa3ce05",
-      "next_update_at": "2026-10-16T06:30:00+08:00",
+      "next_update_at": "2026-10-17T18:30:00+08:00",
       "result": "NO_NEW_ITEM",
       "snapshot_count": 4,
       "snapshot_item_count": 19,
