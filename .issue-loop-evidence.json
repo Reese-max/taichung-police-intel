@@ -1,33 +1,12 @@
 {
-  "schema_version": 1,
-  "status": "failed",
   "repo": "Reese-max/taichung-police-intel",
-  "issue": 29,
-  "base_sha": "2c660cef6f1b1fbf86b141306e54d06e0511c9f9",
-  "created_at": "2026-10-06T05:11:59.498475Z",
-  "gates": {
-    "baseline": "pass",
-    "tdd": "pass",
-    "review": "fail"
-  },
-  "commands": [],
-  "candidate_sha": "eb53499854c92ddf170abc874978cb4fa55e9e77",
-  "changed_files": [
-    ".issue-loop-context.json",
-    ".issue-loop-evidence.json",
-    ".issue-loop-prompt.md",
-    ".issue-loop-red.json",
-    ".issue-loop-review.json",
-    "tests/test_chat_turn_worker.py",
-    "workers/query-gateway/src/index.js"
-  ],
-  "red_proof": {
-    "repo": "Reese-max/taichung-police-intel",
-    "issue": 29,
-    "base_sha": "2c660cef6f1b1fbf86b141306e54d06e0511c9f9",
-    "command": "python -X utf8 -c \"import sys; ws='workers/query-gateway/src/index.js'; source=open(ws).read(); allowed_start=source.find('const allowed = {'); allowed_section=source[allowed_start:source.find('}', allowed_start+1)]; print('RED' if 'chat_turn' not in allowed_section else 'GREEN'); sys.exit(1 if 'chat_turn' not in allowed_section else 0)\"",
-    "exit": 1
-  },
-  "review": null,
-  "failure_reason": "review_sha_mismatch"
+  "issue": 35,
+  "base_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+  "red_proof": "FAIL: test_non_success_stage_times_do_not_measure_successful_latency (test_system_health.SystemHealthTests.test_non_success_stage_times_do_not_measure_successful_latency) (stage='collection', outcome='FAILED')\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"C:\\Users\\Administrator\\issue-loop\\worktrees\\Reese-max_taichung-police-intel-issue-35\\tests\\test_system_health.py\", line 777, in test_non_success_stage_times_do_not_measure_successful_latency\n    self.assertIsNone(result[\"latency_metrics\"][metric])\nAssertionError: 300000 is not None\nRan 49 tests in 2.124s\n\nFAILED (failures=17)\n\nFAIL: test_publish_phase_failures_are_attributed_without_rewriting_collection (test_publication_outcome.OutcomeTests.test_publish_phase_failures_are_attributed_without_rewriting_collection) (phase='PRESERVE', outcome='failure')\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"C:\\Users\\Administrator\\issue-loop\\worktrees\\Reese-max_taichung-police-intel-issue-35\\tests\\test_publication_outcome.py\", line 69, in test_publish_phase_failures_are_attributed_without_rewriting_collection\n    self.assertEqual(stages[name][\"outcome\"], \"FAILED\")\nAssertionError: 'SKIPPED' != 'FAILED'\nRan 29 tests in 1.192s\n\nFAILED (failures=4, errors=2)\n\nFAIL: test_explicit_times_cannot_override_reported_stage_evidence (test_system_health.SystemHealthTests.test_explicit_times_cannot_override_reported_stage_evidence) (outcome='FAILED')\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"C:\\Users\\Administrator\\issue-loop\\worktrees\\Reese-max_taichung-police-intel-issue-35\\tests\\test_system_health.py\", line 821, in test_explicit_times_cannot_override_reported_stage_evidence\n    self.assertIsNone(result[\"latency_metrics\"][\"verify_to_publish_ms\"])\nAssertionError: 420000 is not None\nRan 1 test in 0.004s\n\nFAILED (failures=5)",
+  "test_command": "python -X utf8 -B -m unittest discover -s tests -p 'test_system_health.py' -v && python -X utf8 -B -m unittest discover -s tests -p 'test_publication_outcome.py' -v && node --test apps/web/tests/system-health.test.mjs",
+  "test_exit": 0,
+  "tests_passed": 92,
+  "tests_failed": 0,
+  "summary": "Fixed #35 publication failure attribution: failed/cancelled state pushes map to deployment, Pages artifact uploads to publication_build, and Pages action failures carry the existing deploy error class while preserving collection and raw phase outcomes. Successful latency endpoints now require successful reported stages, cannot fall back from deployment to build or from a reported verifier to canonical validation, and cannot be overridden by explicit timestamps. Added five regression tests covering these paths and retained the existing versioned receipt, JSON/UI and query/upstream lane isolation contracts; the targeted suites increased from 87 to 92 passing tests, with acceptance mapping and remaining operational evidence documented.",
+  "not_done": "No push, PR, merge, issue closure, deployment or external notification was performed. Issue #35 operational acceptance remains open: actual per-stage clocks/hash/history linkage, source-to-public latency/p95/SLO, sustained monitoring and failure/recovery alert delivery/acknowledgement, approved provider/token/cost/load measurements, operator roles/SLA, human reading/correction and raw-purge receipts were not produced; missing production evidence remains UNKNOWN and formal query rights/admission were not changed. Dedicated lint/coverage/CRAP/mutation tools are not configured by the project and were not added."
 }

@@ -45,6 +45,37 @@ class OutcomeTests(unittest.TestCase):
             **overrides,
         }
 
+    def test_publish_phase_failures_are_attributed_without_rewriting_collection(self):
+        for phase, name, error in (
+            ("PRESERVE", "deployment", "PUBLICATION_STATE_PUSH_FAILED"),
+            ("PAGES_UPLOAD", "publication_build", "PUBLICATION_BUILD_FAILED"),
+            ("PAGES_DEPLOY", "deployment", "DEPLOY_ACTION_FAILED"),
+        ):
+            for outcome in ("failure", "cancelled"):
+                with self.subTest(phase=phase, outcome=outcome):
+                    env = self.completed_publication_env(
+                        BUILD_RESULT="success" if phase == "PAGES_DEPLOY" else "failure",
+                        DEPLOY_RESULT="failure" if phase == "PAGES_DEPLOY" else "skipped",
+                        PAGES_DEPLOY="skipped", PUBLIC_VERIFY="skipped", QUERY_VERIFY="skipped",
+                        GENERATION_ID="generation-failed-publish", STATE_COMMIT="a" * 40,
+                    )
+                    if phase == "PRESERVE":
+                        env["PAGES_UPLOAD"] = "skipped"
+                    env[phase] = outcome
+                    receipt = module.runtime_health(env)
+                    stages = {row["stage"]: row for row in receipt["stages"]}
+                    self.assertEqual(stages["collection"]["outcome"], "SUCCESS")
+                    self.assertEqual(stages["canonical_validation"]["outcome"], "SUCCESS")
+                    self.assertEqual(stages[name]["outcome"], "FAILED")
+                    self.assertEqual(stages[name]["error_class"], error)
+                    self.assertEqual(stages[name]["generation_id"], env["GENERATION_ID"])
+                    self.assertEqual(stages[name]["state_commit"], env["STATE_COMMIT"])
+                    self.assertEqual(receipt["lanes"]["publication"], "BLOCKED")
+                    self.assertEqual(receipt["operator_summary"]["primary_stage"]["stage"], name)
+                    self.assertEqual(receipt["phase_results"][phase], outcome)
+                    self.assertFalse(receipt["public_data_verified"])
+                    self.assertIsNone(receipt["latency_metrics"]["publish_to_visible_ms"])
+
     def test_gateway_failure_retains_verified_publication_and_failed_workflow(self):
         env = self.completed_publication_env(DEPLOY_RESULT="failure", QUERY_VERIFY="failure")
         text, code = module.report(env)
@@ -136,7 +167,9 @@ class OutcomeTests(unittest.TestCase):
         stages = {(row["lane"], row["stage"]): row for row in receipt["stages"]}
         self.assertEqual(stages[("publication", "collection")]["outcome"], "FAILED")
         self.assertEqual(stages[("publication", "canonical_validation")]["outcome"], "FAILED")
-        self.assertEqual(stages[("publication", "deployment")]["outcome"], "SKIPPED")
+        self.assertEqual(stages[("publication", "deployment")]["outcome"], "FAILED")
+        self.assertEqual(stages[("publication", "deployment")]["error_class"], "PUBLICATION_STATE_PUSH_FAILED")
+        self.assertEqual(receipt["phase_results"]["PAGES_DEPLOY"], "skipped")
         self.assertEqual(stages[("publication", "public_http_verification")]["outcome"], "SKIPPED")
         self.assertEqual(stages[("publication", "deployment")]["generation_id"], "generation-1")
         self.assertEqual(receipt["overall"], "BLOCKED")
