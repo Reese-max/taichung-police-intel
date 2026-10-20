@@ -693,6 +693,45 @@ class HandoffStateTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "known document revision"):
             confirm_handoff(retained, current_items={old["identity"]: old}, publication={}, generated_at=T2, confirmed_at=T2)
 
+    def test_equal_time_detail_predecessor_survives_source_version_advance(self):
+        old = dict(item(), document_version_id="DOC-1")
+        current = dict(item(version=2), document_version_id="DOC-2")
+        stale = dict(current, document_version_id="DOC-1")
+        for history in ["both", "invalidation", "handoff"]:
+            with self.subTest(history=history):
+                state, watch, _ = add_watch(empty_state(), old, created_at=T0)
+                if history != "invalidation":
+                    state, _ = confirm_handoff(state, current_items={old["identity"]: old},
+                        publication={"collection_run_id": "RUN-1"}, generated_at=T0, confirmed_at=T0)
+                pending = sync_with_publication(state, previous_items={old["identity"]: old},
+                    current_items={current["identity"]: current}, events=[], observed_at=T1, collection_run_id="RUN-2")
+                if history == "handoff":
+                    pending["watch_items"][watch["watch_id"]]["invalidations"] = []
+                receipt = {"source_id": old["source_id"], "stable_key": old["stable_key"],
+                    "classification": {"review_required": True, "status": "MATERIAL_CHANGE", "observed_at": T1,
+                        "before": {"document_version_id": "DOC-2"}, "after": {"document_version_id": "DOC-1"}}}
+
+                retained = sync_with_detail_rechecks(pending, [receipt], observed_at=T1)
+
+                self.assertEqual(retained["watch_items"], pending["watch_items"])
+                self.assertEqual(retained["handoffs"], pending["handoffs"])
+                with self.assertRaisesRegex(ValueError, "known document revision"):
+                    confirm_handoff(retained, current_items={stale["identity"]: stale},
+                        publication={}, generated_at=T1, confirmed_at=T1)
+                reviewed, record = confirm_handoff(retained, current_items={current["identity"]: current},
+                    publication={"collection_run_id": "RUN-2"}, generated_at=T1, confirmed_at=T1)
+                self.assertEqual(record["items"][0]["source_document_version"], "DOC-2")
+                self.assertEqual(reviewed["handoffs"][:-1], pending["handoffs"])
+                repeated = sync_with_detail_rechecks(reviewed, [receipt], observed_at=T1)
+                self.assertEqual(repeated["watch_items"], reviewed["watch_items"])
+
+                receipt["classification"]["observed_at"] = T2
+                later = sync_with_detail_rechecks(reviewed, [receipt], observed_at=T2)
+                final, reversion = confirm_handoff(later, current_items={stale["identity"]: stale},
+                    publication={}, generated_at=T2, confirmed_at=T2)
+                self.assertEqual(reversion["items"][0]["source_document_version"], "DOC-1")
+                self.assertEqual(final["handoffs"][:-1], reviewed["handoffs"])
+
     def test_unchanged_publication_advances_the_detail_replay_clock(self):
         revised, _, watch = self._detail_recheck_revision()
         current = dict(item(), document_version_id="DOCV-NEW")

@@ -1,33 +1,12 @@
 {
-  "schema_version": 1,
-  "status": "failed",
   "repo": "Reese-max/taichung-police-intel",
-  "issue": 29,
-  "base_sha": "2c660cef6f1b1fbf86b141306e54d06e0511c9f9",
-  "created_at": "2026-10-06T05:11:59.498475Z",
-  "gates": {
-    "baseline": "pass",
-    "tdd": "pass",
-    "review": "fail"
-  },
-  "commands": [],
-  "candidate_sha": "eb53499854c92ddf170abc874978cb4fa55e9e77",
-  "changed_files": [
-    ".issue-loop-context.json",
-    ".issue-loop-evidence.json",
-    ".issue-loop-prompt.md",
-    ".issue-loop-red.json",
-    ".issue-loop-review.json",
-    "tests/test_chat_turn_worker.py",
-    "workers/query-gateway/src/index.js"
-  ],
-  "red_proof": {
-    "repo": "Reese-max/taichung-police-intel",
-    "issue": 29,
-    "base_sha": "2c660cef6f1b1fbf86b141306e54d06e0511c9f9",
-    "command": "python -X utf8 -c \"import sys; ws='workers/query-gateway/src/index.js'; source=open(ws).read(); allowed_start=source.find('const allowed = {'); allowed_section=source[allowed_start:source.find('}', allowed_start+1)]; print('RED' if 'chat_turn' not in allowed_section else 'GREEN'); sys.exit(1 if 'chat_turn' not in allowed_section else 0)\"",
-    "exit": 1
-  },
-  "review": null,
-  "failure_reason": "review_sha_mismatch"
+  "issue": 210,
+  "base_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+  "red_proof": "Command: python -X utf8 -B -m unittest discover -s tests -p test_handoff_state.py -v\nExit: 1\nFAIL: test_equal_time_detail_predecessor_survives_source_version_advance (test_handoff_state.HandoffStateTests.test_equal_time_detail_predecessor_survives_source_version_advance) (history='both')\n    self.assertEqual(retained[\"watch_items\"], pending[\"watch_items\"])\nAssertionError: {'WAT[645 chars]'DOC-1'}, 'last_reviewed_version': 1, 'last_re[1286 chars]00'}} != {'WAT[645 chars]'DOC-2'}, 'last_reviewed_version': 1, 'last_re[993 chars]00'}}\nFAIL: test_equal_time_detail_predecessor_survives_source_version_advance (test_handoff_state.HandoffStateTests.test_equal_time_detail_predecessor_survives_source_version_advance) (history='invalidation')\n    self.assertEqual(retained[\"watch_items\"], pending[\"watch_items\"])\nAssertionError: {'WAT[645 chars]'DOC-1'}, 'last_reviewed_version': None, 'last[998 chars]00'}} != {'WAT[645 chars]'DOC-2'}, 'last_reviewed_version': None, 'last[705 chars]00'}}\nFAIL: test_equal_time_detail_predecessor_survives_source_version_advance (test_handoff_state.HandoffStateTests.test_equal_time_detail_predecessor_survives_source_version_advance) (history='handoff')\n    self.assertEqual(retained[\"watch_items\"], pending[\"watch_items\"])\nAssertionError: {'WAT[645 chars]'DOC-1'}, 'last_reviewed_version': 1, 'last_re[498 chars]00'}} != {'WAT[645 chars]'DOC-2'}, 'last_reviewed_version': 1, 'last_re[207 chars]00'}}\nRan 34 tests in 0.965s\nFAILED (failures=3)",
+  "test_command": "python -X utf8 -B -m unittest discover -s tests -p test_handoff_state.py -v",
+  "test_exit": 0,
+  "tests_passed": 34,
+  "tests_failed": 0,
+  "summary": "Updated the shared predecessor check to recognize exact retained document references across numeric source-version advances at equal observation times, preserving existing hash checks and legacy hash-only version matching. Added a regression covering invalidation and confirmed-handoff history independently: DOC-2 remains known after equal-time DOC-1 replay, confirming DOC-2 succeeds, confirming stale v2/DOC-1 fails, and a later legitimate reversion remains confirmable without rewriting history. Updated the handoff flow documentation; all 34 handoff tests pass.",
+  "not_done": "Full npm test exited 1 with 11 failed verification gates on this Windows host; the full-suite acceptance criterion is not met. Clean admitted-base checks independently reproduce PDF_PARSER_UNAVAILABLE (installed pypdf 6.18.0 versus required 6.19.0), missing os.O_NONBLOCK, the 0o600 file-mode assertion, and the query-store wrapper's 60-second timeout; related symlink tests also require Windows privileges. The migration self-check cannot load the declared pg dependency. Schema-drift and source-transport-recovery failures were not repaired or independently reproduced. The pre-commit current-checkout runtime contract rejects a dirty worktree, while its clean-base minimal test passes. No repository push, PR, deployment, unrelated source changes, or global dependency changes were made. Standalone lint, coverage ratchet, CRAP, and mutation gates are not configured."
 }

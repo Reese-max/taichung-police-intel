@@ -254,7 +254,7 @@ def _retained_predecessor(watch: dict[str, Any], version: int, digest: str | Non
         before = row.get("before") or {}
         before_version = before.get("version", row.get("source_version", watch.get("tracked_version")))
         known_hash, known_document = before.get("normalized_sha256"), before.get("document_version_id")
-        if (before_version == version
+        if ((known_document or before_version == version)
                 and (known_hash or known_document)
                 and (not known_hash or digest is None or known_hash == digest)
                 and (not known_document or known_document == document)):
@@ -263,7 +263,7 @@ def _retained_predecessor(watch: dict[str, Any], version: int, digest: str | Non
     for record in (state or {}).get("handoffs", []):
         for entry in record.get("items", []):
             if (entry.get("watch_id") == watch.get("watch_id") and entry.get("identity") == watch.get("identity")
-                    and entry.get("source_version") == version
+                    and (document or entry.get("source_version") == version)
                     and (digest is None or entry.get("source_sha256") == digest)
                     and entry.get("source_document_version") == document
                     and {"version": entry.get("source_version"), "normalized_sha256": entry.get("source_sha256"),
