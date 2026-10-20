@@ -1,6 +1,10 @@
+import copy
 import importlib.util
 import json
 from pathlib import Path
+import subprocess
+import sys
+import tempfile
 import unittest
 
 
@@ -51,6 +55,70 @@ def document(
 
 
 class PublicEventFusionTests(unittest.TestCase):
+    def test_manual_actions_replay_with_archived_ids_and_complete_history(self):
+        documents = [document("CITY"), document("POLICE"), document("TRAFFIC")]
+        events = fusion.fuse_documents(documents)
+        original = copy.deepcopy(events)
+        groups = [["doc-CITY:v1"], ["doc-POLICE:v1", "doc-TRAFFIC:v1"]]
+        split = fusion.split_public_event(events[0], groups, operator="reviewer", decided_at="2026-09-21T10:00:00+08:00")
+        children = [event["public_event_id"] for event in split["events"]]
+        actions = [
+            {"action": "SPLIT", "operator": "reviewer", "at": "2026-09-21T10:00:00+08:00", "payload": {"public_event_id": events[0]["public_event_id"], "groups": groups}},
+            *[{"action": "CONFIRM", "operator": "reviewer", "at": f"2026-09-21T10:0{index}:00+08:00", "payload": {"public_event_id": event_id}} for index, event_id in enumerate(children, start=1)],
+            {"action": "MERGE", "operator": "reviewer", "at": "2026-09-21T10:03:00+08:00", "payload": {"merged_event_ids": children}},
+            {"action": "CONFIRM", "operator": "reviewer", "at": "2026-09-21T10:04:00+08:00", "payload": {"public_event_id": min(children)}},
+        ]
+        replay = fusion.replay_manual_actions(events, actions)
+        self.assertEqual(replay, fusion.replay_manual_actions(events, json.loads(json.dumps(actions))))
+        self.assertEqual(events, original)
+        self.assertEqual(replay["manual_actions"], actions)
+        self.assertEqual(len(replay["public_events"]), 1)
+        event = replay["public_events"][0]
+        self.assertEqual(event["fusion_status"], "CONFIRMED")
+        self.assertEqual(event["manual_history"], actions)
+        self.assertEqual(event["independent_source_count"], 3)
+        self.assertEqual({row["public_event_id"] for row in replay["archived_events"]}, {events[0]["public_event_id"], *children})
+        self.assertEqual({link["document_version_id"] for link in event["linked_document_versions"]}, {row["document_version_id"] for row in documents})
+
+    def test_manual_split_rejects_empty_groups_and_does_not_alias_input_evidence(self):
+        event = fusion.fuse_documents([document("CITY"), document("POLICE")])[0]
+        with self.assertRaisesRegex(ValueError, "nonempty"):
+            fusion.split_public_event(event, [["doc-CITY:v1", "doc-POLICE:v1"], []], operator="reviewer", decided_at="2026-09-21T10:00:00+08:00")
+        split = fusion.split_public_event(event, [["doc-CITY:v1"], ["doc-POLICE:v1"]], operator="reviewer", decided_at="2026-09-21T10:00:00+08:00")
+        split["events"][0]["linked_document_versions"][0]["official_url"] = "https://changed.example/"
+        self.assertEqual(event["linked_document_versions"][0]["official_url"], "https://example.gov/CITY")
+
+    def test_manual_replay_rejects_invalid_targets_and_stale_partitions_without_mutation(self):
+        events = fusion.fuse_documents([document("CITY"), document("POLICE", version="v2")])
+        original = copy.deepcopy(events)
+        for action in (
+            {"action": "CONFIRM", "payload": {"public_event_id": "missing"}},
+            {"action": "SPLIT", "payload": {"public_event_id": events[0]["public_event_id"], "groups": [["doc-CITY:v1"], ["doc-POLICE:v1"]]}},
+            {"action": "MERGE", "payload": {"merged_event_ids": [events[0]["public_event_id"], "missing"]}},
+            {"action": "DELETE", "payload": {}},
+        ):
+            with self.subTest(action=action), self.assertRaises(ValueError):
+                fusion.replay_manual_actions(events, [{**action, "operator": "reviewer", "at": "2026-09-21T10:00:00+08:00"}])
+        self.assertEqual(events, original)
+
+    def test_cli_reconciles_document_versions_before_manual_replay(self):
+        documents = [document("CITY"), document("POLICE"), document("TRAFFIC")]
+        previous = fusion.fuse_documents(documents)
+        documents[1] = document("POLICE", version="v2", start="16:00")
+        payload = {"documents": documents, "previous_events": previous, "snapshot_complete": True, "manual_actions": []}
+        with tempfile.TemporaryDirectory() as directory:
+            input_path = Path(directory) / "input.json"
+            input_path.write_text(json.dumps(payload), encoding="utf-8")
+            result = subprocess.run([sys.executable, "-X", "utf8", str(SCRIPT), "--input", str(input_path)], capture_output=True, text=True, encoding="utf-8", check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        event = json.loads(result.stdout)["public_events"][0]
+        self.assertEqual(event["fusion_status"], "CONFLICT")
+        self.assertEqual({link["document_version_id"] for link in event["linked_document_versions"]}, {"doc-CITY:v1", "doc-POLICE:v1", "doc-POLICE:v2", "doc-TRAFFIC:v1"})
+
+    def test_checked_in_demo_is_generated_by_the_domain_replay(self):
+        expected = json.loads((ROOT / "apps/web/public/data/public-event-demo.json").read_text(encoding="utf-8"))
+        self.assertEqual(fusion.build_demo(), expected)
+
     def test_three_official_sources_merge_into_one_confirmed_event(self):
         events = fusion.fuse_documents([document("CITY"), document("POLICE"), document("TRAFFIC")])
         self.assertEqual(len(events), 1)

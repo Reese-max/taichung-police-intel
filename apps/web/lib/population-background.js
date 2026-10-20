@@ -21,3 +21,28 @@ export async function validatePopulationSnapshot(data) {
   }
   return data;
 }
+
+export async function populationBackgroundForEvent(event, snapshot) {
+  if (event?.fusion_status !== "CONFIRMED") throw new Error("背景資料需要 CONFIRMED 事件");
+  // ponytail: one exact district bridge; use the entity registry when adding districts.
+  if (event.district_id !== "location:tc-xitun") throw new Error("背景資料尚無此行政區的確認對應");
+  const data = await validatePopulationSnapshot(snapshot);
+  const row = data.districts.find((item) => item.district_code === "66000060");
+  return {
+    role: "BACKGROUND_ONLY",
+    dataset_id: new URL(data.source_url).searchParams.get("COL"),
+    resource_id: data.source_receipt.csv_filename,
+    dataset_name: data.source_name,
+    period: data.period,
+    period_label: data.period_label,
+    value: row.population,
+    unit: "人",
+    district_id: event.district_id,
+    district: row.district_name,
+    source_id: data.source_id,
+    source_url: data.source_url,
+    source_receipt: structuredClone(data.source_receipt),
+    acquisition_path: "DIRECT_OFFICIAL",
+    note: "已核對的固定歷史樣本，不代表即時人流或活動影響；來源尚未升格為正式定期來源。",
+  };
+}

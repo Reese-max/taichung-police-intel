@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { populationBackgroundForEvent } from "../lib/population-background.js";
 
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
 const DATA_URL = `${BASE_PATH}/data/public-event-demo.json`;
@@ -38,7 +39,6 @@ function isHttpsUrl(value) {
 function isValidDemo(data) {
   const event = data?.current_event;
   const candidate = data?.candidate_event;
-  const background = data?.background_preview;
   const documents = data?.documents;
   if (
     data?.schema_version !== 1
@@ -47,7 +47,7 @@ function isValidDemo(data) {
     || data?.production_verified !== false
     || !isObject(event)
     || !isObject(candidate)
-    || !isObject(background)
+    || !isObject(data?.previous_event)
     || !Array.isArray(documents)
     || documents.length !== 3
   ) return false;
@@ -90,13 +90,7 @@ function isValidDemo(data) {
     && typeof document.current.title === "string"
   ))) return false;
   return (
-    typeof background.dataset_name === "string"
-    && typeof background.period === "string"
-    && Number.isFinite(background.value)
-    && typeof background.unit === "string"
-    && typeof background.district === "string"
-    && isHttpsUrl(background.source_url)
-    && isObject(data.split_preview)
+    isObject(data.split_preview)
     && Array.isArray(data.split_preview.children)
     && isObject(data.merge_preview)
     && Array.isArray(data.merge_preview.merged_from_public_event_ids)
@@ -117,12 +111,16 @@ export default function PublicEventFusionDemo() {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return response.json();
       })
-      .then((data) => {
+      .then(async (data) => {
         if (cancelled) return;
         if (!isValidDemo(data)) {
           throw new Error("事件融合示範格式不相容，已停止呈現。");
         }
-        setPayload(data);
+        const response = await fetch(`${BASE_PATH}/data/population-112Y12M.json`, { cache: "no-store", signal: AbortSignal.timeout(12000) });
+        if (!response.ok) throw new Error(`D1 HTTP ${response.status}`);
+        const background = await populationBackgroundForEvent(data.previous_event, await response.json());
+        if (cancelled) return;
+        setPayload({ ...data, background_preview: background });
         setLoadState("ready");
       })
       .catch((error) => {
@@ -224,9 +222,10 @@ export default function PublicEventFusionDemo() {
         <div className="v2-fusion-background">
           <strong>背景資料：{payload.background_preview.dataset_name}</strong>
           <p>
-            {payload.background_preview.period} · {payload.background_preview.district} · {payload.background_preview.value.toLocaleString()}{payload.background_preview.unit}
+            {payload.background_preview.period_label}（{payload.background_preview.period}） · {payload.background_preview.district} · {payload.background_preview.value.toLocaleString()}{payload.background_preview.unit}
           </p>
           <small>{payload.background_preview.note} <a href={payload.background_preview.source_url} target="_blank" rel="noreferrer">背景資料原始入口（不支持合成事件）</a></small>
+          <details><summary>前一個已確認事件的背景資料收據</summary><p>資料集：{payload.background_preview.dataset_id}</p><p>資源：{payload.background_preview.resource_id}</p><p>原始 CSV SHA256：{payload.background_preview.source_receipt.raw_csv_sha256}</p></details>
         </div>
 
         <div className="v2-fusion-actions" aria-label="本機人工決策預覽">
@@ -246,6 +245,7 @@ export default function PublicEventFusionDemo() {
             <p>{merge.merged_from_public_event_ids.join(" + ")}；保留 {merge.public_event_id}，退休 {merge.retired_public_event_ids.join("、")}。</p>
           </div>
         )}
+        <a href={DATA_URL}>下載合成文件、版本及人工決策重播紀錄</a>
       </article>
 
       <article className="v2-fusion-candidate">

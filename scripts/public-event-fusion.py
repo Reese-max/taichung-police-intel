@@ -726,8 +726,10 @@ def confirm_candidate(event: dict[str, Any], *, operator: str, decided_at: Any) 
 def merge_public_events(events: list[dict[str, Any]], *, operator: str, decided_at: Any) -> dict[str, Any]:
     if not isinstance(events, list) or len(events) < 2:
         raise ValueError("manual merge requires at least two events")
-    ids = [event.get("public_event_id") for event in events]
-    if any(not isinstance(event, dict) or not event.get("public_event_id") for event in events) or len(ids) != len(set(ids)):
+    if any(not isinstance(event, dict) or not isinstance(event.get("public_event_id"), str) or not event["public_event_id"] for event in events):
+        raise ValueError("manual merge requires unique PublicEvent IDs")
+    ids = [event["public_event_id"] for event in events]
+    if len(ids) != len(set(ids)):
         raise ValueError("manual merge requires unique PublicEvent IDs")
     ordered = sorted((copy.deepcopy(event) for event in events), key=lambda event: event["public_event_id"])
     target = ordered[0]
@@ -747,6 +749,10 @@ def merge_public_events(events: list[dict[str, Any]], *, operator: str, decided_
     target["independent_source_count"] = len(target["independent_source_ids"])
     target["fusion_status"] = "CONFLICT" if any(event.get("fusion_status") == "CONFLICT" for event in ordered) else "CANDIDATE"
     target["merged_from_public_event_ids"] = [event["public_event_id"] for event in ordered]
+    target["manual_history"] = sorted(
+        _unique_dicts([record for event in ordered for record in event.get("manual_history", [])]),
+        key=lambda record: record["at"],
+    )
     target.setdefault("manual_history", []).append(
         _manual_record("MERGE", operator, decided_at, {"merged_event_ids": target["merged_from_public_event_ids"]})
     )
@@ -761,8 +767,10 @@ def split_public_event(
     event: dict[str, Any], groups: list[list[str]], *, operator: str, decided_at: Any
 ) -> dict[str, Any]:
     links = event.get("linked_document_versions")
-    if not isinstance(links, list) or len(groups) < 2:
-        raise ValueError("manual split requires linked documents and two groups")
+    if not isinstance(links, list) or not isinstance(groups, list) or len(groups) < 2:
+        raise ValueError("manual split requires linked documents and two nonempty groups")
+    if any(not isinstance(group, list) or not group or any(not isinstance(item, str) or not item for item in group) for group in groups):
+        raise ValueError("manual split requires nonempty groups of document version IDs")
     all_ids = [link.get("document_version_id") for link in links]
     requested = [document_version_id for group in groups for document_version_id in group]
     if sorted(requested) != sorted(all_ids) or len(requested) != len(set(requested)):
@@ -777,17 +785,52 @@ def split_public_event(
     for index, group in enumerate(groups, start=1):
         child = copy.deepcopy(event)
         child["public_event_id"] = _stable_id("PE", f"split|{event['public_event_id']}|{index}|{'|'.join(sorted(group))}")
-        child["linked_document_versions"] = [link_by_id[item] for item in group]
+        child["linked_document_versions"] = [copy.deepcopy(link_by_id[item]) for item in group]
         child["source_provenance"] = _source_provenance_from_links(child["linked_document_versions"])
         child["independent_source_ids"] = sorted({link.get("independent_source_id") or link.get("source_id") for link in child["linked_document_versions"]})
         child["independent_source_count"] = len(child["independent_source_ids"])
         child["fusion_status"] = "CANDIDATE"
-        child["manual_history"] = [record]
+        child.setdefault("manual_history", []).append(copy.deepcopy(record))
         child["split_from_public_event_id"] = event["public_event_id"]
         children.append(child)
         child_ids.append(child["public_event_id"])
     original["split_into_public_event_ids"] = child_ids
     return {"original": original, "events": children}
+
+
+def replay_manual_actions(events: list[dict[str, Any]], actions: list[dict[str, Any]]) -> dict[str, Any]:
+    """Replay an ordered, evidence-bound ledger without mutating its inputs."""
+    if not isinstance(events, list) or any(not isinstance(event, dict) or not isinstance(event.get("public_event_id"), str) or not event["public_event_id"] for event in events):
+        raise ValueError("replay requires PublicEvents with unique IDs")
+    active = {event["public_event_id"]: copy.deepcopy(event) for event in events}
+    if len(active) != len(events) or not isinstance(actions, list):
+        raise ValueError("replay requires unique PublicEvent IDs and a manual_actions array")
+    archived, records = [], []
+    for raw in actions:
+        if not isinstance(raw, dict) or set(raw) != {"action", "operator", "at", "payload"} or not isinstance(raw.get("payload"), dict):
+            raise ValueError("manual action requires action, operator, at and payload")
+        record = _manual_record(raw["action"], raw["operator"], raw["at"], raw["payload"])
+        action, payload = record["action"], record["payload"]
+        keys = {"merged_event_ids"} if action == "MERGE" else {"public_event_id", "groups"} if action == "SPLIT" else {"public_event_id"}
+        if set(payload) != keys:
+            raise ValueError("manual action payload fields do not match its action")
+        ids = payload["merged_event_ids"] if action == "MERGE" else [payload["public_event_id"]]
+        if not isinstance(ids, list) or not ids or any(not isinstance(item, str) or item not in active for item in ids) or len(ids) != len(set(ids)):
+            raise ValueError("manual action targets must be unique active PublicEvent IDs")
+        selected = [active[event_id] for event_id in ids]
+        kwargs = {"operator": record["operator"], "decided_at": record["at"]}
+        if action == "CONFIRM":
+            replacements = [confirm_candidate(selected[0], **kwargs)]
+        elif action == "MERGE":
+            replacements = [merge_public_events(selected, **kwargs)["public_event"]]
+        else:
+            replacements = split_public_event(selected[0], payload["groups"], **kwargs)["events"]
+        archived.extend(copy.deepcopy(selected))
+        for event_id in ids:
+            del active[event_id]
+        active.update({event["public_event_id"]: event for event in replacements})
+        records.append(record)
+    return {"public_events": sorted(active.values(), key=lambda event: event["public_event_id"]), "archived_events": archived, "manual_actions": records}
 
 
 def attach_background(event: dict[str, Any], record: dict[str, Any]) -> dict[str, Any]:
@@ -875,9 +918,52 @@ def self_check() -> None:
     print(f"PUBLIC_EVENT_FUSION_SELF_CHECK_OK event={event['public_event_id']} sources=3 revision=conflict")
 
 
+def build_demo() -> dict[str, Any]:
+    """Build the checked-in synthetic UI replay through the same domain APIs."""
+    documents = []
+    for source, agency, title, name in (
+        ("S-001", "agency:tc-police", "大型活動交通疏導公告", "模擬警察局"),
+        ("S-032", "agency:tc-traffic", "大型活動交通資訊", "模擬交通局"),
+        ("S-033", "agency:tc-news", "臺中大型活動市政公告", "模擬新聞局"),
+    ):
+        doc = _demo_document(source, agency, title)
+        doc.update(official_url=f"https://fixture.example/{source}", evidence_locator=f"fixture:list-row:{source}:event-2026", acquisition_path="DIRECT_OFFICIAL", source_name=name)
+        documents.append(doc)
+    registry = load_entity_registry()
+    previous = fuse_documents(documents, entity_registry=registry)[0]
+    revised = copy.deepcopy(documents)
+    revised[0].update(document_version_id="doc-S-001:v2", event_start_at="2026-09-20T16:00:00+08:00", observed_at="2026-09-22T09:00:00+08:00")
+    current = reconcile_public_events([previous], revised, snapshot_complete=True, entity_registry=registry)[0]
+    candidate = fuse_documents([dict(documents[0], named_event_id=None)], entity_registry=registry)[0]
+    groups = [
+        [link["document_version_id"] for link in current["linked_document_versions"] if link["source_id"] == "S-001"],
+        [link["document_version_id"] for link in current["linked_document_versions"] if link["source_id"] != "S-001"],
+    ]
+    split = split_public_event(current, groups, operator="demo-preview", decided_at="2026-09-22T10:00:00+08:00")
+    actions = [
+        {"action": "SPLIT", "operator": "demo-preview", "at": "2026-09-22T10:00:00+08:00", "payload": {"public_event_id": current["public_event_id"], "groups": groups}},
+        {"action": "MERGE", "operator": "demo-preview", "at": "2026-09-22T10:01:00+08:00", "payload": {"merged_event_ids": [event["public_event_id"] for event in split["events"]]}},
+    ]
+    replay = replay_manual_actions([current], actions)
+    merged = replay["public_events"][0]
+    version_fields = ("document_version_id", "title", "event_start_at", "event_end_at")
+    return {
+        "schema_version": 1, "kind": "GOVINTEL_PUBLIC_EVENT_DEMO", "status": "FIXTURE_ONLY", "production_verified": False,
+        "generated_at": "2026-09-22T09:00:00+08:00", "generator": "scripts/public-event-fusion.py --demo",
+        "previous_event": previous, "current_event": current,
+        "documents": [{"source_id": before["source_id"], "source_name": before["source_name"], "document_id": before["document_id"], "official_url": before["official_url"], "evidence_locator": before["evidence_locator"], "previous": {field: before[field] for field in version_fields}, "current": {field: after[field] for field in version_fields}} for before, after in zip(documents, revised)],
+        "candidate_event": {**{field: candidate[field] for field in ("public_event_id", "canonical_title", "fusion_status")}, "link_reason": candidate["link_reasons"][0]},
+        "manual_actions": actions,
+        "split_preview": {"original_public_event_id": current["public_event_id"], "original_status": split["original"]["fusion_status"], "children": [{"public_event_id": event["public_event_id"], "fusion_status": event["fusion_status"], "sources": event["independent_source_ids"]} for event in split["events"]]},
+        "merge_preview": {**{field: merged[field] for field in ("public_event_id", "merged_from_public_event_ids", "independent_source_count", "fusion_status")}, "retired_public_event_ids": [event_id for event_id in merged["merged_from_public_event_ids"] if event_id != merged["public_event_id"]]},
+    }
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--input", type=Path)
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--input", type=Path)
+    mode.add_argument("--demo", action="store_true")
     parser.add_argument("--output", type=Path)
     parser.add_argument("--entity-registry", type=Path)
     parser.add_argument("--self-check", action="store_true")
@@ -889,14 +975,23 @@ def main() -> int:
     if args.self_check:
         self_check()
         return 0
-    if not args.input:
-        raise SystemExit("--input is required unless --self-check is used")
-    payload = json.loads(args.input.read_text(encoding="utf-8"))
-    documents = payload.get("documents") if isinstance(payload, dict) else None
-    if not isinstance(documents, list):
-        raise SystemExit("input must be an object with a documents array")
-    registry = load_entity_registry(args.entity_registry) if args.entity_registry else None
-    output = {"schema_version": 1, "public_events": fuse_documents(documents, entity_registry=registry)}
+    if args.demo:
+        output = build_demo()
+    else:
+        if not args.input:
+            raise SystemExit("--input is required unless --demo or --self-check is used")
+        payload = json.loads(args.input.read_text(encoding="utf-8"))
+        documents = payload.get("documents") if isinstance(payload, dict) else None
+        if not isinstance(documents, list):
+            raise SystemExit("input must be an object with a documents array")
+        registry = load_entity_registry(args.entity_registry) if args.entity_registry else None
+        if "previous_events" in payload:
+            if not isinstance(payload.get("snapshot_complete"), bool):
+                raise ValueError("previous_events requires explicit boolean snapshot_complete")
+            events = reconcile_public_events(payload["previous_events"], documents, snapshot_complete=payload["snapshot_complete"], entity_registry=registry)
+        else:
+            events = fuse_documents(documents, entity_registry=registry)
+        output = {"schema_version": 1, **replay_manual_actions(events, payload.get("manual_actions", []))}
     text = json.dumps(output, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
