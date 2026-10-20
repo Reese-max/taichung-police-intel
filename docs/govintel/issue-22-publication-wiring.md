@@ -1,5 +1,21 @@
 # Issue #22 — candidate publication wiring
 
+2026-10-20：修正候選來源在部分收錄後遺失舊項目的情況。`PARTIAL`（含窗口內零筆）保留本輪未見項目的 LKG 與原始 hash、官方連結、發布及擷取時間；同一 stable ID 的新觀察優先。保留項目使用當前來源 health、completeness 與 freshness，完整收錄恢復後才移除已缺席的項目；不改變五個 production 來源或 promotion policy。
+
+驗收對照：
+
+| 條件 | 本地證據 |
+| --- | --- |
+| canary 入口及 ROC/Gregorian 日期 | 既有 `test_news_list_collector.py` 與 `test_candidate_runtime_canary.py`，沿用既有 collector |
+| 有界分頁與完整性 | 既有 `test_news_list_terminal_page.py`／`test_news_list_budget.py`；未走完必要頁維持 `PARTIAL` |
+| status → feed → V2／前端名稱與連結 | 既有 candidate publication 與 source-policy promotion fixture；正式來源仍受 policy 限制 |
+| partial／failed 保留 LKG，五個 P0 隔離 | 新增「完整 → 部分（新版與新項目）→ 部分零筆 → 失敗 → 完整恢復」回歸，並沿用既有 publication fixture 與 validator |
+| bounded live canary | [本次原始 receipt](issue-22-live-canary-20261020.json)：S-001／S-019／S-032 各 1 頁列表、1 篇 detail、2 次 HTTP，全部 HTTP 200／`NO_DRIFT`／`PARTIAL`，`failed_count=0` |
+
+本次 receipt 是單次候選觀察，沒有執行七日觀測、來源權限核准、promotion、部署或正式 publication 驗收。
+
+相關回歸由 95 增為 96 項，全部通過；可重跑命令與修改前的失敗輸出保存在 [issue-loop evidence](../../.issue-loop-evidence.json)。沿用既有 `npm run check` 品質 gate；專案未配置 coverage ratchet、CRAP 或 mutation gate，本次不新增套件。
+
 本地候選接線已完成最小修正，仍不代表候選來源已升格為 production：
 
 - `online_collect.py --canary` 對 list-first collector 使用 `max_details=5`，其他 collector 不接收此選項；候選觀測仍是 bounded、read-only、不可自動 promotion。

@@ -4,7 +4,7 @@ import importlib.util
 import json
 import tempfile
 import unittest
-from datetime import date
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from unittest import mock
 
@@ -252,6 +252,79 @@ class CandidatePublicationWiringTests(unittest.TestCase):
                 {item["stable_id"] for item in feed["items"]},
             )
             self.assertEqual(first_feed["source_summary"], feed["source_summary"])
+
+    def test_partial_candidate_preserves_missing_lkg_until_complete_recovery(self):
+        now = datetime(2026, 9, 11, 8, tzinfo=collector.TZ)
+        phase = "complete"
+
+        def collect(_session, source_id, *_args, **_kwargs):
+            if source_id == "S-019" and phase == "failed":
+                raise ConnectionError("candidate-only outage")
+            keys = ("kept", "missing") if phase == "complete" else ("kept", "new")
+            items = [{
+                "stable_key": key,
+                "source_url": collector.NEWS_LIST_SOURCES[source_id]["list_url"],
+                "published_at": "2026-09-11T00:00:00+08:00",
+                "content_sha256": collector.canonical_sha256((source_id, key, phase)),
+                "payload": {"title": f"{key} {phase}"},
+            } for key in keys]
+            if phase == "empty_partial":
+                for item in items:
+                    item["published_at"] = "2026-08-01T00:00:00+08:00"
+            return {
+                "source_health": "PASS",
+                "window_completeness": "PARTIAL" if phase in {"partial", "empty_partial"} else "COMPLETE_WITH_ITEMS",
+                "window_item_count": 0 if phase == "empty_partial" else len(items),
+                "snapshot_item_count": len(items),
+                "snapshots": [], "manifest_sha256": collector.canonical_sha256(items),
+                "items": items,
+            }
+
+        def run(prior_status=None, prior_feed=None):
+            return candidate_lane.collect_pages_candidate_lane(
+                {**vars(collector), "collect_source": collect},
+                date(2026, 9, 4), date(2026, 9, 11), prior_status, prior_feed,
+                now, "2026-09-12T18:30:00+08:00", session_factory=lambda _: mock.Mock(),
+            )
+
+        sources, items, _ = run()
+        original_status = next(row for row in sources if row["source_id"] == "S-019")
+        original = next(item for item in items if item["source_id"] == "S-019" and item["stable_key"] == "missing")
+        for phase in ("partial", "empty_partial", "failed", "recovered"):
+            with self.subTest(phase=phase):
+                now += timedelta(days=1)
+                sources, items, summary = run({"candidate_sources": sources}, {"candidate_items": items})
+                status = {"candidate_sources": sources}
+                feed = {"candidate_items": items, "candidate_source_summary": summary, "items": []}
+                bundle.validate_candidate_lane(status, feed, active_ids=set(collector.P0_SOURCES), required=True)
+                context = v2.candidate_source_context_projection(status, feed)
+                verify_v2.validate_candidate_source_context(feed, status, {"items": {}}, {"candidate_source_context": context})
+                city = next(row for row in sources if row["source_id"] == "S-019")
+                by_key = {item["stable_key"]: item for item in items if item["source_id"] == "S-019"}
+                if phase == "recovered":
+                    self.assertEqual(set(by_key), {"kept", "new"})
+                    self.assertNotEqual(city["last_known_good"], original_status["last_known_good"])
+                    self.assertTrue(all(item["change_type"] == "CANDIDATE_OBSERVATION" for item in by_key.values()))
+                    continue
+                self.assertEqual(set(by_key), {"kept", "missing", "new"})
+                self.assertEqual(city["last_known_good"], original_status["last_known_good"])
+                self.assertEqual(city["last_success_at"], original_status["last_success_at"])
+                self.assertIn("WINDOW_PARTIAL", city["intelligence_gaps"])
+                retained = by_key["missing"]
+                for field in ("content_sha256", "title", "official_url", "published_at", "fetched_at"):
+                    self.assertEqual(retained[field], original[field])
+                self.assertEqual(retained["change_type"], "LKG")
+                self.assertEqual(retained["window_completeness"], "PARTIAL")
+                self.assertEqual(retained["freshness_status"], city["freshness_status"])
+                self.assertFalse(retained["promotion_eligible"])
+                if phase != "failed":
+                    self.assertEqual(city["result"], "PARTIAL")
+                    self.assertEqual(city["window_item_count"], 0 if phase == "empty_partial" else 2)
+                    self.assertEqual(summary["S-019"]["item_count"], 3)
+                    self.assertEqual(by_key["kept"]["title"], "kept partial")
+                else:
+                    self.assertIsNone(city["window_item_count"])
+                    self.assertTrue(all(item["eligibility"] == "INELIGIBLE_CANDIDATE_SOURCE_FAILED" for item in by_key.values()))
 
     def test_v2_context_names_all_first_promotion_candidates(self):
         expected = {

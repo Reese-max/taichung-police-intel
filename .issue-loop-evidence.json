@@ -1,33 +1,12 @@
 {
-  "schema_version": 1,
-  "status": "failed",
   "repo": "Reese-max/taichung-police-intel",
-  "issue": 29,
-  "base_sha": "2c660cef6f1b1fbf86b141306e54d06e0511c9f9",
-  "created_at": "2026-10-06T05:11:59.498475Z",
-  "gates": {
-    "baseline": "pass",
-    "tdd": "pass",
-    "review": "fail"
-  },
-  "commands": [],
-  "candidate_sha": "eb53499854c92ddf170abc874978cb4fa55e9e77",
-  "changed_files": [
-    ".issue-loop-context.json",
-    ".issue-loop-evidence.json",
-    ".issue-loop-prompt.md",
-    ".issue-loop-red.json",
-    ".issue-loop-review.json",
-    "tests/test_chat_turn_worker.py",
-    "workers/query-gateway/src/index.js"
-  ],
-  "red_proof": {
-    "repo": "Reese-max/taichung-police-intel",
-    "issue": 29,
-    "base_sha": "2c660cef6f1b1fbf86b141306e54d06e0511c9f9",
-    "command": "python -X utf8 -c \"import sys; ws='workers/query-gateway/src/index.js'; source=open(ws).read(); allowed_start=source.find('const allowed = {'); allowed_section=source[allowed_start:source.find('}', allowed_start+1)]; print('RED' if 'chat_turn' not in allowed_section else 'GREEN'); sys.exit(1 if 'chat_turn' not in allowed_section else 0)\"",
-    "exit": 1
-  },
-  "review": null,
-  "failure_reason": "review_sha_mismatch"
+  "issue": 22,
+  "base_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+  "red_proof": "test_partial_candidate_preserves_missing_lkg_until_complete_recovery (tests.test_candidate_publication_wiring.CandidatePublicationWiringTests.test_partial_candidate_preserves_missing_lkg_until_complete_recovery) ... \r\n  test_partial_candidate_preserves_missing_lkg_until_complete_recovery (tests.test_candidate_publication_wiring.CandidatePublicationWiringTests.test_partial_candidate_preserves_missing_lkg_until_complete_recovery) (phase='partial') ... FAIL\r\n  test_partial_candidate_preserves_missing_lkg_until_complete_recovery (tests.test_candidate_publication_wiring.CandidatePublicationWiringTests.test_partial_candidate_preserves_missing_lkg_until_complete_recovery) (phase='failed') ... FAIL\r\n\r\n======================================================================\r\nFAIL: test_partial_candidate_preserves_missing_lkg_until_complete_recovery (tests.test_candidate_publication_wiring.CandidatePublicationWiringTests.test_partial_candidate_preserves_missing_lkg_until_complete_recovery) (phase='partial')\r\n----------------------------------------------------------------------\r\nTraceback (most recent call last):\r\n  File \"C:\\Users\\Administrator\\issue-loop\\worktrees\\Reese-max_taichung-police-intel-issue-22\\tests\\test_candidate_publication_wiring.py\", line 305, in test_partial_candidate_preserves_missing_lkg_until_complete_recovery\r\n    self.assertEqual(set(by_key), {\"kept\", \"missing\", \"new\"})\r\nAssertionError: Items in the second set but not the first:\r\n'missing'\r\n\r\n======================================================================\r\nFAIL: test_partial_candidate_preserves_missing_lkg_until_complete_recovery (tests.test_candidate_publication_wiring.CandidatePublicationWiringTests.test_partial_candidate_preserves_missing_lkg_until_complete_recovery) (phase='failed')\r\n----------------------------------------------------------------------\r\nTraceback (most recent call last):\r\n  File \"C:\\Users\\Administrator\\issue-loop\\worktrees\\Reese-max_taichung-police-intel-issue-22\\tests\\test_candidate_publication_wiring.py\", line 305, in test_partial_candidate_preserves_missing_lkg_until_complete_recovery\r\n    self.assertEqual(set(by_key), {\"kept\", \"missing\", \"new\"})\r\nAssertionError: Items in the second set but not the first:\r\n'missing'\r\n\r\n----------------------------------------------------------------------\r\nRan 1 test in 0.086s\r\n\r\nFAILED (failures=2)",
+  "test_command": "python -X utf8 -B -m unittest tests.test_candidate_publication_wiring tests.test_news_list_collector tests.test_candidate_runtime_canary tests.test_news_list_terminal_page tests.test_news_list_budget tests.test_publication_bundle tests.test_source_policy_integration -q",
+  "test_exit": 0,
+  "tests_passed": 96,
+  "tests_failed": 0,
+  "summary": "修正候選來源 PARTIAL 收錄時遺失未讀到項目的問題，保留 LKG 證據與原始擷取時間，並同步本輪 health、completeness 與 freshness。新版本優先且不重複計數，完整恢復後移除已缺席項目；回歸涵蓋部分零筆、後續失敗與恢復，沿用 status/feed/V2 validator 及五個 P0 隔離測試。沿用現有日期、分頁、canary 入口及 promotion fixture，另保存三個指定來源各一頁、一篇 detail 的 live receipt，均 HTTP 200/NO_DRIFT/PARTIAL 且未 promotion。",
+  "not_done": "未執行 push、PR、部署、正式 publication 驗收、七日觀測、來源使用權限核准或 production promotion；live receipt 僅證明單次有界候選觀察，未證明完整窗口或 production readiness。"
 }

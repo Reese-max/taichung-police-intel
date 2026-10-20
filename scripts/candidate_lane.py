@@ -132,16 +132,6 @@ def collect_pages_candidate_lane(
                 ),
                 "error_code": collector["source_failure_code"](error),
             }
-            for prior_item in source_previous_items:
-                feed_items.append({
-                    **prior_item,
-                    "change_type": "LKG",
-                    "source_health": "FAILED",
-                    "eligibility": "INELIGIBLE_CANDIDATE_SOURCE_FAILED",
-                    "fetched_at": prior_item.get("fetched_at"),
-                    "integration_status": "CANDIDATE",
-                    "promotion_eligible": False,
-                })
         else:
             assert collected is not None
             collected_items = collected.get("items", [])
@@ -222,6 +212,24 @@ def collect_pages_candidate_lane(
                     "promotion_eligible": False,
                 })
                 feed_items.append(projected)
+
+        if record["window_completeness"] == "PARTIAL":
+            # An incomplete poll cannot establish that an unobserved item vanished.
+            observed_ids = {item["stable_id"] for item in feed_items}
+            for prior_item in source_previous_items:
+                if prior_item["stable_id"] in observed_ids:
+                    continue
+                feed_items.append({
+                    **prior_item,
+                    "change_type": "LKG",
+                    "source_health": record["source_health"],
+                    "window_completeness": "PARTIAL",
+                    "freshness_status": record["freshness_status"],
+                    "data_as_of": record["data_as_of"],
+                    "eligibility": "INELIGIBLE_CANDIDATE_SOURCE_FAILED" if error is not None else "INELIGIBLE_CANDIDATE",
+                    "integration_status": "CANDIDATE",
+                    "promotion_eligible": False,
+                })
 
         record["source_role"] = catalog_sources[source_id]["role"]
         record["catalog_status"] = catalog_sources[source_id]["status"]
