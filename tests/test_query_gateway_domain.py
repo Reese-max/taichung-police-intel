@@ -429,6 +429,31 @@ class QueryGatewayConversationTests(unittest.TestCase):
         self.assertEqual(link["evidence_id"], "EV-PE-CHAT-1")
         self.assertEqual(link["event_id"], "PE-CHAT-1")
 
+    def test_fresh_query_does_not_resurrect_prior_narrowing(self):
+        gateway = self.build()
+        weekend = gateway.execute("chat_turn", {"text": "這週末臺中有哪些活動？"})["chat"]
+        narrowed = gateway.execute("chat_turn", {"text": "只看西屯", "context": weekend["context"]})["chat"]
+        fresh = gateway.execute("chat_turn", {"text": "今天臺中有哪些活動？", "context": narrowed["context"]})["chat"]
+        self.assertNotIn("district", fresh["resolved_request"]["arguments"])
+        self.assertNotIn("selected_region", fresh["context"])
+        followup = gateway.execute("chat_turn", {"text": "只看交通", "context": fresh["context"]})["chat"]
+        self.assertNotIn("district", followup["resolved_request"]["arguments"])
+        self.assertEqual(followup["resolved_request"]["arguments"]["time_from"], "2026-09-21")
+
+    def test_reset_clears_previous_filters_even_when_clarifying(self):
+        gateway = self.build()
+        context = {"schema_version": 1, "selected_region": "location:tc-xitun", "selected_agency": "agency:police",
+                   "selected_category": "traffic_control", "selected_event_id": "PE-CHAT-1",
+                   "last_result_event_ids": ["PE-CHAT-1"],
+                   "selected_time_window": {"time_from": "2026-09-26", "time_to": "2026-09-27"}}
+        for text in ("重新查所有活動", "重新開始"):
+            with self.subTest(text=text):
+                chat = gateway.execute("chat_turn", {"text": text, "context": context})["chat"]
+                for key in context.keys() - {"schema_version", "last_result_event_ids"}:
+                    self.assertNotIn(key, chat["context"])
+                if chat["status"] == "CLARIFICATION_NEEDED":
+                    self.assertNotIn("last_result_event_ids", chat["context"])
+
     def test_chat_and_mcp_share_one_gateway_and_resolution(self):
         gateway = self.build()
         tool_names = [tool["name"] for tool in gateway.mcp_tools()]
@@ -542,6 +567,17 @@ class QueryGatewayConversationTests(unittest.TestCase):
         self.assertTrue(chat["publication_hash"])
         self.assertTrue(chat["query_receipt"]["arguments_sha256"])
         self.assertTrue(chat["evidence_links"] or chat["verified"] or chat["unverified"])
+
+    def test_chat_envelope_preserves_selected_ids_trust_and_result_caps(self):
+        gateway = self.build(events=[chat_event(f"PE-CHAT-{index}", fusion="CANDIDATE") for index in range(25)])
+        result = gateway.execute("chat_turn", {"text": "這週末有哪些活動？"})
+        request = result["chat"]["resolved_request"]
+        direct = gateway.execute(request["tool"], request["arguments"])
+        for key in ("event_ids", "evidence_ids", "discovery_unverified_count", "trust_tier_counts", "truncated", "has_more", "total_matches"):
+            self.assertEqual(result[key], direct[key], key)
+        self.assertEqual(result["receipt"]["result_count"], direct["receipt"]["result_count"])
+        self.assertTrue(result["truncated"])
+        self.assertEqual(result["discovery_unverified_count"], 25)
 
     def test_capabilities_and_worker_style_unavailable_reporting(self):
         gateway = self.build()

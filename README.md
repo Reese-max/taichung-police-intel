@@ -168,7 +168,7 @@ Every query response also carries the catalog-derived `query_coverage` projectio
 
 Current-checkout integration receipt:
 
-The Workers `/query` and MCP transports also expose bounded `chat_turn` conversation over publication metadata, source health and the canonical brief. Responses use a `conversation` envelope with `chat`, preserving freshness, gaps, source dates and the resolved query receipt. Event and statistics requests remain `CAPABILITY_NOT_AVAILABLE`; unsupported context filters are refused rather than silently broadening a search. Metadata links do not establish verified semantic claims or real-world event absence. This gateway capability does not add another Web entry point: `/research` remains the user journey and `/ask` redirects there.
+The Workers `/query` and MCP transports also expose bounded `chat_turn` conversation over publication metadata, source health and the canonical brief. Responses use a `conversation` envelope with `chat`, preserving freshness, gaps, source dates and the resolved query receipt. Event and statistics requests remain `CAPABILITY_NOT_AVAILABLE` on the Worker; unsupported context filters are refused rather than silently broadening a search. Metadata links do not establish verified semantic claims or real-world event absence. The existing `/public-query/` page includes **Ask GovIntel** quick actions and follow-ups using this same tool, with only minimal context held in page memory. `/research` retains the document-research journey and `/ask` redirects there. See [the issue-29 contract and acceptance mapping](./docs/govintel/issue-29-conversational-query.md).
 
 ```bash
 npm ci

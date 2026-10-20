@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import * as chatClient from "../lib/chat-answer.js";
 import {
   CHAT_CONTEXT_KEYS,
   CHAT_QUICK_ACTIONS,
@@ -73,4 +74,100 @@ test("summarizeChat keeps unverified and conflicts out of the verified section",
   assert.equal(summary.gaps.length, 1);
   assert.equal(summary.evidenceLinks[0].official_url, "https://police.example/e/PE-1");
   assert.ok(summary.resolvedText.includes("location:tc-xitun"));
+});
+
+function chatEnvelope(context = { schema_version: 1, selected_event_id: "PE-1" }) {
+  const binding = { publication_hash: "a".repeat(64), query_generation_id: "generation-29" };
+  return {
+    schema_version: 1, query_id: "query-29", tool_name: "chat_turn", result_type: "conversation", ...binding,
+    freshness: "STALE", source_gaps: [{ source_id: "S-029", reason: "SOURCE_INCOMPLETE" }], truncated: true,
+    receipt: { schema_version: 1, tool_name: "chat_turn", arguments_sha256: "b".repeat(64), ...binding },
+    chat: { schema_version: 1, publication_hash: binding.publication_hash, status: "UNBOUNDED_NO_MATCH",
+      context, query_receipt: { tool_name: "search_events", ...binding }, lines: ["來源失敗，無法確認。"] },
+  };
+}
+
+test("grouped trust tiers retain the original ordinal used by follow-up selection", () => {
+  const summary = summarizeChat({
+    verified: [{ public_event_id: "PE-2" }], unverified: [{ public_event_id: "PE-1" }],
+    context: { last_result_event_ids: ["PE-1", "PE-2"] },
+  });
+  assert.equal(summary.sections[0].items[0].result_number, 2);
+  assert.equal(summary.sections[1].items[0].result_number, 1);
+  assert.deepEqual(summary.context.last_result_event_ids, ["PE-1", "PE-2"]);
+});
+
+test("Web chat sends only a typed turn and minimal context through the shared gateway", async () => {
+  const calls = [];
+  const payload = chatEnvelope();
+  const result = await chatClient.requestChat("/query", {
+    text: " 第一件有交通管制嗎？ ",
+    context: { schema_version: 1, selected_region: "location:tc-xitun", last_result_event_ids: ["PE-1"],
+      last_query_receipt: { query_id: "previous", transcript: "PRIVATE_RECEIPT" }, transcript: "PRIVATE_TRANSCRIPT" },
+    history: ["PRIVATE_HISTORY"],
+  }, { fetchImpl: async (url, options) => { calls.push([url, JSON.parse(options.body)]); return Response.json(payload); } });
+  assert.deepEqual(calls, [["/query", { tool: "chat_turn", arguments: {
+    text: "第一件有交通管制嗎？", context: { schema_version: 1, selected_region: "location:tc-xitun",
+      last_result_event_ids: ["PE-1"], last_query_receipt: { query_id: "previous" } },
+  } }]]);
+  assert.deepEqual(result, payload);
+  assert.equal(result.freshness, "STALE");
+  assert.equal(result.truncated, true);
+  assert.equal(result.source_gaps[0].reason, "SOURCE_INCOMPLETE");
+});
+
+test("follow-up carries the returned event identity and quick actions stay server resolved", async () => {
+  const payload = chatEnvelope();
+  const calls = [];
+  const client = { fetchImpl: async (_url, options) => { calls.push(JSON.parse(options.body)); return Response.json(payload); } };
+  const first = await chatClient.requestChat("/query", { quickAction: "weekend-events" }, client);
+  await chatClient.requestChat("/query", { text: "跟昨天比改了什麼？", context: first.chat.context }, client);
+  assert.equal(calls[0].arguments.quick_action, "weekend-events");
+  assert.equal(calls[0].arguments.text, undefined);
+  assert.equal(calls[1].arguments.context.selected_event_id, "PE-1");
+});
+
+test("invalid input cannot silently drop narrowing or send a request", async () => {
+  const client = { fetchImpl: () => { assert.fail("invalid turn sent to gateway"); } };
+  for (const input of [{ text: "" }, { text: 3 }, { text: "a".repeat(513) }, { quickAction: "write" },
+    { text: "只看西屯", context: { selected_region: 7 } }]) {
+    await assert.rejects(chatClient.requestChat("/query", input, client), error => error.code === "INVALID_ARGUMENTS");
+  }
+});
+
+test("chat refuses malformed or mixed-publication answers before rendering", async () => {
+  const mutations = [
+    value => { value.schema_version = 2; }, value => { value.result_type = "publication_metadata"; },
+    value => { value.query_id = ""; }, value => { value.chat.schema_version = 2; },
+    value => { value.chat.publication_hash = "other"; }, value => { value.receipt.query_generation_id = "other"; },
+    value => { value.chat.query_receipt.publication_hash = "other"; },
+    value => { value.chat.context.selected_event_id = 7; },
+    value => { value.chat.lines = [{ status: "FAILED" }]; },
+    value => { value.chat.verified = [null]; },
+    value => { value.chat.verified = [{ public_event_id: "PE-1", canonical_title: {} }]; },
+    value => { value.chat.evidence_links = [{ evidence_locator: {} }]; },
+    value => { value.chat.statistics = [{ value: {} }]; },
+    value => { value.chat.sources = [{ source_health: {} }]; },
+    value => { value.source_gaps = [{ reason: {} }]; },
+  ];
+  for (const mutate of mutations) {
+    const payload = chatEnvelope(); mutate(payload);
+    await assert.rejects(chatClient.requestChat("/query", { text: "只看西屯" }, {
+      fetchImpl: async () => Response.json(payload),
+    }), error => error.code === "INVALID_RESPONSE");
+  }
+});
+
+test("Web chat retains release admission and surfaces a gateway outage", async () => {
+  const release = { release_id: "release-29", code_sha: "c".repeat(40), publication_generation: "run-29" };
+  const calls = [];
+  await chatClient.requestChat("https://gateway.example/query", { quickAction: "no-data" }, {
+    codeSha: release.code_sha, publicationGeneration: release.publication_generation,
+    fetchImpl: async (url, options) => { calls.push([url, options]); return Response.json(url.endsWith("release.json") ? release : { ...chatEnvelope(), release }); },
+  });
+  assert.equal(calls.length, 2);
+  assert.equal(JSON.parse(calls[1][1].body).release_id, release.release_id);
+  await assert.rejects(chatClient.requestChat("/query", { text: "查官方證據" }, {
+    fetchImpl: async () => { throw new Error("offline"); },
+  }), error => error.code === "FAILED");
 });

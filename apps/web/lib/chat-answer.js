@@ -5,6 +5,8 @@
 // These helpers mirror the server's minimal-context contract for display and
 // session storage — transcripts are never persisted here.
 
+import { queryGateway } from "./query-release-client.js";
+
 export const CHAT_CONTEXT_SCHEMA_VERSION = 1;
 export const CHAT_CONTEXT_STORAGE_KEY = "govintel:chat-context:v1";
 
@@ -78,14 +80,56 @@ export function sanitizeChatContext(raw) {
     const receipt = raw.last_query_receipt;
     if (typeof receipt !== "object" || Array.isArray(receipt) || Object.keys(receipt).length > MAX_RECEIPT_KEYS) return null;
     const keep = {};
-    for (const [key, value] of Object.entries(receipt)) {
-      const text = boundedText(value);
+    for (const key of ["tool_name", "arguments_sha256", "publication_hash", "query_generation_id", "query_id", "issued_at"]) {
+      if (receipt[key] == null) continue;
+      const text = boundedText(receipt[key]);
       if (text === null) return null;
       keep[key] = text;
     }
     context.last_query_receipt = keep;
   }
   return context;
+}
+
+function chatDisplaySafe(chat, payload) {
+  const texts = (row, keys) => row && typeof row === "object" && !Array.isArray(row) &&
+    keys.every(key => row[key] == null || typeof row[key] === "string");
+  const rows = (items, valid) => items == null || (Array.isArray(items) && items.length <= 100 && items.every(valid));
+  const gap = row => texts(row, ["source_id", "status", "source_health", "reason"]);
+  return texts(payload, ["query_id", "publication_hash", "query_generation_id", "freshness", "verification_summary"]) &&
+    typeof chat.status === "string" && Array.isArray(chat.lines) && rows(chat.lines, line => typeof line === "string") &&
+    ["verified", "unverified", "conflicts", "stale"].every(kind => rows(chat[kind], row =>
+      (kind === "stale" && typeof row === "string") || (texts(row, ["public_event_id", "canonical_title", "event_status"]) && typeof row.public_event_id === "string"))) &&
+    rows(chat.statistics, row => texts(row, ["statistic_id", "geography", "metric", "period", "unit", "dataset_id", "source_id", "updated_at"]) &&
+      (typeof row.value === "string" || (typeof row.value === "number" && Number.isFinite(row.value))) && typeof row.provisional === "boolean") &&
+    rows(chat.sources, row => texts(row, ["source_id", "source_health", "freshness_status", "window_completeness"])) &&
+    rows(chat.evidence_links, row => texts(row, ["official_url", "title", "source_id", "evidence_id", "document_version_id", "evidence_locator"])) &&
+    rows(chat.notices, row => typeof row === "string" || texts(row, ["code", "message"])) &&
+    rows(chat.gaps, gap) && rows(payload.source_gaps, gap);
+}
+
+export async function requestChat(endpoint, { text, quickAction, context = { schema_version: 1 } }, releaseContext = null) {
+  const sanitized = sanitizeChatContext(context);
+  if (!sanitized || (text !== undefined && (typeof text !== "string" || !text.trim() || text.length > 512)) ||
+      (quickAction !== undefined && !CHAT_QUICK_ACTIONS.some(action => action.id === quickAction)) ||
+      (text === undefined && quickAction === undefined)) {
+    throw Object.assign(new Error("對話問題或條件無法驗證，請重新輸入。"), { code: "INVALID_ARGUMENTS" });
+  }
+  const payload = await queryGateway(endpoint, "chat_turn", {
+    ...(text === undefined ? {} : { text: text.trim() }),
+    ...(quickAction === undefined ? {} : { quick_action: quickAction }), context: sanitized,
+  }, releaseContext);
+  const chat = payload.chat;
+  const receipts = [payload.receipt, ...(chat?.query_receipt ? [chat.query_receipt] : [])];
+  if (payload.schema_version !== 1 || payload.result_type !== "conversation" || !payload.query_id ||
+      !payload.publication_hash || !payload.query_generation_id || chat?.schema_version !== 1 ||
+      chat.publication_hash !== payload.publication_hash || !sanitizeChatContext(chat.context) ||
+      payload.receipt?.tool_name !== "chat_turn" ||
+      receipts.some(receipt => receipt?.publication_hash !== payload.publication_hash || receipt?.query_generation_id !== payload.query_generation_id) ||
+      !chatDisplaySafe(chat, payload)) {
+    throw Object.assign(new Error("對話回應或發布收據無法驗證，未顯示回答。"), { code: "INVALID_RESPONSE" });
+  }
+  return payload;
 }
 
 export function loadChatContext(storage) {
@@ -136,7 +180,11 @@ export function summarizeChat(chat) {
   const sections = [];
   for (const kind of ["verified", "unverified", "conflicts", "stale"]) {
     const items = Array.isArray(source[kind]) ? source[kind] : [];
-    if (items.length) sections.push({ kind, label: SECTION_LABELS[kind], items });
+    if (items.length) sections.push({ kind, label: SECTION_LABELS[kind], items: items.map(item => {
+      if (!item || typeof item !== "object") return item;
+      const index = (source.context?.last_result_event_ids || []).indexOf(item.public_event_id);
+      return { ...item, result_number: index < 0 ? null : index + 1 };
+    }) });
   }
   return {
     status: source.status || "OK",

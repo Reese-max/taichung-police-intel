@@ -1,33 +1,12 @@
 {
-  "schema_version": 1,
-  "status": "failed",
   "repo": "Reese-max/taichung-police-intel",
   "issue": 29,
-  "base_sha": "2c660cef6f1b1fbf86b141306e54d06e0511c9f9",
-  "created_at": "2026-10-06T05:11:59.498475Z",
-  "gates": {
-    "baseline": "pass",
-    "tdd": "pass",
-    "review": "fail"
-  },
-  "commands": [],
-  "candidate_sha": "eb53499854c92ddf170abc874978cb4fa55e9e77",
-  "changed_files": [
-    ".issue-loop-context.json",
-    ".issue-loop-evidence.json",
-    ".issue-loop-prompt.md",
-    ".issue-loop-red.json",
-    ".issue-loop-review.json",
-    "tests/test_chat_turn_worker.py",
-    "workers/query-gateway/src/index.js"
-  ],
-  "red_proof": {
-    "repo": "Reese-max/taichung-police-intel",
-    "issue": 29,
-    "base_sha": "2c660cef6f1b1fbf86b141306e54d06e0511c9f9",
-    "command": "python -X utf8 -c \"import sys; ws='workers/query-gateway/src/index.js'; source=open(ws).read(); allowed_start=source.find('const allowed = {'); allowed_section=source[allowed_start:source.find('}', allowed_start+1)]; print('RED' if 'chat_turn' not in allowed_section else 'GREEN'); sys.exit(1 if 'chat_turn' not in allowed_section else 0)\"",
-    "exit": 1
-  },
-  "review": null,
-  "failure_reason": "review_sha_mismatch"
+  "base_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+  "red_proof": "Before implementation: node --test apps/web/tests/chat-answer.test.mjs exited 1: tests 8, pass 3, fail 5; Web chat sends only a typed turn and minimal context through the shared gateway: TypeError: chatClient.requestChat is not a function. Python domain regression exited 1: test_version_comparison_orders_observations_by_instant ... FAIL; AssertionError: Lists differ: ['doc-police:v2', 'doc-police:v1'] != ['doc-police:v1', 'doc-police:v2']. Python conversation regressions exited 1: test_fresh_query_does_not_resurrect_prior_narrowing ... FAIL; AssertionError: 'selected_region' unexpectedly found; test_chat_envelope_preserves_selected_ids_trust_and_result_caps ... FAIL; event_ids: [] != 20 selected IDs.",
+  "test_command": "node --test --test-concurrency=1 apps/web/tests/chat-answer.test.mjs apps/web/tests/chat-turn-worker.test.mjs apps/web/tests/query-release-client.test.mjs && python -X utf8 -B -m unittest discover -s tests -p 'test_query_domain.py' -v && python -X utf8 -B -m unittest discover -s tests -p 'test_query_gateway_domain.py' -v && python -X utf8 -B -m unittest discover -s tests -p 'test_query_gateway_stdio.py' -v",
+  "test_exit": 0,
+  "tests_passed": 81,
+  "tests_failed": 0,
+  "summary": "Added Ask GovIntel quick actions and follow-ups to the existing public-query page using the shared release-bound chat_turn Gateway, with bounded in-memory context, trust sections, exact official evidence, statistics provenance, receipts and isolated outage handling. Reused existing domain/MCP retrieval and fixed fresh-query/reset context, UTC version ordering, endpoint field comparisons and outer-envelope result/truncation metadata. Added 11 regression tests; the focused suite passes 81 tests and an offline browser smoke covers multi-turn identity, version changes, evidence, statistics, mobile layout, reload reset and outage fallback. All 14 acceptance criteria are mapped in docs/govintel/issue-29-conversational-query.md.",
+  "not_done": "Full npm run check is NOT green: Ubuntu WSL completed with exit 1 in web-tests (two PDF_PARSER_TIMEOUT cases) and news-list-checkpoint-tests (2-second CLI timeouts); production build and current-checkout core checks passed. CLI timeouts also reproduce on admitted base c629f82; the base PDF suite passes, while the candidate isolated PDF suite still times out, so its cause remains unresolved. Windows full validation was stopped after POSIX-only failures and the 60-second query-store bridge timeout; all 45 underlying query-store tests pass, and the original base also exceeds the bridge timeout. These gates were not changed. No push, PR, deployment, live collection, source-permission change, production event/statistics enablement, 14-day canary or human-efficiency claim. Worker event/statistics capabilities remain explicitly unavailable; Python optional stores still require approved source admission."
 }

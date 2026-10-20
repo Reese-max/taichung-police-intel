@@ -410,12 +410,6 @@ def _request(tool: str, arguments: dict[str, Any]) -> dict[str, Any]:
     return {"schema_version": QUERY_REQUEST_SCHEMA_VERSION, "tool": tool, "arguments": arguments}
 
 
-def _plan(intent: str, request: dict[str, Any] | None, **extra: Any) -> dict[str, Any]:
-    plan = {"intent": intent, "request": request, "notices": [], "clarification": None}
-    plan.update(extra)
-    return plan
-
-
 def plan_turn(
     *,
     text: str,
@@ -438,9 +432,14 @@ def plan_turn(
     if len(raw) > MAX_TEXT_LENGTH:
         raise ValueError("text must be a bounded non-empty string")
     today = _local_today(now, DEFAULT_TIME_ZONE)
-    ctx = dict(context)
-    if _RESET_RE.search(raw):
-        ctx = {}
+    reset_context = bool(_RESET_RE.search(raw))
+    ctx = {} if reset_context else dict(context)
+
+    def _plan(intent: str, request: dict[str, Any] | None, **extra: Any) -> dict[str, Any]:
+        plan = {"intent": intent, "request": request, "notices": [], "clarification": None, "reset_context": reset_context}
+        plan.update(extra)
+        return plan
+
     narrowed = bool(_NARROW_RE.search(raw))
     notices: list[dict[str, str]] = []
     if location_entities is not None and not location_entities:
@@ -652,7 +651,7 @@ def _update_context(
     plan: dict[str, Any],
     envelope: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    out = dict(context)
+    out = {} if plan.get("reset_context") else dict(context)
     out["schema_version"] = CONTEXT_SCHEMA_VERSION
     request = plan.get("request") or {}
     tool = request.get("tool")
@@ -665,6 +664,8 @@ def _update_context(
                 out.pop("selected_event_id", None)
         return {key: value for key, value in out.items() if value is not None}
     if tool == "search_events":
+        for key in ("selected_time_window", "selected_region", "selected_agency", "selected_category"):
+            out.pop(key, None)
         if arguments.get("time_from") or arguments.get("time_to"):
             out["selected_time_window"] = {
                 "time_from": arguments.get("time_from"),
