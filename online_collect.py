@@ -40,7 +40,7 @@ from collect import (
     scheduled_time,
     timestamp,
 )
-from intel_v2.detail_recheck import classify_observation, plan_recheck
+from intel_v2.detail_recheck import FULL_RECHECK_INTERVAL_HOURS, SEMANTIC_FIELDS, classify_observation, plan_recheck
 from intel_v2.detail_recheck_budget import (
     budget_state_for_storage,
     plan_recheck_budget,
@@ -1169,7 +1169,12 @@ def current_items(connection, source_id: str) -> dict[str, dict]:
 def _detail_previous(row: dict | None) -> dict | None:
     if not row or not row.get("document_version_id"):
         return None
+    result = row.get("last_result") or {}
+    classification = result.get("classification") if isinstance(result, dict) else None
+    version = (classification.get("after") or classification.get("before")) if isinstance(classification, dict) else None
     previous = {
+        **{field: version[field] for field in (*SEMANTIC_FIELDS, "observed_at", "material_text_sha256")
+            if isinstance(version, dict) and field in version},
         "document_version_id": row["document_version_id"],
         "body_sha256": row["body_sha256"],
         "normalized_text_sha256": row["normalized_text_sha256"],
@@ -1380,6 +1385,7 @@ def run_detail_rechecks(
     *,
     limit: int = DETAIL_RECHECK_MAX_PER_RUN,
     interval_hours: float = DETAIL_RECHECK_INTERVAL_HOURS,
+    full_recheck_interval_hours: float = FULL_RECHECK_INTERVAL_HOURS,
     budget_policy: dict | None = None,
 ) -> list[dict]:
     if not isinstance(limit, int) or isinstance(limit, bool) or limit < 0:
@@ -1389,6 +1395,8 @@ def run_detail_rechecks(
     # Validate the policy before opening the row-lock transaction so a bad
     # operator input can never abort a collection run mid-flight.
     resolved_policy = recheck_budget_policy(budget_policy)
+    plan_recheck(None, timestamp(observed_at), interval_hours=interval_hours,
+        full_recheck_interval_hours=full_recheck_interval_hours)
     source_ids = sorted(source_run_ids)
     placeholders = ", ".join(["%s"] * len(source_ids))
     # The candidate batch is the unit of accounting: it must be wider than the
@@ -1412,7 +1420,7 @@ def run_detail_rechecks(
             f"""
             SELECT source_id, stable_key, requested_url, last_checked_at, next_check_at,
                    etag, last_modified, document_version_id, body_sha256,
-                   normalized_text_sha256, attachments, budget_state
+                   normalized_text_sha256, attachments, budget_state, last_result
             FROM detail_recheck_state
             WHERE next_check_at <= %s AND source_id IN ({placeholders})
             ORDER BY next_check_at, source_id, stable_key
@@ -1431,6 +1439,7 @@ def run_detail_rechecks(
                 _detail_previous(row),
                 observed,
                 interval_hours=interval_hours,
+                full_recheck_interval_hours=full_recheck_interval_hours,
             )["status"]
             == "DUE"
         }
@@ -1506,6 +1515,7 @@ def run_detail_rechecks(
                     observed_at=timestamp(observed_at),
                     allowed_hosts={host},
                     interval_hours=interval_hours,
+                    full_recheck_interval_hours=full_recheck_interval_hours,
                     include_body=True,
                 )
             except (ValueError, TypeError, OSError, requests.RequestException) as error:

@@ -9,7 +9,7 @@ from urllib.parse import urljoin, urlsplit, urlunsplit
 import requests
 from bs4 import BeautifulSoup
 
-from intel_v2.detail_recheck import classify_observation, plan_recheck
+from intel_v2.detail_recheck import FULL_RECHECK_INTERVAL_HOURS, classify_observation, plan_recheck
 from intel_v2.located_facts import MAX_DOCUMENT_BYTES, normalized_text, sha256
 
 
@@ -150,6 +150,7 @@ def recheck_detail(
     observed_at: str,
     allowed_hosts: Iterable[str],
     interval_hours: float = 24,
+    full_recheck_interval_hours: float = FULL_RECHECK_INTERVAL_HOURS,
     timeout: float | tuple[float, float] = (5, 15),
     max_body_bytes: int = MAX_BODY_BYTES,
     max_redirects: int = MAX_REDIRECTS,
@@ -162,7 +163,8 @@ def recheck_detail(
         raise ValueError("max_redirects must be non-negative")
     hosts = _hosts(allowed_hosts)
     _approved_url(requested_url, hosts)
-    plan = plan_recheck(previous, observed_at, interval_hours=interval_hours)
+    plan = plan_recheck(previous, observed_at, interval_hours=interval_hours,
+        full_recheck_interval_hours=full_recheck_interval_hours)
     result: dict[str, Any] = {
         "requested_url": requested_url,
         "final_url": None,
@@ -218,12 +220,17 @@ def recheck_detail(
                 body = _read_body(response, max_body_bytes)
                 content_type = _header(response, "Content-Type") or "application/octet-stream"
                 normalized = normalized_text(body, content_type)
+                # ponytail: ignore sentence-ending punctuation only; other edits
+                # need review until a source-specific semantic parser exists.
+                material_text = re.sub(r"[.!?。！？]+(?=\s|$)", "", normalized)
                 observation = {
                     "status_code": status_code,
                     "content_type": content_type,
                     "body_sha256": sha256(body),
                     "normalized_text_sha256": sha256(normalized),
+                    "material_text_sha256": sha256(material_text),
                     "attachments": _attachment_rows(body, final_url, hosts),
+                    "attachments_checked": False,
                 }
                 if include_body:
                     result["response_body"] = body

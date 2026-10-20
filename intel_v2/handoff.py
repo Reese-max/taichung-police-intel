@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Iterable
 from zoneinfo import ZoneInfo
 
+from intel_v2.detail_recheck import SEMANTIC_FIELDS
 
 WATCH_STATUSES = {"WATCHING", "NEEDS_REVIEW", "RESOLVED", "DISMISSED"}
 ACTIVE_WATCH_STATUSES = {"WATCHING", "NEEDS_REVIEW"}
@@ -378,11 +379,9 @@ def _detail_version(value: Any) -> dict[str, Any] | None:
         "document_version_id",
         "body_sha256",
         "normalized_text_sha256",
+        "material_text_sha256",
         "attachments",
-        "published_at",
-        "source_modified_at",
-        "effective_at",
-        "expires_at",
+        *SEMANTIC_FIELDS,
         "observed_at",
         "last_checked_at",
     )

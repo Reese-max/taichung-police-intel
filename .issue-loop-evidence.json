@@ -1,33 +1,12 @@
 {
-  "schema_version": 1,
-  "status": "failed",
   "repo": "Reese-max/taichung-police-intel",
-  "issue": 29,
-  "base_sha": "2c660cef6f1b1fbf86b141306e54d06e0511c9f9",
-  "created_at": "2026-10-06T05:11:59.498475Z",
-  "gates": {
-    "baseline": "pass",
-    "tdd": "pass",
-    "review": "fail"
-  },
-  "commands": [],
-  "candidate_sha": "eb53499854c92ddf170abc874978cb4fa55e9e77",
-  "changed_files": [
-    ".issue-loop-context.json",
-    ".issue-loop-evidence.json",
-    ".issue-loop-prompt.md",
-    ".issue-loop-red.json",
-    ".issue-loop-review.json",
-    "tests/test_chat_turn_worker.py",
-    "workers/query-gateway/src/index.js"
-  ],
-  "red_proof": {
-    "repo": "Reese-max/taichung-police-intel",
-    "issue": 29,
-    "base_sha": "2c660cef6f1b1fbf86b141306e54d06e0511c9f9",
-    "command": "python -X utf8 -c \"import sys; ws='workers/query-gateway/src/index.js'; source=open(ws).read(); allowed_start=source.find('const allowed = {'); allowed_section=source[allowed_start:source.find('}', allowed_start+1)]; print('RED' if 'chat_turn' not in allowed_section else 'GREEN'); sys.exit(1 if 'chat_turn' not in allowed_section else 0)\"",
-    "exit": 1
-  },
-  "review": null,
-  "failure_reason": "review_sha_mismatch"
+  "issue": 21,
+  "base_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+  "red_proof": "Before implementation: python -X utf8 -B -m unittest discover -s tests -p 'test_detail_recheck.py' -v exited 1: FAIL: test_semantic_only_correction_retains_evidence_and_is_idempotent (field='location'); AssertionError: 'UNCHANGED' != 'MATERIAL_CHANGE'; FAIL: test_unchanged_semantic_fields_do_not_reopen_review; AssertionError: 'MATERIAL_CHANGE' != 'UNCHANGED'; Ran 34 tests; FAILED (failures=5). The dependent handoff regression also exited 1: AssertionError: 'WATCHING' != 'NEEDS_REVIEW'. Subsequent pre-implementation regressions: periodic full recheck sent {'If-None-Match': '\"old\"', 'If-Modified-Since': 'Wed, 20 Sep 2026 04:00:00 GMT'} instead of {}; punctuation-only change returned MATERIAL_CHANGE instead of PRESENTATION_ONLY; unverified attachments returned attachment_recheck_required=False. Independent-review regression: invalid full_recheck_interval_hours=1 failed with AssertionError: ValueError not raised before the guard was implemented.",
+  "test_command": "python -X utf8 -B -m unittest discover -s tests -p 'test_detail_recheck*.py' && python -X utf8 -B -m unittest discover -s tests -p 'test_handoff_state.py' && python -X utf8 -B -m unittest discover -s tests -p 'test_review_inbox.py' && node --test apps/web/tests/publication-freshness.test.mjs",
+  "test_exit": 0,
+  "tests_passed": 131,
+  "tests_failed": 0,
+  "summary": "Implemented a staged B-to-C correctness increment using the existing detail-recheck planner, collector, classifier and handoff domain functions. Rechecks now periodically omit conditional validators, preserve the last successful body observation and semantic evidence across restarts/304 responses, distinguish sentence-ending punctuation from time/decimal corrections, and explicitly retain unknown attachment verification. Title/location/status/scope corrections now invalidate only dependent confirmed claims while immutable older briefs remain readable and reconfirmation creates a new exported version. The Git-Bash-runnable acceptance command passed 131 tests with zero failures; three PostgreSQL integration cases were skipped because TEST_DATABASE_URL was not configured.",
+  "not_done": "This is the independently deliverable B-to-C increment allowed by issue #21, not full issue closure. Same-URL attachment byte downloads/version persistence and separate attachment scheduling, automatic extraction/display of semantic differences from arbitrary body text, full A deployment/publication receipt integration, and Twinkle/new source admission remain outstanding. No real-source missed notice, production database execution, deployment, live canary or latency improvement is claimed. No push, PR, remote messages, branch changes, secret changes or new dependencies were performed. The three opt-in PostgreSQL integration cases were not run. Native Windows npm test is not fully green: existing POSIX-only checkpoint/source-audit tests depend on O_NONBLOCK, Unix signals, directory fsync or POSIX permission bits; these unrelated platform limitations were not changed. Coverage ratchet, CRAP, mutation testing and a separate lint gate are not configured by this project."
 }
