@@ -32,6 +32,67 @@ bundle_spec.loader.exec_module(bundle)
 
 
 class CandidatePublicationWiringTests(unittest.TestCase):
+    def test_collector_archive_gate_rejects_retained_lkg_before_any_publication_write(self):
+        cases = [(lane, source_id, location) for lane, source_id in (
+            ("items", "S-004"), ("candidate_items", "S-019")) for location in ("item", "payload")]
+        for lane, source_id, location in cases:
+            with self.subTest(lane=lane, location=location), tempfile.TemporaryDirectory() as directory:
+                output = Path(directory) / "source-status.json"
+                feed_output = output.parent / "intelligence-feed.json"
+                before_status = json.dumps({"schema_version": 1, "mode": "COMPETITION_DEMO",
+                                            "sources": [], "candidate_sources": []})
+                retained = {
+                    "stable_id": "RETAINED-PRIVATE", "source_id": source_id,
+                    "title": "Fictional retained notice", "content_sha256": "a" * 64,
+                    "fetched_at": "2026-09-10T08:00:00+08:00",
+                }
+                markers = {"sensitive": True, "private_notes": "FICTIONAL_PRIVATE_MARKER"}
+                if location == "item":
+                    retained.update(markers)
+                else:
+                    retained["payload"] = markers
+                before_feed = json.dumps({lane: [retained]})
+                output.write_text(before_status, encoding="utf-8")
+                feed_output.write_text(before_feed, encoding="utf-8")
+                with mock.patch.object(collector, "collect_source", side_effect=RuntimeError("offline failure")), mock.patch.object(
+                    candidate_lane, "_bounded_session", return_value=mock.Mock()
+                ):
+                    with self.assertRaisesRegex(ValueError, "archive") as caught:
+                        collector.build_demo_status(output, "MORNING", date(2026, 9, 11), "manual")
+                self.assertNotIn("FICTIONAL_PRIVATE_MARKER", str(caught.exception))
+                self.assertEqual(output.read_text(encoding="utf-8"), before_status)
+                self.assertEqual(feed_output.read_text(encoding="utf-8"), before_feed)
+                self.assertFalse((output.parent / "intelligence-summary.json").exists())
+                self.assertFalse((output.parent / "feed-export.csv").exists())
+
+    def test_collector_archive_gate_checks_item_and_payload_before_projection(self):
+        source_id = "S-032"
+        source_url = "https://www.traffic.taichung.gov.tw/"
+        original = {"stable_key": "archive-fixture", "source_url": source_url,
+                    "published_at": "2026-09-11T00:00:00+08:00", "content_sha256": "a" * 64,
+                    "payload": {"title": "Fictional public notice"}}
+        mutations = [{"contains_personal_data": True}, {"sensitive": True}]
+        mutations += [{field: "FICTIONAL_PRIVATE_MARKER"} for field in (
+            "private_notes", "personal_data", "operational_fields", "credentials")]
+        mutations += [{field: None} for field in (
+            "contains_personal_data", "sensitive", "aggregate_only", "source_available", "replay_required")]
+        for location in ("item", "payload"):
+            for mutation in mutations:
+                with self.subTest(location=location, mutation=mutation):
+                    item = copy.deepcopy(original)
+                    (item if location == "item" else item["payload"]).update(mutation)
+                    with self.assertRaisesRegex(ValueError, "archive|boolean") as caught:
+                        collector.project_feed_item(
+                            item, source_id, "Fictional source", source_url, "PRIMARY_EVENT",
+                            "VERIFIED_CANDIDATE", "FRESH", "PASS", "COMPLETE_WITH_ITEMS",
+                            item["published_at"], item["published_at"], set())
+                    self.assertNotIn("FICTIONAL_PRIVATE_MARKER", str(caught.exception))
+        projected = collector.project_feed_item(
+            original, source_id, "Fictional source", source_url, "PRIMARY_EVENT",
+            "VERIFIED_CANDIDATE", "FRESH", "PASS", "COMPLETE_WITH_ITEMS",
+            original["published_at"], original["published_at"], set())
+        self.assertEqual(projected["title"], original["payload"]["title"])
+
     def test_failed_active_sources_upgrade_legacy_lkg_roles_without_refetch_claims(self):
         for legacy_role in (None, "DISCOVERY_ONLY"):
             with self.subTest(legacy_role=legacy_role), tempfile.TemporaryDirectory() as directory:
@@ -56,6 +117,9 @@ class CandidatePublicationWiringTests(unittest.TestCase):
                         item.pop("catalog_role")
                     else:
                         item["catalog_role"] = legacy_role
+                    item["full_text"] = "FICTIONAL_RETAINED_BODY"
+                    item["raw_payload"] = {"body": "FICTIONAL_RETAINED_BODY"}
+                    item["payload"] = {"body": "FICTIONAL_RETAINED_BODY"}
                     prior_items.append(item)
                 output.write_text(json.dumps({"schema_version": 1, "mode": "COMPETITION_DEMO",
                                               "sources": prior_sources}), encoding="utf-8")
@@ -74,6 +138,9 @@ class CandidatePublicationWiringTests(unittest.TestCase):
                                                      require_candidate_lane=True), [])
                 self.assertEqual(len(feed["items"]), len(prior_items))
                 for before, after in zip(prior_items, feed["items"]):
+                    self.assertNotIn("full_text", after)
+                    self.assertNotIn("raw_payload", after)
+                    self.assertNotIn("payload", after)
                     for field in ("stable_id", "title", "official_url", "content_sha256", "published_at", "fetched_at"):
                         self.assertEqual(after[field], before[field])
                     self.assertEqual(after["catalog_role"], collector.catalog_rows()[after["source_id"]]["role"])
