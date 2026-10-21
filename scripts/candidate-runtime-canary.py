@@ -148,6 +148,12 @@ def run_canary(collector, sources, now, *, session_factory=BoundedSession, exist
         drift = None
     for source_id in sources:
         url = collector.NEWS_LIST_SOURCES[source_id]["list_url"]
+        existing = dict(existing_items.get(source_id) or {})
+        item_state[source_id] = {
+            stable_key: item["content_sha256"]
+            for stable_key, item in existing.items()
+            if item.get("content_sha256")
+        }
         session = session_factory(url)
         started = time.monotonic()
         catalog_row = catalog.get(source_id, {})
@@ -166,7 +172,6 @@ def run_canary(collector, sources, now, *, session_factory=BoundedSession, exist
         try:
             # Unchanged list rows are diffed against the previous observation so
             # only new/changed stable IDs cost a detail-page request.
-            existing = dict(existing_items.get(source_id) or {})
             list_options = {}
             if max_list_pages is not None and collector.NEWS_LIST_SOURCES[source_id].get("format") != "fire_live":
                 list_options["max_list_pages"] = max_list_pages
@@ -208,11 +213,6 @@ def run_canary(collector, sources, now, *, session_factory=BoundedSession, exist
                 "manifest_sha256": manifest,
                 "coverage_independently_verified": False,
             })
-            item_state[source_id] = {
-                item["stable_key"]: item["content_sha256"]
-                for item in result.get("items", [])
-                if item.get("stable_key") and item.get("content_sha256")
-            }
             first_snapshot = next((item for item in result["snapshots"] if item.get("purpose") == "LIST"), None)
             if drift is not None and first_snapshot and "body" in first_snapshot:
                 contract = drift.CONTRACTS[source_id]
@@ -239,6 +239,16 @@ def run_canary(collector, sources, now, *, session_factory=BoundedSession, exist
                 }
             if record["source_health"] not in ("PASS", "DEGRADED") or record["detail_fetch_count"] > 1:
                 raise ValueError("collector violated the bounded candidate contract")
+            observed_items = {
+                item["stable_key"]: item["content_sha256"]
+                for item in result.get("items", [])
+                if item.get("stable_key") and item.get("content_sha256")
+            }
+            # ponytail: keep PARTIAL news hashes until a complete scan; add TTL pruning if growth matters.
+            if result["window_completeness"] == "PARTIAL" and collector.NEWS_LIST_SOURCES[source_id].get("format") != "fire_live":
+                item_state[source_id].update(observed_items)
+            else:
+                item_state[source_id] = observed_items
         except Exception as error:
             import requests
 
