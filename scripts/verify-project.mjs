@@ -417,6 +417,7 @@ if (["quick", "full"].includes(mode) && !failures.length) {
       ["publication-alert-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_publication_alert.py", "-v"]],
       ...(publicationWorkflow ? [] : [["current-checkout-tests", ["-X", "utf8", "scripts/verify-current-checkout.py", "--mode", "core"]]]),
       ["retention-policy-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_retention_policy.py", "-v"]],
+      ["work-rights-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_work_rights.py", "-v"]],
       ["retention-policy-self-check", ["-X", "utf8", "scripts/retention-policy.py", "--self-check"]],
       ["news-list-collector-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_news_list_collector.py", "-v"]],
       ["news-list-budget-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_news_list_budget.py", "-v"]],

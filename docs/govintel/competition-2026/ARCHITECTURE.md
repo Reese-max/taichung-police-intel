@@ -17,7 +17,7 @@
 
 Pages 驗證五個公開檔案 bytes/hash；Gateway 驗證同 publication generation 與受限能力。兩者成功不會把`PARTIAL`來源變完整。當前 Worker 的 publication metadata/sourcehealth/council 能力不是 production PublicEvent 或 statistics store。
 
-## v6 候選本地路徑
+## v6 已部署介面與合成重播路徑
 
 ```text
 已取得的公開資料／明示合成replay
@@ -31,7 +31,7 @@ Pages 驗證五個公開檔案 bytes/hash；Gateway 驗證同 publication genera
         原文核對／標已讀／修改條件／取消／清除
 ```
 
-PR124 query、125 tracking、126 replay 在驗收中。關閉網站時不提供個人背景推播，browser storage 清除可能失去清單。跨裝置帳號、外部通知、多人審批與 handoff／研究匯出為後續，不能當首期完成條件或現有 production 能力。
+PR #124 query、#125 tracking、#126 replay 已合併；受限公開查詢與同瀏覽器追蹤有[固定正式驗收](closure-20261007-pr177/README.md)，合成流程依[展示腳本](DEMO_SCRIPT.md)重播。部署介面不等於正式官方原文准入、即時事件閉環或語意 AI 成效。關閉網站時不提供個人背景推播，browser storage 清除可能失去清單。跨裝置帳號、外部通知、多人審批與 handoff／研究匯出為後續，不能當首期完成條件或現有 production 能力。
 
 ## 可重播核心與尚缺功能
 

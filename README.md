@@ -4,11 +4,11 @@
 
 **First-phase task:** help people query public notices, save their chosen area, topic, road or keywords in the same browser, and see supported changes when reopening the site. The deployed baseline remains the five-source Taichung council／government evidence journey. Public query and personal tracking are deployed; formal content admission and measured benefit require separate evidence.
 
-## Current GovIntel state (2026-10-06)
+## Current GovIntel state (2026-10-16 document review)
 
-The [competition entry](./docs/govintel/competition-2026/README.md), [current status](./docs/govintel/competition-2026/CURRENT_STATUS.md) and [dated acceptance bundle](./docs/govintel/competition-2026/closure-20261006/README.md) distinguish deployment, data admission, model quality and human results.
+The [competition entry](./docs/govintel/competition-2026/README.md), [current status and fixed claim statuses](./docs/govintel/competition-2026/CURRENT_STATUS.md) and [dated acceptance bundle](./docs/govintel/competition-2026/closure-20261007-pr177/README.md) distinguish deployment, data admission, model quality and human results. This local document review uses checkout `c629f82a8b16825d5d89c204c7035dcba500a9ac`; the preserved public acceptance baseline is `b6a602580fddf8b4a634dbdf64fc255678495412` (2026-10-07). It is a dated receipt, not a claim that this checkout or today's public deployment has been accepted.
 
-Public query and browser-only tracking are deployed. The `5e2298c…` release has anonymous five-file hash readback, Pages/Worker binding and 15 actual Chromium production checks. Formal source admission remains **RIGHTS_BLOCKED**: `deployment_verified=true` and `production_verified=false`. Correct refusals do not establish a positive official-content query or semantic AI benefit.
+Public query and browser-only tracking have dated deployment acceptance. The pinned baseline has anonymous five-file hash readback, Pages/Worker binding and 15 actual Chromium production checks. Its formal source admission is **RIGHTS_BLOCKED**: `deployment_verified=true` and `production_verified=false`. Correct refusals do not establish a positive official-content query or semantic AI benefit. [#20](https://github.com/Reese-max/taichung-police-intel/issues/20) still needs the recovery evidence listed in [current limitations](./docs/govintel/competition-2026/LIMITATIONS_AND_SAFETY.md); successful scheduled publication alone does not close it.
 
 D1's fixed 112Y12M/2023-12 CSV and all 29 Taichung districts are verified; production UI values are accepted as historical background. D2 metadata is readable, but its official resource bytes return 403; records and CRS remain unknown. Police/traffic/city/fire candidates are unpromoted; seven valid observation days alone do not approve rights or independent coverage.
 
@@ -99,6 +99,10 @@ npm --prefix apps/web run dev
 ```
 
 Open `http://localhost:3000`.
+
+公開會議的明確啟用導航入口位於 `/live/`，可載入本機 session、搜尋暫定文字、
+保存 WATCH 與查看會後核對收據。操作、30 分鐘離線回放與 runtime 證據邊界見
+[Issue #13 公開會議即時導航](./docs/govintel/issue-13-live-meeting.md)；預設不啟動付費 ASR。
 
 Refresh the public-source status and build the same static artifact used by GitHub Pages:
 
@@ -203,7 +207,7 @@ Schema replay uses the small registry in `scripts/migration_replay.py` (`1→2�
 
 Review Inbox uses `intel_v2/review.py` and `scripts/review-inbox.py` for deterministic fingerprints, deduplication, claim/decision audit, source-version reopening, and bounded homepage projection. `reconcile --input` also projects detail rechecks, discovery outcomes, PublicEvent conflict/candidate/split states, and stale/partial source rows into one local inbox without auto-promoting or auto-resolving them. Local audit state keeps reviewer/assignment details, while the public health receipt exposes only safe IDs and hashes. The Web overlay can mark an item for local follow-up, resolution, dismissal, or reopening and export that browser-local receipt; it never writes the canonical inbox. The first version is local-first and does not add RBAC or notifications.
 
-The bounded PublicEvent core is runnable with `python scripts/public-event-fusion.py --self-check`. It only fuses explicitly official normalized documents, optionally binds caller-provided labels through the versioned entity registry (`--entity-registry`) and carries its receipt, keeps document versions separate, carries forward partial/LKG events, and requires a confirmed event plus exact geography/period/source before adding `BACKGROUND_ONLY` context. The homepage now includes a clearly marked `FIXTURE_ONLY` read-only replay card for three sources, version differences, background context, and browser-local decision previews; it is not wired to live collectors or a write-capable public UI.
+The bounded PublicEvent core is runnable with `python scripts/public-event-fusion.py --self-check`. It only fuses explicitly official normalized documents; the CLI binds caller-provided labels through the canonical entity registry by default (`--entity-registry` selects another registry), validates existing IDs against explicit document jurisdiction, and carries the registry receipt. It keeps document versions separate, carries forward partial/LKG events, and requires a confirmed event plus exact geography/period/source before adding `BACKGROUND_ONLY` context. The homepage now includes a clearly marked `FIXTURE_ONLY` read-only replay card for three sources, version differences, background context, and browser-local decision previews; it is not wired to live collectors or a write-capable public UI.
 
 The NPA source matrix is maintained in [npa-source-inventory.v1.json](./docs/govintel/npa-source-inventory.v1.json), with Batch 1 fixture adapters and explicit `PRIMARY_EVENT` / `PRIMARY_REFERENCE` / `ENRICHMENT` / `EXCLUDE_OR_AGGREGATE_ONLY` roles. Run `python scripts/npa-source-inventory.py --self-check` to verify the inventory. Candidate sources are not production or deployment evidence; personal case-level sources remain blocked from the public canonical feed. Details are in [issue-28-npa-source-matrix.md](./docs/govintel/issue-28-npa-source-matrix.md).
 
@@ -213,7 +217,7 @@ The catalog-derived source policy has a cross-consumer receipt: `python scripts/
 
 Official document conversion is bounded by `intel_v2/located_facts.py` and `scripts/located-facts.py`: approved catalog origin → immutable raw/text hashes → HTML text-range or JSON Pointer locator → `FACT_CANDIDATE` / `NEEDS_REVIEW` fact and evidence projections. A locator/hash mismatch fails closed; the adapter does not promote candidates to verified truth or infer missing dates.
 The live HTML/JSON replay receipt is [official-document-receipt.v1.json](./docs/govintel/official-document-receipt.v1.json); it records hashes and review status, not deployment or human approval.
-The read-only Taiwan Intel Dashboard discovery consumer is replayable with `python scripts/discovery-adapter.py self-check`; media remains unverified until a server-controlled official match, and it never writes canonical events.
+The read-only Taiwan Intel Dashboard discovery consumer is replayable with `python scripts/discovery-adapter.py self-check`. Media always remains unverified; server-controlled official document versions can separately produce read-only #24 event previews. See the [adapter contract, replay commands, acceptance evidence and canary limits](docs/govintel/issue-27-discovery-adapter.md). It never writes canonical documents or events.
 
 ## Public deployment
 
@@ -341,13 +345,16 @@ The retained current-workspace Kiro records show Auto as `qdev::auto`: 10.254967
 - The English path translates the product journey and source names; the official Chinese transcript remains Chinese and is explicitly labelled as navigation-only evidence.
 - The official `S-010` HLS CDN can fail in some Chrome sessions with `ERR_CONTENT_DECODING_FAILED`. A fatal media error or ten-second metadata timeout now preserves the transcript and provenance while showing a prominent link to the official council video. The local 2:43 product-demo MP4 is deliberately not substituted because it does not share the official evidence timeline.
 - Current source freshness, scheduled run, and publication limits are time-bound in [CURRENT_STATUS.md](./docs/govintel/competition-2026/CURRENT_STATUS.md); a successful workflow does not erase `PARTIAL`, `STALE`, or `FAILED` source states.
-- Human evaluation, entrant details, official eligibility, form submission and institutional adoption remain unverified; see [EVALUATION.md](./docs/govintel/competition-2026/EVALUATION.md) and [LIMITATIONS_AND_SAFETY.md](./docs/govintel/competition-2026/LIMITATIONS_AND_SAFETY.md).
+- Human evaluation, the original registration title, representative eligibility, team/IP permissions and institutional adoption remain unverified. Supplement receipt was confirmed separately; see [EVALUATION.md](./docs/govintel/competition-2026/EVALUATION.md) and [LIMITATIONS_AND_SAFETY.md](./docs/govintel/competition-2026/LIMITATIONS_AND_SAFETY.md).
 
 ## License and data rights
 
 No repository software license has been selected. Do not assume reuse rights. Official source content remains subject to each publisher's terms; this project preserves provenance and links rather than claiming ownership.
 
-## Offline PDF candidate verification on Windows
+## Historical Windows PDF candidate verification
+
+The following preserves the earlier PDF candidate's environment and failures;
+it is not a verification result for today's checkout or installed dependencies.
 
 The fixture-only PDF bytes, page-text and citation replay increment is documented
 in [document evidence](docs/govintel/document-evidence.md). It is integrated on

@@ -6,10 +6,11 @@
 
 - **資料不是全世界。** Active source policy 只有五個 S-004／S-006／S-007／S-009／S-029；來源健康不等於問題領域完整覆蓋。
 - **新鮮度不是健康。** 成功連線的來源仍可能 `STALE`；`PARTIAL`、`FAILED`、`UNKNOWN`、valid zero-result 與 `NO_DATA_AS_OF` 要分開看。LKG 保護可讀性，但不把舊資料變 current。
-- **#20 尚未全收斂。** Oct 4 已有晨／晚自然排程、部署與匿名版本／hash 成功證據；剩餘失敗／恢復演練需逐項留證。不能繼續稱流程尚未合併，也不能用成功 run 取代失敗路徑驗收。
+- **#20 尚未全收斂。** [固定正式驗收](closure-20261007-pr177/README.md)與[真實 upload drill](closure-20261006/alert-drill.json)分別保存成功發布及隔離 artifact 失敗／恢復；實際 deploy、source 與 public mismatch 恢復仍需逐項留證。不能繼續稱流程尚未合併，也不能用成功 run 取代失敗路徑驗收。
+- **正式正值查詢仍受權利 gate 阻擋。** 固定正式收據的 `RIGHTS_BLOCKED`／provider `DISABLED`、`deployment_verified=true`／`production_verified=false` 並存；受限拒答與已部署介面不證明來源權利、原文正值查詢或 AI／真人效益。本次文件核對不更新正式收據版本。
 - **候選不是 production。** Open PR、Issue、catalog entry、一次 canary、fixture 或設定檔不能升級 source status。候選 promotion 需要完整性、權利、敏感資料、重播與 current publication evidence。
 - **事件融合是受限核心。** `public-event-demo.json` 是 `FIXTURE_ONLY`；它不證明 live multi-agency coverage、event accuracy、背景資料效益或正式交班服務。
-- **首期追蹤是同瀏覽器功能。** 保存使用者明確選擇的條件與已讀版本；開站／刷新才比對，不含關站推播、跨裝置帳號或敏感身分側寫。清除瀏覽器資料可能失去本機清單。本輪有限 UI／同 checkout 驗收已通過，正式部署與真實來源／真人效益仍另驗。
+- **首期追蹤是同瀏覽器功能。** 保存使用者明確選擇的條件與已讀版本；開站／刷新才比對，不含關站推播、跨裝置帳號或敏感身分側寫。清除瀏覽器資料可能失去本機清單。有限合成 UI 與受限正式頁面各有收據，真實官方新版本／解除的完整流程與真人效益仍另驗。
 - **D1 已核對但仍是歷史背景，D2 尚未取得內容。** D1 指定 112 年 12 月官方 CSV 已下載、核對與本地展示，未 promotion，不能代替現況／真人任務效益；114Y12M JSON service／其他人口檔不能冒充本期。D2 metadata 200 但 TGOS resource 403，POINT_X/Y 不證明 CRS。keyword 與規則 fixture 不能冒充語意模型與 AI 增益。
 - **評估尚未執行。** Precision、recall、F1、任務時間、真人使用、採用、得獎與資格結果不預填。`evaluation-manifest.template.json` 的 result 欄保持 null。
 - **歷史資料有界。** 2026-08 Kiro package、舊 deadline、舊 demo video 與 Kiro credits 是 prior prototype evidence，集中在 [Historical](../historical/README.md)，不代表目前版本或本次官方規則。

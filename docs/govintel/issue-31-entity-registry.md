@@ -1,9 +1,10 @@
 # #31 — Agency / Location / Named Event entity registry
 
-One canonical, non-person entity registry is the shared identity layer for every
-consumer. #24 PublicEvent fusion reads it today; binding #27 discovery matching
-and #29 conversational search to the same layer instead of their own alias
-rules is tracked in PR #81.
+One canonical, non-person entity registry is the shared identity layer for
+#24 PublicEvent fusion, #27 discovery hints, and the optional #29 Python event
+gateway. The fusion CLI loads the canonical registry by default; an explicit
+`--entity-registry` selects an isolated fixture. Deployed consumer acceptance
+remains separate, as described in [shared entity bindings](issue-31-entity-bindings.md).
 
 - Production registry data: `config/entity-registry.v1.json`
 - Isolated collision and dated-event fixtures: `tests/fixtures/entity-registry/seeded-collision-coverage.v2.json`
@@ -58,11 +59,12 @@ The six agency rows cite catalogued sources (`official-source-catalog:S-001`,
 `location:tc-taiwan-blvd` (臺灣大道) and `location:tc-route-74` (台74線), cite the
 `official-road-name` label rather than a dated source citation.
 
-The 15 added rows are kept only in the isolated test fixture; the default runtime registry excludes them. Their dated event occurrences have no verified official schedule and must not become canonical search/fusion facts without review. Every row added for collision coverage is a **seeded fixture**, not a live
+The 16 added rows are kept only in the isolated test fixture; the default runtime registry excludes them. Their dated event occurrences have no verified official schedule and must not become canonical search/fusion facts without review. Every row added for collision coverage is a **seeded fixture**, not a live
 source record, and says so in its provenance string:
 
 | Seeded rows | `evidence` |
 |---|---|
+| city government agency `agency:tc-government` (distinct from the city-hall venue) | `fixture:agency-name` |
 | cross-city roads `location:tc-zhongzheng-road`, `location:nt-zhongzheng-road`, `location:tc-zhongshan-road`, `location:tn-zhongshan-road` | `fixture:road-name` |
 | venues `location:tc-city-hall`, `location:tc-city-council`, `location:tc-railway-station`, `location:tc-national-theater`, `location:tc-rainbow-village`, `location:tc-intercontinental-baseball`, `location:tc-wuri-fishing-port` | `fixture:venue-name` |
 | named-event occurrences `named_event:tc-new-year-eve-2026`, `named_event:tc-new-year-eve-2027`, `named_event:tc-council-regular-2026q4`, `named_event:tc-council-regular-2027q1` | `fixture:named-event-occurrence` |
@@ -118,6 +120,43 @@ python -X utf8 scripts/public-event-fusion.py --self-check
 
 `npm test` runs the suite through `apps/web/tests/entity-registry.test.mjs`, so
 the registry guard runs on every verification gate and in CI.
+
+## Local acceptance mapping (2026-10-17)
+
+| #31 criterion | Mechanism / regression |
+|---|---|
+| Core police, government, traffic, fire, council fixture | `CORE_AGENCIES` in `test_entity_registry.py`; government is fixture-only, not a reviewed production alias. |
+| District, road, venue normalization | All 29 districts and isolated road/venue fixtures; NFKC and 台/臺 normalization. |
+| Three police labels resolve to one ID | `test_core_police_aliases_resolve_to_one_id`. |
+| Cross-city roads stay distinct | Scoped road fixtures plus `test_direct_entity_ids_respect_explicit_document_jurisdiction`; existing agency/location/district IDs also respect explicit document scope. |
+| Same-name events on different dates stay distinct | Dated named-event fixtures and fusion regressions. |
+| #24/#27/#29 share version/hash | `test_default_fusion_cli_discovery_web_and_mcp_share_registry_identity` runs the CLI, discovery adapter, event store and Python Web/MCP gateway. This is synthetic local acceptance. |
+| Manual edits preserve audit/evidence | Correction, merge/split chains and reverts retain snapshots and reject tampered history. |
+| Unconfirmed aliases never become canonical | Canonical rows require `CONFIRMED`; unresolved labels fail closed and discovery candidates retain `DISCOVERY_UNVERIFIED` / `canonical_write=false`. |
+
+Official per-alias source review, production named-event evidence, deployed
+consumer bindings and a live end-to-end receipt remain unverified. These local
+checks do not close those acceptance gates.
+
+The relevant suites now contain 127 tests (125 before this change), all passing
+with exit 0 under Git Bash:
+
+```sh
+python -X utf8 -m unittest discover -s tests -p test_entity_registry.py -v &&
+python -X utf8 -m unittest discover -s tests -p test_public_event_fusion.py -v &&
+python -X utf8 -m unittest discover -s tests -p test_discovery_adapter.py -v &&
+python -X utf8 -m unittest discover -s tests -p test_query_domain.py -v &&
+python -X utf8 -m unittest discover -s tests -p test_query_gateway_domain.py -v
+```
+
+The two registry/fusion Node wrappers pass all 4 checks, and
+`node scripts/verify-project.mjs specs` passes (`secrets=0`). No dedicated lint,
+coverage ratchet, CRAP or mutation gate is configured. The full `npm test` sweep
+exits 1: Node reports 798/800 passing with two `PDF_PARSER_UNAVAILABLE` failures;
+nine Python groups fail, including Windows `os.O_NONBLOCK` incompatibilities;
+the migration self-check cannot import the uninstalled `pg` package. Those
+unmodified paths remain separate from this issue's passing suites; no full-suite,
+web-build or production acceptance is claimed.
 
 ## Non-goals
 

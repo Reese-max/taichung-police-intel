@@ -27,7 +27,9 @@ function isTrustedSeekBase(session, baseUrl) {
     return false;
   }
   try {
-    const host = new URL(baseUrl).hostname.toLowerCase();
+    const parsed = new URL(baseUrl);
+    if (parsed.username || parsed.password || (parsed.port && parsed.port !== "443")) return false;
+    const host = parsed.hostname.toLowerCase();
     const allowed = OFFICIAL_SEEK_HOSTS[session?.source_id] || [];
     return allowed.includes(host);
   } catch {
@@ -64,7 +66,8 @@ export function projectLocator(session, segmentId) {
     ? segmentId
     : findSegment(session, segmentId);
   const seek = session?.seek;
-  if (seek?.kind === "STREAM_TIME" && isTrustedSeekBase(session, seek.base_url)) {
+  if (seek?.kind === "STREAM_TIME" && isTrustedSeekBase(session, seek.base_url)
+      && Number.isFinite(seek.offset_seconds) && seek.offset_seconds >= 0) {
     const absolute = segment.start_seconds + (Number(seek.offset_seconds) || 0);
     return {
       kind: "STREAM_TIME",
@@ -105,6 +108,8 @@ export function projectTimeline(session) {
       partial: segment.partial === true,
       revision: segment.revision,
       speaker_label: segment.speaker_label ?? null,
+      profile_relevance: segment.profile_relevance ?? null,
+      revision_history: segment.revision_history ?? [],
       badges: [...PROVISIONAL_BADGES],
       provisional: true,
       evidence_state: PROVISIONAL_EVIDENCE_STATE,
@@ -187,10 +192,70 @@ export function projectReceiptSummary(session) {
     superseded_by: receipt.superseded_by ?? null,
     current: currentIds.has(receipt.receipt_id),
     verification_status:
-      receipt.stale === true
+      session?.provider_usage?.mode === "FIXTURE_ONLY"
+        ? "FIXTURE_ONLY"
+        : receipt.stale === true
         ? "STALE_NEEDS_REVIEW"
         : receipt.outcome === "CONFIRMED_BY_OFFICIAL_MEDIA" || receipt.outcome === "CONFIRMED_BY_MINUTES"
           ? "OFFICIAL_RECONCILED"
           : "PROVISIONAL_UNRESOLVED",
   }));
+}
+
+/** Local files are navigation input, never a formal publication writer. */
+export function validateLiveViewSession(session) {
+  if (session?.schema_version !== 1 || typeof session.session_id !== "string"
+      || !Number.isInteger(session.session_revision) || session.session_revision < 1
+      || !Number.isInteger(session.max_duration_seconds) || session.max_duration_seconds < 1 || session.max_duration_seconds > 14400
+      || (session.budget_seconds != null && (!Number.isInteger(session.budget_seconds)
+        || session.budget_seconds < 1 || session.budget_seconds > session.max_duration_seconds))
+      || !["PREPARING", "LIVE", "DEGRADED", "ENDED", "RECONCILING", "RECONCILED", "FAILED"].includes(session.status)
+      || !OFFICIAL_SEEK_HOSTS[session.source_id]
+      || !isTrustedSeekBase(session, session.official_source_url)
+      || !isTrustedSeekBase(session, session.stream_url)) {
+    throw new Error("Invalid session schema or official source identity");
+  }
+  if (!Array.isArray(session.segments) || !Array.isArray(session.gap_intervals)
+      || !Array.isArray(session.reconciliation_receipts) || !Array.isArray(session.bookmarks)
+      || typeof session.asr_contract?.provider !== "string"
+      || typeof session.asr_contract?.model !== "string") throw new Error("Invalid session arrays or ASR contract");
+  const ids = new Set();
+  for (const segment of session.segments) {
+    if (typeof segment.segment_id !== "string" || ids.has(segment.segment_id)
+        || typeof segment.text !== "string" || segment.text.length > 20000
+        || !Number.isInteger(segment.revision) || !Array.isArray(segment.revision_history)
+        || segment.revision_history.some((prior) => !prior || typeof prior.text !== "string" || !Number.isInteger(prior.revision)
+          || (prior.speaker_label != null && typeof prior.speaker_label !== "string"))) throw new Error("Invalid segment identity or revision");
+    const profile = segment.profile_relevance;
+    if (profile != null && (!Array.isArray(profile.matched_terms) || profile.matched_terms.some((term) => typeof term !== "string"))) throw new Error("Invalid profile metadata");
+    ids.add(segment.segment_id);
+  }
+  if (session.gap_intervals.some((gap) => !gap || typeof gap.reason !== "string" || typeof gap.gap_id !== "string")) throw new Error("Invalid gap metadata");
+  if (session.reconciliation_receipts.some((receipt) => !receipt || typeof receipt.receipt_id !== "string"
+      || typeof receipt.outcome !== "string" || (receipt.official != null && typeof receipt.official.locator !== "string"))) throw new Error("Invalid receipt metadata");
+  const usage = session.provider_usage;
+  if (usage != null && (!Array.isArray(usage.calls) || !Number.isFinite(usage.reserved_seconds)
+      || !["FIXTURE_ONLY", "GROQ_RECORDED_AUDIO"].includes(usage.mode))) throw new Error("Invalid provider usage");
+  const ranges = [...session.segments, ...session.gap_intervals].sort((a, b) => a.start_seconds - b.start_seconds);
+  let previous = 0;
+  for (const row of ranges) {
+    if (!Number.isFinite(row.start_seconds) || !Number.isFinite(row.end_seconds) || row.start_seconds < 0
+        || row.end_seconds <= row.start_seconds || row.end_seconds > session.max_duration_seconds) throw new Error("Invalid timeline range");
+    if (row.start_seconds < previous) throw new Error("Timeline overlap");
+    previous = row.end_seconds;
+  }
+  return session;
+}
+
+export function createLiveWatch(session, segmentId) {
+  validateLiveViewSession(session);
+  const segment = findSegment(session, segmentId);
+  return {
+    session_id: session.session_id, segment_ids: [segment.segment_id],
+    start_seconds: segment.start_seconds, end_seconds: segment.end_seconds,
+    status: "WATCH", reason_code: "USER_WATCH", provisional: true,
+    text: segment.text, revision: segment.revision, content_sha256: segment.content_sha256,
+    stream_content_hash: session.stream_content_hash, session_revision: session.session_revision,
+    profile_relevance: segment.profile_relevance ?? null,
+  };
 }

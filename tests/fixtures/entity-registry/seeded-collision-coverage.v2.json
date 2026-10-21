@@ -1,8 +1,17 @@
 {
   "schema_version": 1,
-  "registry_version": 2,
-  "updated_at": "2026-10-06",
+  "registry_version": 3,
+  "updated_at": "2026-10-17",
   "entities": [
+    {
+      "entity_id": "agency:tc-government",
+      "kind": "agency",
+      "canonical_label": "臺中市政府",
+      "aliases": ["台中市政府", "中市府"],
+      "jurisdiction": "臺中市",
+      "status": "CONFIRMED",
+      "evidence": "fixture:agency-name"
+    },
     {
       "entity_id": "agency:tc-police",
       "kind": "agency",
