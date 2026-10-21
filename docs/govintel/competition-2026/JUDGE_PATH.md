@@ -13,6 +13,8 @@ npm run check
 
 Node20+、Python3.11+；離線基礎不需 APIkey、付費模型或資料庫。某些完整 runtime 檢查另有依賴時，以其實際退出碼／receipt 為準。
 
+2026-10-16 的 Windows／Python 3.11 執行有 POSIX、符號連結權限及 pinned PDF parser 環境失敗；完整 gate 未通過。靜態 build、文件檢查、合成 replay 與有限 Chromium 操作各自的結果見 [VERIFICATION](VERIFICATION.md)，不以單一通過項代替完整 gate。
+
 ## 可重播的核心
 
 ```bash
@@ -30,7 +32,22 @@ SourcePolicy、locator、PublicEvent fixture 與 handoff 各有自己的資料�
 npm --prefix apps/web run dev
 ```
 
-本地`http://localhost:3000`展示此 checkout 的已驗收能力；v6 candidate 路徑為 `/public-query/`、`/tracking/`、`/sources/`，首頁主導覽提供入口，既有議會 dashboard 保留。確認它與 production 是不同版本，不把未部署 PR 寫成公開可用。公開[demo](https://reese-max.github.io/taichung-police-intel/)保留來源 health／gap 與官方影音 path。
+本地`http://localhost:3000`用於開發此 checkout；v6 路徑為 `/public-query/`、`/tracking/`、`/sources/`，首頁主導覽提供入口，既有議會 dashboard 保留。四分鐘演練請改用 [DEMO_SCRIPT](DEMO_SCRIPT.md)的靜態 build、僅綁 loopback 的伺服器及 R1–R9 操作表，避免把啟動 dev server 當成固定產物的重播。公開[demo](https://reese-max.github.io/taichung-police-intel/)另依固定正式 receipt 判讀，不把本地 checkout 當成公開 served 版本。
+
+在 repo 根目錄可先獨立核對合成序列與文件契約：
+
+```bash
+python3 -X utf8 scripts/replay-commute-reopen.py --self-check
+node --test apps/web/tests/competition-docs.test.mjs
+```
+
+完成靜態 build，且 `http://127.0.0.1:8000` 正在提供該產物後，可用既有實際 UI driver 留存畫面與操作收據（需要已安裝的 Chromium／Chrome 與根目錄 `npm ci`）：
+
+```bash
+CHROMIUM_PATH="/absolute/path/to/chrome" node scripts/e2e-v6-browser.mjs --base-url http://127.0.0.1:8000 --out runtime-evidence/judge-replay
+```
+
+將 `CHROMIUM_PATH` 換成實際可執行檔；Windows Git Bash 可使用 `C:/Program Files/Google/Chrome/Application/chrome.exe`。8000 已有服務時，換一個可用 port 並同步調整伺服器命令與 `--base-url`。driver 檢查保存、重載、延長、已讀、來源缺口、到期不解除、明文解除與取消；收據中的有限 UI 結果不是真人／模型分數。需要 served code SHA／鎖檔及 HTTP／STDIO 全部綁定時，另跑上方 `verify-current-checkout.py --mode full --chrome-path ...`，不得以單獨 UI driver 代替完整 receipt。
 
 在 `/public-query/` 的 D1 卡片切換臺中 29 區，核對人口／戶數／行政區碼、**112 年 12 月（2023-12）**、官方來源、CSV hash 與取得收據。這是實際官方固定期別樣本，不是 synthetic 道路資料；仍為未 promotion 的歷史背景，不能拿 JSON service 的 114Y12M 或擷取日期當同一期／現況。D2 尚缺官方 resource bytes／CRS；不用模擬名錄補成已取得。
 
