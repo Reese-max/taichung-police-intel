@@ -1,9 +1,11 @@
 import importlib.util
 from datetime import datetime, timezone
+import json
 from pathlib import Path
 from types import SimpleNamespace
 import re
 import sys
+import tempfile
 import unittest
 
 
@@ -261,6 +263,97 @@ class CanaryContractTests(unittest.TestCase):
             report["item_state"],
             {"S-001": {"S-001-item-1": "b" * 64}},
         )
+
+    def test_failed_source_preserves_state_for_the_next_observation(self):
+        prior = {"S-019": {"old-item": {"content_sha256": "c" * 64}}}
+        report = module.run_canary(
+            collector(fail="S-019"), list(SOURCES), NOW,
+            session_factory=FakeSession, existing_items=prior,
+        )
+        self.assertEqual(report["failed_count"], 1)
+        self.assertEqual(report["item_state"]["S-019"], {"old-item": "c" * 64})
+        self.assertEqual(report["item_state"]["S-032"], {"S-032-item-1": "b" * 64})
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "previous.json"
+            path.write_text(json.dumps(report), encoding="utf-8")
+            self.assertEqual(module.load_existing_items(path)["S-019"], prior["S-019"])
+
+    def test_rejected_observation_does_not_replace_prior_hashes(self):
+        prior = {"S-001": {"S-001-item-1": {"content_sha256": "c" * 64}}}
+        for reason in ("schema", "health", "detail-budget"):
+            with self.subTest(reason=reason):
+                fixture = collector()
+                original = fixture.collect_source
+
+                def rejected(*args, **kwargs):
+                    result = original(*args, **kwargs)
+                    if reason == "schema":
+                        result["snapshots"][0].update({"body": b"<html>changed</html>", "content_type": "text/html"})
+                    elif reason == "health":
+                        result["source_health"] = "FAILED"
+                    else:
+                        result["snapshots"].append({"purpose": "DETAIL"})
+                    return result
+
+                fixture.collect_source = rejected
+                report = module.run_canary(
+                    fixture, ["S-001"], NOW,
+                    session_factory=FakeSession, existing_items=prior,
+                )
+                self.assertEqual(report["failed_count"], 1)
+                self.assertEqual(report["item_state"], {"S-001": {"S-001-item-1": "c" * 64}})
+                self.assertEqual(prior["S-001"]["S-001-item-1"]["content_sha256"], "c" * 64)
+
+    def test_partial_news_observation_keeps_unseen_ids_and_updates_seen_hashes(self):
+        prior = {"S-001": {
+            "unseen-item": {"content_sha256": "c" * 64},
+            "S-001-item-1": {"content_sha256": "c" * 64},
+        }}
+        report = module.run_canary(
+            collector(), ["S-001"], NOW,
+            session_factory=FakeSession, existing_items=prior,
+        )
+        self.assertEqual(report["failed_count"], 0)
+        self.assertEqual(report["item_state"]["S-001"], {
+            "unseen-item": "c" * 64, "S-001-item-1": "b" * 64,
+        })
+        self.assertEqual(prior["S-001"]["S-001-item-1"]["content_sha256"], "c" * 64)
+
+    def test_complete_observation_replaces_incremental_state_including_zero(self):
+        prior = {"S-001": {"old-item": {"content_sha256": "c" * 64}}}
+        for completeness, empty_snapshot in (("COMPLETE_WITH_ITEMS", False), ("COMPLETE_ZERO", False), ("COMPLETE_ZERO", True)):
+            with self.subTest(completeness=completeness, empty_snapshot=empty_snapshot):
+                fixture = collector()
+                original = fixture.collect_source
+
+                def complete(*args, **kwargs):
+                    result = original(*args, **kwargs)
+                    result["window_completeness"] = completeness
+                    if completeness == "COMPLETE_ZERO":
+                        result["window_item_count"] = 0
+                    if empty_snapshot:
+                        result.update({"items": [], "snapshot_item_count": 0})
+                    return result
+
+                fixture.collect_source = complete
+                report = module.run_canary(
+                    fixture, ["S-001"], NOW,
+                    session_factory=FakeSession, existing_items=prior,
+                )
+                self.assertEqual(report["failed_count"], 0)
+                expected = {} if empty_snapshot else {"S-001-item-1": "b" * 64}
+                self.assertEqual(report["item_state"]["S-001"], expected)
+
+    def test_successful_fire_snapshot_does_not_accumulate_old_incident_ids(self):
+        prior = {"S-031": {"old-incident": {"content_sha256": "c" * 64}}}
+        fixture = collector(sources=("S-031",))
+        fixture.NEWS_LIST_SOURCES["S-031"]["format"] = "fire_live"
+        report = module.run_canary(
+            fixture, ["S-031"], NOW,
+            session_factory=FakeSession, existing_items=prior,
+        )
+        self.assertEqual(report["failed_count"], 0)
+        self.assertEqual(report["item_state"], {"S-031": {"S-031-item-1": "b" * 64}})
 
     def test_fire_candidate_record_carries_usage_notice_and_catalog_truth(self):
         report = module.run_canary(

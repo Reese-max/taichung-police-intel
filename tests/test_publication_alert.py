@@ -10,6 +10,10 @@ spec = importlib.util.spec_from_file_location('publication_alert', Path(__file__
 alert = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(alert)
 
+spec = importlib.util.spec_from_file_location('publication_outcome', Path(__file__).resolve().parents[1] / 'scripts/publication-outcome.py')
+outcome = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(outcome)
+
 
 class FakeGithub:
     def __init__(self):
@@ -63,6 +67,58 @@ class PublicationAlertTests(unittest.TestCase):
         body = self.github.comments[0]['body']
         self.assertNotIn('PRIVATE_QUERY_MUST_NOT_LEAVE', body)
         self.assertNotIn('PRIVATE_TOKEN_MUST_NOT_LEAVE', body)
+
+    def publication_health(self, **overrides):
+        return outcome.runtime_health({
+            **self.health['phase_results'], **self.health['job_results'],
+            'GITHUB_RUN_ID': '123', 'GITHUB_RUN_ATTEMPT': '1',
+            'STATE_COMMIT': 'a' * 40, 'GENERATION_ID': 'b' * 64,
+            'EVIDENCE_URL': f'https://github.com/{alert.REPOSITORY}/actions/runs/123/artifacts/456',
+            **overrides,
+        })
+
+    def test_failure_alert_locates_retained_evidence_and_exact_checkpoint(self):
+        for phase in ('PRESERVE', 'PAGES_UPLOAD', 'PAGES_DEPLOY', 'PUBLIC_VERIFY'):
+            with self.subTest(phase=phase):
+                self.github = FakeGithub()
+                health = self.publication_health(**{phase: 'failure'})
+                receipt = self.send(health)
+                body = self.github.comments[0]['body']
+                self.assertEqual(receipt['failed_phases'], [phase])
+                self.assertEqual(health.get('evidence_url'),
+                    f'https://github.com/{alert.REPOSITORY}/actions/runs/123/artifacts/456')
+                self.assertIn(health['evidence_url'], body)
+                self.assertIn(health['state_commit'], body)
+                self.assertIn(health['generation_id'], body)
+                self.assertEqual(self.send(health)['comment_id'], receipt['comment_id'])
+                self.assertEqual(self.github.posts, 1)
+
+    def test_failed_evidence_upload_keeps_checkpoint_without_a_download_link(self):
+        health = self.publication_health(PRESERVE='failure', EVIDENCE='failure')
+        self.assertIsNone(health.get('evidence_url'))
+        self.send(health)
+        body = self.github.comments[0]['body']
+        self.assertNotIn('/artifacts/', body)
+        self.assertIn(health['state_commit'], body)
+        self.assertIn('未取得成功上傳的 evidence artifact 連結', body)
+
+    def test_untrusted_evidence_locations_never_reach_public_alerts(self):
+        prefix = f'https://github.com/{alert.REPOSITORY}/actions/runs/123/artifacts/456'
+        for url in (prefix + '?token=PRIVATE', prefix + '#PRIVATE',
+                    prefix.replace('github.com/', 'PRIVATE@github.com/'),
+                    prefix.replace(alert.REPOSITORY, 'foreign/repository'),
+                    prefix.replace('/runs/123/', '/runs/999/'),
+                    prefix + '> PRIVATE', 'https://evil.test/PRIVATE'):
+            with self.subTest(url=url):
+                self.github = FakeGithub()
+                health = self.publication_health(PRESERVE='failure', EVIDENCE_URL=url)
+                self.assertIsNone(health.get('evidence_url'))
+                # The alert also validates receipt fields at its own trust boundary.
+                health.update(evidence_url=url, state_commit='PRIVATE_STATE', generation_id='PRIVATE_GENERATION')
+                self.send(health)
+                body = self.github.comments[0]['body']
+                self.assertNotIn('/artifacts/', body)
+                self.assertNotIn('PRIVATE', body)
 
     def test_cancellation_and_contract_block_are_alerted(self):
         self.health['phase_results']['PAGES_DEPLOY'] = 'cancelled'

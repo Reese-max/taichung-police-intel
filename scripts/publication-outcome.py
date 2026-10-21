@@ -6,9 +6,9 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import re
 import sys
 from typing import Mapping
-from urllib.parse import urlsplit
 
 PHASES = ("RESTORE", "COLLECT", "V1", "V2", "V2_VERIFY", "SCHEMA_DRIFT", "VERIFY", "PRESERVE", "PAGES_UPLOAD", "EVIDENCE", "WORKER_DEPLOY", "PAGES_DEPLOY", "PUBLIC_VERIFY", "QUERY_VERIFY")
 OUTCOMES = {"success", "failure", "cancelled", "skipped"}
@@ -24,6 +24,15 @@ PHASE_TO_HEALTH = {
 def phase_value(env: Mapping[str, str], key: str) -> str:
     value = env.get(key, "skipped" if key == "QUERY_VERIFY" else "")
     return value if value in OUTCOMES else "unknown"
+
+
+def retained_evidence_url(env: Mapping[str, str]) -> str | None:
+    url = env.get("EVIDENCE_URL", "")
+    match = re.fullmatch(r"https://github\.com/Reese-max/taichung-police-intel/actions/runs/([0-9]{1,20})/artifacts/[0-9]{1,20}", url)
+    if (phase_value(env, "EVIDENCE") == "success" and match and
+            (not env.get("GITHUB_RUN_ID") or match[1] == env["GITHUB_RUN_ID"])):
+        return url
+    return None
 
 
 def pages_deploy_value(env: Mapping[str, str]) -> str:
@@ -121,6 +130,7 @@ def runtime_health(env: Mapping[str, str], *, observed_at: str | None = None) ->
         "run_attempt": env.get("GITHUB_RUN_ATTEMPT") or None,
         "generation_id": generation_id,
         "state_commit": state_commit,
+        "evidence_url": retained_evidence_url(env),
         "schema_drift_overall": schema_overall or None,
         "query_readiness": readiness,
         "production_verified": production_verified,
@@ -169,9 +179,8 @@ def report(env: Mapping[str, str]) -> tuple[str, int]:
             lines.append("The deployment and release binding passed, but formal queries remain rights-blocked. Zero returned evidence does not mean no events; source rights and freshness still require attention.")
         elif readiness == "VERIFICATION_FAILED":
             lines.append("No consistent formal query readiness receipt is available; step success cannot establish data admission.")
-    url = env.get("EVIDENCE_URL", "")
-    parts = urlsplit(url)
-    if outcome("EVIDENCE") == "success" and parts.scheme == "https" and parts.hostname == "github.com" and "/actions/runs/" in parts.path and "/artifacts/" in parts.path and not parts.query and not parts.fragment:
+    url = retained_evidence_url(env)
+    if url:
         lines.append(f"\nRetained evidence: <{url}>")
     else:
         lines.append("\nNo successful evidence-upload receipt is available. Inspect the job logs; do not assume an artifact exists.")

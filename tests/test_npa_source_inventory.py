@@ -2,6 +2,7 @@ import copy
 import importlib.util
 import json
 from pathlib import Path
+import tempfile
 import unittest
 
 
@@ -140,6 +141,91 @@ class NpaSourceInventoryTests(unittest.TestCase):
         self.assertIn("附件版本", stats["fields"])
         self.assertIn("附件 SHA-256", stats["fields"])
 
+    def test_fixture_canary_reports_parser_rejections_instead_of_success(self):
+        invalid_sections = {
+            "assembly": {**self.fixture["assembly"][0], "event_start_at": "invalid"},
+            "statistics": {key: value for key, value in self.fixture["statistics"][0].items() if key != "統計期別"},
+            "fraud_effectiveness": {**self.fixture["fraud_effectiveness"][0], "月": "13"},
+            "rumors": None,
+            "old_fraud_domains": None,
+            "current_fraud_domains": None,
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "batch1.json"
+            for section, invalid_row in invalid_sections.items():
+                with self.subTest(section=section):
+                    fixture = copy.deepcopy(self.fixture)
+                    fixture[section] = [invalid_row]
+                    path.write_text(json.dumps(fixture, ensure_ascii=False), encoding="utf-8")
+                    report = inventory_script.fixture_canary_report(self.inventory, path)
+                    self.assertEqual(report["parse_failures"], 1)
+                    self.assertEqual(report["schema_drift"], 1)
+                    self.assertEqual(report["status"], "PARTIAL")
+                    self.assertEqual(report["events_used"], 0 if section == "assembly" else 1)
+
+    def test_fixture_canary_requires_every_batch1_section(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "batch1.json"
+            for section in ("assembly", "statistics", "fraud_effectiveness", "rumors", "old_fraud_domains", "current_fraud_domains"):
+                for invalid in (None, [], {}):
+                    with self.subTest(section=section, invalid=invalid):
+                        fixture = copy.deepcopy(self.fixture)
+                        if invalid is None:
+                            del fixture[section]
+                        else:
+                            fixture[section] = invalid
+                        path.write_text(json.dumps(fixture), encoding="utf-8")
+                        report = inventory_script.fixture_canary_report(self.inventory, path)
+                        self.assertEqual(report["schema_drift"], 1)
+                        self.assertEqual(report["status"], "PARTIAL")
+
+    def test_fixture_canary_counts_validated_records_and_events(self):
+        report = inventory_script.fixture_canary_report(self.inventory, FIXTURE)
+        self.assertEqual(report["status"], "PASS")
+        self.assertEqual(report["parsed_records"], 6)
+        self.assertEqual(report["events_used"], 1)
+        self.assertEqual(report["handoff_used"], 0)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "batch1.json"
+            fixture = copy.deepcopy(self.fixture)
+            fixture["assembly"] *= 2
+            path.write_text(json.dumps(fixture), encoding="utf-8")
+            report = inventory_script.fixture_canary_report(self.inventory, path)
+            self.assertEqual(report["parsed_records"], 7)
+            self.assertEqual(report["events_used"], 1)
+
+    def test_fixture_canary_rejects_empty_165_rows_and_fusion_failures(self):
+        invalid_sections = {
+            "rumors": {}, "old_fraud_domains": {}, "current_fraud_domains": {},
+            "assembly": {**self.fixture["assembly"][0], "official_url": "http://example.gov/unsafe"},
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "batch1.json"
+            for section, row in invalid_sections.items():
+                with self.subTest(section=section):
+                    fixture = copy.deepcopy(self.fixture)
+                    fixture[section] = [row]
+                    path.write_text(json.dumps(fixture), encoding="utf-8")
+                    report = inventory_script.fixture_canary_report(self.inventory, path)
+                    self.assertEqual(report["status"], "PARTIAL")
+                    self.assertEqual(report["parse_failures"], 1)
+                    self.assertEqual(report["schema_drift"], 1)
+                    self.assertEqual(report["parsed_records"], 5)
+                    self.assertEqual(report["events_used"], 0 if section == "assembly" else 1)
+
+    def test_165_parser_requires_each_dataset_reference_fields(self):
+        for section, dataset_id, required in (
+            ("rumors", "38262", ("標題", "發布內容", "發布時間")),
+            ("old_fraud_domains", "160055", ("網域",)),
+            ("current_fraud_domains", "176455", ("網域",)),
+        ):
+            for field in required:
+                for invalid in (None, "", "   "):
+                    with self.subTest(dataset_id=dataset_id, field=field, invalid=invalid):
+                        row = {**self.fixture[section][0], field: invalid}
+                        with self.assertRaisesRegex(ValueError, "missing required field"):
+                            adapters.parse_165_records([row], dataset_id=dataset_id)
+
     def test_invalid_excluded_row_cannot_become_public(self):
         broken = copy.deepcopy(self.inventory)
         row = next(item for item in broken["sources"] if item["inventory_id"] == "NPA-14420")
@@ -148,6 +234,70 @@ class NpaSourceInventoryTests(unittest.TestCase):
             inventory_script.validate_inventory(broken, self.catalog)
         with self.assertRaisesRegex(ValueError, "personal/case-level"):
             adapters.assert_public_canonical_allowed(self.fixture["personal_record"])
+
+    def test_public_projections_reject_case_level_sources_at_every_entry(self):
+        document = copy.deepcopy(self.fixture["traffic"])
+        background_event = {"fusion_status": "CONFIRMED", "district_id": document["district_id"], "background": []}
+        prohibited = [
+            {"contains_personal_data": True},
+            {"role": "EXCLUDE_OR_AGGREGATE_ONLY"},
+            {"public_feed_allowed": False},
+        ]
+        for identity in ("14420", "STOLEN-VEHICLES", "LOST-PROPERTY"):
+            prohibited.append({"dataset_id": identity})
+            for field in ("inventory_id", "source_id", "independent_source_id"):
+                prohibited.append({field: f"NPA-{identity}"})
+        for identity in ("STOLEN-VEHICLES", "LOST-PROPERTY"):
+            prohibited.append({"source_key": f"NPA-{identity}-CASE-LEVEL"})
+        for fields in prohibited:
+            with self.subTest(fields=fields):
+                record = {**document, "dataset_id": "REFERENCE", "period": "2026-08", "value": 12,
+                          "unit": "count", "source_url": document["official_url"], **fields}
+                for entry in (
+                    lambda: adapters.assert_public_canonical_allowed(record),
+                    lambda: fusion.fuse_documents([record]),
+                    lambda: fusion.build_public_event(None, [record]),
+                    lambda: fusion.reconcile_public_events([], [record], snapshot_complete=True),
+                    lambda: fusion.attach_background(background_event, record),
+                ):
+                    with self.assertRaisesRegex(ValueError, "excluded"):
+                        entry()
+        self.assertEqual(background_event["background"], [])
+
+    def test_reference_sources_require_background_instead_of_event_promotion(self):
+        document = copy.deepcopy(self.fixture["traffic"])
+        background_event = {"fusion_status": "CONFIRMED", "district_id": document["district_id"], "background": []}
+        for fields in ({"role": "PRIMARY_REFERENCE"}, {"role": "ENRICHMENT"},
+                       {"realtime_allowed": False}, {"public_event_allowed": False}):
+            with self.subTest(fields=fields):
+                record = {**document, "dataset_id": "REFERENCE", "period": "2026-08", "value": 12,
+                          "unit": "count", "source_url": document["official_url"], **fields}
+                with self.assertRaisesRegex(ValueError, "reference/enrichment"):
+                    fusion.fuse_documents([record])
+                with self.assertRaisesRegex(ValueError, "reference/enrichment"):
+                    fusion.build_public_event(None, [record])
+                enriched = fusion.attach_background(background_event, record)
+                self.assertEqual(enriched["background"][0]["period"], "2026-08")
+                self.assertEqual(enriched["background"][0]["role"], "BACKGROUND_ONLY")
+
+    def test_reconciliation_rejects_excluded_history_before_lkg_or_merge(self):
+        document = copy.deepcopy(self.fixture["traffic"])
+        event = fusion.fuse_documents([document])[0]
+        prohibited = []
+        for field, value in (("contains_personal_data", True), ("public_feed_allowed", False)):
+            prohibited.append({**event, field: value})
+        for source_id in ("NPA-14420", "NPA-STOLEN-VEHICLES", "NPA-LOST-PROPERTY"):
+            previous = copy.deepcopy(event)
+            previous["linked_document_versions"][0]["source_id"] = source_id
+            prohibited.append(previous)
+        prohibited.append({**event, "background": [{"dataset_id": "14420"}]})
+        for case, previous in enumerate(prohibited):
+            for documents, complete in (([], False), ([document], False), ([document], True)):
+                with self.subTest(case=case, complete=complete, documents=bool(documents)):
+                    original = copy.deepcopy(previous)
+                    with self.assertRaisesRegex(ValueError, "excluded"):
+                        fusion.reconcile_public_events([previous], documents, snapshot_complete=complete)
+                    self.assertEqual(previous, original)
 
     def test_assembly_parser_fuses_with_taichung_traffic_fixture(self):
         documents = adapters.parse_assembly_records(

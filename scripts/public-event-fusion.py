@@ -16,8 +16,12 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
+import sys
 from typing import Any
 from zoneinfo import ZoneInfo
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from intel_v2.npa_source_adapters import assert_public_canonical_allowed
 
 
 TZ = ZoneInfo("Asia/Taipei")
@@ -61,11 +65,15 @@ def bind_document_entities(document: dict[str, Any], registry: dict[str, Any]) -
         }
         if any(item not in known_ids for item in existing):
             raise ValueError(f"unknown {kind} entity ID")
+        jurisdiction = result.get(f"{kind}_jurisdiction") or result.get("jurisdiction")
+        if jurisdiction is not None and any(
+            module.resolve(registry, kind, item, jurisdiction)["status"] != "RESOLVED" for item in existing
+        ):
+            raise ValueError(f"{kind} entity ID conflicts with document jurisdiction")
         if labels is None:
             continue
         if not isinstance(labels, list) or any(not isinstance(label, str) or not label.strip() for label in labels):
             raise ValueError(f"{label_field} must be a string array")
-        jurisdiction = result.get(f"{kind}_jurisdiction") or result.get("jurisdiction")
         if not isinstance(jurisdiction, str) or not jurisdiction.strip():
             raise ValueError(f"{label_field} requires an explicit jurisdiction")
         resolved = []
@@ -113,6 +121,9 @@ def bind_document_entities(document: dict[str, Any], registry: dict[str, Any]) -
         active_locations = {entity["entity_id"] for entity in registry["entities"] if entity["kind"] == "location"}
         if district_id not in active_locations:
             raise ValueError("unknown district entity ID")
+        jurisdiction = result.get("location_jurisdiction") or result.get("jurisdiction")
+        if jurisdiction is not None and module.resolve(registry, "location", district_id, jurisdiction)["status"] != "RESOLVED":
+            raise ValueError("district entity ID conflicts with document jurisdiction")
     result["entity_registry"] = module.registry_receipt(registry)
     return result
 
@@ -232,6 +243,11 @@ def validate_document(document: dict[str, Any]) -> None:
     required = ("document_id", "document_version_id", "source_id", "title", "event_type")
     if not isinstance(document, dict):
         raise ValueError("document must be an object")
+    assert_public_canonical_allowed(document)
+    if (document.get("role") in {"PRIMARY_REFERENCE", "ENRICHMENT"}
+            or document.get("realtime_allowed") is False
+            or document.get("public_event_allowed") is False):
+        raise ValueError("reference/enrichment cannot enter canonical PublicEvent fusion")
     for field in required:
         if not isinstance(document.get(field), str) or not document[field].strip():
             raise ValueError(f"document missing {field}")
@@ -310,10 +326,12 @@ def _consistent_raw_value(documents: list[dict[str, Any]], field: str) -> str | 
     return sorted(values)[0]
 
 
-def _metadata_time(documents: list[dict[str, Any]], fields: tuple[str, ...]) -> str | None:
+def _metadata_time(documents: list[dict[str, Any]], fields: tuple[str, ...], *, latest: bool = False) -> str | None:
     values = [_stamp(doc.get(field)) for doc in documents for field in fields if doc.get(field)]
     values = [value for value in values if value]
-    return min(values) if values else None
+    if not values:
+        return None
+    return max(values) if latest else min(values)
 
 
 def _linked_documents(documents: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -427,7 +445,7 @@ def build_public_event(
         "conflict_fields": sorted(conflict_fields),
         "uncertain_fields": sorted(uncertain_fields),
         "created_at": _metadata_time(ordered, ("created_at", "observed_at")),
-        "updated_at": _metadata_time(ordered, ("updated_at", "observed_at")),
+        "updated_at": _metadata_time(ordered, ("updated_at", "observed_at"), latest=True),
         "manual_history": [],
         "background": [],
         "source_state": "CURRENT",
@@ -626,6 +644,12 @@ def reconcile_public_events(
     for previous in previous_events:
         if not isinstance(previous, dict) or not previous.get("public_event_id"):
             continue
+        assert_public_canonical_allowed(previous)
+        for source_id in previous.get("independent_source_ids", []):
+            assert_public_canonical_allowed({"source_id": source_id})
+        for record in (previous.get("linked_document_versions", [])
+                       + previous.get("background", []) + previous.get("source_provenance", [])):
+            assert_public_canonical_allowed(record)
         for link in previous.get("linked_document_versions", []):
             document_version_id = link.get("document_version_id") if isinstance(link, dict) else None
             if document_version_id:
@@ -791,6 +815,7 @@ def split_public_event(
 
 
 def attach_background(event: dict[str, Any], record: dict[str, Any]) -> dict[str, Any]:
+    assert_public_canonical_allowed(record)
     if event.get("fusion_status") != "CONFIRMED":
         raise ValueError("background enrichment requires a CONFIRMED public event")
     event_district = event.get("district_id")
@@ -895,7 +920,7 @@ def main() -> int:
     documents = payload.get("documents") if isinstance(payload, dict) else None
     if not isinstance(documents, list):
         raise SystemExit("input must be an object with a documents array")
-    registry = load_entity_registry(args.entity_registry) if args.entity_registry else None
+    registry = load_entity_registry(args.entity_registry)
     output = {"schema_version": 1, "public_events": fuse_documents(documents, entity_registry=registry)}
     text = json.dumps(output, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     if args.output:
