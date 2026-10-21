@@ -4,10 +4,14 @@ import test from "node:test";
 import { createHash } from "node:crypto";
 import { buildResearchRequest, researchEndpoint, researchDate, researchExplanation, requestResearch, validateResearchResponse, verifyResearchDocumentHashes } from "../lib/research-client.js";
 
-const release = { release_id: "b".repeat(64), code_sha: "a".repeat(40), publication_generation: "run-test" };
+const release = {
+  schema_version: 1, release_id: "b".repeat(64), code_sha: "a".repeat(40), publication_generation: "run-test",
+  publication_hash: "c".repeat(64), artifact_hashes: { feed: "d".repeat(64), status: "e".repeat(64), brief: "c".repeat(64) },
+  source_policy_hash: "f".repeat(64), query_generation: "1".repeat(64), evidence_catalog_hash: "2".repeat(64), built_at: "2026-10-01T00:00:00Z",
+};
 const context = { basePath: "/govintel", codeSha: release.code_sha, publicationGeneration: release.publication_generation };
 const source = { evidence_id: "PUB-item-1", source_id: "S-001", title: "測試公開索引", official_url: "https://www.police.taichung.gov.tw/example", published_at: "2026-10-01", data_as_of: null, fetched_at: "2026-10-05T08:00:00Z" };
-const metadata = { schema_version: 1, status: "METADATA_ONLY", reason_code: "DISABLED", provider: { name: "MiniMax", state: "DISABLED" }, question: "交通", answer: [], sources: [source], source_gaps: [{ source_id: "S-001", reason: "STALE_SOURCE_DATA", freshness_status: "STALE" }], query_generation_id: "generation-test", data_status: "STALE", coverage_limitation: "僅檢索核准快照，不代表全部事件。", release };
+const metadata = { schema_version: 1, status: "METADATA_ONLY", reason_code: "DISABLED", provider: { name: "MiniMax", state: "DISABLED" }, question: "交通", answer: [], sources: [source], source_gaps: [{ source_id: "S-001", reason: "STALE_SOURCE_DATA", freshness_status: "STALE" }], query_generation_id: release.query_generation, data_status: "STALE", coverage_limitation: "僅檢索核准快照，不代表全部事件。", release };
 const input = { question: "交通", history: [], publicDataOnly: true };
 function client(payload = metadata, calls = []) {
   return async (url, options) => {
@@ -99,6 +103,43 @@ test("missing context, consent and stale release block before posting", async ()
 
 test("a response release mismatch never returns model text", async () => {
   await assert.rejects(requestResearch("https://gateway.example", input, { ...context, fetchImpl: client({ ...metadata, release: { ...release, release_id: "different" } }) }), error => error.code === "PENDING_UPDATE");
+});
+
+test("research refuses changed or missing release bindings even with the same release ID", async () => {
+  const mutations = Object.keys(release).flatMap(field => [
+    value => { delete value[field]; },
+    value => { value[field] = field === "schema_version" ? 2 : "different"; },
+  ]);
+  for (const key of ["feed", "status", "brief"]) mutations.push(value => { value.artifact_hashes[key] = "0".repeat(64); });
+  for (const mutate of mutations) {
+    const changed = structuredClone(release); mutate(changed);
+    await assert.rejects(requestResearch("https://gateway.example", input, {
+      ...context, fetchImpl: client({ ...metadata, release: changed }),
+    }), error => error.code === "PENDING_UPDATE");
+  }
+});
+
+test("research rejects an incomplete manifest before posting the question", async () => {
+  for (const field of Object.keys(release)) {
+    let calls = 0;
+    const changed = { ...release }; delete changed[field];
+    await assert.rejects(requestResearch("https://gateway.example", input, {
+      ...context, fetchImpl: async () => { calls++; return Response.json(changed); },
+    }), error => error.code === "PENDING_UPDATE", field);
+    assert.equal(calls, 1);
+  }
+});
+
+test("research cannot show an old generation under the current release label", async () => {
+  for (const mode of ["metadata", "documents", "synthesis"]) {
+    const payload = mode === "metadata" ? metadata : hashedDocumentResponse(mode);
+    for (const value of ["old-generation", undefined]) {
+      const changed = { ...payload, query_generation_id: value };
+      await assert.rejects(requestResearch("https://gateway.example", { ...input, mode }, {
+        ...context, fetchImpl: client(changed),
+      }), error => error.code === "PENDING_UPDATE");
+    }
+  }
 });
 
 test("pre-aborted requests do no network work and in-flight cancellation stays distinguishable", async () => {
