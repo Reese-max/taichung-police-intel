@@ -11,6 +11,8 @@ import {
   projectReceiptSummary,
   projectSearchResults,
   projectTimeline,
+  validateLiveViewSession,
+  createLiveWatch,
 } from "../lib/live-session-view.js";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -87,4 +89,51 @@ test("formatStreamClock renders zero-padded stream relative time", () => {
   assert.equal(formatStreamClock(0), "stream+00:00:00");
   assert.equal(formatStreamClock(95.4), "stream+00:01:35");
   assert.equal(formatStreamClock(3661), "stream+01:01:01");
+});
+
+test("local session import fails closed on source identity and timeline overlap", () => {
+  assert.equal(validateLiveViewSession(liveFixture), liveFixture);
+  assert.throws(() => validateLiveViewSession({ ...liveFixture, source_id: "S-999" }), /source/i);
+  const changed = structuredClone(liveFixture);
+  changed.segments[1].start_seconds = 1;
+  assert.throws(() => validateLiveViewSession(changed), /overlap/i);
+});
+
+test("WATCH preserves the selected provisional revision without editing the session", () => {
+  const before = JSON.stringify(liveFixture);
+  const segment = liveFixture.segments[0];
+  const watch = createLiveWatch(liveFixture, segment.segment_id);
+  assert.equal(watch.status, "WATCH");
+  assert.equal(watch.provisional, true);
+  assert.equal(watch.stream_content_hash, liveFixture.stream_content_hash);
+  assert.equal(watch.session_revision, liveFixture.session_revision);
+  assert.equal(watch.text, segment.text);
+  assert.equal(watch.revision, segment.revision);
+  assert.equal(JSON.stringify(liveFixture), before);
+});
+
+test("seek URL credentials and invalid offsets degrade to time text", () => {
+  for (const seek of [
+    { kind: "STREAM_TIME", base_url: "https://user:secret@vod.tccc.gov.tw/a", offset_seconds: 0 },
+    { kind: "STREAM_TIME", base_url: "https://vod.tccc.gov.tw/a", offset_seconds: -1 },
+    { kind: "STREAM_TIME", base_url: "https://vod.tccc.gov.tw/a", offset_seconds: "invalid" },
+  ]) {
+    assert.equal(projectLocator({ ...liveFixture, seek }, liveFixture.segments[0]).kind, "TIME_TEXT");
+  }
+});
+
+test("malformed local JSON is rejected before React renders nested metadata", () => {
+  for (const mutate of [
+    (state) => { state.provider_usage = { calls: null }; },
+    (state) => { state.reconciliation_receipts = [null]; },
+    (state) => { state.segments[0].revision_history = [null]; },
+    (state) => { state.segments[0].profile_relevance = { matched_terms: [null] }; },
+    (state) => { state.status = {}; },
+    (state) => { state.budget_seconds = {}; },
+    (state) => { state.gap_intervals[0].reason = {}; },
+  ]) {
+    const state = structuredClone(liveFixture);
+    mutate(state);
+    assert.throws(() => validateLiveViewSession(state), /Invalid/);
+  }
 });
