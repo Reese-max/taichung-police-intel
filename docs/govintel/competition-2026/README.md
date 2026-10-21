@@ -37,6 +37,7 @@
 | 目標與成果是否混寫？ | [EVALUATION.md](EVALUATION.md)、[manifest template](evaluation-manifest.template.json) |
 | 哪些本輪驗證已完成、還缺什麼？ | [VERIFICATION.md](VERIFICATION.md)、[來源稽核](SOURCE_RELIABILITY_REVIEW_2026-10-05.md) |
 | 舊版本與本次新增？ | [OLD_VS_NEW.md](OLD_VS_NEW.md)、[Historical](../historical/README.md) |
+| 作品、素材、依賴與同意證據？ | [#166 權利覆核清冊](WORK_RIGHTS.md)；獲獎史與實際權利仍待確認，`issue_closable=false`。 |
 
 ## 歷史規劃與證據
 

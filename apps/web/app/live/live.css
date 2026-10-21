@@ -1,0 +1,9 @@
+.live-meeting { max-width: 70rem; margin: auto; padding: 1.5rem; overflow-wrap: anywhere; }
+.live-meeting label, .live-meeting small, .live-timeline span { display: block; margin-block: .5rem; }
+.live-meeting input { max-width: 100%; padding: .5rem; }
+.live-meeting button { margin: .4rem; padding: .5rem .8rem; cursor: pointer; }
+.live-meeting video { width: 100%; max-height: 25rem; }
+.live-badge { font-weight: 700; border-left: .3rem solid #a96900; padding: .6rem; }
+.live-timeline { padding-left: 1.4rem; }
+.live-timeline li { padding: 1rem; margin-block: .8rem; border: 1px solid #c2c8cf; border-radius: .5rem; }
+.live-timeline [data-kind="GAP"] { border-left: .3rem solid #a96900; }
