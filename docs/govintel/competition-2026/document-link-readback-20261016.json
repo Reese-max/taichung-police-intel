@@ -1,0 +1,337 @@
+{
+  "checked_at": "2026-10-16T01:13:56.104289+00:00",
+  "base_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+  "scope": "Read-only public HTTPS GET of external Markdown links in root README, top-level competition Markdown and historical index. No credentials, provider calls, form submission, source promotion, deployment or production hash acceptance. Each URL attempted once; query APIs may require parameters.",
+  "requests": [
+    {
+      "url": "https://data.gov.tw/dataset/5958",
+      "referenced_by": [
+        "docs/govintel/competition-2026/DATA_SOURCE_MATRIX.md"
+      ],
+      "body_saved": false,
+      "status": 200,
+      "final_url": "https://data.gov.tw/dataset/5958",
+      "bytes_read": 524087,
+      "body_sha256": "d712b835a0800269236ba970c5bb9f730ed648319a2ad0f1de08dadfe4569292",
+      "result": "READABLE"
+    },
+    {
+      "url": "https://data.gov.tw/dataset/83551",
+      "referenced_by": [
+        "docs/govintel/competition-2026/DATA_SOURCE_MATRIX.md"
+      ],
+      "body_saved": false,
+      "status": 200,
+      "final_url": "https://data.gov.tw/dataset/83551",
+      "bytes_read": 528571,
+      "body_sha256": "2610d3716a303d56418ea94f75546107fc8079e0d621fe7deb462a233719591d",
+      "result": "READABLE"
+    },
+    {
+      "url": "https://github.com/Reese-max/taichung-police-intel/actions/runs/37169331249",
+      "referenced_by": [
+        "docs/govintel/competition-2026/JUDGE_PATH.md"
+      ],
+      "body_saved": false,
+      "status": 200,
+      "final_url": "https://github.com/Reese-max/taichung-police-intel/actions/runs/37169331249",
+      "bytes_read": 223477,
+      "body_sha256": "f17722ad2c6a8d8e1593572644797240ee553eac9aeef7f5260c1be8a08d247f",
+      "result": "READABLE"
+    },
+    {
+      "url": "https://github.com/Reese-max/taichung-police-intel/actions/runs/37189085475",
+      "referenced_by": [
+        "docs/govintel/competition-2026/SOURCE_RELIABILITY_REVIEW_2026-10-05.md"
+      ],
+      "body_saved": false,
+      "status": 200,
+      "final_url": "https://github.com/Reese-max/taichung-police-intel/actions/runs/37189085475",
+      "bytes_read": 230207,
+      "body_sha256": "f9f6149a7182153da9e78de57633d5d78d05cee104654a59f9bae04e73c5c309",
+      "result": "READABLE"
+    },
+    {
+      "url": "https://github.com/Reese-max/taichung-police-intel/actions/runs/37212963039",
+      "referenced_by": [
+        "docs/govintel/competition-2026/JUDGE_PATH.md"
+      ],
+      "body_saved": false,
+      "status": 200,
+      "final_url": "https://github.com/Reese-max/taichung-police-intel/actions/runs/37212963039",
+      "bytes_read": 223477,
+      "body_sha256": "c07da7d8642c763afb326047094cbb6b865b6f8af601156bfc601a06ebb2606f",
+      "result": "READABLE"
+    },
+    {
+      "url": "https://github.com/Reese-max/taichung-police-intel/actions/runs/37472606240",
+      "referenced_by": [
+        "docs/govintel/competition-2026/VERIFICATION.md"
+      ],
+      "body_saved": false,
+      "status": 200,
+      "final_url": "https://github.com/Reese-max/taichung-police-intel/actions/runs/37472606240",
+      "bytes_read": 237635,
+      "body_sha256": "2e9cbc76f4dad5a998fe43984ed9db651ebd5cee2858a153f62e872c251d94cb",
+      "result": "READABLE"
+    },
+    {
+      "url": "https://github.com/Reese-max/taichung-police-intel/actions/runs/37615111747",
+      "referenced_by": [
+        "docs/govintel/competition-2026/CURRENT_STATUS.md",
+        "docs/govintel/competition-2026/CURRENT_STATUS.md"
+      ],
+      "body_saved": false,
+      "status": 200,
+      "final_url": "https://github.com/Reese-max/taichung-police-intel/actions/runs/37615111747",
+      "bytes_read": 235535,
+      "body_sha256": "8e0526eae9f9565b529449f362deedde4871173b65dd3a3622065bf5ab4f9f9b",
+      "result": "READABLE"
+    },
+    {
+      "url": "https://github.com/Reese-max/taichung-police-intel/issues/161",
+      "referenced_by": [
+        "docs/govintel/competition-2026/CURRENT_STATUS.md"
+      ],
+      "body_saved": false,
+      "status": 200,
+      "final_url": "https://github.com/Reese-max/taichung-police-intel/issues/161",
+      "bytes_read": 294463,
+      "body_sha256": "3b6471f68725f4316c12cbf0f4970aca54aee55ada209a510054225ebfd65292",
+      "result": "READABLE"
+    },
+    {
+      "url": "https://github.com/Reese-max/taichung-police-intel/issues/20",
+      "referenced_by": [
+        "README.md"
+      ],
+      "body_saved": false,
+      "status": 200,
+      "final_url": "https://github.com/Reese-max/taichung-police-intel/issues/20",
+      "bytes_read": 700645,
+      "body_sha256": "556ca1e4900446181cd5385a15a6b5a43b0a4bea28646110beca2eea8a96fdbf",
+      "result": "READABLE"
+    },
+    {
+      "url": "https://github.com/Reese-max/taichung-police-intel/issues/62",
+      "referenced_by": [
+        "README.md",
+        "docs/govintel/competition-2026/ACCEPTANCE_CHECKLIST.md",
+        "docs/govintel/competition-2026/CURRENT_STATUS.md",
+        "docs/govintel/competition-2026/PROPOSAL_MAPPING.md"
+      ],
+      "body_saved": false,
+      "status": 200,
+      "final_url": "https://github.com/Reese-max/taichung-police-intel/issues/62",
+      "bytes_read": 1181567,
+      "body_sha256": "02de5ac730a381a19a5fecd8c956ca997c0bc16c03d666cdcab8f46ec7384e70",
+      "result": "READABLE"
+    },
+    {
+      "url": "https://github.com/Reese-max/taichung-police-intel/pull/124",
+      "referenced_by": [
+        "docs/govintel/competition-2026/JUDGE_PATH.md"
+      ],
+      "body_saved": false,
+      "status": 200,
+      "final_url": "https://github.com/Reese-max/taichung-police-intel/pull/124",
+      "bytes_read": 458165,
+      "body_sha256": "c71d59b0ff89ab765c2b3cbea309f9a6fce886921fedcf1cddc8eee58eb893cc",
+      "result": "READABLE"
+    },
+    {
+      "url": "https://github.com/Reese-max/taichung-police-intel/pull/125",
+      "referenced_by": [
+        "docs/govintel/competition-2026/JUDGE_PATH.md"
+      ],
+      "body_saved": false,
+      "status": 200,
+      "final_url": "https://github.com/Reese-max/taichung-police-intel/pull/125",
+      "bytes_read": 369394,
+      "body_sha256": "ac9b19121cadbe5fb8c8ebcd88118ba386db67040d03d025dabbc72d53b6834b",
+      "result": "READABLE"
+    },
+    {
+      "url": "https://github.com/Reese-max/taichung-police-intel/pull/126",
+      "referenced_by": [
+        "docs/govintel/competition-2026/EVALUATION.md",
+        "docs/govintel/competition-2026/JUDGE_PATH.md"
+      ],
+      "body_saved": false,
+      "status": 200,
+      "final_url": "https://github.com/Reese-max/taichung-police-intel/pull/126",
+      "bytes_read": 413248,
+      "body_sha256": "a414dde0d503064e402d94ea0c5cc650adabd1792ffd7e7dc7544f9cae512d7d",
+      "result": "READABLE"
+    },
+    {
+      "url": "https://github.com/Reese-max/taichung-police-intel/pull/167",
+      "referenced_by": [
+        "docs/govintel/competition-2026/PROPOSAL_MAPPING.md"
+      ],
+      "body_saved": false,
+      "status": 200,
+      "final_url": "https://github.com/Reese-max/taichung-police-intel/pull/167",
+      "bytes_read": 309904,
+      "body_sha256": "af839e35daa13ec292ef4b4ffbff5c00fd27f4b161b7ce0c19fa3705f448f2b8",
+      "result": "READABLE"
+    },
+    {
+      "url": "https://github.com/Reese-max/taichung-police-intel/pull/168",
+      "referenced_by": [
+        "docs/govintel/competition-2026/CURRENT_STATUS.md"
+      ],
+      "body_saved": false,
+      "status": 200,
+      "final_url": "https://github.com/Reese-max/taichung-police-intel/pull/168",
+      "bytes_read": 311429,
+      "body_sha256": "fe99d36b07a50849f166135d8e8f844a2d8edd34a94e75a76a60e5d27f61ef7f",
+      "result": "READABLE"
+    },
+    {
+      "url": "https://reese-max.github.io/taichung-police-intel/",
+      "referenced_by": [
+        "README.md",
+        "docs/govintel/competition-2026/JUDGE_PATH.md"
+      ],
+      "body_saved": false,
+      "status": 200,
+      "final_url": "https://reese-max.github.io/taichung-police-intel/",
+      "bytes_read": 14669,
+      "body_sha256": "34545cead14d89ce264c5196155a5711a315c2aa7b0912343323d187bd995758",
+      "result": "READABLE"
+    },
+    {
+      "url": "https://reese-max.github.io/taichung-police-intel/data/source-status.json",
+      "referenced_by": [
+        "docs/govintel/competition-2026/JUDGE_PATH.md"
+      ],
+      "body_saved": false,
+      "status": 200,
+      "final_url": "https://reese-max.github.io/taichung-police-intel/data/source-status.json",
+      "bytes_read": 15272,
+      "body_sha256": "d4d309fc8f3863659fdcf2b77a71cb05298f3e519349c135f9ee45f06d95a6f3",
+      "result": "READABLE"
+    },
+    {
+      "url": "https://segis.moi.gov.tw/STATCloud/Index",
+      "referenced_by": [
+        "docs/govintel/competition-2026/DATA_SOURCE_MATRIX.md"
+      ],
+      "body_saved": false,
+      "status": 200,
+      "final_url": "https://segis.moi.gov.tw/STATCloud/Index",
+      "bytes_read": 30440,
+      "body_sha256": "54a522c240b922b9e8f7607184bf24e9cdd07f9a51fd638fa605c2d9387b397d",
+      "result": "READABLE"
+    },
+    {
+      "url": "https://ws.moi.gov.tw/Download.ashx?n=MjAyNuOAjOWFp%2BaUv%2Bm7keWuouadvuOAjea0u%2BWLlei%2BpueQhuioiOeVqy5wZGY%3D&u=LzAwMS9VcGxvYWQvNDAwL3JlbGZpbGUvOTAwOS8zNDA1ODEvMzYyMTcwNWMtZTkyNi00Zjc2LWE5YzktODhjZjk5OWYxOWUxLnBkZg%3D%3D",
+      "referenced_by": [
+        "docs/govintel/competition-2026/registration-verification-20261006.md"
+      ],
+      "body_saved": false,
+      "status": 200,
+      "final_url": "https://ws.moi.gov.tw/Download.ashx?n=MjAyNuOAjOWFp%2BaUv%2Bm7keWuouadvuOAjea0u%2BWLlei%2BpueQhuioiOeVqy5wZGY%3D&u=LzAwMS9VcGxvYWQvNDAwL3JlbGZpbGUvOTAwOS8zNDA1ODEvMzYyMTcwNWMtZTkyNi00Zjc2LWE5YzktODhjZjk5OWYxOWUxLnBkZg%3D%3D",
+      "bytes_read": 239747,
+      "body_sha256": "a6b49947cb0d1b3cd581920ec6c6ed97ff69a19ab5f059a30620741b256cae99",
+      "result": "READABLE"
+    },
+    {
+      "url": "https://ws.moi.gov.tw/Download.ashx?n=QUnlsI7lhaXmpa3li5nmh4nnlKjpoZjmma%2Fmp4vmg7Pmm7jnr4TkvosucGRm&u=LzAwMS9VcGxvYWQvNDAwL3JlbGZpbGUvOTAwOS8zNDA1ODEvMDRjMmQ3YTEtYmFkMC00ZDQ4LThiYWEtZmRjZTE4YjNiYzVmLnBkZg%3D%3D",
+      "referenced_by": [
+        "docs/govintel/competition-2026/registration-verification-20261006.md"
+      ],
+      "body_saved": false,
+      "status": 200,
+      "final_url": "https://ws.moi.gov.tw/Download.ashx?n=QUnlsI7lhaXmpa3li5nmh4nnlKjpoZjmma%2Fmp4vmg7Pmm7jnr4TkvosucGRm&u=LzAwMS9VcGxvYWQvNDAwL3JlbGZpbGUvOTAwOS8zNDA1ODEvMDRjMmQ3YTEtYmFkMC00ZDQ4LThiYWEtZmRjZTE4YjNiYzVmLnBkZg%3D%3D",
+      "bytes_read": 404385,
+      "body_sha256": "cab515b04296d7675795ef6022a724a46b2396ac75174e61cbf2b8cc03646192",
+      "result": "READABLE"
+    },
+    {
+      "url": "https://www.moi.gov.tw/News_Content.aspx?n=9&s=340581&sms=9009",
+      "referenced_by": [
+        "docs/govintel/competition-2026/registration-verification-20261006.md"
+      ],
+      "body_saved": false,
+      "status": 200,
+      "final_url": "https://www.moi.gov.tw/News_Content.aspx?n=9&s=340581&sms=9009",
+      "bytes_read": 95374,
+      "body_sha256": "3655bfd872fa640fb77794e9f9356d8c3464fae14f6c60d9aca739be395d9e88",
+      "result": "READABLE"
+    },
+    {
+      "url": "https://www.rdec.taichung.gov.tw/12047/12142/12145",
+      "referenced_by": [
+        "docs/govintel/competition-2026/DATA_SOURCE_MATRIX.md"
+      ],
+      "body_saved": false,
+      "status": 200,
+      "final_url": "https://www.rdec.taichung.gov.tw/12047/12142/12145",
+      "bytes_read": 91952,
+      "body_sha256": "b70d5d330650a882746c166db1d89bac00196d75ccca201ad7b9d9c795a9cf02",
+      "result": "READABLE"
+    },
+    {
+      "url": "https://www.tccc.gov.tw/",
+      "referenced_by": [
+        "docs/govintel/competition-2026/DATA_SOURCE_MATRIX.md"
+      ],
+      "body_saved": false,
+      "status": 200,
+      "final_url": "https://www.tccc.gov.tw/",
+      "bytes_read": 28805,
+      "body_sha256": "f4151ca47bc4eb8feae991543925e19708f658c328611996a776a7ae7d29f1c9",
+      "result": "READABLE"
+    },
+    {
+      "url": "https://www.tccc.gov.tw/wb_download13.asp?uno=&cno=49",
+      "referenced_by": [
+        "docs/govintel/competition-2026/DATA_SOURCE_MATRIX.md"
+      ],
+      "body_saved": false,
+      "status": 200,
+      "final_url": "https://www.tccc.gov.tw/wb_download13.asp?uno=&cno=49",
+      "bytes_read": 9796,
+      "body_sha256": "5ce8d1e12bc590c71755019c4a7c43ed863cee4837a225211ac0ce8e823d4d56",
+      "result": "READABLE"
+    },
+    {
+      "url": "https://www.tccc.gov.tw/wb_download13.asp?uno=&cno=50",
+      "referenced_by": [
+        "docs/govintel/competition-2026/DATA_SOURCE_MATRIX.md"
+      ],
+      "body_saved": false,
+      "status": 200,
+      "final_url": "https://www.tccc.gov.tw/wb_download13.asp?uno=&cno=50",
+      "bytes_read": 12452,
+      "body_sha256": "b3b605afb198426269006b7878fb898506bd215095a748227a0995df857342db",
+      "result": "READABLE"
+    },
+    {
+      "url": "https://yishi.tccc.gov.tw/api/ProceedingsBackWeb/FrontList",
+      "referenced_by": [
+        "docs/govintel/competition-2026/DATA_SOURCE_MATRIX.md"
+      ],
+      "body_saved": false,
+      "status": 400,
+      "final_url": "https://yishi.tccc.gov.tw/api/ProceedingsBackWeb/FrontList",
+      "bytes_read": 145,
+      "body_sha256": "72af97a143a204c8a8720964e177177f22c25028f2237e5151ad42fdcf04b721",
+      "result": "PARAMETER_REQUIRED"
+    },
+    {
+      "url": "https://yishi.tccc.gov.tw/api/Proposal/FrontList",
+      "referenced_by": [
+        "docs/govintel/competition-2026/DATA_SOURCE_MATRIX.md"
+      ],
+      "body_saved": false,
+      "status": 400,
+      "final_url": "https://yishi.tccc.gov.tw/api/Proposal/FrontList",
+      "bytes_read": 145,
+      "body_sha256": "72af97a143a204c8a8720964e177177f22c25028f2237e5151ad42fdcf04b721",
+      "result": "PARAMETER_REQUIRED"
+    }
+  ]
+}

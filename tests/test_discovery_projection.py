@@ -146,6 +146,16 @@ class DiscoveryProjectionTests(unittest.TestCase):
             json.dumps(second, ensure_ascii=False, sort_keys=True),
         )
 
+    def test_media_official_conflict_is_visible_in_pending_note(self):
+        documents = [*self.documents, {**self.documents[0], "document_id": "OTHER",
+                     "document_version_id": "OTHER:v1", "fact_fingerprint": "disagrees"}]
+        result = ingest_feed(self.feed, official_documents=documents, now=NOW)
+        payload = project_discovery_signals(result, now=NOW)
+        media = next(row for row in payload["pending"] if row["candidate_id"] == "gd-1111111111111111")
+        self.assertEqual(media["verification_status"], "DISCOVERY_UNVERIFIED")
+        self.assertEqual(media["note"], "官方來源不一致，待人工判定")
+        self.assertEqual(payload["counts"]["conflict_count"], 1)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -317,10 +317,12 @@ def _consistent_raw_value(documents: list[dict[str, Any]], field: str) -> str | 
     return sorted(values)[0]
 
 
-def _metadata_time(documents: list[dict[str, Any]], fields: tuple[str, ...]) -> str | None:
+def _metadata_time(documents: list[dict[str, Any]], fields: tuple[str, ...], *, latest: bool = False) -> str | None:
     values = [_stamp(doc.get(field)) for doc in documents for field in fields if doc.get(field)]
     values = [value for value in values if value]
-    return min(values) if values else None
+    if not values:
+        return None
+    return max(values) if latest else min(values)
 
 
 def _linked_documents(documents: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -434,7 +436,7 @@ def build_public_event(
         "conflict_fields": sorted(conflict_fields),
         "uncertain_fields": sorted(uncertain_fields),
         "created_at": _metadata_time(ordered, ("created_at", "observed_at")),
-        "updated_at": _metadata_time(ordered, ("updated_at", "observed_at")),
+        "updated_at": _metadata_time(ordered, ("updated_at", "observed_at"), latest=True),
         "manual_history": [],
         "background": [],
         "source_state": "CURRENT",

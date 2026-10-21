@@ -342,6 +342,25 @@ class PublicEventFusionTests(unittest.TestCase):
         self.assertEqual(before["public_event_id"], after["public_event_id"])
         self.assertNotEqual(before["linked_document_versions"], after["linked_document_versions"])
 
+    def test_event_updated_at_uses_latest_source_revision_or_observation(self):
+        older = document("CITY")
+        older.update({
+            "created_at": "2026-09-18T09:00:00+08:00",
+            "updated_at": "2026-09-20T09:00:00+08:00",
+            "observed_at": "2026-09-20T09:05:00+08:00",
+        })
+        newer = document("POLICE")
+        newer.update({
+            "created_at": "2026-09-19T10:00:00+08:00",
+            "updated_at": "2026-09-21T16:00:00+08:00",
+            "observed_at": "2026-09-21T16:10:00+08:00",
+        })
+
+        event = fusion.fuse_documents([older, newer])[0]
+
+        self.assertEqual(event["created_at"], "2026-09-18T09:00:00+08:00")
+        self.assertEqual(event["updated_at"], "2026-09-21T16:10:00+08:00")
+
     def test_input_order_preserves_event_identity_and_link_order(self):
         documents = [document("CITY"), document("POLICE"), document("TRAFFIC")]
         first = fusion.fuse_documents(documents)[0]
