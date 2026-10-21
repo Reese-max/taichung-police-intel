@@ -8,11 +8,15 @@ server-controlled match list.
 from __future__ import annotations
 
 import hashlib
+import copy
+import importlib.util
 import json
 import math
 import re
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 from intel_v2.entity_binding import registry_runtime
 
@@ -40,6 +44,7 @@ DISCOVERY_ID = re.compile(r"^gd-[0-9a-f]{16}$")
 SHA256 = re.compile(r"^sha256:[0-9a-f]{64}$")
 TAICHUNG = re.compile(r"臺中|台中")
 RELEVANCE_TERMS = ("警政", "警察", "反詐", "詐騙", "消防", "道路", "交通", "災防", "NCDR", "氣象")
+RELEVANT_CATEGORIES = {"交通", "治安", "反詐", "災防", "社會", "資安"}
 MATERIAL_FIELDS = (
     "title", "event_time", "region", "lat", "lng", "location_precision", "category",
     "source_url", "publisher_name", "authority", "original_dataset_id", "record_ref",
@@ -221,29 +226,26 @@ def load_feed(path: str) -> dict[str, Any]:
 
 def generation_id(feed: dict[str, Any]) -> str:
     validated = validate_feed(feed)
-    material = {
-        "schema_version": validated["schema_version"],
-        "generated_at": validated["generated_at"],
-        "operating_state": validated["operating_state"],
-        "stale": validated["stale"],
-        "source_snapshot_hash": validated["source_snapshot_hash"],
-        "item_ids": sorted(item["discovery_id"] for item in validated["items"]),
-    }
-    return "gdf-" + _digest(material)[:24]
+    return "gdf-" + _digest(validated)[:24]
 
 
 def _relevance(item: dict[str, Any]) -> tuple[bool, str]:
+    # ponytail: literal category/geography gate; extend terms after measured canary misses.
+    if item.get("category") not in RELEVANT_CATEGORIES:
+        return False, "OUT_OF_SCOPE_CATEGORY"
+    text = " ".join(str(item.get(field) or "") for field in ("title", "category", "topic", "publisher_name"))
+    public_service = any(term in text for term in RELEVANCE_TERMS)
+    if item["category"] == "社會" and not public_service:
+        return False, "NO_PUBLIC_SERVICE_RELEVANCE"
+    if public_service and any(term in text for term in ("全國", "全臺", "全台", "各縣市", "各警察局", "地方政府")):
+        return True, "NATIONWIDE_PUBLIC_SERVICE_IMPACT"
     region = str(item.get("region") or "")
     if TAICHUNG.search(region):
         return True, "TAICHUNG_REGION"
     if region and ("市" in region or "縣" in region):
         return False, "OUT_OF_SCOPE_REGION"
-    text = " ".join(str(item.get(field) or "") for field in ("title", "category", "summary", "topic", "publisher_name"))
     if TAICHUNG.search(text):
         return True, "TAICHUNG_REFERENCE"
-    for term in RELEVANCE_TERMS:
-        if term in text:
-            return True, f"PUBLIC_SAFETY_TERM:{term}"
     return False, "OUT_OF_SCOPE"
 
 
@@ -347,12 +349,20 @@ def classify_change(previous: dict[str, Any] | None, current: dict[str, Any]) ->
 
 
 def _validate_official_documents(documents: list[dict[str, Any]]) -> None:
+    if not isinstance(documents, list):
+        raise DiscoveryFeedError("official_documents must be an array")
     for index, document in enumerate(documents):
         if not isinstance(document, dict):
             raise DiscoveryFeedError(f"official_documents[{index}] must be an object")
         required = {"document_id", "document_version_id", "source_id", "authority"}
         if not required.issubset(document) or document["authority"] != "official":
             raise DiscoveryFeedError(f"official_documents[{index}] is not server-controlled official evidence")
+        for field in ("document_id", "document_version_id", "source_id", "official_url"):
+            if not isinstance(document.get(field), str) or not document[field].strip():
+                raise DiscoveryFeedError(f"official_documents[{index}] missing {field}")
+        url = urlsplit(document["official_url"])
+        if url.scheme != "https" or not url.hostname or url.username or url.password:
+            raise DiscoveryFeedError(f"official_documents[{index}] requires an original HTTPS official_url")
 
 
 def _document_matches(candidate: dict[str, Any], document: dict[str, Any]) -> bool:
@@ -528,8 +538,12 @@ def ingest_feed(
     module.validate_registry(registry)
     registry_receipt = module.registry_receipt(registry)
     previous = _previous_state(previous_state)
-    documents = official_documents or []
+    documents = official_documents if official_documents is not None else []
     _validate_official_documents(documents)
+    prior_receipt = previous.get("last_receipt", {}) if previous else {}
+    documents_hash = (_digest(sorted(documents, key=_canonical)) if documents
+                      else prior_receipt.get("official_documents_hash", _digest([])))
+    documents_changed = bool(documents) and documents_hash != prior_receipt.get("official_documents_hash")
     if not _is_int(ttl_hours) or not 1 <= ttl_hours <= MAX_TTL_HOURS:
         raise ValueError(f"ttl_hours must be between 1 and {MAX_TTL_HOURS}")
     if not _is_int(max_candidates) or not 1 <= max_candidates <= MAX_CANDIDATES_PER_SNAPSHOT:
@@ -565,6 +579,7 @@ def ingest_feed(
             and last_receipt.get("ttl_hours") == ttl_hours
             and last_receipt.get("max_candidates") == max_candidates
             and last_receipt.get("retained_candidate_limit") == max_retained_candidates
+            and not documents_changed
         )
         if (last_receipt.get("entity_registry") == registry_receipt and same_execution
                 and not last_receipt.get("state_truncated")):
@@ -573,6 +588,7 @@ def ingest_feed(
             if retained_active == previous_active:
                 replay_receipt = dict(last_receipt)
                 replay_receipt["replayed"] = True
+                replay_receipt["consumed_at"] = _iso(reference_now)
                 replay_state = {**previous, "candidates": previous_candidates, "active_candidates": retained_active}
                 replay_candidates = [previous_candidates[item] for item in retained_active]
                 return {"state": replay_state, "candidates": replay_candidates,
@@ -580,6 +596,7 @@ def ingest_feed(
 
     projected = [candidate_from_item(validated, item, ttl_hours, entity_registry=registry) for item in validated["items"]]
     projected = [candidate for candidate in projected if candidate["relevant"]]
+    relevant_count = len(projected)
     projected.sort(key=lambda candidate: (candidate.get("event_time") is not None, candidate.get("event_time") or "", candidate["candidate_id"]), reverse=True)
     truncated = len(projected) > max_candidates
     projected = projected[:max_candidates]
@@ -590,10 +607,14 @@ def ingest_feed(
     registry_rebound: list[str] = []
     verification_calls: list[str] = []
     expired_ids: list[str] = []
+    confirmation_latency: list[float] = []
     for candidate in projected:
         candidate["upstream_mode"] = mode
         candidate["historical_only"] = mode == "HISTORICAL_REPLAY"
         old = previous_candidates.get(candidate["candidate_id"])
+        candidate["first_discovered_at"] = old.get("first_discovered_at", _iso(reference_now)) if old else _iso(reference_now)
+        if old and old.get("official_confirmed_at"):
+            candidate["official_confirmed_at"] = old["official_confirmed_at"]
         change = classify_change(old, candidate)
         if (old is not None and old.get("candidate_entities", {}).get("registry_hash")
                 != candidate["candidate_entities"]["registry_hash"]):
@@ -614,7 +635,7 @@ def ingest_feed(
             or (operating_state == "PAUSED" and historical_replay)
             or canary_only
         )
-        if old is not None and change != "MATERIAL_DISCOVERY_CHANGE" and not state_changed and not historical_replay and not canary_only:
+        if old is not None and change != "MATERIAL_DISCOVERY_CHANGE" and not state_changed and not historical_replay and not canary_only and not documents_changed:
             candidate["verification_status"] = old.get("verification_status", candidate["verification_status"])
             for key in ("official_match_status", "verification_sources_checked", "official_document_versions",
                         "official_document_provenance", "official_urls", "independent_source_count", "verification_reason",
@@ -646,6 +667,10 @@ def ingest_feed(
                     "RESTORING": "RESTORING_CANARY_REQUIRED",
                     "DEGRADED": "UPSTREAM_DEGRADED_GAP",
                 }[operating_state]
+        if mode == "CURRENT" and candidate.get("official_match_status") == "VERIFIED_OFFICIAL" and not candidate.get("official_confirmed_at"):
+            candidate["official_confirmed_at"] = _iso(reference_now)
+            discovered_at = _timestamp(candidate["first_discovered_at"], "first_discovered_at")
+            confirmation_latency.append(max(0, (reference_now - discovered_at).total_seconds()))
         candidates.append(candidate)
 
     verified_all = [candidate for candidate in candidates if candidate.get("official_match_status") == "VERIFIED_OFFICIAL"]
@@ -682,6 +707,8 @@ def ingest_feed(
         "upstream_feed_id": FEED_ID,
         "upstream_generation_id": current_generation,
         "upstream_content_hash": validated["source_snapshot_hash"],
+        "official_documents_hash": documents_hash,
+        "consumed_at": _iso(reference_now),
         "upstream_sequence": None,
         "candidate_added": added,
         "candidate_updated": updated,
@@ -691,7 +718,9 @@ def ingest_feed(
         "verification_calls": verification_calls,
         "ttl_hours": ttl_hours,
         "max_candidates": max_candidates,
-        "relevant_count": len(candidates),
+        "relevant_count": relevant_count,
+        "candidate_admitted_count": len(candidates),
+        "confirmation_latency_seconds": confirmation_latency,
         "official_match_count": len(verified),
         "historical_official_match_count": historical_verified_count,
         "canary_match_count": canary_results.count("OFFICIAL_MATCH"),
@@ -734,24 +763,131 @@ def ingest_feed(
     return {"state": state, "candidates": candidates, "receipt": receipt, "replayed": False}
 
 
+def link_official_events(
+    result: dict[str, Any],
+    official_documents: list[dict[str, Any]],
+    *,
+    existing_public_events: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Project matched canonical documents through #24; never write an event/version.
+
+    The normalized documents and existing events are server-controlled inputs,
+    not Dashboard fields. Existing events are used only to link identities.
+    """
+    _validate_official_documents(official_documents)
+    existing = existing_public_events if existing_public_events is not None else []
+    if not isinstance(existing, list) or any(not isinstance(event, dict) or not event.get("public_event_id") for event in existing):
+        raise DiscoveryFeedError("existing_public_events must contain event identities")
+    spec = importlib.util.spec_from_file_location("discovery_public_event_fusion", Path(__file__).resolve().parents[1] / "scripts/public-event-fusion.py")
+    if spec is None or spec.loader is None:
+        raise DiscoveryFeedError("PublicEvent fusion runtime is unavailable")
+    fusion = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(fusion)
+    linked = copy.deepcopy(result)
+    eligible = [row for row in linked["candidates"] if row.get("upstream_mode") == "CURRENT"
+                and row.get("verification_status") != "EXPIRED"
+                and row.get("official_match_status") in {"VERIFIED_OFFICIAL", "CONFLICT"}]
+    provenance = [document for row in eligible for document in row["official_document_provenance"]]
+    normalized = []
+    identity_fields = ("document_id", "document_version_id", "source_id", "official_url")
+    for document in official_documents:
+        matches = [row for row in provenance if row["document_version_id"] == document["document_version_id"]]
+        if not matches:
+            continue
+        if not any(all(row.get(field) == document.get(field) for field in identity_fields) for row in matches):
+            raise DiscoveryFeedError("event document identity disagrees with verified official provenance")
+        try:
+            fusion.validate_document(document)
+        except ValueError as exc:
+            raise DiscoveryFeedError(f"invalid normalized official document: {exc}") from exc
+        projected = copy.deepcopy(document)
+        projected["acquisition_paths"] = sorted(set(fusion._acquisition_paths(document)) | {DISCOVERY_SOURCE})
+        normalized.append(projected)
+    events = fusion.fuse_documents(normalized)
+    existing_by_id = {event["public_event_id"]: event for event in existing}
+    projected_by_id = {}
+    for event in events:
+        versions = {row["document_version_id"] for row in event["linked_document_versions"]}
+        # Exact official versions retain their canonical owner after manual merge/split.
+        owners = {prior["public_event_id"] for prior in existing
+                  if any(row.get("document_version_id") in versions for row in prior.get("linked_document_versions", []))}
+        if len(owners) > 1:
+            raise DiscoveryFeedError("ambiguous existing public event ownership")
+        event_id = next(iter(owners), event["public_event_id"])
+        prior = existing_by_id.get(event_id)
+        conflict = event["fusion_status"] == "CONFLICT" or any(
+            row.get("official_match_status") == "CONFLICT" and versions.intersection(row["official_document_versions"])
+            for row in eligible
+        )
+        if prior:
+            event = fusion._overlay_event_evidence(prior, event)
+            event.update(source_state="PARTIAL_LKG", lkg=True)
+        if conflict:
+            event["fusion_status"] = "CONFLICT"
+            event["conflict_fields"] = sorted(set(event["conflict_fields"]) | {"official_provenance"})
+        event["public_event_id"] = event_id
+        if event_id in projected_by_id:
+            event = fusion._overlay_event_evidence(event, projected_by_id[event_id])
+            if projected_by_id[event_id]["fusion_status"] == "CONFLICT":
+                event["fusion_status"] = "CONFLICT"
+        projected_by_id[event_id] = event
+    events = sorted(projected_by_id.values(), key=lambda event: event["public_event_id"])
+    for candidate in eligible:
+        versions = set(candidate["official_document_versions"])
+        candidate["public_event_ids"] = [event["public_event_id"] for event in events
+                                         if any(row["document_version_id"] in versions for row in event["linked_document_versions"])]
+        candidate["matched_existing"] = any(event_id in existing_by_id for event_id in candidate["public_event_ids"])
+    linked["public_events"] = events
+    linked["receipt"].update(
+        public_event_projection_only=True,
+        new_public_event_count=sum(event["public_event_id"] not in existing_by_id for event in events),
+        existing_event_match_count=sum(event["public_event_id"] in existing_by_id for event in events),
+    )
+    return linked
+
+
 def summarize_canary(receipts: list[dict[str, Any]], *, window_days: int = 14) -> dict[str, Any]:
     """Produce denominator-preserving metrics for a bounded canary window."""
 
     if not _is_int(window_days) or window_days < 1:
         raise ValueError("window_days must be positive")
+    if not isinstance(receipts, list) or any(not isinstance(item, dict) for item in receipts):
+        raise DiscoveryFeedError("canary receipts must be an array of objects")
+    dated = [(item, _timestamp(item.get("consumed_at"), "consumed_at")) for item in receipts]
+    dates = [stamp.date() for _, stamp in dated if stamp is not None]
+    start = max(dates) - timedelta(days=window_days - 1) if dates else None
+    receipts = [item for item, stamp in dated if stamp is None or stamp.date() >= start]
+    observations = [item for item in receipts if not item.get("replayed")]
+    latencies = [value for item in observations for value in item.get("confirmation_latency_seconds", [])]
+    if any(isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0 for value in latencies):
+        raise DiscoveryFeedError("confirmation latency must be finite nonnegative seconds")
+    counters = ("feed_item_count", "relevant_count", "candidate_admitted_count", "official_match_count",
+                "new_public_event_count", "conflict_count", "no_official_match_count", "canonical_change_count",
+                "actionable_change_count", "tracking_count", "false_positive_count", "existing_event_match_count")
+    if any(not _is_int(item.get(field, 0)) or item.get(field, 0) < 0 for item in observations for field in counters):
+        raise DiscoveryFeedError("canary counters must be nonnegative integers")
+    days = sorted({_timestamp(item["consumed_at"], "consumed_at").date() for item in receipts if item.get("consumed_at")})
+    missing_denominator = sum("feed_item_count" not in item for item in observations)
+    missing_timestamp = sum(not item.get("consumed_at") for item in receipts)
     status_values = sorted({str(item.get("status") or "UNKNOWN") for item in receipts})
     return {
         "schema_version": 1,
         "window_days": window_days,
         "run_count": len(receipts),
-        "candidate_added": sum(len(item.get("candidate_added", [])) for item in receipts),
-        "relevant_count": sum(int(item.get("relevant_count", 0)) for item in receipts),
-        "official_match_count": sum(int(item.get("official_match_count", 0)) for item in receipts),
-        "duplicate_existing_event_count": sum(int(item.get("existing_event_match_count", 0)) for item in receipts),
-        "new_public_event_count": sum(int(item.get("new_public_event_count", 0)) for item in receipts),
-        "conflict_count": sum(int(item.get("conflict_count", 0)) for item in receipts),
-        "no_official_match_count": sum(int(item.get("no_official_match_count", 0)) for item in receipts),
-        "canonical_change_count": sum(int(item.get("canonical_change_count", 0)) for item in receipts),
+        "metric_basis": "NON_REPLAYED_CANDIDATE_OBSERVATIONS",
+        "production_verified": False,
+        "observed_day_count": len(days),
+        "coverage_start": days[0].isoformat() if days else None,
+        "coverage_end": days[-1].isoformat() if days else None,
+        "window_complete": len(days) == window_days and not missing_denominator and not missing_timestamp,
+        "replayed_run_count": len(receipts) - len(observations),
+        "missing_denominator_run_count": missing_denominator,
+        "missing_timestamp_run_count": missing_timestamp,
+        "candidate_added": sum(len(item.get("candidate_added", [])) for item in observations),
+        **{field: sum(item.get(field, 0) for item in observations) for field in counters if field != "existing_event_match_count"},
+        "duplicate_existing_event_count": sum(int(item.get("existing_event_match_count", 0)) for item in observations),
+        "confirmation_latency_seconds": {"count": len(latencies), "total": sum(latencies),
+                                         "mean": sum(latencies) / len(latencies) if latencies else None},
         "status_counts": {
             status: sum(str(item.get("status") or "UNKNOWN") == status for item in receipts)
             for status in status_values

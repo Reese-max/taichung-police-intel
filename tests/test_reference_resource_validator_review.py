@@ -3,8 +3,11 @@ import csv
 import hashlib
 import importlib.util
 import io
+import json
 from pathlib import Path
 import struct
+import subprocess
+import sys
 import tempfile
 import unittest
 import zipfile
@@ -19,6 +22,85 @@ class IndependentValidatorReviewTests(unittest.TestCase):
                 'declared_sha256': hashlib.sha256(body).hexdigest(), 'schema': ['id','period','POINT_X','POINT_Y'],
                 'id_fields': ['id'], 'expected_row_count': 1, 'period_evidence': {'field':'period','value':'fictional'},
                 'coordinate_fields': ['POINT_X','POINT_Y'], 'acquisition': {'status':'LOCAL_BYTES','http_status':200}}
+
+    def test_cli_rejects_output_aliases_and_preserves_plan_and_original_bytes(self):
+        body = b'id,period,POINT_X,POINT_Y\na,fictional,121,24\n'
+        for input_name in ('plan.json', 'original.csv'):
+            for alias_kind in ('same', 'relative', 'hardlink', 'symlink'):
+                with self.subTest(input=input_name, alias=alias_kind), tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    plan, resource = root / 'plan.json', root / 'original.csv'
+                    plan.write_text(json.dumps(self.plan(body)), encoding='utf-8')
+                    resource.write_bytes(body)
+                    before = {path: path.read_bytes() for path in (plan, resource)}
+                    original = root / input_name
+                    output = original
+                    if alias_kind == 'relative':
+                        (root / 'nested').mkdir()
+                        output = root / 'nested' / '..' / input_name
+                    elif alias_kind in ('hardlink', 'symlink'):
+                        output = root / 'receipt.json'
+                        try:
+                            if alias_kind == 'hardlink':
+                                output.hardlink_to(original)
+                            else:
+                                output.symlink_to(original)
+                        except OSError as exc:
+                            self.skipTest(f'{alias_kind} unavailable: {exc}')
+                    result = subprocess.run([sys.executable, m.__file__, '--plan', str(plan),
+                                             '--resource', str(resource), '--out', str(output)],
+                                            capture_output=True, text=True, encoding='utf-8')
+                    self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                    self.assertIn('aliases the original input', result.stderr)
+                    self.assertEqual(result.stdout, '')
+                    for path, expected in before.items():
+                        self.assertEqual(path.read_bytes(), expected)
+
+    def test_cli_receipt_replaces_output_links_without_mutating_their_targets(self):
+        body = b'id,period,POINT_X,POINT_Y\na,fictional,121,24\n'
+        for alias_kind in ('hardlink', 'symlink'):
+            with self.subTest(alias=alias_kind), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                plan, resource, output, previous = (root / name for name in
+                                                     ('plan.json', 'original.csv', 'receipt.json', 'previous.json'))
+                plan.write_text(json.dumps(self.plan(body)), encoding='utf-8')
+                resource.write_bytes(body)
+                previous.write_bytes(b'previous receipt')
+                try:
+                    if alias_kind == 'hardlink':
+                        output.hardlink_to(previous)
+                    else:
+                        output.symlink_to(previous)
+                except OSError as exc:
+                    self.skipTest(f'{alias_kind} unavailable: {exc}')
+                result = subprocess.run([sys.executable, m.__file__, '--plan', str(plan),
+                                         '--resource', str(resource), '--out', str(output)],
+                                        capture_output=True, text=True, encoding='utf-8')
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(previous.read_bytes(), b'previous receipt')
+                receipt = json.loads(output.read_text(encoding='utf-8'))
+                self.assertEqual(receipt, json.loads(result.stdout))
+                self.assertEqual(receipt['actual_bytes_sha256'], hashlib.sha256(body).hexdigest())
+                self.assertFalse(output.is_symlink())
+                self.assertFalse(receipt['production_active'])
+
+    def test_cli_blocked_resource_still_writes_an_honest_partial_receipt(self):
+        plan = self.plan(b'fictional')
+        plan.update(declared_sha256=None, expected_row_count=None,
+                    metadata={'http_status': 200, 'sha256': '0' * 64},
+                    acquisition={'status': 'BLOCKED', 'http_status': 403})
+        with tempfile.TemporaryDirectory() as directory:
+            plan_path, output = (Path(directory) / name for name in ('plan.json', 'receipt.json'))
+            plan_path.write_text(json.dumps(plan), encoding='utf-8')
+            result = subprocess.run([sys.executable, m.__file__, '--plan', str(plan_path), '--out', str(output)],
+                                    capture_output=True, text=True, encoding='utf-8')
+            self.assertEqual(result.returncode, 2, result.stderr)
+            receipt = json.loads(output.read_text(encoding='utf-8'))
+            self.assertEqual(receipt, json.loads(result.stdout))
+            self.assertEqual(receipt['acquisition'], 'BLOCKED')
+            self.assertIsNone(receipt['resource_rows'])
+            self.assertEqual(receipt['coordinate_reference_system'], 'UNKNOWN')
+            self.assertFalse(receipt['completeness'])
 
     def test_positive_fixture_is_only_a_local_plan_contract(self):
         body=b'id,period,POINT_X,POINT_Y\na,fictional,121,24\n'

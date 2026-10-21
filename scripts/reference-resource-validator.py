@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import csv
 import hashlib
+import importlib.util
 import io
 import json
 import math
@@ -554,7 +555,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--plan", required=True, type=Path, help="Path to the evidence plan JSON")
     parser.add_argument("--resource", required=False, type=Path, default=None, help="Optional local CSV path")
-    parser.add_argument("--out", required=False, type=Path, default=None, help="Optional JSON receipt path")
+    parser.add_argument("--out", required=False, type=Path, default=None, help="Optional JSON receipt path, distinct from both inputs")
     return parser
 
 
@@ -567,13 +568,23 @@ def main(argv: list[str] | None = None) -> int:
         print(f"resource not found: {args.resource}", file=sys.stderr)
         return 2
     try:
+        if args.out is not None:
+            scope_spec = importlib.util.spec_from_file_location("source_scope_contracts", Path(__file__).with_name("source-scope-contracts.py"))
+            scope = importlib.util.module_from_spec(scope_spec)
+            scope_spec.loader.exec_module(scope)
+            for input_path in (args.plan, args.resource):
+                if input_path is not None:
+                    scope.reject_output_input_alias(input_path, args.out)
         receipt = validate_files(args.plan, args.resource)
-    except ValueError as exc:
+        if args.out is not None:
+            csv_spec = importlib.util.spec_from_file_location("csv_audit_io", Path(__file__).with_name("reference-csv-audit.py"))
+            csv_audit = importlib.util.module_from_spec(csv_spec)
+            csv_spec.loader.exec_module(csv_audit)
+            csv_audit.write_json(args.out, receipt)
+    except (ValueError, OSError) as exc:
         print(str(exc), file=sys.stderr)
         return 2
     text = json.dumps(receipt, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
-    if args.out is not None:
-        args.out.write_text(text, encoding="utf-8")
     sys.stdout.write(text)
     return 0 if receipt["completeness"] else 2
 

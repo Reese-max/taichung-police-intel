@@ -2,11 +2,15 @@ from datetime import datetime, timezone
 import importlib.util
 import json
 from pathlib import Path
+import subprocess
+import sys
 import unittest
 import tempfile
 from governed_policy_fixture import make_governed_policy_fixture, load_fixture_module, bind_checked_in_publication
 
 from intel_v2.entity_binding import registry_runtime
+from intel_v2.discovery_adapter import ingest_feed
+from test_public_event_fusion import document
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -124,6 +128,56 @@ class QueryGatewayDomainTests(unittest.TestCase):
         self.assertEqual(web["entity_resolution"]["district"]["entity_id"], "location:tc-xitun")
         with self.assertRaisesRegex(gateway_module.GatewayError, "unique confirmed"):
             gateway.execute("search_events", {"district": "不存在的路"})
+
+    def test_default_fusion_cli_discovery_web_and_mcp_share_registry_identity(self):
+        receipt = registry_runtime().registry_receipt(registry_runtime().load_registry())
+        documents = []
+        for source_id, alias, origin in (
+            ("S-001", "中市警", "https://www.police.taichung.gov.tw"),
+            ("S-032", "臺中市警局", "https://www.traffic.taichung.gov.tw"),
+        ):
+            row = document(source_id)
+            row.update(jurisdiction="臺中市", agency_ids=[], location_ids=[],
+                       agency_labels=[alias], location_labels=["台中市西屯區"],
+                       official_url=f"{origin}/fictional/entity-identity-replay")
+            documents.append(row)
+        with tempfile.TemporaryDirectory(prefix="entity-identity-replay-") as directory:
+            input_path = Path(directory) / "documents.json"
+            input_path.write_text(json.dumps({"documents": documents}, ensure_ascii=False), encoding="utf-8")
+            result = subprocess.run(
+                [sys.executable, "-X", "utf8", str(ROOT / "scripts/public-event-fusion.py"), "--input", str(input_path)],
+                cwd=ROOT, capture_output=True, text=True, encoding="utf-8", timeout=30,
+            )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        events = json.loads(result.stdout)["public_events"]
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0].get("entity_registry"), receipt)
+        self.assertEqual(events[0]["agency_ids"], ["agency:tc-police"])
+        self.assertEqual(events[0]["location_ids"], ["location:tc-xitun"])
+
+        feed = json.loads((ROOT / "tests/fixtures/discovery/dashboard-feed.v1.json").read_text(encoding="utf-8"))
+        feed["items"][0]["entities"] = ["臺中市警局", "台中市西屯區"]
+        discovery = ingest_feed(feed, official_documents=[], now=self.gateway.clock())
+        candidate = next(row for row in discovery["candidates"] if row["candidate_id"] == feed["items"][0]["discovery_id"])
+        self.assertEqual(discovery["receipt"]["entity_registry"], receipt)
+        for field in ("agency_ids", "location_ids"):
+            self.assertEqual(candidate["candidate_entities"][field], events[0][field])
+        self.assertEqual(candidate["verification_status"], "DISCOVERY_UNVERIFIED")
+        self.assertFalse(candidate["canonical_write"])
+
+        snapshot = gateway_module.load_snapshot()
+        snapshot["event_store"] = gateway_module.query_domain.build_event_store(events)
+        gateway = gateway_module.QueryGateway(snapshot=snapshot, clock=self.gateway.clock)
+        arguments = {"district": "西屯", "agency": "臺中市政府警察局"}
+        web = gateway.execute("search_events", arguments)
+        mcp = gateway_module.dispatch_mcp(gateway, {
+            "jsonrpc": "2.0", "id": 31, "method": "tools/call",
+            "params": {"name": "search_events", "arguments": arguments},
+        })["result"]["structuredContent"]
+        self.assertEqual(web["event_ids"], [events[0]["public_event_id"]])
+        self.assertEqual(mcp["event_ids"], web["event_ids"])
+        self.assertEqual(web["receipt"]["entity_registry"], receipt)
+        self.assertEqual(mcp["receipt"]["entity_registry"], receipt)
 
     def test_alias_on_unbound_store_and_stale_binding_fail_closed(self):
         with self.assertRaisesRegex(gateway_module.GatewayError, "registry-bound"):

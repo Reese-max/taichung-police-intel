@@ -1,0 +1,42 @@
+[
+  {
+    "candidate_id": "gd-1111111111111111",
+    "document_id": "DOC-OFFICIAL-ROAD-1",
+    "document_version_id": "DOCV-OFFICIAL-ROAD-1",
+    "source_id": "S-032",
+    "independent_source_id": "S-032",
+    "authority": "official",
+    "original_source_identity": "S-032:traffic-road-1",
+    "official_url": "https://www.traffic.taichung.gov.tw/fictional/road-1",
+    "fact_fingerprint": "road-control:2026-09-20",
+    "title": "合成臺中市道路管制公告",
+    "event_type": "road_control",
+    "named_event_id": "event:discovery-fixture-road",
+    "event_start_at": "2026-09-20T18:00:00+08:00",
+    "event_end_at": "2026-09-20T22:00:00+08:00",
+    "district_id": "location:tc-xitun",
+    "agency_ids": ["agency:tc-traffic"],
+    "location_ids": ["location:tc-xitun"],
+    "acquisition_paths": ["DIRECT_OFFICIAL"]
+  },
+  {
+    "candidate_id": "gd-1111111111111111",
+    "document_id": "DOC-OFFICIAL-POLICE-1",
+    "document_version_id": "DOCV-OFFICIAL-POLICE-1",
+    "source_id": "S-001",
+    "independent_source_id": "S-001",
+    "authority": "official",
+    "original_source_identity": "S-001:police-road-1",
+    "official_url": "https://www.police.taichung.gov.tw/fictional/road-1",
+    "fact_fingerprint": "road-control:2026-09-20",
+    "title": "合成臺中市道路交通管制公告",
+    "event_type": "road_control",
+    "named_event_id": "event:discovery-fixture-road",
+    "event_start_at": "2026-09-20T18:00:00+08:00",
+    "event_end_at": "2026-09-20T22:00:00+08:00",
+    "district_id": "location:tc-xitun",
+    "agency_ids": ["agency:tc-police"],
+    "location_ids": ["location:tc-xitun"],
+    "acquisition_paths": ["DIRECT_OFFICIAL"]
+  }
+]

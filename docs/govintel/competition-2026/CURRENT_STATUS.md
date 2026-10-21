@@ -1,12 +1,27 @@
 # GovIntel AI－現行實作與證據狀態
 
-核對日：2026-10-07（Asia/Taipei）。本頁固定已驗收 `main@b6a602580fddf8b4a634dbdf64fc255678495412` 與 [發布 run 37615111747](https://github.com/Reese-max/taichung-police-intel/actions/runs/37615111747)。[PR #177 驗收包](closure-20261007-pr177/README.md)保存三個必要 CI job、精確樹、匿名五檔、Gateway 與 15 項正式 Chromium 結果。這份紀錄只代表其實際查核時間；後续程式修復或蒐集另留 receipt。10/6 的 [歷史包](closure-20261006/README.md)保留原版本與限制。
+文件核對日：2026-10-16（Asia/Taipei），checkout `c629f82a8b16825d5d89c204c7035dcba500a9ac`。公開驗收引用固定為 2026-10-07 的 `main@b6a602580fddf8b4a634dbdf64fc255678495412` 與 [發布 run 37615111747](https://github.com/Reese-max/taichung-police-intel/actions/runs/37615111747)。[PR #177 驗收包](closure-20261007-pr177/README.md)保存三個必要 CI job、精確樹、匿名五檔、Gateway 與 15 項正式 Chromium 結果。這份紀錄只代表其實際查核時間；後續程式修復或蒐集另留 receipt。本次文件核對不把此 checkout 或今天公開站重新認證為該版本。10/6 的 [歷史包](closure-20261006/README.md)保留原版本與限制。
 
 **程式已發布，正式來源查詢仍 `RIGHTS_BLOCKED`。** `deployment_verified=true` 與 `production_verified=false` 同時成立：發布與受限拒答通過，逐來源正式權利尚未准入；不是已能返回核准官方內容的正值查詢。原始 v6 的 85%／90%／30%、20 事件／60 文件及 3–5 位試用者仍是計畫，沒有模型／真人效益結果。
 
 產品／構想書工作題名為 **GovIntel AI－公共資訊查詢與個人化追蹤平台**。主辦已確認收妥補件、未接受更名；原報名完整題名、代表資格與封面指示仍待確認。不能把產品工作題名當已核准的正式報名題名。
 
-## 能力與證據
+## 固定 Claim／Status／Evidence
+
+狀態以單項能力及證據範圍判讀；`PRODUCTION_ACTIVE` 只指固定公開驗收基準中的部署，不證明今天資料新鮮、正式權利准入或真人成效。
+
+| Claim | Status | Evidence／限制 |
+|---|---|---|
+| 五來源 publication／metadata 查詢 | `PRODUCTION_ACTIVE` | [五檔 hash](closure-20261007-pr177/production-bytes.json)、[Gateway](closure-20261007-pr177/production-query.json)；來源仍 PARTIAL，legacy active 不等於權利准入。 |
+| 公開查詢／同瀏覽器條件追蹤 | `PRODUCTION_ACTIVE` | [正式 browser](closure-20261007-pr177/production-browser.json)；僅保存、修改、刷新、取消、清除等受限流程，不含關站推播／跨裝置。 |
+| 新聞／市政／交通／消防 collector | `CANDIDATE_CANARY` | [來源矩陣](DATA_SOURCE_MATRIX.md)、[原始觀察窗口](../source-reviews/2026-10-06/candidate-window-actual.json)；程式已合併不等於 source promotion。 |
+| Twinkle hybrid | `DESIGN_ONLY` | [策略與 overlay](../TWINKLE_HYBRID_SOURCES.md)；未成為已驗收 runtime，鏡像不增加獨立佐證。 |
+| latest-information loop | `IMPLEMENTED_NOT_PRODUCTION` | [同 checkout verifier](../../../scripts/verify-current-checkout.py)可重播版本／缺口契約；完整即時官方內容閉環待 #21／#161。 |
+| PublicEvent 事件融合 | `IMPLEMENTED_NOT_PRODUCTION` | [fixture](../../../apps/web/public/data/public-event-demo.json)、[self-check](../../../scripts/public-event-fusion.py)；`FIXTURE_ONLY`，不代表 live 多機關覆蓋。 |
+| scheduled publishing 的剩餘恢復驗收 #20 | `BLOCKED` | [固定發布 run](https://github.com/Reese-max/taichung-police-intel/actions/runs/37615111747)、[upload drill](closure-20261006/alert-drill.json)；實際 deploy／source／public mismatch 恢復仍需逐項收據。 |
+| 正式核准原文正值查詢／AI／真人效果 | `BLOCKED` | [驗收清單](ACCEPTANCE_CHECKLIST.md)：`RIGHTS_BLOCKED`／provider `DISABLED`，保留集與真人方法 `NOT_RUN`；85%／90%／30% 是目標。 |
+
+## 能力與證據細節
 
 | 項目 | 現況 | 實際證據及限制 |
 |---|---|---|
@@ -41,9 +56,9 @@ v6 是 2026-10-01 的原始 10 頁 A4 送件版本，保留原件；本頁不改
 
 Claude Code 已官方登入並完成一次公開程式碼覆核；[程式修復](../claude-code-followup-20261007.md)及 [Python 3.14／有界 IO](../source-code-io-compatibility-20261007.md)已落地，實際 CPython 3.14.7 的 112 項測試通過，與 Python 3.12 的 180 項有重疊，不能相加。
 
-S032 [歷史 V2 traversal](../s032-v2-terminal-observation-20261007.json)在舊 binding 下實際取得 82 頁／814 ID／36 期間列表項；最新 binding 的 [5 次 GET 相容性觀察](../s032-code-io-compatibility-observation-20261007.json)只包含四頁前綴與獨立末頁，不遷移或重標歷史 chain。正文／附件、獨立覆蓋、權利與完整業務 scope 仍待核對。15 項来源進度見 [有界目標](../source-acquisition-targets.v1.json)。
+S032 [歷史 V2 traversal](../s032-v2-terminal-observation-20261007.json)在舊 binding 下實際取得 82 頁／814 ID／36 期間列表項；最新 binding 的 [5 次 GET 相容性觀察](../s032-code-io-compatibility-observation-20261007.json)只包含四頁前綴與獨立末頁，不遷移或重標歷史 chain。正文／附件、獨立覆蓋、權利與完整業務 scope 仍待核對。15 項來源進度見 [有界目標](../source-acquisition-targets.v1.json)。
 
-S001 [13:46 UTC 原入口檢查](../s001-original-availability-20261007T1346.json)只有一次正常 GET，仍 503，錯誤 body 未取得；S034 與 D2 已拒路徑未重試。模型／真人、資料使用准入與主辦未確認項仍是待辦，程式覆核不代替產品實测。
+S001 [13:46 UTC 原入口檢查](../s001-original-availability-20261007T1346.json)只有一次正常 GET，仍 503，錯誤 body 未取得；S034 與 D2 已拒路徑未重試。模型／真人、資料使用准入與主辦未確認項仍是待辦，程式覆核不代替產品實測。
 
 ## 10/6 晚間新觀察
 
