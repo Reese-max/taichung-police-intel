@@ -1,15 +1,27 @@
 {
   "repo": "Reese-max/taichung-police-intel",
-  "issue": 161,
+  "issue": 165,
   "base_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
-  "red_proof": "test at apps\\web\\tests\\query-release-client.test.mjs:50:1\n✖ same release labels cannot hide missing or changed data and policy bindings (3.1943ms)\n  AssertionError [ERR_ASSERTION]: Missing expected rejection.\n\nℹ tests 47\nℹ pass 41\nℹ fail 6\nRed command exited 1 before implementation; full output retained in runtime-evidence/issue-161/red.log.",
-  "test_command": "node --test --test-concurrency=1 apps/web/tests/query-release-client.test.mjs apps/web/tests/research-client.test.mjs apps/web/tests/controlled-answer-client.test.mjs apps/web/tests/controlled-answer-pipeline.test.mjs",
+  "red_proof": "FAIL: test_cost_and_workload_denominators_stay_explicit (test_capacity_plan.CapacityPlanTests.test_cost_and_workload_denominators_stay_explicit)\r\n----------------------------------------------------------------------\r\nTraceback (most recent call last):\r\n  File \"C:\\Users\\Administrator\\issue-loop\\worktrees\\Reese-max_taichung-police-intel-issue-165\\tests\\test_capacity_plan.py\", line 16, in setUp\r\n    self.assertTrue(PLAN.is_file(), \"#165 capacity planning input register is missing\")\r\nAssertionError: False is not true : #165 capacity planning input register is missing\n\nRan 4 tests in 0.001s\r\n\r\nFAILED (failures=4)",
+  "test_command": "python -X utf8 tests/test_capacity_plan.py -v && python -X utf8 -m unittest discover -s tests -p \"test_commute_reopen_replay.py\" -v",
   "test_exit": 0,
-  "tests_passed": 63,
+  "tests_passed": 114,
   "tests_failed": 0,
-  "summary": "補強 #161 generation/hash 不符拒答的工程缺口：公開查詢與研究 transport 共用完整 release 綁定檢查，並各自核對 query envelope、receipt、policy 或研究 generation。不完整 manifest 在 POST 前阻擋，同標籤下的混版回應以 PENDING_UPDATE 拒絕；沿用既有 canonical JSON、Worker manifest builder、查詢與追蹤服務。新增失敗優先回歸及離線瀏覽器混版案例，並在既有驗收文件逐項列出 #161 對應與尚缺證據；63 個目標與實際 Worker 串接測試通過。",
-  "not_done": "完整 issue #161 尚未完成，維持 BLOCKED_BY_SOURCE_ADMISSION：此 checkout 的核准 policy 為 legacy schema 1，五來源 formal admission 均為 UNKNOWN / APPROVED_GOVERNANCE_MISSING。未進行正式已准入官方正值查詢、匿名原文完整回查、真正關閉重開、自然修訂、已讀後再修訂、明文解除或真人成效驗收；離線 fixture/browser 不能替代這些 gate。未改動來源權利、promotion、正式資料或既有追蹤語意，未部署、push、建立 PR 或對外同步 #25/#62。專案未配置獨立 lint、coverage ratchet、CRAP 或 mutation gate，沒有新增這些工具。 完整 npm run check 為 exit 1：八組既有 Python gate 涉及 Windows 缺少 O_NONBLOCK、Unix deadline、目錄 fsync、symlink/0600 權限語意；三個最小失敗已在乾淨 admitted base 重現，未擴修這些題外模組。正式鍵盤成功流程尚未驗收。",
+  "summary": "新增 #165 人力、六週相依時程及成本輸入文件，沿用既有 #33／#35 收據，未提供的真人承諾、日期、費率與負荷維持 null／未排定。同步 v6 p7／p9 對照及驗收清單，加入 4 項回歸檢查與完整 gate 入口；文件逐項列出七項驗收的本地交付、前置 gate 與 cutoff 縮小交付。官方公告窗口已回查，但本地規劃整理不代表 #165 已達正式關閉條件。",
+  "not_done": "#165 尚未完成：未取得真人角色／每週工時與相容性確認、團隊實際起訖／里程碑日期與最新主辦通知、核准約 60 原件及逐版處理／模型／資源／人工紀錄、當期費率／免費限制與月負荷、團隊預算上限及實際量測／處置責任；七日有效觀察、授權／完整性、D2 原件、官方版本案例及真人安排仍沿用未通過 gate。僅同步 repo 的 #25／#62 對照文件，未重交構想書或更新外部 issues。npm run check 完整執行但 exit 1，10 個失敗群組為 web-tests、schema-drift-tests、news-list-checkpoint-tests、checkpoint-code-binding-tests、news-list-runtime-binding-integration-tests、source-scope-contract-tests、reference-csv-audit-tests、reference-json-collection-audit-tests、current-checkout-tests、source-transport-recovery-tests；包含既有 Windows O_NONBLOCK／mkfifo／檔案權限假設與隔離 Python 缺 pypdf，相關檔案與 admitted base 相同。Next.js 靜態建置及輸出三檔存在檢查通過；完整專案 acceptance 未通過，完整輸出保留本機 runtime-evidence/issue-165/full-gate.log。Repo 沒有設定獨立 lint／coverage ratchet／CRAP／mutation gate，未新增。未 push、未建立 PR、未改其他分支、未部署、未啟用來源／模型、未付費／招募／對外發送。",
   "merged_evidence": [
+    {
+      "repo": "Reese-max/taichung-police-intel",
+      "issue": 161,
+      "base_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+      "red_proof": "test at apps\\web\\tests\\query-release-client.test.mjs:50:1\n✖ same release labels cannot hide missing or changed data and policy bindings (3.1943ms)\n  AssertionError [ERR_ASSERTION]: Missing expected rejection.\n\nℹ tests 47\nℹ pass 41\nℹ fail 6\nRed command exited 1 before implementation; full output retained in runtime-evidence/issue-161/red.log.",
+      "test_command": "node --test --test-concurrency=1 apps/web/tests/query-release-client.test.mjs apps/web/tests/research-client.test.mjs apps/web/tests/controlled-answer-client.test.mjs apps/web/tests/controlled-answer-pipeline.test.mjs",
+      "test_exit": 0,
+      "tests_passed": 63,
+      "tests_failed": 0,
+      "summary": "補強 #161 generation/hash 不符拒答的工程缺口：公開查詢與研究 transport 共用完整 release 綁定檢查，並各自核對 query envelope、receipt、policy 或研究 generation。不完整 manifest 在 POST 前阻擋，同標籤下的混版回應以 PENDING_UPDATE 拒絕；沿用既有 canonical JSON、Worker manifest builder、查詢與追蹤服務。新增失敗優先回歸及離線瀏覽器混版案例，並在既有驗收文件逐項列出 #161 對應與尚缺證據；63 個目標與實際 Worker 串接測試通過。",
+      "not_done": "完整 issue #161 尚未完成，維持 BLOCKED_BY_SOURCE_ADMISSION：此 checkout 的核准 policy 為 legacy schema 1，五來源 formal admission 均為 UNKNOWN / APPROVED_GOVERNANCE_MISSING。未進行正式已准入官方正值查詢、匿名原文完整回查、真正關閉重開、自然修訂、已讀後再修訂、明文解除或真人成效驗收；離線 fixture/browser 不能替代這些 gate。未改動來源權利、promotion、正式資料或既有追蹤語意，未部署、push、建立 PR 或對外同步 #25/#62。專案未配置獨立 lint、coverage ratchet、CRAP 或 mutation gate，沒有新增這些工具。 完整 npm run check 為 exit 1：八組既有 Python gate 涉及 Windows 缺少 O_NONBLOCK、Unix deadline、目錄 fsync、symlink/0600 權限語意；三個最小失敗已在乾淨 admitted base 重現，未擴修這些題外模組。正式鍵盤成功流程尚未驗收。"
+    },
     {
       "repo": "Reese-max/taichung-police-intel",
       "issue": 14,
