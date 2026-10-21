@@ -54,7 +54,7 @@ def _note(candidate: dict[str, Any]) -> str:
     status = candidate["verification_status"]
     if status == "NO_OFFICIAL_MATCH" or candidate.get("official_match_status") == "NO_OFFICIAL_MATCH":
         return "尚未找到官方確認"
-    if status == "CONFLICT":
+    if status == "CONFLICT" or candidate.get("official_match_status") == "CONFLICT":
         return "官方來源不一致，待人工判定"
     if status == "OFFICIAL_CANDIDATE":
         return "官方候選，待回查原始來源"
