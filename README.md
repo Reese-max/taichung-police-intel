@@ -100,6 +100,10 @@ npm --prefix apps/web run dev
 
 Open `http://localhost:3000`.
 
+公開會議的明確啟用導航入口位於 `/live/`，可載入本機 session、搜尋暫定文字、
+保存 WATCH 與查看會後核對收據。操作、30 分鐘離線回放與 runtime 證據邊界見
+[Issue #13 公開會議即時導航](./docs/govintel/issue-13-live-meeting.md)；預設不啟動付費 ASR。
+
 Refresh the public-source status and build the same static artifact used by GitHub Pages:
 
 ```bash

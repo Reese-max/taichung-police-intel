@@ -47,7 +47,7 @@ python3 -m http.server 8000 --bind 127.0.0.1 --directory apps/web/out
 
 在 query 的 D1 卡片切換臺中 29 區，核對 112 年 12 月（2023-12）人口／戶數、原始 CSV hash 與官方來源；這是已核對歷史樣本，未 promotion，不能算現況人口／人潮。D2 官方 resource 403，不能以未核對名錄或座標補畫成功。
 
-語意 AI、獨立保留集與真人比較仍未完成；85%／90%／30% 只說目標。工程 fixture 的命中與用時不能當真人或 AI 效益。最終整合驗收狀態看 [VERIFICATION](VERIFICATION.md)；依[報名核對](registration-verification-20261006.md)，10/5 已確認補件收妥、更名未接受，原報名題名、代表資格與重交指示仍待核對。
+語意 AI、獨立保留集與真人比較仍未完成；85%／90%／30% 只說目標。工程 fixture 的命中與用時不能當真人或 AI 效益。最終整合驗收狀態看 [VERIFICATION](VERIFICATION.md)；10/5 主辦已確認補件收妥，惟更名未接受；未接受更名之下，原報名完整題名、代表資格與封面／重交指示仍待確認，見[報名核對](registration-verification-20261006.md)。
 
 ## 快照操作核對表
 
