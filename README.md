@@ -217,7 +217,7 @@ The catalog-derived source policy has a cross-consumer receipt: `python scripts/
 
 Official document conversion is bounded by `intel_v2/located_facts.py` and `scripts/located-facts.py`: approved catalog origin → immutable raw/text hashes → HTML text-range or JSON Pointer locator → `FACT_CANDIDATE` / `NEEDS_REVIEW` fact and evidence projections. A locator/hash mismatch fails closed; the adapter does not promote candidates to verified truth or infer missing dates.
 The live HTML/JSON replay receipt is [official-document-receipt.v1.json](./docs/govintel/official-document-receipt.v1.json); it records hashes and review status, not deployment or human approval.
-The read-only Taiwan Intel Dashboard discovery consumer is replayable with `python scripts/discovery-adapter.py self-check`; media remains unverified until a server-controlled official match, and it never writes canonical events.
+The read-only Taiwan Intel Dashboard discovery consumer is replayable with `python scripts/discovery-adapter.py self-check`. Media always remains unverified; server-controlled official document versions can separately produce read-only #24 event previews. See the [adapter contract, replay commands, acceptance evidence and canary limits](docs/govintel/issue-27-discovery-adapter.md). It never writes canonical documents or events.
 
 ## Public deployment
 
