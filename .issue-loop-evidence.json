@@ -93,6 +93,18 @@
       "tests_failed": 0,
       "summary": "重用既有 live_meeting 狀態機與 role profile，新增明確 opt-in 的有界錄製 WAV→Groq 入口，包含持久用量 reservation、crash gap、跨程序鎖與父／子程序 deadline。新增 /live/ 的 provisional 搜尋、修訂、WATCH、實際 seek／時間文字降級，補齊 minutes 衝突收據的官方 hash、來源類型與版本狀態；合成回放不會匯出正式候選。以 30 分鐘自有合成錄製 fixture 驗證 150 秒缺漏、到期零新增呼叫及會後收據，39 個 Python、69 個 Node 與 10 項 Chromium 檢查通過。",
       "not_done": "npm run check 已執行但 exit 1：Windows/POSIX O_NONBLOCK、目錄開啟、chmod/symlink 與 pypdf 6.18.0/6.19.0 環境問題；前三類已在 admitted base 乾淨副本重現，完整 gate 尚未綠燈。MVP 為操作者提供授權錄製 WAV 分段，不含自動 HLS 擷取或會後來源爬取；未執行真實付費 Groq、公開會議 canary、官方影音可用性或真人 usability 驗證。沒有 push、PR 或部署。"
+    },
+    {
+      "repo": "Reese-max/taichung-police-intel",
+      "issue": 28,
+      "base_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+      "red_proof": "FAIL: test_fixture_canary_reports_parser_rejections_instead_of_success (test_npa_source_inventory.NpaSourceInventoryTests.test_fixture_canary_reports_parser_rejections_instead_of_success) (section='assembly')\n  self.assertEqual(report[\"parse_failures\"], 1)\nAssertionError: 0 != 1\nRan 27 tests in 0.830s\nFAILED (failures=15, errors=10)\n\nFAIL: test_public_projections_reject_case_level_sources_at_every_entry (fields={'contains_personal_data': True})\n  with self.assertRaisesRegex(ValueError, \"excluded\"):\nAssertionError: ValueError not raised\nRan 1 test in 0.002s\nFAILED (failures=1)",
+      "test_command": "python -X utf8 -m unittest discover -s tests -p \"test_npa_source_inventory.py\" -v && python -X utf8 -m unittest discover -s tests -p \"test_public_event_fusion.py\" -v && python -X utf8 scripts/npa-source-inventory.py --self-check && python -X utf8 scripts/public-event-fusion.py --self-check",
+      "test_exit": 0,
+      "tests_passed": 60,
+      "tests_failed": 0,
+      "summary": "重用 #28 既有 inventory、六個 Batch 1 parser 與 PublicEvent fusion，讓離線 canary 回報真實解析失敗、schema 契約拒絕與去重後事件候選數，並拒絕 165 空白必要欄位。個案排除 guard 現在涵蓋事件建立、融合、背景附加與舊事件 LKG／沿革合併；reference／enrichment 只能走保留期別的背景路徑。新增 8 項 NPA 回歸，NPA 測試從 24 增至 32，連同既有 28 項融合測試共 60 項通過，文件逐項對照原驗收並保留外部證據邊界。",
+      "not_done": "未新增來源准入、權利核准、正式蒐集、資料庫持久化、公開 UI 寫入、部署或真人驗收；原始資料品質、官方維度／可加性與全矩陣資源完整性仍待外部覆核，整張總單未宣稱結案。完整 npm run check 未全綠：Linux 新聞 checkpoint 有三個 2 秒 CLI 逾時（admitted base 亦重現）與一次觀測時間序錯誤；Windows 既有 Unix API 不相容與固定 PDF parser 版本差異未修補。PostgreSQL 整合因 TEST_DATABASE_URL 未設定未驗證。未推送、開 PR、關閉 issue 或更動其他分支。"
     }
   ]
 }

@@ -240,6 +240,8 @@ def parse_fraud_effectiveness_rows(rows: list[dict[str, Any]], *, observed_at: s
 
 def parse_165_records(rows: list[dict[str, Any]], *, dataset_id: str) -> list[dict[str, Any]]:
     """Normalize 165 family records without treating them as local case counts."""
+    if not isinstance(rows, list):
+        raise ValueError("165 rows must be an array")
     dataset_id = str(dataset_id)
     if dataset_id not in NPA_165_DATASETS:
         raise ValueError(f"unsupported 165 dataset: {dataset_id}")
@@ -247,9 +249,11 @@ def parse_165_records(rows: list[dict[str, Any]], *, dataset_id: str) -> list[di
     for row in rows:
         if not isinstance(row, dict):
             raise ValueError("165 row must be an object")
-        title = _text(row, "title", "標題") or ""
-        content = _text(row, "content", "發布內容") or ""
-        domain = _text(row, "domain", "網域")
+        rumor = dataset_id == "38262"
+        title = _required_text(row, "title", "標題") if rumor else _text(row, "title", "標題") or ""
+        content = _required_text(row, "content", "發布內容") if rumor else _text(row, "content", "發布內容") or ""
+        published_at = _required_text(row, "published_at", "發布時間") if rumor else _text(row, "published_at", "發布時間")
+        domain = _text(row, "domain", "網域") if rumor else _required_text(row, "domain", "網域")
         domain_key = re.sub(r"^https?://", "", domain.lower()).rstrip("/") if domain else ""
         dedupe_key = f"domain:{domain_key}" if domain_key else f"text:{_digest({'title': title, 'content': content}, 20)}"
         result.append(
@@ -263,7 +267,7 @@ def parse_165_records(rows: list[dict[str, Any]], *, dataset_id: str) -> list[di
                 "domain": domain,
                 "title": title,
                 "content": content,
-                "published_at": _text(row, "published_at", "發布時間"),
+                "published_at": published_at,
                 "realtime_allowed": False,
                 "local_case_count_allowed": False,
                 "related_source_ids": ["NPA-38262", "NPA-160055", "CTX-165"],
@@ -295,8 +299,13 @@ def dedupe_165_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 def assert_public_canonical_allowed(record: dict[str, Any]) -> None:
     """Fail closed for case-level personal records before public projection."""
-    dataset_id = str(record.get("dataset_id", "")).upper()
-    if record.get("contains_personal_data") or dataset_id in PERSONAL_DATASET_IDS:
+    if not isinstance(record, dict):
+        raise ValueError("public canonical record must be an object")
+    identities = {
+        str(record.get(field, "")).strip().upper().removeprefix("NPA-").removesuffix("-CASE-LEVEL")
+        for field in ("dataset_id", "inventory_id", "source_id", "independent_source_id", "source_key")
+    }
+    if record.get("contains_personal_data") or identities & PERSONAL_DATASET_IDS:
         raise ValueError("personal/case-level record is excluded from public canonical feed")
-    if record.get("role") == "EXCLUDE_OR_AGGREGATE_ONLY":
+    if record.get("role") == "EXCLUDE_OR_AGGREGATE_ONLY" or record.get("public_feed_allowed") is False:
         raise ValueError("excluded record cannot enter public canonical feed")
