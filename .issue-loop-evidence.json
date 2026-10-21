@@ -1,12 +1,26 @@
 {
   "repo": "Reese-max/taichung-police-intel",
-  "issue": 13,
+  "issue": 166,
   "base_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
-  "red_proof": "Before implementation: python -X utf8 -m unittest discover -s tests -p test_live_meeting_runtime.py -v (exit 1)\nERROR: test_bookmark_survives_a_profile_and_speaker_revision\nValueError: bookmark profile relevance is not bound to its segments\nERROR: test_disabled_or_unconfigured_transport_makes_zero_provider_calls\nModuleNotFoundError: No module named 'intel_v2.live_asr'\nFAIL: test_budget_stop_cannot_be_resumed_or_append_more_text\nAssertionError: ValueError not raised\nFAIL: test_minutes_contradiction_keeps_the_official_after_hash_and_locator\nAssertionError: unexpectedly None\nFAIL: test_segment_cannot_exceed_authorized_budget\nAssertionError: ValueError not raised\nRan 6 tests in 0.007s\nFAILED (failures=3, errors=3)",
-  "test_command": "python -X utf8 -m unittest discover -s tests -p 'test_live_meeting*.py' -v && node --test apps/web/tests/live-session-view.test.mjs apps/web/tests/live-session.test.mjs && python -X utf8 scripts/live-meeting.py self-check && npm --prefix apps/web run build && node scripts/verify-live-meeting-browser.mjs && npm run check:gate0",
+  "red_proof": "test_all_rights_categories_and_official_uses_remain_unapproved (test_work_rights.WorkRightsTests.test_all_rights_categories_and_official_uses_remain_unapproved) ... ERROR\nFileNotFoundError: [Errno 2] No such file or directory: 'C:\\\\Users\\\\Administrator\\\\issue-loop\\\\worktrees\\\\Reese-max_taichung-police-intel-issue-166\\\\docs\\\\govintel\\\\competition-2026\\\\work-rights-review.v1.json'\nRan 5 tests in 0.002s\nFAILED (errors=5)\nCommand: python -X utf8 -m unittest discover -s tests -p test_work_rights.py -v; exit 1.",
+  "test_command": "python -X utf8 -m unittest discover -s tests -p test_work_rights.py -v",
   "test_exit": 0,
-  "tests_passed": 118,
+  "tests_passed": 5,
   "tests_failed": 0,
-  "summary": "重用既有 live_meeting 狀態機與 role profile，新增明確 opt-in 的有界錄製 WAV→Groq 入口，包含持久用量 reservation、crash gap、跨程序鎖與父／子程序 deadline。新增 /live/ 的 provisional 搜尋、修訂、WATCH、實際 seek／時間文字降級，補齊 minutes 衝突收據的官方 hash、來源類型與版本狀態；合成回放不會匯出正式候選。以 30 分鐘自有合成錄製 fixture 驗證 150 秒缺漏、到期零新增呼叫及會後收據，39 個 Python、69 個 Node 與 10 項 Chromium 檢查通過。",
-  "not_done": "npm run check 已執行但 exit 1：Windows/POSIX O_NONBLOCK、目錄開啟、chmod/symlink 與 pypdf 6.18.0/6.19.0 環境問題；前三類已在 admitted base 乾淨副本重現，完整 gate 尚未綠燈。MVP 為操作者提供授權錄製 WAV 分段，不含自動 HLS 擷取或會後來源爬取；未執行真實付費 Groq、公開會議 canary、官方影音可用性或真人 usability 驗證。沒有 push、PR 或部署。"
+  "summary": "Added a fixed-version public work-rights review packet binding 34 Git-byte evidence references, 20 canonical sources, 15 tracked media/PDF assets and two archived model outputs. Five regression tests verify the evidence, conservative six-category rights and official-use status, award-history uncertainty, canonical retention/source policy binding and complete tracked-asset enumeration, including a shallow LF checkout replay. The competition entry and acceptance checklist link the report, which maps all six issue criteria and keeps issue_closable=false for missing real approvals.",
+  "not_done": "Issue #166 is not closable: actual prior-award records, rights-holder/contributor consents, source/use approvals, complete Python transitive inventory, delivered third-party notices, provider output/display-asset permissions and official promotion/closeout consent remain unverified. No software license, policy approval, source promotion, production verification, external send, push or PR was created. Full npm run check exited 1 with 10 failing groups (Web: 797 passed, 3 failed); the Next.js production build passed, but a green full suite is not claimed. Existing Windows mode/symlink failures were reproduced on unchanged admitted base c629f82 (38 tests: failures=2, errors=1, skipped=2), plus 3 base tests reproduced directory fsync, Unix deadline and missing O_NONBLOCK errors. No separate lint, coverage ratchet, CRAP or mutation gates are configured.",
+  "merged_evidence": [
+    {
+      "repo": "Reese-max/taichung-police-intel",
+      "issue": 13,
+      "base_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+      "red_proof": "Before implementation: python -X utf8 -m unittest discover -s tests -p test_live_meeting_runtime.py -v (exit 1)\nERROR: test_bookmark_survives_a_profile_and_speaker_revision\nValueError: bookmark profile relevance is not bound to its segments\nERROR: test_disabled_or_unconfigured_transport_makes_zero_provider_calls\nModuleNotFoundError: No module named 'intel_v2.live_asr'\nFAIL: test_budget_stop_cannot_be_resumed_or_append_more_text\nAssertionError: ValueError not raised\nFAIL: test_minutes_contradiction_keeps_the_official_after_hash_and_locator\nAssertionError: unexpectedly None\nFAIL: test_segment_cannot_exceed_authorized_budget\nAssertionError: ValueError not raised\nRan 6 tests in 0.007s\nFAILED (failures=3, errors=3)",
+      "test_command": "python -X utf8 -m unittest discover -s tests -p 'test_live_meeting*.py' -v && node --test apps/web/tests/live-session-view.test.mjs apps/web/tests/live-session.test.mjs && python -X utf8 scripts/live-meeting.py self-check && npm --prefix apps/web run build && node scripts/verify-live-meeting-browser.mjs && npm run check:gate0",
+      "test_exit": 0,
+      "tests_passed": 118,
+      "tests_failed": 0,
+      "summary": "重用既有 live_meeting 狀態機與 role profile，新增明確 opt-in 的有界錄製 WAV→Groq 入口，包含持久用量 reservation、crash gap、跨程序鎖與父／子程序 deadline。新增 /live/ 的 provisional 搜尋、修訂、WATCH、實際 seek／時間文字降級，補齊 minutes 衝突收據的官方 hash、來源類型與版本狀態；合成回放不會匯出正式候選。以 30 分鐘自有合成錄製 fixture 驗證 150 秒缺漏、到期零新增呼叫及會後收據，39 個 Python、69 個 Node 與 10 項 Chromium 檢查通過。",
+      "not_done": "npm run check 已執行但 exit 1：Windows/POSIX O_NONBLOCK、目錄開啟、chmod/symlink 與 pypdf 6.18.0/6.19.0 環境問題；前三類已在 admitted base 乾淨副本重現，完整 gate 尚未綠燈。MVP 為操作者提供授權錄製 WAV 分段，不含自動 HLS 擷取或會後來源爬取；未執行真實付費 Groq、公開會議 canary、官方影音可用性或真人 usability 驗證。沒有 push、PR 或部署。"
+    }
+  ]
 }

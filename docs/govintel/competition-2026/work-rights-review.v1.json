@@ -1,0 +1,412 @@
+{
+  "schema_version": 1,
+  "issue": 166,
+  "status": "REVIEW_REQUIRED",
+  "issue_closable": false,
+  "scope": "FIXED_VERSION_PUBLIC_EVIDENCE_INVENTORY_NOT_LEGAL_OR_OWNER_APPROVAL",
+  "versions": {
+    "prototype": {
+      "code_sha": "562141e396c693e115b3fce10594c434c401a58e",
+      "tree_sha": "45b6b92fff58b8dd3094189e7611ebffc98429d3"
+    },
+    "accepted_release": {
+      "code_sha": "5e2298c8db12ec2631dbd8dac11c14599133dcc6",
+      "tree_sha": "acd7dff3f10d4059ff4430e1fdb3fedf742c83c5"
+    },
+    "audit_base": {
+      "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+      "tree_sha": "e7a79311e79ebcce7275eeeae8abfa7e8fc47521",
+      "production_acceptance_verified": false
+    }
+  },
+  "award_review": {
+    "status": "UNKNOWN",
+    "verified_award_records": [],
+    "official_modification_percentage": null,
+    "organizer_determination": "PENDING",
+    "required_inputs": [
+      "Actual prior competition and award records from the team; historical participation is not proof of an award.",
+      "If applicable, organizer determination against the fixed old/new feature and acceptance evidence; file or line counts are not an official percentage."
+    ]
+  },
+  "rights_inventory": {
+    "project_code": {
+      "status": "NOT_VERIFIED",
+      "rights_holder": null,
+      "consent_receipts": [],
+      "evidence_ids": [
+        "old_vs_new",
+        "historical_delta",
+        "historical_package"
+      ],
+      "missing_inputs": [
+        "Repository software license has not been selected.",
+        "Actual ownership and permission for existing GovIntel/Taiwan Intel code and this increment."
+      ]
+    },
+    "contributions": {
+      "status": "NOT_VERIFIED",
+      "rights_holder": null,
+      "consent_receipts": [],
+      "evidence_ids": [
+        "historical_delta",
+        "accepted_ci"
+      ],
+      "missing_inputs": [
+        "Rights-holder and contributor confirmation covering the fixed Git history, including employment or third-party obligations.",
+        "Git authorship and public access do not establish ownership or consent."
+      ]
+    },
+    "dependencies": {
+      "status": "NOT_VERIFIED",
+      "rights_holder": null,
+      "consent_receipts": [],
+      "evidence_ids": [
+        "dependency_inventory",
+        "root_lock",
+        "web_lock",
+        "python_requirements"
+      ],
+      "missing_inputs": [
+        "Complete Python transitive inventory for the actual delivery environment.",
+        "Verify actual delivered license/NOTICE texts and attribution obligations, including optional binaries; historical installed-file hashes are not a shipping notice bundle."
+      ]
+    },
+    "source_data": {
+      "status": "NOT_VERIFIED",
+      "rights_holder": null,
+      "consent_receipts": [],
+      "evidence_ids": [
+        "source_catalog",
+        "retention_rights",
+        "source_review",
+        "approved_source_policy"
+      ],
+      "missing_inputs": [
+        "Real per-source, per-field and per-use review under issue #39, including full text, excerpts, raw retention, summaries, model transmission and video."
+      ]
+    },
+    "model_outputs": {
+      "status": "NOT_VERIFIED",
+      "rights_holder": null,
+      "consent_receipts": [],
+      "evidence_ids": [
+        "model_diagnostic",
+        "model_output_01",
+        "model_output_02"
+      ],
+      "missing_inputs": [
+        "Applicable provider terms, provenance, attribution and permission for the archived synthetic diagnostic outputs and any later selected display outputs.",
+        "A synthetic evaluation receipt establishes execution, not an output license or product benefit."
+      ]
+    },
+    "display_assets": {
+      "status": "NOT_VERIFIED",
+      "rights_holder": null,
+      "consent_receipts": [],
+      "evidence_ids": [
+        "asset_01",
+        "asset_02",
+        "asset_03",
+        "asset_04",
+        "asset_05",
+        "asset_06",
+        "asset_07",
+        "asset_08",
+        "asset_09",
+        "asset_10",
+        "asset_11",
+        "asset_12",
+        "asset_13",
+        "asset_14",
+        "asset_15"
+      ],
+      "missing_inputs": [
+        "Rights and attribution for the historical demo video and any embedded third-party images, sound, fonts, screen captures or official content.",
+        "PDF test fixtures are listed for provenance; their presence is not a claim of competition use or a rights-holder approval.",
+        "External linked or embedded media and private presentation materials need separate review; no tracked standalone raster images were found at the audit base."
+      ]
+    }
+  },
+  "source_rights_binding": {
+    "source_ids": [
+      "CTX-165",
+      "CTX-POP",
+      "S-001",
+      "S-004",
+      "S-006",
+      "S-007",
+      "S-009",
+      "S-010",
+      "S-011",
+      "S-019",
+      "S-026",
+      "S-028",
+      "S-029",
+      "S-031",
+      "S-032",
+      "S-033",
+      "S-034",
+      "S-035",
+      "S-036",
+      "S-037"
+    ],
+    "formal_admission": {
+      "status": "UNKNOWN",
+      "reason": "APPROVED_GOVERNANCE_MISSING",
+      "governance_hash": null,
+      "blocked_sources": [
+        "S-004",
+        "S-006",
+        "S-007",
+        "S-009",
+        "S-029"
+      ],
+      "per_source": {
+        "S-004": "APPROVED_GOVERNANCE_MISSING",
+        "S-006": "APPROVED_GOVERNANCE_MISSING",
+        "S-007": "APPROVED_GOVERNANCE_MISSING",
+        "S-009": "APPROVED_GOVERNANCE_MISSING",
+        "S-029": "APPROVED_GOVERNANCE_MISSING"
+      }
+    },
+    "model_transmission_allowed": false,
+    "canonical_policy_changed": false,
+    "retention_policy_hash": "9c7f589c80df456d4b547151a1e3a5eb7d29258fee6ed2268613598de820729d",
+    "approved_policy_binding": {
+      "policy_version": 1,
+      "policy_hash": "3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501",
+      "catalog_hash": "5088623df5af4b8a30f4c597c51235c0f36a3dfd8bc4f2aea9af8f26d10213ef",
+      "active_source_ids": [
+        "S-004",
+        "S-006",
+        "S-007",
+        "S-009",
+        "S-029"
+      ]
+    }
+  },
+  "dependency_scope": {
+    "inventory_code_sha": "5e2298c8db12ec2631dbd8dac11c14599133dcc6",
+    "declared_entry_count": 77,
+    "installed_observations": "HISTORICAL_2026_10_06_NOT_CURRENT_ENVIRONMENT",
+    "python_transitive_inventory": "NOT_VERIFIED",
+    "shipping_notices": "NOT_VERIFIED"
+  },
+  "official_use_consent": {
+    "uses": {
+      "competition_submission": "NOT_VERIFIED",
+      "official_promotion": "NOT_VERIFIED",
+      "project_closeout": "NOT_VERIFIED"
+    },
+    "public_receipt_ids": [],
+    "private_originals_included": false,
+    "required_inputs": [
+      "Actual authorized rights-holder consents covering the selected version, materials, uses and attribution.",
+      "Keep signed originals and personal details private; publish only authorized redacted receipt identifiers and verification outcome."
+    ]
+  },
+  "closure_blockers": [
+    "AWARD_HISTORY_UNKNOWN",
+    "OWNER_AND_CONTRIBUTOR_CONSENT_MISSING",
+    "SOURCE_RIGHTS_UNREVIEWED",
+    "PYTHON_TRANSITIVE_INVENTORY_MISSING",
+    "SHIPPING_NOTICES_UNVERIFIED",
+    "MODEL_OUTPUT_TERMS_UNVERIFIED",
+    "DISPLAY_ASSET_RIGHTS_UNVERIFIED",
+    "OFFICIAL_USE_CONSENT_MISSING"
+  ],
+  "asset_evidence_ids": [
+    "asset_01",
+    "asset_02",
+    "asset_03",
+    "asset_04",
+    "asset_05",
+    "asset_06",
+    "asset_07",
+    "asset_08",
+    "asset_09",
+    "asset_10",
+    "asset_11",
+    "asset_12",
+    "asset_13",
+    "asset_14",
+    "asset_15"
+  ],
+  "model_output_evidence_ids": [
+    "model_output_01",
+    "model_output_02"
+  ],
+  "evidence": {
+    "historical_delta": {
+      "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+      "path": "docs/govintel/competition-2026/closure-20261006/old-new-file-delta.json",
+      "sha256": "b611b9a812a05fbe65a6759754745535d23e5fe55208af4e0039466dba495942"
+    },
+    "old_vs_new": {
+      "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+      "path": "docs/govintel/competition-2026/OLD_VS_NEW.md",
+      "sha256": "d544ba560e64ffdb5d37a4176849cb70961824fe64146f52fd16369bbd98e561"
+    },
+    "proposal_mapping": {
+      "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+      "path": "docs/govintel/competition-2026/PROPOSAL_MAPPING.md",
+      "sha256": "fae1f51c16c5cfecd014c7af626c9d3408b7ba34e29def89a6c182ff42e69657"
+    },
+    "historical_package": {
+      "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+      "path": "docs/govintel/historical/README.md",
+      "sha256": "726480e8ee0b56d2808a41963c21d85825a71d8dcb656c969067beb36178cf69"
+    },
+    "accepted_ci": {
+      "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+      "path": "docs/govintel/competition-2026/closure-20261006/ci-tree-binding.json",
+      "sha256": "fd49e60c842dd27769407d28a791586b4f3e454f7f9ab2d03eec23c0b5f65a42"
+    },
+    "accepted_browser": {
+      "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+      "path": "docs/govintel/competition-2026/closure-20261006/production-browser.json",
+      "sha256": "ade6147dbea805478775f7480a08e0237c753a52c9ae85a699f3795ed37909d5"
+    },
+    "accepted_query": {
+      "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+      "path": "docs/govintel/competition-2026/closure-20261006/production-query.json",
+      "sha256": "d05f54d59249fdba1642d0b5840c887817a126815c9d92980906be6cd0a8c5b2"
+    },
+    "dependency_inventory": {
+      "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+      "path": "docs/govintel/competition-2026/closure-20261006/dependency-license-inventory.json",
+      "sha256": "76e044b8f7b362ed16a1fda62b214674f81f49df773c9125029370f1784bcd57"
+    },
+    "root_lock": {
+      "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+      "path": "package-lock.json",
+      "sha256": "ca1ee8307e524a281937c287ce21ab0b70f98501e5eb561b7403de44d935286f"
+    },
+    "web_lock": {
+      "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+      "path": "apps/web/package-lock.json",
+      "sha256": "d7cc995fad42550defbd86178f08210202d98593aab509e3b8983a64725b8ed9"
+    },
+    "python_requirements": {
+      "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+      "path": "requirements.txt",
+      "sha256": "3a1805e2744bd714d93ce26a3e9680f7b034146f6a025b548c58c3caff9e34cb"
+    },
+    "source_catalog": {
+      "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+      "path": "docs/govintel/source-catalog.v2.json",
+      "sha256": "aa30cbd61e76f14d5d9f48402bea46f7c96fb117ae5c3a7e21463a6d1b0b9afa"
+    },
+    "retention_rights": {
+      "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+      "path": "docs/govintel/retention-rights-policy.v1.json",
+      "sha256": "87a9e9d0e91881d17e840e8e34e2c7249836bc4a6b5baa67585ac2bfff2ce845"
+    },
+    "source_review": {
+      "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+      "path": "docs/govintel/source-rights-review-packet-20261007.json",
+      "sha256": "c596c50c2ef47777b2ebbc3944ee44002ab64bea204a36a331740a0015c7006e"
+    },
+    "approved_source_policy": {
+      "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+      "path": "docs/govintel/source-policy.approved.json",
+      "sha256": "7dffabb2c5869d71cff202e653edd35416bd81b343243793d910ec53e39b65c5"
+    },
+    "model_diagnostic": {
+      "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+      "path": "docs/govintel/competition-2026/model-diagnostic-20261006/diagnostic-index.json",
+      "sha256": "57394df49fa42c95bea883da8ad808db7a0ffc3f58e9d9af1589f520493967c3"
+    },
+    "release_gate": {
+      "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+      "path": "docs/govintel/issue-62-release-closure.md",
+      "sha256": "b30eede9dd8fabe477056a06b52e2afaf40ee9a9527541e52b152f4dc15605f8"
+    },
+    "asset_01": {
+      "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+      "path": "apps/web/public/demo-video.mp4",
+      "sha256": "6d2e91ec6467e7e655bf9432dbdd0c1a20cfdb0c33b8d7e160db7dfd440c7b6e"
+    },
+    "asset_02": {
+      "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+      "path": "tests/fixtures/document-pdf/blank-only.pdf",
+      "sha256": "82380ff24d75fdd0c350d1ebb64829c85071c21e150b32683e3f0b84f57570a0"
+    },
+    "asset_03": {
+      "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+      "path": "tests/fixtures/document-pdf/corrupt.pdf",
+      "sha256": "88143242b4b8dbd60f57dbb1bd25634d6b5ba8fb2868fc95ab618a9fe74c08d9"
+    },
+    "asset_04": {
+      "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+      "path": "tests/fixtures/document-pdf/empty-password.pdf",
+      "sha256": "ed8be7ebf717fa3ec667a73572ebd16140313c01354033841a1f6408e06deb2f"
+    },
+    "asset_05": {
+      "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+      "path": "tests/fixtures/document-pdf/encrypted.pdf",
+      "sha256": "3a1aff9fdc3ab1e0f1c922c732d63adfde77236670ec84a33b09531f6ca46eeb"
+    },
+    "asset_06": {
+      "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+      "path": "tests/fixtures/document-pdf/many-text-pages.pdf",
+      "sha256": "f3a832427af2181159b6ecadf901b8237f889a05b71c9273b53607896ef943f9"
+    },
+    "asset_07": {
+      "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+      "path": "tests/fixtures/document-pdf/mixed.pdf",
+      "sha256": "90421cde078c2b5cf19062c643f295958c4570f6f4be0f7a6008a923777cccc6"
+    },
+    "asset_08": {
+      "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+      "path": "tests/fixtures/document-pdf/page-failure.pdf",
+      "sha256": "eb299f124759f633c74257ed1f8fbfbc51c61baefa39fa53f0be946b88ecb3c4"
+    },
+    "asset_09": {
+      "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+      "path": "tests/fixtures/document-pdf/scan-only.pdf",
+      "sha256": "ad8fd549df6f21036bada5529795fe1c6ecff183639aff5118ccd9cd1c114c3b"
+    },
+    "asset_10": {
+      "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+      "path": "tests/fixtures/document-pdf/too-many-pages.pdf",
+      "sha256": "6867ed8d1f28eff79aed68a28cc7055b13f66f159b6202529096f9436fa9babd"
+    },
+    "asset_11": {
+      "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+      "path": "tests/fixtures/document-pdf/too-much-text.pdf",
+      "sha256": "b77c6e89456fb5c0cc25cbc7993309e61e2c952c399f1404546680537e440151"
+    },
+    "asset_12": {
+      "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+      "path": "tests/fixtures/document-pdf/two-page.pdf",
+      "sha256": "95d062f2397fb22d035ad9f6c7b3a117de17eb8f066d5c410757b0b54dda7c50"
+    },
+    "asset_13": {
+      "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+      "path": "tests/fixtures/document-pdf/unicode-spaces.pdf",
+      "sha256": "a87f1b53ac4d70b17b3c626ed52dfe8fd742adc464bf6a725080974c509a264c"
+    },
+    "asset_14": {
+      "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+      "path": "tests/fixtures/document-pdf/whitespace-only.pdf",
+      "sha256": "5fa5d6f72b54ee2f848bd526b49cb919ad4a6cde79d29f95054fa8ac4e72255a"
+    },
+    "asset_15": {
+      "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+      "path": "tests/fixtures/s006-synthetic-revision-date.pdf",
+      "sha256": "7f3465374fcd4f504453a0f8897182855a9fb179bbb2845576ce03397f6b7e07"
+    },
+    "model_output_01": {
+      "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+      "path": "docs/govintel/competition-2026/model-diagnostic-20261006/attempt-3/predictions.jsonl",
+      "sha256": "50699b5c1c2f8881ad40f9db29929cb47527ddf6fc70debb50f7ccebe7d8b554"
+    },
+    "model_output_02": {
+      "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
+      "path": "docs/govintel/competition-2026/model-diagnostic-20261006/attempt-4/predictions.jsonl",
+      "sha256": "ebb992dfd74171226619950bda48b16b39e689a625bb5fec083abd908906d472"
+    }
+  }
+}
