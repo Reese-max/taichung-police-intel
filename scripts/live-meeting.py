@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager, nullcontext
 import json
 import os
 import sys
@@ -35,6 +36,7 @@ from intel_v2.live_meeting import (
     validate_session,
 )
 from intel_v2.role_profiles import load_catalog
+from intel_v2.live_asr import ingest_chunk, replay_recording
 
 
 DEFAULT_STATE = ROOT / "state" / "live-meeting-session.json"
@@ -59,7 +61,37 @@ def write(path: Path, value: dict) -> None:
     os.replace(temporary, path)
 
 
+@contextmanager
+def session_lock(path: Path):
+    """OS releases the lock on a crash; never delete a lock another process uses."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.with_suffix(path.suffix + ".lock").open("a+b") as handle:
+        if handle.tell() == 0:
+            handle.write(b"\0")
+            handle.flush()
+        handle.seek(0)
+        try:
+            if os.name == "nt":
+                import msvcrt
+                msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as error:
+            raise ValueError("session is already in use") from error
+        try:
+            yield
+        finally:
+            if os.name == "nt":
+                handle.seek(0)
+                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                fcntl.flock(handle, fcntl.LOCK_UN)
+
+
 def command_start(args: argparse.Namespace) -> int:
+    if args.state.exists():
+        raise ValueError("session file already exists; choose a new --state to preserve history")
     state = start_session(
         source_id=args.source_id,
         official_source_url=args.official_source_url,
@@ -77,6 +109,25 @@ def command_start(args: argparse.Namespace) -> int:
     )
     write(args.state, state)
     print(f"LIVE_MEETING_STARTED session_id={state['session_id']} status={state['status']} transport={state['transport_status']}")
+    return 0
+
+
+def command_transcribe(args: argparse.Namespace) -> int:
+    profile = load_catalog(args.profile_catalog)["profiles"][args.profile_id] if args.profile_id else None
+    fixture = json.loads(args.fixture_response.read_text(encoding="utf-8")) if args.fixture_response else None
+    state = ingest_chunk(
+        read(args.state), args.audio, start_seconds=args.start, requested_at=args.at or now(),
+        opt_in=args.recorded_public_audio, api_key=os.environ.get("GROQ_API_KEY"),
+        fixture_response=fixture, profile=profile, save=lambda value: write(args.state, value),
+    )
+    usage = state.get("provider_usage", {})
+    print(f"LIVE_CHUNK status={state['status']} calls={len(usage.get('calls', []))} reserved_seconds={usage.get('reserved_seconds', 0)} mode={usage.get('mode', 'NONE')} estimated_cost_usd=UNKNOWN")
+    return 0
+
+
+def command_replay(args: argparse.Namespace) -> int:
+    fixture = json.loads(args.fixture.read_text(encoding="utf-8"))
+    print(json.dumps(replay_recording(fixture, args.out, save=write), ensure_ascii=False))
     return 0
 
 
@@ -286,7 +337,7 @@ def parser() -> argparse.ArgumentParser:
     result.add_argument("--state", type=Path, default=DEFAULT_STATE)
     commands = result.add_subparsers(dest="command", required=True)
 
-    start = commands.add_parser("start")
+    start = commands.add_parser("start", aliases=["start-live-session"])
     start.add_argument("--source-id", required=True)
     start.add_argument("--official-source-url", required=True)
     start.add_argument("--stream-url", required=True)
@@ -326,6 +377,21 @@ def parser() -> argparse.ArgumentParser:
     append.add_argument("--at")
     append.set_defaults(handler=command_append)
 
+    transcribe = commands.add_parser("transcribe-chunk", help="explicitly transcribe operator-authorized public PCM WAV")
+    transcribe.add_argument("--audio", type=Path, required=True)
+    transcribe.add_argument("--start", type=float, required=True)
+    transcribe.add_argument("--recorded-public-audio", action="store_true")
+    transcribe.add_argument("--fixture-response", type=Path, help="offline only; requires a fixture provider session")
+    transcribe.add_argument("--profile-id")
+    transcribe.add_argument("--profile-catalog", type=Path, default=ROOT / "docs/govintel/role-profiles.v1.json")
+    transcribe.add_argument("--at")
+    transcribe.set_defaults(handler=command_transcribe)
+
+    replay = commands.add_parser("replay-recording", help="30-minute owned recording, accelerated media clock, no network")
+    replay.add_argument("--fixture", type=Path, default=ROOT / "tests/fixtures/live-meeting/recorded-stream.json")
+    replay.add_argument("--out", type=Path, default=ROOT / "runtime-evidence/live-meeting")
+    replay.set_defaults(handler=command_replay)
+
     gap = commands.add_parser("gap")
     gap.add_argument("--start", type=float, required=True)
     gap.add_argument("--end", type=float, required=True)
@@ -342,7 +408,7 @@ def parser() -> argparse.ArgumentParser:
     resume.add_argument("--at")
     resume.set_defaults(handler=command_resume)
 
-    stop = commands.add_parser("stop")
+    stop = commands.add_parser("stop", aliases=["stop-live-session"])
     stop.add_argument("--reason", default="USER_STOP")
     stop.add_argument("--at")
     stop.set_defaults(handler=command_stop)
@@ -391,4 +457,6 @@ def parser() -> argparse.ArgumentParser:
 
 if __name__ == "__main__":
     arguments = parser().parse_args()
-    raise SystemExit(arguments.handler(arguments))
+    readonly = {"status", "formal-candidates", "search", "locator", "timeline", "self-check", "replay-recording"}
+    with nullcontext() if arguments.command in readonly else session_lock(arguments.state):
+        raise SystemExit(arguments.handler(arguments))
