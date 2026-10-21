@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from intel_v2.discovery_adapter import ingest_feed, load_feed
+from intel_v2.discovery_adapter import ingest_feed, link_official_events, load_feed, summarize_canary
 
 
 def write_json(path: Path, value: dict) -> None:
@@ -53,9 +53,13 @@ def self_check() -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("ingest", "self-check"))
+    parser.add_argument("command", choices=("ingest", "canary-report", "self-check"))
     parser.add_argument("--feed", type=Path)
     parser.add_argument("--official-documents", type=Path)
+    parser.add_argument("--event-documents", type=Path, help="Server-controlled normalized official documents for read-only #24 projection")
+    parser.add_argument("--existing-public-events", type=Path, help="Existing event identities; never overwritten")
+    parser.add_argument("--receipts", type=Path, help="JSON array of consumer receipts for canary-report")
+    parser.add_argument("--window-days", type=int, default=14)
     parser.add_argument("--state", type=Path)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--now")
@@ -70,8 +74,17 @@ def main() -> int:
     if args.command == "self-check":
         self_check()
         return 0
+    if args.command == "canary-report":
+        if args.receipts is None or args.output is None:
+            parser.error("canary-report requires --receipts and --output")
+        report = summarize_canary(json.loads(args.receipts.read_text(encoding="utf-8")), window_days=args.window_days)
+        write_json(args.output, report)
+        print(f"DISCOVERY_CANARY_REPORT_OK runs={report['run_count']} days={report['observed_day_count']}/{report['window_days']} output={args.output}")
+        return 0
     if args.feed is None or args.output is None:
         parser.error("ingest requires --feed and --output")
+    if args.existing_public_events and not args.event_documents:
+        parser.error("--existing-public-events requires --event-documents")
     feed = load_feed(str(args.feed))
     documents = json.loads(args.official_documents.read_text(encoding="utf-8")) if args.official_documents else []
     previous = json.loads(args.state.read_text(encoding="utf-8")) if args.state and args.state.exists() else None
@@ -87,6 +100,12 @@ def main() -> int:
         historical_replay=args.historical_replay,
         canary_mode=args.canary_mode,
     )
+    if args.event_documents is not None:
+        event_documents = json.loads(args.event_documents.read_text(encoding="utf-8"))
+        existing = json.loads(args.existing_public_events.read_text(encoding="utf-8")) if args.existing_public_events else []
+        if isinstance(existing, dict):
+            existing = existing["public_events"]
+        result = link_official_events(result, event_documents, existing_public_events=existing)
     write_json(args.output, result)
     print(f"DISCOVERY_ADAPTER_OK status={result['receipt']['status']} relevant={result['receipt']['relevant_count']} output={args.output}")
     return 0

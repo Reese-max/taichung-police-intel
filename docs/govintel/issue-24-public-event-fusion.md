@@ -12,7 +12,7 @@
 - 有官方明確 `occurrence_id` 時，日期變更保持同一 `public_event_id` 並標示 `stable_occurrence_id`；沒有明確 occurrence identity 的同名異日仍分開。
 - `occurrence_relations: RESCHEDULES` 只有在來源文件／版本、官方 URL locator、理由、人工 `CONFIRMED` review 與相同 registry version/hash 齊全時，才可由 `reconcile_public_events` 保留原 `public_event_id`；新日期、關聯沿革與被導向的暫時 ID 都保留。`PENDING_REVIEW` 不自動合併。
 
-驗證：`tests/test_public_event_fusion.py` 23 tests pass；`node --test apps/web/tests/public-event-fusion.test.mjs apps/web/tests/public-event-demo.test.mjs` 4 tests pass；CLI self-check 會重播三來源、版本衝突、entity registry receipt 與背景資料防護。
+驗證：`tests/test_public_event_fusion.py` 29 tests pass；`node --test apps/web/tests/public-event-fusion.test.mjs apps/web/tests/public-event-demo.test.mjs` 4 tests pass；CLI self-check 會重播三來源、版本衝突、entity registry receipt 與背景資料防護。`created_at` 保留最早已知時間，`updated_at` 取最新來源修訂或觀察時間，避免新版本被較舊時間遮蔽。
 
 首頁另有 `apps/web/public/data/public-event-demo.json` 的 `FIXTURE_ONLY` replay card：展示三份官方文件、同一 `public_event_id`、前後版本差異、`CONFLICT`、背景資料期別與 exact official links；confirm／merge／split 只做 browser-local preview，不寫入 canonical state。它是產品 demo 驗收，不是 live collector 或 production receipt。
 

@@ -267,6 +267,10 @@ class OutcomeTests(unittest.TestCase):
                 "PUBLIC_VERIFY": "success",
                 "GENERATION_ID": "generation-cli",
                 "STATE_COMMIT": "c" * 40,
+                "GITHUB_RUN_ID": "123",
+                "GITHUB_RUN_ATTEMPT": "1",
+                "EVIDENCE": "success",
+                "EVIDENCE_URL": "https://github.com/Reese-max/taichung-police-intel/actions/runs/123/artifacts/456",
             }
             result = subprocess.run(
                 [sys.executable, str(ROOT / "scripts/publication-outcome.py"), "--health-output", str(output)],
@@ -277,6 +281,7 @@ class OutcomeTests(unittest.TestCase):
             self.assertEqual(receipt["schema_version"], 1)
             self.assertEqual(receipt["kind"], "GOVINTEL_RUNTIME_HEALTH_RECEIPT")
             self.assertEqual(receipt["generation_id"], "generation-cli")
+            self.assertEqual(receipt["evidence_url"], env["EVIDENCE_URL"])
 
     def test_success_is_not_a_live_verification_receipt(self):
         text, code = module.report({"BUILD_RESULT": "success", "DEPLOY_RESULT": "success"})
@@ -350,6 +355,10 @@ class OutcomeTests(unittest.TestCase):
             "https://evil.test/artifact",
             "http://github.com/actions/runs/1/artifacts/2",
             "https://github.com/actions/runs/1/artifacts/2?token=secret",
+            "https://user:PRIVATE@github.com/Reese-max/taichung-police-intel/actions/runs/123/artifacts/456",
+            "https://github.com:443/Reese-max/taichung-police-intel/actions/runs/123/artifacts/456",
+            "https://github.com/foreign/repository/actions/runs/123/artifacts/456",
+            "https://[PRIVATE/artifact",
         ]:
             self.assertNotIn(url, module.report({"EVIDENCE": "success", "EVIDENCE_URL": url})[0])
 

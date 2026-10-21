@@ -226,6 +226,23 @@ class PublicEventFusionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "conflicts with document event_start_at"):
             fusion.bind_document_entities(dict(before, named_event_date="2026-09-21"), registry)
 
+    def test_direct_entity_ids_respect_explicit_document_jurisdiction(self):
+        registry = fusion.load_entity_registry()
+        for field, entity_id, scope in (
+            ("agency_ids", "agency:tc-police", "agency_jurisdiction"),
+            ("location_ids", "location:tc-xitun", "location_jurisdiction"),
+            ("district_id", "location:tc-xitun", "location_jurisdiction"),
+        ):
+            source = {field: entity_id if field == "district_id" else [entity_id]}
+            snapshot = json.loads(json.dumps(source))
+            self.assertEqual(fusion.bind_document_entities(source, registry)[field], source[field])
+            self.assertEqual(source, snapshot)
+            self.assertEqual(fusion.bind_document_entities(dict(source, **{scope: "台中市"}), registry)[field], source[field])
+            for scope_field in (scope, "jurisdiction"):
+                with self.subTest(field=field, scope=scope_field):
+                    with self.assertRaisesRegex(ValueError, "conflicts with document jurisdiction"):
+                        fusion.bind_document_entities(dict(source, **{scope_field: "臺北市"}), registry)
+
     def test_direct_named_event_id_must_match_document_jurisdiction_and_observed_date(self):
         registry = json.loads((ROOT / "tests/fixtures/entity-registry/false-positives.v1.json").read_text(encoding="utf-8"))
         direct = document("POLICE", named="named_event:forum-0920")
@@ -324,6 +341,25 @@ class PublicEventFusionTests(unittest.TestCase):
         after = fusion.fuse_documents([document("POLICE", version="v2"), document("TRAFFIC")])[0]
         self.assertEqual(before["public_event_id"], after["public_event_id"])
         self.assertNotEqual(before["linked_document_versions"], after["linked_document_versions"])
+
+    def test_event_updated_at_uses_latest_source_revision_or_observation(self):
+        older = document("CITY")
+        older.update({
+            "created_at": "2026-09-18T09:00:00+08:00",
+            "updated_at": "2026-09-20T09:00:00+08:00",
+            "observed_at": "2026-09-20T09:05:00+08:00",
+        })
+        newer = document("POLICE")
+        newer.update({
+            "created_at": "2026-09-19T10:00:00+08:00",
+            "updated_at": "2026-09-21T16:00:00+08:00",
+            "observed_at": "2026-09-21T16:10:00+08:00",
+        })
+
+        event = fusion.fuse_documents([older, newer])[0]
+
+        self.assertEqual(event["created_at"], "2026-09-18T09:00:00+08:00")
+        self.assertEqual(event["updated_at"], "2026-09-21T16:10:00+08:00")
 
     def test_input_order_preserves_event_identity_and_link_order(self):
         documents = [document("CITY"), document("POLICE"), document("TRAFFIC")]

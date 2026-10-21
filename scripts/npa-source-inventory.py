@@ -4,16 +4,22 @@ from __future__ import annotations
 
 import argparse
 from datetime import datetime, timezone
+from functools import partial
 import hashlib
+import importlib.util
 import json
 from pathlib import Path
 import re
+import sys
 from urllib.parse import parse_qs, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 from typing import Any
 
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from intel_v2 import npa_source_adapters as adapters
+
 DEFAULT_INVENTORY = ROOT / "docs/govintel/npa-source-inventory.v1.json"
 DEFAULT_CATALOG = ROOT / "docs/govintel/source-catalog.v2.json"
 DEFAULT_FIXTURE = ROOT / "tests/fixtures/npa/batch1.json"
@@ -305,15 +311,42 @@ def fixture_canary_report(inventory: dict[str, Any], fixture_path: Path = DEFAUL
         for row in inventory["sources"]
         if row.get("batch") in {"BATCH_1", "BATCH_2", "BATCH_3"}
     }
-    if not fixture.get("assembly") or not fixture.get("statistics") or not fixture.get("rumors"):
-        raise ValueError("Batch 1 fixture is incomplete")
+    observed_at = "2026-09-21T09:00:00+08:00"
+    parsers = {
+        "assembly": partial(adapters.parse_assembly_records, observed_at=observed_at),
+        "statistics": partial(adapters.parse_important_statistics_rows, observed_at=observed_at),
+        "fraud_effectiveness": partial(adapters.parse_fraud_effectiveness_rows, observed_at=observed_at),
+        "rumors": partial(adapters.parse_165_records, dataset_id="38262"),
+        "old_fraud_domains": partial(adapters.parse_165_records, dataset_id="160055"),
+        "current_fraud_domains": partial(adapters.parse_165_records, dataset_id="176455"),
+    }
+    parsed = {}
+    failed_sections = []
+    spec = importlib.util.spec_from_file_location("npa_fixture_fusion", ROOT / "scripts/public-event-fusion.py")
+    fusion = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(fusion)
+    events = []
+    for section, parser in parsers.items():
+        rows = fixture.get(section)
+        try:
+            if not isinstance(rows, list) or not rows:
+                raise ValueError("missing or invalid fixture section")
+            normalized = parser(rows)
+            if section == "assembly":
+                events = fusion.fuse_documents(normalized)
+            parsed[section] = normalized
+        except ValueError:
+            failed_sections.append(section)
     return {
         "mode": "OFFLINE_FIXTURE",
+        "status": ("PARTIAL" if parsed else "FAILED") if failed_sections else "PASS",
         "records": records,
+        "parsed_records": sum(len(rows) for rows in parsed.values()),
         "frequency_classes": len(frequencies),
-        "parse_failures": 0,
-        "schema_drift": 0,
-        "events_used": len(fixture["assembly"]),
+        "parse_failures": len(failed_sections),
+        "schema_drift": len(failed_sections),
+        "failed_sections": failed_sections,
+        "events_used": len(events),
         "handoff_used": 0,
     }
 
@@ -322,6 +355,7 @@ def self_check() -> None:
     inventory = load_json(DEFAULT_INVENTORY)
     summary = validate_inventory(inventory, load_json(DEFAULT_CATALOG))
     canary = fixture_canary_report(inventory)
+    assert canary["status"] == "PASS", f"NPA fixture canary failed: {canary['failed_sections']}"
     assert summary["role_counts"]["PRIMARY_EVENT"] >= 1
     assert summary["role_counts"]["EXCLUDE_OR_AGGREGATE_ONLY"] >= 3
     print(
