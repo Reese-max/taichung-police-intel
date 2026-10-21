@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "scope": "OWNED_SYNTHETIC_AUDIO_FIXTURE",
+  "rights": "Original PCM silence generated locally for this repository's tests; synthetic transcript and official locators are test data, not meeting evidence.",
+  "duration_seconds": 1800,
+  "chunk_seconds": 30,
+  "stream_disconnect": [300, 390],
+  "asr_outage_at": 600,
+  "crash_at": 900,
+  "started_at": "2026-10-16T10:00:00+08:00",
+  "interim_text": "交通預算已通過",
+  "final_text": "交通預算尚待審查",
+  "minutes_text": "預算尚未通過，另案審查。"
+}
