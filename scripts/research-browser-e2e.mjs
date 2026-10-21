@@ -15,7 +15,7 @@ const publicRoot = resolve(root, "apps/web/out");
 const output = resolve(process.env.GOVINTEL_RESEARCH_BROWSER_OUTPUT || "/tmp/govintel-research-browser");
 const types = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".woff2": "font/woff2" };
 const sourceStatus = JSON.parse(await readFile(resolve(root, "apps/web/public/data/source-status.json"), "utf8"));
-const release = { release_id: "OFFLINE-RESEARCH-BROWSER", code_sha: execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim(), publication_generation: sourceStatus.latest_collection_run.collection_run_id };
+const release = { code_sha: execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim(), publication_generation: sourceStatus.latest_collection_run.collection_run_id };
 const checks = [];
 const server = createServer(async (request, response) => {
   try {
@@ -38,6 +38,10 @@ try {
   const module = await governedFixture.loadWorker("research-browser");
   const bytes = await governedFixture.publication();
   const snapshot = await module.buildSnapshot({ PUBLIC_ORIGIN: "https://offline.example.invalid" }, async name => ({ bytes: bytes[name], hash: createHash("sha256").update(bytes[name]).digest("hex") }));
+  // Bind fictional responses to the generation rendered by the offline page.
+  Object.assign(release, await module.createReleaseManifest({ ...snapshot,
+    generatedFrom: { ...snapshot.generatedFrom, collection_run_id: release.publication_generation },
+  }, release.code_sha));
   snapshot.release = release;
   const corpus = await createDocumentResearchFixture(snapshot, { texts: [
     "FICTIONAL OFFLINE DOCUMENT. 交通公告記載的開始時間為 16:00。",
@@ -73,7 +77,9 @@ try {
       if (currentMode === "error") return route.fulfill({ status: 503, json: { error: { code: "PROVIDER_UNAVAILABLE", message: "SYNTHETIC_UPSTREAM_PRIVATE_MARKER" } } });
       const payload = { schema_version: 1, status: "METADATA_ONLY", reason_code: currentMode === "metadata" ? "DISABLED" : "RIGHTS_BLOCKED", provider: { name: "MiniMax", state: "DISABLED" }, question: input.question, answer: [],
         sources: currentMode === "metadata" ? [{ evidence_id: "OFFLINE-FICTIONAL-1", source_id: "OFFLINE-SOURCE", title: "離線測試：交通管制公告索引（非真實公告）", official_url: "https://example.test/fictional", published_at: "2026-10-01T01:00:00Z", data_as_of: null, fetched_at: "2026-10-05T02:00:00Z" }] : [],
-        source_gaps: [{ source_id: null, reason: "STALE_SNAPSHOT" }], query_generation_id: "offline-fixture-generation", data_status: "STALE", coverage_limitation: "離線測試資料。僅提供索引，不代表現實事件或最新狀態。", release };
+        source_gaps: [{ source_id: null, reason: "STALE_SNAPSHOT" }], query_generation_id: release.query_generation, data_status: "STALE", coverage_limitation: "離線測試資料。僅提供索引，不代表現實事件或最新狀態。", release };
+      if (currentMode === "mixed-release") payload.release = { ...release, source_policy_hash: "0".repeat(64) };
+      if (currentMode === "mixed-generation") payload.query_generation_id = "old-generation";
       return route.fulfill({ json: payload }).catch(() => {});
     }
     // Keep the QA completely offline, including unexpected third-party assets.
@@ -128,6 +134,15 @@ try {
   await page.goBack(); await page.getByRole("heading", { name: "你想查找哪類公開資料？" }).waitFor();
   assert.equal(await page.locator(".research-turn").count(), 0); assert.deepEqual(errors, []);
   checks.push("navigation back does not resurrect conversation; zero page errors");
+  for (const fault of ["mixed-release", "mixed-generation"]) {
+    mode = fault;
+    await page.getByLabel("輸入研究問題", { exact: true }).fill("交通"); await checkbox.check(); await submit.click();
+    await page.getByRole("heading", { name: "發布版本待更新", exact: true }).waitFor();
+    assert.equal(await page.locator(".research-result").count(), 0);
+    assert.equal(await page.locator(".research-answer").count(), 0);
+    await page.getByRole("button", { name: "開始新對話", exact: true }).click();
+    checks.push(`${fault} is refused without rendering stale results`);
+  }
   mode = "document-fixture";
   await page.getByLabel("研究模式", { exact: true }).selectOption("documents");
   await page.getByLabel("輸入研究問題", { exact: true }).fill("交通"); await checkbox.check(); await submit.click();

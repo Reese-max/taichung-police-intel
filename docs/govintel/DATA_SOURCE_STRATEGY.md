@@ -202,4 +202,33 @@ S-031 消防即時災情已接線為候選 adapter；它是高頻、短生命週
 
 `promotion_plan` 中每個來源都必須在觀測窗口內逐日累積有效 canary receipt；`scripts/verify-candidate-observation-window.py` 會把「來源完全沒有出現在任何 receipt」視為未完成窗口（BLOCKED），而不是略過。每日觀測 workflow（`.github/workflows/candidate-source-observation.yml`）的 matrix 必須涵蓋 `promotion_plan` 全部來源（S-019、S-001、S-032、S-033、S-031），缺漏來源無法累積七日收據。
 
+### 2026-10-16：候選觀察增量快取修正（#14）
+
+`scripts/candidate-runtime-canary.py` 的 `item_state` 保存下次列表差異比對所需的 stable ID／內容 hash。來源失敗、schema 拒絕或詳頁預算檢查失敗時保留先前快取；所有檢查通過後才更新。新聞列表的 `PARTIAL` 觀察合併已見項目並保留未見 ID，完整觀察（含 `COMPLETE_ZERO`）則替換快取。S-031 成功時只保存當次快照的 hashes，避免累積已消失的即時災情 ID。
+
+| #14 驗收項目 | 程式／離線驗證與剩餘界線 |
+|---|---|
+| 列表先行、僅新／變更 ID 取得詳頁 | 沿用 `online_collect.collect_news_list`；`test_news_list_collector.py` 驗證 unchanged skip、變更與請求上限。 |
+| 失敗／PARTIAL 不破壞既有資料 | `test_candidate_runtime_canary.py` 新增失敗報告重載、schema／健康／詳頁上限拒絕、PARTIAL 保留未見 ID；快取與輸入彼此獨立。正式 LKG 仍由原有 collector／publication 流程管理。 |
+| success／FAILED／PARTIAL／COMPLETE_ZERO | 候選 runtime 回歸涵蓋各狀態；完整觀察依實際 items 替換快取，零筆窗口仍可保留窗口外列表項目，空快照才清空；失敗仍保留 null 計數。 |
+| stable key、版本、無實質變更不警示、首次 baseline、兩次完整快照才移除 | 沿用 `intel_v2.semantics.compare_snapshot` 與 `test_v2_semantics.py`；快取更新不產生事件。 |
+| S-031 隱私、短期保存與用途提示 | 沿用 coarse metadata、retention policy 與 public usage notice；新增成功快照不累積舊 ID 的回歸。實際來源／UI 與七日條件仍需真實驗收。 |
+| 不破壞既有五個 P0 source | collector、P0 集合與核准 policy 均沿用；建置通過，但本機完整測試仍有下列阻擋，未宣稱全專案回歸通過。 |
+| 發布來源角色／integration status、未核准不得 production | 沿用 source policy、bundle validator 與候選觀察窗口檢查；本次未升級來源。 |
+| 每來源七日 canary、匿名回查、獨立完整性與權利 | 本次僅離線程式修補，未新增真實觀察日、匿名來源查核或權利證據，這些條件仍待完成。 |
+
+本次未執行線上 collector、部署、push 或 PR；#14 維持未結案。既有候選／production 狀態及歷史收據保留。
+
+本機驗證（完整紀錄保留在忽略的 `.runtime/issue-14-*.log`）：
+
+| 命令 | 實際結果 |
+|---|---|
+| `python -X utf8 -m unittest discover -s tests -p test_candidate_runtime_canary.py -v` | 原有 19 項通過；新增回歸後 24 項出現 4 failures／1 error（exit 1），修正後 24 項通過（exit 0）。 |
+| `python -X utf8 -m unittest discover -s tests -v` | 1,541 項，17 failures／86 errors／12 skipped，exit 1。包含 Windows 缺少 `os.O_NONBLOCK`／FIFO、symlink 權限／Unix mode、PDF parser pin、子程序 CP950，以及提交前乾淨工作目錄檢查。 |
+| `npm --prefix apps/web test` | 800 項，795 pass／5 fail，exit 1；含 PDF parser pin、子程序 CP950、提交前工作目錄檢查與一次 Python fixture 逾時。該逾時案例單獨重跑 1/1 pass（exit 0）。 |
+| `npm run check:gate0`、`npm run check:specs` | 各 exit 0，`required=164 specs=4 secrets=0`。 |
+| `npm --prefix apps/web run build` | exit 0，Next 16.3.8 編譯與 11/11 靜態頁面產生成功，source policy `changed=false`。 |
+
+以 `git show c629f82a8b16825d5d89c204c7035dcba500a9ac:intel_v2/checkpoint_code_binding.py` 的原件獨立重現缺少 `O_NONBLOCK`；相關原件與目前工作目錄內容一致。現有 Python 的 `pypdf=6.18.0` 與專案 pin `6.19.0` 不符。這些完整測試阻擋未在 #14 擴大修補，也未以跳過測試或更改全域環境掩蓋。
+
 機器可讀清冊：`docs/govintel/source-catalog.v2.json`。

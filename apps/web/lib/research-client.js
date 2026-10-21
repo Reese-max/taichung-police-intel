@@ -1,4 +1,6 @@
 // Browser-side transport only. Provider credentials and model calls stay on the Gateway.
+import { releaseBindingMatches } from "./query-release-client.js";
+
 export const RESEARCH_QUESTION_LIMIT = 512;
 export const RESEARCH_HISTORY_LIMIT = 4;
 export const RESEARCH_MODES = Object.freeze(["metadata", "documents", "synthesis"]);
@@ -286,7 +288,7 @@ export async function requestResearch(endpoint, input, context = {}) {
     const releaseResponse = await request(`${context.basePath || ""}/data/release.json`);
     if (!releaseResponse.ok) throw problem("無法核對發布版本，請稍後重試。", "PENDING_UPDATE");
     const release = await json(releaseResponse);
-    if (!text(release?.release_id, 256) || !text(release?.code_sha, 128)
+    if (!releaseBindingMatches(release, release)
         || (context.codeSha && release.code_sha !== context.codeSha)
         || release.publication_generation !== context.publicationGeneration) {
       throw problem("發布版本已變更，請重新載入頁面後查詢。", "PENDING_UPDATE");
@@ -300,7 +302,7 @@ export async function requestResearch(endpoint, input, context = {}) {
       const code = typeof payload?.error?.code === "string" && /^[A-Z][A-Z0-9_]{0,127}$/.test(payload.error.code) ? payload.error.code : "FAILED";
       throw problem("研究請求未完成，沒有可顯示的回答。", code);
     }
-    if (release && ["release_id", "code_sha", "publication_generation"].some(field => payload?.release?.[field] !== release[field])) {
+    if (!releaseBindingMatches(payload?.release, release) || payload?.query_generation_id !== release.query_generation) {
       throw problem("回應發布版本已變更，請重新載入頁面後查詢。", "PENDING_UPDATE");
     }
     const checked = validateResearchResponse(payload, body.question, body.mode);
