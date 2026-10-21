@@ -9,6 +9,7 @@ const destinations = [
   ["/public-query/", "公開查詢"],
   ["/research/", "公開研究"],
   ["/tracking/", "我的追蹤"],
+  ["/live/", "會議導航"],
   ["/sources/", "來源狀態"],
 ];
 
