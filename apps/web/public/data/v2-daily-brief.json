@@ -30,8 +30,8 @@
   ],
   "baseline_established_at": "2026-08-27T12:13:22+08:00",
   "candidate_source_context": {
-    "collection_run_id": "CR-DEMO-20261022-EVENING-SCHEDULE",
-    "generated_at": "2026-10-22T23:25:49+08:00",
+    "collection_run_id": "CR-DEMO-20261023-EVENING-SCHEDULE",
+    "generated_at": "2026-10-23T23:16:28+08:00",
     "integration_status": "CANDIDATE",
     "items": [
       {
@@ -62,6 +62,21 @@
         "stable_id": "FEED-S-019-b78051fe1ae5efdc",
         "stable_key": "3395508",
         "title": "2第734次市政會議紀錄(10月6日)：都發局「幸福城市，安居臺中，以人為本的都市發展與住宅實踐」及地政局「幸福城市，地利共享」2026-10-19",
+        "window_completeness": "PARTIAL"
+      },
+      {
+        "change_type": "CANDIDATE_OBSERVATION",
+        "eligibility": "INELIGIBLE_CANDIDATE",
+        "integration_status": "CANDIDATE",
+        "official_url": "https://www.traffic.taichung.gov.tw/news/index-1.asp?Parser=9,4,20,,,,21854",
+        "promotion_eligible": false,
+        "published_at": "2026-10-23T00:00:00+08:00",
+        "source_health": "PASS",
+        "source_id": "S-032",
+        "source_name": "臺中市政府交通局最新消息",
+        "stable_id": "FEED-S-032-6adf81d6550c8914",
+        "stable_key": "21854",
+        "title": "薔琵颱風來襲 中市部分紅黃線路段開放停車",
         "window_completeness": "PARTIAL"
       },
       {
@@ -203,7 +218,7 @@
         "change_type": "CANDIDATE_OBSERVATION",
         "eligibility": "INELIGIBLE_CANDIDATE",
         "integration_status": "CANDIDATE",
-        "official_url": "https://www.traffic.taichung.gov.tw/news/index-1.asp?Parser=9,4,20,,,,21831",
+        "official_url": "https://www.traffic.taichung.gov.tw/news/index-1.asp?Parser=9,4,20,,,,21831,,,,2",
         "promotion_eligible": false,
         "published_at": "2026-10-16T00:00:00+08:00",
         "source_health": "PASS",
@@ -228,21 +243,6 @@
         "stable_key": "21829",
         "title": "北區新興停車場BOT案公聽會！中市交通局廣徵民意 打造更完善停車環境",
         "window_completeness": "PARTIAL"
-      },
-      {
-        "change_type": "CANDIDATE_OBSERVATION",
-        "eligibility": "INELIGIBLE_CANDIDATE",
-        "integration_status": "CANDIDATE",
-        "official_url": "https://www.traffic.taichung.gov.tw/news/index-1.asp?Parser=9,4,20,,,,21827,,,,2",
-        "promotion_eligible": false,
-        "published_at": "2026-10-15T00:00:00+08:00",
-        "source_health": "PASS",
-        "source_id": "S-032",
-        "source_name": "臺中市政府交通局最新消息",
-        "stable_id": "FEED-S-032-c5a8710ab0cf5942",
-        "stable_key": "21827",
-        "title": "AI守護行人安全！中市交通局導入智慧安全警示系統 新光遠百商圈10月底啟用",
-        "window_completeness": "PARTIAL"
       }
     ],
     "promotion_eligible": false,
@@ -257,7 +257,7 @@
           "NO_LAST_KNOWN_GOOD",
           "NO_DATA_AS_OF"
         ],
-        "last_checked_at": "2026-10-22T23:25:38+08:00",
+        "last_checked_at": "2026-10-23T23:16:20+08:00",
         "pagination": null,
         "promotion_eligible": false,
         "source_health": "FAILED",
@@ -274,7 +274,7 @@
           "NO_LAST_KNOWN_GOOD",
           "STALE_DATA"
         ],
-        "last_checked_at": "2026-10-22T23:25:45+08:00",
+        "last_checked_at": "2026-10-23T23:16:24+08:00",
         "pagination": {
           "complete": false,
           "page_limit": 4,
@@ -296,7 +296,7 @@
           "NO_LAST_KNOWN_GOOD",
           "STALE_DATA"
         ],
-        "last_checked_at": "2026-10-22T23:25:49+08:00",
+        "last_checked_at": "2026-10-23T23:16:28+08:00",
         "pagination": {
           "complete": false,
           "page_limit": 4,
@@ -312,7 +312,7 @@
       }
     ]
   },
-  "generated_at": "2026-10-22T23:25:49+08:00",
+  "generated_at": "2026-10-23T23:16:28+08:00",
   "generator_version": 2,
   "mode": "V2_SHADOW",
   "other_changes": [],
@@ -402,7 +402,7 @@
   ],
   "schema_version": 1,
   "snapshot_complete": false,
-  "source_collection_run_id": "CR-DEMO-20261022-EVENING-SCHEDULE",
+  "source_collection_run_id": "CR-DEMO-20261023-EVENING-SCHEDULE",
   "source_health": {
     "failed_count": 0,
     "gap_count": 6,
@@ -422,7 +422,7 @@
     "policy_hash": "3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501",
     "policy_version": 1
   },
-  "source_status_generated_at": "2026-10-22T23:25:49+08:00",
+  "source_status_generated_at": "2026-10-23T23:16:28+08:00",
   "status_message": "本期未偵測到可確認的新增或修正；歷史資料保留於資料庫。",
   "tracking_items": []
 }
