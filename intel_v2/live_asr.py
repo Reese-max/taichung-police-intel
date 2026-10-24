@@ -142,8 +142,24 @@ def ingest_chunk(
     if usage["mode"] != ("FIXTURE_ONLY" if fixture else "GROQ_RECORDED_AUDIO"):
         raise ValueError("fixture and paid usage cannot share a session")
     if state["transport_status"] == "BUDGET_STOP":
-        return state
+        # Record SESSION_CRASH gaps for any PENDING calls before budget stop
+        for previous in usage["calls"]:
+            if previous["status"] == "PENDING":
+                if result["status"] == "FAILED":
+                    result = resume_session(_touch(result, at), resumed_at=at)
+                result = record_gap(_touch(result, at), start_seconds=previous["start_seconds"],
+                                    end_seconds=previous["end_seconds"], reason="SESSION_CRASH", detected_at=at)
+                previous["status"] = "FAILED"
+        return result
     if elapsed >= state["budget_seconds"] or usage["reserved_seconds"] >= state["budget_seconds"]:
+        # Record SESSION_CRASH gaps for any PENDING calls before budget exhaustion
+        for previous in usage["calls"]:
+            if previous["status"] == "PENDING":
+                if result["status"] == "FAILED":
+                    result = resume_session(_touch(result, at), resumed_at=at)
+                result = record_gap(_touch(result, at), start_seconds=previous["start_seconds"],
+                                    end_seconds=previous["end_seconds"], reason="SESSION_CRASH", detected_at=at)
+                previous["status"] = "FAILED"
         if result["status"] == "FAILED":
             result = resume_session(_touch(result, at), resumed_at=at)
         result = budget_stop(_touch(result, at), stopped_at=at)
