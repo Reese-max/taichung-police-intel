@@ -24,7 +24,7 @@ from typing import Callable
 import wave
 
 from intel_v2.live_meeting import (
-    _number, _stamp, _touch, add_bookmark, append_segment, budget_stop, build_timeline,
+    _gap_id, _number, _stamp, _touch, add_bookmark, append_segment, budget_stop, build_timeline,
     record_gap, reconcile_session, resume_session, start_session, stop_session, validate_session,
 )
 from intel_v2.role_profiles import load_catalog
@@ -141,8 +141,45 @@ def ingest_chunk(
     })
     if usage["mode"] != ("FIXTURE_ONLY" if fixture else "GROQ_RECORDED_AUDIO"):
         raise ValueError("fixture and paid usage cannot share a session")
-    if state["transport_status"] == "BUDGET_STOP":
-        return state
+    was_budget_stopped = state["transport_status"] == "BUDGET_STOP"
+    # A durable reservation is charged even when the process never recorded
+    # its result. Recover it before either a budget short circuit or any new
+    # chunk validation can return/raise; rejecting a replay must not leave the
+    # on-disk ledger PENDING indefinitely.
+    recovered = False
+    for index, previous in enumerate(usage["calls"]):
+        if previous["status"] == "PENDING":
+            # Older adapters could already have persisted a budget gap over
+            # this uncertain call. Split only that synthetic gap so the crash
+            # remains visible, without reopening the stopped transport.
+            if was_budget_stopped:
+                gaps = []
+                for gap in result["gap_intervals"]:
+                    if (gap["reason"] != "BUDGET_STOP" or previous["start_seconds"] >= gap["end_seconds"]
+                            or previous["end_seconds"] <= gap["start_seconds"]):
+                        gaps.append(gap)
+                        continue
+                    if gap["start_seconds"] < previous["start_seconds"]:
+                        gaps.append(dict(gap, end_seconds=previous["start_seconds"],
+                                         gap_id=_gap_id(result, gap["start_seconds"], previous["start_seconds"], "BUDGET_STOP")))
+                    if gap["end_seconds"] > previous["end_seconds"]:
+                        gaps.append(dict(gap, start_seconds=previous["end_seconds"],
+                                         gap_id=_gap_id(result, previous["end_seconds"], gap["end_seconds"], "BUDGET_STOP")))
+                result["gap_intervals"] = gaps
+            if result["status"] == "FAILED":
+                result = resume_session(_touch(result, at), resumed_at=at)
+            result["provider_usage"]["calls"][index]["status"] = "FAILED"
+            result = record_gap(_touch(result, at), start_seconds=previous["start_seconds"],
+                                end_seconds=previous["end_seconds"], reason="SESSION_CRASH", detected_at=at)
+            recovered = True
+    if recovered:
+        if was_budget_stopped:
+            result["transport_status"] = "BUDGET_STOP"
+            result = _touch(result, at)
+        save(result)
+        usage = result["provider_usage"]
+    if was_budget_stopped:
+        return result if recovered else state
     if elapsed >= state["budget_seconds"] or usage["reserved_seconds"] >= state["budget_seconds"]:
         if result["status"] == "FAILED":
             result = resume_session(_touch(result, at), resumed_at=at)
@@ -169,13 +206,6 @@ def ingest_chunk(
     for row in [*result["segments"], *result["gap_intervals"]]:
         if start < row["end_seconds"] and end > row["start_seconds"]:
             raise ValueError("chunk overlaps an existing segment or gap")
-    for previous in usage["calls"]:
-        if previous["status"] == "PENDING":
-            if result["status"] == "FAILED":
-                result = resume_session(result, resumed_at=at)
-            result = record_gap(_touch(result, at), start_seconds=previous["start_seconds"],
-                                end_seconds=previous["end_seconds"], reason="SESSION_CRASH", detected_at=at)
-            previous["status"] = "FAILED"
     if result["status"] == "FAILED":
         result = resume_session(_touch(result, at), resumed_at=at)
     last_end = max([row["end_seconds"] for row in [*result["segments"], *result["gap_intervals"]]] + [0])

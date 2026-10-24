@@ -28,3 +28,40 @@ Issue #21 B 段還要求「每來源請求上限、主機併發上限、退避�
 刻意保留的界線：目前只有一次隔離 ephemeral DB migration 驗證，尚未在持久／正式 DB 執行排程，也沒有 7-day canary；因此不能宣稱 production recheck、公開部署或真實來源收件已完成。
 
 正式資料庫以 transaction advisory lock 序列化預算准入與 ledger 更新；rolling window 同時計入未到期與其他來源的已保存請求，不只當次到期批次。無法解讀的歷史額度會拒絕同來源／host 的新請求。
+
+## 2026-10-20：完整正文複查與摘要依賴修正
+
+本輪沿用既有 collector、版本分類器、snapshot blobs 與 handoff 流程，補上 B→C 的正確性缺口，沒有新增來源或改動排程。這是 Issue #21 可獨立驗收的一段，並非整份需求或正式部署的完成證明。
+
+- `plan_recheck()`、`recheck_detail()`、`run_detail_rechecks()` 支援 `full_recheck_interval_hours`（預設 168 小時，不得短於一般 `interval_hours`）。一般核對到期時，最後成功取得正文的 `observed_at` 若已超過完整複查期限，或該時間未知，就移除條件式 headers 重新取得正文；仍遵守既有每輪／來源／主機額度與退避。這是第一個到期核對的策略，並非七天內一定成功的 SLA。
+- collector 從既有 `last_result.classification.after`／`before` 恢復正文時間與語意欄位，不新增 migration。304、429 與失敗可更新核對時間，但不會把最後成功取得正文的時間往後推；舊資料沒有這項時間時，下次到期採完整複查。
+- 標題、地點、狀態、範圍與官方時間欄位一併保存在前後版本及 handoff invalidation。修正會標記正確的舊 claim；相同資料重跑不再遺失欄位或重複要求核對。未提供的官方時間仍保持 null。
+- 額外保存 `material_text_sha256`，只忽略空白前或句尾的 `.!?。！？` 差異。原始正文 hash、既有正規化 hash 與文件版本仍保留差異；`17:00 → 16:00`、`1.5 → 15` 仍要求核對。其他標點或語意不明的修改採保守待核對，未加入 LLM 或通用語意解析器。
+- HTTP adapter 只列舉附件連結，故即使正文 200 成功，也明確回報 `attachment_recheck_required=true`；304 同樣不能證明附件未變。
+
+### 本輪驗收對照
+
+| Issue 情境 | 證據與界線 |
+|---|---|
+| 同網址／標題／列表，正文更正 | HTTP fixture 的時間更正為 `MATERIAL_CHANGE`；定期移除 validators，避免永久依賴來源的 304。一般正文仍只提供 hash 異動，沒有自動抽取「管制開始時間」的欄位差異文案。 |
+| 排版或標點變更 | 既有 `PRESENTATION_ONLY` 與新增句末標點 fixture 通過；其他標點仍可能要求人工核對。 |
+| 正文不變、附件內容更正 | 分類器可比較外部已核對的附件 hash，但 HTTP transport 尚未下載同網址附件；此項未完成。 |
+| 首次看到上月文件 | 沿用官方日期／擷取日期分離，不以本輪時間補造官方時間；參見 `test_official_source_dates.py`、`test_date_metadata_projection.py`。 |
+| 首次完整快照、相同資料重跑 | `BASELINE` 不產生 NEW；新增語意欄位重播檢查為 `UNCHANGED`。 |
+| partial／失敗／單筆消失 | 沿用 last-known-good 與 `event_cancelled=false`；未新增任何自動取消或解除語意。 |
+| 更正缺乏可確認關聯 | 依確切 source/stable key 與已確認文件版本關聯；不按主題改寫其他摘要。 |
+| 靜態舊版前推時鐘 | 既有 `publication-freshness.test.mjs` 驗證不用重建即可過期、未知時鐘不保證時效；未新增 deployment receipt。 |
+| Twinkle 索引較新、原始期別較舊 | 本輪未接入或變更 Twinkle；原始 dataset/resource 對應及 live canary 仍由 #14 驗收。 |
+| 同源雙路徑 | 沿用 `test_public_event_fusion.py` 的獨立來源去重；未擴充來源數。 |
+| 併發、重試與 delayed job | 沿用 advisory lock、rolling budget 與 handoff 來源時鐘；新增重啟／304／完整核對往返測試。真實 PostgreSQL 併發測試仍需要隔離的 `TEST_DATABASE_URL`。 |
+| 公告→異動→舊摘要待核對→人工確認→新版匯出 | `test_semantic_correction_rechecks_only_dependent_handoff_and_exports_new_version` 為明確標示的合成公告重播：保留前後地點、僅影響相關摘要、舊版不變、新版另有編號及引用。既有 `scripts/handoff-state.py self-check` 提供可操作的跨日重播。 |
+
+可由 Git Bash 重跑本輪相關驗收：
+
+```bash
+python -X utf8 -B -m unittest discover -s tests -p 'test_detail_recheck*.py' && python -X utf8 -B -m unittest discover -s tests -p 'test_handoff_state.py' && python -X utf8 -B -m unittest discover -s tests -p 'test_review_inbox.py' && node --test apps/web/tests/publication-freshness.test.mjs
+```
+
+未做：同網址附件 bytes 下載／持久化與獨立複查、一般正文的重要主張自動抽取與差異文案、完整 A 段 deployment/publication receipt 整合、Twinkle／新來源接入、實際部署／canary／延遲量測。本輪不啟動正式資料庫、不宣稱正式公告漏件已重現，也不把合成重播當成 production 證據。專案目前沒有設定獨立 lint、coverage ratchet、CRAP 或 mutation gate；沿用既有驗證器與測試，未安裝額外工具。
+
+廣域驗證：已完整執行 `npm test`，原生 Windows 未全綠；既有 checkpoint／來源稽核測試使用 POSIX 的 `O_NONBLOCK`、檔案權限、directory fsync 與 Unix signal，另有需乾淨提交的 current-checkout gate。這些平台限制不藉本輪修改繞過；相關驗收命令與 Linux 全套補驗分開回報，不以局部綠燈冒充全套通過。

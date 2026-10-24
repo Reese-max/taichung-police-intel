@@ -11,6 +11,7 @@ import { indexQueryPresentation } from "../../lib/query-presentation.js";
 import { validateSourceStatus } from "../../lib/source-status.js";
 import { publicationDate, sourceDateLabel } from "../../lib/publication-dates.js";
 import PopulationBackground from "../../components/PopulationBackground.js";
+import QueryChat from "../../components/QueryChat.js";
 import "./query.css";
 
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
@@ -189,6 +190,7 @@ export default function PublicQueryPage() {
   return <main className="pq-page" aria-labelledby="pq-title">
     <header className="pq-header"><div><p className="pq-eyebrow">GovIntel AI · 免登入公開查詢</p><h1 id="pq-title">公共資訊查詢</h1>
       <p className="pq-desc">查詢已准入的公開索引；來源未准入或涵蓋不完整時顯示暫不可用，不當作零筆資料。</p><a href={`${BASE_PATH}/#v2-archive-title`}>閱讀既有歷史資料與原文</a></div></header>
+    <QueryChat endpoint={GATEWAY} releaseContext={{ basePath: BASE_PATH, codeSha: process.env.NEXT_PUBLIC_RELEASE_CODE_SHA, publicationGeneration: sourceStatus?.latest_collection_run?.collection_run_id }} />
     <p id="pq-mode-note" className="pq-coverage">行政區、類型、路段、日期篩選與正式事件查詢尚未提供。合成示例非真實資料。</p>
     <div className="pq-field pq-mode-select"><label htmlFor="pq-mode">資料模式</label><select id="pq-mode" value={mode} aria-describedby="pq-mode-note" onChange={(event) => changeMode(event.target.value)}>
       <option value="published">公開原文索引 · 關鍵字查詢</option><option value="events" disabled>正式事件查詢 · 尚未提供</option><option value="replay">合成通勤示例 · 保存快照重播</option>

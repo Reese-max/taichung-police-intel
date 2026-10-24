@@ -30,7 +30,7 @@ test("gold evaluation unit suite passes", () => {
     "-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_gold_evaluator.py", "-v",
   ]);
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-  assert.match(result.stderr, /Ran 47 tests/);
+  assert.match(result.stderr, /Ran 50 tests/);
   assert.match(result.stderr, /OK/);
 });
 

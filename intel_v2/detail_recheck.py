@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import re
 from datetime import datetime, timedelta
 from typing import Any
@@ -15,6 +16,7 @@ from zoneinfo import ZoneInfo
 
 
 TZ = ZoneInfo("Asia/Taipei")
+FULL_RECHECK_INTERVAL_HOURS = 168
 HASH_RE = r"^[0-9a-f]{64}$"
 SEMANTIC_FIELDS = (
     "title",
@@ -95,11 +97,15 @@ def plan_recheck(
     now: str,
     *,
     interval_hours: float = 24,
+    full_recheck_interval_hours: float = FULL_RECHECK_INTERVAL_HOURS,
 ) -> dict[str, Any]:
     """Return a due/conditional-request plan without contacting the source."""
     current = _timestamp(now)
-    if not isinstance(interval_hours, (int, float)) or interval_hours <= 0:
-        raise ValueError("interval_hours must be positive")
+    for field, value in (("interval_hours", interval_hours), ("full_recheck_interval_hours", full_recheck_interval_hours)):
+        if type(value) not in (int, float) or not math.isfinite(value) or value <= 0:
+            raise ValueError(f"{field} must be positive and finite")
+    if full_recheck_interval_hours < interval_hours:
+        raise ValueError("full_recheck_interval_hours must not be shorter than interval_hours")
     previous = previous or {}
     last_checked = previous.get("last_checked_at")
     if not last_checked:
@@ -107,10 +113,11 @@ def plan_recheck(
             "status": "DUE",
             "reason": "NEVER_CHECKED",
             "due_at": _stamp(current),
-            "request_headers": _request_headers(previous),
+            "request_headers": {},
         }
     checked = _timestamp(last_checked)
-    if current < checked:
+    last_full = _timestamp(previous["observed_at"]) if previous.get("observed_at") else None
+    if current < checked or (last_full is not None and current < last_full):
         return {
             "status": "UNKNOWN",
             "reason": "CLOCK_BEFORE_LAST_CHECK",
@@ -131,13 +138,18 @@ def plan_recheck(
         "status": status,
         "reason": reason,
         "due_at": _stamp(current if status == "DUE" else checked + timedelta(hours=interval_hours)),
-        "request_headers": _request_headers(previous) if status == "DUE" else {},
+        "request_headers": _request_headers(previous)
+        if status == "DUE" and last_full is not None and current - last_full < timedelta(hours=full_recheck_interval_hours)
+        else {},
     }
 
 
 def _version(previous: dict[str, Any] | None, observation: dict[str, Any], observed: str) -> dict[str, Any]:
     body_sha256 = _hash(observation.get("body_sha256"), "body_sha256")
     normalized_sha256 = _hash(observation.get("normalized_text_sha256"), "normalized_text_sha256")
+    material_text_sha256 = observation.get("material_text_sha256")
+    if material_text_sha256 is not None:
+        _hash(material_text_sha256, "material_text_sha256")
     previous = previous or {}
     attachments = _attachments(
         observation["attachments"] if "attachments" in observation else previous.get("attachments")
@@ -162,10 +174,11 @@ def _version(previous: dict[str, Any] | None, observation: dict[str, Any], obser
     }
     return {
         "document_version_id": "DOCV-" + _sha(material).upper()[:20],
+        "material_text_sha256": material_text_sha256,
         "body_sha256": body_sha256,
         "normalized_text_sha256": normalized_sha256,
         "attachments": attachments,
-        **times,
+        **{field: material[field] for field in SEMANTIC_FIELDS},
         "observed_at": observed,
         "last_checked_at": observed,
         "etag": observation["etag"] if "etag" in observation else previous.get("etag"),
@@ -180,11 +193,9 @@ def _before(previous: dict[str, Any] | None) -> dict[str, Any] | None:
         "document_version_id",
         "body_sha256",
         "normalized_text_sha256",
+        "material_text_sha256",
         "attachments",
-        "published_at",
-        "source_modified_at",
-        "effective_at",
-        "expires_at",
+        *SEMANTIC_FIELDS,
         "observed_at",
         "last_checked_at",
         "etag",
@@ -257,7 +268,7 @@ def classify_observation(
             "baseline": True,
             "preserve_last_known_good": True,
             "event_cancelled": False,
-            "attachment_recheck_required": "attachments" not in observation,
+            "attachment_recheck_required": not observation.get("attachments_checked", "attachments" in observation),
         }
 
     changed_fields = [
@@ -265,6 +276,8 @@ def classify_observation(
         if previous.get(field) != after.get(field)
     ]
     normalized_changed = previous.get("normalized_text_sha256") != after["normalized_text_sha256"]
+    if after["material_text_sha256"] and previous.get("material_text_sha256") == after["material_text_sha256"]:
+        normalized_changed = False
     attachments_changed = previous.get("attachments", []) != after["attachments"]
     body_changed = previous.get("body_sha256") != after["body_sha256"]
     if changed_fields or normalized_changed:
@@ -287,5 +300,5 @@ def classify_observation(
         "baseline": False,
         "preserve_last_known_good": True,
         "event_cancelled": False,
-        "attachment_recheck_required": "attachments" not in observation,
+        "attachment_recheck_required": not observation.get("attachments_checked", "attachments" in observation),
     }

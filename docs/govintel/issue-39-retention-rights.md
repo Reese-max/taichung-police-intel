@@ -6,7 +6,9 @@
 
 已接線：**對外綁定**。`scripts/query-gateway.py` 在每個帶 `retention` 欄位的 response 上引用啟動時推導出的 `RETENTION_BINDING`；`workers/query-gateway/src/index.js` 則 import 由 `retention-policy.py --binding` 產生的 `apps/web/public/data/retention-policy-binding.json`（變數名 `RETENTION_POLICY`）。兩邊不可能各自宣稱不同的權利狀態。MCP `initialize`／`tools/list` 外層封裝本來就不帶 `retention` 欄位。
 
-尚未接線（**本議題不宣稱已完成**）：archive gate 目前只由 `scripts/retention-policy.py` 的 CLI 與測試呼叫。實際的 live query 路徑是 `scripts/query-store.py` → `apps/web/public/data/*.json` → gateway／worker，它並沒有 import retention module；`scripts/query-store.py` 內另有一個同名但無關的 `policy_binding` 區域變數。collector 與 `scripts/migration_replay.py` 也仍走自己的資料管線。換句話說：`--project`／`--plan` 的規則已經是正確且測試過的守門員，但把它們插進 live query 路徑是後續議題的工作。
+已接線：**公開 archive gate**。collector 在建立 feed 前共用 `archive_decision(..., layer="publication")`，檢查原始 item 與內層 payload；active／candidate 的 last-known-good（LKG）在任何發布檔寫入前再次檢查，拒絕時保留原有發布檔。安全 LKG 重新發布時移除內容負載與 payload。`scripts/query-store.py` 在欄位投影前共用 `archive_decision(..., layer="query_index")`，因此 canonical rebuild 與 migration replay 的現行重建入口也受同一規則約束；Worker 則在等效入口依既有 retention matrix 執行相同檢查。治理標記不會因先清洗欄位而被忽略，錯誤也不回傳標記值。
+
+尚未完成：`project_public_record()` 的撤稿呈現與 `plan_expiry()` 的到期規劃，仍不能當成 collector／正式查詢已具備完整撤回傳播或實際清除的證據。逐來源真人審查、正式准入與部署驗收也須另有實際收據；本次僅修補公開投影前的 archive gate，不核准來源或用途。
 
 ## 資料類型矩陣
 
@@ -94,6 +96,25 @@ class 的欄位集合是**精確比對**：多一個或少一個欄位都會讓 
 binding 的每個欄位都由編譯後的政策推導：`public_projection` 來自 query index layer，`full_text_allowed`／`excerpt_allowed` 以「全部 class 都允許」為準，`catalog_hash` 一併輸出。rights/terms 狀態則以**最嚴格**的 class 為準（任一 class 為 `UNKNOWN` 就報 `UNKNOWN`），因此 consumer 不可能把未驗證的權限畫成已開放授權。
 
 ## 驗證
+
+本次新增 4 項回歸測試，相關測試由 88 項增至 92 項。先執行新增測試取得 `ValueError not raised`／`Missing expected rejection`，再接上 gate；另確認 LKG 的 active／candidate 兩條路徑及巢狀 payload 都會拒絕，拒絕時不覆寫檔案，安全資料仍可投影。權利核准的正例全部使用隔離的虛構 fixture，不修改真實審查或公開資料。
+
+`npm run check:gate0` 結束碼 0，輸出 `VERIFY_OK mode=gate0 required=164 specs=4 secrets=0`；`git diff --check` 結束碼 0。完整 `npm run check` 結束碼 1，其中 `npm --prefix apps/web run build` 成功。失敗包含本機 Windows CPython 3.11 的相容性限制：admitted base 的 `read_source_bounded()` 可獨立重現 `os.O_NONBLOCK` 缺失，其他既有測試也有 Unix deadline／目錄操作、POSIX 權限或 symlink 限制；隔離 Python（`-I`）無法匯入 pypdf，HTTP wrapper 另有逾時。current-checkout 驗證器在未提交工作樹上會拒絕，即使其五個內部檢查都通過。專案未配置獨立 lint、coverage ratchet、CRAP 或 mutation gate，本次未新增這些工具。
+
+```bash
+python -X utf8 -B -m unittest discover -s tests -p test_retention_policy.py -v && python -X utf8 -B -m unittest discover -s tests -p test_source_governance_integration.py -v && python -X utf8 -B -m unittest discover -s tests -p test_candidate_publication_wiring.py -v && node --test apps/web/tests/query-gateway-worker.test.mjs
+```
+
+| 驗收條件 | 機制與限制 |
+|---|---|
+| versioned matrix、catalog 引用 rights／retention | 既有 policy compiler 與 source policy；本次不修改權利狀態 |
+| media link-only、unknown 不宣稱 open | 既有 allowlist／governed policy；保留全文剝除與未知權利拒絕測試 |
+| 個資／敏感資料不進 public archive | 本次補上 collector、兩種 LKG、Python Query Store、Worker 的投影前 gate；非布林治理旗標與禁止欄位也拒絕 |
+| raw／normalized／publication／query index 分層規則 | 既有 layer policy；本次由可信呼叫端固定 publication／query_index layer |
+| 撤稿後保留 history 並標示 unavailable | 既有領域投影測試；正式管線完整傳播仍待完成 |
+| expiry dry-run、audit linkage 與 replay limitation | 既有 planner／receipt 與測試；實際到期／撤回執行及不復活收據仍待完成 |
+| 逐來源、逐用途真人審查與正式准入 | 待實際審查；不以虛構 fixture 或工程測試取代 |
+| 正式匿名正值查詢、來源轉換及產品驗收 | 未執行；沒有新 promotion、部署或真人結果 |
 
 ```bash
 python -X utf8 -m unittest discover -s tests -p 'test_retention_policy.py' -v

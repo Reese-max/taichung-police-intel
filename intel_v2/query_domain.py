@@ -577,7 +577,10 @@ def compare_event_versions(store: dict[str, Any], event_id: str, *, before_versi
     if event is None:
         raise KeyError(event_id)
     versions = list(event.get("version_history") or [])
-    versions.sort(key=lambda version: (version.get("observed_at") or "", version.get("document_version_id") or version.get("version_id") or ""))
+    versions.sort(key=lambda version: (
+        _instant(version["observed_at"], name="observed_at") if version.get("observed_at") else datetime.min.replace(tzinfo=timezone.utc),
+        version.get("document_version_id") or version.get("version_id") or "",
+    ))
     by_id = {(version.get("document_version_id") or version.get("version_id")): version for version in versions}
     if before_version is not None and before_version not in by_id:
         raise KeyError(before_version)
@@ -611,11 +614,7 @@ def compare_event_versions(store: dict[str, Any], event_id: str, *, before_versi
         }
     before_fields = before.get("fields", {})
     after_fields = after.get("fields", {})
-    changed = sorted({
-        *before.get("changed_fields", []),
-        *after.get("changed_fields", []),
-        *(key for key in set(before_fields) | set(after_fields) if before_fields.get(key) != after_fields.get(key)),
-    })
+    changed = sorted(key for key in set(before_fields) | set(after_fields) if before_fields.get(key) != after_fields.get(key))
     return {
         "comparison_status": "COMPARED",
         "public_event_id": event_id,

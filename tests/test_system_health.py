@@ -753,6 +753,84 @@ class SystemHealthTests(unittest.TestCase):
         self.assertEqual(metrics["verify_to_publish_ms"], 420000)
         self.assertEqual(metrics["publish_to_visible_ms"], 60000)
 
+    def test_non_success_stage_times_do_not_measure_successful_latency(self):
+        stages = [
+            stage("publication", "collection", "SUCCESS", ended_at="2026-09-11T08:00:00+08:00"),
+            stage("publication", "canonical_validation", "SUCCESS", ended_at="2026-09-11T08:05:00+08:00"),
+            stage("publication", "deployment", "SUCCESS", ended_at="2026-09-11T08:12:00+08:00"),
+            stage("publication", "public_http_verification", "SUCCESS", ended_at="2026-09-11T08:13:00+08:00"),
+        ]
+        affected = {
+            "collection": ("detect_to_verify_ms",),
+            "canonical_validation": ("detect_to_verify_ms", "verify_to_publish_ms"),
+            "deployment": ("verify_to_publish_ms", "publish_to_visible_ms"),
+            "public_http_verification": ("publish_to_visible_ms",),
+        }
+        for name, metrics in affected.items():
+            for outcome in sorted(health.VALID_OUTCOMES - {"SUCCESS"}):
+                with self.subTest(stage=name, outcome=outcome):
+                    rows = deepcopy(stages)
+                    next(row for row in rows if row["stage"] == name)["outcome"] = outcome
+                    before = deepcopy(rows)
+                    result = health.build_health(rows)
+                    for metric in metrics:
+                        self.assertIsNone(result["latency_metrics"][metric])
+                        slo_name = "publish_to_public_visible_ms" if metric == "publish_to_visible_ms" else metric
+                        self.assertFalse(result["slo"]["metrics"][slo_name]["measured"])
+                    self.assertEqual(rows, before)
+
+    def test_build_time_does_not_substitute_for_missing_deployment_time(self):
+        stages = [
+            stage("publication", "canonical_validation", "SUCCESS", ended_at="2026-09-11T08:05:00+08:00"),
+            stage("publication", "publication_build", "SUCCESS", ended_at="2026-09-11T08:10:00+08:00"),
+            stage("publication", "public_http_verification", "SUCCESS", ended_at="2026-09-11T08:13:00+08:00"),
+        ]
+        for deployment in ([], [stage("publication", "deployment", "SUCCESS")]):
+            with self.subTest(deployment=deployment):
+                result = health.build_health(stages + deployment)
+                self.assertIsNone(result["latency_metrics"]["verify_to_publish_ms"])
+                self.assertIsNone(result["latency_metrics"]["publish_to_visible_ms"])
+                self.assertFalse(result["slo"]["metrics"]["publish_to_public_visible_ms"]["measured"])
+
+    def test_unverified_fusion_does_not_fall_back_to_canonical_validation_time(self):
+        stages = [
+            stage("publication", "collection", "SUCCESS", ended_at="2026-09-11T08:00:00+08:00"),
+            stage("publication", "canonical_validation", "SUCCESS", ended_at="2026-09-11T08:05:00+08:00"),
+            stage("publication", "deployment", "SUCCESS", ended_at="2026-09-11T08:12:00+08:00"),
+        ]
+        for outcome, ended_at in (("FAILED", "2026-09-11T08:03:00+08:00"), ("UNKNOWN", None), ("SUCCESS", None)):
+            with self.subTest(outcome=outcome, ended_at=ended_at):
+                result = health.build_health(stages + [
+                    stage("publication", "fusion_verification", outcome, ended_at=ended_at),
+                ])
+                self.assertIsNone(result["latency_metrics"]["detect_to_verify_ms"])
+                self.assertIsNone(result["latency_metrics"]["verify_to_publish_ms"])
+
+    def test_explicit_times_cannot_override_reported_stage_evidence(self):
+        timestamps = {
+            "source_published_at": "2026-09-11T07:59:00+08:00",
+            "detected_at": "2026-09-11T08:00:00+08:00",
+            "verified_at": "2026-09-11T08:05:00+08:00",
+            "published_at": "2026-09-11T08:12:00+08:00",
+            "public_visible_at": "2026-09-11T08:13:00+08:00",
+        }
+        before = deepcopy(timestamps)
+        cases = [(outcome, timestamps["published_at"]) for outcome in sorted(health.VALID_OUTCOMES - {"SUCCESS"})]
+        for outcome, ended_at in cases + [("SUCCESS", None)]:
+            with self.subTest(outcome=outcome, ended_at=ended_at):
+                rows = [stage("publication", "deployment", outcome, ended_at=ended_at)]
+                result = health.build_health(rows, timestamps)
+                self.assertIsNone(result["latency_metrics"]["verify_to_publish_ms"])
+                self.assertIsNone(result["latency_metrics"]["publish_to_visible_ms"])
+                self.assertFalse(result["slo"]["metrics"]["publish_to_public_visible_ms"]["measured"])
+        result = health.build_health([
+            stage("publication", "collection", "SUCCESS", ended_at=timestamps["detected_at"]),
+            stage("publication", "deployment", "SUCCESS", ended_at=timestamps["published_at"]),
+        ], timestamps)
+        self.assertEqual(result["latency_metrics"]["source_to_detect_ms"], 60000)
+        self.assertEqual(result["latency_metrics"]["publish_to_visible_ms"], 60000)
+        self.assertEqual(timestamps, before)
+
     def test_checked_in_receipt_carries_versioned_model_and_unknown_safe_slo(self):
         if os.getenv("GOVINTEL_PUBLICATION_WORKFLOW") == "1":
             self.skipTest("Pages publication tests use generated artifacts, not the checked-in snapshot")

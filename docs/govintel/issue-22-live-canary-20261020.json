@@ -1,0 +1,231 @@
+{
+  "schema_version": 1,
+  "validation_scope": "SINGLE_OBSERVATION_NOT_PROMOTION",
+  "observed_at": "2026-10-20T22:37:16.630030+08:00",
+  "source_count": 3,
+  "failed_count": 0,
+  "status": "OBSERVED",
+  "sources": [
+    {
+      "source_id": "S-001",
+      "source_url": "https://www.police.taichung.gov.tw/ch/home.jsp?id=1&parentpath=0&mcustomize=news_list.jsp",
+      "source_role": "PRIMARY_EVENT",
+      "integration_status": "CANDIDATE",
+      "catalog_status": "AUDITED_EXISTING",
+      "promotion_eligible": false,
+      "observed_at": "2026-10-20T22:37:16.630030+08:00",
+      "source_health": "PASS",
+      "collector_window_claim": "PARTIAL",
+      "window_item_count": 3,
+      "snapshot_item_count": 15,
+      "snapshot_count": 2,
+      "detail_fetch_count": 1,
+      "unchanged_detail_skips": 0,
+      "pagination": {
+        "strategy": "next-link",
+        "pages_fetched": 1,
+        "page_limit": 1,
+        "complete": false
+      },
+      "list_traversal": {
+        "stop_reason": "PAGE_LIMIT",
+        "requested_start": "2026-10-14",
+        "requested_end": "2026-10-20",
+        "reverse_chronological_observed": true,
+        "all_observed_dates_known": true,
+        "oldest_observed_date": "2026-09-26",
+        "newest_observed_date": "2026-10-16",
+        "whole_history_completeness": "UNKNOWN",
+        "detail_pages_complete": false,
+        "attachments_downloaded": false
+      },
+      "manifest_sha256": "42028be114bb34e160ee89ff3b29c8934e02542fe32e3b8ca41bcd1d9d5755d3",
+      "coverage_independently_verified": false,
+      "schema_contract": {
+        "contract_version": "1.1",
+        "parser_version": "online_collect:p0-live-1",
+        "transport": "HTML_LIST_DETAIL",
+        "status": "NO_DRIFT",
+        "observed_schema_fingerprint": "4832129a45e12eb78dfa5c028dfe4d5f3f32eff3ff569362bb2479cc825f1631",
+        "sample_sha256": "6e5ef2599e2fca67ccac9b86bce20a3eaedcd5e76b6a54ffa44e3400a3c5d21e",
+        "reasons": [
+          "LIST_WINDOW_NOT_PROVEN"
+        ],
+        "review_required": false
+      },
+      "http_calls": 2,
+      "last_http_status": 200,
+      "elapsed_ms": 2641
+    },
+    {
+      "source_id": "S-019",
+      "source_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186",
+      "source_role": "PRIMARY_EVENT",
+      "integration_status": "CANDIDATE",
+      "catalog_status": "AUDITED_EXISTING",
+      "promotion_eligible": false,
+      "observed_at": "2026-10-20T22:37:16.630030+08:00",
+      "source_health": "PASS",
+      "collector_window_claim": "PARTIAL",
+      "window_item_count": 1,
+      "snapshot_item_count": 30,
+      "snapshot_count": 2,
+      "detail_fetch_count": 1,
+      "unchanged_detail_skips": 0,
+      "pagination": {
+        "strategy": "next-link",
+        "pages_fetched": 1,
+        "page_limit": 1,
+        "complete": false
+      },
+      "list_traversal": {
+        "stop_reason": "PAGE_LIMIT",
+        "requested_start": "2026-10-14",
+        "requested_end": "2026-10-20",
+        "reverse_chronological_observed": true,
+        "all_observed_dates_known": true,
+        "oldest_observed_date": "2026-02-23",
+        "newest_observed_date": "2026-10-19",
+        "whole_history_completeness": "UNKNOWN",
+        "detail_pages_complete": false,
+        "attachments_downloaded": false
+      },
+      "manifest_sha256": "740042c6b7a6010c6b34c1904bf2bec988c533f65cf8e7ec3677c23ee18ac29d",
+      "coverage_independently_verified": false,
+      "schema_contract": {
+        "contract_version": "1.1",
+        "parser_version": "online_collect:p0-live-1",
+        "transport": "HTML_LIST_DETAIL",
+        "status": "NO_DRIFT",
+        "observed_schema_fingerprint": "0d1a8ee088ec19ba162eaa99fa5f735820aaf6dec0b92646706e47cdc68ba379",
+        "sample_sha256": "81fda7021db16203a7ad060377a6b74b792586ee13a9aafaa4a32d95171719e0",
+        "reasons": [
+          "LIST_WINDOW_NOT_PROVEN"
+        ],
+        "review_required": false
+      },
+      "http_calls": 2,
+      "last_http_status": 200,
+      "elapsed_ms": 3109
+    },
+    {
+      "source_id": "S-032",
+      "source_url": "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,20",
+      "source_role": "PRIMARY_EVENT",
+      "integration_status": "CANDIDATE",
+      "catalog_status": "VERIFIED_CANDIDATE",
+      "promotion_eligible": false,
+      "observed_at": "2026-10-20T22:37:16.630030+08:00",
+      "source_health": "PASS",
+      "collector_window_claim": "PARTIAL",
+      "window_item_count": 8,
+      "snapshot_item_count": 10,
+      "snapshot_count": 2,
+      "detail_fetch_count": 1,
+      "unchanged_detail_skips": 0,
+      "pagination": {
+        "strategy": "next-link",
+        "pages_fetched": 1,
+        "page_limit": 1,
+        "complete": false
+      },
+      "list_traversal": {
+        "stop_reason": "PAGE_LIMIT",
+        "requested_start": "2026-10-14",
+        "requested_end": "2026-10-20",
+        "reverse_chronological_observed": true,
+        "all_observed_dates_known": true,
+        "oldest_observed_date": "2026-10-12",
+        "newest_observed_date": "2026-10-19",
+        "whole_history_completeness": "UNKNOWN",
+        "detail_pages_complete": false,
+        "attachments_downloaded": false
+      },
+      "manifest_sha256": "629f16857dc3a9e3316b6be06bccbe7fb09657d31cd5e0221c13ec870ea45cda",
+      "coverage_independently_verified": false,
+      "schema_contract": {
+        "contract_version": "1.1",
+        "parser_version": "online_collect:p0-live-1",
+        "transport": "HTML_LIST_DETAIL",
+        "status": "NO_DRIFT",
+        "observed_schema_fingerprint": "98b99108d6e847c3b387b06b279f5c45e59a49fc0eaff89cca1d554647c80a2a",
+        "sample_sha256": "bcf077a86d8eabe3d46be3628e1455eb9458b0951e9fb7f8f550c03754e64dc7",
+        "reasons": [
+          "LIST_WINDOW_NOT_PROVEN"
+        ],
+        "review_required": false
+      },
+      "http_calls": 2,
+      "last_http_status": 200,
+      "elapsed_ms": 3078
+    }
+  ],
+  "item_state": {
+    "S-001": {
+      "202610160001": "b6e63e343e6691b9cc1cd50c194ecbc92f617ed8b50a09be5d56f12d1f4064c4",
+      "202610150003": "3f5d1cb059363005a78175856c498a020c542f4eed78c4a41adef450f2cf23bd",
+      "202610150001": "9082749a38f2ef2253a6715334b435e92e71a65d04cc966919e44872345e74c2",
+      "202610130001": "153bba24ce68641a4848359a46d7ad0e1a9cb8e933c6958d1c67e10813f61cfd",
+      "202610120003": "628a9098baf35c9323ceb9c4688dc5162d34022d18ab3a8ea7904f3e331276a1",
+      "202610120002": "e4f47720a06c7aa6833e7eaea691d5836b578f80f1d15e74eba94f8baa74ef02",
+      "202610080003": "93cf5fdb76e45bd8116dca9f27c5961087d9c123810bb0d4a89c47992dd11ab9",
+      "202610060003": "75b81069a9950b2107a842d4ee37d3e0cc837375f7a3ad81245a1b1d4aafc38b",
+      "202610060002": "0130ce157dabbc4b4623e8068b0afd9458003b87fc4206b115782a0ddd21bfd4",
+      "202610020004": "19a3a4eb5b2cb329009d3d298f913fa487ca1dc6a84c13092a393c53f112622b",
+      "202609300001": "42076a658488d74fa204c71343b3204daf7eab47309e96337da40137f771a46e",
+      "202609290013": "b0510f8032027596f694b7188e21d33810907c51887545769038464f12545e5f",
+      "202609290004": "dfb02ae3e803ef40ee8e0077d7fb65124c8eb441a80e07441fbc04bba4fde4fd",
+      "202609290003": "6fbf2e0f5c87c1d1dca5de03f21d31e606d5dd99dd8471d7ebe03f89481d3988",
+      "202609290012": "a57140cff17fb010c74e31f1ac42edd7b067773358caac65e38a8ac6b5d1dcc2"
+    },
+    "S-019": {
+      "3395508": "ac7701f2aae4d42421fb86af973407bcd0d95e2a417afc4346e222d78d55c817",
+      "3377338": "e5a8e94f4e7079ddb5dec8e9f50c3a2a3febde85d286fffe065528dc1e53fb0d",
+      "3372111": "3a9abd05d5829346923a9ddb45f82087857d2149c6984f497ac21d6a384c30bf",
+      "3367065": "fcfd607c59985860f0088b1c72f982066fe3747e1747a2381a26a2ce24f23028",
+      "3362693": "3126f0ae9df1eda5c11983dfe435f0acdd4137db006b50946cea53d6b232c3cd",
+      "3357568": "3fc28682fd9b0e4dd162b78220425c0788cac011b8f7007ed2ee0c71f11075e5",
+      "3351539": "764f23fb0b641b141b320a6c02a17acfae431ba6b78be765f7620dedef2765aa",
+      "3345436": "5309321a21cdda468dde2c78d8939972563d0434d7ff646521c113f79f3b6b5a",
+      "3342464": "4500e4365920dc1b64917c1baefbe2531815241e67939a93342c3100ac8219de",
+      "3333153": "b8e3020a5f9650213dfbcc47718e31b643485d21c8fc4e40fbd7b07e9be1adfc",
+      "3329578": "166d26585458df1d73441160ccb34a07c52c8e1caa47d5b4fecf38a1631b369d",
+      "3327768": "9156f9b0b14d055cd5f5fd889b069f9c53a5b98bbed08c68adba249a55ee70ca",
+      "3316634": "8a50d3180cb2fdd46e6ce491a414f30417a1ca1b4c1da39b20b800e2bd361835",
+      "3312177": "607294141ebd8bfecba9ad34c8f1086bbe9195ba0ebaf700733c1dd4a620a230",
+      "3303606": "fc24b2b85783165bb3432989fcbd67cc43bcb230f07e07cdfc33d50413183225",
+      "3300182": "f04f63a769238cbabfab17c4f7bc4f6dce1f6cd33dab7e2aa976ccf7d517b678",
+      "3299470": "cd401a482b6e9eb5c725eb9bf44bebda1c65000c57e0b622c2b9f0a2beefad68",
+      "3279987": "fa2b6d5406548a222c2933733ddff0c2a13f403790b8b919edd73a5a2d46551d",
+      "3276556": "f18ede67ecdfb8458fb7b3869ed7ec8a910980cef02fe7c987099a4f5c3628b6",
+      "3275667": "554629b3344ea96fa9df81c082bfdb32a49f94efeb53dcce4b5e392816180349",
+      "3270098": "1450c88bbe407ed137f25c79cac44a851946c79e875821fc14c1a645a9e50e87",
+      "3261060": "63fa9ccbc891ce34831d38c032b049fb6956ef56e98e5f39a7446cae1d3d8d0b",
+      "3254763": "20b7d3bd7de1854f1c4179aca51f1fbe7b51d3bfe35fa2e2eac9f2d62cd6da4f",
+      "3251336": "becc5ff3c9b1002b24443b172444f8272433eaa09d1c7d4d4cdd7dfe53f0d56c",
+      "3244550": "0a38ba1edda97bdccb4716486abb4e7dc0d7c0b927071fcd4ed5dd6fc1bab02f",
+      "3240320": "789bcd0906767da945ec56ab97546909af17fbafc66d0c847c4d04e1cad98503",
+      "3238034": "64e4a075de49c5af6580e38faf1fa89b0cae2ebae75d79257282237cb697c75a",
+      "3229410": "2eb5ab535417d0cdbd27a5b34a40640a7be8a035166c9fb571ef2d362dad9102",
+      "3224806": "d49ee4ef74afb8bbed8595779810328363da8e2edab1f0c886383ffe28b7671c",
+      "3217844": "a6b12e5690118a2c2fe749c9e3b5ee4433fadd82d97e2f35233f905d1e0b834e"
+    },
+    "S-032": {
+      "21836": "8c7ae6a5fbce0b1c59bd3d2867828b0e8b0b07438627f71a3d62711cb051f566",
+      "21834": "81e998f84f3d0b2d04bf09519dbf44f822af581444fac30d9429636fdcb08434",
+      "21833": "8a1c1bee6065e1723ebbe5baf8c6c84104c1da0fe06d9bf5af0273ef151f47ea",
+      "21835": "540a421af5e8d0445c7d7b1e324665372612b87ad6b80e631b1ef4f778d4c0ea",
+      "21832": "5d665718f3082a12d52fb9ada9d96474cb8fc96f087e5330fcbf3a1fc66bb76b",
+      "21831": "9f01462e56d004e16b7a9f6f71061e0913f63af743ec3a5389494f19369a0724",
+      "21829": "337748d9c400471f41b12995ee30dd65721fa4f8144e5936fcdfff4789530b62",
+      "21827": "9588f6c3cae1ab4505ecbd5ba7ef22c7d1c5063fd5c40ecc852d55b75a9e7017",
+      "21824": "3932a6a992289f76ada0695037f3404f159b36d7829c1412541fe5d843e2ebf4",
+      "21816": "71b87f80bd3ce642a0b6a14bc831e489db9e6f22d6ef02e100cda4ef898532dc"
+    }
+  },
+  "request_budgets": {
+    "html_list_pages": 1,
+    "actual_http_attempts": 4,
+    "detail_pages": 1
+  }
+}

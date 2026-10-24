@@ -118,6 +118,26 @@ class QueryDomainTests(unittest.TestCase):
         explicit_before = domain.compare_event_versions(store, "PE-1", before_version="doc-police:v1")
         self.assertEqual(explicit_before["after"]["document_version_id"], "doc-police:v2")
 
+    def test_version_comparison_orders_observations_by_instant(self):
+        row = event()
+        row["version_history"][0]["observed_at"] = "2026-09-20T00:30:00+08:00"
+        row["version_history"][1]["observed_at"] = "2026-09-19T17:00:00Z"
+        store = domain.build_event_store([row])
+        for arguments in ({}, {"before_version": "doc-police:v1"}, {"after_version": "doc-police:v2"}):
+            with self.subTest(arguments=arguments):
+                result = domain.compare_event_versions(store, "PE-1", **arguments)
+                self.assertEqual(result["comparison_status"], "COMPARED")
+                self.assertEqual(result["source_document_versions"], ["doc-police:v1", "doc-police:v2"])
+
+    def test_version_comparison_does_not_reuse_a_previous_transition(self):
+        row = event()
+        row["version_history"][0]["fields"] = dict(row["version_history"][1]["fields"])
+        row["version_history"][0]["changed_fields"] = ["canonical_title"]
+        row["version_history"][1]["changed_fields"] = []
+        comparison = domain.compare_event_versions(domain.build_event_store([row]), "PE-1")
+        self.assertEqual(comparison["changed_fields"], [])
+        self.assertEqual(comparison["materiality"], "NO_CHANGE")
+
     def test_event_projection_preserves_explicit_trust_tiers(self):
         explicit_stale = event("PE-EXPLICIT-STALE")
         explicit_stale["verification_status"] = "STALE"
