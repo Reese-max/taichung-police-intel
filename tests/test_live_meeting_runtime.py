@@ -156,6 +156,42 @@ class LiveMeetingRuntimeTests(unittest.TestCase):
             self.assertEqual([(gap["start_seconds"], gap["end_seconds"], gap["reason"])
                               for gap in state["gap_intervals"]], [(0, 30, "SESSION_CRASH")])
 
+    def test_budget_depletion_persists_session_crash_gap(self):
+        """When budget is depleted, SESSION_CRASH gap should be persisted for PENDING calls."""
+        from intel_v2.live_asr import ingest_chunk
+
+        audio_out = Path("/tmp/test_chunk.wav")
+        import wave
+        with wave.open(str(audio_out), "wb") as handle:
+            handle.setparams((1, 2, 16000, 0, "NONE", "not compressed"))
+            handle.writeframes(b"\0\0" * 16000 * 30)
+
+        saved = []
+
+        def crash(state):
+            saved.append(copy.deepcopy(state))
+            raise KeyboardInterrupt("simulate a process crash after durable reservation")
+
+        try:
+            ingest_chunk(session(budget=30), audio_out, start_seconds=0, requested_at=T0,
+                         opt_in=True, fixture_response={"text": "交通"}, save=crash)
+        except KeyboardInterrupt:
+            pass
+
+        with patch("requests.post") as post:
+            state = json.loads(json.dumps(saved[-1]))
+            # Ingest more audio - should record SESSION_CRASH gap before budget stop
+            state = ingest_chunk(state, audio_out, start_seconds=35,
+                                 requested_at=T0,
+                                 opt_in=True,
+                                 fixture_response={"text": "超預算"},
+                                 save=Mock())
+            gap_reasons = [gap["reason"] for gap in state.get("gap_intervals", [])]
+            self.assertIn("SESSION_CRASH", gap_reasons,
+                          "BUG: SESSION_CRASH gap not recorded after budget depletion!")
+            self.assertIn("BUDGET_STOP", gap_reasons)
+            self.assertEqual(state["status"], "DEGRADED")
+
     def test_fixture_cannot_enter_a_paid_session_and_expired_clock_blocks_transport(self):
         from intel_v2.live_asr import ingest_chunk
 
