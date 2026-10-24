@@ -1,32 +1,19 @@
 {
-  "code_sha": "b6067198dc429a902ffbfc51a2f2c86ea8862e76",
+  "code_sha": "2c68480a19ed76897c0e654ba474908f72174744",
   "files": {
     "apps/web/public/data/feed-export.csv": "ff2fba1526956503064c1ba59dc3206a79ed27dea3b176752a0fce1f4a5ca502",
     "apps/web/public/data/intelligence-feed.json": "3d141a9bc3c23299c7fa99edeaf68046c53add4ac77c5e8af9ffca257fd17604",
     "apps/web/public/data/intelligence-summary.json": "926c9236ba47f510a7c03598a7fb7b990dbf33a8579bb6ccdcc92b3b892ef567",
     "apps/web/public/data/source-status.json": "2bc36f33ee1094518c59df479a013e3d2f233dc85eed50cc451175c405660fc4",
     "apps/web/public/data/v2-daily-brief.json": "5175a9602776100c84fe45ad24d592e824c15ebea60dc6e4b1f73355ec9e4f09",
-    "state/schema-drift-state.json": "cdbe3aecb222dc6bd9408964e0a24d50f6adf19553a6bbf15b4429fdd06460e7",
+    "state/schema-drift-state.json": "3a7df693fe5935d993980ece49d50bd4d0157023a9ede9ec06a3284702212b6f",
     "state/v2-handoff-state.json": "9770be16bcb3fba8bd8bab8f9abf2efc60b07e2f0928eec59c655bd6e2f77425",
     "state/v2-shadow-state.json": "e3c7d10d91ecd47f3b45a3a33af09ef16d0012ffbe31ae4a46478b8505c138ea"
   },
-  "generation_id": "7c6e30c0e237154b807b454a73069c75a6ea98810f15883cdef47021d1d7f6e3",
-  "http_verification": {
-    "attempt": 1,
-    "base_url": "https://reese-max.github.io/taichung-police-intel/",
-    "generation_id": "7c6e30c0e237154b807b454a73069c75a6ea98810f15883cdef47021d1d7f6e3",
-    "verified_at": "2026-10-24T14:08:35.001960+00:00",
-    "verified_files": {
-      "apps/web/public/data/feed-export.csv": "ff2fba1526956503064c1ba59dc3206a79ed27dea3b176752a0fce1f4a5ca502",
-      "apps/web/public/data/intelligence-feed.json": "3d141a9bc3c23299c7fa99edeaf68046c53add4ac77c5e8af9ffca257fd17604",
-      "apps/web/public/data/intelligence-summary.json": "926c9236ba47f510a7c03598a7fb7b990dbf33a8579bb6ccdcc92b3b892ef567",
-      "apps/web/public/data/source-status.json": "2bc36f33ee1094518c59df479a013e3d2f233dc85eed50cc451175c405660fc4",
-      "apps/web/public/data/v2-daily-brief.json": "5175a9602776100c84fe45ad24d592e824c15ebea60dc6e4b1f73355ec9e4f09"
-    }
-  },
+  "generation_id": "37fc76d40762a347353ea9dada1532e250f84acc7acaa4a5eb06047ab49eb05f",
   "producer_attempt": "1",
-  "producer_run_id": "40100755485",
+  "producer_run_id": "40100774912",
   "schema_version": 1,
-  "slot": "evening",
-  "state": "PUBLISHED"
+  "slot": "code",
+  "state": "PENDING_PUBLICATION"
 }
