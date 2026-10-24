@@ -1,0 +1,23 @@
+{
+  "synthetic": true,
+  "note": "Project-authored fictional notice; not an official record.",
+  "identity": "S-029:SYNTH-ROAD-001",
+  "source_id": "S-029",
+  "official_url": "https://example.gov.tw/synthetic/road-001",
+  "before_version": 1,
+  "after_version": 2,
+  "before_text": "合成市政公告：示範路一段施工管制，期間自 115年11月1日至 115年11月15日，每日 22:00 至 05:00，由示範局辦理。",
+  "after_text": "合成市政公告：示範路一段施工管制，期間自 115年11月1日至 115年11月30日，每日 22:00 至 05:00，由示範局辦理。",
+  "good_response": {
+    "statements": [
+      {
+        "claim_type": "TIME",
+        "text": "管制結束日由 115年11月15日 延長為 115年11月30日。",
+        "evidence": [
+          {"side": "before", "quote": "至 115年11月15日"},
+          {"side": "after", "quote": "至 115年11月30日"}
+        ]
+      }
+    ]
+  }
+}

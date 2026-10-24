@@ -16,6 +16,7 @@
 | 公開查詢／同瀏覽器條件追蹤 | `PRODUCTION_ACTIVE` | [正式 browser](closure-20261007-pr177/production-browser.json)；僅保存、修改、刷新、取消、清除等受限流程，不含關站推播／跨裝置。 |
 | 新聞／市政／交通／消防 collector | `CANDIDATE_CANARY` | [來源矩陣](DATA_SOURCE_MATRIX.md)、[原始觀察窗口](../source-reviews/2026-10-06/candidate-window-actual.json)；程式已合併不等於 source promotion。 |
 | Twinkle hybrid | `DESIGN_ONLY` | [策略與 overlay](../TWINKLE_HYBRID_SOURCES.md)；未成為已驗收 runtime，鏡像不增加獨立佐證。 |
+| 附原文出處的變更摘要（AI 候選＋人工覆核） | `IMPLEMENTED_NOT_PRODUCTION` | [說明](../change-summary.md)、[測試](../../../tests/test_change_summary.py)；僅合成 fixture 與離線 provider，provider 預設 `DISABLED`，正式內容受 `RIGHTS_BLOCKED` 擋下；無正確率或效益結果。 |
 | latest-information loop | `IMPLEMENTED_NOT_PRODUCTION` | [同 checkout verifier](../../../scripts/verify-current-checkout.py)可重播版本／缺口契約；完整即時官方內容閉環待 #21／#161。 |
 | PublicEvent 事件融合 | `IMPLEMENTED_NOT_PRODUCTION` | [fixture](../../../apps/web/public/data/public-event-demo.json)、[self-check](../../../scripts/public-event-fusion.py)；`FIXTURE_ONLY`，不代表 live 多機關覆蓋。 |
 | scheduled publishing 的剩餘恢復驗收 #20 | `BLOCKED` | [固定發布 run](https://github.com/Reese-max/taichung-police-intel/actions/runs/37615111747)、[upload drill](closure-20261006/alert-drill.json)；實際 deploy／source／public mismatch 恢復仍需逐項收據。 |
