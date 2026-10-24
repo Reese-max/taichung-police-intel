@@ -19,6 +19,7 @@ BEFORE = {
     "body_sha256": "a" * 64,
     "normalized_text_sha256": "b" * 64,
     "attachments": [{"attachment_id": "pdf-1", "content_sha256": "c" * 64}],
+    "observed_at": "2026-09-20T12:00:00+08:00",
     "last_checked_at": "2026-09-20T12:00:00+08:00",
     "etag": '"old"',
     "last_modified": "Wed, 20 Sep 2026 04:00:00 GMT",
@@ -27,12 +28,48 @@ BEFORE = {
 
 
 class DetailRecheckTests(unittest.TestCase):
+    def test_semantic_only_correction_retains_evidence_and_is_idempotent(self):
+        for field in ("title", "location", "status", "scope"):
+            with self.subTest(field=field):
+                observation = {
+                    "body_sha256": "a" * 64,
+                    "normalized_text_sha256": "b" * 64,
+                    "attachments": [],
+                    field: "original",
+                }
+                baseline = classify_observation(None, observation, observed_at=NOW)["after"]
+                correction = dict(observation, **{field: "corrected"})
+                result = classify_observation(baseline, correction, observed_at=NOW)
+                self.assertEqual(result["status"], "MATERIAL_CHANGE")
+                self.assertTrue(result["review_required"])
+                self.assertEqual(result["changed_fields"], [field])
+                self.assertEqual(result["before"][field], "original")
+                self.assertEqual(result["after"][field], "corrected")
+                self.assertNotEqual(baseline["document_version_id"], result["after"]["document_version_id"])
+                repeated = classify_observation(result["after"], correction, observed_at=NOW)
+                self.assertEqual(repeated["status"], "UNCHANGED")
+                self.assertFalse(repeated["review_required"])
+                self.assertEqual(repeated["after"]["document_version_id"], result["after"]["document_version_id"])
+
+    def test_unchanged_semantic_fields_do_not_reopen_review(self):
+        previous = dict(BEFORE, title="公告", location="臺中市", status="ACTIVE", scope="道路")
+        result = classify_observation(previous, previous, observed_at=NOW)
+        self.assertEqual(result["status"], "UNCHANGED")
+        self.assertFalse(result["review_required"])
+
     def test_due_plan_preserves_conditional_request_headers(self):
         result = plan_recheck(BEFORE, NOW, interval_hours=24)
         self.assertEqual(result["status"], "DUE")
         self.assertEqual(result["reason"], "TTL_EXPIRED")
         self.assertEqual(result["request_headers"]["If-None-Match"], '"old"')
         self.assertEqual(result["request_headers"]["If-Modified-Since"], BEFORE["last_modified"])
+
+    def test_full_recheck_interval_is_configurable_and_validated(self):
+        result = plan_recheck(BEFORE, NOW, full_recheck_interval_hours=24)
+        self.assertEqual(result["request_headers"], {})
+        for invalid in (True, 0, -1, 1, float("nan"), float("inf")):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                plan_recheck(BEFORE, NOW, full_recheck_interval_hours=invalid)
 
     def test_not_due_plan_does_not_request_again(self):
         result = plan_recheck(BEFORE, "2026-09-21T11:59:59+08:00", interval_hours=24)
@@ -406,6 +443,37 @@ class FakeHTTPSession:
 
 
 class DetailRecheckHTTPTests(unittest.TestCase):
+    def test_sentence_punctuation_is_presentation_but_time_and_decimal_changes_need_review(self):
+        for old, new, expected in (
+            ("Control 17:00.", "Control 17:00!", "PRESENTATION_ONLY"),
+            ("管制 17:00。", "管制 17:00！", "PRESENTATION_ONLY"),
+            ("Control 17:00.", "Control 16:00!", "MATERIAL_CHANGE"),
+            ("Range 1.5 km.", "Range 15 km!", "MATERIAL_CHANGE"),
+        ):
+            with self.subTest(old=old, new=new):
+                session = FakeHTTPSession(*(FakeHTTPResponse(body=f"<p>{text}</p>".encode("utf-8"),
+                    headers={"Content-Type": "text/html"}) for text in (old, new)))
+                baseline = recheck_detail(session, "https://official.test/detail", None,
+                    observed_at=NOW, allowed_hosts={"official.test"})["classification"]["after"]
+                result = recheck_detail(session, "https://official.test/detail", baseline,
+                    observed_at="2026-09-22T12:00:00+08:00", allowed_hosts={"official.test"})["classification"]
+                self.assertEqual(result["status"], expected)
+                self.assertEqual(result["review_required"], expected == "MATERIAL_CHANGE")
+                self.assertNotEqual(result["before"]["document_version_id"], result["after"]["document_version_id"])
+
+    def test_periodic_full_recheck_omits_unreliable_validators(self):
+        for full_observation, full_interval in (
+            (None, 168), ("2026-09-13T12:00:00+08:00", 168), (BEFORE["observed_at"], 24),
+        ):
+            with self.subTest(full_observation=full_observation, full_interval=full_interval):
+                previous = dict(BEFORE, observed_at=full_observation)
+                session = FakeHTTPSession(FakeHTTPResponse(body=b"<p>control 16:00</p>"))
+                result = recheck_detail(session, "https://official.test/detail", previous,
+                    observed_at=NOW, allowed_hosts={"official.test"}, full_recheck_interval_hours=full_interval)
+                self.assertEqual(session.calls[0][1]["headers"], {})
+                self.assertEqual(result["classification"]["status"], "MATERIAL_CHANGE")
+                self.assertEqual(result["classification"]["after"]["observed_at"], NOW)
+
     def test_baseline_extracts_hashes_attachments_and_conditional_metadata(self):
         first = FakeHTTPResponse(
             body=(
@@ -424,6 +492,7 @@ class DetailRecheckHTTPTests(unittest.TestCase):
         )
         self.assertEqual(result["classification"]["status"], "BASELINE")
         self.assertEqual(len(result["observation"]["attachments"]), 1)
+        self.assertTrue(result["classification"]["attachment_recheck_required"])
         self.assertEqual(result["observation"]["etag"], '"v1"')
         self.assertEqual(result["request_headers"], {})
 

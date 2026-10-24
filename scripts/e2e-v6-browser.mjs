@@ -68,7 +68,7 @@ async function replayQuery(target, snapshot = "R1") {
   await target.locator("#pq-mode").selectOption("replay");
   await target.locator('#pq-snapshot option[value="R1"]').waitFor({ state: "attached" });
   await target.locator("#pq-snapshot").selectOption(snapshot);
-  const filters = target.locator("form details").filter({ has: target.locator("#pq-road") });
+  const filters = target.getByRole("form", { name: "公開資料條件查詢", exact: true }).locator("details").filter({ has: target.locator("#pq-road") });
   assert.equal(await filters.getAttribute("open"), null);
   await filters.locator("summary").click();
 }
@@ -80,7 +80,9 @@ async function roadFilters(target) {
   await target.locator("#pq-daily-to").fill("17:00");
 }
 async function submit(target) {
-  await target.locator('form button[type="submit"]').click();
+  const form = target.getByRole("form", { name: "公開資料條件查詢", exact: true });
+  assert.equal(await form.count(), 1, "The filter query has its own named form beside conversational queries");
+  await form.getByRole("button", { name: "查詢", exact: true }).click();
   await target.locator(".pq-result-meta, .pq-error").first().waitFor({ state: "visible" });
   const errorDetails = target.locator(".pq-error > details");
   if (await errorDetails.count()) await errorDetails.locator("summary").click();

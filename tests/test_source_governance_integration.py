@@ -53,7 +53,7 @@ class GovernedFixtureIntegrationTests(unittest.TestCase):
         feed = json.loads(feed_path.read_text())
         for row in feed["items"]:
             row.update(committee="FICTIONAL_COMMITTEE", next_milestone="FICTIONAL_MILESTONE",
-                       private_notes="FICTIONAL_PRIVATE", full_text="FICTIONAL_BODY")
+                       full_text="FICTIONAL_BODY")
         feed_path.write_text(json.dumps(feed, ensure_ascii=False), encoding="utf-8")
         store = qs.build_from_paths(qs.DEFAULT_FEED, qs.DEFAULT_STATUS, qs.DEFAULT_BRIEF)
         self.assertEqual(len(store["items"]), 2)
@@ -64,6 +64,32 @@ class GovernedFixtureIntegrationTests(unittest.TestCase):
             self.assertLessEqual(set(row), fields | system)
             self.assertTrue({"committee", "next_milestone", "private_notes", "full_text"}.isdisjoint(row))
         self.assertNotIn("FICTIONAL_PRIVATE", json.dumps(store))
+
+    def test_query_archive_gate_checks_original_governance_before_projection(self):
+        f = self.fixture()
+        qs = load_fixture_module(f, "fixture_archive_gate", "scripts/query-store.py")
+        path = f["paths"]["public"] / "intelligence-feed.json"
+        original = path.read_text(encoding="utf-8")
+        mutations = [{"contains_personal_data": True}, {"sensitive": True}]
+        mutations += [{field: "FICTIONAL_PRIVATE_MARKER"} for field in (
+            "private_notes", "personal_data", "operational_fields", "credentials")]
+        mutations += [{field: value} for field in (
+            "contains_personal_data", "sensitive", "aggregate_only", "source_available", "replay_required")
+            for value in (None, "FICTIONAL_PRIVATE_MARKER", 0)]
+        for mutation in mutations:
+            feed = json.loads(original)
+            feed["items"][0].update(mutation)
+            path.write_text(json.dumps(feed), encoding="utf-8")
+            for route in ("item", "store"):
+                with self.subTest(mutation=mutation, route=route):
+                    with self.assertRaisesRegex(ValueError, "archive|boolean") as caught:
+                        if route == "item":
+                            qs.project_feed_item(feed["items"][0], "a" * 64)
+                        else:
+                            qs.build_from_paths(qs.DEFAULT_FEED, qs.DEFAULT_STATUS, qs.DEFAULT_BRIEF)
+                    self.assertNotIn("FICTIONAL_PRIVATE_MARKER", str(caught.exception))
+        path.write_text(original, encoding="utf-8")
+        self.assertEqual(len(qs.build_from_paths(qs.DEFAULT_FEED, qs.DEFAULT_STATUS, qs.DEFAULT_BRIEF)["items"]), 2)
 
     def test_unapproved_origin_and_mixed_governance_binding_fail_closed(self):
         for mode in ("origin", "binding"):

@@ -1412,7 +1412,12 @@ class QueryGateway:
             scope = self._scope(now=now, capability_id="publication_metadata")
         return self._envelope(
             "chat_turn", args, scope,
-            {"chat": chat},
+            {"chat": chat, **{key: envelope[key] for key in (
+                "event_ids", "evidence_ids", "discovery_unverified_count", "trust_tier_counts", "conflict_count", "stale_count",
+                "result_count", "total_matches", "has_more", "next_cursor", "domain_query_generation_id",
+            ) if envelope is not None and key in envelope}},
+            result_count=(envelope or {}).get("result_count", 0),
+            truncated=(envelope or {}).get("truncated", False),
             result_type="conversation",
         )
 

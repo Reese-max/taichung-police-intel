@@ -156,6 +156,111 @@ class LiveMeetingRuntimeTests(unittest.TestCase):
             self.assertEqual([(gap["start_seconds"], gap["end_seconds"], gap["reason"])
                               for gap in state["gap_intervals"]], [(0, 30, "SESSION_CRASH")])
 
+    def _crashed_reservation(self, audio, budget):
+        from intel_v2.live_asr import ingest_chunk
+
+        reserved = []
+        def crash(state):
+            reserved.append(copy.deepcopy(state))
+            raise KeyboardInterrupt("crash after the reservation reaches disk")
+        with self.assertRaises(KeyboardInterrupt):
+            ingest_chunk(session(budget=budget), audio, start_seconds=0,
+                         requested_at=T0, opt_in=True,
+                         fixture_response={"text": "交通"}, save=crash)
+        return json.loads(json.dumps(reserved[-1]))
+
+    def test_crashed_reservation_is_persisted_before_budget_stop(self):
+        from intel_v2.live_asr import ingest_chunk
+
+        with tempfile.TemporaryDirectory() as directory:
+            audio = Path(directory) / "chunk.wav"
+            with wave.open(str(audio), "wb") as handle:
+                handle.setparams((1, 2, 16000, 0, "NONE", "not compressed"))
+                handle.writeframes(b"\0\0" * 16000 * 30)
+            for budget, at in [(30, "2026-10-16T10:00:30+08:00"),
+                               (1800, "2026-10-16T10:30:01+08:00")]:
+                with self.subTest(budget=budget):
+                    restored = self._crashed_reservation(audio, budget)
+                    before = copy.deepcopy(restored)
+                    saved = []
+                    with patch("intel_v2.live_asr._groq_transcribe") as provider:
+                        result = ingest_chunk(restored, audio, start_seconds=30,
+                                              requested_at=at, opt_in=True,
+                                              fixture_response={"text": "later"},
+                                              save=lambda value: saved.append(copy.deepcopy(value)))
+                        provider.assert_not_called()
+                    self.assertEqual(restored, before, "recovery must not mutate caller state")
+                    self.assertGreaterEqual(len(saved), 2, "recovery must reach disk before budget stop")
+                    for value in saved:
+                        validate_session(value)
+                        self.assertEqual(value["provider_usage"]["calls"][0]["status"], "FAILED")
+                        self.assertEqual(value["provider_usage"]["reserved_seconds"], 30)
+                        self.assertEqual(value["gap_intervals"][0]["reason"], "SESSION_CRASH")
+                    self.assertEqual(result["transport_status"], "BUDGET_STOP")
+                    self.assertEqual([(gap["start_seconds"], gap["end_seconds"], gap["reason"])
+                                      for gap in result["gap_intervals"]],
+                                     [(0, 30, "SESSION_CRASH"), (30, 1800, "BUDGET_STOP")])
+
+    def test_legacy_pending_budget_stop_is_repaired_without_reopening_transport(self):
+        from intel_v2.live_asr import ingest_chunk
+
+        with tempfile.TemporaryDirectory() as directory:
+            audio = Path(directory) / "chunk.wav"
+            with wave.open(str(audio), "wb") as handle:
+                handle.setparams((1, 2, 16000, 0, "NONE", "not compressed"))
+                handle.writeframes(b"\0\0" * 16000 * 30)
+            stopped = budget_stop(self._crashed_reservation(audio, 30),
+                                  stopped_at="2026-10-16T10:00:30+08:00")
+            saved = []
+            result = ingest_chunk(stopped, Path("missing.wav"), start_seconds=30,
+                                  requested_at="2026-10-16T10:00:31+08:00", opt_in=True,
+                                  fixture_response={"text": "later"},
+                                  save=lambda value: saved.append(copy.deepcopy(value)))
+            self.assertEqual(len(saved), 1)
+            validate_session(result)
+            self.assertEqual(result["transport_status"], "BUDGET_STOP")
+            self.assertEqual(result["provider_usage"]["calls"][0]["status"], "FAILED")
+            self.assertEqual([(gap["start_seconds"], gap["end_seconds"], gap["reason"])
+                              for gap in result["gap_intervals"]],
+                             [(0, 30, "SESSION_CRASH"), (30, 1800, "BUDGET_STOP")])
+            self.assertNotEqual(result["gap_intervals"][1]["gap_id"], stopped["gap_intervals"][0]["gap_id"])
+            with self.assertRaisesRegex(ValueError, "budget"):
+                resume_session(result, resumed_at="2026-10-16T10:00:32+08:00")
+            repeated_save = Mock()
+            self.assertEqual(ingest_chunk(result, Path("missing.wav"), start_seconds=30,
+                                         requested_at="2026-10-16T10:00:33+08:00", opt_in=True,
+                                         fixture_response={"text": "later"}, save=repeated_save), result)
+            repeated_save.assert_not_called()
+
+    def test_backfill_rejection_first_persists_the_crash_recovery(self):
+        from intel_v2.live_asr import ingest_chunk
+
+        with tempfile.TemporaryDirectory() as directory:
+            audio = Path(directory) / "chunk.wav"
+            with wave.open(str(audio), "wb") as handle:
+                handle.setparams((1, 2, 16000, 0, "NONE", "not compressed"))
+                handle.writeframes(b"\0\0" * 16000 * 30)
+            restored = self._crashed_reservation(audio, 1800)
+            saved = []
+            with patch("intel_v2.live_asr._groq_transcribe") as provider:
+                with self.assertRaisesRegex(ValueError, "overlap|backfill"):
+                    ingest_chunk(restored, audio, start_seconds=0,
+                                 requested_at="2026-10-16T10:00:05+08:00", opt_in=True,
+                                 fixture_response={"text": "retry"},
+                                 save=lambda value: saved.append(copy.deepcopy(value)))
+                provider.assert_not_called()
+            self.assertEqual(len(saved), 1)
+            validate_session(saved[0])
+            self.assertEqual(saved[0]["provider_usage"]["calls"][0]["status"], "FAILED")
+            self.assertEqual(saved[0]["provider_usage"]["reserved_seconds"], 30)
+            self.assertEqual([(gap["start_seconds"], gap["end_seconds"], gap["reason"])
+                              for gap in saved[0]["gap_intervals"]], [(0, 30, "SESSION_CRASH")])
+            # Repeating a rejected request must not duplicate the recovery record.
+            with self.assertRaisesRegex(ValueError, "overlap|backfill"):
+                ingest_chunk(saved[0], audio, start_seconds=0,
+                             requested_at="2026-10-16T10:00:06+08:00", opt_in=True,
+                             fixture_response={"text": "retry"}, save=Mock())
+
     def test_fixture_cannot_enter_a_paid_session_and_expired_clock_blocks_transport(self):
         from intel_v2.live_asr import ingest_chunk
 

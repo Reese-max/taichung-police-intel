@@ -96,7 +96,7 @@ def load_gold_cases(manifest_path: Path = DEFAULT_MANIFEST) -> tuple[dict[str, A
     if manifest.get("schema_version") != 1:
         raise SystemExit("unsupported v6 gold manifest schema")
     cases = [json.loads(line) for line in (manifest_path.parent / manifest["case_file"]).read_text(encoding="utf-8").splitlines() if line.strip()]
-    ev.validate_cases(cases)
+    ev.validate_cases(cases, manifest)
     return manifest, cases
 
 

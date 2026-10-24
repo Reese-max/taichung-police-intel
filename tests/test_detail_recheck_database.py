@@ -7,6 +7,7 @@ import re
 import unittest
 
 import online_collect
+from intel_v2.detail_recheck import classify_observation
 import os
 from pathlib import Path
 import uuid
@@ -143,6 +144,34 @@ def _assigned_columns(statement, params):
 
 
 class DetailRecheckDatabaseTests(unittest.TestCase):
+    def test_full_body_clock_and_semantic_evidence_survive_restart_after_304(self):
+        original = "2026-09-19T20:00:00+08:00"
+        observation = {"body_sha256": "a" * 64, "normalized_text_sha256": "b" * 64,
+            "attachments": [], "location": "第一路段", "etag": '"v1"'}
+        baseline = classify_observation(None, observation, observed_at=original)
+        row = due_row(last_checked_at=datetime(2026, 9, 20, 12, 0, tzinfo=timezone.utc))
+        row.update(baseline["after"])
+        row["last_checked_at"] = datetime(2026, 9, 20, 12, 0, tzinfo=timezone.utc)
+        row["last_result"] = {"classification": baseline}
+        connection = FakeConnection(row)
+        session = FakeSession(FakeResponse(304))
+        result = online_collect.run_detail_rechecks(connection, session, {"S-004": "SR-1"},
+            datetime(2026, 9, 21, 12, 0, tzinfo=timezone.utc))
+        self.assertEqual(session.calls[0][1]["headers"], {"If-None-Match": '"v1"'})
+        before = result[0]["classification"]["before"]
+        self.assertEqual(before["observed_at"], original)
+        self.assertEqual(before["location"], "第一路段")
+        row.update(full_state_updates(connection)[0])
+        for field in ("last_result", "attachments", "budget_state"):
+            row[field] = json.loads(row[field])
+        restarted = FakeConnection(row)
+        full_session = FakeSession()
+        refreshed = online_collect.run_detail_rechecks(restarted, full_session, {"S-004": "SR-2"},
+            datetime(2026, 9, 27, 12, 0, tzinfo=timezone.utc))
+        self.assertEqual(full_session.calls[0][1]["headers"], {})
+        self.assertEqual(refreshed[0]["classification"]["before"]["observed_at"], original)
+        self.assertEqual(refreshed[0]["classification"]["after"]["location"], "第一路段")
+
     def test_retry_after_and_interval_are_bounded(self):
         now = datetime(2026, 9, 21, 12, 0, tzinfo=timezone.utc)
         self.assertEqual(
@@ -391,6 +420,13 @@ class DetailRecheckDatabaseTests(unittest.TestCase):
                 datetime(2026, 9, 21, 12, 0, tzinfo=timezone.utc),
                 budget_policy={"per_source_limit": 0},
             )
+        self.assertEqual(connection.sql, [])
+
+    def test_invalid_full_recheck_interval_is_rejected_before_any_state_is_touched(self):
+        connection = FakeConnection(due_row())
+        with self.assertRaisesRegex(ValueError, "full_recheck_interval_hours"):
+            online_collect.run_detail_rechecks(connection, FakeSession(), {"S-004": "SR-1"},
+                datetime(2026, 9, 21, 12, 0, tzinfo=timezone.utc), full_recheck_interval_hours=1)
         self.assertEqual(connection.sql, [])
 
     def test_register_updates_url_without_accepting_an_unapproved_origin(self):

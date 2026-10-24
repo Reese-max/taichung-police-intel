@@ -180,6 +180,61 @@ class GoldEvaluatorTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "reviewer"):
             ev.validate_cases([case])
 
+    def test_synthetic_dataset_requires_explicit_true_case_labels(self):
+        case = {**self.cases[0], "reviewer": "test-only-reviewer"}
+        for label in (False, None, "true", 1):
+            with self.subTest(label=label), self.assertRaisesRegex(ValueError, "synthetic"):
+                ev.validate_cases([{**case, "synthetic": label}], self.manifest)
+        del case["synthetic"]
+        with self.assertRaisesRegex(ValueError, "synthetic"):
+            ev.validate_cases([case], self.manifest)
+        ev.validate_cases([{**case, "synthetic": True}], self.manifest)
+        ev.validate_cases([{**case, "synthetic": False}], {"dataset_type": "HUMAN_REVIEWED_HOLDOUT"})
+
+    def test_all_synthetic_manifest_versions_reject_mixed_cases(self):
+        replay_spec = importlib.util.spec_from_file_location("gold_admission_replay", ROOT / "scripts/replay-commute-reopen.py")
+        replay = importlib.util.module_from_spec(replay_spec)
+        replay_spec.loader.exec_module(replay)
+        for version in ("v1", "v2", "v3", "v6/commute-reopen-v1"):
+            source = ROOT / "eval/gold" / version / "manifest.json"
+            manifest, cases = ev.load_gold(source)
+            cases[0].update(synthetic=False, reviewer="test-only-reviewer")
+            with self.subTest(version=version), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "manifest.json"
+                path.write_text(json.dumps(manifest), encoding="utf-8")
+                (path.parent / manifest["case_file"]).write_text(
+                    "\n".join(json.dumps(case) for case in cases), encoding="utf-8",
+                )
+                loaders = (ev.load_gold, replay.load_gold_cases) if version.startswith("v6/") else (ev.load_gold,)
+                for loader in loaders:
+                    with self.subTest(loader=loader.__name__), self.assertRaisesRegex(ValueError, "synthetic"):
+                        loader(path)
+
+    def test_mixed_synthetic_cli_input_is_rejected_before_report_output(self):
+        manifest, cases = ev.load_gold()
+        cases[0].update(synthetic=False, reviewer="test-only-reviewer")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            case_path = root / manifest["case_file"]
+            case_path.write_text("\n".join(json.dumps(case) for case in cases), encoding="utf-8")
+            original = case_path.read_bytes()
+            predictions_path = root / "predictions.jsonl"
+            predictions_path.write_text("\n".join(
+                json.dumps({"case_id": case["case_id"], "prediction": case["expected"]}) for case in cases
+            ), encoding="utf-8")
+            output_path = root / "report.json"
+            result = subprocess.run(
+                [sys.executable, "-X", "utf8", str(SCRIPT), "--manifest", str(manifest_path),
+                 "--predictions", str(predictions_path), "--output", str(output_path)],
+                cwd=ROOT, capture_output=True, text=True, check=False,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("synthetic", result.stderr)
+            self.assertFalse(output_path.exists())
+            self.assertEqual(case_path.read_bytes(), original)
+
     def test_identical_complete_reports_compare_deterministically(self):
         report = ev.evaluate(self.manifest, self.cases, ev.perfect_predictions(self.cases))
         first = ev.compare_reports(report, report)
@@ -589,6 +644,7 @@ class RegressionHarnessTests(unittest.TestCase):
             ev.compare_reports(forged, self.perfect)
 
     def test_label_version_requires_history(self):
+        manifest = {"dataset_type": "HUMAN_REVIEWED_HOLDOUT", "splits": ["dev"]}
         base_case = {
             "case_id": "historical-1",
             "task": "event_pair",
@@ -606,16 +662,16 @@ class RegressionHarnessTests(unittest.TestCase):
                 {"version": 2, "reviewer": "annotator-b", "note": "relabelled after adjudication"},
             ],
         }
-        ev.validate_cases([relabelled], {"splits": ["dev"]})
+        ev.validate_cases([relabelled], manifest)
         with self.assertRaisesRegex(ValueError, "history"):
-            ev.validate_cases([{**base_case, "label_version": 2}], self.manifest)
+            ev.validate_cases([{**base_case, "label_version": 2}], manifest)
         bad_entry = {
             **base_case,
             "label_version": 2,
             "history": [{"version": 1, "note": "missing reviewer"}],
         }
         with self.assertRaisesRegex(ValueError, "reviewer"):
-            ev.validate_cases([bad_entry], self.manifest)
+            ev.validate_cases([bad_entry], manifest)
 
 if __name__ == "__main__":
     unittest.main()

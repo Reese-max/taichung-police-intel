@@ -214,7 +214,7 @@ test("fictional reviewed schema2 uses the exact39 public fields and source origi
   const values = await completePublicationFixture();
   const feed = JSON.parse(values["intelligence-feed.json"]);
   for (const row of feed.items) Object.assign(row, { committee: "FICTIONAL_COMMITTEE", next_milestone: "FICTIONAL_MILESTONE",
-    private_notes: "FICTIONAL_PRIVATE", full_text: "FICTIONAL_BODY" });
+    full_text: "FICTIONAL_BODY" });
   values["intelligence-feed.json"] = Buffer.from(JSON.stringify(feed));
   const read = async name => ({ bytes: values[name], hash: createHash("sha256").update(values[name]).digest("hex") });
   const snapshot = await buildSnapshot(env, read);
@@ -231,6 +231,28 @@ test("fictional reviewed schema2 uses the exact39 public fields and source origi
   feed.items[0].official_url = "https://unapproved.example.test/fictional";
   values["intelligence-feed.json"] = Buffer.from(JSON.stringify(feed));
   await assert.rejects(buildSnapshot(env, read), /origin is not approved/);
+});
+
+test("Worker archive gate rejects original sensitive markers before projection", async () => {
+  const values = await completePublicationFixture();
+  const original = values["intelligence-feed.json"];
+  const mutations = [{ contains_personal_data: true }, { sensitive: true },
+    ...["private_notes", "personal_data", "operational_fields", "credentials"].map(field => ({ [field]: "FICTIONAL_PRIVATE_MARKER" })),
+    ...["contains_personal_data", "sensitive", "aggregate_only", "source_available", "replay_required"]
+      .flatMap(field => [null, "FICTIONAL_PRIVATE_MARKER", 0].map(value => ({ [field]: value })))];
+  const read = async name => ({ bytes: values[name], hash: createHash("sha256").update(values[name]).digest("hex") });
+  for (const mutation of mutations) {
+    const feed = JSON.parse(original);
+    Object.assign(feed.items[0], mutation);
+    values["intelligence-feed.json"] = Buffer.from(JSON.stringify(feed));
+    await assert.rejects(buildSnapshot(env, read), error => {
+      assert.match(error.message, /archive|boolean/);
+      assert.doesNotMatch(error.message, /FICTIONAL_PRIVATE_MARKER/);
+      return true;
+    }, JSON.stringify(mutation));
+  }
+  values["intelligence-feed.json"] = original;
+  assert.equal((await buildSnapshot(env, read)).items.length, 2);
 });
 
 test("served schema2 cannot self-authorize different public fields or a mixed governance binding", async () => {
