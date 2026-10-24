@@ -30,8 +30,8 @@
   ],
   "baseline_established_at": "2026-08-27T12:13:22+08:00",
   "candidate_source_context": {
-    "collection_run_id": "CR-DEMO-20261023-EVENING-SCHEDULE",
-    "generated_at": "2026-10-23T23:16:28+08:00",
+    "collection_run_id": "CR-DEMO-20261024-MORNING-SCHEDULE",
+    "generated_at": "2026-10-24T08:58:36+08:00",
     "integration_status": "CANDIDATE",
     "items": [
       {
@@ -198,51 +198,6 @@
         "stable_key": "21835",
         "title": "旱溪東路自行車道換新裝！中市交通局改善舖面護欄 下坡路段加強安全",
         "window_completeness": "PARTIAL"
-      },
-      {
-        "change_type": "CANDIDATE_OBSERVATION",
-        "eligibility": "INELIGIBLE_CANDIDATE",
-        "integration_status": "CANDIDATE",
-        "official_url": "https://www.traffic.taichung.gov.tw/news/index-1.asp?Parser=9,4,20,,,,21832",
-        "promotion_eligible": false,
-        "published_at": "2026-10-16T00:00:00+08:00",
-        "source_health": "PASS",
-        "source_id": "S-032",
-        "source_name": "臺中市政府交通局最新消息",
-        "stable_id": "FEED-S-032-610628d5be2e7f0c",
-        "stable_key": "21832",
-        "title": "告別紙本繳費單！中市10/15捷運綠線周邊路邊智慧停車無紙化上線 綁定代扣繳最高6折優惠",
-        "window_completeness": "PARTIAL"
-      },
-      {
-        "change_type": "CANDIDATE_OBSERVATION",
-        "eligibility": "INELIGIBLE_CANDIDATE",
-        "integration_status": "CANDIDATE",
-        "official_url": "https://www.traffic.taichung.gov.tw/news/index-1.asp?Parser=9,4,20,,,,21831,,,,2",
-        "promotion_eligible": false,
-        "published_at": "2026-10-16T00:00:00+08:00",
-        "source_health": "PASS",
-        "source_id": "S-032",
-        "source_name": "臺中市政府交通局最新消息",
-        "stable_id": "FEED-S-032-55d89ce8e3176000",
-        "stable_key": "21831",
-        "title": "中市敬老卡搭計程車提高補助至100點 首週使用人次突破11萬",
-        "window_completeness": "PARTIAL"
-      },
-      {
-        "change_type": "CANDIDATE_OBSERVATION",
-        "eligibility": "INELIGIBLE_CANDIDATE",
-        "integration_status": "CANDIDATE",
-        "official_url": "https://www.traffic.taichung.gov.tw/news/index-1.asp?Parser=9,4,20,,,,21829,,,,2",
-        "promotion_eligible": false,
-        "published_at": "2026-10-16T00:00:00+08:00",
-        "source_health": "PASS",
-        "source_id": "S-032",
-        "source_name": "臺中市政府交通局最新消息",
-        "stable_id": "FEED-S-032-df90c36c8b879066",
-        "stable_key": "21829",
-        "title": "北區新興停車場BOT案公聽會！中市交通局廣徵民意 打造更完善停車環境",
-        "window_completeness": "PARTIAL"
       }
     ],
     "promotion_eligible": false,
@@ -257,7 +212,7 @@
           "NO_LAST_KNOWN_GOOD",
           "NO_DATA_AS_OF"
         ],
-        "last_checked_at": "2026-10-23T23:16:20+08:00",
+        "last_checked_at": "2026-10-24T08:58:26+08:00",
         "pagination": null,
         "promotion_eligible": false,
         "source_health": "FAILED",
@@ -267,14 +222,14 @@
         "window_completeness": "PARTIAL"
       },
       {
-        "freshness_status": "STALE",
+        "freshness_status": "VERY_STALE",
         "integration_status": "CANDIDATE",
         "intelligence_gaps": [
           "WINDOW_PARTIAL",
           "NO_LAST_KNOWN_GOOD",
-          "STALE_DATA"
+          "VERY_STALE_DATA"
         ],
-        "last_checked_at": "2026-10-23T23:16:24+08:00",
+        "last_checked_at": "2026-10-24T08:58:32+08:00",
         "pagination": {
           "complete": false,
           "page_limit": 4,
@@ -289,14 +244,14 @@
         "window_completeness": "PARTIAL"
       },
       {
-        "freshness_status": "STALE",
+        "freshness_status": "VERY_STALE",
         "integration_status": "CANDIDATE",
         "intelligence_gaps": [
           "WINDOW_PARTIAL",
           "NO_LAST_KNOWN_GOOD",
-          "STALE_DATA"
+          "VERY_STALE_DATA"
         ],
-        "last_checked_at": "2026-10-23T23:16:28+08:00",
+        "last_checked_at": "2026-10-24T08:58:36+08:00",
         "pagination": {
           "complete": false,
           "page_limit": 4,
@@ -312,7 +267,7 @@
       }
     ]
   },
-  "generated_at": "2026-10-23T23:16:28+08:00",
+  "generated_at": "2026-10-24T08:58:36+08:00",
   "generator_version": 2,
   "mode": "V2_SHADOW",
   "other_changes": [],
@@ -402,7 +357,7 @@
   ],
   "schema_version": 1,
   "snapshot_complete": false,
-  "source_collection_run_id": "CR-DEMO-20261023-EVENING-SCHEDULE",
+  "source_collection_run_id": "CR-DEMO-20261024-MORNING-SCHEDULE",
   "source_health": {
     "failed_count": 0,
     "gap_count": 6,
@@ -422,7 +377,7 @@
     "policy_hash": "3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501",
     "policy_version": 1
   },
-  "source_status_generated_at": "2026-10-23T23:16:28+08:00",
+  "source_status_generated_at": "2026-10-24T08:58:36+08:00",
   "status_message": "本期未偵測到可確認的新增或修正；歷史資料保留於資料庫。",
   "tracking_items": []
 }
