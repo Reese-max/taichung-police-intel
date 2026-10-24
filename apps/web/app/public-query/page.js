@@ -199,7 +199,7 @@ export default function PublicQueryPage() {
       <label htmlFor="pq-snapshot">重播節點 </label><select id="pq-snapshot" value={snapshotId} disabled={!bundle} onChange={(event) => { sequence.current += 1; setSnapshotId(event.target.value); setResults(null); setState("idle"); setSaveNotice(""); setError(null); }}>{Object.entries(bundle?.snapshots || {}).map(([id, value]) => <option key={id} value={id}>{id} · {value.note}</option>)}</select>{replayError && <p role="alert">{replayError}</p>}
     </div> : <p className="pq-coverage">查詢範圍為標題與來源中介資料；原文全文請由連結閱讀。</p>}
 
-    <form className="pq-search-form" onSubmit={(event) => { event.preventDefault(); handleSearch(); }}><div className="pq-search-row pq-keyword-row">
+    <form className="pq-search-form" aria-label="公開資料條件查詢" onSubmit={(event) => { event.preventDefault(); handleSearch(); }}><div className="pq-search-row pq-keyword-row">
       <div className="pq-field"><label htmlFor="pq-q">關鍵字（標題查詢）</label><input id="pq-q" type="search" value={draft.q} maxLength={512} onChange={(event) => setDraft({ ...draft, q: event.target.value })} placeholder="例如：施工延期" /></div>
       <button type="submit" className="pq-btn-primary" disabled={state === "loading" || (mode === "replay" && !bundle)}>查詢</button>
     </div>
