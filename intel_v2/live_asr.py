@@ -141,25 +141,37 @@ def ingest_chunk(
     })
     if usage["mode"] != ("FIXTURE_ONLY" if fixture else "GROQ_RECORDED_AUDIO"):
         raise ValueError("fixture and paid usage cannot share a session")
-    if state["transport_status"] == "BUDGET_STOP":
-        # Record SESSION_CRASH gaps for any PENDING calls before budget stop
-        for previous in usage["calls"]:
-            if previous["status"] == "PENDING":
-                if result["status"] == "FAILED":
-                    result = resume_session(_touch(result, at), resumed_at=at)
-                result = record_gap(_touch(result, at), start_seconds=previous["start_seconds"],
-                                    end_seconds=previous["end_seconds"], reason="SESSION_CRASH", detected_at=at)
-                previous["status"] = "FAILED"
+    pending = [index for index, call in enumerate(usage["calls"]) if call["status"] == "PENDING"]
+    stopped = state["transport_status"] == "BUDGET_STOP"
+    if pending and stopped:
+        # Rebuild the legacy budget-stop tail after recovering its reservations.
+        result["gap_intervals"] = [
+            gap for gap in result["gap_intervals"]
+            if gap["reason"] != "BUDGET_STOP" or not any(
+                usage["calls"][index]["start_seconds"] < gap["end_seconds"]
+                and usage["calls"][index]["end_seconds"] > gap["start_seconds"]
+                for index in pending
+            )
+        ]
+    for index in pending:
+        previous = result["provider_usage"]["calls"][index]
+        if result["status"] == "FAILED":
+            result = resume_session(_touch(result, at), resumed_at=at)
+        result["provider_usage"]["calls"][index]["status"] = "FAILED"
+        if not any((gap["start_seconds"], gap["end_seconds"], gap["reason"]) ==
+                   (previous["start_seconds"], previous["end_seconds"], "SESSION_CRASH")
+                   for gap in result["gap_intervals"]):
+            result = record_gap(_touch(result, at), start_seconds=previous["start_seconds"],
+                                end_seconds=previous["end_seconds"], reason="SESSION_CRASH", detected_at=at)
+    if pending:
+        result = _touch(result, at)
+        if stopped:
+            result = budget_stop(result, stopped_at=at)
+        save(result)  # Recovery must survive even when the new chunk is rejected.
+        usage = result["provider_usage"]
+    if stopped:
         return result
     if elapsed >= state["budget_seconds"] or usage["reserved_seconds"] >= state["budget_seconds"]:
-        # Record SESSION_CRASH gaps for any PENDING calls before budget exhaustion
-        for previous in usage["calls"]:
-            if previous["status"] == "PENDING":
-                if result["status"] == "FAILED":
-                    result = resume_session(_touch(result, at), resumed_at=at)
-                result = record_gap(_touch(result, at), start_seconds=previous["start_seconds"],
-                                    end_seconds=previous["end_seconds"], reason="SESSION_CRASH", detected_at=at)
-                previous["status"] = "FAILED"
         if result["status"] == "FAILED":
             result = resume_session(_touch(result, at), resumed_at=at)
         result = budget_stop(_touch(result, at), stopped_at=at)
@@ -185,13 +197,6 @@ def ingest_chunk(
     for row in [*result["segments"], *result["gap_intervals"]]:
         if start < row["end_seconds"] and end > row["start_seconds"]:
             raise ValueError("chunk overlaps an existing segment or gap")
-    for previous in usage["calls"]:
-        if previous["status"] == "PENDING":
-            if result["status"] == "FAILED":
-                result = resume_session(result, resumed_at=at)
-            result = record_gap(_touch(result, at), start_seconds=previous["start_seconds"],
-                                end_seconds=previous["end_seconds"], reason="SESSION_CRASH", detected_at=at)
-            previous["status"] = "FAILED"
     if result["status"] == "FAILED":
         result = resume_session(_touch(result, at), resumed_at=at)
     last_end = max([row["end_seconds"] for row in [*result["segments"], *result["gap_intervals"]]] + [0])

@@ -10,7 +10,7 @@
 - `start-live-session`／`stop-live-session` 與原有 `start`／`stop` 相容。開始時必須指定 allowlist 中的官方來源及 HTTPS stream 身分。
 - transport 需要 `--enable-transport --provider-authorized` 與明確的 `--budget-seconds`。實際 Groq 呼叫另需環境中的 `GROQ_API_KEY` 及每次 `--recorded-public-audio`；未具備條件就拒絕，不會送出請求。
 - 音訊由操作者確認為授權的公開會議錄製內容；只接受本機、1–60 秒、小於 2 MB 的 mono PCM16／16 kHz WAV。入口不下載 HLS、不跟隨 redirect、不接受 provider 指定 URL，也不自動重試。
-- session 同時限制媒體時間、累計保留的音訊秒數及實際請求 deadline。送出前先保存 PENDING reservation；失敗與 crash 仍計入使用量。下次操作將未完成 reservation 標為 `SESSION_CRASH` gap，不能重送同一區間。
+- session 同時限制媒體時間、累計保留的音訊秒數及實際請求 deadline。送出前先保存 PENDING reservation；失敗與 crash 仍計入使用量。下次 ingest 會先持久化 `FAILED` reservation 與 `SESSION_CRASH` gap，再判斷預算／牆鐘到期或拒絕重送同一區間（#219）。已停止的舊 session 也會修復尚未關閉的 reservation，並保留 `BUDGET_STOP`，不能重新取得預算。
 - 父／子程序各有整體逾時；到期後不得透過 `resume` 重新取得預算。顯示呼叫次數、保留秒數與 mode；`estimated_cost_usd=null` 表示金額未知，不把音訊秒數誤稱為實際帳單。未驗證 unattended 串流成本，不提供自動常駐。
 - CLI 對整個讀取→reservation→transport→保存交易持有 OS lock；crash 後 OS 釋放鎖。鎖檔保留，避免刪除仍被其他程序使用的鎖。
 

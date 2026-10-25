@@ -1,10 +1,26 @@
 {
-  "repo": "Reese-max/taichung-police-intel",
-  "issue": 219,
-  "base_sha": "b6067198dc429a902ffbfc51a2f2c86ea8862e76",
-  "candidate_sha": "da41caa0434bb659a962ceddbc4e38c7a735891c",
-  "reviewer": "issue-loop-worker",
-  "read_only": true,
-  "status": "pass",
-  "findings": []
+  "pr": 221,
+  "head": "9fc2de30ba78bd8a726adf77a7dadafcc3d4e488",
+  "findings": [
+    {
+      "severity": "med",
+      "file": "intel_v2/live_asr.py",
+      "line": 164,
+      "issue": "record_gap deep-copies the session, so assigning previous['status'] afterward changes the detached ledger, leaving the saved exhausted session PENDING. Re-entering BUDGET_STOP then tries to add an overlapping crash gap instead of returning the stopped state."
+    },
+    {
+      "severity": "med",
+      "file": "intel_v2/live_asr.py",
+      "line": 190,
+      "issue": "Recovery still runs after budget/audio checks and is not saved before the backfill rejection. Retrying the crashed interval raises ValueError with the durable reservation still PENDING, failing issue #219's same-start acceptance criterion."
+    },
+    {
+      "severity": "low",
+      "file": "tests/test_live_meeting_runtime.py",
+      "line": 163,
+      "issue": "The new regression only checks returned gap reasons and uses a shared /tmp WAV. It neither checks the persisted FAILED ledger nor covers same-start rejection or wall-clock exhaustion; the detached-ledger defect therefore passes."
+    }
+  ],
+  "fixed": true,
+  "summary": "Fixed two crash-recovery defects and strengthened the regression test: pending reservations are durably saved as FAILED with SESSION_CRASH before budget exits or rejected retries, while stopped sessions remain stopped and retain earlier gaps. All 41 related Python tests, 69 Web tests and the CLI self-check pass; regression tests first failed with three assertions and two overlap errors. Full npm run check remains red in 10 groups on Windows (Web 813/816), while the Next.js production build passes; four platform failures also reproduce from the original reviewed head."
 }

@@ -1,28 +1,12 @@
 {
-  "schema_version": 1,
-  "status": "failed",
   "repo": "Reese-max/taichung-police-intel",
-  "issue": 219,
-  "base_sha": "b6067198dc429a902ffbfc51a2f2c86ea8862e76",
-  "created_at": "2026-10-24T12:19:01.735509Z",
-  "gates": {
-    "baseline": "pass",
-    "tdd": "pass",
-    "review": "fail"
-  },
-  "commands": [],
-  "candidate_sha": "da41caa0434bb659a962ceddbc4e38c7a735891c",
-  "changed_files": [
-    "intel_v2/live_asr.py",
-    "tests/test_live_meeting_runtime.py"
-  ],
-  "red_proof": {
-    "repo": "Reese-max/taichung-police-intel",
-    "issue": 219,
-    "base_sha": "b6067198dc429a902ffbfc51a2f2c86ea8862e76",
-    "command": "python -X utf8 tests/test_live_meeting_runtime.py LiveMeetingRuntimeTests.test_budget_depletion_persists_session_crash_gap",
-    "exit": 1
-  },
-  "review": null,
-  "failure_reason": "review_sha_mismatch"
+  "issue": 221,
+  "base_sha": "9fc2de30ba78bd8a726adf77a7dadafcc3d4e488",
+  "red_proof": "Before implementation, python -X utf8 -B -m unittest discover -s tests -p test_live_meeting_runtime.py -v exited 1 on the reviewed source: Ran 15 tests; FAILED (failures=3, errors=2). test_budget_depletion_persists_session_crash_gap failed for reserved budget, same interval and wall clock: AssertionError: Lists differ: ['PENDING'] != ['FAILED']. Stopped reservation and stopped crash gap both raised ValueError: gap intervals cannot overlap. Full output: runtime-evidence/pr-221/red.log. A further history-preservation regression first failed against the initial repair (earlier BUDGET_STOP gap missing) and passed after limiting tail replacement; output: runtime-evidence/pr-221/history-red.log.",
+  "test_command": "python -X utf8 -B -m unittest discover -s tests -p \"test_live_meeting*.py\" -v && python -X utf8 -B scripts/live-meeting.py self-check && node --test apps/web/tests/live-session-view.test.mjs apps/web/tests/live-session.test.mjs && npm run check:gate0 && git diff --check",
+  "test_exit": 0,
+  "tests_passed": 110,
+  "tests_failed": 0,
+  "summary": "Centralized recovery before budget/audio/backfill checks, updating the live copied ledger and saving FAILED + SESSION_CRASH before any later rejection. Repaired legacy stopped reservations without reopening transport, preserved unrelated historical gaps, replaced the shared /tmp fixture with temporary files and disk-readback assertions, and updated the existing operations document. All 41 related Python tests, 69 Web tests, CLI self-check and gate0 pass.",
+  "not_done": "Full npm run check exited 1 with 10 failing groups: web-tests (813 passed, 3 failed), schema-drift-tests, news-list-checkpoint-tests, checkpoint-code-binding-tests, news-list-runtime-binding-integration-tests, source-scope-contract-tests, reference-csv-audit-tests, reference-json-collection-audit-tests, current-checkout-tests and source-transport-recovery-tests. Failures include Windows O_NONBLOCK, directory/symlink/file-mode assumptions, PDF_PARSER_UNAVAILABLE (installed pypdf 6.18.0 versus required 6.19.0), and the pre-commit dirty-checkout guard. Four platform failures were reproduced in a git-archive export of original head 9fc2de30ba78bd8a726adf77a7dadafcc3d4e488 (4 tests: 1 failure, 3 errors); full logs are in runtime-evidence/pr-221/. The Next.js production build passed. Full-suite success, Linux CI and live Groq acceptance are not claimed; no unrelated platform/dependency changes, push, other-branch changes, deployment or paid provider calls were performed."
 }

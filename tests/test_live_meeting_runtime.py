@@ -17,7 +17,7 @@ import wave
 
 from intel_v2.live_meeting import (
     add_bookmark, append_segment, budget_stop, formal_candidates,
-    reconcile_session, resume_session, start_session, stop_session, validate_session,
+    reconcile_session, record_gap, resume_session, start_session, stop_session, validate_session,
 )
 from intel_v2.role_profiles import load_catalog
 
@@ -157,40 +157,107 @@ class LiveMeetingRuntimeTests(unittest.TestCase):
                               for gap in state["gap_intervals"]], [(0, 30, "SESSION_CRASH")])
 
     def test_budget_depletion_persists_session_crash_gap(self):
-        """When budget is depleted, SESSION_CRASH gap should be persisted for PENDING calls."""
         from intel_v2.live_asr import ingest_chunk
 
-        audio_out = Path("/tmp/test_chunk.wav")
-        import wave
-        with wave.open(str(audio_out), "wb") as handle:
-            handle.setparams((1, 2, 16000, 0, "NONE", "not compressed"))
-            handle.writeframes(b"\0\0" * 16000 * 30)
+        for label, budget, start, at in [
+            ("reserved budget", 30, 30, "2026-10-16T10:00:30+08:00"),
+            ("same interval", 60, 0, "2026-10-16T10:00:05+08:00"),
+            ("wall clock", 60, 30, "2026-10-16T10:01:00+08:00"),
+            ("stopped reservation", 60, 30, "2026-10-16T10:00:05+08:00"),
+            ("stopped crash gap", 60, 30, "2026-10-16T10:00:05+08:00"),
+        ]:
+            with self.subTest(case=label), tempfile.TemporaryDirectory() as directory:
+                audio = Path(directory) / "chunk.wav"
+                state_path = Path(directory) / "session.json"
+                with wave.open(str(audio), "wb") as handle:
+                    handle.setparams((1, 2, 16000, 0, "NONE", "not compressed"))
+                    handle.writeframes(b"\0\0" * 16000 * 30)
 
+                def save(state):
+                    state_path.write_text(json.dumps(validate_session(state)), encoding="utf-8")
+
+                def crash(state):
+                    save(state)
+                    raise KeyboardInterrupt("crash after durable reservation")
+
+                with self.assertRaises(KeyboardInterrupt):
+                    ingest_chunk(session(budget=budget), audio, start_seconds=0, requested_at=T0,
+                                 opt_in=True, fixture_response={"text": "交通"}, save=crash)
+                restored = json.loads(state_path.read_text(encoding="utf-8"))
+                if label.startswith("stopped"):
+                    if label == "stopped crash gap":
+                        restored = record_gap(restored, start_seconds=0, end_seconds=30,
+                                              reason="SESSION_CRASH", detected_at=at)
+                    restored = budget_stop(restored, stopped_at=at)
+                    save(restored)
+                with patch("intel_v2.live_asr._groq_transcribe") as provider:
+                    if label == "same interval":
+                        with self.assertRaisesRegex(ValueError, "backfill|overlaps"):
+                            ingest_chunk(restored, audio, start_seconds=start, requested_at=at,
+                                         opt_in=True, fixture_response={"text": "retry"}, save=save)
+                    else:
+                        result = ingest_chunk(restored, audio, start_seconds=start, requested_at=at,
+                                              opt_in=True, fixture_response={"text": "later"}, save=save)
+                    provider.assert_not_called()
+                persisted = validate_session(json.loads(state_path.read_text(encoding="utf-8")))
+                self.assertEqual([call["status"] for call in persisted["provider_usage"]["calls"]], ["FAILED"])
+                self.assertEqual(persisted["provider_usage"]["reserved_seconds"], 30)
+                self.assertEqual(persisted["segments"], [])
+                self.assertEqual(restored["provider_usage"]["calls"][0]["status"], "PENDING")
+                expected = [(0, 30, "SESSION_CRASH")]
+                if label != "same interval":
+                    expected.append((30, 1800, "BUDGET_STOP"))
+                self.assertEqual([(gap["start_seconds"], gap["end_seconds"], gap["reason"])
+                                  for gap in persisted["gap_intervals"]], expected)
+                if label == "same interval":
+                    result = ingest_chunk(persisted, audio, start_seconds=30,
+                                          requested_at="2026-10-16T10:00:30+08:00", opt_in=True,
+                                          fixture_response={"text": "交通重新連線"}, save=save)
+                    self.assertEqual([call["status"] for call in result["provider_usage"]["calls"]],
+                                     ["FAILED", "SUCCEEDED"])
+                else:
+                    self.assertEqual(result, persisted)
+                    self.assertEqual(result["transport_status"], "BUDGET_STOP")
+                    unchanged = Mock()
+                    again = ingest_chunk(persisted, audio, start_seconds=start, requested_at=at,
+                                         opt_in=True, fixture_response={"text": "retry"}, save=unchanged)
+                    self.assertEqual(again, persisted)
+                    unchanged.assert_not_called()
+
+    def test_stopped_recovery_preserves_earlier_budget_gaps(self):
+        from intel_v2.live_asr import ingest_chunk
+
+        state = record_gap(session(budget=120), start_seconds=0, end_seconds=30,
+                           reason="BUDGET_STOP", detected_at=T0)
+        state = append_segment(state, sequence=0, start_seconds=30, end_seconds=60,
+                               text="交通", received_at=T0, finalized=True)
+        original_gap = copy.deepcopy(state["gap_intervals"][0])
         saved = []
 
         def crash(state):
-            saved.append(copy.deepcopy(state))
-            raise KeyboardInterrupt("simulate a process crash after durable reservation")
+            saved.append(copy.deepcopy(validate_session(state)))
+            raise KeyboardInterrupt("crash after durable reservation")
 
-        try:
-            ingest_chunk(session(budget=30), audio_out, start_seconds=0, requested_at=T0,
-                         opt_in=True, fixture_response={"text": "交通"}, save=crash)
-        except KeyboardInterrupt:
-            pass
-
-        with patch("requests.post") as post:
-            state = json.loads(json.dumps(saved[-1]))
-            # Ingest more audio - should record SESSION_CRASH gap before budget stop
-            state = ingest_chunk(state, audio_out, start_seconds=35,
-                                 requested_at=T0,
-                                 opt_in=True,
-                                 fixture_response={"text": "超預算"},
-                                 save=Mock())
-            gap_reasons = [gap["reason"] for gap in state.get("gap_intervals", [])]
-            self.assertIn("SESSION_CRASH", gap_reasons,
-                          "BUG: SESSION_CRASH gap not recorded after budget depletion!")
-            self.assertIn("BUDGET_STOP", gap_reasons)
-            self.assertEqual(state["status"], "DEGRADED")
+        with tempfile.TemporaryDirectory() as directory:
+            audio = Path(directory) / "chunk.wav"
+            with wave.open(str(audio), "wb") as handle:
+                handle.setparams((1, 2, 16000, 0, "NONE", "not compressed"))
+                handle.writeframes(b"\0\0" * 16000 * 30)
+            with self.assertRaises(KeyboardInterrupt):
+                ingest_chunk(state, audio, start_seconds=60, requested_at=T0,
+                             opt_in=True, fixture_response={"text": "交通"}, save=crash)
+            stopped = budget_stop(saved[-1], stopped_at=T0)
+            persisted = Mock()
+            result = ingest_chunk(stopped, audio, start_seconds=90, requested_at=T0,
+                                  opt_in=True, fixture_response={"text": "retry"}, save=persisted)
+        validate_session(result)
+        self.assertIn(original_gap, result["gap_intervals"])
+        self.assertEqual([(gap["start_seconds"], gap["end_seconds"], gap["reason"])
+                          for gap in result["gap_intervals"]],
+                         [(0, 30, "BUDGET_STOP"), (60, 90, "SESSION_CRASH"), (90, 1800, "BUDGET_STOP")])
+        self.assertEqual(result["segments"], stopped["segments"])
+        self.assertEqual(result["transport_status"], "BUDGET_STOP")
+        persisted.assert_called_once_with(result)
 
     def test_fixture_cannot_enter_a_paid_session_and_expired_clock_blocks_transport(self):
         from intel_v2.live_asr import ingest_chunk
