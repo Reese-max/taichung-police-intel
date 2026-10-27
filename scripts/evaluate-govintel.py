@@ -521,8 +521,6 @@ def load_gold(manifest_path: Path = DEFAULT_MANIFEST) -> tuple[dict[str, Any], l
         if not required_cases.issubset(present):
             raise ValueError("v2 synthetic regression fixtures are incomplete")
         for case in cases:
-            if case.get("synthetic") is not True:
-                raise ValueError("v2 regression seed may contain synthetic fixtures only")
             expected = case["expected"]
             if case["task"] == "query_ids" and ("ranked_ids" not in expected or "answer_state" not in expected):
                 raise ValueError(f"v2 query case requires ranking and answer-state labels: {case['case_id']}")
@@ -533,6 +531,8 @@ def load_gold(manifest_path: Path = DEFAULT_MANIFEST) -> tuple[dict[str, Any], l
 
 def validate_cases(cases: list[dict[str, Any]], manifest: dict[str, Any] | None = None) -> None:
     ids: set[str] = set()
+    dataset_type = manifest.get("dataset_type") if isinstance(manifest, dict) else None
+    synthetic_only = isinstance(dataset_type, str) and dataset_type.startswith("SYNTHETIC_")
     supported = {
         "event_pair",
         "material_change",
@@ -568,6 +568,8 @@ def validate_cases(cases: list[dict[str, Any]], manifest: dict[str, Any] | None 
             if split not in required_splits:
                 raise ValueError(f"split {split!r} not declared in manifest splits: {case_id}")
             split_counts[split] += 1
+        if synthetic_only and case.get("synthetic") is not True:
+            raise ValueError(f"synthetic dataset requires synthetic=true: {case_id}")
         if case.get("synthetic") is not True:
             reviewer = case.get("reviewer")
             if not isinstance(reviewer, str) or not reviewer:

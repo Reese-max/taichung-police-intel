@@ -590,27 +590,27 @@ CHAIN_TIMESTAMP_SOURCES = {
     "source_published_at": (),
     "detected_at": ("collection",),
     "verified_at": ("fusion_verification", "canonical_validation"),
-    "published_at": ("deployment", "publication_build"),
+    "published_at": ("deployment",),
     "public_visible_at": ("public_http_verification",),
 }
 
 
-def chain_timestamps(stages: list[dict[str, Any]]) -> dict[str, Any]:
+def chain_timestamps(stages: list[dict[str, Any]], timestamps: dict[str, Any] | None = None) -> dict[str, Any]:
     """Derive the latency chain from real stage receipts.
 
     `source_published_at` has no stage, so it is never synthesised here; a source
     without a published timestamp keeps source→detect latency UNKNOWN.
     """
-    ended: dict[str, Any] = {}
-    for stage in stages:
-        if isinstance(stage, dict) and stage.get("outcome") not in {"UNKNOWN", "SKIPPED", None}:
-            ended[str(stage.get("stage"))] = stage.get("ended_at")
-    times: dict[str, Any] = {}
+    receipts = {stage.get("stage"): stage for stage in stages if isinstance(stage, dict)}
+    times = dict(timestamps or {})
     for key, candidates in CHAIN_TIMESTAMP_SOURCES.items():
-        times[key] = next(
-            (ended[name] for name in candidates if ended.get(name) is not None),
-            None,
-        )
+        # A reported verifier owns this endpoint even when it failed or has no
+        # clock; a later validation must not hide that missing evidence.
+        receipt = next((receipts[name] for name in candidates if name in receipts), {})
+        if receipt:
+            times[key] = receipt.get("ended_at") if receipt.get("outcome") == "SUCCESS" else None
+        else:
+            times.setdefault(key, None)
     return times
 
 
@@ -760,7 +760,7 @@ def build_health(
         # already supplied one keeps its own measurement.
         stages = list(stages) + [upstream_operating_state_stage(extra.get("upstream_receipt"))]
         lanes = {lane: lane_health(lane, [row for row in stages if row["lane"] == lane]) for lane in sorted(VALID_LANES)}
-    times = chain_timestamps(stages) if timestamps is None else timestamps
+    times = chain_timestamps(stages, timestamps)
     metrics = {
         "source_to_detect_ms": latency_ms(times.get("source_published_at"), times.get("detected_at")),
         "detect_to_verify_ms": latency_ms(times.get("detected_at"), times.get("verified_at")),

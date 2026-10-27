@@ -97,6 +97,19 @@ function projectFeedItem(item, feedHash, sourceFreshness = null) {
   if (!item || typeof item !== "object" || typeof item.stable_id !== "string" || typeof item.title !== "string" || typeof item.source_id !== "string") {
     throw new Error("invalid feed row");
   }
+  // Match retention.archive_decision before the field projection erases its inputs.
+  for (const flag of ["contains_personal_data", "sensitive", "aggregate_only", "source_available", "replay_required"]) {
+    if (Object.hasOwn(item, flag) && typeof item[flag] !== "boolean") throw new Error(`${flag} must be a boolean`);
+  }
+  const sourceClass = retentionMatrix.classes[retentionMatrix.source_classes[item.source_id]];
+  const blockedFields = retentionMatrix.prohibited_public_fields.filter(field =>
+    !["raw_payload", "raw_bytes", "body", "full_text"].includes(field) && Object.hasOwn(item, field));
+  if (!sourceClass || blockedFields.length || item.contains_personal_data || item.sensitive ||
+      (sourceClass.sensitive_default && item.aggregate_only !== true) ||
+      sourceClass.archive_eligibility === "NOT_ARCHIVABLE" ||
+      retentionMatrix.layer_policies.query_index.archive_eligibility === "NOT_ARCHIVABLE") {
+    throw new Error("record is not allowed into the public archive");
+  }
   assertHash(item.content_sha256, "content_sha256");
   if (item.official_url !== null && item.official_url !== undefined &&
       (!String(item.official_url).startsWith("https://") || new URL(item.official_url).username || new URL(item.official_url).password)) {

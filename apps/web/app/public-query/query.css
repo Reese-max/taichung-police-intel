@@ -18,6 +18,12 @@ dialog.pq-drawer::backdrop { background: #000b; }
 dialog.pq-drawer:not([open]) { display: none; }
 .pq-drawer pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .85rem; }
 .pq-drawer-header button { flex-shrink: 0; }
+.pq-chat .pq-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.pq-chat .pq-keyword-row { flex-wrap: wrap; margin-top: 1rem; }
+.pq-chat .pq-field { min-width: min(100%, 240px); }
+.pq-chat pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.pq-chat-table { overflow-x: auto; }
+.pq-chat-table th, .pq-chat-table td { padding: 8px; text-align: left; }
 @media (max-width: 390px) {
   .pq-page .pq-search-form { padding: 14px; }
   .pq-page .pq-event-head { flex-wrap: wrap; }

@@ -100,18 +100,28 @@ def runtime_health(env: Mapping[str, str], *, observed_at: str | None = None) ->
         validation_outcome, validation_error = "unknown", "CANONICAL_VALIDATION_INCOMPLETE"
 
     deploy = pages_deploy_value(env)
+    preserve = phase_value(env, "PRESERVE")
+    deployment_outcome = deploy
+    deployment_error = ("DEPLOY_ACTION_FAILED" if deploy in {"failure", "cancelled"}
+                        else "DEPLOYMENT_NOT_RUN" if deploy == "skipped" else None)
+    if preserve in {"failure", "cancelled"}:
+        deployment_outcome, deployment_error = preserve, "PUBLICATION_STATE_PUSH_FAILED"
     public_verify = phase_value(env, "PUBLIC_VERIFY")
     query_verify = phase_value(env, "QUERY_VERIFY")
     stages = [
         stage("discovery", "source_contracts", schema, schema_error or ("SCHEMA_DRIFT_NOT_VERIFIED" if schema != "success" else None)),
         stage("publication", "collection", collect, "COLLECTION_NOT_RUN" if collect == "skipped" else None),
         stage("publication", "canonical_validation", validation_outcome, validation_error),
-        stage("publication", "deployment", deploy, "DEPLOYMENT_NOT_RUN" if deploy == "skipped" else None),
+        stage("publication", "deployment", deployment_outcome, deployment_error),
         stage("publication", "public_http_verification", public_verify,
               "PUBLIC_HTTP_NOT_VERIFIED" if public_verify != "success" else None),
         stage("query", "mcp_web_query", query_verify,
               "QUERY_RUNTIME_NOT_VERIFIED" if query_verify != "success" else None),
     ]
+    if "PAGES_UPLOAD" in env:
+        upload = phase_value(env, "PAGES_UPLOAD")
+        stages.append(stage("publication", "publication_build", upload,
+                            "PUBLICATION_BUILD_FAILED" if upload in {"failure", "cancelled"} else None))
     if "WORKER_DEPLOY" in env:
         worker = phase_value(env, "WORKER_DEPLOY")
         stages.append(stage("query", "worker_deployment", worker,

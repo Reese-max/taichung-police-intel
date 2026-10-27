@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import base64
 from datetime import datetime, timezone
+from functools import cache
 import hashlib
 import importlib.util
 import json
@@ -52,6 +53,17 @@ def load_policy_module():
 def load_current_policy() -> dict[str, Any]:
     module = load_policy_module()
     return module.load_current_policy()
+
+
+@cache
+def load_retention_module():
+    spec = importlib.util.spec_from_file_location(
+        "query_store_retention", ROOT / "scripts/retention-policy.py")
+    if spec is None or spec.loader is None:
+        raise ValueError("retention policy module is unavailable")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def canonical_json(value: Any) -> bytes:
@@ -159,12 +171,17 @@ def _project_source_dates(source):
     return result
 
 
-def project_feed_item(item: dict[str, Any], feed_hash: str, *, source_freshness: dict[str, str] | None = None) -> dict[str, Any]:
+def project_feed_item(item: dict[str, Any], feed_hash: str, *, source_freshness: dict[str, str] | None = None,
+                      retention_policy: dict[str, Any] | None = None) -> dict[str, Any]:
     if not isinstance(item, dict):
         raise ValueError("invalid feed row; refusing silent omission")
     stable_id, title, source_id = (_string(item.get(k)) for k in ("stable_id", "title", "source_id"))
     if not stable_id or not title or not source_id:
         raise ValueError("feed item missing stable_id/title/source_id")
+    decision = load_retention_module().archive_decision(
+        {**item, "record_id": stable_id}, policy=retention_policy, layer="query_index")
+    if decision["decision"] != "ARCHIVE":
+        raise ValueError(f"record is not allowed into the public archive: {decision['reason']}")
     if len(title) > 2000 or len(stable_id) > 256:
         raise ValueError("feed row exceeds field limit")
     official_url = _string(item.get("official_url"))
@@ -277,7 +294,9 @@ def build_store(feed: dict[str, Any], status: dict[str, Any], brief: dict[str, A
         _string(source.get("source_id")): str(source.get("freshness_status") or "UNKNOWN").upper()
         for source in sources if isinstance(source, dict)
     }
-    projected = [project_feed_item(item, hashes["feed"], source_freshness=source_freshness) for item in rows]
+    retention_policy = load_retention_module().compile_policy()
+    projected = [project_feed_item(item, hashes["feed"], source_freshness=source_freshness,
+                                   retention_policy=retention_policy) for item in rows]
     projected.sort(key=lambda r: r["canonical_id"])
     if len({r["canonical_id"] for r in projected}) != len(projected):
         raise ValueError("duplicate canonical_id in publication projection")

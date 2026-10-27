@@ -1,6 +1,8 @@
 # Gold evaluation data and metric definitions
 
-`v1` is preserved as the original 15-case synthetic seed. The default evaluator uses `v2`, a versioned synthetic-only fixture set. Neither version contains human-reviewed labels or provides real-world accuracy evidence. Historical or public-source cases must remain in a separate dataset and require a named human reviewer before they can be evaluated as gold.
+`v1` is preserved as the original 15-case synthetic seed and remains the evaluator default. Select `v2` explicitly with `--manifest eval/gold/v2/manifest.json` for its versioned metric-comparison fixtures. Neither version contains human-reviewed labels or provides real-world accuracy evidence. Historical or public-source cases must remain in a separate dataset and require a named human reviewer before they can be evaluated as gold.
+
+All manifests declaring a `SYNTHETIC_*` dataset type require literal JSON `"synthetic": true` on every case, including schema-1 datasets. The evaluator loader and v6 replay share this check through `validate_cases`; a reviewer name cannot override it. Missing labels, `false`, `null`, strings and numbers are rejected before scoring or creating a report. This validates dataset declarations only; it cannot establish source rights, label provenance or actual independent human review.
 
 Run the deterministic starter evaluation with:
 
@@ -37,3 +39,18 @@ Baseline comparison rejects incomplete, empty, or incompatible reports. With `--
 Undefined rates are `null` with a zero denominator and make baseline comparison `UNSCORABLE` unless another metric already regressed. Predictions must be JSONL objects keyed by known `case_id`; material-change cases include `material_change` and `fields`, query cases include `ids` and `ranked_ids`, claim cases with evidence labels include `support_status` and `evidence_ids`, and discovery-to-official cases include `confirmed`.
 
 Canonical `v1` and `v6/commute-reopen-v1` remain frozen. `v2` is the explicitly selected synthetic metric-comparison seed; `v3` is the separate 21-case synthetic dev/holdout extension from #149. None includes an actual human holdout trial. Pin the manifest and dataset SHA for comparisons. Cross-dataset diagnostics cannot pass the model promotion gate.
+
+## Issue #33 acceptance mapping
+
+| Engineering requirement | Existing mechanism / verification |
+| --- | --- |
+| Versioned annotation contract and dataset manifest | Manifest schema versions, `validate_cases`, reviewer/version/history validation; synthetic admission now applies across v1/v2/v3/v6. |
+| Deterministic evaluation | No random sampling; identical inputs produce sorted JSON and a dataset SHA-256. |
+| CI regression subset | `apps/web/tests/gold-eval.test.mjs` runs the evaluator unit suite and CLI checks through `npm run check`. |
+| Machine-readable full report | `evaluate-govintel.py --manifest … --predictions … --output …`. |
+| Metric denominators | Counts and denominators accompany rates; undefined rates remain `null`. |
+| Required failure fixtures | v2/v3 cover false merge, body-only revision, source failure, conflict, media-only and stale cases. |
+| Previous-baseline comparison | Pinned dataset/schema/denominator checks, score deltas and per-case regressions. |
+| Failed gates cannot justify a better-model claim | `--fail-on-regression` and `--require-promotion-gate`; synthetic data is never eligible for model promotion. |
+
+These are engineering checks, not closure of the later human-evaluation criteria. Rights-cleared official samples, two actual independent annotators, event/time-independent holdout, consenting participants, A/B/C and semantic-off comparisons remain unperformed. In particular, the frozen v6 manifest still records its cross-split version-chain limitation. No synthetic fixture or test-only reviewer in the admission regressions supplies those missing receipts.
