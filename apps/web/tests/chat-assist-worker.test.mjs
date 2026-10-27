@@ -93,6 +93,8 @@ test("only a menu tool with typed, bounded arguments survives validation", () =>
   assert.equal(validateChatIntent({ tool: "search_events", time_expression: "this_weekend" }, SOURCES, QUESTION, NOW).time_window.label, "這週末");
   assert.deepEqual(validateChatIntent({ tool: "search_evidence", q: "反詐 公告" }, SOURCES, QUESTION, NOW).arguments, { q: "反詐 公告" });
   // Keywords outside the question are the model steering the search.
+  assert.deepEqual(validateChatIntent({ tool: "search_evidence", q: "car pet" }, SOURCES, "查詢 car pet 相關公告", NOW).arguments, { q: "car pet" });
+  assert.throws(() => validateChatIntent({ tool: "search_evidence", q: "carpet" }, SOURCES, "查詢 car pet 相關公告", NOW), error => error.code === "OUTPUT_REJECTED");
   for (const q of ["選舉", "反詐 選舉", "交通管制"]) {
     assert.throws(() => validateChatIntent({ tool: "search_evidence", q }, SOURCES, QUESTION, NOW), error => error.code === "OUTPUT_REJECTED", q);
   }

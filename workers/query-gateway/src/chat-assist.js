@@ -79,7 +79,8 @@ export function validateChatIntent(raw, sourceIds, question, nowMs = Date.now())
     if (raw.tool !== "search_evidence" || typeof raw.q !== "string" || /[\u0000-\u001f\u007f]/.test(raw.q)) throw reject();
     const q = raw.q.trim();
     if (!q || q.length > CHAT_INTENT_LIMITS.q) throw reject();
-    const asked = fold(question).replace(/\s+/g, "");
+    // Word boundaries stay: "car pet" in the question does not license "carpet".
+    const asked = fold(question).replace(/\s+/g, " ");
     if (fold(q).split(/\s+/).some(word => !asked.includes(word))) throw reject();
     args.q = q;
   }
