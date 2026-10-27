@@ -32,6 +32,16 @@ python3 scripts/summarize-change.py            # 合成公告，離線，不送�
 python3 -m unittest tests.test_change_summary -v
 ```
 
+## 公開站 Demo 頁
+
+靜態頁 `/change-summary/`（尚未加入主導覽，直接用網址開啟）顯示合成公告的新舊原文、AI 候選摘要、逐句引文與其位置，並標明 `FIXTURE_ONLY`／待人工覆核／模型為 `SCRIPTED_FIXTURE`。頁面在瀏覽器內重新核對每段引文都等於所顯示原文的對應位置，不符或 `published`／狀態不對就不顯示摘要。資料檔由下列指令重產：
+
+```bash
+python3 scripts/summarize-change.py --web-demo apps/web/public/data/change-summary-demo.json
+```
+
+只接受合成 fixture；不接任何正式來源或 feed。
+
 ## 診斷評測（尚未對真實模型執行）
 
 `scripts/evaluate-change-summary.py` 對 `eval/change-summary/v1/` 的 8 組**合成**前後文跑摘要器，計算：變更案例是否涵蓋應有的新值、應拒答案例（只改標點／空白）是否拒答、錯誤拒答、禁止出現的值（如被注入指令誘導的「已取消」、未寫出的原因）以及各驗證拒絕代碼的次數。

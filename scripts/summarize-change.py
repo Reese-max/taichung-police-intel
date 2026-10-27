@@ -28,6 +28,7 @@ def main() -> int:
     parser.add_argument("--fixture", type=Path, default=DEFAULT_FIXTURE)
     parser.add_argument("--live", action="store_true", help="use the provider configured in the environment")
     parser.add_argument("--output", type=Path, help="write the summary JSON here instead of stdout")
+    parser.add_argument("--web-demo", type=Path, help="also write the public demo data file (synthetic fixtures only)")
     args = parser.parse_args()
 
     fixture = json.loads(args.fixture.read_text(encoding="utf-8"))
@@ -50,6 +51,20 @@ def main() -> int:
         provider = ScriptedProvider(json.dumps(fixture["good_response"], ensure_ascii=False))
     summary = summarize_change(data, provider)
     result = {"summary": summary, "review_candidate": review_candidate(summary)}
+    if args.web_demo:
+        if fixture.get("synthetic") is not True or summary["status"] != "PENDING_REVIEW":
+            raise SystemExit("the web demo accepts only synthetic fixtures with a pending summary")
+        sides = data.sides()
+        demo = {
+            "schema_version": 1,
+            "kind": "GOVINTEL_CHANGE_SUMMARY_DEMO",
+            "status": "FIXTURE_ONLY",
+            "production_verified": False,
+            "before_text": sides["before"],
+            "after_text": sides["after"],
+            "summary": summary,
+        }
+        args.web_demo.write_text(json.dumps(demo, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     text = json.dumps(result, ensure_ascii=False, indent=2) + "\n"
     if args.output:
         args.output.write_text(text, encoding="utf-8")
