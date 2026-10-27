@@ -121,6 +121,7 @@ const reasonCode = value => value === null || (typeof value === "string" && /^[A
 const day = value => typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
 const GATE_VERSION = "answer-evidence-gate/3";
 const RENDERER_VERSION = "controlled-answer-renderer/1";
+const squash = value => String(value).normalize("NFC").replace(/\s+/g, "");
 
 async function sha256Hex(text) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
@@ -141,13 +142,21 @@ function readyAnswerSafe(answer, payload) {
       receipt.publication_hash !== payload.publication_hash || !/^[a-f0-9]{64}$/.test(receipt.answer_sha256 || "") ||
       !Array.isArray(receipt.evidence_ids) || !Array.isArray(receipt.claims) || receipt.claims.length !== answer.answer.length ||
       !Array.isArray(ids) || ids.length !== answer.answer.length || new Set(ids).size !== ids.length) return false;
+  // Each title claim must also agree with this same reply's evidence link: the
+  // title (normalized as the gate does) and the exact publication locator.
+  const links = Array.isArray(payload.chat?.evidence_links) ? payload.chat.evidence_links : [];
   return ids.every((id, index) => {
     const claim = receipt.claims[index];
-    const proposition = claim?.propositions?.[0];
-    return typeof id === "string" && id.length <= 256 && id.startsWith("PUB-") && receipt.evidence_ids.includes(id) &&
-      claim.claim_type === "STATUS" && claim.support_status === "SUPPORTED" && claim.propositions.length === 1 &&
-      proposition.subject === `publication:${id.slice(4)}:title` && typeof proposition.value === "string" && proposition.value.length <= 1024 &&
-      Array.isArray(claim.supporting_evidence) && claim.supporting_evidence.some(row => row?.evidence_id === id) &&
+    if (typeof id !== "string" || id.length > 256 || !id.startsWith("PUB-") || !receipt.evidence_ids.includes(id) ||
+        !claim || typeof claim !== "object" || !Array.isArray(claim.propositions) || claim.propositions.length !== 1 ||
+        !Array.isArray(claim.supporting_evidence)) return false;
+    const canonical = id.slice(4);
+    const proposition = claim.propositions[0];
+    const link = links.find(row => row?.canonical_id === canonical);
+    return claim.claim_type === "STATUS" && claim.support_status === "SUPPORTED" && Boolean(proposition) && typeof proposition === "object" &&
+      proposition.subject === `publication:${canonical}:title` && typeof proposition.value === "string" && proposition.value.length <= 1024 &&
+      Boolean(link) && typeof link.title === "string" && squash(link.title) === squash(proposition.value) && typeof link.official_url === "string" &&
+      claim.supporting_evidence.some(row => row?.evidence_id === id && row.locator === `${link.official_url}#publication:${canonical}`) &&
       answer.answer[index] === `官方來源已核對：${proposition.subject}=${proposition.value}。`;
   });
 }
@@ -160,7 +169,7 @@ function assistSafe(chat, payload) {
   if (parser.kind === "llm") {
     if (range !== null && (!range || typeof range !== "object" || !day(range.time_from) || !day(range.time_to) ||
         range.time_zone !== "Asia/Taipei" || typeof range.label !== "string" || range.label.length > 64)) return false;
-  } else if (parser.kind !== "rules" || !reasonCode(parser.fallback_reason)) return false;
+  } else if (parser.kind !== "rules" || !reasonCode(parser.fallback_reason) || range !== undefined) return false;
   if (!answer || typeof answer !== "object" || Array.isArray(answer) || !reasonCode(answer.reason_code) ||
       !Array.isArray(answer.answer) || answer.answer.length > 32 || answer.answer.some(line => typeof line !== "string" || line.length > 2000)) return false;
   if (answer.status === "ANSWER_READY") return readyAnswerSafe(answer, payload);

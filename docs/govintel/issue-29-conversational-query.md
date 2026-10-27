@@ -105,5 +105,18 @@ production even with a key. Activation still needs the owner steps in
 `research-mvp.md` and `research-admission.md`, including the browser Access/session
 route; nothing here enables a provider or changes any approval.
 
+Known limits:
+
+- The intent step sends the question to the provider whenever the four gates are
+  on, even while formal admission is `RIGHTS_BLOCKED` (only publication text is held
+  back). Turning `RESEARCH_*` on therefore also starts sending `/chat` questions.
+- Every keyword of `q` must appear in the question; a model that rephrases falls
+  back to the rules. The model can still omit a time or source the question named:
+  the turn then runs without it, and the UI shows the conditions actually applied
+  (no time condition is listed), so the omission is visible but not refused.
+- The browser accepts an assisted answer only when each line rebuilds from a
+  passing gate receipt and matches that reply's own evidence title and locator; it
+  cannot detect a Worker that forges all of them consistently.
+
 Offline checks: `node --test --test-concurrency=1 apps/web/tests/chat-assist-worker.test.mjs apps/web/tests/chat-assist-client.test.mjs`
 (mocked provider and admission only).

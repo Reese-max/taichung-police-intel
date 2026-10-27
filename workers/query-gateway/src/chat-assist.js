@@ -7,7 +7,7 @@ export const CHAT_INTENT_PARSER = "chat-intent-llm/1";
 export const CHAT_RULES_PARSER = "chat-rules/1";
 export const CHAT_INTENT_TOOLS = Object.freeze(["search_evidence", "get_source_health", "get_current_brief", "search_events", "query_statistics"]);
 export const CHAT_TIME_EXPRESSIONS = Object.freeze(["none", "today", "yesterday", "day_before_yesterday", "tomorrow",
-  "day_after_tomorrow", "this_week", "next_week", "this_weekend", "next_weekend", "last_days", "dates"]);
+  "day_after_tomorrow", "this_week", "next_week", "this_weekend", "next_weekend", "last_week", "last_days", "dates"]);
 export const CHAT_INTENT_LIMITS = Object.freeze({ q: 64, lastDays: 90, dateSpanDays: 366 });
 const TIME_ZONE = "Asia/Taipei";
 // Taiwan has kept UTC+8 without daylight saving since 1980.
@@ -29,6 +29,7 @@ const SYSTEM = "Map one public-information question to exactly one read-only que
   "Do not answer the question, add facts, URLs, SQL, or other keys.";
 
 const object = value => value !== null && typeof value === "object" && !Array.isArray(value);
+const fold = value => String(value).normalize("NFKC").toLowerCase();
 const reject = () => new ResearchError("OUTPUT_REJECTED", "模型解析未通過核對。", 503);
 
 function taipeiDay(nowMs) {
@@ -62,19 +63,24 @@ export function resolveTimeExpression(intent, nowMs = Date.now()) {
     case "next_week": { const monday = (7 - weekday) % 7 || 7; return dateWindow(day(monday), day(monday + 6), "下週"); }
     case "this_weekend": { const sunday = (6 - weekday) % 7; return dateWindow(day(sunday - 1), day(sunday), "這週末"); }
     case "next_weekend": { const saturday = ((7 - weekday) % 7 || 7) + 5; return dateWindow(day(saturday), day(saturday + 1), "下週末"); }
+    case "last_week": return dateWindow(day(-6), today, "最近一週");
     case "last_days": return dateWindow(day(1 - intent.last_days), today, `最近${intent.last_days}天`);
     case "dates": return dateWindow(calendarDay(intent.date_from), calendarDay(intent.date_to), "指定日期");
     default: throw reject();
   }
 }
 
-export function validateChatIntent(raw, sourceIds, nowMs = Date.now()) {
+// question: the person's own words; every keyword of q must appear in it, so the
+// model cannot widen or redirect the search beyond what was asked.
+export function validateChatIntent(raw, sourceIds, question, nowMs = Date.now()) {
   if (!object(raw) || Object.keys(raw).some(key => !KEYS.includes(key)) || !CHAT_INTENT_TOOLS.includes(raw.tool)) throw reject();
   const args = {};
   if (raw.q !== undefined) {
     if (raw.tool !== "search_evidence" || typeof raw.q !== "string" || /[\u0000-\u001f\u007f]/.test(raw.q)) throw reject();
     const q = raw.q.trim();
     if (!q || q.length > CHAT_INTENT_LIMITS.q) throw reject();
+    const asked = fold(question).replace(/\s+/g, "");
+    if (fold(q).split(/\s+/).some(word => !asked.includes(word))) throw reject();
     args.q = q;
   }
   if (raw.source_id !== undefined) {
@@ -101,5 +107,5 @@ export async function planChatIntent(question, sourceIds, env, request, fetchImp
     question, tools: CHAT_INTENT_TOOLS.map(name => ({ name, use: TOOL_USE[name] })),
     source_ids: sourceIds, time_expressions: CHAT_TIME_EXPRESSIONS,
   } }, env, request, fetchImpl);
-  return validateChatIntent(raw, sourceIds, nowMs);
+  return validateChatIntent(raw, sourceIds, question, nowMs);
 }

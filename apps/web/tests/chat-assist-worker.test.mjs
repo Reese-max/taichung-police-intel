@@ -11,6 +11,7 @@ import { requestChat } from "../lib/chat-answer.js";
 const hash = value => createHash("sha256").update(value).digest("hex");
 const PROVIDER = "https://api.minimax.io/v1/chat/completions";
 const SOURCES = ["S-004", "S-006"];
+const QUESTION = "反詐相關的公告";
 // Wednesday 2026-10-28 11:00 in Taipei.
 const NOW = Date.parse("2026-10-28T03:00:00Z");
 const completion = value => Response.json({ choices: [{ finish_reason: "stop", message: { content: JSON.stringify(value) } }] });
@@ -59,6 +60,7 @@ test("relative times resolve on the server clock to explicit Asia/Taipei dates",
   assert.deepEqual(at("this_weekend"), expect("2026-10-31", "2026-11-01", "這週末"));
   assert.deepEqual(at("next_weekend"), expect("2026-11-07", "2026-11-08", "下週末"));
   assert.deepEqual(at("last_days", { last_days: 3 }), expect("2026-10-26", "2026-10-28", "最近3天"));
+  assert.deepEqual(at("last_week"), expect("2026-10-22", "2026-10-28", "最近一週"));
   assert.deepEqual(at("dates", { date_from: "2026-11-01", date_to: "2026-11-02" }), expect("2026-11-01", "2026-11-02", "指定日期"));
   // 00:30 on the 28th in Taipei is still the 27th in UTC; Sunday keeps its own weekend.
   assert.deepEqual(at("today", {}, Date.parse("2026-10-27T16:30:00Z")), expect("2026-10-28", "2026-10-28", "今天"));
@@ -69,7 +71,7 @@ test("relative times resolve on the server clock to explicit Asia/Taipei dates",
 
 test("the Worker's time windows match intel_v2/conversation.py for the same day", () => {
   const phrases = { today: "今天", yesterday: "昨天", day_before_yesterday: "前天", tomorrow: "明天", day_after_tomorrow: "後天",
-    this_week: "這週", next_week: "下週", this_weekend: "這週末", next_weekend: "下週末", last_days: "最近3天" };
+    this_week: "這週", next_week: "下週", this_weekend: "這週末", next_weekend: "下週末", last_week: "最近一週", last_days: "最近3天" };
   const root = fileURLToPath(new URL("../../../", import.meta.url));
   for (const [day, now] of [["2026-10-28", NOW], ["2026-11-01", Date.parse("2026-11-01T02:00:00Z")], ["2026-10-31", Date.parse("2026-10-31T15:59:00Z")]]) {
     const script = ["import json, sys", "from datetime import date", "from intel_v2.conversation import parse_time_window",
@@ -85,10 +87,15 @@ test("the Worker's time windows match intel_v2/conversation.py for the same day"
 });
 
 test("only a menu tool with typed, bounded arguments survives validation", () => {
-  const ok = validateChatIntent({ tool: "search_evidence", q: "  反詐  ", source_id: "S-004", time_expression: "none" }, SOURCES, NOW);
+  const ok = validateChatIntent({ tool: "search_evidence", q: "  反詐  ", source_id: "S-004", time_expression: "none" }, SOURCES, QUESTION, NOW);
   assert.deepEqual(ok, { tool: "search_evidence", arguments: { q: "反詐", source_id: "S-004" }, time_window: null });
-  assert.deepEqual(validateChatIntent({ tool: "get_source_health", source_id: "S-006" }, SOURCES, NOW).arguments, { source_id: "S-006" });
-  assert.equal(validateChatIntent({ tool: "search_events", time_expression: "this_weekend" }, SOURCES, NOW).time_window.label, "這週末");
+  assert.deepEqual(validateChatIntent({ tool: "get_source_health", source_id: "S-006" }, SOURCES, QUESTION, NOW).arguments, { source_id: "S-006" });
+  assert.equal(validateChatIntent({ tool: "search_events", time_expression: "this_weekend" }, SOURCES, QUESTION, NOW).time_window.label, "這週末");
+  assert.deepEqual(validateChatIntent({ tool: "search_evidence", q: "反詐 公告" }, SOURCES, QUESTION, NOW).arguments, { q: "反詐 公告" });
+  // Keywords outside the question are the model steering the search.
+  for (const q of ["選舉", "反詐 選舉", "交通管制"]) {
+    assert.throws(() => validateChatIntent({ tool: "search_evidence", q }, SOURCES, QUESTION, NOW), error => error.code === "OUTPUT_REJECTED", q);
+  }
   for (const bad of [null, [], "search_evidence", {}, { tool: "validate_answer" }, { tool: "chat_turn", q: "x" }, { tool: "get_publication_receipt" },
     { tool: "search_evidence", sql: "select 1" }, { tool: "search_evidence", q: "x".repeat(CHAT_INTENT_LIMITS.q + 1) },
     { tool: "search_evidence", q: "   " }, { tool: "search_evidence", q: "a\u0000b" }, { tool: "search_evidence", q: 7 },
@@ -101,7 +108,7 @@ test("only a menu tool with typed, bounded arguments survives validation", () =>
     { tool: "search_events", time_expression: "dates", date_from: "2026-11-02", date_to: "2026-11-01" },
     { tool: "search_events", time_expression: "dates", date_from: "2025-01-01", date_to: "2026-11-01" },
     { tool: "search_events", time_expression: "dates", date_from: "2026/11/01", date_to: "2026-11-02" }]) {
-    assert.throws(() => validateChatIntent(bad, SOURCES, NOW), error => error.code === "OUTPUT_REJECTED", JSON.stringify(bad));
+    assert.throws(() => validateChatIntent(bad, SOURCES, QUESTION, NOW), error => error.code === "OUTPUT_REJECTED", JSON.stringify(bad));
   }
   assert.ok(CHAT_TIME_EXPRESSIONS.includes("none"));
 });
@@ -118,7 +125,7 @@ test("a disabled provider answers with the deterministic rules and sends nothing
 test("a validated intent runs the typed query and only gate-checked text becomes the answer", () => withSnapshot(async (module, snapshot) => {
   const log = { admissions: [], calls: [] };
   const result = await module.executeAssistedChat(snapshot, chat("有沒有測試相關的官方公告？"), ready(log), request(), provider(log, [
-    { tool: "search_evidence", q: "測試官方" },
+    { tool: "search_evidence", q: "測試" },
     payload => completion({ evidence_ids: payload.sources.slice(0, 1).map(row => row.evidence_id) }),
   ]));
   assert.equal(log.calls.length, 2); assert.equal(log.admissions.length, 2);
@@ -129,7 +136,7 @@ test("a validated intent runs the typed query and only gate-checked text becomes
   assert.deepEqual(intent.source_ids, snapshot.sources.map(row => row.source_id));
   assert.equal(JSON.stringify(intent).includes("測試官方標題"), false);
   assert.deepEqual(result.chat.parser, { kind: "llm", version: "chat-intent-llm/1", time_window: null });
-  assert.deepEqual(result.chat.resolved_request, { tool: "search_evidence", arguments: { q: "測試官方" } });
+  assert.deepEqual(result.chat.resolved_request, { tool: "search_evidence", arguments: { q: "測試" } });
   const answer = result.chat.assisted_answer;
   assert.equal(answer.status, "ANSWER_READY"); assert.equal(answer.reason_code, null);
   assert.equal(answer.answer.length, 1); assert.match(answer.answer[0], /^官方來源已核對：publication:.*:title=/);

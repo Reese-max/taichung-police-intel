@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
-import { requestChat, summarizeChat } from "../lib/chat-answer.js";
+import { CHAT_ASSIST_NOT_SENT, requestChat, summarizeChat } from "../lib/chat-answer.js";
 import { queryGateway } from "../lib/query-release-client.js";
 
 const context = { basePath: "/taichung-police-intel", codeSha: "a".repeat(40), publicationGeneration: "run-62" };
@@ -12,8 +12,11 @@ const release = {
 };
 const receipt = { tool_name: "chat_turn", publication_hash: release.publication_hash, query_generation_id: release.query_generation };
 const ANSWER = ["官方來源已核對：publication:X:title=測試。"];
+const URL_OF = canonical => `https://example.test/n/${canonical}`;
 const claim = (value = "測試", id = "PUB-X") => ({ claim_type: "STATUS", support_status: "SUPPORTED",
-  propositions: [{ subject: `publication:${id.slice(4)}:title`, value }], supporting_evidence: [{ evidence_id: id }] });
+  propositions: [{ subject: `publication:${id.slice(4)}:title`, value }],
+  supporting_evidence: [{ evidence_id: id, locator: `${URL_OF(id.slice(4))}#publication:${id.slice(4)}` }] });
+const REPLACED = ["官方來源已核對：publication:X:title=替換。"];
 const gateReceipt = (answer = ANSWER, claims = [claim()]) => ({ gate_status: "PASS", validator_version: "answer-evidence-gate/3",
   renderer_version: "controlled-answer-renderer/1", publication_hash: release.publication_hash, evidence_ids: ["PUB-X"], claims,
   answer_sha256: createHash("sha256").update(JSON.stringify(answer)).digest("hex") });
@@ -24,7 +27,8 @@ function payload(chatFields = {}) {
     publication_hash: release.publication_hash, query_generation_id: release.query_generation, policy: { policy_hash: release.source_policy_hash },
     freshness: "RECENT", verification_summary: "僅代表已核對的公開快照範圍。", source_gaps: [], receipt,
     chat: { schema_version: 1, status: "RECENT", resolved_request: { tool: "search_evidence", arguments: { q: "測試" } }, lines: ["索引中繼資料"],
-      verified: [], unverified: [], conflicts: [], stale: [], statistics: [], sources: [], evidence_links: [], notices: [], gaps: [],
+      verified: [], unverified: [], conflicts: [], stale: [], statistics: [], sources: [], notices: [], gaps: [],
+      evidence_links: [{ canonical_id: "X", source_id: "S-004", official_url: URL_OF("X"), title: "測 試" }],
       publication_hash: release.publication_hash, query_receipt: null, context: { schema_version: 1 },
       parser: { kind: "llm", version: "chat-intent-llm/1", time_window: null },
       assisted_answer: { status: "ANSWER_READY", reason_code: null, answer: ANSWER, selected_evidence_ids: ["PUB-X"], answer_evidence_receipt: gateReceipt() },
@@ -97,6 +101,17 @@ test("an assisted reply with an unverifiable parser or answer is never shown", a
     // text and proposition replaced together, the hash left as the Worker computed it
     ready(["官方來源已核對：publication:X:title=替換。"], gateReceipt(ANSWER, [claim("替換")])),
     ready(ANSWER, { ...gateReceipt(), evidence_ids: ["PUB-Y"] }),
+    // answer, proposition and hash all replaced together: the reply's own evidence title disagrees
+    ready(REPLACED, gateReceipt(REPLACED, [claim("替換")])),
+    // answer, proposition and the reply's evidence title all replaced: only the Worker's hash disagrees
+    { evidence_links: [{ canonical_id: "X", source_id: "S-004", official_url: URL_OF("X"), title: "替換" }], ...ready(REPLACED, gateReceipt(ANSWER, [claim("替換")])) },
+    ready(ANSWER, gateReceipt(ANSWER, [{ ...claim(), supporting_evidence: [{ evidence_id: "PUB-X", locator: "https://evil.test/n/X#publication:X" }] }])),
+    { evidence_links: [], ...ready(ANSWER, gateReceipt()) },
+    ready(ANSWER, gateReceipt(ANSWER, [null])),
+    ready(ANSWER, gateReceipt(ANSWER, [{ ...claim(), propositions: "publication:X:title=測試" }])),
+    { parser: { kind: "rules", version: "chat-rules/1", fallback_reason: "DISABLED",
+      time_window: { time_from: "2026-10-31", time_to: "2026-11-01", time_zone: "Asia/Taipei", label: "x".repeat(440) } },
+      assisted_answer: { status: "NOT_ATTEMPTED", reason_code: "DISABLED", answer: [] } },
     ready(ANSWER, gateReceipt(ANSWER, [{ ...claim(), supporting_evidence: [{ evidence_id: "PUB-Y" }] }])),
     ready(ANSWER, gateReceipt(ANSWER, [{ ...claim(), claim_type: "CAUSE" }])),
     ready(ANSWER, gateReceipt(ANSWER, [{ ...claim(), propositions: [...claim().propositions, { subject: "publication:X:title", value: "x" }] }])),
@@ -113,6 +128,13 @@ test("an assisted reply with an unverifiable parser or answer is never shown", a
   const ok = await requestChat("https://gateway.example", { text: "測試", assist: true, publicDataOnly: true }, { ...context, fetchImpl: gateway(payload(fallback), []) });
   assert.deepEqual(summarizeChat(ok.chat).parser, fallback.parser);
   assert.deepEqual(summarizeChat(ok.chat).assistedAnswer, fallback.assisted_answer);
+});
+
+test("only reasons reached before any provider transmission count as not sent", () => {
+  // research.js: DISABLED/KEY_MISSING/BILLING_REVIEW_REQUIRED/ADMISSION_UNCONFIGURED stop before admission,
+  // ADMISSION_DENIED stops before the provider; the rest may follow a sent request.
+  assert.deepEqual([...CHAT_ASSIST_NOT_SENT].sort(), ["ADMISSION_DENIED", "ADMISSION_UNCONFIGURED", "BILLING_REVIEW_REQUIRED", "DISABLED", "KEY_MISSING"]);
+  for (const code of ["OUTPUT_REJECTED", "PROVIDER_UNAVAILABLE", "TIMEOUT"]) assert.equal(CHAT_ASSIST_NOT_SENT.has(code), false);
 });
 
 test("a deterministic reply that carries assisted fields is never shown as checked", async () => {
