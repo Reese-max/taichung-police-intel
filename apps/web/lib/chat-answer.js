@@ -108,17 +108,81 @@ function chatDisplaySafe(chat, payload) {
     rows(chat.gaps, gap) && rows(payload.source_gaps, gap);
 }
 
-export async function requestChat(endpoint, { text, quickAction, context = { schema_version: 1 } }, releaseContext = null) {
+// The assisted route's own fields: how the question was parsed and the answer
+// step's outcome. Only gate-checked text may appear in an answer.
+export const CHAT_ASSIST_REASON_LABELS = {
+  DISABLED: "站方未啟用 AI 解析", KEY_MISSING: "AI 尚未完成啟用設定", BILLING_REVIEW_REQUIRED: "AI 尚未完成啟用設定",
+  ADMISSION_UNCONFIGURED: "AI 尚未完成啟用設定", ADMISSION_DENIED: "未取得 AI 使用授權或額度", OUTPUT_REJECTED: "AI 輸出未通過核對",
+  PROVIDER_UNAVAILABLE: "AI 服務暫時無法使用", INPUT_RESTRICTED: "問題含可能的個人資料", RIGHTS_BLOCKED: "來源權利尚未核准，不產生 AI 回答",
+  TOOL_HAS_NO_ANSWER_STEP: "此類查詢不產生 AI 回答", QUERY_NOT_EXECUTED: "查詢條件無法套用，未產生回答", NO_MATCH: "沒有符合的已收錄公告",
+  NO_APPROVED_SOURCES: "沒有可供核對的目前官方來源", NO_RELEVANT_SELECTION: "AI 未找到相關公告",
+};
+const reasonCode = value => value === null || (typeof value === "string" && /^[A-Z][A-Z0-9_]{0,63}$/.test(value));
+const day = value => typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
+const GATE_VERSION = "answer-evidence-gate/3";
+const RENDERER_VERSION = "controlled-answer-renderer/1";
+
+async function sha256Hex(text) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+// Fallback reasons under which the question never reached the provider.
+export const CHAT_ASSIST_NOT_SENT = new Set(["DISABLED", "KEY_MISSING", "BILLING_REVIEW_REQUIRED", "ADMISSION_UNCONFIGURED", "ADMISSION_DENIED"]);
+
+// A ready answer must be the Worker's controlled rendering of a passing gate's
+// supported title claims for this publication: claim i is the title of selected
+// ID i, cites that evidence, and its line is rebuilt here from the proposition.
+function readyAnswerSafe(answer, payload) {
+  const receipt = answer.answer_evidence_receipt;
+  const ids = answer.selected_evidence_ids;
+  if (answer.reason_code !== null || answer.answer.length === 0 || !receipt || typeof receipt !== "object" ||
+      receipt.gate_status !== "PASS" || receipt.validator_version !== GATE_VERSION || receipt.renderer_version !== RENDERER_VERSION ||
+      receipt.publication_hash !== payload.publication_hash || !/^[a-f0-9]{64}$/.test(receipt.answer_sha256 || "") ||
+      !Array.isArray(receipt.evidence_ids) || !Array.isArray(receipt.claims) || receipt.claims.length !== answer.answer.length ||
+      !Array.isArray(ids) || ids.length !== answer.answer.length || new Set(ids).size !== ids.length) return false;
+  return ids.every((id, index) => {
+    const claim = receipt.claims[index];
+    const proposition = claim?.propositions?.[0];
+    return typeof id === "string" && id.length <= 256 && id.startsWith("PUB-") && receipt.evidence_ids.includes(id) &&
+      claim.claim_type === "STATUS" && claim.support_status === "SUPPORTED" && claim.propositions.length === 1 &&
+      proposition.subject === `publication:${id.slice(4)}:title` && typeof proposition.value === "string" && proposition.value.length <= 1024 &&
+      Array.isArray(claim.supporting_evidence) && claim.supporting_evidence.some(row => row?.evidence_id === id) &&
+      answer.answer[index] === `官方來源已核對：${proposition.subject}=${proposition.value}。`;
+  });
+}
+
+function assistSafe(chat, payload) {
+  const parser = chat.parser;
+  const answer = chat.assisted_answer;
+  if (!parser || typeof parser !== "object" || Array.isArray(parser) || typeof parser.version !== "string" || parser.version.length > 64) return false;
+  const range = parser.time_window;
+  if (parser.kind === "llm") {
+    if (range !== null && (!range || typeof range !== "object" || !day(range.time_from) || !day(range.time_to) ||
+        range.time_zone !== "Asia/Taipei" || typeof range.label !== "string" || range.label.length > 64)) return false;
+  } else if (parser.kind !== "rules" || !reasonCode(parser.fallback_reason)) return false;
+  if (!answer || typeof answer !== "object" || Array.isArray(answer) || !reasonCode(answer.reason_code) ||
+      !Array.isArray(answer.answer) || answer.answer.length > 32 || answer.answer.some(line => typeof line !== "string" || line.length > 2000)) return false;
+  if (answer.status === "ANSWER_READY") return readyAnswerSafe(answer, payload);
+  return ["NO_ANSWER", "NOT_ATTEMPTED"].includes(answer.status) && answer.answer.length === 0;
+}
+
+// assist: send the question to the Web-only assisted route. It needs the
+// public-data attestation, always binds the release and allows more time.
+export async function requestChat(endpoint, { text, quickAction, context = { schema_version: 1 }, assist = false, publicDataOnly = false }, releaseContext = null) {
   const sanitized = sanitizeChatContext(context);
   if (!sanitized || (text !== undefined && (typeof text !== "string" || !text.trim() || text.length > 512)) ||
       (quickAction !== undefined && !CHAT_QUICK_ACTIONS.some(action => action.id === quickAction)) ||
-      (text === undefined && quickAction === undefined)) {
+      (text === undefined && quickAction === undefined) || (assist && (text === undefined || quickAction !== undefined))) {
     throw Object.assign(new Error("對話問題或條件無法驗證，請重新輸入。"), { code: "INVALID_ARGUMENTS" });
+  }
+  if (assist && publicDataOnly !== true) {
+    throw Object.assign(new Error("請先確認問題只含公開、不含個資的資訊。"), { code: "PUBLIC_DATA_CONFIRMATION_REQUIRED" });
   }
   const payload = await queryGateway(endpoint, "chat_turn", {
     ...(text === undefined ? {} : { text: text.trim() }),
     ...(quickAction === undefined ? {} : { quick_action: quickAction }), context: sanitized,
-  }, releaseContext);
+  }, releaseContext, assist ? { route: "chat", timeoutMs: 45000, bindRelease: true, body: { public_data_only: true } } : undefined);
   const chat = payload.chat;
   const receipts = [payload.receipt, ...(chat?.query_receipt ? [chat.query_receipt] : [])];
   if (payload.schema_version !== 1 || payload.result_type !== "conversation" || !payload.query_id ||
@@ -126,7 +190,11 @@ export async function requestChat(endpoint, { text, quickAction, context = { sch
       chat.publication_hash !== payload.publication_hash || !sanitizeChatContext(chat.context) ||
       payload.receipt?.tool_name !== "chat_turn" ||
       receipts.some(receipt => receipt?.publication_hash !== payload.publication_hash || receipt?.query_generation_id !== payload.query_generation_id) ||
-      !chatDisplaySafe(chat, payload)) {
+      !chatDisplaySafe(chat, payload) || (assist && !assistSafe(chat, payload)) ||
+      // A deterministic reply never carries the assisted fields; they would render as checked.
+      (!assist && (chat.parser !== undefined || chat.assisted_answer !== undefined)) ||
+      (assist && chat.assisted_answer.status === "ANSWER_READY" &&
+        await sha256Hex(JSON.stringify(chat.assisted_answer.answer)) !== chat.assisted_answer.answer_evidence_receipt.answer_sha256)) {
     throw Object.assign(new Error("對話回應或發布收據無法驗證，未顯示回答。"), { code: "INVALID_RESPONSE" });
   }
   return payload;
@@ -205,6 +273,8 @@ export function summarizeChat(chat) {
     resolvedText: resolvedRequestText(source.resolved_request),
     publicationHash: source.publication_hash || null,
     queryReceipt: source.query_receipt || null,
+    parser: source.parser || null,
+    assistedAnswer: source.assisted_answer || null,
     context: sanitizeChatContext(source.context) || { schema_version: CHAT_CONTEXT_SCHEMA_VERSION },
   };
 }
