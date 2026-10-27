@@ -32,6 +32,20 @@ python3 scripts/summarize-change.py            # 合成公告，離線，不送�
 python3 -m unittest tests.test_change_summary -v
 ```
 
+## 診斷評測（尚未對真實模型執行）
+
+`scripts/evaluate-change-summary.py` 對 `eval/change-summary/v1/` 的 8 組**合成**前後文跑摘要器，計算：變更案例是否涵蓋應有的新值、應拒答案例（只改標點／空白）是否拒答、錯誤拒答、禁止出現的值（如被注入指令誘導的「已取消」、未寫出的原因）以及各驗證拒絕代碼的次數。
+
+```bash
+python3 scripts/evaluate-change-summary.py                       # provider 停用 → evaluation_status=NOT_RUN，不填任何指標
+python3 scripts/evaluate-change-summary.py --responses eval/change-summary/v1/scripted-responses.json   # 離線自我測試
+GOVINTEL_SUMMARY_PROVIDER=anthropic ANTHROPIC_API_KEY=... python3 scripts/evaluate-change-summary.py --output <新檔案>
+```
+
+- `scripted-responses.json` 是專案自寫的腳本回應，只用來驗證 harness 本身，**不是模型結果**，其 8/8 不能引用為成效。
+- 範圍固定為 `SYNTHETIC_DIAGNOSTIC_NOT_HOLDOUT`：只送合成案例、不送任何官方紀錄；不是獨立保留集，也不是 `EVALUATION.md` 的 C 對 C_semantic_off 比較。
+- 輸出檔不覆寫舊結果，每次嘗試另存新檔。
+
 ## 不代表什麼
 
 - 驗證證明「引文存在、數字有出處、有引用變更處」，**不證明**摘要語意完全正確或沒有遺漏；所以人工覆核是必要的。
