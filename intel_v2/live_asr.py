@@ -169,8 +169,11 @@ def ingest_chunk(
             if result["status"] == "FAILED":
                 result = resume_session(_touch(result, at), resumed_at=at)
             result["provider_usage"]["calls"][index]["status"] = "FAILED"
-            result = record_gap(_touch(result, at), start_seconds=previous["start_seconds"],
-                                end_seconds=previous["end_seconds"], reason="SESSION_CRASH", detected_at=at)
+            if not any((gap["start_seconds"], gap["end_seconds"], gap["reason"]) ==
+                       (previous["start_seconds"], previous["end_seconds"], "SESSION_CRASH")
+                       for gap in result["gap_intervals"]):
+                result = record_gap(_touch(result, at), start_seconds=previous["start_seconds"],
+                                    end_seconds=previous["end_seconds"], reason="SESSION_CRASH", detected_at=at)
             recovered = True
     if recovered:
         if was_budget_stopped:
