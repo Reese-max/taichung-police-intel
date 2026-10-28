@@ -347,7 +347,11 @@ def schema_drift_candidates(receipt: dict[str, Any]) -> list[dict[str, Any]]:
                 "reason": reason,
                 "entity_ids": {"source_id": row["source_id"]},
                 "observed_at": row.get("observed_at") or receipt.get("generated_at"),
-                "evidence": {"before": row.get("last_known_good"), "after": {"status": status, "reasons": row.get("reasons", []), "observed_at": row.get("observed_at")}},
+                "evidence": {"before": row.get("last_known_good"), "after": {
+                    "status": status, "reasons": row.get("reasons", []), "observed_at": row.get("observed_at"),
+                    # a Taiwan-relayed observation, or a relay refused, says so
+                    **{key: row[key] for key in ("observation_origin", "relay_captured_by", "live_error_reason", "relay_rejected") if key in row},
+                }},
                 "priority_reason": "官方來源契約／可用性需要人工覆核",
             }
         )

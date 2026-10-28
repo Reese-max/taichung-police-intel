@@ -168,3 +168,19 @@ test("historical feed is explicitly labelled archive rather than current intelli
   assert.match(source, /不代表本期新增/);
   assert.match(source, /歷史資料 · 開啟官方來源/);
 });
+
+test("V2 dashboard surfaces Taiwan-relayed stage evidence with its own capture time", async () => {
+  const source = await readFile(componentUrl, "utf8");
+  assert.match(source, /data-testid="v2-stage-relayed-sources"/);
+  assert.match(source, /台灣轉交/);
+  assert.match(source, /擷取於/);
+  assert.match(source, /本次直連失敗/);
+  assert.match(source, /live_error_reason/);
+  assert.match(source, /evidence_observed_at/);
+  // Only stages with a non-empty relayed_sources list render the relay line.
+  assert.match(source, /relayed_sources\?\.length > 0 && \(/);
+  // Relayed stages show the evidence capture time, not just the check end time.
+  assert.match(source, /stage\.relayed_sources\?\.length[\s\S]{0,120}stage\.evidence_observed_at/);
+  // Multiple relayed sources stay separated for readers.
+  assert.match(source, /\.join\("；"\)/);
+});

@@ -73,10 +73,13 @@ A same-url, same-title change such as 17:00→16:00 is labelled via `basis`
 `CONFIRMED_OFFICIAL` automatically — a synthetic replay is not a real official
 revision.
 
-Known comparison limits: duplicate `(subject_id, predicate)` rows collapse to
-the last one; when several fields change at once only the first is reported;
-diffing a different `original_source_identity` is flagged via
-`source_identity_matches: false` rather than refused.
+Comparison rejects duplicate `(subject_id, predicate)` rows in either version
+and different `original_source_identity` values with `ValueError`, before
+returning any diff. When several fields change at once, `affected_facts`
+contains a separate row for each change, ordered by value, valid time, then
+verification status within each subject/predicate key. Existing single-change,
+added/removed, and unchanged output shapes are preserved; successful comparisons
+retain `source_identity_matches: true`.
 
 ## 2026-09-21 local replay
 

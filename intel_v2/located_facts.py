@@ -334,10 +334,22 @@ def compare_document_versions(
 
     ``basis`` labels the comparison set (e.g. SYNTHETIC_MODIFIED_COPY for an
     explicitly marked copy); callers must not present a synthetic replay as a
-    real official revision.
+    real official revision. Different source identities and duplicate fact keys
+    raise ValueError; simultaneous field changes produce separate diff rows.
     """
+    if old_document.get("original_source_identity") != new_document.get("original_source_identity"):
+        raise ValueError("document source identity mismatch")
+
     def keyed(facts):
-        return {(f.get("subject_id"), f.get("predicate")): f for f in facts if isinstance(f, dict)}
+        result = {}
+        for fact in facts:
+            if not isinstance(fact, dict):
+                continue
+            key = (fact.get("subject_id"), fact.get("predicate"))
+            if key in result:
+                raise ValueError(f"duplicate fact key: {key!r}")
+            result[key] = fact
+        return result
 
     old_by_key = keyed(old_facts)
     new_by_key = keyed(new_facts)
@@ -355,19 +367,17 @@ def compare_document_versions(
                              "old_normalized_value": old.get("normalized_value"), "new_normalized_value": None,
                              "old_valid_time": old.get("valid_time"), "new_valid_time": None})
             continue
-        if old.get("normalized_value") != new.get("normalized_value"):
-            change = "VALUE_CHANGED"
-        elif old.get("valid_time") != new.get("valid_time"):
-            change = "VALID_TIME_CHANGED"
-        elif old.get("verification_status") != new.get("verification_status"):
-            change = "VERIFICATION_CHANGED"
-        else:
-            continue
-        affected.append({"subject_id": key[0], "predicate": key[1], "change": change,
-                         "old_normalized_value": old.get("normalized_value"),
-                         "new_normalized_value": new.get("normalized_value"),
-                         "old_valid_time": old.get("valid_time"),
-                         "new_valid_time": new.get("valid_time")})
+        for field, change in (
+            ("normalized_value", "VALUE_CHANGED"),
+            ("valid_time", "VALID_TIME_CHANGED"),
+            ("verification_status", "VERIFICATION_CHANGED"),
+        ):
+            if old.get(field) != new.get(field):
+                affected.append({"subject_id": key[0], "predicate": key[1], "change": change,
+                                 "old_normalized_value": old.get("normalized_value"),
+                                 "new_normalized_value": new.get("normalized_value"),
+                                 "old_valid_time": old.get("valid_time"),
+                                 "new_valid_time": new.get("valid_time")})
     return {
         "basis": basis,
         "source_identity_matches": old_document.get("original_source_identity") == new_document.get("original_source_identity"),

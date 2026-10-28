@@ -75,6 +75,31 @@ def controlled_publication_inputs():
     return status, brief
 
 
+class RelayedSourceHealthTests(unittest.TestCase):
+    def test_a_relayed_source_is_named_with_when_its_evidence_was_taken(self):
+        receipt = {
+            "generated_at": "2026-10-28T22:40:00+00:00",
+            "overall": "HEALTHY",
+            "review_inbox": [],
+            "sources": [
+                {"source_id": "S-001", "status": "NO_DRIFT", "observed_at": "2026-10-28T21:50:00+00:00",
+                 "observation_origin": "TAIWAN_RELAY", "relay_captured_by": "taiwan-relay",
+                 "live_error_reason": "LIVE_FETCH_CONNECTIONERROR"},
+                {"source_id": "S-019", "status": "NO_DRIFT", "observed_at": "2026-10-28T22:39:00+00:00"},
+            ],
+        }
+        stage = health.schema_contract_stage(receipt)
+        self.assertEqual(stage["outcome"], "SUCCESS")
+        self.assertEqual(stage["relayed_sources"], [{
+            "source_id": "S-001", "observed_at": "2026-10-28T21:50:00+00:00",
+            "relay_captured_by": "taiwan-relay", "live_error_reason": "LIVE_FETCH_CONNECTIONERROR",
+        }])
+        self.assertEqual(stage["evidence_observed_at"], "2026-10-28T21:50:00+00:00")
+        self.assertEqual(stage["ended_at"], "2026-10-28T22:40:00+00:00")
+        receipt["sources"] = receipt["sources"][1:]
+        self.assertEqual(health.schema_contract_stage(receipt)["relayed_sources"], [])
+
+
 class SystemHealthTests(unittest.TestCase):
     def test_unchanged_health_receipt_keeps_windows_checkout_timestamp(self):
         text = '{\n  "overall": "UNKNOWN"\n}\n'

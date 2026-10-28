@@ -210,6 +210,11 @@ jobs:
           GOVINTEL_RESEARCH_BROWSER_OUTPUT: ${{ runner.temp }}/govintel-runtime-evidence/research-browser
         run: node scripts/research-browser-e2e.mjs
 
+      - name: Verify Ask GovIntel chat and its AI switch with offline browser fixtures
+        env:
+          GOVINTEL_CHAT_BROWSER_OUTPUT: ${{ runner.temp }}/govintel-runtime-evidence/chat-browser
+        run: node scripts/chat-assist-browser-e2e.mjs
+
       - name: Preserve explicit status when setup prevented execution
         if: ${{ always() }}
         run: |
