@@ -950,11 +950,17 @@ def _live_session():
 
         def request(self, method, url, **kwargs):
             kwargs["timeout"] = LIVE_REQUEST_TIMEOUT
-            response = super().request(method, url, **kwargs)
-            self._govintel_response_count += 1
-            return response
+            return super().request(method, url, **kwargs)
 
     session = ProbeSession()
+
+    def count_answer(response, *_args, **_kwargs):
+        # Response hooks run once the status line and headers arrive, before
+        # Requests reads the body: a body that then times out still counts.
+        session._govintel_response_count += 1
+        return response
+
+    session.hooks["response"].append(count_answer)
     session.headers.update({
         "User-Agent": "TaichungPoliceIntelSchemaDrift/1.0 (+public-source-monitor)",
         "Accept-Language": "zh-TW,zh;q=0.9",
@@ -1177,7 +1183,13 @@ def _read_relay(path: Path, now: datetime) -> dict[str, dict[str, Any] | str]:
     }}
 
 
-def _with_relay(observation: dict[str, Any], relay: dict[str, dict[str, Any] | str], *, responded: bool) -> dict[str, Any]:
+def _with_relay(
+    observation: dict[str, Any],
+    relay: dict[str, dict[str, Any] | str],
+    *,
+    responded: bool,
+    now: datetime | None = None,
+) -> dict[str, Any]:
     """A live probe that got no HTTP response at all may be stood in for by a valid relay.
 
     `responded` is whether any request of the probe (a fallback or a redirect
@@ -1187,6 +1199,11 @@ def _with_relay(observation: dict[str, Any], relay: dict[str, dict[str, Any] | s
     candidate = relay.get(source_id)
     if candidate is None or responded or observation.get("http_status") != 0:
         return observation
+    # the relay was read before the probes ran; it must still be recent now
+    if not isinstance(candidate, str):
+        age = ((now or datetime.now(timezone.utc)) - datetime.fromisoformat(candidate["observed_at"])).total_seconds()
+        if age > RELAY_MAX_AGE_SECONDS:
+            candidate = "RELAY_STALE"
     if isinstance(candidate, str):
         print(f"SCHEMA_DRIFT_RELAY_REJECTED source={source_id} reason={candidate}", flush=True)
         return {**observation, "relay_rejected": candidate}

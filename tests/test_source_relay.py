@@ -94,6 +94,13 @@ class SourceRelayHostTests(unittest.TestCase):
         self.assertEqual(codes & {35, 51, 53, 54, 58, 59, 60, 64, 66, 77, 80, 82, 83, 90, 91}, set())
         self.assertNotIn("2>$null", source)
 
+    def test_the_capture_bounds_its_download_and_its_read(self):
+        source = (RELAY_DIR / "capture-s001.ps1").read_text(encoding="ascii")
+        limit = int(re.search(r"\$MaxBytes = (\d+)", source).group(1))
+        self.assertEqual(limit, drift.RELAY_MAX_BODY_BYTES)
+        self.assertIn("--max-filesize $MaxBytes", source)
+        self.assertLess(source.index("$Length -gt $MaxBytes"), source.index("ReadAllBytes"))
+
     def test_the_capture_script_fetches_exactly_the_catalog_urls_and_stays_ascii(self):
         text = (RELAY_DIR / "capture-s001.ps1").read_bytes()
         self.assertFalse(re.search(rb"[^\x00-\x7f]", text))

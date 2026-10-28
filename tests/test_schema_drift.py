@@ -1322,13 +1322,46 @@ class SourceRelayTests(unittest.TestCase):
         self.assertEqual(kept["http_status"], 0)
         self.assertNotIn("observation_origin", kept)
 
-    def test_the_probe_session_counts_every_answer(self):
+    def test_the_probe_session_counts_an_answer_before_its_body_is_read(self):
+        import requests
+        from requests.adapters import HTTPAdapter
+
+        class HeadersThenBodyTimeout(HTTPAdapter):
+            def send(self, request, **kwargs):
+                response = requests.Response()
+                response.status_code = 200
+                response.url = request.url
+                response.request = request
+
+                class Body:
+                    def read(self, *_args, **_kwargs):
+                        raise requests.exceptions.ConnectionError("body timed out")
+
+                    def stream(self, *_args, **_kwargs):
+                        raise requests.exceptions.ConnectionError("body timed out")
+
+                response.raw = Body()
+                return response
+
         session = drift._live_session()
-        answer = SimpleNamespace(status_code=503)
-        with mock.patch("requests.Session.request", return_value=answer):
+        session.mount("https://", HeadersThenBodyTimeout())
+        with self.assertRaises(requests.exceptions.ConnectionError):
             session.get("https://official.test/a")
-            session.get("https://official.test/b")
-        self.assertEqual(session._govintel_response_count, 2)
+        self.assertEqual(session._govintel_response_count, 1)
+
+    def test_a_relay_that_expired_while_the_probes_ran_is_refused(self):
+        from datetime import datetime, timedelta, timezone
+
+        loaded_at = datetime.now(timezone.utc)
+        observed = loaded_at - timedelta(seconds=drift.RELAY_MAX_AGE_SECONDS - 10)
+        relay = self._relay(_relay_payload(observed_at=observed.isoformat(timespec="seconds")), now=loaded_at)
+        self.assertIsInstance(relay["S-001"], dict)
+        failed = {"source_id": "S-001", "http_status": 0, "error_reason": "LIVE_FETCH_CONNECTIONERROR", "body": b""}
+        kept = drift._with_relay(failed, relay, responded=False, now=loaded_at + timedelta(seconds=30))
+        self.assertEqual(kept["relay_rejected"], "RELAY_STALE")
+        self.assertNotIn("observation_origin", kept)
+        used = drift._with_relay(failed, relay, responded=False, now=loaded_at)
+        self.assertEqual(used["observation_origin"], "TAIWAN_RELAY")
 
     def test_a_malformed_relay_is_refused_and_the_live_probe_still_runs(self):
         for payload in ({"source_id": []}, {"source_id": {"S-001": 1}}, ["S-001"], "S-001", 7, None):

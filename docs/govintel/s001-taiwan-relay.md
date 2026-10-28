@@ -41,3 +41,4 @@ relay host（OCI，常駐）── 排程 ── SSH（forced command）──�
 - 只涵蓋 schema-drift 觀察；S-001 的候選收集（candidate lane）仍是 live，不受影響。
 - 台灣主機或 relay host 停機時，轉交過期，S-001 回到現行的 `SOURCE_UNAVAILABLE`（fail closed）。
 - 台灣主機的管理員能偽造擷取內容；影響限於 S-001 的 schema-drift 判定，不進正式資料。
+- 公開儀表板（`apps/web/components/V2DailyDashboard.js`）尚未顯示 `relayed_sources`／`evidence_observed_at`，畫面上的時間仍是檢查完成時間；JSON 收據已有完整標記（後續工作）。

@@ -15,13 +15,15 @@ $Transient = @('429', '500', '502', '503', '504')
 # empty reply, send, receive. A TLS or certificate failure is not among them.
 $TransientExit = @(6, 7, 28, 52, 55, 56)
 $Agent = 'TaichungPoliceIntelSchemaDrift/1.0 (+public-source-monitor)'
+# The relay refuses a body over 5 MiB; a larger download is cut off, not kept.
+$MaxBytes = 5242880
 $Tmp = [System.IO.Path]::GetTempFileName()
 try {
     foreach ($Url in $Urls) {
         $Observed = [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ss') + '+00:00'
         # A native command's stderr must not become a terminating error here.
         $ErrorActionPreference = 'Continue'
-        $Meta = & curl.exe -s --max-time 45 --proto '=https' --max-redirs 0 -A $Agent `
+        $Meta = & curl.exe -s --max-time 45 --max-filesize $MaxBytes --proto '=https' --max-redirs 0 -A $Agent `
             -H 'Accept-Language: zh-TW,zh;q=0.9' -o $Tmp -w '%{http_code}|%{content_type}' $Url
         $Exit = $LASTEXITCODE
         $ErrorActionPreference = 'Stop'
@@ -34,8 +36,9 @@ try {
             if ($Transient -contains $Status) { continue }
             break
         }
+        $Length = (Get-Item -LiteralPath $Tmp).Length
+        if ($Length -eq 0 -or $Length -gt $MaxBytes) { break }
         $Bytes = [System.IO.File]::ReadAllBytes($Tmp)
-        if ($Bytes.Length -eq 0) { break }
         $Hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $Tmp).Hash.ToLowerInvariant()
         $Relay = [ordered]@{
             schema        = 'govintel-source-relay/v1'
