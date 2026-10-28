@@ -158,7 +158,7 @@ jobs:
         env:
           PENDING_RECOVERY: ${{ steps.restore_state.outputs.pending_recovery }}
           # Read anonymously; the Taiwan host's write key reaches that repository only.
-          SOURCE_RELAY_REPOSITORY: https://github.com/Reese-max/govintel-source-relay.git
+          SOURCE_RELAY_URL: https://raw.githubusercontent.com/Reese-max/govintel-source-relay/main/relay/S-001.json
         run: |
           set -euo pipefail
           output=apps/web/public/data/schema-drift.json
@@ -173,8 +173,9 @@ jobs:
           # when the live fetch gets no response, and only while it is recent.
           relay_args=()
           relay_file="$(mktemp)"
-          if timeout 60s git fetch --quiet --no-tags --depth=1 "$SOURCE_RELAY_REPOSITORY" main 2>/dev/null \
-            && git show FETCH_HEAD:relay/S-001.json > "$relay_file" 2>/dev/null; then
+          # Bounded in time and size; any failure only leaves S-001 live-only.
+          if curl --fail --silent --show-error --proto '=https' --max-time 30 \
+            --max-filesize 7100000 --output "$relay_file" "$SOURCE_RELAY_URL"; then
             relay_args+=(--relay "$relay_file")
           else
             echo "No source relay is available; S-001 is probed live only."

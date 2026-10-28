@@ -62,6 +62,7 @@ class SourceRelayHostTests(unittest.TestCase):
             "schema": capture(source_id="S-007"),
             "http_status": capture(http_status=500),
             "types": capture(captured_by=1),
+            "types ": capture(source_id=["S-001"]),
             "url": capture(final_url="https://example.test/"),
             "observed_at": capture(observed_at="2026-10-28T06:00:00"),
             "age": capture(observed_at=(now - timedelta(minutes=30)).isoformat()),
@@ -70,7 +71,28 @@ class SourceRelayHostTests(unittest.TestCase):
         }
         for reason, payload in cases.items():
             with self.subTest(reason=reason):
-                self.assertEqual(check_relay.problem(payload, now=now), reason)
+                self.assertEqual(check_relay.problem(payload, now=now), reason.strip())
+
+    def test_an_oversized_capture_is_refused_before_it_is_read(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "relay.json"
+            path.write_bytes(b" " * (check_relay.MAX_FILE_BYTES + 1))
+            self.assertEqual(check_relay.main([str(path)]), 1)
+        self.assertEqual(check_relay.MAX_FILE_BYTES, drift.RELAY_MAX_FILE_BYTES)
+        # the relay host and the Pages download cut a capture off at the same size
+        script = (RELAY_DIR / "relay-s001.sh").read_text(encoding="utf-8")
+        workflow = (ROOT / ".github/workflows/pages.yml").read_text(encoding="utf-8")
+        cut = int(re.search(r"head -c (\d+)", script).group(1))
+        limit = int(re.search(r"--max-filesize (\d+)", workflow).group(1))
+        self.assertGreaterEqual(limit, check_relay.MAX_FILE_BYTES)
+        self.assertEqual(cut, limit + 1)
+
+    def test_the_capture_never_falls_back_on_a_tls_failure(self):
+        source = (RELAY_DIR / "capture-s001.ps1").read_text(encoding="ascii")
+        transient = re.search(r"\$TransientExit = @\(([^)]*)\)", source).group(1)
+        codes = {int(code) for code in transient.split(",")}
+        self.assertEqual(codes & {35, 51, 53, 54, 58, 59, 60, 64, 66, 77, 80, 82, 83, 90, 91}, set())
+        self.assertNotIn("2>$null", source)
 
     def test_the_capture_script_fetches_exactly_the_catalog_urls_and_stays_ascii(self):
         text = (RELAY_DIR / "capture-s001.ps1").read_bytes()

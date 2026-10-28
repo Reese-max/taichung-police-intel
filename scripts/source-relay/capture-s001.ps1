@@ -11,14 +11,24 @@ $Urls = @(
 )
 # Only a transient failure may fall back to the alternate list; anything else fails closed.
 $Transient = @('429', '500', '502', '503', '504')
+# curl exit codes of a transient transport failure: resolve, connect, timeout,
+# empty reply, send, receive. A TLS or certificate failure is not among them.
+$TransientExit = @(6, 7, 28, 52, 55, 56)
 $Agent = 'TaichungPoliceIntelSchemaDrift/1.0 (+public-source-monitor)'
 $Tmp = [System.IO.Path]::GetTempFileName()
 try {
     foreach ($Url in $Urls) {
         $Observed = [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ss') + '+00:00'
-        $Meta = & curl.exe -sS --max-time 45 --proto '=https' --max-redirs 0 -A $Agent `
-            -H 'Accept-Language: zh-TW,zh;q=0.9' -o $Tmp -w '%{http_code}|%{content_type}' $Url 2>$null
-        if ($LASTEXITCODE -ne 0) { continue }
+        # A native command's stderr must not become a terminating error here.
+        $ErrorActionPreference = 'Continue'
+        $Meta = & curl.exe -s --max-time 45 --proto '=https' --max-redirs 0 -A $Agent `
+            -H 'Accept-Language: zh-TW,zh;q=0.9' -o $Tmp -w '%{http_code}|%{content_type}' $Url
+        $Exit = $LASTEXITCODE
+        $ErrorActionPreference = 'Stop'
+        if ($Exit -ne 0) {
+            if ($TransientExit -contains $Exit) { continue }
+            break
+        }
         $Status, $ContentType = ([string]$Meta) -split '\|', 2
         if ($Status -ne '200') {
             if ($Transient -contains $Status) { continue }

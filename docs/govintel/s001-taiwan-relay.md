@@ -10,7 +10,7 @@ S-001「臺中市政府警察局警政新聞」拒絕非台灣位址：2026-10-2
 ```
 pages.yml（GitHub runner）── live 抓 S-001 ──✗ 無回應
         │
-        └─ 匿名 fetch Reese-max/govintel-source-relay@main:relay/S-001.json
+        └─ 匿名下載 raw.githubusercontent.com/Reese-max/govintel-source-relay/main/relay/S-001.json（curl，30 秒、約 7MB 上限）
                ▲
 relay host（OCI，常駐）── 排程 ── SSH（forced command）──► 台灣主機：capture-s001.ps1
         └─ check_relay.py 通過才 commit／push（deploy key 只能寫 relay repo）
@@ -19,7 +19,7 @@ relay host（OCI，常駐）── 排程 ── SSH（forced command）──�
 - `scripts/source-relay/capture-s001.ps1`：台灣主機上由 SSH forced command 執行，只輸出一個 JSON；URL、標頭、fallback 規則同 `online_collect.get_news_listing`。主機上不放任何 GitHub 憑證。
 - `scripts/source-relay/check_relay.py`：relay host 發佈前的檢查（僅標準函式庫），15 分鐘內的擷取才發佈。
 - `scripts/source-relay/relay-s001.sh`：relay host 排程腳本。
-- `scripts/schema_drift.py --live --relay FILE`：`load_relay` 驗 schema、catalog URL、HTTP 200、時間（4 小時內、不超前 5 分鐘）、內容雜湊；**只有 live 完全沒有回應（http_status 0）時**才以轉交代替。HTTP 錯誤照實保留。
+- `scripts/schema_drift.py --live --relay FILE`：`load_relay` 先限檔案大小再讀，驗 schema、型別、catalog URL、HTTP 200、時間（4 小時內、不超前 5 分鐘）、內容雜湊；格式錯誤一律轉成拒絕原因，不中止 live probe。**只有整次 probe（含 fallback、redirect）都沒收到任何 HTTP 回應時**才以轉交代替；收到過回應（例如 503 後 fallback 逾時）就保留 live 證據。
 
 ## 收據上的標示
 
@@ -33,6 +33,8 @@ relay host（OCI，常駐）── 排程 ── SSH（forced command）──�
 | `observed_at` | 台灣主機擷取時間，不是 build 時間 |
 
 轉交被拒時，來源維持 `SOURCE_UNAVAILABLE`，並多出 `relay_rejected`（例如 `RELAY_STALE`、`RELAY_BODY_HASH_MISMATCH`）。
+
+這些標記也保留在 `state/schema-drift-state.json` 的 `current`／`last_known_good`／`history`、收據的 `review_inbox` 與 Review Inbox 證據。`system-health.json` 的 source_contracts 階段另有 `relayed_sources` 與 `evidence_observed_at`（最舊證據的擷取時間），與檢查完成時間 `ended_at` 分開。
 
 ## 範圍與限制
 

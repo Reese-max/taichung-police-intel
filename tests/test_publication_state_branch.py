@@ -263,24 +263,15 @@ class PublicationStateBranchTests(unittest.TestCase):
             state_path.write_text(json.dumps(schema_drift.empty_state()) + "\n", encoding="utf-8")
         before = module.read_working_bundle(self.work)
         checkpoint = self.head()
-        # the Taiwan host's relay repository; without a relay it holds no relay file
-        relay_remote = self.root / "relay.git"
-        relay_seed = self.root / "relay-seed"
-        git(self.root, "init", "-q", "--bare", str(relay_remote))
-        git(self.root, "init", "-q", "-b", "main", str(relay_seed))
-        git(relay_seed, "config", "user.name", "test")
-        git(relay_seed, "config", "user.email", "test@example.test")
-        relay_path = relay_seed / ("relay/S-001.json" if relay else "README.md")
-        relay_path.parent.mkdir(exist_ok=True)
-        relay_path.write_text('{"source_id": "S-001"}\n', encoding="utf-8")
-        git(relay_seed, "add", ".")
-        git(relay_seed, "commit", "-q", "-m", "relay")
-        git(relay_seed, "push", "-q", str(relay_remote), "main")
+        # the Taiwan relay as the raw URL serves it; without one the download fails
+        relay_fixture = self.root / "relay-S-001.json"
+        relay_fixture.write_text('{"source_id": "S-001"}\n', encoding="utf-8")
 
         workflow = (SCRIPT.parents[1] / ".github/workflows/pages.yml").read_text()
         step = workflow.split("        id: schema_drift\n", 1)[1].split("\n      - name:", 1)[0]
         self.assertIn("PENDING_RECOVERY: ${{ steps.restore_state.outputs.pending_recovery }}", step)
-        self.assertIn("SOURCE_RELAY_REPOSITORY: https://github.com/Reese-max/govintel-source-relay.git", step)
+        self.assertIn("SOURCE_RELAY_URL: https://raw.githubusercontent.com/Reese-max/govintel-source-relay/main/relay/S-001.json", step)
+        self.assertIn("--max-filesize", step)
         script = textwrap.dedent(step.split("        run: |\n", 1)[1])
         restore = dict(line.split("=", 1) for line in output.read_text().splitlines())
         self.assertEqual(restore["pending_recovery"], str(pending).lower())
@@ -323,11 +314,23 @@ class PublicationStateBranchTests(unittest.TestCase):
             os.execv(sys.executable, [sys.executable, *args])
         '''), encoding="utf-8")
         python.chmod(0o755)
+        # The relay download: serves the fixture to --output, or fails as curl --fail would.
+        curl = bin_dir / "curl"
+        curl.write_text(f"#!{sys.executable}\n" + textwrap.dedent('''
+            import os, shutil, sys
+            args = sys.argv[1:]
+            assert args[-1] == os.environ["SOURCE_RELAY_URL"], args
+            if os.environ["RELAY_FIXTURE"] == "":
+                raise SystemExit(22)
+            shutil.copyfile(os.environ["RELAY_FIXTURE"], args[args.index("--output") + 1])
+        '''), encoding="utf-8")
+        curl.chmod(0o755)
         result = subprocess.run(["bash", "-c", script], cwd=self.work, capture_output=True,
                                 text=True, timeout=20, env={
             **os.environ, "PATH": str(bin_dir) + os.pathsep + os.environ.get("PATH", ""),
             "PENDING_RECOVERY": restore["pending_recovery"],
-            "SOURCE_RELAY_REPOSITORY": str(relay_remote),
+            "SOURCE_RELAY_URL": "https://raw.githubusercontent.com/Reese-max/govintel-source-relay/main/relay/S-001.json",
+            "RELAY_FIXTURE": str(relay_fixture) if relay else "",
             "SCHEMA_REPLAY_INPUT": str(observations),
             "SCHEMA_REPLAY_SCRIPT": str(SCRIPT.with_name("schema_drift.py")),
             "SCHEMA_REPLAY_CALLS": str(calls_path),

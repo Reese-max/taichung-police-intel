@@ -428,12 +428,20 @@ def schema_contract_stage(receipt: dict[str, Any] | None) -> dict[str, Any]:
         outcome, error = "SUCCESS", None
     else:
         outcome, error = "UNKNOWN", "SOURCE_CONTRACT_STATUS_UNKNOWN"
+    # A relayed source was observed by a Taiwan host before this check ran.
+    relayed = [
+        {key: source.get(key) for key in ("source_id", "observed_at", "relay_captured_by", "live_error_reason")}
+        for source in receipt["sources"]
+        if isinstance(source, dict) and source.get("observation_origin") == "TAIWAN_RELAY"
+    ]
     return {
         "lane": "discovery",
         "stage": "source_contracts",
         "outcome": outcome,
         "error_class": error,
         "contract_overall": receipt.get("overall"),
+        "relayed_sources": relayed,
+        "evidence_observed_at": min((row["observed_at"] for row in relayed if isinstance(row.get("observed_at"), str)), default=receipt.get("generated_at")),
         "review_inbox_count": len(receipt.get("review_inbox", [])) if isinstance(receipt.get("review_inbox"), list) else 0,
         "ended_at": receipt.get("generated_at"),
         "last_success_at": receipt.get("generated_at") if outcome == "SUCCESS" else None,

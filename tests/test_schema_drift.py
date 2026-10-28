@@ -1197,7 +1197,7 @@ class SourceRelayTests(unittest.TestCase):
             path.write_text(json.dumps(payload), encoding="utf-8")
             return drift.load_relay(path, now=now)
 
-    def _live(self, relay, *, fail_s001):
+    def _live(self, relay, *, fail_s001, session=None):
         response = SimpleNamespace(
             content=b"sample",
             status_code=200,
@@ -1212,8 +1212,13 @@ class SourceRelayTests(unittest.TestCase):
             return response, None
 
         with mock.patch.object(drift, "_source_deadline", return_value=mock.MagicMock()):
-            observations = drift.live_observations(session=object(), fetch_source=fetch, relay=relay)
+            observations = drift.live_observations(session=session or self._counting(), fetch_source=fetch, relay=relay)
         return next(item for item in observations if item["source_id"] == "S-001")
+
+    @staticmethod
+    def _counting():
+        # a probe session as _live_session builds it: it counts the HTTP answers it got
+        return SimpleNamespace(_govintel_response_count=0)
 
     def test_a_valid_relay_stands_in_only_for_a_live_fetch_without_response(self):
         relay = self._relay(_relay_payload())
@@ -1291,6 +1296,78 @@ class SourceRelayTests(unittest.TestCase):
             path = Path(tmp) / "relay.json"
             path.write_text("{not json", encoding="utf-8")
             self.assertEqual(drift.load_relay(path), {"S-001": "RELAY_UNREADABLE_JSONDECODEERROR"})
+
+    def test_a_probe_that_got_any_answer_keeps_it_over_the_relay(self):
+        # the list answered 503, then the fallback list timed out: no response is left,
+        # but one was received, so the relay must not hide it
+        relay = self._relay(_relay_payload())
+        session = self._counting()
+
+        def fetch(probe, source_id):
+            if source_id == "S-001":
+                probe._govintel_response_count += 1
+                raise ConnectionError("fallback timed out after a 503")
+            return SimpleNamespace(content=b"x", status_code=200, headers={}, url="https://official.test/",
+                                   request=SimpleNamespace(url="https://official.test/")), None
+
+        with mock.patch.object(drift, "_source_deadline", return_value=mock.MagicMock()):
+            observations = drift.live_observations(session=session, fetch_source=fetch, relay=relay)
+        kept = next(item for item in observations if item["source_id"] == "S-001")
+        self.assertEqual(kept["http_status"], 0)
+        self.assertNotIn("observation_origin", kept)
+
+    def test_a_session_that_cannot_count_answers_never_relays(self):
+        relay = self._relay(_relay_payload())
+        kept = self._live(relay, fail_s001=ConnectionError("blocked abroad"), session=object())
+        self.assertEqual(kept["http_status"], 0)
+        self.assertNotIn("observation_origin", kept)
+
+    def test_the_probe_session_counts_every_answer(self):
+        session = drift._live_session()
+        answer = SimpleNamespace(status_code=503)
+        with mock.patch("requests.Session.request", return_value=answer):
+            session.get("https://official.test/a")
+            session.get("https://official.test/b")
+        self.assertEqual(session._govintel_response_count, 2)
+
+    def test_a_malformed_relay_is_refused_and_the_live_probe_still_runs(self):
+        for payload in ({"source_id": []}, {"source_id": {"S-001": 1}}, ["S-001"], "S-001", 7, None):
+            with self.subTest(payload=payload):
+                relay = self._relay(payload)
+                self.assertTrue(all(isinstance(value, str) for value in relay.values()))
+                kept = self._live(relay, fail_s001=ConnectionError("blocked abroad"))
+                self.assertEqual(kept["http_status"], 0)
+                self.assertNotIn("observation_origin", kept)
+
+    def test_an_oversized_relay_file_is_not_read(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "relay.json"
+            path.write_bytes(b" " * (drift.RELAY_MAX_FILE_BYTES + 1))
+            with mock.patch.object(Path, "read_text", side_effect=AssertionError("read")):
+                self.assertEqual(drift.load_relay(path), {"S-001": "RELAY_FILE_OVERSIZED"})
+
+    def test_relay_provenance_is_kept_in_state_history_and_review_evidence(self):
+        from intel_v2.review import schema_drift_candidates
+
+        relay = self._relay(_relay_payload())
+        relayed = self._live(relay, fail_s001=ConnectionError("blocked abroad"))
+        _receipt, state = drift.build_receipt([relayed])
+        saved = state["sources"]["S-001"]
+        self.assertEqual(saved["current"]["observation_origin"], "TAIWAN_RELAY")
+        # the relayed body is no S-001 list, so the run is review evidence
+        receipt, state = drift.build_receipt([relayed], state=state)
+        self.assertEqual(state["sources"]["S-001"]["history"][-1]["observation_origin"], "TAIWAN_RELAY")
+        row = next(item for item in receipt["review_inbox"] if item["source_id"] == "S-001")
+        self.assertEqual(row["observation_origin"], "TAIWAN_RELAY")
+        self.assertEqual(row["live_error_reason"], "LIVE_FETCH_CONNECTIONERROR")
+        candidate = next(item for item in schema_drift_candidates(receipt) if item["entity_ids"]["source_id"] == "S-001")
+        self.assertEqual(candidate["evidence"]["after"]["observation_origin"], "TAIWAN_RELAY")
+
+    def test_a_good_relayed_baseline_says_it_was_relayed(self):
+        good = drift.observe(drift.CONTRACTS["S-007"], "{}", content_type="application/json")
+        good = {**good, "status": "NO_DRIFT", "observation_origin": "TAIWAN_RELAY", "live_error_reason": "LIVE_FETCH_TIMEOUT"}
+        state = drift.update_state(drift.empty_state(), good)
+        self.assertEqual(state["sources"]["S-007"]["last_known_good"]["observation_origin"], "TAIWAN_RELAY")
 
     def test_relay_requires_live(self):
         with self.assertRaises(SystemExit):

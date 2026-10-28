@@ -24,6 +24,7 @@ URLS = {
 MAX_AGE_SECONDS = 15 * 60
 MAX_FUTURE_SECONDS = 300
 MAX_BODY_BYTES = 5 * 1024 * 1024
+MAX_FILE_BYTES = MAX_BODY_BYTES * 4 // 3 + 64 * 1024
 KEYS = {
     "schema", "source_id", "requested_url", "final_url", "http_status", "content_type",
     "observed_at", "body_base64", "body_sha256", "captured_by",
@@ -35,12 +36,12 @@ def problem(payload: object, *, now: datetime | None = None) -> str | None:
     now = now or datetime.now(timezone.utc)
     if not isinstance(payload, dict) or set(payload) != KEYS:
         return "fields"
+    if not all(isinstance(payload[key], str) for key in KEYS - {"http_status"}):
+        return "types"
     if payload["schema"] != SCHEMA or payload["source_id"] not in URLS:
         return "schema"
     if type(payload["http_status"]) is not int or payload["http_status"] != 200:
         return "http_status"
-    if not all(isinstance(payload[key], str) for key in KEYS - {"http_status"}):
-        return "types"
     urls = URLS[payload["source_id"]]
     if payload["requested_url"] not in urls or payload["final_url"] not in urls:
         return "url"
@@ -71,7 +72,11 @@ def main(argv: list[str]) -> int:
         print("usage: check_relay.py CAPTURE.json", file=sys.stderr)
         return 2
     try:
-        payload = json.loads(Path(argv[0]).read_text(encoding="utf-8"))
+        path = Path(argv[0])
+        if path.stat().st_size > MAX_FILE_BYTES:
+            print("RELAY_CHECK_FAILED reason=oversized", file=sys.stderr)
+            return 1
+        payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as error:
         print(f"RELAY_CHECK_FAILED reason=unreadable:{type(error).__name__}", file=sys.stderr)
         return 1
