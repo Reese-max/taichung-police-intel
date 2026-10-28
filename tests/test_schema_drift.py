@@ -1184,7 +1184,7 @@ def _relay_payload(body: bytes = b"<html>relayed list</html>", **overrides):
         "observed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "body_base64": base64.b64encode(body).decode("ascii"),
         "body_sha256": hashlib.sha256(body).hexdigest(),
-        "captured_by": "lab5090",
+        "captured_by": "taiwan-relay",
     }
     payload.update(overrides)
     return payload
@@ -1224,7 +1224,7 @@ class SourceRelayTests(unittest.TestCase):
         relay = self._relay(_relay_payload())
         used = self._live(relay, fail_s001=ConnectionError("blocked abroad"))
         self.assertEqual(used["observation_origin"], "TAIWAN_RELAY")
-        self.assertEqual(used["relay_captured_by"], "lab5090")
+        self.assertEqual(used["relay_captured_by"], "taiwan-relay")
         self.assertEqual(used["live_error_reason"], "LIVE_FETCH_CONNECTIONERROR")
         self.assertEqual(used["http_status"], 200)
         self.assertEqual(used["body"], b"<html>relayed list</html>")
