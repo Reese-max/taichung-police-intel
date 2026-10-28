@@ -64,3 +64,60 @@ script; no additional quality tooling was installed.
 
 These are local implementation/fixture checks. Production deployment, live source
 coverage, a 14-day canary and human efficiency measurements remain unverified.
+
+## Optional model-assisted intent (Web only, disabled by default)
+
+`/public-query/` has an opt-in "AI 解析問題（實驗）" switch. With it on, a typed
+question (never a quick action) goes to the Worker's `POST /chat` instead of
+`chat_turn` on `/query`. The route needs the matching `release_id` and an explicit
+`public_data_only: true` attestation, and applies the same length and personal-data
+guard as `/research` before any provider work. MCP and `/query` `chat_turn` are
+unchanged and never call a model, so MCP clients keep deterministic results and pay
+nothing.
+
+- **Intent step** (`workers/query-gateway/src/chat-assist.js`): one call through the
+  existing `/research` provider path (`requestResearchJson`), so every gate of
+  `research-mvp.md` applies unchanged: `RESEARCH_ENABLED`, `MINIMAX_API_KEY`,
+  `MINIMAX_BILLING_REVIEWED` and a `RESEARCH_ADMISSION` reservation per call. The model
+  receives only the question, the fixed tool menu, the public source IDs and the time
+  expression names, never publication text. It must return JSON naming one menu tool
+  (`search_evidence`, `get_source_health`, `get_current_brief`, `search_events`,
+  `query_statistics`), at most a 64-character `q` (search only), an exact snapshot
+  `source_id`, and a time expression name. Anything else is `OUTPUT_REJECTED`.
+- **Time**: the server resolves the expression on its own clock to explicit
+  Asia/Taipei dates with the same windows and labels as
+  `intel_v2/conversation.py` `parse_time_window` (a test compares both). The Worker's
+  metadata has no time index, so a parsed window is reported in `chat.parser.time_window`
+  and treated as an unsupported narrowing filter; the query is not broadened.
+- **Fallback**: a disabled provider, denied admission, provider error or rejected
+  output falls back to the deterministic rules; `chat.parser` records
+  `{kind: "rules", fallback_reason}`.
+- **Answer step**: only after a validated intent ran `search_evidence` with results,
+  and only when formal admission is `ADMITTED`, the existing metadata selection
+  (`selectMetadataAnswer`, shared with `/research`) lets a second admitted call pick
+  exact IDs among at most six current trusted rows. The server builds title claims and
+  runs the unchanged `answer-evidence-gate/3`; `chat.assisted_answer.answer` holds
+  only the controlled renderer's text. Every other outcome is a reason code with an
+  empty answer. It supports which publication is relevant, not facts in its title.
+
+Current checked-in governance is `RIGHTS_BLOCKED`, so the answer step stays off in
+production even with a key. Activation still needs the owner steps in
+`research-mvp.md` and `research-admission.md`, including the browser Access/session
+route; nothing here enables a provider or changes any approval.
+
+Known limits:
+
+- The intent step sends the question to the provider whenever the four gates are
+  on, even while formal admission is `RIGHTS_BLOCKED` (only publication text is held
+  back). Turning `RESEARCH_*` on therefore also starts sending `/chat` questions.
+- A model `search_evidence` must carry `q`, and every keyword of `q` must appear in
+  the question with word boundaries kept; a model that omits or rephrases the
+  keywords falls back to the rules. The model can still omit a time or source the question named:
+  the turn then runs without it, and the UI shows the conditions actually applied
+  (no time condition is listed), so the omission is visible but not refused.
+- The browser accepts an assisted answer only when each line rebuilds from a
+  passing gate receipt and matches that reply's own evidence title and locator; it
+  cannot detect a Worker that forges all of them consistently.
+
+Offline checks: `node --test --test-concurrency=1 apps/web/tests/chat-assist-worker.test.mjs apps/web/tests/chat-assist-client.test.mjs`
+(mocked provider and admission only).

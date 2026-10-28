@@ -1,5 +1,6 @@
 import { executeDocumentResearch } from "./document-research.js";
-import { parseResearchInput, researchProviderState, researchTerms, selectResearchSources, ResearchError, readBoundedJson } from "./research.js";
+import { parseResearchInput, researchProviderState, researchTerms, selectResearchSources, ResearchError, readBoundedJson, RESEARCH_LIMITS } from "./research.js";
+import { CHAT_INTENT_PARSER, CHAT_RULES_PARSER, planChatIntent } from "./chat-assist.js";
 import { gateAnswer } from "../../../apps/web/lib/answer-evidence-gate.js";
 import { projectPublicBrief, projectPublicSource } from "./public-brief.js";
 import { projectPublicationDates, projectSourceDates } from "../../../apps/web/lib/publication-dates.js";
@@ -719,14 +720,16 @@ function chatContext(raw) {
   return context;
 }
 
-async function executeChat(snapshot, args) {
+// plan: a validated model intent from the assisted Web route; null for the
+// deterministic rules that /query and MCP always use.
+async function executeChat(snapshot, args, plan = null) {
   const text = args.text == null ? null : chatText(args.text, "text", 512);
   const action = args.quick_action == null ? null : chatText(args.quick_action, "quick_action", 64);
   if (text === null && action === null) throw new GatewayError("INVALID_ARGUMENTS", "chat_turn requires text or quick_action");
   if (action !== null && !Object.hasOwn(CHAT_ACTIONS, action)) throw new GatewayError("INVALID_ARGUMENTS", "unknown quick_action");
   const context = chatContext(args.context);
   const normalized = text || "";
-  let tool = action ? CHAT_ACTIONS[action] : /統計|趨勢|件數/.test(normalized) ? "query_statistics" :
+  let tool = plan ? plan.tool : action ? CHAT_ACTIONS[action] : /統計|趨勢|件數/.test(normalized) ? "query_statistics" :
     /來源健康|來源狀態|(為什麼|為何).{0,8}(沒有|無|找不到|查不到)|沒有.{0,4}(資料|更新)/.test(normalized) ? "get_source_health" :
     /證據|原文|佐證|出處|官方文件|官方資料/.test(normalized) ? "search_evidence" :
     /簡報|概況|總覽/.test(normalized) ? "get_current_brief" : "search_events";
@@ -735,13 +738,23 @@ async function executeChat(snapshot, args) {
   // Metadata has no event, geography, category or time index. Never silently
   // broaden a narrowed request into an unrestricted metadata search.
   const unsupportedFilters = ["selected_event_id", "selected_region", "selected_category", "selected_time_window"].filter(key => context[key] != null);
+  // A parsed time is a narrowing filter like the context's own window.
+  if (plan?.time_window && !unsupportedFilters.includes("selected_time_window")) unsupportedFilters.push("selected_time_window");
   if (context.selected_agency) {
     if (["search_evidence", "get_source_health"].includes(tool) && snapshot.sources.some(row => row.source_id === context.selected_agency)) {
       resolvedArgs.source_id = context.selected_agency;
     } else unsupportedFilters.push("selected_agency");
   }
+  if (plan?.arguments.source_id) {
+    if (resolvedArgs.source_id && resolvedArgs.source_id !== plan.arguments.source_id) unsupportedFilters.push("selected_agency");
+    else resolvedArgs.source_id = plan.arguments.source_id;
+  }
+  // Model-parsed narrowing carries forward like the context's own selections, so a
+  // follow-up turn never quietly drops it; the person clears it with the context.
+  if (plan?.time_window) context.selected_time_window = plan.time_window;
+  if (plan?.arguments.source_id && resolvedArgs.source_id === plan.arguments.source_id) context.selected_agency = plan.arguments.source_id;
   if (tool === "search_evidence") {
-    const q = normalized.replace(/^查官方證據[：:\s]*/, "").trim();
+    const q = plan ? plan.arguments.q : normalized.replace(/^查官方證據[：:\s]*/, "").trim();
     if (q) resolvedArgs.q = q;
     else if (action === "anti-fraud") resolvedArgs.q = "反詐";
   }
@@ -853,29 +866,85 @@ export async function executeResearch(snapshot, rawInput, env, request, fetchImp
     const score = row => terms.filter(term => String(row.title || "").toLowerCase().includes(term)).length;
     return score(b) - score(a) || a.canonical_id.localeCompare(b.canonical_id);
   }).slice(0, 6);
-  const source = row => ({ evidence_id: `PUB-${row.canonical_id}`, source_id: row.source_id,
-    title: row.title, official_url: row.official_url, published_at: row.published_at,
-    data_as_of: row.data_as_of, fetched_at: row.fetched_at });
-  const result = { ...base, sources: rows.map(source) };
+  const result = { ...base, sources: rows.map(researchSource) };
   if (!rows.length) return { ...result, reason_code: "NO_MATCH" };
   if (state !== "READY") return { ...result, reason_code: state };
+  const outcome = await selectMetadataAnswer(snapshot, input, rows, env, request, fetchImpl);
+  if (outcome.reason_code) return { ...result, reason_code: outcome.reason_code };
+  return { ...result, status: "ANSWER_READY", sources: outcome.selected.map(researchSource), answer: outcome.answer,
+    answer_evidence_receipt: outcome.answer_evidence_receipt, reason_code: null };
+}
+
+const researchSource = row => ({ evidence_id: `PUB-${row.canonical_id}`, source_id: row.source_id,
+  title: row.title, official_url: row.official_url, published_at: row.published_at,
+  data_as_of: row.data_as_of, fetched_at: row.fetched_at });
+
+// Shared by /research metadata mode and the assisted Web chat: the model only selects
+// exact IDs among current trusted rows; the claims are server-built title assertions
+// that pass the unchanged formal gate. Any failure is a reason code, never prose.
+async function selectMetadataAnswer(snapshot, input, rows, env, request, fetchImpl) {
   const trusted = new Set(trustedEvidence(snapshot).filter(row => row.is_current).map(row => row.evidence_id));
   const approved = rows.filter(row => trusted.has(`PUB-${row.canonical_id}`));
-  if (!approved.length) return { ...result, reason_code: "NO_APPROVED_SOURCES" };
+  if (!approved.length) return { reason_code: "NO_APPROVED_SOURCES" };
   try {
-    const ids = await selectResearchSources(input, approved.map(source), env, request, fetchImpl);
-    if (!ids.length) return { ...result, reason_code: "NO_RELEVANT_SELECTION" };
+    const ids = await selectResearchSources(input, approved.map(researchSource), env, request, fetchImpl);
+    if (!ids.length) return { reason_code: "NO_RELEVANT_SELECTION" };
     const selected = ids.map(id => approved.find(row => `PUB-${row.canonical_id}` === id));
     const claims = selected.map((row, index) => ({ schema_version: 1, claim_id: `research-${index + 1}`,
       text: row.title, claim_type: "STATUS", temporal_scope: "CURRENT",
       proposition: { subject: `publication:${row.canonical_id}:title`, value: row.title }, cited_evidence_ids: [`PUB-${row.canonical_id}`] }));
     const checked = await validateAnswer(snapshot, claims);
-    if (checked.gate_status !== "PASS" || checked.final_claims.some(claim => claim.support_status !== "SUPPORTED")) return { ...result, reason_code: "OUTPUT_REJECTED" };
-    return { ...result, status: "ANSWER_READY", sources: selected.map(source), answer: checked.answer,
-      answer_evidence_receipt: checked.receipt, reason_code: null };
+    if (checked.gate_status !== "PASS" || checked.final_claims.some(claim => claim.support_status !== "SUPPORTED")) return { reason_code: "OUTPUT_REJECTED" };
+    return { reason_code: null, selected, answer: checked.answer, answer_evidence_receipt: checked.receipt };
   } catch (error) {
-    return { ...result, reason_code: error instanceof ResearchError ? error.code : "OUTPUT_REJECTED" };
+    return { reason_code: error instanceof ResearchError ? error.code : "OUTPUT_REJECTED" };
   }
+}
+
+const ASSISTED_CHAT_KEYS = ["tool", "arguments", "release_id", "public_data_only"];
+
+// The Web-only assisted chat: a separately admitted model call may choose the typed
+// query; anything short of a validated intent falls back to the same rules /query
+// and MCP use. Publication titles reach the model only for formally admitted
+// evidence, and only gate-checked text is returned as an answer.
+export async function executeAssistedChat(snapshot, input, env, request, fetchImpl = fetch) {
+  if (!input || typeof input !== "object" || Array.isArray(input) || Object.keys(input).some(key => !ASSISTED_CHAT_KEYS.includes(key)) ||
+      input.tool !== "chat_turn" || input.public_data_only !== true) {
+    throw new GatewayError("INVALID_ARGUMENTS", "assisted chat requires chat_turn text with the public-data attestation");
+  }
+  const args = input.arguments;
+  if (!args || typeof args !== "object" || Array.isArray(args) || Object.keys(args).some(key => !["text", "context"].includes(key))) {
+    throw new GatewayError("INVALID_ARGUMENTS", "assisted chat accepts only text and context");
+  }
+  const text = chatText(args.text, "text", 512);
+  // The same length and personal-data guard as /research, and the context's own
+  // validation, before any admission or provider work.
+  parseResearchInput({ question: text, public_data_only: true });
+  chatContext(args.context);
+  const state = researchProviderState(env);
+  let plan = null;
+  let fallback = state === "READY" ? null : state;
+  if (!fallback) {
+    try { plan = await planChatIntent(text, snapshot.sources.map(row => row.source_id), env, request, fetchImpl); }
+    catch (error) { fallback = error instanceof ResearchError ? error.code : "OUTPUT_REJECTED"; }
+  }
+  const result = await executeChat(snapshot, { text, ...(args.context === undefined ? {} : { context: args.context }) }, plan);
+  const chat = result.chat;
+  chat.parser = plan ? { kind: "llm", version: CHAT_INTENT_PARSER, time_window: plan.time_window }
+    : { kind: "rules", version: CHAT_RULES_PARSER, fallback_reason: fallback };
+  const skipped = reason => ({ status: "NOT_ATTEMPTED", reason_code: reason, answer: [] });
+  if (!plan) chat.assisted_answer = skipped(fallback);
+  else if (chat.resolved_request.tool !== "search_evidence") chat.assisted_answer = skipped("TOOL_HAS_NO_ANSWER_STEP");
+  else if (chat.status === "CAPABILITY_NOT_AVAILABLE") chat.assisted_answer = skipped("QUERY_NOT_EXECUTED");
+  else if (!chat.results.length) chat.assisted_answer = skipped("NO_MATCH");
+  else if (snapshot.formalAdmission?.status !== "ADMITTED") chat.assisted_answer = skipped("RIGHTS_BLOCKED");
+  else {
+    const outcome = await selectMetadataAnswer(snapshot, { question: text, history: [] }, chat.results.slice(0, RESEARCH_LIMITS.sources), env, request, fetchImpl);
+    chat.assisted_answer = outcome.reason_code ? { status: "NO_ANSWER", reason_code: outcome.reason_code, answer: [] } :
+      { status: "ANSWER_READY", reason_code: null, answer: outcome.answer, selected_evidence_ids: outcome.selected.map(row => `PUB-${row.canonical_id}`),
+        answer_evidence_receipt: outcome.answer_evidence_receipt };
+  }
+  return result;
 }
 
 class GatewayError extends Error {
@@ -958,11 +1027,16 @@ export default {
 
       }
       if (request.method === "GET" && url.pathname === "/capabilities") return responseJson({ schema_version: 1, server_version: SERVER_VERSION, read_only: true, release: snapshot.release, capabilities: mcpTools().map(tool => tool.name), unavailable_capabilities: DOMAIN_CAPABILITIES, policy: snapshot.policyBinding, retention: retentionPolicy(snapshot) }, 200, request, env);
-      if (request.method !== "POST" || !["/query", "/mcp", "/research"].includes(url.pathname)) return responseJson(jsonError("NOT_FOUND", "route not found"), 404, request, env);
+      if (request.method !== "POST" || !["/query", "/mcp", "/research", "/chat"].includes(url.pathname)) return responseJson(jsonError("NOT_FOUND", "route not found"), 404, request, env);
       if (url.pathname === "/research") {
         const input = await readBoundedJson(request, 8192);
         if (typeof input?.release_id !== "string" || input.release_id !== snapshot.release.release_id) throw new GatewayError("QUERY_TEMPORARILY_UNAVAILABLE", "Research release mismatch; reload the publication", 503);
         return responseJson(await executeResearch(snapshot, input, env, request), 200, request, env);
+      }
+      if (url.pathname === "/chat") {
+        const input = await readBoundedJson(request, 8192);
+        if (typeof input?.release_id !== "string" || input.release_id !== snapshot.release.release_id) throw new GatewayError("QUERY_TEMPORARILY_UNAVAILABLE", "Assisted chat release mismatch; reload the publication", 503);
+        return responseJson(await executeAssistedChat(snapshot, input, env, request), 200, request, env);
       }
 
       const bytes = await request.arrayBuffer();
