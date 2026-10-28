@@ -57,12 +57,28 @@ the receipt and the Worker's release block. The same cursor string comes from
 both and leads to the same next page, and invalid arguments fail with the same
 error code.
 
-Aligning the two surfaced three differences, now fixed: the Worker accepted a
-non-string `source_id` for `get_source_health`; the Worker encoded cursors with
-unsorted keys; and the Python Gateway stated `collection_coverage_status` only
-for rights-blocked queries, while the Worker and the release verifier expect it
-beside every formal query status.
+Aligning the two surfaced these differences in the Worker, now fixed to match
+the Python Gateway: `get_source_health` accepted a non-string `source_id`,
+rejected a `null` one (Python reads it as absent) and listed every source for
+an empty one (Python lists none); `validate_answer` skipped the generation
+check for a falsy `expected_generation`; results published at the same instant
+were ordered by locale collation rather than code point; and search cursors
+were encoded with unsorted keys. The Python Gateway, for its part, stated
+`collection_coverage_status` only for rights-blocked queries, while the Worker
+and the release verifier expect it beside every formal query status. The
+comparison keeps the whole receipt except `issued_at` and `server_version`.
 
-Not covered: `chat_turn` natural-language parsing (the Worker uses its own
-bounded rules, Python uses `intel_v2/conversation.py`), and a failed index
-rebuild, which the Worker reports as `PARTIAL` and Python as `STALE`.
+Both runtimes still read an empty `source_id` as "no filter" for
+`search_evidence` but as an exact filter for `get_source_health`; that is the
+Python Gateway's existing contract and is kept identical rather than changed.
+
+Not covered, and known to differ:
+
+- `chat_turn` natural-language parsing: the Worker uses its own bounded rules,
+  Python uses `intel_v2/conversation.py`.
+- Keyword case folding: the Worker lower-cases with `toLocaleLowerCase()`,
+  Python with `casefold()`, so a few non-CJK letters (for example `ß` against
+  `SS`) can match differently and give different cursor filter hashes.
+- A failed index rebuild: the Python Gateway marks the formal status `STALE`
+  and keeps the earlier collection status; the Worker marks the collection
+  status `PARTIAL` and keeps any rights-blocked formal status.

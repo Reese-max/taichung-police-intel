@@ -10,13 +10,15 @@ import { createGovernedPolicyFixture } from "./governed-policy-fixture.mjs";
 
 const hash = value => createHash("sha256").update(value).digest("hex");
 const PUBLICATION = ["source-policy.json", "intelligence-feed.json", "source-status.json", "v2-daily-brief.json"];
-// Transport and clock fields that legitimately differ between two calls.
-const VOLATILE = new Set(["query_id", "queried_at", "issued_at", "server_version", "release", "receipt"]);
+// Transport, clock and implementation-name fields that legitimately differ between two calls;
+// everything else, the receipt's argument hash, counts and bindings included, must match.
+const VOLATILE = { "": new Set(["query_id", "queried_at", "release"]), receipt: new Set(["issued_at", "server_version"]) };
 
-function comparable(value) {
-  if (Array.isArray(value)) return value.map(comparable);
+function comparable(value, parent = "") {
+  if (Array.isArray(value)) return value.map(row => comparable(row));
   if (value && typeof value === "object") {
-    return Object.fromEntries(Object.keys(value).filter(key => !VOLATILE.has(key)).sort().map(key => [key, comparable(value[key])]));
+    const skip = VOLATILE[parent] || new Set();
+    return Object.fromEntries(Object.keys(value).filter(key => !skip.has(key)).sort().map(key => [key, comparable(value[key], parent === "" ? key : `${parent}.${key}`)]));
   }
   return value;
 }
@@ -85,11 +87,14 @@ function assertParity({ web, mcp }, label) {
 }
 
 test("the same filters return the same canonical IDs, order, status, gaps and coverage on Web and MCP", () => bothRuntimes(async call => {
-  for (const args of [{ q: "測試" }, { q: "zzzz" }, { source_id: "S-004" }, { source_id: "S-006" }, {}, { q: "測試", limit: 1 }]) {
+  for (const args of [{ q: "測試" }, { q: "zzzz" }, { source_id: "S-004" }, { source_id: "S-006" }, {}, { q: "測試", limit: 1 },
+    { source_id: "" }, { source_id: null }, { q: "測試", source_id: "S-999" }]) {
     const pair = await call("search_evidence", args);
     assertParity(pair, `search_evidence ${JSON.stringify(args)}`);
   }
-  for (const args of [{}, { source_id: "S-006" }]) assertParity(await call("get_source_health", args), `get_source_health ${JSON.stringify(args)}`);
+  for (const args of [{}, { source_id: "S-006" }, { source_id: "" }, { source_id: null }, { source_id: "S-999" }]) {
+    assertParity(await call("get_source_health", args), `get_source_health ${JSON.stringify(args)}`);
+  }
   assertParity(await call("get_publication_receipt", {}), "get_publication_receipt");
   assertParity(await call("get_current_brief", {}), "get_current_brief");
 }));
@@ -108,12 +113,25 @@ test("each runtime's cursor leads to the same next page", () => bothRuntimes(asy
 
 test("invalid requests fail with the same error code", () => bothRuntimes(async call => {
   for (const [name, args] of [["search_evidence", { q: "x".repeat(513) }], ["search_evidence", { unknown: 1 }], ["search_evidence", { limit: 0 }],
-    ["get_source_health", { source_id: 7 }], ["search_events", {}], ["validate_answer", { claims: [] }]]) {
+    ["get_source_health", { source_id: 7 }], ["search_events", {}], ["validate_answer", { claims: [] }],
+    ...["", false, 0, "stale-generation"].map(expected => ["validate_answer", { claims: [{ claim_type: "STATUS" }], expected_generation: expected }]),
+    ["search_evidence", { q: "測試", expected_generation: "" }]]) {
     const pair = await call(name, args);
     assert.ok(pair.web.error && pair.mcp.error, `${name} ${JSON.stringify(args)} should fail on both: ${JSON.stringify(pair)}`);
     assert.equal(pair.web.error, pair.mcp.error, `${name} ${JSON.stringify(args)}`);
   }
 }));
+
+test("results published at the same instant are ordered by code point on both", () => bothRuntimes(async call => {
+  const pair = await call("search_evidence", {});
+  assertParity(pair, "search_evidence {} with mixed-case IDs");
+  // Python string order puts "Z" (U+005A) before "a" (U+0061); a locale collation would not.
+  assert.deepEqual(pair.web.results.map(row => row.canonical_id), ["Z-FIXTURE-UPPER", "a-fixture-lower"]);
+}, { mutate: values => {
+  const [first, second] = values["intelligence-feed.json"].items;
+  assert.equal(first.published_at, second.published_at);
+  first.stable_id = "a-fixture-lower"; second.stable_id = "Z-FIXTURE-UPPER";
+} }));
 
 test("a failed source and its gap read the same on Web and MCP", () => bothRuntimes(async call => {
   for (const args of [{}, { source_id: "S-006" }]) assertParity(await call("get_source_health", args), `get_source_health ${JSON.stringify(args)}`);
