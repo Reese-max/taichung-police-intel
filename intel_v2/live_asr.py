@@ -24,6 +24,7 @@ from typing import Callable
 import wave
 
 from intel_v2.live_meeting import (
+    MAX_WORD_TIMESTAMPS,
     _gap_id, _number, _stamp, _touch, add_bookmark, append_segment, budget_stop, build_timeline,
     record_gap, reconcile_session, resume_session, start_session, stop_session, validate_session,
 )
@@ -56,8 +57,11 @@ def _groq_worker() -> None:
             "https://api.groq.com/openai/v1/audio/transcriptions",
             headers={"Authorization": f"Bearer {request['api_key']}"},
             files={"file": ("chunk.wav", base64.b64decode(request["audio"]), "audio/wav")},
-            data={"model": contract["model"], "language": contract["language"],
-                  "response_format": "verbose_json", "temperature": "0"},
+            data=[
+                ("model", contract["model"]), ("language", contract["language"]),
+                ("response_format", "verbose_json"), ("temperature", "0"),
+                ("timestamp_granularities[]", "segment"), ("timestamp_granularities[]", "word"),
+            ],
             timeout=(min(5, request["timeout"]), request["timeout"]),
             allow_redirects=False, stream=True,
         )
@@ -97,6 +101,23 @@ def _groq_transcribe(audio_bytes: bytes, api_key: str, contract: dict, timeout: 
     if response.returncode != 0:
         raise ValueError("ASR transport failed")
     return json.loads(response.stdout)
+
+
+def _provider_words(payload: dict) -> object:
+    """Top-level words win, even if unavailable; otherwise flatten in segment order."""
+    if "words" in payload:
+        return payload["words"]
+    segments = payload.get("segments")
+    if not isinstance(segments, list):
+        return None
+    words = []
+    for segment in segments:
+        if not isinstance(segment, dict) or not isinstance(segment.get("words"), list):
+            return None  # An incomplete nested batch must never be partly retained.
+        words.extend(segment["words"][:MAX_WORD_TIMESTAMPS + 1 - len(words)])
+        if len(words) > MAX_WORD_TIMESTAMPS:
+            break
+    return words
 
 
 def ingest_chunk(
@@ -247,20 +268,22 @@ def ingest_chunk(
         # supply interim/final updates; Groq returns one final transcription.
         updates = payload.get("updates") if fixture else None
         if updates is None:
-            updates = [{"text": payload.get("text"), "finalized": True}]
+            updates = [{"text": payload.get("text"), "words": _provider_words(payload), "finalized": True}]
         if not isinstance(updates, list) or not 1 <= len(updates) <= 20:
             raise ValueError("invalid bounded transcript updates")
         sequence = max([row["sequence"] for row in result["segments"]] + [-1]) + 1
         working = result
         received = (datetime.fromisoformat(at) + timedelta(seconds=time.perf_counter() - started)).isoformat()
         for update in updates:
-            if api_key and api_key in str(update.get("text", "")):
+            words = _provider_words(update)
+            if api_key and any(api_key in str(value) for value in (update.get("text", ""), words)):
                 raise ValueError("provider text cannot contain the configured credential")
             working = append_segment(
                 working, sequence=sequence, start_seconds=start, end_seconds=end,
                 text=update["text"], received_at=received,
                 finalized=update.get("finalized", False), partial=update.get("partial", False),
                 speaker_label=update.get("speaker_label"), confidence=update.get("confidence"), profile=profile,
+                words=words,
             )
         result = working
         result["provider_usage"]["calls"][-1]["status"] = "SUCCEEDED"
