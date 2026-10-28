@@ -336,9 +336,18 @@ function SystemHealthSummary({ health, localReview, onDecision, onFeedback, onEx
               <small>
                 {stage.error_class
                   ? `${stage.error_class}${stage.error_stage ? ` @ ${stage.error_stage}` : ""}`
-                  : `最後觀測：${formatDateTime(stage.ended_at || stage.last_success_at)}`}
+                  : `最後觀測：${formatDateTime(
+                      stage.relayed_sources?.length
+                        ? stage.evidence_observed_at || stage.ended_at || stage.last_success_at
+                        : stage.ended_at || stage.last_success_at
+                    )}`}
                 {stage.generation_id && ` · generation ${stage.generation_id}`}
               </small>
+              {stage.relayed_sources?.length > 0 && (
+                <small data-testid="v2-stage-relayed-sources">
+                  {`台灣轉交：${stage.relayed_sources.map((relayed) => `${relayed.source_id}（擷取於 ${formatDateTime(relayed.observed_at)}，本次直連失敗：${relayed.live_error_reason}）`).join("；")}`}
+                </small>
+              )}
             </li>
           ))}
         </ul>
