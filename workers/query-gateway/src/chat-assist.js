@@ -75,6 +75,9 @@ export function resolveTimeExpression(intent, nowMs = Date.now()) {
 export function validateChatIntent(raw, sourceIds, question, nowMs = Date.now()) {
   if (!object(raw) || Object.keys(raw).some(key => !KEYS.includes(key)) || !CHAT_INTENT_TOOLS.includes(raw.tool)) throw reject();
   const args = {};
+  // A metadata search without keywords would be the model widening it to everything;
+  // that question goes to the rules instead.
+  if (raw.tool === "search_evidence" && raw.q === undefined) throw reject();
   if (raw.q !== undefined) {
     if (raw.tool !== "search_evidence" || typeof raw.q !== "string" || /[\u0000-\u001f\u007f]/.test(raw.q)) throw reject();
     const q = raw.q.trim();

@@ -100,6 +100,7 @@ test("only a menu tool with typed, bounded arguments survives validation", () =>
   }
   for (const bad of [null, [], "search_evidence", {}, { tool: "validate_answer" }, { tool: "chat_turn", q: "x" }, { tool: "get_publication_receipt" },
     { tool: "search_evidence", sql: "select 1" }, { tool: "search_evidence", q: "x".repeat(CHAT_INTENT_LIMITS.q + 1) },
+    { tool: "search_evidence" }, { tool: "search_evidence", source_id: "S-004" }, { tool: "search_evidence", time_expression: "today" },
     { tool: "search_evidence", q: "   " }, { tool: "search_evidence", q: "a\u0000b" }, { tool: "search_evidence", q: 7 },
     { tool: "get_current_brief", q: "x" }, { tool: "search_evidence", source_id: "S-999" }, { tool: "get_current_brief", source_id: "S-004" },
     { tool: "search_events", time_expression: "someday" }, { tool: "search_events", time_expression: "last_days" },

@@ -110,8 +110,9 @@ Known limits:
 - The intent step sends the question to the provider whenever the four gates are
   on, even while formal admission is `RIGHTS_BLOCKED` (only publication text is held
   back). Turning `RESEARCH_*` on therefore also starts sending `/chat` questions.
-- Every keyword of `q` must appear in the question; a model that rephrases falls
-  back to the rules. The model can still omit a time or source the question named:
+- A model `search_evidence` must carry `q`, and every keyword of `q` must appear in
+  the question with word boundaries kept; a model that omits or rephrases the
+  keywords falls back to the rules. The model can still omit a time or source the question named:
   the turn then runs without it, and the UI shows the conditions actually applied
   (no time condition is listed), so the omission is visible but not refused.
 - The browser accepts an assisted answer only when each line rebuilds from a
