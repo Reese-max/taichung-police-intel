@@ -55,7 +55,9 @@ from intel_v2.located_facts import validate_document_url
 
 USER_AGENT = "TaichungPoliceIntel/0.2 (+public-source-monitor)"
 DETAIL_RECHECK_INTERVAL_HOURS = 24
-DETAIL_RECHECK_MAX_PER_RUN = 1
+# A run's GETs: one body plus up to two attachments, within the per-source
+# limit of three (intel_v2/detail_recheck_budget.py).
+DETAIL_RECHECK_MAX_PER_RUN = 3
 REDIRECT_STATUSES = {301, 302, 303, 307, 308}
 MAX_REDIRECTS = 3
 API_S007 = "https://yishi.tccc.gov.tw/api/ProceedingsBackWeb/FrontList"

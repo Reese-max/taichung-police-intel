@@ -257,28 +257,32 @@ class DetailRecheckDatabaseTests(unittest.TestCase):
 
     def test_per_run_limit_holds_back_the_remaining_due_targets(self):
         observed = datetime(2026, 9, 21, 12, 0, tzinfo=timezone.utc)
-        connection = FakeConnection([due_row("traffic-1"), due_row("traffic-2"), due_row("traffic-3")])
+        self.assertEqual(online_collect.DETAIL_RECHECK_MAX_PER_RUN, 3)
+        # source and host caps above the run ceiling, so only the per-run ceiling can hold the fourth back
+        connection = FakeConnection([due_row(f"traffic-{index}") for index in range(1, 5)])
         session = FakeSession()
-        result = online_collect.run_detail_rechecks(connection, session, {"S-004": "SR-1"}, observed)
+        result = online_collect.run_detail_rechecks(
+            connection, session, {"S-004": "SR-1"}, observed,
+            budget_policy={"per_source_limit": 10, "per_host_limit": 10})
         candidate_limit = next(
             params[-1]
             for statement, params in connection.sql
             if "FROM detail_recheck_state" in statement and "LIMIT %s" in statement
         )
-        self.assertEqual(
+        self.assertGreater(
             candidate_limit,
-            5,
+            online_collect.DETAIL_RECHECK_MAX_PER_RUN,
             "the candidate batch must be wider than the per-run ceiling or the caps have nothing to arbitrate",
         )
         self.assertEqual(
             [item["reason"] for item in result],
-            [None, "RUN_LIMIT_REACHED", "RUN_LIMIT_REACHED"],
-            "the default per-run ceiling of one request must not depend on the SQL LIMIT alone",
+            [None, None, None, "RUN_LIMIT_REACHED"],
+            "the default per-run ceiling of three requests must not depend on the SQL LIMIT alone",
         )
-        self.assertEqual(len(session.calls), 1)
+        self.assertEqual(len(session.calls), 3)
         self.assertEqual(
             len(budget_updates(connection)),
-            2,
+            1,
             "each held-back target must still record why it was not requested",
         )
         for update in budget_updates(connection):

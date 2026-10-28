@@ -75,7 +75,7 @@ python -X utf8 -B -m unittest discover -s tests -p 'test_detail_recheck*.py' && 
 - 逐筆重新准入時，尚待處理的到期候選列仍視為同一批次：壞帳本只拒絕該列，拒絕後將乾淨的 ledger 同步回本輪 history，不會把健康列誤判成預算用盡；批次外無法解讀的歷史帳本仍拒絕同來源／host 的新請求。
 - `attachment_checks` 逐筆列出已核／未核、HTTP status 與原因；預算不足為 `REQUEST_BUDGET_EXHAUSTED`。升級過渡期：main 時期存下、沒有 `url` 的附件列會標為 `MISSING_URL`，不發附件請求；持續收到正文 304 時，須等正文改版重新解析、補上 URL 後才開始核對。既有 2xx 路徑會重新解析正文，因此若較早收到完整 2xx，即使 hash 相同，也可能先補回 URL；本輪不新增舊資料補 URL 的程式。只有全部成功核對才設定 `attachments_checked=true`；已確認無附件時為空集合全數核對。
 - 429／5xx 保存 `Retry-After` 秒數、保留該附件 LKG，停止後續附件並標為 `SOURCE_BACKOFF`。沒有已確認變更時分類為 `DEFERRED`；已有附件變更時保留 `ATTACHMENT_CHANGED`／`review_required`，同時由既有 ledger 套用退避。正文 304 的附件變更不會推進最後取得完整正文的 `observed_at`。
-- 邊界：首次正文／正文變更仍只列舉附件，下載在正文不變時進行；不保存附件 bytes、不新增獨立排程、不調高既有額度。刻意保留 `DETAIL_RECHECK_MAX_PER_RUN = 1`：預設正文 GET 會用完整輪額度，附件以 `REQUEST_BUDGET_EXHAUSTED`／`attachments_checked=false` 保持未核，預設不會下載附件。要核對附件，呼叫端必須提高 `run_detail_rechecks(..., limit=...)`，同時確保 `budget_policy` 的 `per_source_limit`／`per_host_limit` 在 rolling window 內仍有餘額；每跳 redirect 也會消耗一次。現有 CLI 未提供此額度的參數或環境變數，設定同名環境變數不會生效。
+- 邊界：首次正文／正文變更仍只列舉附件，下載在正文不變時進行；不保存附件 bytes、不新增獨立排程、不調高既有額度。`DETAIL_RECHECK_MAX_PER_RUN` 預設為 3（2026-10-28 由 1 調高）：一輪可核一份正文加至多兩個附件，仍受 `per_source_limit = 3` 約束；額度不足時附件以 `REQUEST_BUDGET_EXHAUSTED`／`attachments_checked=false` 保持未核。要核更多附件，呼叫端可提高 `run_detail_rechecks(..., limit=...)`，同時確保 `budget_policy` 的 `per_source_limit`／`per_host_limit` 在 rolling window 內仍有餘額；每跳 redirect 也會消耗一次。現有 CLI 未提供此額度的參數或環境變數，設定同名環境變數不會生效。
 
 例如正文加三個附件、沒有 redirect 或歷史用量時，呼叫端可明確設定如下；這是設定說明，本輪未變更排程呼叫端或預設值：
 

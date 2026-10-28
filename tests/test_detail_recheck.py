@@ -987,10 +987,13 @@ class AttachmentContentRecheckTests(unittest.TestCase):
             "_defer_detail_recheck", "_detail_recheck_outcome", "_detail_unavailable", "run_detail_rechecks"}
         source = Path(__file__).resolve().parents[1] / "online_collect.py"
         tree = ast.parse(source.read_text(encoding="utf-8"))
+        # the collector's real default, not a copy that could drift from it
+        default_limit = next(node.value.value for node in tree.body if isinstance(node, ast.Assign)
+            and any(isinstance(target, ast.Name) and target.id == "DETAIL_RECHECK_MAX_PER_RUN" for target in node.targets))
         module = ast.Module(body=[ast.ImportFrom(module="__future__", names=[ast.alias(name="annotations")], level=0),
             *(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name in names)], type_ignores=[])
         env = dict(globals(), FULL_RECHECK_INTERVAL_HOURS=168, SEMANTIC_FIELDS=core.SEMANTIC_FIELDS,
-            DETAIL_RECHECK_MAX_PER_RUN=1, DETAIL_RECHECK_INTERVAL_HOURS=24,
+            DETAIL_RECHECK_MAX_PER_RUN=default_limit, DETAIL_RECHECK_INTERVAL_HOURS=24,
             timestamp=lambda value: value.isoformat(timespec="seconds"),
             validate_document_url=lambda *_: {"entrypoint": self.url},
             _save_detail_snapshot=lambda *_: None)
@@ -1068,12 +1071,25 @@ class AttachmentContentRecheckTests(unittest.TestCase):
                 self.assertEqual(outcomes[0]["budget"]["state"]["request_counts"], {NOW: 2})
                 self.assertTrue(any("UPDATE detail_recheck_state" in sql for sql, _ in connection.writes))
 
-    def test_collector_default_limit_leaves_attachment_unchecked(self):
+    def test_collector_default_limit_checks_the_body_and_its_attachment(self):
+        run, Connection = self.collector_harness()
+        row = dict(self.previous(), source_id="s", stable_key="a", requested_url=self.url, budget_state={})
+        connection = Connection([row])
+        session = FakeHTTPSession(FakeHTTPResponse(304), FakeHTTPResponse(304, url=self.pdf))
+        result = run(connection, session, {"s": "run"}, datetime.fromisoformat(NOW))[0]
+        self.assertEqual([url for url, _ in session.calls], [self.url, self.pdf])
+        self.assertFalse(result["review_required"])
+        self.assertFalse(result["classification"]["attachment_recheck_required"])
+        stored = next(json.loads(params[13]) for sql, params in connection.writes
+            if "document_version_id = %s" in sql)
+        self.assertTrue(stored["observation"]["attachments_checked"])
+
+    def test_collector_limit_of_one_leaves_attachment_unchecked(self):
         run, Connection = self.collector_harness()
         row = dict(self.previous(), source_id="s", stable_key="a", requested_url=self.url, budget_state={})
         connection = Connection([row])
         session = FakeHTTPSession(FakeHTTPResponse(304))
-        result = run(connection, session, {"s": "run"}, datetime.fromisoformat(NOW))[0]
+        result = run(connection, session, {"s": "run"}, datetime.fromisoformat(NOW), limit=1)[0]
         self.assertEqual(len(session.calls), 1)
         self.assertFalse(result["review_required"])
         self.assertTrue(result["classification"]["attachment_recheck_required"])
