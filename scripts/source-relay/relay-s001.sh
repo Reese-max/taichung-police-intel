@@ -24,7 +24,7 @@ trap 'rm -f "$capture"' EXIT
 # The forced command ignores what is asked for; "capture" only names the intent.
 # At most one byte past the checker's limit lands; check_relay.py refuses it.
 timeout 120s ssh "${SSH_COMMON[@]}" -o ConnectTimeout=20 -i "$HOME_DIR/keys/taiwan_capture" \
-  "$TAIWAN_HOST" capture | head -c 7100001 > "$capture"
+  "$TAIWAN_HOST" capture < /dev/null | head -c 7100001 > "$capture"
 python3 "$HERE/check_relay.py" "$capture"
 observed_at="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["observed_at"])' "$capture")"
 
