@@ -118,15 +118,30 @@ def read_source_bounded(path):
     """Reject nonregular/oversized sources before reading; bound file growth."""
     descriptor = None
     try:
-        flags = os.O_RDONLY | os.O_NONBLOCK | getattr(os, "O_CLOEXEC", 0)
+        # Preflight also prevents opening FIFOs/devices when NONBLOCK is absent.
+        before = os.lstat(path)
+        if not stat.S_ISREG(before.st_mode) or not 0 <= before.st_size <= MAX_SOURCE_BYTES:
+            raise ValueError(ERROR)
+        # Windows lstat/fstat can report different ctime semantics; compare
+        # ctime only between successive calls to the same API below.
+        fields = ("st_dev", "st_ino", "st_mode", "st_size", "st_mtime_ns")
+        flags = (os.O_RDONLY | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_NOFOLLOW", 0)
+                 | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_BINARY", 0))
         descriptor = os.open(path, flags)
         metadata = os.fstat(descriptor)
-        if not stat.S_ISREG(metadata.st_mode) or not 0 <= metadata.st_size <= MAX_SOURCE_BYTES:
+        if (not stat.S_ISREG(metadata.st_mode)
+                or any(getattr(metadata, field) != getattr(before, field) for field in fields)):
             raise ValueError(ERROR)
         with os.fdopen(descriptor, "rb") as stream:
             descriptor = None  # The stream owns and closes it from here.
             source = stream.read(MAX_SOURCE_BYTES + 1)
-        if len(source) > MAX_SOURCE_BYTES:
+            after = os.fstat(stream.fileno())
+            current = os.lstat(path)
+        if (len(source) > MAX_SOURCE_BYTES or len(source) != metadata.st_size
+                or not stat.S_ISREG(after.st_mode) or not stat.S_ISREG(current.st_mode)
+                or after.st_ctime_ns != metadata.st_ctime_ns or current.st_ctime_ns != before.st_ctime_ns
+                or any(getattr(info, field) != getattr(before, field)
+                       for info in (after, current) for field in fields)):
             raise ValueError(ERROR)
         return source
     except (OSError, TypeError, ValueError) as error:

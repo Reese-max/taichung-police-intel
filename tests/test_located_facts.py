@@ -304,8 +304,83 @@ class LocatedFactsTests(unittest.TestCase):
         self.assertTrue(diff["document_version_changed"])
         self.assertEqual([a["change"] for a in diff["affected_facts"]], ["REMOVED"])
         other = acquire_document(source_id="S-028", requested_url="https://data.gov.tw/dataset/88147", final_url="https://data.gov.tw/dataset/88147", body=b"{}", content_type="application/json", fetched_at=STAMP)
-        mismatch = compare_document_versions(document_v1, bundle_v1["facts"], other, [], basis="SYNTHETIC_MODIFIED_COPY")
-        self.assertFalse(mismatch["source_identity_matches"])
+        with self.assertRaisesRegex(ValueError, "source identity mismatch"):
+            compare_document_versions(document_v1, bundle_v1["facts"], other, [], basis="SYNTHETIC_MODIFIED_COPY")
+
+    def test_version_diff_rejects_duplicate_keys_in_either_version(self):
+        from intel_v2.located_facts import compare_document_versions
+        document = self.html_document(HTML.read_bytes())
+        fact = {"subject_id": "road:A", "predicate": "road_control_start_at", "normalized_value": "17:00"}
+        for side in ("old", "new"):
+            for value in ("17:00", "16:00"):
+                with self.subTest(side=side, duplicate_value=value):
+                    duplicates = [fact, {**fact, "subject_id": "road:B"}, {**fact, "normalized_value": value}]
+                    old_facts, new_facts = (duplicates, [fact]) if side == "old" else ([fact], duplicates)
+                    with self.assertRaisesRegex(ValueError, "duplicate fact key.*road:A.*road_control_start_at"):
+                        compare_document_versions(document, old_facts, document, new_facts)
+
+    def test_version_diff_rejects_different_source_identities_with_empty_facts(self):
+        from intel_v2.located_facts import compare_document_versions
+        document = self.html_document(HTML.read_bytes())
+        other = {**document, "original_source_identity": document["original_source_identity"] + "&page=2"}
+        for old, new in ((document, other), (other, document)):
+            with self.subTest(old_identity=old["original_source_identity"]):
+                with self.assertRaisesRegex(ValueError, "source identity mismatch"):
+                    compare_document_versions(old, [], new, [])
+
+    def test_version_diff_reports_every_changed_field_with_existing_row_shape(self):
+        from intel_v2.located_facts import compare_document_versions
+        document = self.html_document(HTML.read_bytes())
+        old = {
+            "subject_id": "road:A", "predicate": "road_control_start_at",
+            "normalized_value": "17:00", "valid_time": "2026-09-21",
+            "verification_status": "FACT_CANDIDATE",
+        }
+        changes = (
+            ("normalized_value", "16:00", "VALUE_CHANGED"),
+            ("valid_time", None, "VALID_TIME_CHANGED"),
+            ("verification_status", "NEEDS_REVIEW", "VERIFICATION_CHANGED"),
+        )
+        for mask in range(8):
+            with self.subTest(changed_fields=mask):
+                new = dict(old)
+                expected_changes = []
+                for bit, (field, value, change) in enumerate(changes):
+                    if mask & (1 << bit):
+                        new[field] = value
+                        expected_changes.append(change)
+                diff = compare_document_versions(document, [old], document, [new])
+                self.assertEqual(diff, {
+                    "basis": "UNSPECIFIED", "source_identity_matches": True,
+                    "document_version_changed": False, "raw_bytes_sha256_changed": False,
+                    "extracted_text_sha256_changed": False, "extractor_version_matches": True,
+                    "affected_facts": [
+                        {"subject_id": old["subject_id"], "predicate": old["predicate"], "change": change,
+                         "old_normalized_value": old["normalized_value"], "new_normalized_value": new["normalized_value"],
+                         "old_valid_time": old["valid_time"], "new_valid_time": new["valid_time"]}
+                        for change in expected_changes
+                    ],
+                })
+
+    def test_version_diff_keeps_distinct_keys_and_added_removed_rows(self):
+        from intel_v2.located_facts import compare_document_versions
+        document = self.html_document(HTML.read_bytes())
+        facts = [
+            {"subject_id": "road:A", "predicate": "start", "normalized_value": "17:00"},
+            {"subject_id": "road:B", "predicate": "start", "normalized_value": "18:00"},
+            {"subject_id": "road:A", "predicate": "end", "normalized_value": "19:00"},
+        ]
+        self.assertEqual(compare_document_versions(document, facts, document, facts)["affected_facts"], [])
+        for change, old_facts, new_facts in (("ADDED", [], facts), ("REMOVED", facts, [])):
+            with self.subTest(change=change):
+                rows = compare_document_versions(document, old_facts, document, new_facts)["affected_facts"]
+                self.assertEqual(rows, [
+                    {"subject_id": fact["subject_id"], "predicate": fact["predicate"], "change": change,
+                     "old_normalized_value": fact["normalized_value"] if change == "REMOVED" else None,
+                     "new_normalized_value": fact["normalized_value"] if change == "ADDED" else None,
+                     "old_valid_time": None, "new_valid_time": None}
+                    for fact in sorted(facts, key=lambda fact: (fact["subject_id"], fact["predicate"]))
+                ])
 
     def test_unapproved_origin_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "outside the approved source origin"):

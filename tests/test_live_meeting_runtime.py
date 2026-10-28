@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import base64
+from contextlib import contextmanager
 import importlib.util
 import json
 from pathlib import Path
@@ -17,7 +18,7 @@ import wave
 
 from intel_v2.live_meeting import (
     add_bookmark, append_segment, budget_stop, formal_candidates,
-    reconcile_session, resume_session, start_session, stop_session, validate_session,
+    reconcile_session, record_gap, resume_session, start_session, stop_session, validate_session,
 )
 from intel_v2.role_profiles import load_catalog
 
@@ -36,7 +37,161 @@ def session(budget=60, provider="fixture"):
     )
 
 
+@contextmanager
+def temporary_file(suffix):
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as handle:
+        path = Path(handle.name)
+    try:
+        yield path
+    finally:
+        path.unlink()
+
+
 class LiveMeetingRuntimeTests(unittest.TestCase):
+    def test_mock_provider_nested_words_and_top_level_precedence(self):
+        from intel_v2.live_asr import ingest_chunk
+
+        words = [{"word": "交通", "start": 0, "end": 1},
+                 {"word": "安全", "start": 1, "end": 2}]
+        nested = [{"words": [words[0]]}, {"words": [words[1]]}]
+        for name, extra, reason in [
+            ("nested", {"segments": nested}, None),
+            ("top_level_wins", {"words": words, "segments": [{"words": [{"word": "錯誤"}]}]}, None),
+            ("null_top_level_wins", {"words": None, "segments": nested}, "MISSING_WORDS"),
+            ("empty_top_level_wins", {"words": [], "segments": nested}, "EMPTY_WORDS"),
+            ("invalid_top_level_wins", {"words": "invalid", "segments": nested}, "INVALID_WORDS"),
+            ("incomplete_nested_batch", {"segments": [nested[0], {}]}, "MISSING_WORDS"),
+            ("nested_mismatch", {"segments": [{"words": [words[0]]}]}, "WORDS_TEXT_MISMATCH"),
+            ("nested_out_of_order", {"segments": [nested[1], nested[0]]}, "NON_MONOTONIC_WORDS"),
+            ("nested_limit", {"segments": [{"words": [words[0]] * 2049}]}, "TOO_MANY_WORDS"),
+        ]:
+            with self.subTest(case=name), temporary_file(".wav") as audio, temporary_file(".json") as path:
+                with wave.open(str(audio), "wb") as handle:
+                    handle.setparams((1, 2, 16000, 0, "NONE", "not compressed"))
+                    handle.writeframes(b"\0\0" * 16000 * 2)
+                def save(value):
+                    validate_session(value)
+                    path.write_text(json.dumps(value, ensure_ascii=False, allow_nan=False), encoding="utf-8")
+                with patch("intel_v2.live_asr._groq_transcribe", return_value={"text": "交通安全", **extra}) as provider, patch("requests.post") as post:
+                    state = ingest_chunk(session(provider="groq"), audio, start_seconds=30,
+                                         requested_at="2026-10-16T10:00:30+08:00", opt_in=True,
+                                         api_key="test-only", save=save)
+                provider.assert_called_once()
+                post.assert_not_called()
+                self.assertEqual(validate_session(json.loads(path.read_text(encoding="utf-8"))), state)
+                self.assertEqual(state["provider_usage"]["calls"][-1]["status"], "SUCCEEDED")
+                row = state["segments"][0]
+                self.assertEqual(row["word_timestamps_reason"], reason)
+                self.assertEqual(row["word_timestamps_status"], "AVAILABLE" if reason is None else "UNAVAILABLE")
+                self.assertEqual(row["words"], [{"word": "交通", "start": 30.0, "end": 31.0},
+                                               {"word": "安全", "start": 31.0, "end": 32.0}] if reason is None else None)
+
+    def test_worker_requests_segment_and_word_granularities(self):
+        from intel_v2.live_asr import _groq_worker
+        import contextlib
+        import io
+
+        payload = {"text": "交通", "words": [{"word": "交通", "start": 0, "end": 1}]}
+        response = Mock(status_code=200)
+        response.iter_content.return_value = [json.dumps(payload).encode()]
+        request = json.dumps({"audio": base64.b64encode(b"audio").decode(), "api_key": "test-only",
+                              "contract": session()["asr_contract"], "timeout": 1})
+        output = io.StringIO()
+        with patch("sys.stdin", io.StringIO(request)), contextlib.redirect_stdout(output), patch("requests.post", return_value=response) as post:
+            _groq_worker()
+        self.assertEqual(json.loads(output.getvalue()), payload)
+        self.assertEqual(post.call_args.kwargs["data"], [
+            ("model", "whisper-large-v3"), ("language", "zh"),
+            ("response_format", "verbose_json"), ("temperature", "0"),
+            ("timestamp_granularities[]", "segment"), ("timestamp_granularities[]", "word"),
+        ])
+        response.close.assert_called_once()
+
+    def test_mock_provider_words_are_persisted_atomically_in_session_seconds(self):
+        from intel_v2.live_asr import ingest_chunk
+
+        valid = {"word": " 交通 ", "start": 0, "end": 1, "unused": "discard"}
+        cases = [
+            ("valid", [valid, {"word": "安全", "start": 1.12345, "end": 2}], None),
+            ("missing", None, "MISSING_WORDS"),
+            ("empty", [], "EMPTY_WORDS"),
+            ("not_array", {"word": "交通"}, "INVALID_WORDS"),
+            ("not_object", [valid, None], "INVALID_WORDS"),
+            ("missing_word", [valid, {"start": 0, "end": 1}], "INVALID_WORD_TEXT"),
+            ("blank_word", [valid, {"word": " ", "start": 0, "end": 1}], "INVALID_WORD_TEXT"),
+        ]
+        for name, first, last, reason in [
+            ("negative", -0.00001, 1, "WORD_OUT_OF_BOUNDS"),
+            ("overflow", 0, 2.00001, "WORD_OUT_OF_BOUNDS"),
+            ("absolute_instead_of_relative", 30, 31, "WORD_OUT_OF_BOUNDS"),
+            ("text", "0", 1, "NON_NUMERIC_TIMESTAMP"),
+            ("none", None, 1, "NON_NUMERIC_TIMESTAMP"),
+            ("boolean", False, 1, "NON_NUMERIC_TIMESTAMP"),
+            ("nan", float("nan"), 1, "NON_NUMERIC_TIMESTAMP"),
+            ("infinity", 0, float("inf"), "NON_NUMERIC_TIMESTAMP"),
+            ("huge_integer", 0, 10 ** 400, "NON_NUMERIC_TIMESTAMP"),
+            ("reversed", 1, 0.99999, "INVALID_WORD_INTERVAL"),
+        ]:
+            cases.append((name, [valid, {"word": "安全", "start": first, "end": last}], reason))
+        with temporary_file(".wav") as audio, temporary_file(".json") as path:
+            with wave.open(str(audio), "wb") as handle:
+                handle.setparams((1, 2, 16000, 0, "NONE", "not compressed"))
+                handle.writeframes(b"\0\0" * 16000 * 2)
+            for name, words, reason in cases:
+                with self.subTest(case=name):
+                    payload = {"text": "交通安全", "words": words}
+                    if name == "missing":
+                        del payload["words"]
+                    def save(value):
+                        validate_session(value)
+                        path.write_text(json.dumps(value, ensure_ascii=False, allow_nan=False), encoding="utf-8")
+                    with patch("intel_v2.live_asr._groq_transcribe", return_value=payload) as provider, patch("requests.post") as post:
+                        state = ingest_chunk(session(provider="groq"), audio, start_seconds=30,
+                                             requested_at="2026-10-16T10:00:30+08:00", opt_in=True,
+                                             api_key="test-only", save=save)
+                    provider.assert_called_once()
+                    post.assert_not_called()
+                    restored = validate_session(json.loads(path.read_text(encoding="utf-8")))
+                    self.assertEqual(restored, state)
+                    self.assertEqual(state["provider_usage"]["calls"][-1]["status"], "SUCCEEDED")
+                    segment = state["segments"][0]
+                    self.assertEqual((segment["start_seconds"], segment["end_seconds"]), (30, 32))
+                    self.assertEqual(segment["word_timestamps_status"], "AVAILABLE" if reason is None else "UNAVAILABLE")
+                    self.assertEqual(segment["word_timestamps_reason"], reason)
+                    self.assertTrue(segment["provisional"])
+                    self.assertEqual(segment["evidence_state"], "LIVE_ASR_PROVISIONAL")
+                    self.assertEqual(segment["text"], "交通安全")
+                    self.assertEqual(segment["words"], [
+                        {"word": "交通", "start": 30.0, "end": 31.0},
+                        {"word": "安全", "start": 31.123, "end": 32.0},
+                    ] if reason is None else None)
+
+    def test_fixture_revisions_use_only_the_words_for_each_update(self):
+        from intel_v2.live_asr import ingest_chunk
+
+        with temporary_file(".wav") as audio:
+            with wave.open(str(audio), "wb") as handle:
+                handle.setparams((1, 2, 16000, 0, "NONE", "not compressed"))
+                handle.writeframes(b"\0\0" * 16000 * 2)
+            payload = {"words": [{"word": "不得沿用", "start": 0, "end": 1}], "updates": [
+                {"text": "交通", "partial": True, "words": [{"word": "交通", "start": 0, "end": 1}]},
+                {"text": "道路", "words": [{"word": "道路", "start": 0.5, "end": 2}]},
+                {"text": "道路安全", "finalized": True},
+            ]}
+            with patch("requests.post") as post:
+                state = ingest_chunk(session(), audio, start_seconds=30, requested_at=T0,
+                                     opt_in=True, fixture_response=payload, save=Mock())
+            post.assert_not_called()
+        segment = validate_session(json.loads(json.dumps(state)))["segments"][0]
+        self.assertEqual(segment["revision"], 3)
+        self.assertIsNone(segment["words"])
+        self.assertEqual(segment["word_timestamps_status"], "UNAVAILABLE")
+        self.assertEqual(segment["word_timestamps_reason"], "MISSING_WORDS")
+        self.assertEqual([row["words"] for row in segment["revision_history"]], [
+            [{"word": "交通", "start": 30.0, "end": 31.0}],
+            [{"word": "道路", "start": 30.5, "end": 32.0}],
+        ])
+
     def test_budget_stop_cannot_be_resumed_or_append_more_text(self):
         state = budget_stop(session(), stopped_at=T0)
         with self.assertRaisesRegex(ValueError, "budget"):
@@ -230,6 +385,42 @@ class LiveMeetingRuntimeTests(unittest.TestCase):
             self.assertEqual(ingest_chunk(result, Path("missing.wav"), start_seconds=30,
                                          requested_at="2026-10-16T10:00:33+08:00", opt_in=True,
                                          fixture_response={"text": "later"}, save=repeated_save), result)
+            repeated_save.assert_not_called()
+
+    def test_stopped_crash_gap_recovers_pending_call_without_a_duplicate_gap(self):
+        from intel_v2.live_asr import ingest_chunk
+
+        with tempfile.TemporaryDirectory() as directory:
+            audio = Path(directory) / "chunk.wav"
+            with wave.open(str(audio), "wb") as handle:
+                handle.setparams((1, 2, 16000, 0, "NONE", "not compressed"))
+                handle.writeframes(b"\0\0" * 16000 * 30)
+            restored = self._crashed_reservation(audio, 60)
+            # A prior recovery already persisted the SESSION_CRASH gap while
+            # the on-disk reservation still reads PENDING.
+            restored = record_gap(restored, start_seconds=0, end_seconds=30,
+                                  reason="SESSION_CRASH", detected_at="2026-10-16T10:00:05+08:00")
+            restored = budget_stop(restored, stopped_at="2026-10-16T10:00:05+08:00")
+            saved = []
+            result = ingest_chunk(restored, Path("missing.wav"), start_seconds=30,
+                                  requested_at="2026-10-16T10:00:06+08:00", opt_in=True,
+                                  fixture_response={"text": "later"},
+                                  save=lambda value: saved.append(copy.deepcopy(value)))
+            self.assertEqual(len(saved), 1)
+            validate_session(result)
+            self.assertEqual(result, saved[0])
+            self.assertEqual(result["transport_status"], "BUDGET_STOP")
+            self.assertEqual(result["provider_usage"]["calls"][0]["status"], "FAILED")
+            self.assertEqual(result["provider_usage"]["reserved_seconds"], 30)
+            self.assertEqual([(gap["start_seconds"], gap["end_seconds"], gap["reason"])
+                              for gap in result["gap_intervals"]],
+                             [(0, 30, "SESSION_CRASH"), (30, 1800, "BUDGET_STOP")])
+            with self.assertRaisesRegex(ValueError, "budget"):
+                resume_session(result, resumed_at="2026-10-16T10:00:07+08:00")
+            repeated_save = Mock()
+            self.assertEqual(ingest_chunk(result, Path("missing.wav"), start_seconds=30,
+                                          requested_at="2026-10-16T10:00:08+08:00", opt_in=True,
+                                          fixture_response={"text": "later"}, save=repeated_save), result)
             repeated_save.assert_not_called()
 
     def test_backfill_rejection_first_persists_the_crash_recovery(self):
