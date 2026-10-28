@@ -14,6 +14,33 @@
 - 父／子程序各有整體逾時；到期後不得透過 `resume` 重新取得預算。顯示呼叫次數、保留秒數與 mode；`estimated_cost_usd=null` 表示金額未知，不把音訊秒數誤稱為實際帳單。未驗證 unattended 串流成本，不提供自動常駐。
 - CLI 對整個讀取→reservation→transport→保存交易持有 OS lock；crash 後 OS 釋放鎖。鎖檔保留，避免刪除仍被其他程序使用的鎖。
 
+### 詞級時間戳
+
+Groq 請求沿用 canary 的重複 multipart 參數 `timestamp_granularities[]`，同時要求
+`segment` 與 `word`。`append_segment(..., words=...)` 接受 provider 的 chunk 相對秒數，
+canonical segment 的 `words` 保存 `{word, start, end}`，時間轉為 session 絕對秒數，
+沿用 segment `start_seconds`／`end_seconds` 的毫秒精度。詞文字去除首尾空白，忽略多餘欄位。
+回應優先使用頂層 `words`（即使為 null、空陣列或無效值也不改採其他資料）；
+僅在頂層沒有此鍵時，依 `segments[*].words` 原有順序串接，時間仍以 chunk 為基準，
+不另加 provider segment 的起點。巢狀批次中任一 segment 缺少 words 陣列時，整批視為缺資料。
+
+整批先驗證原始時間必須為有限數值（不接受字串或布林值）、`start <= end` 且在 chunk 範圍內，
+才進行取位。有效時 `word_timestamps_status="AVAILABLE"`、`word_timestamps_reason=null`。
+每批最多 2,048 詞，每詞去除首尾空白後最多 256 個 Unicode 字元；超過上限整批失效。
+相鄰詞的 start、end 各自必須單調不減（允許相等及重疊），以原始時間檢查後才取位。
+詞文字依序串接後，與該版本 segment 文字分別做 Unicode NFKC 正規化（含全半形統一），
+去除空白與 Unicode 標點後必須完全相等；不做大小寫、同義詞或繁簡轉換。
+缺 words、空陣列或任一詞不合格時，整批保存為 `words=null`、
+`word_timestamps_status="UNAVAILABLE"`，不留下部分有效詞；文字本身仍可保存。
+原因碼包含 `MISSING_WORDS`、`EMPTY_WORDS`、`INVALID_WORDS`、`INVALID_WORD_TEXT`、
+`NON_NUMERIC_TIMESTAMP`、`INVALID_WORD_INTERVAL`、`WORD_OUT_OF_BOUNDS`、
+`WORDS_TEXT_MISMATCH`、`TOO_MANY_WORDS`、`NON_MONOTONIC_WORDS`；單詞過長使用 `INVALID_WORD_TEXT`。
+
+每次文字修訂只使用該次回應的詞級資料；未提供新 words 時明確失效，舊資料隨原文字與
+`content_sha256` 保留於 `revision_history`。segment 文字 hash 契約維持不變，
+新增欄位由既有 session／stream hash 涵蓋，當前與歷史詞級資料均由 `validate_session` 驗證。
+舊 schema-v1 fixture 可不含這組欄位；新寫入版本一律明確記錄狀態。所有 live 文字仍為 provisional。
+
 以下為有另外付費授權後的操作範例，`chunk.wav` 必須由操作者提供；範例沒有金鑰值，不會由驗收腳本執行：
 
 ```bash

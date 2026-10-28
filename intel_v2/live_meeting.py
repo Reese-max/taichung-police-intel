@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import math
 import re
+import unicodedata
 from datetime import datetime
 from typing import Any, Iterable
 from urllib.parse import urlparse
@@ -51,6 +52,14 @@ PROVISIONAL_BADGES = ("LIVE", "AI_TRANSCRIPT", "UNCHECKED")
 PROVISIONAL_EVIDENCE_STATE = "LIVE_ASR_PROVISIONAL"
 SEARCH_LIMIT_MAX = 200
 STALE_REASONS = {"SOURCE_REVISED"}
+WORD_TIMESTAMP_FIELDS = ("words", "word_timestamps_status", "word_timestamps_reason")
+MAX_WORD_TIMESTAMPS = 2048
+MAX_WORD_LENGTH = 256
+WORD_TIMESTAMP_UNAVAILABLE_REASONS = {
+    "MISSING_WORDS", "EMPTY_WORDS", "INVALID_WORDS", "INVALID_WORD_TEXT",
+    "NON_NUMERIC_TIMESTAMP", "INVALID_WORD_INTERVAL", "WORD_OUT_OF_BOUNDS",
+    "WORDS_TEXT_MISMATCH", "TOO_MANY_WORDS", "NON_MONOTONIC_WORDS",
+}
 PROFILE_RELEVANCE_FIELDS = {
     "profile_id",
     "profile_version",
@@ -145,6 +154,82 @@ def _segment_content_hash(
     if profile_relevance is not None:
         payload["profile_relevance"] = profile_relevance
     return canonical_sha256(payload)
+
+
+def _word_text_key(text: str) -> str:
+    return "".join(char for char in unicodedata.normalize("NFKC", text)
+                   if not char.isspace() and not unicodedata.category(char).startswith("P"))
+
+
+def _word_timestamps(words: object, start: float, end: float, *, text: str, offset: float = 0) -> dict[str, Any]:
+    """Validate the entire batch before retaining any provider words."""
+    reason = None
+    normalized = []
+    previous = None
+    if words is None:
+        reason = "MISSING_WORDS"
+    elif not isinstance(words, list):
+        reason = "INVALID_WORDS"
+    elif not words:
+        reason = "EMPTY_WORDS"
+    elif len(words) > MAX_WORD_TIMESTAMPS:
+        reason = "TOO_MANY_WORDS"
+    else:
+        for word in words:
+            if not isinstance(word, dict):
+                reason = "INVALID_WORDS"
+                break
+            try:
+                word_text = _text(word.get("word"), "word text", max_length=MAX_WORD_LENGTH)
+            except ValueError:
+                reason = "INVALID_WORD_TEXT"
+                break
+            first, last = word.get("start"), word.get("end")
+            try:
+                if any(isinstance(value, bool) or not isinstance(value, (int, float))
+                       or not math.isfinite(float(value)) for value in (first, last)):
+                    raise ValueError("invalid numeric timestamp")
+            except (ValueError, OverflowError):
+                reason = "NON_NUMERIC_TIMESTAMP"
+                break
+            # Check raw values before rounding: tiny reversed/outside intervals
+            # must not become valid through millisecond normalization.
+            if first > last:
+                reason = "INVALID_WORD_INTERVAL"
+                break
+            if first < start - offset or last > round(end - offset, 3):
+                reason = "WORD_OUT_OF_BOUNDS"
+                break
+            if previous is not None and (first < previous[0] or last < previous[1]):
+                reason = "NON_MONOTONIC_WORDS"
+                break
+            previous = (first, last)
+            normalized.append({"word": word_text, "start": round(float(first) + offset, 3),
+                               "end": round(float(last) + offset, 3)})
+        if reason is None and _word_text_key("".join(word["word"] for word in normalized)) != _word_text_key(text):
+            reason = "WORDS_TEXT_MISMATCH"
+    return {
+        "words": normalized if reason is None else None,
+        "word_timestamps_status": "AVAILABLE" if reason is None else "UNAVAILABLE",
+        "word_timestamps_reason": reason,
+    }
+
+
+def _validate_word_timestamps(row: dict[str, Any], start: float, end: float) -> None:
+    if not any(field in row for field in WORD_TIMESTAMP_FIELDS):
+        return  # Existing schema-v1 sessions predate word timestamp metadata.
+    if not all(field in row for field in WORD_TIMESTAMP_FIELDS):
+        raise ValueError("word timestamp metadata is incomplete")
+    if row["word_timestamps_status"] == "UNAVAILABLE":
+        reason = row["word_timestamps_reason"]
+        if row["words"] is not None or not isinstance(reason, str) or reason not in WORD_TIMESTAMP_UNAVAILABLE_REASONS:
+            raise ValueError("unavailable word timestamps require a reason and no words")
+    elif row["word_timestamps_status"] == "AVAILABLE":
+        expected = _word_timestamps(row["words"], start, end, text=row["text"])
+        if expected["word_timestamps_status"] != "AVAILABLE" or any(row[field] != expected[field] for field in WORD_TIMESTAMP_FIELDS):
+            raise ValueError("available word timestamps must be normalized and within the segment")
+    else:
+        raise ValueError("invalid word timestamp status")
 
 
 def _validated_profile(profile: dict[str, Any], ranking_policy_version: str) -> dict[str, Any]:
@@ -388,7 +473,13 @@ def append_segment(
     confidence: float | None = None,
     speaker_label: str | None = None,
     profile: dict[str, Any] | None = None,
+    words: object = None,
 ) -> dict[str, Any]:
+    """Append/revise text; optional provider words use chunk-relative seconds.
+
+    Persist words in session seconds with this revision only. Omitting words
+    invalidates timing for the new revision, retaining the old batch in history.
+    """
     result = _copy(state)
     if result["status"] not in {"LIVE", "DEGRADED"}:
         raise ValueError("segments can only be appended while LIVE or DEGRADED")
@@ -425,7 +516,9 @@ def append_segment(
             for key in (
                 "revision", "text", "content_sha256", "received_at", "finalized", "partial",
                 "confidence", "speaker_label", "profile_relevance", "finalized_at",
+                *WORD_TIMESTAMP_FIELDS,
             )
+            if key in current
         })
         segments.remove(current)
     content_sha256 = _segment_content_hash(
@@ -458,6 +551,7 @@ def append_segment(
             "profile_relevance": profile_relevance,
             "revision": revision,
             "revision_history": history,
+            **_word_timestamps(words, start, end, text=text, offset=start),
         }
     )
     segments.sort(key=lambda item: item["sequence"])
@@ -1032,6 +1126,7 @@ def validate_session(state: dict[str, Any]) -> dict[str, Any]:
             raise ValueError("confidence must be between 0 and 1")
         profile_relevance = segment.get("profile_relevance")
         _validate_profile_relevance(profile_relevance, text)
+        _validate_word_timestamps(segment, start, end)
         expected_hash = _segment_content_hash(
             text=text,
             start_seconds=start,
@@ -1055,6 +1150,7 @@ def validate_session(state: dict[str, Any]) -> dict[str, Any]:
             _stamp(prior.get("received_at"))
             prior_profile = prior.get("profile_relevance")
             _validate_profile_relevance(prior_profile, prior_text)
+            _validate_word_timestamps(prior, start, end)
             prior_hash = _segment_content_hash(
                 text=prior_text,
                 start_seconds=start,
