@@ -17,7 +17,7 @@ import wave
 
 from intel_v2.live_meeting import (
     add_bookmark, append_segment, budget_stop, formal_candidates,
-    reconcile_session, resume_session, start_session, stop_session, validate_session,
+    reconcile_session, record_gap, resume_session, start_session, stop_session, validate_session,
 )
 from intel_v2.role_profiles import load_catalog
 
@@ -230,6 +230,42 @@ class LiveMeetingRuntimeTests(unittest.TestCase):
             self.assertEqual(ingest_chunk(result, Path("missing.wav"), start_seconds=30,
                                          requested_at="2026-10-16T10:00:33+08:00", opt_in=True,
                                          fixture_response={"text": "later"}, save=repeated_save), result)
+            repeated_save.assert_not_called()
+
+    def test_stopped_crash_gap_recovers_pending_call_without_a_duplicate_gap(self):
+        from intel_v2.live_asr import ingest_chunk
+
+        with tempfile.TemporaryDirectory() as directory:
+            audio = Path(directory) / "chunk.wav"
+            with wave.open(str(audio), "wb") as handle:
+                handle.setparams((1, 2, 16000, 0, "NONE", "not compressed"))
+                handle.writeframes(b"\0\0" * 16000 * 30)
+            restored = self._crashed_reservation(audio, 60)
+            # A prior recovery already persisted the SESSION_CRASH gap while
+            # the on-disk reservation still reads PENDING.
+            restored = record_gap(restored, start_seconds=0, end_seconds=30,
+                                  reason="SESSION_CRASH", detected_at="2026-10-16T10:00:05+08:00")
+            restored = budget_stop(restored, stopped_at="2026-10-16T10:00:05+08:00")
+            saved = []
+            result = ingest_chunk(restored, Path("missing.wav"), start_seconds=30,
+                                  requested_at="2026-10-16T10:00:06+08:00", opt_in=True,
+                                  fixture_response={"text": "later"},
+                                  save=lambda value: saved.append(copy.deepcopy(value)))
+            self.assertEqual(len(saved), 1)
+            validate_session(result)
+            self.assertEqual(result, saved[0])
+            self.assertEqual(result["transport_status"], "BUDGET_STOP")
+            self.assertEqual(result["provider_usage"]["calls"][0]["status"], "FAILED")
+            self.assertEqual(result["provider_usage"]["reserved_seconds"], 30)
+            self.assertEqual([(gap["start_seconds"], gap["end_seconds"], gap["reason"])
+                              for gap in result["gap_intervals"]],
+                             [(0, 30, "SESSION_CRASH"), (30, 1800, "BUDGET_STOP")])
+            with self.assertRaisesRegex(ValueError, "budget"):
+                resume_session(result, resumed_at="2026-10-16T10:00:07+08:00")
+            repeated_save = Mock()
+            self.assertEqual(ingest_chunk(result, Path("missing.wav"), start_seconds=30,
+                                          requested_at="2026-10-16T10:00:08+08:00", opt_in=True,
+                                          fixture_response={"text": "later"}, save=repeated_save), result)
             repeated_save.assert_not_called()
 
     def test_backfill_rejection_first_persists_the_crash_recovery(self):
