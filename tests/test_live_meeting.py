@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import json
 from pathlib import Path
+import tempfile
 import unittest
 
 from intel_v2.live_meeting import (
@@ -52,6 +53,166 @@ def started(*, authorized: bool = True, transport: bool = True, budget: int | No
 
 
 class LiveMeetingTests(unittest.TestCase):
+    def test_words_match_text_after_width_whitespace_and_punctuation_normalization(self):
+        for text, tokens, reason in [
+            ("交通，安全！ ＡＢＣ　１２３", ["交通", " 安全 ", "ABC", "123"], None),
+            ("ＡＢＣ１２３", ["ＡＢＣ", "１２３"], None),
+            ("交通安全", ["安全", "交通"], "WORDS_TEXT_MISMATCH"),
+            ("交通安全", ["交通"], "WORDS_TEXT_MISMATCH"),
+            ("交通", ["道路"], "WORDS_TEXT_MISMATCH"),
+            ("交通", ["交通", "安全"], "WORDS_TEXT_MISMATCH"),
+        ]:
+            with self.subTest(text=text, tokens=tokens):
+                state = append_segment(started(), sequence=0, start_seconds=10, end_seconds=12,
+                                       text=text, received_at=T0,
+                                       words=[{"word": token, "start": 0, "end": 1} for token in tokens])
+                row = validate_session(state)["segments"][0]
+                self.assertEqual(row["word_timestamps_reason"], reason)
+                self.assertEqual(row["word_timestamps_status"], "AVAILABLE" if reason is None else "UNAVAILABLE")
+                if reason:
+                    self.assertIsNone(row["words"])
+
+    def test_word_limits_and_raw_timestamp_order_reject_the_entire_batch(self):
+        for name, text, words, reason in [
+            ("count_at_limit", "詞" * 2048, [{"word": "詞", "start": 0, "end": 1}] * 2048, None),
+            ("count_over_limit", "詞" * 2049, [{"word": "詞", "start": 0, "end": 1}] * 2049, "TOO_MANY_WORDS"),
+            ("length_at_limit", "詞" * 256, [{"word": "詞" * 256, "start": 0, "end": 1}], None),
+            ("length_over_limit", "詞" * 257, [{"word": "詞" * 257, "start": 0, "end": 1}], "INVALID_WORD_TEXT"),
+            ("decreasing_start", "交通安全", [{"word": "交通", "start": 1, "end": 1.5},
+                                                 {"word": "安全", "start": 0.9, "end": 2}], "NON_MONOTONIC_WORDS"),
+            ("decreasing_end", "交通安全", [{"word": "交通", "start": 0, "end": 1.5},
+                                               {"word": "安全", "start": 1, "end": 1.4}], "NON_MONOTONIC_WORDS"),
+            ("raw_order_before_rounding", "交通安全", [{"word": "交通", "start": 1.00002, "end": 1.5},
+                                                         {"word": "安全", "start": 1.00001, "end": 2}], "NON_MONOTONIC_WORDS"),
+            ("monotonic_overlap", "交通安全", [{"word": "交通", "start": 0, "end": 1.5},
+                                                 {"word": "安全", "start": 1, "end": 2}], None),
+        ]:
+            with self.subTest(case=name):
+                row = validate_session(append_segment(
+                    started(), sequence=0, start_seconds=10, end_seconds=12,
+                    text=text, words=words, received_at=T0,
+                ))["segments"][0]
+                self.assertEqual(row["word_timestamps_reason"], reason)
+                self.assertEqual(row["word_timestamps_status"], "AVAILABLE" if reason is None else "UNAVAILABLE")
+                self.assertEqual(row["words"] is None, reason is not None)
+
+    def test_legacy_segment_without_word_metadata_loads_validates_and_revises(self):
+        from intel_v2.live_meeting import _touch, WORD_TIMESTAMP_FIELDS
+
+        state = append_segment(started(), sequence=0, start_seconds=10, end_seconds=12,
+                               text="交通", received_at=T0)
+        original_hash = state["segments"][0]["content_sha256"]
+        for field in WORD_TIMESTAMP_FIELDS:
+            del state["segments"][0][field]
+        with tempfile.TemporaryFile(mode="w+", encoding="utf-8") as handle:
+            json.dump(_touch(state, T0), handle, ensure_ascii=False)
+            handle.seek(0)
+            restored = validate_session(json.load(handle))
+        revised = validate_session(append_segment(
+            restored, sequence=0, start_seconds=10, end_seconds=12, text="道路", received_at=T1,
+            words=[{"word": "道路", "start": 0, "end": 2}],
+        ))["segments"][0]
+        self.assertEqual(revised["revision"], 2)
+        self.assertEqual(revised["word_timestamps_status"], "AVAILABLE")
+        prior = revised["revision_history"][0]
+        self.assertEqual(prior["content_sha256"], original_hash)
+        self.assertFalse(any(field in prior for field in WORD_TIMESTAMP_FIELDS))
+
+    def test_revision_rejects_words_for_the_previous_text(self):
+        words = [{"word": "交通", "start": 0, "end": 2}]
+        state = append_segment(started(), sequence=0, start_seconds=10, end_seconds=12,
+                               text="交通", received_at=T0, words=words)
+        revised = validate_session(append_segment(
+            state, sequence=0, start_seconds=10, end_seconds=12,
+            text="道路", received_at=T1, words=words,
+        ))["segments"][0]
+        self.assertIsNone(revised["words"])
+        self.assertEqual(revised["word_timestamps_status"], "UNAVAILABLE")
+        self.assertEqual(revised["word_timestamps_reason"], "WORDS_TEXT_MISMATCH")
+        self.assertEqual(revised["revision_history"][0]["word_timestamps_status"], "AVAILABLE")
+
+    def test_word_data_follows_revision_without_changing_text_hash_contract(self):
+        from intel_v2.live_meeting import _segment_content_hash
+
+        state = append_segment(started(), sequence=0, start_seconds=10, end_seconds=12,
+                               text="交通", received_at=T0, partial=True,
+                               words=[{"word": "交通", "start": 0, "end": 2}])
+        original = copy.deepcopy(state["segments"][0])
+        self.assertEqual(original["words"], [{"word": "交通", "start": 10.0, "end": 12.0}])
+        self.assertEqual(original["content_sha256"], _segment_content_hash(
+            text="交通", start_seconds=10.0, end_seconds=12.0, asr_contract=state["asr_contract"],
+            finalized=False, partial=True,
+        ))
+        state = add_bookmark(state, segment_ids=[original["segment_id"]], reason_code="REVIEW", bookmarked_at=T0)
+        bookmark = copy.deepcopy(state["bookmarks"][0])
+        state = append_segment(state, sequence=0, start_seconds=10, end_seconds=12,
+                               text="道路安全", received_at=T1, finalized=True)
+        segment = validate_session(json.loads(json.dumps(state)))["segments"][0]
+        self.assertEqual(segment["segment_id"], original["segment_id"])
+        self.assertNotEqual(segment["content_sha256"], original["content_sha256"])
+        self.assertEqual(segment["revision_history"][0]["content_sha256"], original["content_sha256"])
+        self.assertEqual(segment["revision_history"][0]["words"], original["words"])
+        self.assertEqual(segment["revision_history"][0]["word_timestamps_status"], "AVAILABLE")
+        self.assertEqual(segment["word_timestamps_status"], "UNAVAILABLE")
+        self.assertIsNone(segment["words"])
+        self.assertEqual(state["bookmarks"][0], bookmark)
+        self.assertTrue(segment["provisional"])
+
+    def test_canonical_word_validation_covers_current_and_historical_versions(self):
+        from intel_v2.live_meeting import _touch
+
+        state = append_segment(started(), sequence=0, start_seconds=10, end_seconds=12,
+                               text="交通", received_at=T0,
+                               words=[{"word": "交通", "start": 0, "end": 2}])
+        state = append_segment(state, sequence=0, start_seconds=10, end_seconds=12,
+                               text="道路", received_at=T1,
+                               words=[{"word": "道路", "start": 0, "end": 1}])
+        for historical in (False, True):
+            for mutation in ("bounds", "non_numeric", "nan", "reversed", "empty", "missing_status", "unavailable_with_words", "missing_reason", "text_mismatch", "too_many", "too_long", "decreasing_start", "decreasing_end", "only_words", "only_status", "only_reason"):
+                with self.subTest(historical=historical, mutation=mutation):
+                    tampered = copy.deepcopy(state)
+                    row = tampered["segments"][0]
+                    if historical:
+                        row = row["revision_history"][0]
+                    if mutation == "bounds":
+                        row["words"][0]["end"] = 12.00001
+                    elif mutation == "non_numeric":
+                        row["words"][0]["start"] = "10"
+                    elif mutation == "nan":
+                        row["words"][0]["start"] = float("nan")
+                    elif mutation == "reversed":
+                        row["words"][0]["start"] = row["words"][0]["end"] + 0.00001
+                    elif mutation == "empty":
+                        row["words"] = []
+                    elif mutation == "missing_status":
+                        del row["word_timestamps_status"]
+                    elif mutation == "unavailable_with_words":
+                        row["word_timestamps_status"] = "UNAVAILABLE"
+                        row["word_timestamps_reason"] = "MISSING_WORDS"
+                    elif mutation == "text_mismatch":
+                        row["words"][0]["word"] = "錯誤文字"
+                    elif mutation == "too_many":
+                        row["words"] = [row["words"][0]] * 2049
+                    elif mutation == "too_long":
+                        row["words"][0]["word"] = "詞" * 257
+                    elif mutation in {"decreasing_start", "decreasing_end"}:
+                        row["words"] = [{"word": row["text"], "start": 11, "end": 11.5},
+                                        {"word": ".", "start": 10.5, "end": 12}]
+                        if mutation == "decreasing_end":
+                            row["words"][1].update(start=11.1, end=11.4)
+                    elif mutation.startswith("only_"):
+                        keep = {"only_words": "words", "only_status": "word_timestamps_status",
+                                "only_reason": "word_timestamps_reason"}[mutation]
+                        for field in ("words", "word_timestamps_status", "word_timestamps_reason"):
+                            if field != keep:
+                                del row[field]
+                    else:
+                        row["word_timestamps_status"] = "UNAVAILABLE"
+                        row["words"] = None
+                        row["word_timestamps_reason"] = None
+                    with self.assertRaisesRegex(ValueError, "word"):
+                        validate_session(_touch(tampered, T1))
+
     def test_explicit_transport_is_bounded_and_no_auth_stays_preparing(self):
         state = started(authorized=False)
         self.assertEqual(state["status"], "PREPARING")

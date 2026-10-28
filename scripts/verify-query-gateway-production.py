@@ -287,6 +287,24 @@ def check_rights_error(document: dict) -> None:
         raise RuntimeError("Protected current query did not return only a typed RIGHTS_BLOCKED refusal")
 
 
+# Fallback reasons under which the question never reached the provider. An anonymous
+# verifier carries no Access assertion, so the assisted route must stop at one of them.
+ASSIST_NOT_SENT = {"DISABLED", "KEY_MISSING", "BILLING_REVIEW_REQUIRED", "ADMISSION_UNCONFIGURED", "ADMISSION_DENIED"}
+ASSISTED_CHAT_PROBE = "查官方證據 公告"
+
+
+def check_assisted_chat(document: dict, release: dict, worker_version: str) -> None:
+    check_query(document, release, worker_version)
+    chat = document.get("chat")
+    parser = chat.get("parser") if isinstance(chat, dict) else None
+    answer = chat.get("assisted_answer") if isinstance(chat, dict) else None
+    if (document.get("result_type") != "conversation" or document.get("receipt", {}).get("tool_name") != "chat_turn" or
+            not isinstance(parser, dict) or parser.get("kind") != "rules" or parser.get("fallback_reason") not in ASSIST_NOT_SENT or
+            not isinstance(answer, dict) or answer.get("status") != "NOT_ATTEMPTED" or answer.get("answer") != [] or
+            answer.get("reason_code") != parser.get("fallback_reason")):
+        raise RuntimeError("Anonymous assisted chat did not stay on the rules without a provider call")
+
+
 def mcp_content(document: dict) -> dict:
     result = document.get("result", {})
     if result.get("isError") is not False or not isinstance(result.get("structuredContent"), dict):
@@ -514,6 +532,14 @@ def verify(gateway_url: str, public_url: str, client: JsonClient | None = None, 
                 raise RuntimeError("MCP protected current query did not return a typed refusal")
             typed = json.loads(content[0]["text"])
             check_rights_error(typed)
+    # The Web-only assisted route: release-bound, attested, and never a provider call for an anonymous caller.
+    chat_payload = {"tool": "chat_turn", "arguments": {"text": ASSISTED_CHAT_PROBE}, "public_data_only": True, "release_id": release["release_id"]}
+    _, assisted, _ = client.request(f"{gateway_url}/chat", method="POST", payload=chat_payload)
+    check_assisted_chat(assisted, release, worker_version)
+    for probe, expected in (({**chat_payload, "release_id": "0" * 64}, 503), ({**chat_payload, "public_data_only": False}, 400)):
+        status, refusal, _ = client.request(f"{gateway_url}/chat", method="POST", payload=probe, expected_status=expected)
+        if status != expected or not isinstance(refusal.get("error"), dict) or "chat" in refusal:
+            raise RuntimeError("Assisted chat accepted a request without the release binding or the public-data attestation")
 
     verified_at = datetime.now(timezone.utc).isoformat()
     deployment_verified = bool(anonymous_http and pages_deployment and deployed_at and expected_code_sha)
@@ -542,7 +568,7 @@ def verify(gateway_url: str, public_url: str, client: JsonClient | None = None, 
         "capabilities": sorted(actual_capabilities),
         "official_evidence_url": official_url,
         "official_evidence_id": evidence["canonical_id"] if evidence else None,
-        "checks": {"health": "SUCCESS", "capabilities": "SUCCESS", "hash_binding": "SUCCESS", "release_binding": "SUCCESS", "query": "SUCCESS", "mcp": "SUCCESS", "evidence_locator": "RIGHTS_BLOCKED" if blocked else "SUCCESS", "formal_query_admission": "UNKNOWN" if blocked else "ADMITTED", "protected_query_refusal": "SUCCESS" if blocked else "NOT_CHECKED"},
+        "checks": {"health": "SUCCESS", "capabilities": "SUCCESS", "hash_binding": "SUCCESS", "release_binding": "SUCCESS", "query": "SUCCESS", "mcp": "SUCCESS", "evidence_locator": "RIGHTS_BLOCKED" if blocked else "SUCCESS", "formal_query_admission": "UNKNOWN" if blocked else "ADMITTED", "protected_query_refusal": "SUCCESS" if blocked else "NOT_CHECKED", "assisted_chat": "RULES_ONLY_NO_PROVIDER"},
         "public_generation": public_docs["v2-daily-brief.json"].get("source_collection_run_id"),
     }
 
