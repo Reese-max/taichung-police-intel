@@ -43,6 +43,15 @@ MAX_SIGNATURE_NAMES = 500
 MAX_OBSERVATION_TEXT = 4096
 LIVE_SOURCE_BUDGET_SECONDS = 60
 LIVE_REQUEST_TIMEOUT = (5, 15)
+# A source the hosted runner cannot reach (S-001 refuses non-Taiwan addresses)
+# may be observed by a Taiwan host and relayed. A relay only stands in when the
+# live fetch got no response at all, and only while it is recent.
+RELAY_SCHEMA = "govintel-source-relay/v1"
+RELAY_SOURCES = frozenset({"S-001"})
+RELAY_MAX_AGE_SECONDS = 4 * 3600
+RELAY_MAX_FUTURE_SECONDS = 300
+RELAY_MAX_BODY_BYTES = 5 * 1024 * 1024
+RELAY_ORIGIN = "TAIWAN_RELAY"
 OBSERVATION_KEYS = {
     "body": (bytes, str),
     "http_status": (int,),
@@ -53,7 +62,13 @@ OBSERVATION_KEYS = {
     "requested_url": (str, type(None)),
     "final_url": (str, type(None)),
     "error_reason": (str,),
+    # Provenance of a relayed observation; absent on a direct live fetch.
+    "observation_origin": (str,),
+    "relay_captured_by": (str,),
+    "live_error_reason": (str,),
+    "relay_rejected": (str,),
 }
+PROVENANCE_KEYS = ("observation_origin", "relay_captured_by", "live_error_reason", "relay_rejected")
 
 
 def _news(source_id: str, name: str, pattern: str, *, published_required: bool = True) -> dict[str, Any]:
@@ -275,6 +290,7 @@ def _base_result(contract: dict[str, Any], body: bytes, observed_at: str | None,
         "observed_at": observed_at or now_iso(),
         "requested_url": meta.get("requested_url"),
         "final_url": meta.get("final_url"),
+        **{key: meta[key] for key in PROVENANCE_KEYS if meta.get(key) is not None},
     }
 
 
@@ -435,6 +451,10 @@ def observe(
     final_url: str | None = None,
     error_reason: str | None = None,
     previous: dict[str, Any] | None = None,
+    observation_origin: str | None = None,
+    relay_captured_by: str | None = None,
+    live_error_reason: str | None = None,
+    relay_rejected: str | None = None,
 ) -> dict[str, Any]:
     raw = body.encode("utf-8") if isinstance(body, str) else body
     result = _base_result(
@@ -445,6 +465,10 @@ def observe(
         requested_url=requested_url,
         final_url=final_url,
         http_status=http_status,
+        observation_origin=observation_origin,
+        relay_captured_by=relay_captured_by,
+        live_error_reason=live_error_reason,
+        relay_rejected=relay_rejected,
     )
     if http_status < 200 or http_status >= 300:
         result["reasons"] = [error_reason or (f"HTTP_{http_status}" if http_status else "TRANSPORT_FAILURE")]
@@ -1051,7 +1075,100 @@ def _failed_observation(source_id: str, error: Exception) -> dict[str, Any]:
     }
 
 
-def live_observations(*, session=None, fetch_source=None) -> list[dict[str, Any]]:
+def _relay_urls(source_id: str) -> set[str]:
+    if str(ROOT) not in sys.path:
+        sys.path.insert(0, str(ROOT))
+    from online_collect import NEWS_LIST_SOURCES
+
+    config = NEWS_LIST_SOURCES[source_id]
+    return {url for url in (config.get("list_url"), config.get("fallback_list_url")) if url}
+
+
+def load_relay(path: Path | None, *, now: datetime | None = None) -> dict[str, dict[str, Any] | str]:
+    """Each relayed source's observation, or why its relay cannot stand in.
+
+    The relay is evidence from another host, so every field it carries is
+    checked against what this repository would have fetched itself.
+    """
+    if path is None or not path.exists():
+        return {}
+    now = now or datetime.now(timezone.utc)
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        return {source_id: f"RELAY_UNREADABLE_{type(error).__name__.upper()}" for source_id in RELAY_SOURCES}
+    source_id = payload.get("source_id") if isinstance(payload, dict) else None
+    if source_id not in RELAY_SOURCES:
+        return {}
+
+    def rejected(reason: str) -> dict[str, dict[str, Any] | str]:
+        return {source_id: reason}
+
+    if payload.get("schema") != RELAY_SCHEMA:
+        return rejected("RELAY_SCHEMA_MISMATCH")
+    expected_types = {
+        "requested_url": str, "final_url": str, "content_type": str, "observed_at": str,
+        "body_base64": str, "body_sha256": str, "captured_by": str,
+    }
+    for key, kind in expected_types.items():
+        if not isinstance(payload.get(key), kind):
+            return rejected(f"RELAY_FIELD_INVALID_{key.upper()}")
+    if type(payload.get("http_status")) is not int or payload["http_status"] != 200:
+        return rejected("RELAY_HTTP_STATUS_NOT_200")
+    urls = _relay_urls(source_id)
+    if payload["requested_url"] not in urls or payload["final_url"] not in urls:
+        return rejected("RELAY_URL_NOT_IN_CATALOG")
+    if len(payload["captured_by"]) > 64 or len(payload["content_type"]) > 256:
+        return rejected("RELAY_METADATA_OVERSIZED")
+    try:
+        observed = datetime.fromisoformat(payload["observed_at"].replace("Z", "+00:00"))
+    except ValueError:
+        return rejected("RELAY_OBSERVED_AT_INVALID")
+    if observed.tzinfo is None:
+        return rejected("RELAY_OBSERVED_AT_NAIVE")
+    age = (now - observed).total_seconds()
+    if age > RELAY_MAX_AGE_SECONDS:
+        return rejected("RELAY_STALE")
+    if age < -RELAY_MAX_FUTURE_SECONDS:
+        return rejected("RELAY_FROM_FUTURE")
+    if len(payload["body_base64"]) > RELAY_MAX_BODY_BYTES * 4 // 3 + 4:
+        return rejected("RELAY_BODY_OVERSIZED")
+    try:
+        body = base64.b64decode(payload["body_base64"], validate=True)
+    except ValueError:
+        return rejected("RELAY_BODY_NOT_BASE64")
+    if not body or len(body) > RELAY_MAX_BODY_BYTES:
+        return rejected("RELAY_BODY_SIZE")
+    if sha256(body) != payload["body_sha256"].lower():
+        return rejected("RELAY_BODY_HASH_MISMATCH")
+    return {source_id: {
+        "source_id": source_id,
+        "body": body,
+        "http_status": 200,
+        "content_type": payload["content_type"],
+        "resource_id": None,
+        "observed_at": observed.astimezone(timezone.utc).isoformat(timespec="seconds"),
+        "requested_url": payload["requested_url"],
+        "final_url": payload["final_url"],
+        "observation_origin": RELAY_ORIGIN,
+        "relay_captured_by": payload["captured_by"],
+    }}
+
+
+def _with_relay(observation: dict[str, Any], relay: dict[str, dict[str, Any] | str]) -> dict[str, Any]:
+    """A live fetch that got no response at all may be stood in for by a valid relay."""
+    source_id = observation["source_id"]
+    candidate = relay.get(source_id)
+    if candidate is None or observation.get("http_status") != 0:
+        return observation
+    if isinstance(candidate, str):
+        print(f"SCHEMA_DRIFT_RELAY_REJECTED source={source_id} reason={candidate}", flush=True)
+        return {**observation, "relay_rejected": candidate}
+    print(f"SCHEMA_DRIFT_RELAY_USED source={source_id} observed_at={candidate['observed_at']}", flush=True)
+    return {**candidate, "live_error_reason": observation.get("error_reason") or "LIVE_FETCH_NO_RESPONSE"}
+
+
+def live_observations(*, session=None, fetch_source=None, relay=None) -> list[dict[str, Any]]:
     session = session or _live_session()
     fetch_source = fetch_source or _fetch_live_source
     # A retrying Requests adapter owns the transient retry budget. The outer
@@ -1095,6 +1212,7 @@ def live_observations(*, session=None, fetch_source=None) -> list[dict[str, Any]
             observation = _failed_observation(source_id, error)
             if deadline_exceeded:
                 observation["error_reason"] = "LIVE_SOURCE_DEADLINE_EXCEEDED"
+            observation = _with_relay(observation, relay or {})
         observations.append(observation)
         print(
             f"SCHEMA_DRIFT_SOURCE_END source={source_id} "
@@ -1186,14 +1304,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--preserve-state", action="store_true",
                         help="Write a fresh observation receipt without advancing durable schema state")
+    parser.add_argument("--relay", type=Path,
+                        help="A Taiwan-host relay observation; used with --live only when a source got no response")
     parser.add_argument("--self-check", action="store_true")
     args = parser.parse_args(argv)
+    if args.relay is not None and not args.live:
+        parser.error("--relay requires --live")
     if args.self_check:
         self_check()
         return 0
     state = json.loads(args.state.read_text(encoding="utf-8")) if args.state.exists() else empty_state()
     observations = (
-        live_observations() if args.live
+        (live_observations(relay=load_relay(args.relay)) if args.relay is not None else live_observations()) if args.live
         else interrupted_live_observations() if args.live_interrupted_receipt
         else _load_observations(args.input) if args.input
         else []
