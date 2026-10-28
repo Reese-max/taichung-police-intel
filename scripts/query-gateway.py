@@ -820,6 +820,11 @@ class QueryGateway:
         ))
 
     def _index_scope(self, scope: dict[str, Any]) -> dict[str, Any]:
+        # The Worker states the collection-only status beside every formal query
+        # status, rights-blocked or not; release checks compare it across surfaces.
+        coverage = scope.get("query_coverage")
+        if isinstance(coverage, dict) and "formal_admission" in coverage and "collection_coverage_status" not in coverage:
+            scope["query_coverage"] = {**coverage, "collection_coverage_status": coverage["status"]}
         if not self.snapshot.get("rebuild_failure"):
             return scope
         scope["data_status"] = "STALE"
