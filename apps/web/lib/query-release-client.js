@@ -18,12 +18,15 @@ function gatewayError(message, code) {
   return Object.assign(new Error(message), { code });
 }
 
-export async function queryGateway(endpoint, tool, args, context = null) {
+// route "chat" is the Web-only assisted chat: it always binds the release, even
+// for a local Gateway, and allows for the separately admitted model calls.
+export async function queryGateway(endpoint, tool, args, context = null, { route = "query", timeoutMs = 12000, bindRelease = false, body = {} } = {}) {
   if (!endpoint) throw gatewayError("未設定正式查詢服務。", "CAPABILITY_NOT_AVAILABLE");
+  if (!["query", "chat"].includes(route)) throw gatewayError("查詢路徑無法驗證。", "CAPABILITY_NOT_AVAILABLE");
   const fetchImpl = context?.fetchImpl || fetch;
   const request = async (url, options) => {
     try {
-      return await fetchImpl(url, { ...options, signal: AbortSignal.timeout(12000) });
+      return await fetchImpl(url, { ...options, signal: AbortSignal.timeout(timeoutMs) });
     } catch (error) {
       if (error?.name === "TimeoutError") throw gatewayError("查詢服務逾時，請稍後重試。", "TIMEOUT");
       throw gatewayError("查詢服務目前無法連線，請稍後重試。", "FAILED");
@@ -31,23 +34,23 @@ export async function queryGateway(endpoint, tool, args, context = null) {
   };
   let release;
   const remote = !["localhost", "127.0.0.1", "[::1]"].includes(new URL(endpoint, "http://localhost").hostname);
-  if (remote) {
-    if (!context?.codeSha || !context?.publicationGeneration) {
+  if (remote || bindRelease) {
+    if (!context?.publicationGeneration || (remote && !context?.codeSha)) {
       throw gatewayError("缺少發布版本，請重新載入頁面後查詢。", "CAPABILITY_NOT_AVAILABLE");
     }
     const response = await request(`${context.basePath ?? ""}/data/release.json`, { cache: "no-store" });
     if (!response.ok) throw gatewayError("無法核對發布版本，請稍後重試。", "PENDING_UPDATE");
     try { release = await response.json(); }
     catch { throw gatewayError("發布版本資料無法驗證，請稍後重試。", "PENDING_UPDATE"); }
-    if (!releaseBindingMatches(release, release) || release.code_sha !== context.codeSha || release.publication_generation !== context.publicationGeneration) {
+    if (!releaseBindingMatches(release, release) || (context.codeSha && release.code_sha !== context.codeSha) || release.publication_generation !== context.publicationGeneration) {
       throw gatewayError("發布版本已變更，請重新載入頁面後查詢。", "PENDING_UPDATE");
     }
   }
   const normalized = endpoint.replace(/\/+$/, "");
-  const url = normalized.endsWith("/query") ? normalized : `${normalized}/query`;
-  const response = await request(url, {
+  const base = normalized.endsWith("/query") ? normalized.slice(0, -"/query".length) : normalized;
+  const response = await request(`${base}/${route}`, {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ tool, arguments: args, ...(release ? { release_id: release.release_id } : {}) }),
+    body: JSON.stringify({ tool, arguments: args, ...body, ...(release ? { release_id: release.release_id } : {}) }),
   });
   let payload;
   try { payload = await response.json(); }
