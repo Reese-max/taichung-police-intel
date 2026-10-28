@@ -55,7 +55,9 @@ from intel_v2.located_facts import validate_document_url
 
 USER_AGENT = "TaichungPoliceIntel/0.2 (+public-source-monitor)"
 DETAIL_RECHECK_INTERVAL_HOURS = 24
-DETAIL_RECHECK_MAX_PER_RUN = 1
+# A run's GETs: one body plus up to two attachments, within the per-source
+# limit of three (intel_v2/detail_recheck_budget.py).
+DETAIL_RECHECK_MAX_PER_RUN = 3
 REDIRECT_STATUSES = {301, 302, 303, 307, 308}
 MAX_REDIRECTS = 3
 API_S007 = "https://yishi.tccc.gov.tw/api/ProceedingsBackWeb/FrontList"
@@ -1411,7 +1413,7 @@ def run_detail_rechecks(
         resolved_policy["per_source_limit"],
         resolved_policy["per_host_limit"],
     )
-    # ponytail: one row lock spans one bounded request; split claim/worker
+    # ponytail: one row lock spans bounded GETs; split claim/worker
     # phases only if recheck throughput becomes a measured bottleneck.
     with connection.transaction():
         # Serialize rolling-budget admission and ledger updates across runs.
@@ -1447,28 +1449,18 @@ def run_detail_rechecks(
             )["status"]
             == "DUE"
         }
-        decisions = {
-            (item["source_id"], item["stable_key"]): item
-            for item in plan_recheck_budget(
-                [
-                    {
-                        "source_id": row["source_id"],
-                        "stable_key": row["stable_key"],
-                        "host": _detail_budget_host(row),
-                        "budget_state": row.get("budget_state"),
-                    }
-                    for row in rows
-                    if (row["source_id"], row["stable_key"]) in due_keys
-                ],
-                now=observed,
-                policy=resolved_policy,
-                run_limit=limit,
-                historical_targets=[{
-                    "source_id": row["source_id"], "stable_key": row["stable_key"],
-                    "host": _detail_budget_host(row), "budget_state": row.get("budget_state"),
-                } for row in historical_rows],
-            )
-        }
+        history = {(row["source_id"], row["stable_key"]): {
+            "source_id": row["source_id"], "stable_key": row["stable_key"],
+            "host": _detail_budget_host(row), "budget_state": row.get("budget_state"),
+        } for row in historical_rows}
+        # Locked candidate rows supersede the historical snapshot.
+        history.update({(row["source_id"], row["stable_key"]): {
+            "source_id": row["source_id"], "stable_key": row["stable_key"],
+            "host": _detail_budget_host(row), "budget_state": row.get("budget_state"),
+        } for row in rows})
+        pending_targets = [history[(row["source_id"], row["stable_key"])] for row in rows
+            if (row["source_id"], row["stable_key"]) in due_keys]
+        requests_used = 0
         outcomes = []
         for row in rows:
             key = (row["source_id"], row["stable_key"])
@@ -1491,7 +1483,12 @@ def run_detail_rechecks(
                     _detail_recheck_outcome(row, "NOT_DUE", state, {"due_at": next_due})
                 )
                 continue
-            decision = decisions[key]
+            # Keep remaining candidates in the current batch so a malformed
+            # sibling is refused on its own row, not charged as unknown history.
+            decision = plan_recheck_budget(pending_targets, now=observed,
+                policy=resolved_policy, run_limit=limit - requests_used,
+                historical_targets=list(history.values()))[0]
+            pending_targets.pop(0)
             if decision["decision"] != "ALLOW":
                 _defer_detail_recheck(
                     connection,
@@ -1500,6 +1497,7 @@ def run_detail_rechecks(
                     budget_state=decision["budget_state"],
                     observed_at=observed_at,
                 )
+                history[key]["budget_state"] = decision["budget_state"]
                 outcomes.append(
                     _detail_recheck_outcome(
                         row, decision["reason"], decision["budget_state"], decision
@@ -1521,6 +1519,11 @@ def run_detail_rechecks(
                     interval_hours=interval_hours,
                     full_recheck_interval_hours=full_recheck_interval_hours,
                     include_body=True,
+                    max_requests=min(
+                        limit - requests_used,
+                        resolved_policy["per_source_limit"] - decision["source_attempts_in_window"],
+                        resolved_policy["per_host_limit"] - decision["host_attempts_in_window"],
+                    ),
                 )
             except (ValueError, TypeError, OSError, requests.RequestException) as error:
                 result = _detail_unavailable(row["requested_url"], previous, observed_at, error)
@@ -1572,7 +1575,10 @@ def run_detail_rechecks(
                 classification,
                 now=observed,
                 policy=resolved_policy,
+                request_count=result.get("request_count", 1),
             )
+            requests_used += result.get("request_count", 1)
+            history[key]["budget_state"] = budget_state
             if budget_state["deferred_until"]:
                 next_check_at = max(next_check_at, datetime.fromisoformat(budget_state["deferred_until"]))
             public_result = {key: value for key, value in result.items() if key != "response_body"}

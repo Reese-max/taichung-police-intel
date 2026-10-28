@@ -73,14 +73,25 @@ def _attachments(value: Any) -> list[dict[str, Any]]:
             raise ValueError("attachment IDs must be unique and non-empty")
         seen.add(attachment_id)
         row = {"attachment_id": attachment_id}
+        if item.get("url") is not None:
+            row["url"] = str(item["url"])
         if item.get("content_sha256") is not None:
             row["content_sha256"] = _hash(item["content_sha256"], "attachment content_sha256")
         if item.get("etag") is not None:
             row["etag"] = str(item["etag"])
         if item.get("last_modified") is not None:
             row["last_modified"] = str(item["last_modified"])
+        if item.get("last_checked_at") is not None:
+            row["last_checked_at"] = _stamp(_timestamp(item["last_checked_at"]))
+        if item.get("last_attempted_at") is not None:
+            row["last_attempted_at"] = _stamp(_timestamp(item["last_attempted_at"]))
         rows.append(row)
     return sorted(rows, key=lambda item: item["attachment_id"])
+
+
+def _attachment_content(rows: Any) -> list[dict[str, Any]]:
+    return [{key: row[key] for key in ("attachment_id", "content_sha256") if key in row}
+        for row in _attachments(rows)]
 
 
 def _request_headers(previous: dict[str, Any]) -> dict[str, str]:
@@ -173,7 +184,7 @@ def _version(previous: dict[str, Any] | None, observation: dict[str, Any], obser
         },
     }
     return {
-        "document_version_id": "DOCV-" + _sha(material).upper()[:20],
+        "document_version_id": "DOCV-" + _sha({**material, "attachments": _attachment_content(attachments)}).upper()[:20],
         "material_text_sha256": material_text_sha256,
         "body_sha256": body_sha256,
         "normalized_text_sha256": normalized_sha256,
@@ -234,7 +245,7 @@ def classify_observation(
     status_code = observation.get("status_code", 200)
     if type(status_code) is not int:
         raise ValueError("status_code must be an integer")
-    if status_code == 304:
+    if status_code == 304 and (not previous or "attachments" not in observation):
         return _terminal(
             "NOT_MODIFIED",
             observed,
@@ -251,10 +262,15 @@ def classify_observation(
             before=previous,
             retry_after_seconds=min(retry, 86400) if retry is not None else None,
         )
-    if status_code < 200 or status_code >= 300 or observation.get("available") is False:
+    if (status_code != 304 and (status_code < 200 or status_code >= 300)) or observation.get("available") is False:
         return _terminal("UNAVAILABLE", observed, before=previous)
 
+    if status_code == 304:
+        observation = {**{key: previous.get(key) for key in (
+            "body_sha256", "normalized_text_sha256", "material_text_sha256")}, **observation}
     after = _version(previous, observation, observed)
+    if status_code == 304:
+        after["observed_at"] = previous.get("observed_at")
     if previous is None:
         return {
             "schema_version": 1,
@@ -278,8 +294,16 @@ def classify_observation(
     normalized_changed = previous.get("normalized_text_sha256") != after["normalized_text_sha256"]
     if after["material_text_sha256"] and previous.get("material_text_sha256") == after["material_text_sha256"]:
         normalized_changed = False
-    attachments_changed = previous.get("attachments", []) != after["attachments"]
+    old_attachments = {row["attachment_id"]: row for row in _attachment_content(previous.get("attachments"))}
+    new_attachments = {row["attachment_id"]: row for row in _attachment_content(after["attachments"])}
+    attachment_baseline_ids = sorted(key for key in old_attachments.keys() & new_attachments.keys()
+        if "content_sha256" not in old_attachments[key] and "content_sha256" in new_attachments[key])
+    attachments_changed = old_attachments.keys() != new_attachments.keys() or any(
+        row["content_sha256"] != new_attachments[key].get("content_sha256")
+        for key, row in old_attachments.items() if "content_sha256" in row and key in new_attachments)
     body_changed = previous.get("body_sha256") != after["body_sha256"]
+    if not (changed_fields or normalized_changed or attachments_changed or body_changed) and previous.get("document_version_id"):
+        after["document_version_id"] = previous["document_version_id"]
     if changed_fields or normalized_changed:
         status = "MATERIAL_CHANGE"
     elif attachments_changed:
@@ -287,7 +311,9 @@ def classify_observation(
     elif body_changed:
         status = "PRESENTATION_ONLY"
     else:
-        status = "UNCHANGED"
+        status = "NOT_MODIFIED" if status_code == 304 else "UNCHANGED"
+    if observation.get("attachment_recheck_deferred") and status in {"NOT_MODIFIED", "UNCHANGED"}:
+        status = "DEFERRED"
     return {
         "schema_version": 1,
         "status": status,
@@ -300,5 +326,8 @@ def classify_observation(
         "baseline": False,
         "preserve_last_known_good": True,
         "event_cancelled": False,
+        "attachment_baseline_ids": attachment_baseline_ids,
         "attachment_recheck_required": not observation.get("attachments_checked", "attachments" in observation),
+        "attachment_recheck_deferred": bool(observation.get("attachment_recheck_deferred")),
+        "retry_after_seconds": observation.get("retry_after_seconds"),
     }

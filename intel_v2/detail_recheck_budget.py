@@ -57,6 +57,7 @@ def empty_budget_state() -> dict[str, Any]:
     return {
         "schema_version": 1,
         "attempts": [],
+        "request_counts": {},
         "failure_streak": 0,
         "deferred_until": None,
         "first_deferred_at": None,
@@ -115,6 +116,10 @@ def normalize_budget_state(value: Any, *, now: str, policy: dict[str, Any] | Non
         raise ValueError("budget_state must be an object")
     state = empty_budget_state()
     state["attempts"] = _attempts(value.get("attempts"), resolved["window_seconds"], current)
+    counts = value.get("request_counts", {})
+    if not isinstance(counts, dict) or any(type(count) is not int or count <= 0 for count in counts.values()):
+        raise ValueError("request_counts must contain positive integers")
+    state["request_counts"] = {stamp: counts.get(stamp, 1) for stamp in state["attempts"]}
     streak = value.get("failure_streak", 0)
     if not isinstance(streak, int) or isinstance(streak, bool) or streak < 0:
         raise ValueError("failure_streak must be a non-negative integer")
@@ -206,8 +211,9 @@ def plan_recheck_budget(
                 source_totals[item["source_id"]] = max(source_totals.get(item["source_id"], 0), resolved["per_source_limit"])
                 host_totals[item["host"]] = max(host_totals.get(item["host"], 0), resolved["per_host_limit"])
             continue
-        source_totals[item["source_id"]] = source_totals.get(item["source_id"], 0) + len(state["attempts"])
-        host_totals[item["host"]] = host_totals.get(item["host"], 0) + len(state["attempts"])
+        count = sum(state["request_counts"].values())
+        source_totals[item["source_id"]] = source_totals.get(item["source_id"], 0) + count
+        host_totals[item["host"]] = host_totals.get(item["host"], 0) + count
 
     decisions = []
     granted_sources: dict[str, int] = {}
@@ -307,9 +313,12 @@ def record_recheck_budget(
     *,
     now: str,
     policy: dict[str, Any] | None = None,
+    request_count: int = 1,
 ) -> dict[str, Any]:
     """Return the next ledger entry for one finished or refused recheck."""
     resolved = _policy(policy)
+    if type(request_count) is not int or request_count < 0:
+        raise ValueError("request_count must be non-negative")
     current = _timestamp(now)
     if not isinstance(classification, dict):
         raise ValueError("classification must be an object")
@@ -317,10 +326,11 @@ def record_recheck_budget(
     if not isinstance(status, str) or not status:
         raise ValueError("classification status is required")
     budget_state = normalize_budget_state(state, now=now, policy=resolved)
-    budget_state["attempts"] = _attempts(
-        [*budget_state["attempts"], _stamp(current)], resolved["window_seconds"], current
-    )
-    if status in BACKING_OFF_STATUSES:
+    if request_count:
+        stamp = _stamp(current)
+        budget_state["request_counts"][stamp] = budget_state["request_counts"].get(stamp, 0) + request_count
+        budget_state["attempts"] = sorted(budget_state["request_counts"])
+    if status in BACKING_OFF_STATUSES or classification.get("attachment_recheck_deferred"):
         outcome = "BACKED_OFF"
         retry_after = classification.get("retry_after_seconds")
         if retry_after is not None and (not isinstance(retry_after, int) or isinstance(retry_after, bool) or retry_after < 0):
@@ -399,7 +409,7 @@ def pending_retry_rows(states: list[dict[str, Any]], *, now: str) -> list[dict[s
                 "retry_deadline_exceeded": state["retry_deadline_exceeded"],
                 "seconds_until_retry": max(int((deferred - current).total_seconds()), 0) if deferred else 0,
                 "seconds_until_deadline": max(int((deadline - current).total_seconds()), 0) if deadline else None,
-                "attempts_in_window": len(state["attempts"]),
+                "attempts_in_window": sum(state["request_counts"].values()),
             }
         )
     return sorted(
