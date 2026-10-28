@@ -557,7 +557,8 @@ async function queryStore(snapshot, { q: text = null, canonical_id: canonicalId 
   if (offset > selected.length) throw new GatewayError("INVALID_ARGUMENTS", "cursor offset exceeds result set");
   const result = selected.slice(offset, offset + limit);
   const nextCursor = offset + result.length < selected.length
-    ? btoa(JSON.stringify({ generation: snapshot.generationId, filters: filterHash, offset: offset + result.length })).replace(/\+/g, "-").replace(/\//g, "_")
+    // Sorted keys, as the Python Gateway encodes it: one cursor string for one page.
+    ? btoa(canonicalJson({ generation: snapshot.generationId, filters: filterHash, offset: offset + result.length })).replace(/\+/g, "-").replace(/\//g, "_")
     : null;
   const scope = assessScope(snapshot, sourceId);
   return {
@@ -802,6 +803,8 @@ async function execute(snapshot, tool, rawArgs = {}) {
     const argumentsHash = await sha256(canonicalJson(args));
     return { ...envelope(snapshot, tool, args, scope, { search_scope: result.search_scope, answerable_no_match: result.answerable_no_match, total_matches: result.total_matches, result_count: result.result_count, offset: result.offset, has_more: result.has_more, next_cursor: result.next_cursor, results: result.results }, result.result_count, result.truncated), receipt: { ...envelope(snapshot, tool, args, scope, {}, result.result_count, result.truncated).receipt, arguments_sha256: argumentsHash } };
   }
+  // The same bound as the advertised input schema and the Python Gateway.
+  if (args.source_id !== undefined && (typeof args.source_id !== "string" || args.source_id.length > 64)) throw new GatewayError("INVALID_ARGUMENTS", "invalid source_id");
   const scopeRaw = assessScope(snapshot, args.source_id);
   const scope = { ...scopeRaw, coverage: queryCoverage(snapshot, tool === "get_source_health" ? "source_health" : "publication_metadata", args.source_id ? { source_id: args.source_id } : {}) };
   const argumentsHash = await sha256(canonicalJson(args));

@@ -43,3 +43,26 @@ non-empty publication hash. Repeating `tools/list` with
 This confirms the local Streamable HTTP boundary and Origin rejection only;
 the server was bound to `127.0.0.1` and was terminated after the probe. It is
 not an anonymous Pages or production MCP endpoint receipt.
+
+## Web Worker and stdio MCP parity (issue #29)
+
+Production Web traffic reaches the Cloudflare Worker (`workers/query-gateway`),
+while stdio MCP clients run the Python Gateway. `apps/web/tests/gateway-runtime-parity.test.mjs`
+loads one fictional governed publication into both and requires the same
+typed answers for `search_evidence` (keyword, miss, source filter, paging),
+`get_source_health`, `get_publication_receipt` and `get_current_brief`, with
+and without a failed source: identical canonical IDs, order, freshness,
+source gaps, query coverage and result rows, ignoring only query IDs, clocks,
+the receipt and the Worker's release block. The same cursor string comes from
+both and leads to the same next page, and invalid arguments fail with the same
+error code.
+
+Aligning the two surfaced three differences, now fixed: the Worker accepted a
+non-string `source_id` for `get_source_health`; the Worker encoded cursors with
+unsorted keys; and the Python Gateway stated `collection_coverage_status` only
+for rights-blocked queries, while the Worker and the release verifier expect it
+beside every formal query status.
+
+Not covered: `chat_turn` natural-language parsing (the Worker uses its own
+bounded rules, Python uses `intel_v2/conversation.py`), and a failed index
+rebuild, which the Worker reports as `PARTIAL` and Python as `STALE`.
