@@ -37,7 +37,7 @@ Issue #21 B 段還要求「每來源請求上限、主機併發上限、退避�
 - collector 從既有 `last_result.classification.after`／`before` 恢復正文時間與語意欄位，不新增 migration。304、429 與失敗可更新核對時間，但不會把最後成功取得正文的時間往後推；舊資料沒有這項時間時，下次到期採完整複查。
 - 標題、地點、狀態、範圍與官方時間欄位一併保存在前後版本及 handoff invalidation。修正會標記正確的舊 claim；相同資料重跑不再遺失欄位或重複要求核對。未提供的官方時間仍保持 null。
 - 額外保存 `material_text_sha256`，只忽略空白前或句尾的 `.!?。！？` 差異。原始正文 hash、既有正規化 hash 與文件版本仍保留差異；`17:00 → 16:00`、`1.5 → 15` 仍要求核對。其他標點或語意不明的修改採保守待核對，未加入 LLM 或通用語意解析器。
-- HTTP adapter 只列舉附件連結，故即使正文 200 成功，也明確回報 `attachment_recheck_required=true`；304 同樣不能證明附件未變。
+- HTTP adapter 在初次或正文有變時列舉附件連結；正文不變時的實際附件核對已於 2026-10-28 補上，見下節。附件未全部成功核對時仍回報 `attachment_recheck_required=true`。
 
 ### 本輪驗收對照
 
@@ -45,7 +45,7 @@ Issue #21 B 段還要求「每來源請求上限、主機併發上限、退避�
 |---|---|
 | 同網址／標題／列表，正文更正 | HTTP fixture 的時間更正為 `MATERIAL_CHANGE`；定期移除 validators，避免永久依賴來源的 304。一般正文仍只提供 hash 異動，沒有自動抽取「管制開始時間」的欄位差異文案。 |
 | 排版或標點變更 | 既有 `PRESENTATION_ONLY` 與新增句末標點 fixture 通過；其他標點仍可能要求人工核對。 |
-| 正文不變、附件內容更正 | 分類器可比較外部已核對的附件 hash，但 HTTP transport 尚未下載同網址附件；此項未完成。 |
+| 正文不變、附件內容更正 | 2026-10-28 補上離線 fixture：正文 304 或同 hash 的 2xx 後，在剩餘預算內下載同網址附件，bytes SHA-256 異動為 `ATTACHMENT_CHANGED`，並要求複查。部分核對、限流與傳輸失敗明確保留未核對狀態；未做真實來源驗收。 |
 | 首次看到上月文件 | 沿用官方日期／擷取日期分離，不以本輪時間補造官方時間；參見 `test_official_source_dates.py`、`test_date_metadata_projection.py`。 |
 | 首次完整快照、相同資料重跑 | `BASELINE` 不產生 NEW；新增語意欄位重播檢查為 `UNCHANGED`。 |
 | partial／失敗／單筆消失 | 沿用 last-known-good 與 `event_cancelled=false`；未新增任何自動取消或解除語意。 |
@@ -62,6 +62,35 @@ Issue #21 B 段還要求「每來源請求上限、主機併發上限、退避�
 python -X utf8 -B -m unittest discover -s tests -p 'test_detail_recheck*.py' && python -X utf8 -B -m unittest discover -s tests -p 'test_handoff_state.py' && python -X utf8 -B -m unittest discover -s tests -p 'test_review_inbox.py' && node --test apps/web/tests/publication-freshness.test.mjs
 ```
 
-未做：同網址附件 bytes 下載／持久化與獨立複查、一般正文的重要主張自動抽取與差異文案、完整 A 段 deployment/publication receipt 整合、Twinkle／新來源接入、實際部署／canary／延遲量測。本輪不啟動正式資料庫、不宣稱正式公告漏件已重現，也不把合成重播當成 production 證據。專案目前沒有設定獨立 lint、coverage ratchet、CRAP 或 mutation gate；沿用既有驗證器與測試，未安裝額外工具。
+未做：附件 bytes 持久化與獨立排程複查、一般正文的重要主張自動抽取與差異文案、完整 A 段 deployment/publication receipt 整合、Twinkle／新來源接入、實際部署／canary／延遲量測。本輪不啟動正式資料庫、不宣稱正式公告漏件已重現，也不把合成重播當成 production 證據。專案目前沒有設定獨立 lint、coverage ratchet、CRAP 或 mutation gate；沿用既有驗證器與測試，未安裝額外工具。
 
 廣域驗證：已完整執行 `npm test`，原生 Windows 未全綠；既有 checkpoint／來源稽核測試使用 POSIX 的 `O_NONBLOCK`、檔案權限、directory fsync 與 Unix signal，另有需乾淨提交的 current-checkout gate。這些平台限制不藉本輪修改繞過；相關驗收命令與 Linux 全套補驗分開回報，不以局部綠燈冒充全套通過。
+
+## 2026-10-28：正文不變時核對附件 bytes
+
+- 保存 approved 附件 `url`、`content_sha256`、自身 validators、成功核對時間 `last_checked_at` 與最近嘗試時間 `last_attempted_at`，沿用既有 attachments JSONB 與 before/after，不新增 migration。新欄位對舊資料皆有才收；附件 URL／validators／核對與嘗試時間不參與文件版本 hash，避免僅 ETag 或時間更新造成誤報。既有附件首次取得 hash 只建立基準，以 `attachment_baseline_ids` 列出 ID，保留 `NOT_MODIFIED`／`UNCHANGED` 與原文件版本，不要求複查；往後已知 hash 改變、附件新增或移除仍會要求複查。
+- 正文 304 或 2xx 且 body hash 相同時，優先核對尚無 `last_attempted_at` 的附件，再依最近嘗試時間由舊到新下載 bytes；同時間依 `attachment_id` 穩定排序。成功、404、429／5xx、逾時、URL／redirect 拒絕與超限均記錄嘗試時間，失敗不更新成功時間 `last_checked_at`、hash 或 validators。預算不足、`SOURCE_BACKOFF` 跳過與缺少 URL 不記為嘗試。時間隨分類結果保存並在下輪恢復，因此持續失敗的附件也會輪替，不再搶走每輪唯一附件額度；429／5xx 仍沿用來源退避。
+- 共用 `_approved_url`、`_read_body`、手動 redirect 迴圈與 `request_count`。正文與附件的 redirect 均逐跳檢查 approved host allowlist，兩個已核准 host 之間允許 redirect；任何一跳未核准、非 HTTPS、非 443、超大宣告或串流回應均拒絕。collector 目前只傳單一 host，所以其實際下載仍限制於該 host。附件 304 保留已知 hash；沒有已知 hash 時採無條件下載，不以單獨 304 補造內容證據。
+- 每次 GET（含正文、附件、redirect 與失敗嘗試）扣除同一輪／來源／host 的剩餘額度，沒有額外附件預算。collector 每筆完成後重新做既有 budget admission；同秒多次請求以 `budget_state.request_counts` 計數，舊 ledger 缺少此欄時每個既有時間戳視為一次，既有去重與 rolling window 保留。待重試視圖同樣顯示實際請求數。下載期間停用並於離開 GET 時還原 adapter 自動 retries，避免隱藏重試繞過額度；此流程沿用序列化 collector，不支援共用 session 的並行呼叫。
+- 逐筆重新准入時，尚待處理的到期候選列仍視為同一批次：壞帳本只拒絕該列，拒絕後將乾淨的 ledger 同步回本輪 history，不會把健康列誤判成預算用盡；批次外無法解讀的歷史帳本仍拒絕同來源／host 的新請求。
+- `attachment_checks` 逐筆列出已核／未核、HTTP status 與原因；預算不足為 `REQUEST_BUDGET_EXHAUSTED`。升級過渡期：main 時期存下、沒有 `url` 的附件列會標為 `MISSING_URL`，不發附件請求；持續收到正文 304 時，須等正文改版重新解析、補上 URL 後才開始核對。既有 2xx 路徑會重新解析正文，因此若較早收到完整 2xx，即使 hash 相同，也可能先補回 URL；本輪不新增舊資料補 URL 的程式。只有全部成功核對才設定 `attachments_checked=true`；已確認無附件時為空集合全數核對。
+- 429／5xx 保存 `Retry-After` 秒數、保留該附件 LKG，停止後續附件並標為 `SOURCE_BACKOFF`。沒有已確認變更時分類為 `DEFERRED`；已有附件變更時保留 `ATTACHMENT_CHANGED`／`review_required`，同時由既有 ledger 套用退避。正文 304 的附件變更不會推進最後取得完整正文的 `observed_at`。
+- 邊界：首次正文／正文變更仍只列舉附件，下載在正文不變時進行；不保存附件 bytes、不新增獨立排程、不調高既有額度。刻意保留 `DETAIL_RECHECK_MAX_PER_RUN = 1`：預設正文 GET 會用完整輪額度，附件以 `REQUEST_BUDGET_EXHAUSTED`／`attachments_checked=false` 保持未核，預設不會下載附件。要核對附件，呼叫端必須提高 `run_detail_rechecks(..., limit=...)`，同時確保 `budget_policy` 的 `per_source_limit`／`per_host_limit` 在 rolling window 內仍有餘額；每跳 redirect 也會消耗一次。現有 CLI 未提供此額度的參數或環境變數，設定同名環境變數不會生效。
+
+例如正文加三個附件、沒有 redirect 或歷史用量時，呼叫端可明確設定如下；這是設定說明，本輪未變更排程呼叫端或預設值：
+
+```python
+run_detail_rechecks(
+    connection, session, source_run_ids, observed_at,
+    limit=4,
+    budget_policy={"per_source_limit": 4, "per_host_limit": 5},
+)
+```
+
+只提高為 `limit=2` 且來源／host 還有餘額時，每輪正文之外最多核對一個附件；三個可成功下載的附件會在三個到期輪次內各核對一次。不是三次立即重試，也不是在預設額度 1 下可完成附件核對的保證。
+
+本輪僅執行下列離線驗收；未呼叫 provider、官方網站或 PostgreSQL。`online_collect.py` 的預算整合有使用實際函式 AST 與 fake connection/session 的離線測試；完整匯入與資料庫測試仍待 Linux 補驗（本機缺 psycopg）。
+
+```powershell
+C:/Users/Administrator/anaconda3/python.exe -X utf8 -B -m unittest discover -s tests -p "test_detail_recheck.py" -v
+```
