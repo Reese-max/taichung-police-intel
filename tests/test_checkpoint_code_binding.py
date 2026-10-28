@@ -24,8 +24,22 @@ def project(value, count=2, *, strict=True):
 
 
 @contextmanager
-def fictional_module(source=SOURCE, *, name="fictional_checkpoint_module"):
+def source_directory():
     with tempfile.TemporaryDirectory() as directory:
+        yield Path(directory)
+
+
+@contextmanager
+def without_open_flags():
+    missing = {"O_NONBLOCK", "O_NOFOLLOW", "O_CLOEXEC"}
+    with mock.patch.object(cb, "os", SimpleNamespace(**{key: value for key, value in vars(os).items()
+                                                       if key not in missing})):
+        yield
+
+
+@contextmanager
+def fictional_module(source=SOURCE, *, name="fictional_checkpoint_module"):
+    with source_directory() as directory:
         path = Path(directory) / "fictional.py"
         path.write_text(source, encoding="utf-8")
         spec = importlib.util.spec_from_file_location(name, path)
@@ -267,14 +281,14 @@ class CodeBindingTests(unittest.TestCase):
             cb._normalize(nested)
 
     def test_regular_source_reader_accepts_exact_size_boundary(self):
-        with tempfile.TemporaryDirectory() as directory:
+        with source_directory() as directory:
             path = Path(directory) / "fictional.py"
             path.write_bytes(b"FICTIONAL")
             with mock.patch.object(cb, "MAX_SOURCE_BYTES", 9):
                 self.assertEqual(cb.read_source_bounded(path), b"FICTIONAL")
 
     def test_sparse_oversized_source_is_rejected_without_reading(self):
-        with tempfile.TemporaryDirectory() as directory:
+        with source_directory() as directory:
             path = Path(directory) / "fictional.py"
             with path.open("wb") as stream:
                 stream.truncate(cb.MAX_SOURCE_BYTES + 1)
@@ -284,9 +298,9 @@ class CodeBindingTests(unittest.TestCase):
                 reader.assert_not_called()
 
     def test_growth_after_stat_cannot_read_more_than_limit_plus_one(self):
-        with tempfile.TemporaryDirectory() as directory:
+        with source_directory() as directory:
             path = Path(directory) / "fictional.py"
-            path.write_bytes(b"FICTIONAL_SOURCE_GREW_PAST_THE_BOUND")
+            path.write_bytes(b"F")
             sizes = []
             real_fdopen = cb.os.fdopen
             def observed_fdopen(descriptor, mode):
@@ -296,19 +310,23 @@ class CodeBindingTests(unittest.TestCase):
                         return self
                     def read(self, size):
                         sizes.append(size)
+                        with path.open("ab") as writer:
+                            writer.write(b"ICTIONAL_SOURCE_GREW_PAST_THE_BOUND")
                         return stream.read(size)
+                    def fileno(self):
+                        return stream.fileno()
                     def __exit__(self, *args):
                         stream.close()
                 return ObservedReader()
             with mock.patch.object(cb, "MAX_SOURCE_BYTES", 16), \
-                    mock.patch.object(cb.os, "fstat", return_value=SimpleNamespace(st_mode=stat.S_IFREG, st_size=1)), \
                     mock.patch.object(cb.os, "fdopen", side_effect=observed_fdopen):
                 with self.assertRaises(ValueError):
                     cb.read_source_bounded(path)
             self.assertEqual(sizes, [17])
 
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "os.mkfifo is unavailable")
     def test_fifo_source_is_rejected_nonblocking_without_reading(self):
-        with tempfile.TemporaryDirectory() as directory:
+        with source_directory() as directory:
             path = Path(directory) / "fictional.fifo"
             os.mkfifo(path)
             original_open = cb.os.open
@@ -316,11 +334,97 @@ class CodeBindingTests(unittest.TestCase):
                     mock.patch.object(cb.os, "fdopen", side_effect=AssertionError("FIFO must not be read")) as reader:
                 with self.assertRaises(ValueError):
                     cb.read_source_bounded(path)
-                self.assertTrue(opener.call_args.args[1] & os.O_NONBLOCK)
+                if opener.called:
+                    self.assertTrue(opener.call_args.args[1] & os.O_NONBLOCK)
                 reader.assert_not_called()
 
+    @unittest.skipUnless(hasattr(os, "mkfifo"), "os.mkfifo is unavailable")
+    def test_fifo_without_open_flags_is_rejected_before_open(self):
+        with source_directory() as directory, without_open_flags():
+            path = Path(directory) / "fictional.fifo"
+            os.mkfifo(path)
+            with mock.patch.object(cb.os, "open", side_effect=AssertionError("must not open FIFO")):
+                with self.assertRaises(ValueError):
+                    cb.read_source_bounded(path)
+
+    def test_reader_without_optional_flags_checks_regular_files_before_open(self):
+        with source_directory() as directory, without_open_flags():
+            path = Path(directory) / "fictional.py"
+            content = b"FICTIONAL\r\n\x1a\x00"
+            path.write_bytes(content)
+            self.assertEqual(cb.read_source_bounded(path), content)
+            with mock.patch.object(cb, "MAX_SOURCE_BYTES", len(content) - 1), \
+                    mock.patch.object(cb.os, "open", side_effect=AssertionError("must reject before open")):
+                with self.assertRaises(ValueError):
+                    cb.read_source_bounded(path)
+            for mode in (stat.S_IFDIR, stat.S_IFIFO, stat.S_IFCHR, stat.S_IFBLK, stat.S_IFLNK):
+                with self.subTest(mode=mode), \
+                        mock.patch.object(cb.os, "lstat", return_value=SimpleNamespace(st_mode=mode, st_size=0)), \
+                        mock.patch.object(cb.os, "open", side_effect=AssertionError("must reject before open")):
+                    with self.assertRaises(ValueError):
+                        cb.read_source_bounded(path)
+
+    def test_reader_rejects_changed_descriptor_before_reading(self):
+        with source_directory() as directory, without_open_flags():
+            path = Path(directory) / "fictional.py"
+            other = Path(directory) / "other.py"
+            path.write_bytes(b"FIRST")
+            other.write_bytes(b"OTHER")
+            original_open = cb.os.open
+            with mock.patch.object(cb.os, "open", side_effect=lambda path, flags: original_open(other, flags)), \
+                    mock.patch.object(cb.os, "fdopen", side_effect=AssertionError("must check descriptor first")):
+                with self.assertRaises(ValueError):
+                    cb.read_source_bounded(path)
+
+    def test_reader_rejects_growth_and_replacement_below_size_limit(self):
+        for change in ("growth", "replacement", "symlink", "shrink"):
+            with self.subTest(change=change), source_directory() as directory, without_open_flags():
+                path = Path(directory) / "fictional.py"
+                other = Path(directory) / "other.py"
+                path.write_bytes(b"FIRST")
+                other.write_bytes(b"OTHER")
+                original_fstat = cb.os.fstat
+                calls = []
+                def changed_fstat(descriptor):
+                    calls.append(descriptor)
+                    if len(calls) == 2:
+                        if change == "growth":
+                            with path.open("ab") as writer:
+                                writer.write(b"GREW")
+                        elif change == "shrink":
+                            with path.open("wb") as writer:
+                                writer.write(b"F")
+                        elif change == "replacement":
+                            # The path's next lstat observes a replacement inode;
+                            # no Windows sharing/delete privileges are required.
+                            cb.os.lstat = lambda path: other.stat()
+                        else:
+                            cb.os.lstat = lambda path: SimpleNamespace(st_mode=stat.S_IFLNK)
+                    return original_fstat(descriptor)
+                with mock.patch.object(cb.os, "fstat", side_effect=changed_fstat):
+                    with self.assertRaises(ValueError):
+                        cb.read_source_bounded(path)
+
+    def test_symlink_source_is_rejected_before_open(self):
+        with source_directory() as directory:
+            target = Path(directory) / "target.py"
+            link = Path(directory) / "link.py"
+            target.write_bytes(b"FICTIONAL")
+            try:
+                link.symlink_to(target)
+            except (OSError, NotImplementedError):
+                # Still exercise the lstat rejection when symlink creation is denied.
+                with mock.patch.object(cb.os, "lstat", return_value=SimpleNamespace(st_mode=stat.S_IFLNK)), \
+                        mock.patch.object(cb.os, "open", side_effect=AssertionError("must not follow symlink")):
+                    with self.assertRaises(ValueError):
+                        cb.read_source_bounded(link)
+            else:
+                with mock.patch.object(cb.os, "open", side_effect=AssertionError("must not follow symlink")):
+                    with self.assertRaises(ValueError):
+                        cb.read_source_bounded(link)
+
     def test_directory_source_is_rejected_before_reading(self):
-        with tempfile.TemporaryDirectory() as directory:
+        with source_directory() as directory:
             with mock.patch.object(cb.os, "fdopen", side_effect=AssertionError("directory must not be read")) as reader:
                 with self.assertRaises(ValueError):
                     cb.read_source_bounded(Path(directory))
