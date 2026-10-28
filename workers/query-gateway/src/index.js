@@ -58,6 +58,17 @@ async function sha256(value) {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+// Python's string order: by code point, so characters beyond the BMP sort after
+// U+E000..U+FFFF instead of between them as UTF-16 code units would.
+function codePointOrder(a, b) {
+  const left = [...a], right = [...b];
+  for (let index = 0; index < Math.min(left.length, right.length); index += 1) {
+    const difference = left[index].codePointAt(0) - right[index].codePointAt(0);
+    if (difference) return difference;
+  }
+  return left.length - right.length;
+}
+
 function parseInstant(value) {
   if (typeof value !== "string" || !/(Z|[+-]\d{2}:\d{2})$/i.test(value)) return NaN;
   return Date.parse(value);
@@ -554,11 +565,12 @@ async function queryStore(snapshot, { q: text = null, canonical_id: canonicalId 
   }
   const selected = snapshot.items.filter((row) => (!canonicalId || row.canonical_id === canonicalId) && (!sourceId || row.source_id === sourceId) && (!changeType || row.change_type === changeType) &&
     (!needle || [row.title, row.committee, row.source_id, row.canonical_id].map((value) => String(value || "")).join(" ").toLocaleLowerCase().includes(needle)));
-  selected.sort((a, b) => (parseInstant(b.published_at) || -Infinity) - (parseInstant(a.published_at) || -Infinity) || a.canonical_id.localeCompare(b.canonical_id));
+  selected.sort((a, b) => (parseInstant(b.published_at) || -Infinity) - (parseInstant(a.published_at) || -Infinity) || codePointOrder(a.canonical_id, b.canonical_id));
   if (offset > selected.length) throw new GatewayError("INVALID_ARGUMENTS", "cursor offset exceeds result set");
   const result = selected.slice(offset, offset + limit);
   const nextCursor = offset + result.length < selected.length
-    ? btoa(JSON.stringify({ generation: snapshot.generationId, filters: filterHash, offset: offset + result.length })).replace(/\+/g, "-").replace(/\//g, "_")
+    // Sorted keys, as the Python Gateway encodes it: one cursor string for one page.
+    ? btoa(canonicalJson({ generation: snapshot.generationId, filters: filterHash, offset: offset + result.length })).replace(/\+/g, "-").replace(/\//g, "_")
     : null;
   const scope = assessScope(snapshot, sourceId);
   return {
@@ -815,8 +827,10 @@ async function execute(snapshot, tool, rawArgs = {}) {
     const argumentsHash = await sha256(canonicalJson(args));
     return { ...envelope(snapshot, tool, args, scope, { search_scope: result.search_scope, answerable_no_match: result.answerable_no_match, total_matches: result.total_matches, result_count: result.result_count, offset: result.offset, has_more: result.has_more, next_cursor: result.next_cursor, results: result.results }, result.result_count, result.truncated), receipt: { ...envelope(snapshot, tool, args, scope, {}, result.result_count, result.truncated).receipt, arguments_sha256: argumentsHash } };
   }
+  // The same bound as the advertised input schema and the Python Gateway.
+  if (args.source_id != null && (typeof args.source_id !== "string" || args.source_id.length > 64)) throw new GatewayError("INVALID_ARGUMENTS", "invalid source_id");
   const scopeRaw = assessScope(snapshot, args.source_id);
-  const scope = { ...scopeRaw, coverage: queryCoverage(snapshot, tool === "get_source_health" ? "source_health" : "publication_metadata", args.source_id ? { source_id: args.source_id } : {}) };
+  const scope = { ...scopeRaw, coverage: queryCoverage(snapshot, tool === "get_source_health" ? "source_health" : "publication_metadata", args.source_id != null ? { source_id: args.source_id } : {}) };
   const argumentsHash = await sha256(canonicalJson(args));
   if (tool === "get_current_brief") {
     if (snapshot.formalAdmission.status !== "ADMITTED") throw new GatewayError("RIGHTS_BLOCKED", "Current formal brief lacks approved governance or publication rights", 503);
@@ -832,14 +846,14 @@ async function execute(snapshot, tool, rawArgs = {}) {
     return { ...envelope(snapshot, tool, args, scope, { publication_receipt: publicationReceipt }, 1, false, "publication_receipt"), receipt: { ...envelope(snapshot, tool, args, scope, {}, 1).receipt, arguments_sha256: argumentsHash } };
   }
   if (tool === "get_source_health") {
-    const selected = snapshot.status.sources.filter((row) => !args.source_id || row.source_id === args.source_id).map(publicSource);
+    const selected = snapshot.status.sources.filter((row) => args.source_id == null || row.source_id === args.source_id).map(publicSource);
     const sourceRights = selected.map(row => { const rights = retentionMatrix.classes[retentionMatrix.source_classes[row.source_id]];
       return {source_id: row.source_id, rights_status: rights.rights_status, review_required: rights.review_required}; });
     return { ...envelope(snapshot, tool, args, scope, { sources: selected, source_rights: sourceRights,
       formal_admission: snapshot.formalAdmission }, selected.length), receipt: { ...envelope(snapshot, tool, args, scope, {}, selected.length).receipt, arguments_sha256: argumentsHash } };
   }
   if (!Array.isArray(args.claims) || args.claims.length < 1 || args.claims.length > 32 || (args.claims.some((claim) => !claim || typeof claim !== "object" || Object.keys(claim).some((key) => !["schema_version", "claim_id", "text", "claim_type", "temporal_scope", "proposition", "cited_evidence_ids"].includes(key))))) throw new GatewayError("INVALID_ARGUMENTS", "validate_answer requires 1 to 32 structured claims");
-  if (args.expected_generation && args.expected_generation !== snapshot.generationId) throw new GatewayError("INVALID_ARGUMENTS", "query generation mismatch; retry against the requested snapshot");
+  if (args.expected_generation != null && args.expected_generation !== snapshot.generationId) throw new GatewayError("INVALID_ARGUMENTS", "query generation mismatch; retry against the requested snapshot");
   const gate = await validateAnswer(snapshot, args.claims);
   return { ...envelope(snapshot, tool, args, scope, { gate_status: gate.gate_status, answer: gate.answer, final_claims: gate.final_claims, evidence_ids: gate.receipt.evidence_ids || [], answer_evidence_receipt: gate.receipt }, gate.final_claims?.length || 0, false, "answer_evidence"), receipt: { ...envelope(snapshot, tool, args, scope, {}, gate.final_claims?.length || 0).receipt, arguments_sha256: argumentsHash } };
 }
