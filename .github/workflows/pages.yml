@@ -157,6 +157,8 @@ jobs:
         timeout-minutes: 14
         env:
           PENDING_RECOVERY: ${{ steps.restore_state.outputs.pending_recovery }}
+          # Read anonymously; the Taiwan host's write key reaches that repository only.
+          SOURCE_RELAY_URL: https://raw.githubusercontent.com/Reese-max/govintel-source-relay/main/relay/S-001.json
         run: |
           set -euo pipefail
           output=apps/web/public/data/schema-drift.json
@@ -166,10 +168,22 @@ jobs:
           fi
           # Never export a receipt checked out from main as this run's result.
           rm -f "$output"
+          # S-001 refuses non-Taiwan addresses. A Taiwan host relays its list
+          # page to a separate repository; schema_drift.py uses the relay only
+          # when the live fetch gets no response, and only while it is recent.
+          relay_args=()
+          relay_file="$(mktemp)"
+          # Bounded in time and size; any failure only leaves S-001 live-only.
+          if curl --fail --silent --show-error --proto '=https' --max-time 30 \
+            --max-filesize 7100000 --output "$relay_file" "$SOURCE_RELAY_URL"; then
+            relay_args+=(--relay "$relay_file")
+          else
+            echo "No source relay is available; S-001 is probed live only."
+          fi
           # Ten source probes have separate 60-second deadlines. This outer
           # guard covers startup/parsing and still emits an interrupted receipt.
           if timeout --signal=TERM --kill-after=5s 12m \
-            python -X utf8 scripts/schema_drift.py --live "${schema_args[@]}" \
+            python -X utf8 scripts/schema_drift.py --live "${schema_args[@]}" "${relay_args[@]}" \
               --state state/schema-drift-state.json --output "$output"; then
             exit 0
           else

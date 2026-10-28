@@ -245,7 +245,7 @@ class PublicationStateBranchTests(unittest.TestCase):
             module.persist(self.work, "publication-state", "102", "1", "morning")
         self.assertEqual(self.head(), before)
 
-    def run_pages_schema_step(self, *, pending, interrupted=False):
+    def run_pages_schema_step(self, *, pending, interrupted=False, relay=False):
         if not shutil.which("bash") or not shutil.which("timeout"):
             self.skipTest("the Pages shell requires bash and timeout")
         from scripts import schema_drift
@@ -263,10 +263,15 @@ class PublicationStateBranchTests(unittest.TestCase):
             state_path.write_text(json.dumps(schema_drift.empty_state()) + "\n", encoding="utf-8")
         before = module.read_working_bundle(self.work)
         checkpoint = self.head()
+        # the Taiwan relay as the raw URL serves it; without one the download fails
+        relay_fixture = self.root / "relay-S-001.json"
+        relay_fixture.write_text('{"source_id": "S-001"}\n', encoding="utf-8")
 
         workflow = (SCRIPT.parents[1] / ".github/workflows/pages.yml").read_text()
         step = workflow.split("        id: schema_drift\n", 1)[1].split("\n      - name:", 1)[0]
         self.assertIn("PENDING_RECOVERY: ${{ steps.restore_state.outputs.pending_recovery }}", step)
+        self.assertIn("SOURCE_RELAY_URL: https://raw.githubusercontent.com/Reese-max/govintel-source-relay/main/relay/S-001.json", step)
+        self.assertIn("--max-filesize", step)
         script = textwrap.dedent(step.split("        run: |\n", 1)[1])
         restore = dict(line.split("=", 1) for line in output.read_text().splitlines())
         self.assertEqual(restore["pending_recovery"], str(pending).lower())
@@ -300,14 +305,32 @@ class PublicationStateBranchTests(unittest.TestCase):
                     raise SystemExit(124)
                 index = args.index("--live")
                 args[index:index + 1] = ["--input", os.environ["SCHEMA_REPLAY_INPUT"]]
+                if "--relay" in args:
+                    relay = args.index("--relay")
+                    with Path(args[relay + 1]).open() as handle:
+                        assert json.load(handle)["source_id"] == "S-001"
+                    del args[relay:relay + 2]
             args[args.index("scripts/schema_drift.py")] = os.environ["SCHEMA_REPLAY_SCRIPT"]
             os.execv(sys.executable, [sys.executable, *args])
         '''), encoding="utf-8")
         python.chmod(0o755)
+        # The relay download: serves the fixture to --output, or fails as curl --fail would.
+        curl = bin_dir / "curl"
+        curl.write_text(f"#!{sys.executable}\n" + textwrap.dedent('''
+            import os, shutil, sys
+            args = sys.argv[1:]
+            assert args[-1] == os.environ["SOURCE_RELAY_URL"], args
+            if os.environ["RELAY_FIXTURE"] == "":
+                raise SystemExit(22)
+            shutil.copyfile(os.environ["RELAY_FIXTURE"], args[args.index("--output") + 1])
+        '''), encoding="utf-8")
+        curl.chmod(0o755)
         result = subprocess.run(["bash", "-c", script], cwd=self.work, capture_output=True,
                                 text=True, timeout=20, env={
             **os.environ, "PATH": str(bin_dir) + os.pathsep + os.environ.get("PATH", ""),
             "PENDING_RECOVERY": restore["pending_recovery"],
+            "SOURCE_RELAY_URL": "https://raw.githubusercontent.com/Reese-max/govintel-source-relay/main/relay/S-001.json",
+            "RELAY_FIXTURE": str(relay_fixture) if relay else "",
             "SCHEMA_REPLAY_INPUT": str(observations),
             "SCHEMA_REPLAY_SCRIPT": str(SCRIPT.with_name("schema_drift.py")),
             "SCHEMA_REPLAY_CALLS": str(calls_path),
@@ -316,6 +339,8 @@ class PublicationStateBranchTests(unittest.TestCase):
         self.assertEqual(result.returncode, 124 if interrupted else 0, result.stdout + result.stderr)
         calls = [json.loads(line) for line in calls_path.read_text().splitlines()]
         self.assertIn("--live", calls[0])
+        self.assertEqual("--relay" in calls[0], relay)
+        self.assertTrue(all("--relay" not in call for call in calls[1:]))
         for call in calls:
             self.assertEqual("--preserve-state" in call, pending)
         receipt = json.loads(receipt_path.read_text())
@@ -336,6 +361,12 @@ class PublicationStateBranchTests(unittest.TestCase):
         self.assertEqual(module.read_working_bundle(self.work), before)
         self.assertFalse(module.persist(self.work, "publication-state", "replay", "1", "code"))
         self.assertEqual(self.head(), checkpoint)
+
+    def test_pages_schema_probe_hands_the_taiwan_relay_to_the_live_probe(self):
+        self.run_pages_schema_step(pending=False, relay=True)
+
+    def test_interrupted_pages_probe_does_not_hand_the_relay_to_its_fallback(self):
+        self.run_pages_schema_step(pending=False, interrupted=True, relay=True)
 
     def test_interrupted_pending_pages_probe_keeps_state_and_fresh_failure_receipt(self):
         before, checkpoint = self.run_pages_schema_step(pending=True, interrupted=True)

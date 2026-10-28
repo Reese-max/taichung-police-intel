@@ -22,6 +22,7 @@ dialog.pq-drawer:not([open]) { display: none; }
 .pq-chat .pq-keyword-row { flex-wrap: wrap; margin-top: 1rem; }
 .pq-chat .pq-field { min-width: min(100%, 240px); }
 .pq-chat pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.pq-chat .pq-assist label { display: block; margin-top: 0.25rem; }
 .pq-chat-table { overflow-x: auto; }
 .pq-chat-table th, .pq-chat-table td { padding: 8px; text-align: left; }
 @media (max-width: 390px) {

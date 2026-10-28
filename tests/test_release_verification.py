@@ -78,6 +78,7 @@ class PublicationClient:
         }
         self.mutate = lambda route, document: None
         self.calls = []
+        self.chat_refusals = True
 
     def query(self, tool, common):
         if tool == "get_publication_receipt":
@@ -125,6 +126,15 @@ class PublicationClient:
             document = {**common, "status": "ok", "publication_freshness": common["freshness"], "server_version": "query-gateway-v1-workers"}
         elif name == "capabilities":
             document = {**common, "capabilities": sorted(module.REQUIRED_CAPABILITIES)}
+        elif name == "chat":
+            refused = self.chat_refusals and (payload.get("release_id") != self.release["release_id"] or payload.get("public_data_only") is not True)
+            if refused:
+                status = 503 if payload.get("release_id") != self.release["release_id"] else 400
+                document = {"schema_version": 1, "error": {"code": "QUERY_TEMPORARILY_UNAVAILABLE" if status == 503 else "INVALID_ARGUMENTS", "message": "Fictional refusal"}}
+            else:
+                document = {**common, "result_type": "conversation", "receipt": {**common["receipt"], "tool_name": "chat_turn"},
+                            "chat": {"parser": {"kind": "rules", "version": "chat-rules/1", "fallback_reason": "DISABLED"},
+                                     "assisted_answer": {"status": "NOT_ATTEMPTED", "reason_code": "DISABLED", "answer": []}}}
         elif name == "query":
             document = self.query(payload["tool"], common)
             if payload["tool"] in ("get_current_brief", "validate_answer"):
@@ -138,7 +148,7 @@ class PublicationClient:
             error = payload["params"]["name"] in ("get_current_brief", "validate_answer")
             document = {"result": {"isError": error, "content": [{"type": "text", "text": json.dumps(content)}], **({} if error else {"structuredContent": content})}}
         document = copy.deepcopy(document)
-        route = payload.get("tool", payload.get("method")) if payload else name
+        route = ("chat" if name == "chat" else payload.get("tool", payload.get("method"))) if payload else name
         if route == "tools/call" and payload["params"]["name"] != "get_publication_receipt":
             route = "mcp_" + payload["params"]["name"]
         self.mutate(route, document)
@@ -170,6 +180,22 @@ class ReleaseVerificationTests(unittest.TestCase):
                 client.mutate = mutate
                 with self.assertRaisesRegex(RuntimeError, "release"):
                     module.verify("https://gateway.example", PUBLIC, client)
+
+    def test_anonymous_assisted_chat_must_stay_on_the_rules_and_bind_the_release(self):
+        self.assertEqual(module.verify("https://gateway.example", PUBLIC, PublicationClient())["checks"]["assisted_chat"], "RULES_ONLY_NO_PROVIDER")
+        for label, change in (("model parsed", lambda chat: chat["parser"].update(kind="llm")),
+                              ("sent then rejected", lambda chat: (chat["parser"].update(fallback_reason="OUTPUT_REJECTED"), chat["assisted_answer"].update(reason_code="OUTPUT_REJECTED"))),
+                              ("answer shown", lambda chat: chat["assisted_answer"].update(status="ANSWER_READY", reason_code=None, answer=["模型文字"])),
+                              ("no parser", lambda chat: chat.pop("parser"))):
+            with self.subTest(label=label):
+                client = PublicationClient()
+                client.mutate = lambda route, document, change=change: change(document["chat"]) if route == "chat" and "chat" in document else None
+                with self.assertRaisesRegex(RuntimeError, "assisted chat"):
+                    module.verify("https://gateway.example", PUBLIC, client)
+        client = PublicationClient()
+        client.chat_refusals = False
+        with self.assertRaisesRegex(RuntimeError, "Assisted chat accepted"):
+            module.verify("https://gateway.example", PUBLIC, client)
 
     def test_loopback_or_private_gateway_is_not_a_production_origin(self):
         for origin in ("https://localhost:8788", "https://127.0.0.1", "https://[::1]",

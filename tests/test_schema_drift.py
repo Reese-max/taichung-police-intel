@@ -1166,5 +1166,246 @@ class SchemaDriftTests(unittest.TestCase):
             drift.build_receipt([{**sample, "source_id": "S-UNKNOWN"}])
 
 
+S001_LIST_URL = online_collect.NEWS_LIST_SOURCES["S-001"]["list_url"]
+
+
+def _relay_payload(body: bytes = b"<html>relayed list</html>", **overrides):
+    import base64
+    import hashlib
+    from datetime import datetime, timezone
+
+    payload = {
+        "schema": drift.RELAY_SCHEMA,
+        "source_id": "S-001",
+        "requested_url": S001_LIST_URL,
+        "final_url": S001_LIST_URL,
+        "http_status": 200,
+        "content_type": "text/html;charset=UTF-8",
+        "observed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "body_base64": base64.b64encode(body).decode("ascii"),
+        "body_sha256": hashlib.sha256(body).hexdigest(),
+        "captured_by": "taiwan-relay",
+    }
+    payload.update(overrides)
+    return payload
+
+
+class SourceRelayTests(unittest.TestCase):
+    def _relay(self, payload, *, now=None):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "relay.json"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            return drift.load_relay(path, now=now)
+
+    def _live(self, relay, *, fail_s001, session=None):
+        response = SimpleNamespace(
+            content=b"sample",
+            status_code=200,
+            headers={"content-type": "text/plain"},
+            url="https://official.test/source",
+            request=SimpleNamespace(url="https://official.test/source"),
+        )
+
+        def fetch(_session, source_id):
+            if source_id == "S-001" and fail_s001 is not None:
+                raise fail_s001
+            return response, None
+
+        with mock.patch.object(drift, "_source_deadline", return_value=mock.MagicMock()):
+            observations = drift.live_observations(session=session or self._counting(), fetch_source=fetch, relay=relay)
+        return next(item for item in observations if item["source_id"] == "S-001")
+
+    @staticmethod
+    def _counting():
+        # a probe session as _live_session builds it: it counts the HTTP answers it got
+        return SimpleNamespace(_govintel_response_count=0)
+
+    def test_a_valid_relay_stands_in_only_for_a_live_fetch_without_response(self):
+        relay = self._relay(_relay_payload())
+        used = self._live(relay, fail_s001=ConnectionError("blocked abroad"))
+        self.assertEqual(used["observation_origin"], "TAIWAN_RELAY")
+        self.assertEqual(used["relay_captured_by"], "taiwan-relay")
+        self.assertEqual(used["live_error_reason"], "LIVE_FETCH_CONNECTIONERROR")
+        self.assertEqual(used["http_status"], 200)
+        self.assertEqual(used["body"], b"<html>relayed list</html>")
+        # a live answer, even a failing one, is never replaced
+        direct = self._live(relay, fail_s001=None)
+        self.assertNotIn("observation_origin", direct)
+        self.assertEqual(direct["body"], b"sample")
+
+    def test_a_live_http_error_is_kept_not_relayed(self):
+        relay = self._relay(_relay_payload())
+        error = online_collect.requests.exceptions.HTTPError("503")
+        error.response = SimpleNamespace(
+            content=b"", status_code=503, headers={}, url=S001_LIST_URL, request=SimpleNamespace(url=S001_LIST_URL)
+        )
+        kept = self._live(relay, fail_s001=error)
+        self.assertEqual(kept["http_status"], 503)
+        self.assertNotIn("observation_origin", kept)
+
+    def test_the_relay_provenance_reaches_the_published_receipt(self):
+        relay = self._relay(_relay_payload())
+        observation = self._live(relay, fail_s001=ConnectionError("blocked abroad"))
+        receipt, _state = drift.build_receipt([observation])
+        row = next(item for item in receipt["sources"] if item["source_id"] == "S-001")
+        self.assertEqual(row["observation_origin"], "TAIWAN_RELAY")
+        self.assertEqual(row["live_error_reason"], "LIVE_FETCH_CONNECTIONERROR")
+        self.assertEqual(row["observed_at"], observation["observed_at"])
+        others = [item for item in receipt["sources"] if item["source_id"] != "S-001"]
+        self.assertTrue(all("observation_origin" not in item for item in others))
+
+    def test_a_relay_that_cannot_be_trusted_is_refused_with_its_reason(self):
+        from datetime import datetime, timedelta, timezone
+
+        now = datetime.now(timezone.utc)
+        cases = [
+            (_relay_payload(schema="other/v1"), "RELAY_SCHEMA_MISMATCH"),
+            (_relay_payload(http_status=503), "RELAY_HTTP_STATUS_NOT_200"),
+            (_relay_payload(http_status=True), "RELAY_HTTP_STATUS_NOT_200"),
+            (_relay_payload(requested_url="https://evil.test/list"), "RELAY_URL_NOT_IN_CATALOG"),
+            (_relay_payload(final_url="https://www.police.taichung.gov.tw/other"), "RELAY_URL_NOT_IN_CATALOG"),
+            (_relay_payload(observed_at=(now - timedelta(hours=5)).isoformat()), "RELAY_STALE"),
+            (_relay_payload(observed_at=(now + timedelta(hours=1)).isoformat()), "RELAY_FROM_FUTURE"),
+            (_relay_payload(observed_at="2026-10-28T06:00:00"), "RELAY_OBSERVED_AT_NAIVE"),
+            (_relay_payload(observed_at="yesterday"), "RELAY_OBSERVED_AT_INVALID"),
+            (_relay_payload(body_sha256="0" * 64), "RELAY_BODY_HASH_MISMATCH"),
+            (_relay_payload(body_base64="not base64!"), "RELAY_BODY_NOT_BASE64"),
+            (_relay_payload(body=b""), "RELAY_BODY_SIZE"),
+            (_relay_payload(captured_by=7), "RELAY_FIELD_INVALID_CAPTURED_BY"),
+        ]
+        for payload, reason in cases:
+            with self.subTest(reason=reason):
+                self.assertEqual(self._relay(payload, now=now), {"S-001": reason})
+
+    def test_a_refused_relay_keeps_the_live_failure_and_says_why(self):
+        relay = self._relay(_relay_payload(body_sha256="0" * 64))
+        kept = self._live(relay, fail_s001=ConnectionError("blocked abroad"))
+        self.assertEqual(kept["http_status"], 0)
+        self.assertEqual(kept["error_reason"], "LIVE_FETCH_CONNECTIONERROR")
+        self.assertEqual(kept["relay_rejected"], "RELAY_BODY_HASH_MISMATCH")
+        receipt, _state = drift.build_receipt([kept])
+        row = next(item for item in receipt["sources"] if item["source_id"] == "S-001")
+        self.assertEqual(row["status"], "SOURCE_UNAVAILABLE")
+        self.assertEqual(row["relay_rejected"], "RELAY_BODY_HASH_MISMATCH")
+
+    def test_only_listed_sources_may_be_relayed_and_a_missing_file_is_no_relay(self):
+        self.assertEqual(self._relay(_relay_payload(source_id="S-007")), {})
+        self.assertEqual(drift.load_relay(None), {})
+        self.assertEqual(drift.load_relay(Path(tempfile.gettempdir()) / "no-such-relay.json"), {})
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "relay.json"
+            path.write_text("{not json", encoding="utf-8")
+            self.assertEqual(drift.load_relay(path), {"S-001": "RELAY_UNREADABLE_JSONDECODEERROR"})
+
+    def test_a_probe_that_got_any_answer_keeps_it_over_the_relay(self):
+        # the list answered 503, then the fallback list timed out: no response is left,
+        # but one was received, so the relay must not hide it
+        relay = self._relay(_relay_payload())
+        session = self._counting()
+
+        def fetch(probe, source_id):
+            if source_id == "S-001":
+                probe._govintel_response_count += 1
+                raise ConnectionError("fallback timed out after a 503")
+            return SimpleNamespace(content=b"x", status_code=200, headers={}, url="https://official.test/",
+                                   request=SimpleNamespace(url="https://official.test/")), None
+
+        with mock.patch.object(drift, "_source_deadline", return_value=mock.MagicMock()):
+            observations = drift.live_observations(session=session, fetch_source=fetch, relay=relay)
+        kept = next(item for item in observations if item["source_id"] == "S-001")
+        self.assertEqual(kept["http_status"], 0)
+        self.assertNotIn("observation_origin", kept)
+
+    def test_a_session_that_cannot_count_answers_never_relays(self):
+        relay = self._relay(_relay_payload())
+        kept = self._live(relay, fail_s001=ConnectionError("blocked abroad"), session=object())
+        self.assertEqual(kept["http_status"], 0)
+        self.assertNotIn("observation_origin", kept)
+
+    def test_the_probe_session_counts_an_answer_before_its_body_is_read(self):
+        import requests
+        from requests.adapters import HTTPAdapter
+
+        class HeadersThenBodyTimeout(HTTPAdapter):
+            def send(self, request, **kwargs):
+                response = requests.Response()
+                response.status_code = 200
+                response.url = request.url
+                response.request = request
+
+                class Body:
+                    def read(self, *_args, **_kwargs):
+                        raise requests.exceptions.ConnectionError("body timed out")
+
+                    def stream(self, *_args, **_kwargs):
+                        raise requests.exceptions.ConnectionError("body timed out")
+
+                response.raw = Body()
+                return response
+
+        session = drift._live_session()
+        session.mount("https://", HeadersThenBodyTimeout())
+        with self.assertRaises(requests.exceptions.ConnectionError):
+            session.get("https://official.test/a")
+        self.assertEqual(session._govintel_response_count, 1)
+
+    def test_a_relay_that_expired_while_the_probes_ran_is_refused(self):
+        from datetime import datetime, timedelta, timezone
+
+        loaded_at = datetime.now(timezone.utc)
+        observed = loaded_at - timedelta(seconds=drift.RELAY_MAX_AGE_SECONDS - 10)
+        relay = self._relay(_relay_payload(observed_at=observed.isoformat(timespec="seconds")), now=loaded_at)
+        self.assertIsInstance(relay["S-001"], dict)
+        failed = {"source_id": "S-001", "http_status": 0, "error_reason": "LIVE_FETCH_CONNECTIONERROR", "body": b""}
+        kept = drift._with_relay(failed, relay, responded=False, now=loaded_at + timedelta(seconds=30))
+        self.assertEqual(kept["relay_rejected"], "RELAY_STALE")
+        self.assertNotIn("observation_origin", kept)
+        used = drift._with_relay(failed, relay, responded=False, now=loaded_at)
+        self.assertEqual(used["observation_origin"], "TAIWAN_RELAY")
+
+    def test_a_malformed_relay_is_refused_and_the_live_probe_still_runs(self):
+        for payload in ({"source_id": []}, {"source_id": {"S-001": 1}}, ["S-001"], "S-001", 7, None):
+            with self.subTest(payload=payload):
+                relay = self._relay(payload)
+                self.assertTrue(all(isinstance(value, str) for value in relay.values()))
+                kept = self._live(relay, fail_s001=ConnectionError("blocked abroad"))
+                self.assertEqual(kept["http_status"], 0)
+                self.assertNotIn("observation_origin", kept)
+
+    def test_an_oversized_relay_file_is_not_read(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "relay.json"
+            path.write_bytes(b" " * (drift.RELAY_MAX_FILE_BYTES + 1))
+            with mock.patch.object(Path, "read_text", side_effect=AssertionError("read")):
+                self.assertEqual(drift.load_relay(path), {"S-001": "RELAY_FILE_OVERSIZED"})
+
+    def test_relay_provenance_is_kept_in_state_history_and_review_evidence(self):
+        from intel_v2.review import schema_drift_candidates
+
+        relay = self._relay(_relay_payload())
+        relayed = self._live(relay, fail_s001=ConnectionError("blocked abroad"))
+        _receipt, state = drift.build_receipt([relayed])
+        saved = state["sources"]["S-001"]
+        self.assertEqual(saved["current"]["observation_origin"], "TAIWAN_RELAY")
+        # the relayed body is no S-001 list, so the run is review evidence
+        receipt, state = drift.build_receipt([relayed], state=state)
+        self.assertEqual(state["sources"]["S-001"]["history"][-1]["observation_origin"], "TAIWAN_RELAY")
+        row = next(item for item in receipt["review_inbox"] if item["source_id"] == "S-001")
+        self.assertEqual(row["observation_origin"], "TAIWAN_RELAY")
+        self.assertEqual(row["live_error_reason"], "LIVE_FETCH_CONNECTIONERROR")
+        candidate = next(item for item in schema_drift_candidates(receipt) if item["entity_ids"]["source_id"] == "S-001")
+        self.assertEqual(candidate["evidence"]["after"]["observation_origin"], "TAIWAN_RELAY")
+
+    def test_a_good_relayed_baseline_says_it_was_relayed(self):
+        good = drift.observe(drift.CONTRACTS["S-007"], "{}", content_type="application/json")
+        good = {**good, "status": "NO_DRIFT", "observation_origin": "TAIWAN_RELAY", "live_error_reason": "LIVE_FETCH_TIMEOUT"}
+        state = drift.update_state(drift.empty_state(), good)
+        self.assertEqual(state["sources"]["S-007"]["last_known_good"]["observation_origin"], "TAIWAN_RELAY")
+
+    def test_relay_requires_live(self):
+        with self.assertRaises(SystemExit):
+            drift.main(["--input", "x.json", "--relay", "relay.json"])
+
+
 if __name__ == "__main__":
     unittest.main()
