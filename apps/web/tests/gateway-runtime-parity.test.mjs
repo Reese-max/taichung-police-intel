@@ -133,6 +133,17 @@ test("results published at the same instant are ordered by code point on both", 
   first.stable_id = "a-fixture-lower"; second.stable_id = "Z-FIXTURE-UPPER";
 } }));
 
+test("IDs beyond the BMP are ordered by code point on both, not by UTF-16 code unit", () => bothRuntimes(async call => {
+  const pair = await call("search_evidence", {});
+  assertParity(pair, "search_evidence {} with IDs beyond the BMP");
+  assert.deepEqual(pair.web.results.map(row => row.canonical_id), ["ID-\uE000", "ID-\u{10000}"]);
+  const first = await call("search_evidence", { limit: 1 });
+  assertParity(first, "first page of one");
+}, { mutate: values => {
+  const [first, second] = values["intelligence-feed.json"].items;
+  first.stable_id = "ID-\u{10000}"; second.stable_id = "ID-\uE000";
+} }));
+
 test("a failed source and its gap read the same on Web and MCP", () => bothRuntimes(async call => {
   for (const args of [{}, { source_id: "S-006" }]) assertParity(await call("get_source_health", args), `get_source_health ${JSON.stringify(args)}`);
   for (const args of [{ q: "測試" }, { source_id: "S-006" }]) assertParity(await call("search_evidence", args), `search_evidence ${JSON.stringify(args)}`);

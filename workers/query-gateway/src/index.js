@@ -57,6 +57,17 @@ async function sha256(value) {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+// Python's string order: by code point, so characters beyond the BMP sort after
+// U+E000..U+FFFF instead of between them as UTF-16 code units would.
+function codePointOrder(a, b) {
+  const left = [...a], right = [...b];
+  for (let index = 0; index < Math.min(left.length, right.length); index += 1) {
+    const difference = left[index].codePointAt(0) - right[index].codePointAt(0);
+    if (difference) return difference;
+  }
+  return left.length - right.length;
+}
+
 function parseInstant(value) {
   if (typeof value !== "string" || !/(Z|[+-]\d{2}:\d{2})$/i.test(value)) return NaN;
   return Date.parse(value);
@@ -553,7 +564,7 @@ async function queryStore(snapshot, { q: text = null, canonical_id: canonicalId 
   }
   const selected = snapshot.items.filter((row) => (!canonicalId || row.canonical_id === canonicalId) && (!sourceId || row.source_id === sourceId) && (!changeType || row.change_type === changeType) &&
     (!needle || [row.title, row.committee, row.source_id, row.canonical_id].map((value) => String(value || "")).join(" ").toLocaleLowerCase().includes(needle)));
-  selected.sort((a, b) => (parseInstant(b.published_at) || -Infinity) - (parseInstant(a.published_at) || -Infinity) || (a.canonical_id < b.canonical_id ? -1 : a.canonical_id > b.canonical_id ? 1 : 0));
+  selected.sort((a, b) => (parseInstant(b.published_at) || -Infinity) - (parseInstant(a.published_at) || -Infinity) || codePointOrder(a.canonical_id, b.canonical_id));
   if (offset > selected.length) throw new GatewayError("INVALID_ARGUMENTS", "cursor offset exceeds result set");
   const result = selected.slice(offset, offset + limit);
   const nextCursor = offset + result.length < selected.length

@@ -52,8 +52,9 @@ loads one fictional governed publication into both and requires the same
 typed answers for `search_evidence` (keyword, miss, source filter, paging),
 `get_source_health`, `get_publication_receipt` and `get_current_brief`, with
 and without a failed source: identical canonical IDs, order, freshness,
-source gaps, query coverage and result rows, ignoring only query IDs, clocks,
-the receipt and the Worker's release block. The same cursor string comes from
+source gaps, query coverage, result rows and receipts, ignoring only query IDs,
+the query clock, the Worker's release block and the receipt's `issued_at` and
+`server_version`. The same cursor string comes from
 both and leads to the same next page, and invalid arguments fail with the same
 error code.
 
@@ -66,7 +67,7 @@ were ordered by locale collation rather than code point; and search cursors
 were encoded with unsorted keys. The Python Gateway, for its part, stated
 `collection_coverage_status` only for rights-blocked queries, while the Worker
 and the release verifier expect it beside every formal query status. The
-comparison keeps the whole receipt except `issued_at` and `server_version`.
+ordering is by code point, so IDs beyond the BMP sort as Python sorts them.
 
 Both runtimes still read an empty `source_id` as "no filter" for
 `search_evidence` but as an exact filter for `get_source_health`; that is the
