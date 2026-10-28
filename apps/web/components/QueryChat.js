@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CHAT_QUICK_ACTIONS, requestChat, summarizeChat } from "../lib/chat-answer.js";
+import { CHAT_ASSIST_NOT_SENT, CHAT_ASSIST_REASON_LABELS, CHAT_QUICK_ACTIONS, requestChat, summarizeChat } from "../lib/chat-answer.js";
 import { safeHttpsUrl } from "../lib/public-query.js";
 
 const TIERS = { verified: "VERIFIED", unverified: "UNVERIFIED", conflicts: "CONFLICT", stale: "STALE" };
@@ -12,6 +12,8 @@ export default function QueryChat({ endpoint, releaseContext }) {
   const [response, setResponse] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [assist, setAssist] = useState(false);
+  const [publicOnly, setPublicOnly] = useState(false);
   const active = useRef(null);
   useEffect(() => () => { active.current = null; }, []);
 
@@ -37,7 +39,12 @@ export default function QueryChat({ endpoint, releaseContext }) {
     <h2 id="pq-chat-title">Ask GovIntel · 對話查詢</h2>
     <p>以自然語言查詢並縮小地區、時間或事件。能力依伺服器核准資料而定；對話條件只保留在本頁，重新整理即清除。</p>
     <div className="pq-actions" aria-label="對話快速查詢">{CHAT_QUICK_ACTIONS.map(action => <button key={action.id} type="button" disabled={busy} onClick={() => run({ quickAction: action.id })}>{action.label}</button>)}</div>
-    <form className="pq-search-row pq-keyword-row" onSubmit={event => { event.preventDefault(); run({ text }); }}>
+    <fieldset className="pq-assist" disabled={busy}>
+      <legend>AI 解析問題（實驗）</legend>
+      <label><input type="checkbox" checked={assist} onChange={event => setAssist(event.target.checked)} /> 由 AI 判斷要查哪一種資料；事實仍只來自下方的官方資料，回答須通過證據核對</label>
+      {assist && <label><input type="checkbox" checked={publicOnly} onChange={event => setPublicOnly(event.target.checked)} /> 我確認問題只含公開、不含個人的資訊（問題會送到站方核准的 AI 服務）</label>}
+    </fieldset>
+    <form className="pq-search-row pq-keyword-row" onSubmit={event => { event.preventDefault(); run(assist ? { text, assist: true, publicDataOnly: publicOnly } : { text }); }}>
       <div className="pq-field"><label htmlFor="pq-chat-question">公開資料問題或追問</label><input id="pq-chat-question" value={text} maxLength={512} disabled={busy} onChange={event => setText(event.target.value)} placeholder="例如：這週末臺中有哪些活動？ → 只看西屯" /></div>
       <button type="submit" disabled={busy || !text.trim()}>送出問題</button>
       <button type="button" disabled={busy} onClick={() => { setContext({ schema_version: 1 }); setResponse(null); setError(null); setText(""); }}>清除查詢脈絡</button>
@@ -47,6 +54,13 @@ export default function QueryChat({ endpoint, releaseContext }) {
     {summary && <div aria-live="polite" aria-label="對話查詢結果">
       <p><strong>{summary.statusLabel} · {summary.status}</strong> · 新鮮度：{response.freshness}</p>
       <p>{response.verification_summary}</p>
+      {summary.parser && <p>解析方式：{summary.parser.kind === "llm" ? `AI 解析（${summary.parser.version}）` :
+        `${CHAT_ASSIST_NOT_SENT.has(summary.parser.fallback_reason) ? "規則（問題未送出給 AI" : "規則（AI 解析未成功，問題可能已送出，改用規則"}：${CHAT_ASSIST_REASON_LABELS[summary.parser.fallback_reason] || summary.parser.fallback_reason}）`}
+        {summary.parser.time_window && ` · 時間條件：${summary.parser.time_window.label}（${summary.parser.time_window.time_from}～${summary.parser.time_window.time_to}，${summary.parser.time_window.time_zone}）`}</p>}
+      {summary.assistedAnswer && (summary.assistedAnswer.status === "ANSWER_READY"
+        ? <section aria-label="AI 挑選並通過證據核對的回答"><h3>AI 挑選並通過證據核對的回答</h3><ul>{summary.assistedAnswer.answer.map((line, index) => <li key={index}>{line}</li>)}</ul>
+          <p>核對器：{summary.assistedAnswer.answer_evidence_receipt.validator_version} · 只代表公告標題的索引記載，不證明標題中的事件事實。</p></section>
+        : <p>AI 回答：未產生（{CHAT_ASSIST_REASON_LABELS[summary.assistedAnswer.reason_code] || summary.assistedAnswer.reason_code}）</p>)}
       {summary.lines.map((line, index) => <p key={index}>{line}</p>)}
       {gaps.length > 0 && <div className="pq-gaps"><strong>資料缺口：</strong><ul>{gaps.map((gap, index) => <li key={index}>{gap.source_id || "整體"} · {gap.status || gap.source_health} · {gap.reason}</li>)}</ul></div>}
       {summary.notices.map((notice, index) => <p key={index}>{typeof notice === "string" ? notice : `${notice.code} · ${notice.message}`}</p>)}
