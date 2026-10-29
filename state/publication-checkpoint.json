@@ -2,31 +2,18 @@
   "code_sha": "667bce632ae0da296b7b16a9ef45c9c29ee46b30",
   "files": {
     "apps/web/public/data/feed-export.csv": "ff2fba1526956503064c1ba59dc3206a79ed27dea3b176752a0fce1f4a5ca502",
-    "apps/web/public/data/intelligence-feed.json": "b3479c1e10c9e13e2e1d7f01178a5e1af355645c514359588fafffe12f91e33c",
-    "apps/web/public/data/intelligence-summary.json": "a29e8f1d4b32f11de03991d4371f82f57403682b7da72000c9dee219efa77913",
-    "apps/web/public/data/source-status.json": "90ee59ace7af8c7171e816c7af5923c93194a316328eb594a0c8e94253cfbaee",
-    "apps/web/public/data/v2-daily-brief.json": "4c6bcedd539bded54d1380915532307a59aa5d06687a8add5a1c5aa2d18cc6b0",
-    "state/schema-drift-state.json": "3a60ec177aec5f9637be33f6eed241753cf7276927d21bdc07a63383c6409338",
-    "state/v2-handoff-state.json": "c767cdc087c005f47a13357b8e3efaa2b866ab010d784779e9ac04e9cd6cd167",
-    "state/v2-shadow-state.json": "a517ad83ebd31508a05e5c6b370945d335f930c686db4d84a50d7101d3a3d705"
+    "apps/web/public/data/intelligence-feed.json": "18ecfaa238821ec12e082c82da767217a7e454a6efc58b5463cb906b5e83a2c2",
+    "apps/web/public/data/intelligence-summary.json": "f5815586c9f64f73f033bd6b2a8f1c7f59867edbb840913728e2080e300b460c",
+    "apps/web/public/data/source-status.json": "20eeda55ad137e447b5f0809934bc25c23de81679efdfcfa04cbdb722391447e",
+    "apps/web/public/data/v2-daily-brief.json": "520abc2868d0057bd2ef5abf0c5725805484658c35a718981a85c5f35ac89a45",
+    "state/schema-drift-state.json": "1a25e9f71b6d94f8c0d63b64d799ca2fc3a75c80f8563e3502a539ea1e8d5522",
+    "state/v2-handoff-state.json": "9cd38e38fe3005ba369627762ac8a962a47000700a94839bf11e1f44a29a7282",
+    "state/v2-shadow-state.json": "cdc9b630a335a63e7a2ebab0daec3549daf2910bb8b9666de16725349786af2a"
   },
-  "generation_id": "590e60b2c2ebf5ec7c9412a66c188b64a9669401ca0499d225456de8006e83c6",
-  "http_verification": {
-    "attempt": 1,
-    "base_url": "https://reese-max.github.io/taichung-police-intel/",
-    "generation_id": "590e60b2c2ebf5ec7c9412a66c188b64a9669401ca0499d225456de8006e83c6",
-    "verified_at": "2026-10-28T17:18:24.373994+00:00",
-    "verified_files": {
-      "apps/web/public/data/feed-export.csv": "ff2fba1526956503064c1ba59dc3206a79ed27dea3b176752a0fce1f4a5ca502",
-      "apps/web/public/data/intelligence-feed.json": "b3479c1e10c9e13e2e1d7f01178a5e1af355645c514359588fafffe12f91e33c",
-      "apps/web/public/data/intelligence-summary.json": "a29e8f1d4b32f11de03991d4371f82f57403682b7da72000c9dee219efa77913",
-      "apps/web/public/data/source-status.json": "90ee59ace7af8c7171e816c7af5923c93194a316328eb594a0c8e94253cfbaee",
-      "apps/web/public/data/v2-daily-brief.json": "4c6bcedd539bded54d1380915532307a59aa5d06687a8add5a1c5aa2d18cc6b0"
-    }
-  },
+  "generation_id": "8c351ca8023a426ad87343596172ec60c9a3e77069dc888d518f523deff749b7",
   "producer_attempt": "1",
-  "producer_run_id": "40733337141",
+  "producer_run_id": "40803222713",
   "schema_version": 1,
-  "slot": "code",
-  "state": "PUBLISHED"
+  "slot": "morning",
+  "state": "PENDING_PUBLICATION"
 }
