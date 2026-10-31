@@ -67,6 +67,7 @@ for (const phase of ["headers", "body"]) {
       server.listen(0, "127.0.0.1");
       await once(server, "listening");
       const base = `http://127.0.0.1:${server.address().port}`;
+      const started = Date.now();
       const loading = loadConditionDatasets("/candidate", {
         fetchImpl: async (url, options) => {
           const name = url.split("/").at(-1).replace(/\.json$/, "");
@@ -99,6 +100,7 @@ for (const phase of ["headers", "body"]) {
       await disconnected.promise;
       if (completion === "after") releaseHealthy.resolve();
       assertPartialDatasets(await loading);
+      assert.ok(Date.now() - started < 1500);
       assert.deepEqual([...completed].sort(), names.filter(name => name !== "source-status").sort());
       assert.ok([...requests.entries()].every(([name, signal]) => signal.aborted === (name === "source-status")));
     });
