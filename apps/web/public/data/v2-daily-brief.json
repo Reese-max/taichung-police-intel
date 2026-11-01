@@ -30,8 +30,8 @@
   ],
   "baseline_established_at": "2026-08-27T12:13:22+08:00",
   "candidate_source_context": {
-    "collection_run_id": "CR-DEMO-20261031-EVENING-SCHEDULE",
-    "generated_at": "2026-10-31T23:52:05+08:00",
+    "collection_run_id": "CR-DEMO-20261101-MORNING-SCHEDULE",
+    "generated_at": "2026-11-01T09:27:07+08:00",
     "integration_status": "CANDIDATE",
     "items": [
       {
@@ -230,7 +230,7 @@
         "window_completeness": "PARTIAL"
       },
       {
-        "change_type": "CANDIDATE_OBSERVATION",
+        "change_type": "LKG",
         "eligibility": "INELIGIBLE_CANDIDATE",
         "integration_status": "CANDIDATE",
         "official_url": "https://www.traffic.taichung.gov.tw/news/index-1.asp?Parser=9,4,20,,,,21855,,,,2",
@@ -392,7 +392,7 @@
           "NO_LAST_KNOWN_GOOD",
           "NO_DATA_AS_OF"
         ],
-        "last_checked_at": "2026-10-31T23:51:56+08:00",
+        "last_checked_at": "2026-11-01T09:26:59+08:00",
         "pagination": null,
         "promotion_eligible": false,
         "source_health": "FAILED",
@@ -410,7 +410,7 @@
           "NO_LAST_KNOWN_GOOD",
           "VERY_STALE_DATA"
         ],
-        "last_checked_at": "2026-10-31T23:52:01+08:00",
+        "last_checked_at": "2026-11-01T09:27:04+08:00",
         "pagination": {
           "complete": false,
           "page_limit": 4,
@@ -432,7 +432,7 @@
           "NO_LAST_KNOWN_GOOD",
           "VERY_STALE_DATA"
         ],
-        "last_checked_at": "2026-10-31T23:52:05+08:00",
+        "last_checked_at": "2026-11-01T09:27:07+08:00",
         "pagination": {
           "complete": false,
           "page_limit": 4,
@@ -448,7 +448,7 @@
       }
     ]
   },
-  "generated_at": "2026-10-31T23:52:05+08:00",
+  "generated_at": "2026-11-01T09:27:07+08:00",
   "generator_version": 2,
   "mode": "V2_SHADOW",
   "other_changes": [],
@@ -538,7 +538,7 @@
   ],
   "schema_version": 1,
   "snapshot_complete": false,
-  "source_collection_run_id": "CR-DEMO-20261031-EVENING-SCHEDULE",
+  "source_collection_run_id": "CR-DEMO-20261101-MORNING-SCHEDULE",
   "source_health": {
     "failed_count": 1,
     "gap_count": 8,
@@ -558,7 +558,7 @@
     "policy_hash": "3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501",
     "policy_version": 1
   },
-  "source_status_generated_at": "2026-10-31T23:52:05+08:00",
+  "source_status_generated_at": "2026-11-01T09:27:07+08:00",
   "status_message": "本期未偵測到可確認的新增或修正；歷史資料保留於資料庫。",
   "tracking_items": []
 }
