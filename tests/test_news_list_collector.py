@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import unittest
 from contextlib import nullcontext
 from datetime import date, datetime
@@ -46,6 +47,7 @@ FIRE_LIVE = """<div class="update"><strong>最後異動時間：</strong>2026-09
 <span data-th="執行狀況："></span></li></ul>""".encode("utf-8")
 
 DETAIL = _page("<div>detail body</div><a href='files/a.pdf'>附件</a>")
+FIRE_FIXTURES = Path(__file__).parent / "fixtures/fire-live"
 
 
 class FakeResponse:
@@ -79,6 +81,75 @@ def _collect(cfg_id: str, list_html: bytes, existing=None, max_details=None, **e
 
 
 class ParseNewsListTests(unittest.TestCase):
+    def test_fire_empty_dispatch_rejects_whole_page_with_safe_counts(self):
+        body = (FIRE_FIXTURES / "empty-dispatch.html").read_bytes()
+        page_url = oc.NEWS_LIST_SOURCES["S-031"]["list_url"] + ",,,,,,,,3"
+        with self.assertRaises(oc.FireLiveValidationError) as caught:
+            oc.parse_fire_live(body, page_url=page_url)
+        error = caught.exception
+        self.assertEqual(error.reason, "HTML_LIVE_REQUIRED_VALUE_MISSING")
+        self.assertEqual(error.diagnostics, {
+            "source_id": "S-031", "page": 3, "invalid_row_count": 2,
+            "rejected_row_count": 3, "invalid_row_numbers": [2, 3],
+            "row_numbers_truncated": False, "missing_labels": [],
+            "empty_required_fields": ["派遣分隊"], "invalid_required_fields": [],
+        })
+        for text in ("合成路", "合成分隊甲", "合成案別", "合成地圖文字", "2026/09/10"):
+            self.assertNotIn(text, str(error))
+
+    def test_fire_missing_label_is_distinct_and_still_rejects_whole_page(self):
+        with self.assertRaises(oc.FireLiveValidationError) as caught:
+            oc.parse_fire_live((FIRE_FIXTURES / "missing-dispatch-label.html").read_bytes())
+        error = caught.exception
+        self.assertEqual(error.reason, "HTML_LIVE_REQUIRED_LABEL_MISSING")
+        self.assertEqual(error.status, "BREAKING_DRIFT")
+        self.assertEqual(error.diagnostics["missing_labels"], ["派遣分隊"])
+        self.assertEqual(error.diagnostics["empty_required_fields"], [])
+        self.assertEqual(error.diagnostics["invalid_row_count"], 2)
+        self.assertEqual(error.diagnostics["rejected_row_count"], 3)
+
+    def test_fire_all_required_identity_values_remain_required(self):
+        from bs4 import BeautifulSoup
+
+        body = (FIRE_FIXTURES / "empty-dispatch.html").read_bytes()
+        for label in ("受理時間：", "案類：", "案別", "發生地點：", "派遣分隊："):
+            with self.subTest(label=label):
+                doc = BeautifulSoup(body, "html.parser")
+                for row in doc.select("ul > li:not(.list_head)")[1:]:
+                    row.decompose()
+                doc.find("span", attrs={"data-th": label}).clear()
+                with self.assertRaises(oc.FireLiveValidationError) as caught:
+                    oc.parse_fire_live(str(doc).encode())
+                self.assertEqual(caught.exception.diagnostics["empty_required_fields"], [label.rstrip("：")])
+                self.assertEqual(caught.exception.diagnostics["rejected_row_count"], 1)
+
+    def test_fire_diagnostics_bound_row_numbers_without_hiding_total(self):
+        from bs4 import BeautifulSoup
+
+        doc = BeautifulSoup((FIRE_FIXTURES / "empty-dispatch.html").read_bytes(), "html.parser")
+        row = str(doc.select("ul > li:not(.list_head)")[1])
+        body = str(doc.select_one(".update")) + '<ul class="list rwd-table">' + row * 25 + '</ul>'
+        with self.assertRaises(oc.FireLiveValidationError) as caught:
+            oc.parse_fire_live(body.encode())
+        self.assertEqual(caught.exception.diagnostics["invalid_row_count"], 25)
+        self.assertEqual(caught.exception.diagnostics["rejected_row_count"], 25)
+        self.assertEqual(caught.exception.diagnostics["invalid_row_numbers"], list(range(1, 21)))
+        self.assertTrue(caught.exception.diagnostics["row_numbers_truncated"])
+
+    def test_fire_invalid_timestamp_and_page_query_are_not_echoed(self):
+        from bs4 import BeautifulSoup
+
+        doc = BeautifulSoup((FIRE_FIXTURES / "empty-dispatch.html").read_bytes(), "html.parser")
+        for row in doc.select("ul > li:not(.list_head)")[1:]:
+            row.decompose()
+        doc.find("span", attrs={"data-th": "受理時間："}).string = "private-event-token"
+        with self.assertRaises(oc.FireLiveValidationError) as caught:
+            oc.parse_fire_live(str(doc).encode(), page_url=oc.NEWS_LIST_SOURCES["S-031"]["list_url"] + "&token=secret-query")
+        self.assertEqual(caught.exception.reason, "HTML_LIVE_REQUIRED_VALUE_INVALID")
+        self.assertIsNone(caught.exception.diagnostics["page"])
+        self.assertNotIn("private-event-token", str(caught.exception))
+        self.assertNotIn("secret-query", str(caught.exception))
+
     def test_source_patterns_extract_stable_ids_and_dates(self):
         cases = (
             ("S-001", POLICE_LIST, ["202609100003", "202609080003", "202607010001"]),

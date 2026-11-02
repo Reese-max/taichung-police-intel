@@ -575,9 +575,16 @@ def _observe_fire_live(contract: dict[str, Any], body: bytes, result: dict[str, 
     try:
         if str(ROOT) not in sys.path:
             sys.path.insert(0, str(ROOT))
-        from online_collect import parse_fire_live
+        from online_collect import FireLiveValidationError, parse_fire_live
 
-        entries = parse_fire_live(body)
+        entries = parse_fire_live(body, page_url=result["final_url"] or result["requested_url"])
+    except FireLiveValidationError as error:
+        result["reasons"] = [error.reason]
+        result["status"] = error.status
+        result["parse_diagnostics"] = error.diagnostics
+        _signature(result, {"transport": contract["transport"], "parse": "failed", "validation_failure": error.reason})
+        result["review_required"] = True
+        return result
     except Exception as error:
         result["reasons"] = ["HTML_LIVE_SHAPE_FAILED", type(error).__name__.upper()]
         result["status"] = "BREAKING_DRIFT"

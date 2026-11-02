@@ -41,6 +41,27 @@ FIRE_LIVE = """<div class="update">最後異動時間：2026-09-21 19:24:23</div
 
 
 class SchemaDriftTests(unittest.TestCase):
+    def test_fire_value_failure_is_distinct_from_missing_label_and_stays_blocked(self):
+        fixtures = Path(__file__).parent / "fixtures/fire-live"
+        for name, status, reason, field_key in (
+            ("empty-dispatch.html", "CONTENT_SHAPE_UNKNOWN", "HTML_LIVE_REQUIRED_VALUE_MISSING", "empty_required_fields"),
+            ("missing-dispatch-label.html", "BREAKING_DRIFT", "HTML_LIVE_REQUIRED_LABEL_MISSING", "missing_labels"),
+        ):
+            with self.subTest(fixture=name):
+                result = drift.observe(drift.CONTRACTS["S-031"], (fixtures / name).read_bytes(),
+                                       content_type="text/html", requested_url=online_collect.NEWS_LIST_SOURCES["S-031"]["list_url"] + ",,,,,,,,3")
+                self.assertEqual(result["status"], status)
+                self.assertNotIn(result["status"], drift.GOOD_STATUSES)
+                self.assertEqual(result["reasons"], [reason])
+                self.assertTrue(result["review_required"])
+                self.assertEqual(result["window_completeness"], "PARTIAL")
+                self.assertEqual(result["parse_diagnostics"][field_key], ["派遣分隊"])
+                self.assertEqual(result["parse_diagnostics"]["source_id"], "S-031")
+                self.assertEqual(result["parse_diagnostics"]["page"], 3)
+                self.assertEqual(result["parse_diagnostics"]["invalid_row_count"], 2)
+                self.assertEqual(result["parse_diagnostics"]["rejected_row_count"], 3)
+                self.assertNotIn("合成路", json.dumps(result, ensure_ascii=False))
+
     def test_all_required_news_contracts_use_real_parser_shapes(self):
         html = {
             "S-001": '<li><a href="news_view.jsp?dataserno=1">警政新聞 115-09-10</a></li>',

@@ -857,10 +857,54 @@ def _fire_datetime(value: str, label: str) -> datetime:
             return datetime.strptime(raw, fmt).replace(tzinfo=TZ)
         except ValueError:
             pass
-    raise ValueError(f"fire live {label} has invalid timestamp: {raw!r}")
+    raise ValueError(f"fire live {label} has invalid timestamp")
 
 
-def parse_fire_live(html: bytes) -> list[dict]:
+def fire_live_page_number(page_url: str | None) -> int | None:
+    """Extract only the official list cursor; never retain URL/query contents."""
+    if page_url is None:
+        return 1
+    configured = urllib.parse.urlsplit(NEWS_LIST_SOURCES["S-031"]["list_url"])
+    parts = urllib.parse.urlsplit(page_url)
+    if (parts.scheme, parts.netloc, parts.path) != (configured.scheme, configured.netloc, configured.path):
+        return None
+    query = urllib.parse.parse_qs(parts.query, keep_blank_values=True)
+    if set(query) != {"Parser"} or len(query["Parser"]) != 1:
+        return None
+    cursor = query["Parser"][0]
+    if cursor == "99,8,226":
+        return 1
+    match = re.fullmatch(r"99,8,226,{8}([1-9]\d{0,5})", cursor)
+    return int(match.group(1)) if match else None
+
+
+class FireLiveValidationError(ValueError):
+    """Non-content diagnostics for a rejected whole live incident page."""
+
+    def __init__(self, message: str, *, page: int | None, row_count: int,
+                 missing_labels: dict[int, set[str]] | None = None,
+                 empty_fields: dict[int, set[str]] | None = None,
+                 invalid_fields: dict[int, set[str]] | None = None):
+        groups = (missing_labels or {}, empty_fields or {}, invalid_fields or {})
+        invalid_rows = sorted(set().union(*(set(group) for group in groups)))
+        self.reason = (
+            "HTML_LIVE_REQUIRED_LABEL_MISSING" if groups[0] else
+            "HTML_LIVE_REQUIRED_VALUE_MISSING" if groups[1] else
+            "HTML_LIVE_REQUIRED_VALUE_INVALID"
+        )
+        self.status = "BREAKING_DRIFT" if groups[0] else "CONTENT_SHAPE_UNKNOWN"
+        self.diagnostics = {
+            "source_id": "S-031", "page": page,
+            "invalid_row_count": len(invalid_rows), "rejected_row_count": row_count,
+            "invalid_row_numbers": invalid_rows[:20],
+            "row_numbers_truncated": len(invalid_rows) > 20,
+            **{name: sorted(set().union(*group.values())) if group else []
+               for name, group in zip(("missing_labels", "empty_required_fields", "invalid_required_fields"), groups)},
+        }
+        super().__init__(message + ": " + json.dumps(self.diagnostics, ensure_ascii=False, sort_keys=True))
+
+
+def parse_fire_live(html: bytes, *, page_url: str | None = None) -> list[dict]:
     """Parse only coarse, transient incident metadata from the official table."""
     soup = BeautifulSoup(html, "html.parser")
     update = soup.select_one(".update")
@@ -880,8 +924,10 @@ def parse_fire_live(html: bytes) -> list[dict]:
         raise ValueError("fire live page has no incident rows")
 
     required = {"受理時間", "案類", "案別", "發生地點", "派遣分隊", "執行狀況"}
+    page = fire_live_page_number(page_url)
     entries = []
-    for row in rows:
+    missing_labels, empty_fields, invalid_fields = {}, {}, {}
+    for row_number, row in enumerate(rows, 1):
         values = {}
         for span in row.find_all("span", attrs={"data-th": True}, recursive=False):
             label = re.sub(r"[：:]$", "", span["data-th"].strip())
@@ -889,17 +935,25 @@ def parse_fire_live(html: bytes) -> list[dict]:
             values[label] = direct_text
         missing = required - set(values)
         if missing:
-            raise ValueError(f"fire live row is missing fields: {sorted(missing)}")
-        received_at = _fire_datetime(values["受理時間"], "reception")
+            missing_labels[row_number] = missing
+            continue
+        empty = {field for field in ("受理時間", "案類", "案別", "發生地點", "派遣分隊") if not values[field].strip()}
+        if empty:
+            empty_fields[row_number] = empty
+            continue
+        try:
+            received_at = _fire_datetime(values["受理時間"], "reception")
+        except ValueError:
+            invalid_fields[row_number] = {"受理時間"}
+            continue
         category = values["案類"].strip()
         event_type = values["案別"].strip()
         location = values["發生地點"].strip()
         dispatch_unit = values["派遣分隊"].strip()
-        if not category or not event_type or not location or not dispatch_unit:
-            raise ValueError("fire live row has an empty required value")
         districts = re.findall(r"[\u4e00-\u9fff]{1,3}區", location)
         if not districts:
-            raise ValueError("fire live row has no district")
+            invalid_fields[row_number] = {"發生地點"}
+            continue
         identity = {
             "received_at": received_at.isoformat(),
             "category": category,
@@ -917,6 +971,13 @@ def parse_fire_live(html: bytes) -> list[dict]:
             "status": values["執行狀況"].strip() or "UNKNOWN",
             "source_modified_at": source_modified_at.isoformat(),
         })
+    if missing_labels or empty_fields or invalid_fields:
+        message = ("fire live row is missing fields" if missing_labels else
+                   "fire live row has an empty required value" if empty_fields else
+                   "fire live row has an invalid required value")
+        raise FireLiveValidationError(message, page=page, row_count=len(rows),
+                                      missing_labels=missing_labels, empty_fields=empty_fields,
+                                      invalid_fields=invalid_fields)
     return entries
 
 
@@ -925,7 +986,7 @@ def collect_fire_live(session: requests.Session, start: date, end: date) -> dict
     del start, end
     config = NEWS_LIST_SOURCES["S-031"]
     listing = get(session, config["list_url"], source_id="S-031")
-    entries = parse_fire_live(listing.content)
+    entries = parse_fire_live(listing.content, page_url=listing.url)
     items = []
     for entry in entries:
         payload = {key: value for key, value in entry.items() if key != "stable_key"}
