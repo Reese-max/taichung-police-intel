@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -265,34 +266,78 @@ class NoRedirect(HTTPRedirectHandler):
         return None
 
 
-def verify_public_files(base_url, bundle, *, attempts=3, delay=2, allow_loopback=False):
+def verify_public_files(base_url, bundle, *, attempts=13, delay=5, max_wait=120, allow_loopback=False):
+    """Wait for exact bytes with a probe budget and bounded socket reads.
+
+    The budget is checked before requests and between read1 chunks. An in-flight
+    socket operation can finish after it, up to its (at most 15 second) timeout;
+    a late result never authorizes acknowledgement.
+    """
     parts = urlsplit(base_url)
     is_public = (parts.scheme == "https" and parts.netloc.lower() == "reese-max.github.io" and
                  parts.path.rstrip("/") == "/taichung-police-intel")
     is_test = (allow_loopback and parts.scheme == "http" and parts.hostname == "127.0.0.1")
     if not (is_public or is_test) or parts.username or parts.password or parts.query or parts.fragment:
         raise RuntimeError("public verification URL is not the approved Pages origin/path")
+    if (type(attempts) is not int or not 1 <= attempts <= 25 or
+            type(delay) not in (int, float) or not math.isfinite(delay) or not 0 <= delay <= 30 or
+            type(max_wait) not in (int, float) or not math.isfinite(max_wait) or not 0 < max_wait <= 300):
+        raise RuntimeError("invalid bounded public verification budget")
     opener = build_opener(NoRedirect)
     expected = {p: digest(bundle[p]) for p in PUBLIC_PATHS}
-    last_error = "no probe"
+    started = time.monotonic()
+    deadline = started + max_wait
+    history = []
     for attempt in range(attempts):
         verified = {}
-        try:
-            for relative, wanted in expected.items():
-                suffix = relative.removeprefix("apps/web/public/")
-                with opener.open(base_url.rstrip("/") + "/" + suffix, timeout=15) as response:
-                    data = response.read(MAX_FILE_BYTES + 1)
-                    if response.status != 200 or len(data) > MAX_FILE_BYTES or digest(data) != wanted:
-                        raise RuntimeError(f"public data hash/status mismatch: {suffix}")
-                    verified[relative] = digest(data)
+        observations = []
+        for relative, wanted in expected.items():
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            suffix = relative.removeprefix("apps/web/public/")
+            row = {"path": suffix, "expected_sha256": wanted,
+                   "http_status": None, "observed_sha256": None}
+            try:
+                with opener.open(base_url.rstrip("/") + "/" + suffix, timeout=min(15, remaining)) as response:
+                    # read1 returns after at most one underlying read, so a
+                    # trickling body cannot keep read(n) alive indefinitely.
+                    data = bytearray()
+                    while len(data) <= MAX_FILE_BYTES and time.monotonic() < deadline:
+                        chunk = response.read1(min(65536, MAX_FILE_BYTES + 1 - len(data)))
+                        if not chunk:
+                            break
+                        data.extend(chunk)
+                    actual = digest(data)
+                    row.update(http_status=response.status, observed_sha256=actual,
+                               received_bytes=len(data), oversized=len(data) > MAX_FILE_BYTES,
+                               last_modified=response.headers.get("Last-Modified"),
+                               age=response.headers.get("Age"))
+                    row["budget_exceeded"] = time.monotonic() > deadline
+                    if (response.status == 200 and len(data) <= MAX_FILE_BYTES and
+                            actual == wanted and time.monotonic() <= deadline):
+                        verified[relative] = actual
+            except (OSError, URLError, RuntimeError) as error:
+                row.update(http_status=getattr(error, "code", None),
+                           error_type=type(error).__name__)
+            observations.append(row)
+        receipt = {"attempt": attempt + 1,
+                   "elapsed_seconds": round(time.monotonic() - started, 3),
+                   "files": observations}
+        history.append(receipt)
+        print("PUBLIC_DATA_PROBE " + json.dumps(receipt, sort_keys=True), flush=True)
+        if verified == expected:
             return {"generation_id": generation(bundle), "verified_files": verified,
                     "verified_at": datetime.now(timezone.utc).isoformat(),
-                    "base_url": base_url, "attempt": attempt + 1}
-        except (OSError, URLError, RuntimeError) as error:
-            last_error = str(error)
-            if attempt + 1 < attempts:
-                time.sleep(delay)
-    raise RuntimeError(f"public data verification failed: {last_error}")
+                    "base_url": base_url, "attempt": attempt + 1,
+                    "verification_attempts": history}
+        remaining = deadline - time.monotonic()
+        if attempt + 1 >= attempts or remaining <= 0:
+            break
+        time.sleep(min(delay, remaining))
+    raise RuntimeError("public data verification failed: " +
+                       json.dumps({"attempts": len(history), "max_wait_seconds": max_wait,
+                                   "last_probe": history[-1] if history else None}, sort_keys=True))
 
 
 def acknowledge(repo, branch, expected_commit, expected_generation, base_url, *, verifier=None):
