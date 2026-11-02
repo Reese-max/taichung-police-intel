@@ -129,6 +129,8 @@ const required = [
   "tests/test_v2_publication_contract.py",
   "tests/test_publication_state_branch.py",
   "tests/test_publication_propagation.py",
+  "scripts/verify-display-cap-runtime.py",
+  "scripts/record-subtest-evidence.py",
   "tests/test_publication_outcome.py",
   "tests/test_publication_alert.py",
   "scripts/e2e-browser.mjs",
