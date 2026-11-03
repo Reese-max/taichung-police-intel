@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import errno
 import importlib.util
 from datetime import datetime, timedelta
 import json
@@ -16,6 +17,54 @@ from requests.adapters import HTTPAdapter
 
 ROOT = Path(__file__).resolve().parents[1]
 CANDIDATE_STATUSES = {"AUDITED_EXISTING", "VERIFIED_CANDIDATE"}
+
+
+def transport_error_diagnostics(error: BaseException) -> dict:
+    """Read a bounded exception graph, never arbitrary messages or URLs."""
+    import requests
+
+    pending, queued, seen = [error], {id(error)}, set()
+    classes, numbers, reasons, truncated = set(), set(), set(), False
+    codes = {
+        errno.ENETUNREACH: "NETWORK_UNREACHABLE", 10051: "NETWORK_UNREACHABLE",
+        errno.EHOSTUNREACH: "HOST_UNREACHABLE", 10065: "HOST_UNREACHABLE",
+        errno.ECONNRESET: "CONNECTION_RESET", 10054: "CONNECTION_RESET",
+        errno.ECONNREFUSED: "CONNECTION_REFUSED", 10061: "CONNECTION_REFUSED",
+        errno.ETIMEDOUT: "TIMEOUT", 10060: "TIMEOUT",
+    }
+    while pending and len(seen) < 8:
+        current = pending.pop(0)
+        queued.discard(id(current))
+        if id(current) in seen:
+            continue
+        seen.add(id(current))
+        name = type(current).__name__
+        classes.add(name if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,79}", name) else "Exception")
+        number = getattr(current, "errno", None)
+        if type(number) is int and -1000 <= number <= 200000:
+            numbers.add(number)
+            if number in codes:
+                reasons.add(codes[number])
+        if isinstance(current, (requests.Timeout, TimeoutError)):
+            reasons.add("TIMEOUT")
+        if isinstance(current, requests.exceptions.SSLError):
+            reasons.add("TLS_ERROR")
+        if isinstance(current, requests.exceptions.ProxyError):
+            reasons.add("PROXY_ERROR")
+        # urllib3 nests the original OSError in reason/args; requests wraps it
+        # again. Traverse exception objects only, not their potentially secret text.
+        if len(current.args) > 8:
+            truncated = True
+        for child in (current.__cause__, current.__context__, getattr(current, "reason", None), *current.args[:8]):
+            if isinstance(child, BaseException) and id(child) not in seen and id(child) not in queued:
+                if len(seen) + len(pending) >= 8:
+                    truncated = True
+                else:
+                    pending.append(child)
+                    queued.add(id(child))
+    return {"exception_types": sorted(classes), "errno_values": sorted(numbers),
+            "reason_codes": sorted(reasons) or ["TRANSPORT_FAILURE_UNSPECIFIED"],
+            "exception_graph_truncated": truncated or bool(pending)}
 
 
 def _load_policy_module():
@@ -227,7 +276,7 @@ def run_canary(collector, sources, now, *, session_factory=BoundedSession, exist
                 )
                 record["schema_contract"] = {
                     key: contract_result.get(key)
-                    for key in ("contract_version", "parser_version", "transport", "status", "observed_schema_fingerprint", "sample_sha256", "reasons", "review_required")
+                    for key in ("contract_version", "parser_version", "transport", "status", "observed_schema_fingerprint", "sample_sha256", "reasons", "review_required", "parse_diagnostics")
                 }
                 if contract_result["status"] not in drift.GOOD_STATUSES:
                     raise ValueError(f"schema contract {contract_result['status']}")
@@ -264,11 +313,17 @@ def run_canary(collector, sources, now, *, session_factory=BoundedSession, exist
                 ],
                 "review_required": True,
             }
+            fire_validation = isinstance(error, getattr(collector, "FireLiveValidationError", ()))
+            if fire_validation:
+                failure_contract.update(status=error.status, reasons=[error.reason], parse_diagnostics=error.diagnostics)
             # A failed fetch has no schema sample. Retain a real schema result
             # if collection reached that check, instead of replacing its drift
             # details with a generic parser-unknown diagnosis.
-            if transport_failed or "schema_contract" not in record:
+            if transport_failed or fire_validation or "schema_contract" not in record:
                 record["schema_contract"] = failure_contract
+            transport_diagnostics = transport_error_diagnostics(error) if transport_failed else None
+            if transport_diagnostics is not None:
+                record["transport_diagnostics"] = transport_diagnostics
             record.update({
                 "source_health": "FAILED",
                 "collector_window_claim": "PARTIAL",
@@ -278,7 +333,8 @@ def run_canary(collector, sources, now, *, session_factory=BoundedSession, exist
                 "detail_fetch_count": None,
                 "manifest_sha256": None,
                 "error_type": type(error).__name__,
-                "error_message": str(error).strip()[:256],
+                "error_message": ("transport failure: " + ",".join(transport_diagnostics["reason_codes"])
+                                  if transport_diagnostics is not None else str(error).strip()[:256]),
             })
         finally:
             record["http_calls"] = session.calls

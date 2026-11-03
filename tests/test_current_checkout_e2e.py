@@ -62,6 +62,34 @@ def governed_context(*, brief_reviewed=False):
     return temporary, modules, ctx
 
 
+class DisplayCapRuntimeReceiptTests(unittest.TestCase):
+    def setUp(self):
+        spec = importlib.util.spec_from_file_location("display_cap_runtime", ROOT / "scripts/verify-display-cap-runtime.py")
+        self.module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.module)
+        self.receipt = {"status": "PASS", "code_sha": "a" * 40, "worktree_dirty": False,
+                        "production_verified": False, "not_run": [],
+                        "test_mode": "CURRENT_CHECKOUT_LOOPBACK_HTTP",
+                        "checks": [{"id": name, "status": "PASS"} for name in ("web_build", "build_only_release")]}
+
+    def test_complete_bound_runtime_receipt_is_accepted(self):
+        self.module.validate_runtime(self.receipt, "a" * 40)
+
+    def test_dirty_wrong_commit_or_production_claim_is_rejected(self):
+        for patch in ({"worktree_dirty": True}, {"code_sha": "b" * 40}, {"production_verified": True}):
+            with self.subTest(patch=patch), self.assertRaises(ValueError):
+                self.module.validate_runtime(dict(self.receipt, **patch), "a" * 40)
+
+    def test_unrun_browser_or_partial_status_is_rejected(self):
+        for patch in ({"status": "PARTIAL"}, {"not_run": [{"id": "browser_e2e"}]}):
+            with self.subTest(patch=patch), self.assertRaises(ValueError):
+                self.module.validate_runtime(dict(self.receipt, **patch), "a" * 40)
+
+    def test_missing_actual_build_is_rejected(self):
+        with self.assertRaises(ValueError):
+            self.module.validate_runtime(dict(self.receipt, checks=[]), "a" * 40)
+
+
 class V6BrowserBindingTests(unittest.TestCase):
     def setUp(self):
         self.ctx = {"identity": {"code_sha": "a" * 40}, "hashes": {key: key * 20 for key in ("feed", "status", "brief")}}

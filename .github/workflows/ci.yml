@@ -94,6 +94,17 @@ jobs:
       - name: Run full verification gate
         run: npm run check
 
+      - name: Record each existing alias subtest without suppressing skips
+        run: python -X utf8 -B scripts/record-subtest-evidence.py --output "${{ runner.temp }}/alias-subtests.json"
+
+      - name: Retain exact alias subtest evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: alias-subtests-${{ github.sha }}
+          path: ${{ runner.temp }}/alias-subtests.json
+          if-no-files-found: error
+
       - name: Verify generated V1 publication bundle
         run: python -X utf8 scripts/verify-publication-bundle.py
 
@@ -215,7 +226,17 @@ jobs:
           GOVINTEL_CHAT_BROWSER_OUTPUT: ${{ runner.temp }}/govintel-runtime-evidence/chat-browser
         run: node scripts/chat-assist-browser-e2e.mjs
 
+      - name: Verify actual display-cap runtime in an isolated clean baseline
+        shell: bash
+        run: |
+          govintel_chromium_path="$(node -p "require('playwright-core').chromium.executablePath()")"
+          python -X utf8 -B scripts/verify-display-cap-runtime.py \
+            --chrome-path "$govintel_chromium_path" \
+            --output "$RUNNER_TEMP/govintel-runtime-evidence/display-cap"
+
       - name: Preserve explicit status when setup prevented execution
+        # The display-cap verifier uses a separate clean synthetic commit; the
+        # original dirty-fixture skip and clean-checkout protection stay intact.
         if: ${{ always() }}
         run: |
           python -X utf8 - <<'PY'
@@ -241,6 +262,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: govintel-current-checkout-browser-${{ github.sha }}
-          path: ${{ runner.temp }}/govintel-runtime-evidence
+          path: |
+            ${{ runner.temp }}/govintel-runtime-evidence
+            !${{ runner.temp }}/govintel-runtime-evidence/display-cap/baseline/**
+            !${{ runner.temp }}/govintel-runtime-evidence/display-cap/source.tar
           if-no-files-found: warn
           retention-days: 14

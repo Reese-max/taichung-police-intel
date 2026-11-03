@@ -57,6 +57,78 @@ def collector(fail=None, sources=SOURCES, existing_log=None):
 
 
 class CanaryContractTests(unittest.TestCase):
+    def test_fire_validation_failure_preserves_safe_diagnostics_and_prior_state(self):
+        import online_collect as oc
+
+        prior = {"S-031": {"old-item": {"content_sha256": "c" * 64}}}
+        fixtures = Path(__file__).parent / "fixtures/fire-live"
+        for filename, status, reason in (
+            ("empty-dispatch.html", "CONTENT_SHAPE_UNKNOWN", "HTML_LIVE_REQUIRED_VALUE_MISSING"),
+            ("missing-dispatch-label.html", "BREAKING_DRIFT", "HTML_LIVE_REQUIRED_LABEL_MISSING"),
+        ):
+            with self.subTest(fixture=filename):
+                fixture = collector(sources=("S-031",))
+                fixture.FireLiveValidationError = oc.FireLiveValidationError
+                def fail(session, *args, **kwargs):
+                    session.calls = 1
+                    return oc.parse_fire_live((fixtures / filename).read_bytes())
+                fixture.collect_source = fail
+                report = module.run_canary(fixture, ["S-031"], NOW, session_factory=FakeSession, existing_items=prior)
+                record = report["sources"][0]
+                self.assertEqual(report["failed_count"], 1)
+                self.assertEqual(record["source_health"], "FAILED")
+                self.assertEqual(record["schema_contract"]["status"], status)
+                self.assertEqual(record["schema_contract"]["reasons"], [reason])
+                self.assertEqual(record["schema_contract"]["parse_diagnostics"]["rejected_row_count"], 3)
+                self.assertTrue(record["schema_contract"]["review_required"])
+                self.assertFalse(record["promotion_eligible"])
+                self.assertIsNone(record["snapshot_item_count"])
+                self.assertIsNone(record["manifest_sha256"])
+                self.assertEqual(report["item_state"], {"S-031": {"old-item": "c" * 64}})
+                for value in ("合成路", "合成分隊甲", "合成案別", "合成地圖文字"):
+                    self.assertNotIn(value, json.dumps(report, ensure_ascii=False))
+
+    def test_transport_report_exposes_errno_chain_without_messages_or_query_values(self):
+        import errno
+        import requests
+        from urllib3.exceptions import MaxRetryError
+
+        inner = OSError(errno.ENETUNREACH, "private-event-content")
+        error = requests.ConnectionError(MaxRetryError(None, "https://user:password@official.test/?token=secret-query", reason=inner))
+        fixture = collector(sources=("S-001",))
+        def fail(session, *args, **kwargs):
+            session.calls = 1
+            raise error
+        fixture.collect_source = fail
+        report = module.run_canary(fixture, ["S-001"], NOW, session_factory=FakeSession)
+        record = report["sources"][0]
+        self.assertEqual(record["schema_contract"]["status"], "SOURCE_UNAVAILABLE")
+        self.assertEqual(record["schema_contract"]["reasons"], ["COLLECTOR_TRANSPORT_FAILED"])
+        self.assertEqual(record["transport_diagnostics"]["reason_codes"], ["NETWORK_UNREACHABLE"])
+        self.assertEqual(record["transport_diagnostics"]["errno_values"], [errno.ENETUNREACH])
+        self.assertEqual(set(record["transport_diagnostics"]["exception_types"]), {"ConnectionError", "MaxRetryError", "OSError"})
+        self.assertIsNone(record["snapshot_item_count"])
+        for value in ("private-event-content", "password", "secret-query", "official.test", "token="):
+            self.assertNotIn(value, json.dumps(report))
+
+    def test_transport_diagnostic_graph_is_bounded_and_cycles_terminate(self):
+        import requests
+
+        error = requests.ConnectionError("never copied")
+        current = error
+        for _ in range(20):
+            current.__cause__ = OSError("never copied")
+            current = current.__cause__
+        result = module.transport_error_diagnostics(error)
+        self.assertTrue(result["exception_graph_truncated"])
+        self.assertLessEqual(len(result["exception_types"]), 8)
+        current.__cause__ = error
+        self.assertTrue(module.transport_error_diagnostics(error)["exception_graph_truncated"])
+        cycle = requests.Timeout("secret-value")
+        cycle.__cause__ = cycle
+        self.assertEqual(module.transport_error_diagnostics(cycle)["reason_codes"], ["TIMEOUT"])
+        self.assertFalse(module.transport_error_diagnostics(cycle)["exception_graph_truncated"])
+
     def test_success_is_candidate_observation_not_promotion(self):
         report = module.run_canary(collector(), list(SOURCES), NOW, session_factory=FakeSession)
         self.assertEqual(report["source_count"], 3)
