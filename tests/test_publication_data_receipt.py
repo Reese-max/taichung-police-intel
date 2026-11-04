@@ -230,10 +230,13 @@ class PublicationDataReceiptTests(unittest.TestCase):
         self.assertIn(self.status['sources'][0]['source_id'], result.stdout)
         self.assertFalse(json.loads(output.read_text())['production_verified'])
 
-    def test_workflow_downloads_exact_attempt_before_report_even_after_failure(self):
+    def test_workflow_downloads_exact_producer_before_report_even_after_failure(self):
         workflow = (ROOT / '.github/workflows/pages.yml').read_text()
         job = workflow.split('  publication_outcome:', 1)[1]
-        self.assertIn('name: publication-evidence-${{ github.run_id }}-${{ github.run_attempt }}', job)
+        self.assertIn('name: publication-evidence-${{ github.run_id }}-${{ github.run_attempt }}', workflow.split('  publication_outcome:', 1)[0])
+        self.assertIn('evidence_id: ${{ steps.evidence.outputs.artifact-id }}', workflow)
+        self.assertIn('artifact-ids: ${{ needs.build.outputs.evidence_id }}', job)
+        self.assertNotIn('github.run_attempt', job.split('name: Report actual', 1)[0])
         self.assertLess(job.index('uses: actions/download-artifact@'), job.index('name: Report actual'))
         self.assertIn('name: Report actual build and deployment outcomes\n        if: always()', job)
         self.assertIn('DATA_EVIDENCE_REQUIRED: "true"', job)

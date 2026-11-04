@@ -48,6 +48,7 @@ jobs:
       data_health_sha256: ${{ steps.data_receipt.outputs.sha256 }}
       pages_upload: ${{ steps.pages_upload.outcome }}
       evidence: ${{ steps.evidence.outcome }}
+      evidence_id: ${{ steps.evidence.outputs.artifact-id }}
       evidence_url: ${{ steps.evidence.outputs.artifact-url }}
     runs-on: ubuntu-latest
     services:
@@ -353,10 +354,11 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-      - name: Download this attempt's retained publication data receipts
+      - name: Download the producing build's exact publication data receipts
+        if: needs.build.outputs.evidence == 'success' && needs.build.outputs.evidence_id != ''
         uses: actions/download-artifact@v8
         with:
-          name: publication-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          artifact-ids: ${{ needs.build.outputs.evidence_id }}
           path: runtime-evidence/publication-data
       - name: Report actual build and deployment outcomes
         if: always()
