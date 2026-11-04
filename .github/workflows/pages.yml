@@ -45,6 +45,7 @@ jobs:
       preserve: ${{ steps.preserve.outcome }}
       state_commit: ${{ steps.preserve.outputs.state_commit }}
       generation_id: ${{ steps.preserve.outputs.generation_id }}
+      data_health_sha256: ${{ steps.data_receipt.outputs.sha256 }}
       pages_upload: ${{ steps.pages_upload.outcome }}
       evidence: ${{ steps.evidence.outcome }}
       evidence_url: ${{ steps.evidence.outputs.artifact-url }}
@@ -245,6 +246,10 @@ jobs:
             --branch publication-state \
             --slot "${{ steps.slot.outputs.value }}"
 
+      - name: Bind retained system health after checkpoint verification
+        id: data_receipt
+        run: python -X utf8 -c 'import hashlib; from pathlib import Path; print("sha256=" + hashlib.sha256(Path("apps/web/public/data/system-health.json").read_bytes()).hexdigest())' >> "$GITHUB_OUTPUT"
+
       - name: Bind the built publication to this release
         run: node scripts/build-release-manifest.mjs --data-dir apps/web/out/data --code-sha "$GITHUB_SHA"
 
@@ -348,8 +353,16 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
+      - name: Download this attempt's retained publication data receipts
+        uses: actions/download-artifact@v8
+        with:
+          name: publication-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: runtime-evidence/publication-data
       - name: Report actual build and deployment outcomes
+        if: always()
         env:
+          DATA_EVIDENCE_REQUIRED: "true"
+          EXPECTED_SYSTEM_HEALTH_SHA256: ${{ needs.build.outputs.data_health_sha256 }}
           BUILD_RESULT: ${{ needs.build.result }}
           WORKER_DEPLOY: ${{ needs.worker.result }}
           DEPLOY_RESULT: ${{ needs.deploy.result }}
@@ -372,7 +385,7 @@ jobs:
           QUERY_PRODUCTION_VERIFIED: ${{ needs.deploy.outputs.query_production_verified }}
           GENERATION_ID: ${{ needs.build.outputs.generation_id }}
           STATE_COMMIT: ${{ needs.build.outputs.state_commit }}
-        run: python scripts/publication-outcome.py --health-output runtime-evidence/publication-health.json
+        run: python scripts/publication-outcome.py --health-output runtime-evidence/publication-health.json --data-evidence runtime-evidence/publication-data
 
       - name: Deliver failure or verified infrastructure recovery alert
         if: always()

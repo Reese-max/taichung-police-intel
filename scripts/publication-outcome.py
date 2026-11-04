@@ -1,6 +1,7 @@
 """Report actual CI phases without equating action success with live verification."""
 from __future__ import annotations
 import argparse
+import hashlib
 from datetime import datetime, timezone
 import importlib.util
 import json
@@ -63,7 +64,56 @@ def query_readiness(env: Mapping[str, str]) -> tuple[str | None, bool]:
     return "VERIFICATION_FAILED", False
 
 
-def runtime_health(env: Mapping[str, str], *, observed_at: str | None = None) -> dict:
+def publication_data(env: Mapping[str, str], evidence: Path) -> dict:
+    """Read data only from this run's artifact; never restore or execute it.
+
+    The checkpoint digest binds all eight state files, not a reused collection
+    name. Re-derive the two data stages and compare the retained system receipt
+    so an older or modified system-health file cannot green a partial snapshot.
+    """
+    spec = importlib.util.spec_from_file_location(
+        "publication_data_checkpoint", Path(__file__).with_name("publication-state-branch.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    bundle = module.read_working_bundle(evidence)
+    expected = env.get("GENERATION_ID", "")
+    if not re.fullmatch(r"[0-9a-f]{64}", expected) or module.generation(bundle) != expected:
+        raise ValueError("DATA_RECEIPT_GENERATION_MISMATCH")
+    system_path = module.safe_target(evidence, "apps/web/public/data/system-health.json")
+    system_bytes = system_path.read_bytes()
+    if len(system_bytes) > module.MAX_FILE_BYTES:
+        raise ValueError("DATA_RECEIPT_TOO_LARGE")
+    system_hash = hashlib.sha256(system_bytes).hexdigest()
+    if system_hash != env.get("EXPECTED_SYSTEM_HEALTH_SHA256"):
+        raise ValueError("DATA_RECEIPT_SYSTEM_HASH_MISMATCH")
+    system = json.loads(system_bytes)
+    status = json.loads(bundle["apps/web/public/data/source-status.json"])
+    brief = json.loads(bundle["apps/web/public/data/v2-daily-brief.json"])
+    health = load_system_health()
+    policy = health.load_current_policy()
+    stages = [health.normalize_stage(row) for row in health.current_publication_stages(
+        status, brief, policy, {}, {}, {})
+        if row["stage"] in {"collection", "canonical_validation"}]
+    retained = system.get("stages")
+    if (system.get("schema_version") != 1 or not isinstance(retained, list)
+            or system.get("policy") != health.policy_binding(policy)):
+        raise ValueError("DATA_RECEIPT_POLICY_MISMATCH")
+    for row in stages:
+        matches = [item for item in retained if isinstance(item, dict)
+                   and item.get("lane") == row["lane"] and item.get("stage") == row["stage"]]
+        if len(matches) != 1 or matches[0] != row:
+            raise ValueError("DATA_RECEIPT_SYSTEM_MISMATCH")
+    data_status = health.lane_health("publication", stages + [
+        {"stage": name, "outcome": "SUCCESS"} for name in ("deployment", "public_http_verification")])
+    collection = next(row for row in stages if row["stage"] == "collection")
+    return {"status": data_status, "verification": "VERIFIED", "stages": stages,
+            "generation_id": expected, "collection_run_id": collection.get("generation_id"),
+            "source_gaps": collection.get("source_warnings", []),
+            "system_health_sha256": system_hash}
+
+
+def runtime_health(env: Mapping[str, str], *, observed_at: str | None = None,
+                   data_evidence: Path | None = None) -> dict:
     """Build a receipt from workflow outcomes without inventing phase timestamps."""
     observed_at = observed_at or datetime.now(timezone.utc).isoformat()
     generation_id = env.get("GENERATION_ID") or None
@@ -118,6 +168,26 @@ def runtime_health(env: Mapping[str, str], *, observed_at: str | None = None) ->
         stage("query", "mcp_web_query", query_verify,
               "QUERY_RUNTIME_NOT_VERIFIED" if query_verify != "success" else None),
     ]
+    data = {"status": "UNKNOWN", "verification": "UNVERIFIED", "source_gaps": []}
+    # Legacy library callers can still inspect CI stages. The workflow always
+    # requires bound evidence; missing artifacts must produce an unknown lane.
+    if data_evidence is not None or env.get("DATA_EVIDENCE_REQUIRED") == "true":
+        try:
+            if data_evidence is None:
+                raise ValueError("DATA_RECEIPT_MISSING")
+            data = publication_data(env, data_evidence)
+            replacements = {row["stage"]: row for row in data["stages"]}
+            stages = [replacements.get(row["stage"], row)
+                      if row["outcome"] in {"SUCCESS", "SKIPPED"} else row for row in stages]
+        except (OSError, ValueError, KeyError, TypeError, AttributeError, RuntimeError) as error:
+            data["error_class"] = "DATA_RECEIPT_UNVERIFIED"
+            allowed = {"DATA_RECEIPT_GENERATION_MISMATCH", "DATA_RECEIPT_POLICY_MISMATCH",
+                       "DATA_RECEIPT_SYSTEM_MISMATCH", "DATA_RECEIPT_SYSTEM_HASH_MISMATCH",
+                       "DATA_RECEIPT_TOO_LARGE", "DATA_RECEIPT_MISSING"}
+            data["reason"] = str(error) if isinstance(error, ValueError) and str(error) in allowed else "DATA_RECEIPT_INVALID_OR_MISSING"
+            for row in stages:
+                if row["stage"] in {"collection", "canonical_validation"} and row["outcome"] != "FAILED":
+                    row.update(outcome="UNKNOWN", error_class="DATA_RECEIPT_UNVERIFIED")
     if "PAGES_UPLOAD" in env:
         upload = phase_value(env, "PAGES_UPLOAD")
         stages.append(stage("publication", "publication_build", upload,
@@ -146,14 +216,17 @@ def runtime_health(env: Mapping[str, str], *, observed_at: str | None = None) ->
         "production_verified": production_verified,
         "query_deployment_verified": query_verify == "success" and readiness in {"RIGHTS_BLOCKED", "EVIDENCE_LOCATOR_VERIFIED"},
         "public_data_verified": phase_value(env, "BUILD_RESULT") == "success" and deploy == "success" and public_verify == "success",
+        "deployment_status": "VERIFIED" if deploy == public_verify == "success" else "UNVERIFIED",
+        "data_status": data["status"],
+        "data_receipt": {key: value for key, value in data.items() if key != "stages"},
         "job_results": {key: phase_value(env, key) for key in ("BUILD_RESULT", "DEPLOY_RESULT")},
         "phase_results": {key: deploy if key == "PAGES_DEPLOY" else phase_value(env, key) for key in PHASES},
     })
     return health
 
 
-def write_runtime_health(env: Mapping[str, str], target: Path) -> dict:
-    receipt = runtime_health(env)
+def write_runtime_health(env: Mapping[str, str], target: Path, *, data_evidence: Path | None = None) -> dict:
+    receipt = runtime_health(env, data_evidence=data_evidence)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(receipt, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return receipt
@@ -208,11 +281,20 @@ def report(env: Mapping[str, str]) -> tuple[str, int]:
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--health-output", type=Path)
+    parser.add_argument("--data-evidence", type=Path)
     args = parser.parse_args(argv)
+    if (args.data_evidence is not None or os.environ.get("DATA_EVIDENCE_REQUIRED") == "true") and not args.health_output:
+        parser.error("bound data evidence requires --health-output")
     text, code = report(os.environ)
+    data_unverified = False
     if args.health_output:
         try:
-            write_runtime_health(os.environ, args.health_output)
+            receipt = write_runtime_health(os.environ, args.health_output, data_evidence=args.data_evidence)
+            text += f"\nDeployment: `{receipt['deployment_status']}`; data quality: `{receipt['data_status']}`.\n"
+            text += "Source gaps: " + json.dumps(receipt["data_receipt"]["source_gaps"], ensure_ascii=False) + "\n"
+            if (args.data_evidence is not None or os.environ.get("DATA_EVIDENCE_REQUIRED") == "true") and receipt["data_receipt"]["verification"] != "VERIFIED":
+                data_unverified = True
+                code = 1
         except (OSError, ValueError, json.JSONDecodeError) as error:
             print(f"HEALTH_RECEIPT_FAIL {error}", file=sys.stderr)
             code = 1
@@ -222,7 +304,9 @@ def main(argv=None) -> int:
             handle.write(text)
     print(text)
     if code:
-        if "State: `PUBLIC_DATA_VERIFIED`" in text:
+        if data_unverified:
+            print("::warning title=Publication data receipt unverified::Data quality is UNKNOWN; inspect this attempt's retained checkpoint and system receipts. Deployment verification is reported separately.")
+        elif "State: `PUBLIC_DATA_VERIFIED`" in text:
             print("::warning title=Publication workflow incomplete::Public data verification succeeded; inspect the deploy job and Query Gateway outcomes for downstream failure.")
         else:
             print("::warning title=Publication not confirmed::Check build, preserve, artifact and deploy outcomes; this is not a zero-event result.")
