@@ -1,7 +1,14 @@
 # Publication data health
 
-The outcome job downloads `publication-evidence-<run>-<attempt>` into a separate
-data directory. It never executes or restores code from that artifact.
+The build uploads `publication-evidence-<run>-<producing-attempt>` and exports
+its immutable artifact ID. The outcome job downloads that exact build output
+into a separate data directory. A downstream-only rerun may have a newer
+`run_attempt` while retaining the successful build's outputs; reporting must not
+derive an artifact name from its own attempt. Missing/failed producer outputs
+skip downloading and keep the existing required-data failure path, without
+falling back to all artifacts or a latest-name search. A full rebuild supplies
+its new artifact ID with its matching generation/hash outputs.
+The outcome job never executes or restores code from the artifact.
 
 `publication-outcome.py --data-evidence <directory>` verifies the eight checkpoint
 files against the build's SHA256 `GENERATION_ID` and checks the system receipt's

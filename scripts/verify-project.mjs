@@ -419,6 +419,7 @@ if (["quick", "full"].includes(mode) && !failures.length) {
       ["publication-propagation-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_publication_propagation.py", "-v"]],
       ["publication-outcome-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_publication_outcome.py", "-v"]],
       ["publication-data-receipt-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_publication_data_receipt.py", "-v"]],
+      ["publication-evidence-producer-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_publication_evidence_producer.py", "-v"]],
       ["publication-alert-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_publication_alert.py", "-v"]],
       ...(publicationWorkflow ? [] : [["current-checkout-tests", ["-X", "utf8", "scripts/verify-current-checkout.py", "--mode", "core"]]]),
       ["retention-policy-tests", ["-X", "utf8", "-m", "unittest", "discover", "-s", "tests", "-p", "test_retention_policy.py", "-v"]],
