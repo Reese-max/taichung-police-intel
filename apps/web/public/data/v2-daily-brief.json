@@ -30,10 +30,40 @@
   ],
   "baseline_established_at": "2026-08-27T12:13:22+08:00",
   "candidate_source_context": {
-    "collection_run_id": "CR-DEMO-20261105-MORNING-SCHEDULE",
-    "generated_at": "2026-11-05T10:43:28+08:00",
+    "collection_run_id": "CR-DEMO-20261105-EVENING-SCHEDULE",
+    "generated_at": "2026-11-06T02:09:39+08:00",
     "integration_status": "CANDIDATE",
     "items": [
+      {
+        "change_type": "CANDIDATE_OBSERVATION",
+        "eligibility": "INELIGIBLE_CANDIDATE",
+        "integration_status": "CANDIDATE",
+        "official_url": "https://www.rdec.taichung.gov.tw/3407668/post",
+        "promotion_eligible": false,
+        "published_at": "2026-11-05T00:00:00+08:00",
+        "source_health": "PASS",
+        "source_id": "S-019",
+        "source_name": "臺中市政府市政會議紀錄與專案報告",
+        "stable_id": "FEED-S-019-c8cc7d4ed772bf7b",
+        "stable_key": "3407668",
+        "title": "1第737次市政會議紀錄(10月27日)：勞工局「富市台中 就業成功」、法制局「法制為民，權益優先-八年創新與便民成果」2026-11-05",
+        "window_completeness": "PARTIAL"
+      },
+      {
+        "change_type": "CANDIDATE_OBSERVATION",
+        "eligibility": "INELIGIBLE_CANDIDATE",
+        "integration_status": "CANDIDATE",
+        "official_url": "https://www.rdec.taichung.gov.tw/3407653/post",
+        "promotion_eligible": false,
+        "published_at": "2026-11-05T00:00:00+08:00",
+        "source_health": "PASS",
+        "source_id": "S-019",
+        "source_name": "臺中市政府市政會議紀錄與專案報告",
+        "stable_id": "FEED-S-019-433dd3cdfe3e604c",
+        "stable_key": "3407653",
+        "title": "2第736次市政會議紀錄(10月13日)：觀旅局「八載深耕，大玩台中，永續觀光，幸福城市」、運動局「酷運動•酷城市-從生活中找選手，從運動中見城市」2026-11-05",
+        "window_completeness": "PARTIAL"
+      },
       {
         "change_type": "LKG",
         "eligibility": "INELIGIBLE_CANDIDATE",
@@ -527,7 +557,7 @@
           "NO_LAST_KNOWN_GOOD",
           "NO_DATA_AS_OF"
         ],
-        "last_checked_at": "2026-11-05T10:43:01+08:00",
+        "last_checked_at": "2026-11-06T02:09:21+08:00",
         "pagination": null,
         "promotion_eligible": false,
         "source_health": "FAILED",
@@ -537,14 +567,13 @@
         "window_completeness": "PARTIAL"
       },
       {
-        "freshness_status": "VERY_STALE",
+        "freshness_status": "FRESH",
         "integration_status": "CANDIDATE",
         "intelligence_gaps": [
           "WINDOW_PARTIAL",
-          "NO_LAST_KNOWN_GOOD",
-          "VERY_STALE_DATA"
+          "NO_LAST_KNOWN_GOOD"
         ],
-        "last_checked_at": "2026-11-05T10:43:23+08:00",
+        "last_checked_at": "2026-11-06T02:09:35+08:00",
         "pagination": {
           "complete": false,
           "page_limit": 4,
@@ -566,7 +595,7 @@
           "NO_LAST_KNOWN_GOOD",
           "VERY_STALE_DATA"
         ],
-        "last_checked_at": "2026-11-05T10:43:28+08:00",
+        "last_checked_at": "2026-11-06T02:09:39+08:00",
         "pagination": {
           "complete": false,
           "page_limit": 4,
@@ -582,7 +611,7 @@
       }
     ]
   },
-  "generated_at": "2026-11-05T10:43:28+08:00",
+  "generated_at": "2026-11-06T02:09:39+08:00",
   "generator_version": 2,
   "mode": "V2_SHADOW",
   "other_changes": [],
@@ -672,7 +701,7 @@
   ],
   "schema_version": 1,
   "snapshot_complete": false,
-  "source_collection_run_id": "CR-DEMO-20261105-MORNING-SCHEDULE",
+  "source_collection_run_id": "CR-DEMO-20261105-EVENING-SCHEDULE",
   "source_health": {
     "failed_count": 0,
     "gap_count": 6,
@@ -692,7 +721,7 @@
     "policy_hash": "3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501",
     "policy_version": 1
   },
-  "source_status_generated_at": "2026-11-05T10:43:28+08:00",
+  "source_status_generated_at": "2026-11-06T02:09:39+08:00",
   "status_message": "本期未偵測到可確認的新增或修正；歷史資料保留於資料庫。",
   "tracking_items": []
 }
