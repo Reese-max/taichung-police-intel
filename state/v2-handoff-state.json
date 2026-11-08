@@ -1,10 +1,10 @@
 {
   "handoffs": [],
   "last_publication": {
-    "collection_run_id": "CR-DEMO-20261107-EVENING-SCHEDULE",
-    "observed_at": "2026-11-08T00:34:29+08:00"
+    "collection_run_id": "CR-DEMO-20261108-MORNING-SCHEDULE",
+    "observed_at": "2026-11-08T09:44:36+08:00"
   },
-  "last_updated_at": "2026-11-08T00:34:29+08:00",
+  "last_updated_at": "2026-11-08T09:44:36+08:00",
   "mode": "V2_HANDOFF",
   "schema_version": 1,
   "watch_items": {}
