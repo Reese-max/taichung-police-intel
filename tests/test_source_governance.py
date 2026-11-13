@@ -55,6 +55,17 @@ class SourceGovernanceTests(unittest.TestCase):
             self.assertFalse(rights["full_text_allowed"] or rights["excerpt_allowed"])
             self.assertFalse(rights["may_claim_open_permission"])
         self.assertEqual(sp.formal_admission(old)["reason"], "APPROVED_GOVERNANCE_MISSING")
+        # The gate itself is unchanged: unknown or unreviewed rights still block every active source.
+        admission = sp.governance_module().admission
+        for change in ({"rights_status": "UNKNOWN"}, {"review_required": True}):
+            with self.subTest(change=change):
+                blocked = copy.deepcopy(candidate)
+                for row in blocked["active_sources"]:
+                    row["rights_retention_public_policy_refs"].update(change)
+                refused = admission(blocked)
+                self.assertEqual(refused["status"], "RIGHTS_BLOCKED")
+                self.assertEqual(refused["blocked_sources"], sorted(candidate["active_source_ids"]))
+                self.assertEqual(set(refused["per_source"].values()), {"RIGHTS_UNKNOWN_OR_UNREVIEWED"})
 
     def test_resigned_source_governance_tampering_cannot_change_trusted_inputs(self):
         candidate = sp.compile_governed_policy(sp.load_catalog(), previous=sp.load_current_policy())

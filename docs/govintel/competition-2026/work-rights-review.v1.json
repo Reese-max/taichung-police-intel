@@ -301,7 +301,7 @@
     "retention_rights": {
       "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
       "path": "docs/govintel/retention-rights-policy.v1.json",
-      "sha256": "87a9e9d0e91881d17e840e8e34e2c7249836bc4a6b5baa67585ac2bfff2ce845"
+      "sha256": "da6fbe0e4fa92b03cab4f6e8069922d2ce5c0f81d32ecfce2e8dccafc9cff218"
     },
     "source_review": {
       "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",

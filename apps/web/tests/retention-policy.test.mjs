@@ -62,9 +62,7 @@ test("compiled policy binds a versioned matrix, terms and archive eligibility", 
     assert.equal(source.rights_status, "OWNER_ASSERTED_PERMISSION", sourceId);
     assert.equal(source.full_text_allowed || source.excerpt_allowed, false, sourceId);
     assert.ok(source.data_types.length > 0, sourceId);
-    if (source.rights_status === "UNKNOWN") {
-      assert.equal(source.terms_status, "CATALOG_ENTRYPOINT_NOT_A_LICENSE", sourceId);
-    }
+    assert.equal(source.terms_status, "OWNER_DECISION_TERMS_NOT_VERIFIED", sourceId);
   }
   assert.deepEqual(policy.layer_policies.raw_snapshot, {
     archive_eligibility: "NOT_ARCHIVABLE",

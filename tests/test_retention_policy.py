@@ -340,7 +340,7 @@ class RetentionPolicyTests(unittest.TestCase):
         untyped["rights_status_values"].pop("OWNER_ASSERTED_PERMISSION")
         with self.assertRaisesRegex(ValueError, "rights status is undocumented"):
             retention.compile_policy(policy=untyped)
-        project_owned = self.unknown_rights_policy()
+        project_owned = copy.deepcopy(policy)
         project_owned["classes"]["OFFICIAL_MEDIA_LINK"]["terms_status"] = "PROJECT_OWNED_NO_THIRD_PARTY_LICENSE"
         with self.assertRaisesRegex(ValueError, "open permission"):
             retention.compile_policy(policy=project_owned)
@@ -407,17 +407,22 @@ class RetentionPolicyTests(unittest.TestCase):
             self.assertTrue(source_policy["data_types"])
 
     def test_unknown_rights_cannot_be_declared_an_open_license(self):
-        compiled = retention.compile_policy()
-        for source_id, source_policy in compiled["source_policies"].items():
-            if source_policy["rights_status"] != "UNKNOWN":
-                continue
+        policy = self.unknown_rights_policy()
+        unknown_sources = retention.compile_policy(policy=policy)["source_policies"]
+        self.assertEqual(len(unknown_sources), 20)
+        for source_id, source_policy in unknown_sources.items():
+            self.assertEqual(source_policy["rights_status"], "UNKNOWN", source_id)
             self.assertTrue(source_policy["review_required"], source_id)
             self.assertEqual(source_policy["terms_status"], "CATALOG_ENTRYPOINT_NOT_A_LICENSE", source_id)
-        policy = self.unknown_rights_policy()
-        for source_id, source_policy in retention.compile_policy(policy=policy)["source_policies"].items():
-            if source_policy["rights_status"] == "UNKNOWN":
-                self.assertTrue(source_policy["review_required"], source_id)
-                self.assertEqual(source_policy["terms_status"], "CATALOG_ENTRYPOINT_NOT_A_LICENSE", source_id)
+        # The checked-in owner assertion cannot borrow another label in either direction.
+        for field, value in (("terms_status", "CATALOG_ENTRYPOINT_NOT_A_LICENSE"),
+                             ("terms_status", "PROJECT_OWNED_NO_THIRD_PARTY_LICENSE"),
+                             ("rights_status", "OPEN_DATA_LICENSED"), ("rights_status", "UNKNOWN")):
+            with self.subTest(field=field, value=value):
+                borrowed = retention.load_json(retention.POLICY)
+                borrowed["classes"]["OFFICIAL_MEDIA_LINK"][field] = value
+                with self.assertRaisesRegex(ValueError, "open permission"):
+                    retention.compile_policy(policy=borrowed)
         mutated = copy.deepcopy(policy)
         mutated["classes"]["OFFICIAL_MEDIA_LINK"]["terms_status"] = "VERIFIED_OPEN_PERMISSION"
         with self.assertRaisesRegex(ValueError, "open permission"):
@@ -938,9 +943,8 @@ class RetentionPolicyTests(unittest.TestCase):
         self.assertEqual(unknown["rights_status"], "UNKNOWN")
         self.assertEqual(unknown["terms_status"], "CATALOG_ENTRYPOINT_NOT_A_LICENSE")
         self.assertIn("PROJECT_CONTROLLED", binding["rights_status_values"])
-        for value in compiled["classes"].values():
-            if value["rights_status"] == "UNKNOWN":
-                self.assertEqual(value["terms_status"], "CATALOG_ENTRYPOINT_NOT_A_LICENSE")
+        for class_id in THIRD_PARTY_CLASSES:
+            self.assertEqual(compiled["classes"][class_id]["terms_status"], "OWNER_DECISION_TERMS_NOT_VERIFIED", class_id)
 
     def test_checked_in_binding_matches_the_compiled_policy(self):
         compiled = retention.compile_policy()

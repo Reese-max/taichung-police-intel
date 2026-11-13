@@ -324,6 +324,11 @@ def compile_policy(catalog: dict[str, Any] | None = None, policy: dict[str, Any]
             raise ValueError(f"retention class fields do not match the compiled vocabulary: {class_id}")
         if value["rights_status"] == "UNKNOWN" and value["terms_status"] != UNKNOWN_RIGHTS_TERMS_STATUS:
             raise ValueError(f"unknown rights must not be presented as an open permission: {class_id}")
+        # An owner assertion is its own label: never borrowed by, or dressed up as, another status.
+        if (value["rights_status"] == "OWNER_ASSERTED_PERMISSION") != (value["terms_status"] == "OWNER_DECISION_TERMS_NOT_VERIFIED"):
+            raise ValueError(f"an owner assertion must not be presented as an open permission or verified terms: {class_id}")
+        if value["terms_status"] == "PROJECT_OWNED_NO_THIRD_PARTY_LICENSE" and value["rights_status"] != "PROJECT_CONTROLLED":
+            raise ValueError(f"third-party rights must not be presented as an open permission: {class_id}")
         if value["rights_status"] not in rights_status_values:
             raise ValueError(f"rights status is undocumented: {class_id}")
         if value["terms_status"] not in terms_status_values:
