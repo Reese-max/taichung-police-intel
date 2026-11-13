@@ -6,7 +6,12 @@ import tempfile
 import subprocess
 import sys
 import unittest
-from governed_policy_fixture import make_governed_policy_fixture, load_fixture_module, bind_checked_in_publication
+from governed_policy_fixture import (
+    make_governed_policy_fixture,
+    make_legacy_policy_fixture,
+    load_fixture_module,
+    bind_checked_in_publication,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "query-store.py"
@@ -168,9 +173,13 @@ class QueryStoreTests(unittest.TestCase):
             loaded = json.loads(output.read_text(encoding="utf-8"))
             self.assertEqual(loaded["generation_id"], store["generation_id"])
 
-    def test_resealed_current_projection_cannot_publish_unadmitted_sources(self):
-        native = load_fixture_module({"root": ROOT}, "native_current_query_refusal", "scripts/query-store.py")
+    def test_resealed_legacy_projection_cannot_publish_unadmitted_sources(self):
+        temporary = tempfile.TemporaryDirectory(prefix="legacy-query-refusal-")
+        self.addCleanup(temporary.cleanup)
+        fixture = make_legacy_policy_fixture(Path(temporary.name) / "legacy", source_root=ROOT)
+        native = load_fixture_module(fixture, "legacy_query_refusal", "scripts/query-store.py")
         store = native.build_from_paths(native.DEFAULT_FEED, native.DEFAULT_STATUS, native.DEFAULT_BRIEF)
+        self.assertEqual(store["formal_admission"]["status"], "UNKNOWN")
         self.assertEqual(store["items"], [])
         historical = json.loads((ROOT / "tests/fixtures/source-policy/publication-metadata-v3.json").read_text())
         for sid in ("S-999", "S-032", "S-004", None):
@@ -183,6 +192,26 @@ class QueryStoreTests(unittest.TestCase):
                 self._reseal(native, candidate)
                 with self.assertRaises(ValueError):
                     native.query_store(candidate)
+
+    def test_current_checkout_projects_admitted_public_rows(self):
+        native = load_fixture_module({"root": ROOT}, "current_governed_query_store", "scripts/query-store.py")
+        store = native.build_from_paths(native.DEFAULT_FEED, native.DEFAULT_STATUS, native.DEFAULT_BRIEF)
+        self.assertEqual(store["formal_admission"]["status"], "ADMITTED")
+        self.assertEqual(store["formal_admission"]["blocked_sources"], [])
+        self.assertGreater(store["counts"]["publication_items"], 0)
+        policy = json.loads((ROOT / "docs/govintel/source-policy.approved.json").read_text(encoding="utf-8"))
+        allowed_fields = {
+            row["source_id"]: set(row["rights_retention_public_policy_refs"]["public_fields"])
+            for row in policy["active_sources"]
+        }
+        system_fields = {
+            "record_type", "canonical_id", "source_role", "trust_tier",
+            "verification_status", "canonical_ref",
+        }
+        for row in store["items"]:
+            self.assertLessEqual(set(row) - system_fields, allowed_fields[row["source_id"]])
+            self.assertNotIn("full_text", row)
+            self.assertNotIn("excerpt", row)
 
     @staticmethod
     def _reseal(module, store):

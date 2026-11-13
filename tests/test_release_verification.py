@@ -13,7 +13,11 @@ import tempfile
 import unittest
 from urllib.error import HTTPError
 from unittest.mock import patch, Mock
-from governed_policy_fixture import make_governed_policy_fixture, load_fixture_module
+from governed_policy_fixture import (
+    make_governed_policy_fixture,
+    make_legacy_policy_fixture,
+    load_fixture_module,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location("production_query", Path(os.environ.get("TAI398_VERIFIER_SOURCE", ROOT / "scripts/verify-query-gateway-production.py")))
@@ -34,6 +38,8 @@ def shadow_json_key(text, key, canary):
 class PublicationClient:
     fixture_directory = None
     fixture = None
+    legacy_fixture_directory = None
+    legacy_fixture = None
 
     def __init__(self, *, blocked=False):
         self.blocked = blocked
@@ -43,19 +49,25 @@ class PublicationClient:
                 PublicationClient.fixture = make_governed_policy_fixture(Path(PublicationClient.fixture_directory.name), source_root=ROOT)
             root = PublicationClient.fixture["root"]
         else:
-            root = ROOT
+            if PublicationClient.legacy_fixture is None:
+                PublicationClient.legacy_fixture_directory = tempfile.TemporaryDirectory()
+                PublicationClient.legacy_fixture = make_legacy_policy_fixture(
+                    Path(PublicationClient.legacy_fixture_directory.name) / "legacy",
+                    source_root=ROOT,
+                )
+            root = PublicationClient.legacy_fixture["root"]
         self.raw = {name: (root / "apps/web/public/data" / name).read_bytes() for name in module.ARTIFACTS}
         self.hashes = {key: hashlib.sha256(self.raw[name]).hexdigest() for key, name in
                        zip(("feed", "status", "brief"), module.ARTIFACTS)}
         self.feed = json.loads(self.raw["intelligence-feed.json"])
         self.status = json.loads(self.raw["source-status.json"])
         self.policy = json.loads((root / "apps/web/public/data/source-policy.json").read_bytes())
-        if blocked:
-            ids = self.policy["active_source_ids"]
-            self.admission = {"status": "UNKNOWN", "reason": "APPROVED_GOVERNANCE_MISSING", "governance_hash": None,
-                "blocked_sources": ids, "per_source": {sid: "APPROVED_GOVERNANCE_MISSING" for sid in ids}}
-        else:
-            self.admission = {"status": "ADMITTED", "reason": None, "governance_hash": self.policy["governance_binding"]["governance_hash"], "blocked_sources": [], "per_source": {}}
+        policy_module = load_fixture_module(
+            PublicationClient.legacy_fixture if blocked else PublicationClient.fixture,
+            "release_client_source_policy",
+            "scripts/source-policy.py",
+        )
+        self.admission = policy_module.formal_admission(self.policy)
         self.binding = {key: self.policy[key] for key in ("policy_version", "policy_hash", "catalog_hash", "active_source_ids")}
         if not blocked:
             self.binding["governance_hash"] = self.policy["governance_binding"]["governance_hash"]
@@ -155,10 +167,15 @@ class PublicationClient:
         return status, document, json.dumps(document).encode()
 
 
-# Exercise the positive verifier from its own compiler-produced, fictional
-# approved repository. The native current repository remains legacy policy 1.
+# Exercise each verifier against the policy snapshot that its isolated client serves.
+PublicationClient(blocked=True)
+legacy_verifier_path = PublicationClient.legacy_fixture["root"] / "scripts/verify-query-gateway-production.py"
+shutil.copyfile(Path(os.environ.get("TAI398_VERIFIER_SOURCE", ROOT / "scripts/verify-query-gateway-production.py")), legacy_verifier_path)
+spec = importlib.util.spec_from_file_location("legacy_release_verifier", legacy_verifier_path)
+native_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(native_module)
+
 PublicationClient()
-native_module = module
 fixture_verifier_path = PublicationClient.fixture["root"] / "scripts/verify-query-gateway-production.py"
 shutil.copyfile(Path(os.environ.get("TAI398_VERIFIER_SOURCE", ROOT / "scripts/verify-query-gateway-production.py")), fixture_verifier_path)
 spec = importlib.util.spec_from_file_location("fictional_positive_release_verifier", fixture_verifier_path)

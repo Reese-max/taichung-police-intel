@@ -134,9 +134,12 @@ test("multi-chunk search reaches the end of a document and bounds every context"
   }
 });
 
-test("source-policy schema 1 and real repository rights stay blocked even with fictional document grants", async () => {
+test("legacy source-policy schema 1 stays blocked even with fictional document grants", async () => {
   const fixture = await fictionalFixture();
-  fixture.sourcePolicy = JSON.parse(await readFile(new URL("../public/data/source-policy.json", import.meta.url), "utf8"));
+  fixture.sourcePolicy = JSON.parse(await readFile(new URL(
+    "../../../docs/govintel/source-policy-history/3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501.json",
+    import.meta.url,
+  ), "utf8"));
   assert.equal(fixture.sourcePolicy.schema_version, 1);
   fixture.expectedSourcePolicyHash = fixture.sourcePolicy.policy_hash;
   await rejects(() => createDocumentEvidenceStore(fixture), "FORMAL_ADMISSION_REQUIRED");

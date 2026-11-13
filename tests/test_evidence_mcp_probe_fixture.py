@@ -1,7 +1,7 @@
 """Actual compiler/runtime controls for the optional #15 diagnostic fixture.
 
 Every permission here is fictional and confined to a separate temporary root.
-The checked-in legacy policy remains UNKNOWN and cannot authorize a brief.
+The isolated legacy policy remains UNKNOWN and cannot authorize a brief.
 """
 import copy
 import importlib.util
@@ -12,7 +12,11 @@ import sys
 import tempfile
 import unittest
 
-from governed_policy_fixture import make_governed_policy_fixture, load_fixture_module
+from governed_policy_fixture import (
+    make_governed_policy_fixture,
+    make_legacy_policy_fixture,
+    load_fixture_module,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location("evidence_mcp_probe", ROOT / "scripts/probe-evidence-mcp-sdk.py")
@@ -35,8 +39,12 @@ class EvidenceMCPProbeFixtureTests(unittest.TestCase):
     def fixture(self, **options):
         return make_governed_policy_fixture(Path(self.owned.name) / "fixture", source_root=ROOT, **options)
 
-    def test_unchanged_current_policy_refuses_formal_brief_and_answer(self):
-        g = load_fixture_module({"root": ROOT}, "probe_current_gateway", "scripts/query-gateway.py")
+    def test_legacy_policy_fixture_refuses_formal_brief_and_answer(self):
+        fixture = make_legacy_policy_fixture(
+            Path(self.owned.name) / "legacy",
+            source_root=ROOT,
+        )
+        g = load_fixture_module(fixture, "probe_legacy_gateway", "scripts/query-gateway.py")
         gateway = g.QueryGateway()
         result = gateway.execute("search_evidence", {"limit": 1})
         self.assertEqual(result["result_count"], 0)
@@ -46,6 +54,12 @@ class EvidenceMCPProbeFixtureTests(unittest.TestCase):
             with self.subTest(tool=tool), self.assertRaises(g.GatewayError) as error:
                 gateway.execute(tool, args)
             self.assertEqual(error.exception.code, "RIGHTS_BLOCKED")
+
+        current = load_fixture_module({"root": ROOT}, "probe_current_governed_gateway", "scripts/query-gateway.py")
+        admitted = current.QueryGateway().execute("search_evidence", {"limit": 1})
+        self.assertEqual(admitted["query_coverage"]["formal_admission"]["status"], "ADMITTED")
+        self.assertEqual(admitted["query_coverage"]["formal_admission"]["blocked_sources"], [])
+        self.assertGreater(admitted["result_count"], 0)
 
     def test_explicit_separate_review_uses_real_compiler_ids_origins_and_two_rows(self):
         result = probe.prepare_fictional_fixture(ROOT, Path(self.owned.name) / "fictional")

@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import test, { after } from "node:test";
 import { createGovernedPolicyFixture } from "./governed-policy-fixture.mjs";
+import { createLegacyPublicArtifacts } from "./legacy-policy-fixture.mjs";
 const governedFixture = await createGovernedPolicyFixture();
 after(() => governedFixture.cleanup());
 const { default: worker, buildSnapshot, createReleaseManifest } = await governedFixture.loadWorker("suite");
@@ -280,7 +281,7 @@ test("current legacy1 and unknown-rights2 keep health but refuse CURRENT formal 
       const values = await fixture.publication();
       let module = await fixture.loadWorker(`rights-denied-${kind}`);
       if (kind === "legacy1") {
-        values["source-policy.json"] = await readFile(new URL("../../../docs/govintel/source-policy.approved.json", import.meta.url));
+        Object.assign(values, await createLegacyPublicArtifacts());
         module = await import("../../../workers/query-gateway/src/index.js?actual-legacy-refusal");
       }
       const snapshot = await module.buildSnapshot(env, async name => ({ bytes: values[name], hash: createHash("sha256").update(values[name]).digest("hex") }));

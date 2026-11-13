@@ -4,6 +4,7 @@ import test from 'node:test';
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { createGovernedPolicyFixture } from './governed-policy-fixture.mjs';
+import { createLegacyPublicArtifacts } from './legacy-policy-fixture.mjs';
 import { parseResearchInput, researchProviderState, selectResearchSources, readBoundedJson, RESEARCH_LIMITS } from '../../../workers/query-gateway/src/research.js';
 import { buildSnapshot, executeResearch } from '../../../workers/query-gateway/src/index.js';
 const input = { question: '測試官方標題', public_data_only: true };
@@ -65,9 +66,18 @@ test('upstream errors never reflect credentials or provider body and never retry
   await assert.rejects(selectResearchSources(parseResearchInput(input), [source], env(), request(), async () => { calls++; return new Response('OFFLINE_FAKE_KEY SECRET_PROVIDER_TEXT', { status: 429 }); }), error => error.code === 'PROVIDER_UNAVAILABLE' && !error.message.includes('SECRET') && !error.message.includes('FAKE_KEY'));
   assert.equal(calls, 1);
 });
-test('real checked-in governance is blocked, returns no sources and performs no AI calls', async () => {
+test('current governed publication admits formal metadata', async () => {
   const root = new URL('../public/data/', import.meta.url);
   const snapshot = await buildSnapshot({ PUBLIC_ORIGIN: 'https://example.test' }, async name => { const bytes = await readFile(new URL(name, root)); return { bytes, hash: createHash('sha256').update(bytes).digest('hex') }; });
+  assert.equal(snapshot.formalAdmission.status, 'ADMITTED');
+  assert.deepEqual(snapshot.formalAdmission.blocked_sources, []);
+  assert.ok(snapshot.items.length > 0);
+});
+test('legacy policy fixture is blocked and performs no AI calls', async () => {
+  const artifacts = await createLegacyPublicArtifacts();
+  const snapshot = await buildSnapshot({ PUBLIC_ORIGIN: 'https://example.test' }, async name => {
+    const bytes = artifacts[name]; return { bytes, hash: createHash('sha256').update(bytes).digest('hex') };
+  });
   let calls = 0;
   const result = await executeResearch(snapshot, input, env(), request(), async () => { calls++; });
   assert.equal(result.reason_code, 'RIGHTS_BLOCKED'); assert.equal(result.status, 'METADATA_ONLY');

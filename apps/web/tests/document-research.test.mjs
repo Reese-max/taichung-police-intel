@@ -4,6 +4,7 @@ import test, { before, after } from 'node:test';
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { createGovernedPolicyFixture } from './governed-policy-fixture.mjs';
+import { createLegacyPublicArtifacts } from './legacy-policy-fixture.mjs';
 import { createDocumentResearchFixture, refreshDocumentResearchFixture, rehashDocumentPermission, completion, supportedProducer, supportedCritic } from './document-research-fixture.mjs';
 import { parseResearchInput } from '../../../workers/query-gateway/src/research.js';
 import { buildSnapshot, executeResearch } from '../../../workers/query-gateway/src/index.js';
@@ -40,15 +41,34 @@ test('mode parsing defaults to metadata, rejects arbitrary mode and enforces exp
   assert.equal(parseResearchInput({ ...input('metadata'), question: '界'.repeat(171) }).question.length, 171);
 });
 
-test('actual checked-in schema1 is zero-admission in all modes, even with a poison bundle getter', async () => {
+test('current governed publication admits only whitelisted metadata', async () => {
   const root = new URL('../public/data/', import.meta.url);
-  const real = await buildSnapshot({ PUBLIC_ORIGIN: 'https://example.test' }, async name => {
+  const current = await buildSnapshot({ PUBLIC_ORIGIN: 'https://example.test' }, async name => {
     const bytes = await readFile(new URL(name, root)); return { bytes, hash: createHash('sha256').update(bytes).digest('hex') };
+  });
+  assert.equal(current.formalAdmission.status, 'ADMITTED');
+  assert.deepEqual(current.formalAdmission.blocked_sources, []);
+  assert.ok(current.items.length > 0);
+  const allowed = new Map(current.policy.active_sources.map(row => [
+    row.source_id, new Set(row.rights_retention_public_policy_refs.public_fields),
+  ]));
+  const system = new Set(['record_type', 'canonical_id', 'source_role', 'trust_tier', 'verification_status', 'canonical_ref']);
+  for (const row of current.items) {
+    assert.ok([...Object.keys(row)].filter(key => !system.has(key)).every(key => allowed.get(row.source_id).has(key)));
+    assert.equal('full_text' in row, false);
+    assert.equal('excerpt' in row, false);
+  }
+});
+
+test('legacy schema1 is zero-admission in all modes, even with a poison bundle getter', async () => {
+  const artifacts = await createLegacyPublicArtifacts();
+  const legacy = await buildSnapshot({ PUBLIC_ORIGIN: 'https://example.test' }, async name => {
+    const bytes = artifacts[name]; return { bytes, hash: createHash('sha256').update(bytes).digest('hex') };
   });
   let calls = 0;
   const env = { get RESEARCH_DOCUMENT_BUNDLE() { throw new Error('Must not read docs before formal admission'); } };
   for (const mode of ['metadata', 'documents', 'synthesis']) {
-    const result = await executeResearch(real, input(mode), env, request(), () => { calls++; });
+    const result = await executeResearch(legacy, input(mode), env, request(), () => { calls++; });
     assert.equal(result.reason_code, 'RIGHTS_BLOCKED'); assert.deepEqual(result.sources, []); assert.deepEqual(result.answer, []);
     assert.equal(result.document_evidence, undefined); assert.equal(result.synthesis, undefined);
   }

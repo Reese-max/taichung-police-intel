@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from governed_policy_fixture import make_legacy_policy_fixture, load_fixture_module
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "source-policy.py"
@@ -18,8 +19,23 @@ spec.loader.exec_module(sp)
 class SourcePolicyTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        global sp
+        cls.legacy_directory = tempfile.TemporaryDirectory(prefix="legacy-source-policy-")
+        cls.legacy_fixture = make_legacy_policy_fixture(
+            Path(cls.legacy_directory.name) / "legacy",
+            source_root=ROOT,
+        )
+        sp = load_fixture_module(
+            cls.legacy_fixture,
+            "legacy_source_policy_tests",
+            "scripts/source-policy.py",
+        )
         cls.catalog = sp.load_catalog()
         cls.baseline = sp.load_current_policy()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.legacy_directory.cleanup()
 
     def good_states(self, policy=None):
         policy = policy or self.baseline
@@ -109,7 +125,10 @@ class SourcePolicyTests(unittest.TestCase):
                                      cwd=ROOT, text=True, capture_output=True)
             self.assertEqual(allowed.returncode, 0, allowed.stderr)
             policy = json.loads(output_path.read_text(encoding="utf-8"))
-            self.assertEqual(policy["policy_version"], self.baseline["policy_version"] + 1)
+            current_policy = json.loads(
+                (ROOT / "docs/govintel/source-policy.approved.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(policy["policy_version"], current_policy["policy_version"] + 1)
             self.assertIn("S-032", policy["active_source_ids"])
             self.assertEqual(policy["transition"]["promoted"][0]["source_id"], "S-032")
 
