@@ -172,7 +172,7 @@
     },
     "model_transmission_allowed": false,
     "canonical_policy_changed": false,
-    "retention_policy_hash": "9c7f589c80df456d4b547151a1e3a5eb7d29258fee6ed2268613598de820729d",
+    "retention_policy_hash": "6a52c17625af49cf4b618bbcd22a4909c23df3efd2f92ff70ae2935e8643cf13",
     "approved_policy_binding": {
       "policy_version": 1,
       "policy_hash": "3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501",

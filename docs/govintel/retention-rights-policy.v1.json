@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "policy_version": 2,
-  "updated_at": "2026-10-06",
-  "purpose": "Conservative public projection and retention defaults; not a legal rights determination.",
+  "policy_version": 3,
+  "updated_at": "2026-11-13",
+  "purpose": "Public projection and retention rules. Since 2026-11-13 third-party source classes are released by project owner decision; not a legal rights determination and not a per-source terms verification.",
   "retention_windows": {
     "SOURCE_TERMS_REVIEW": {
       "max_age_days": null,
@@ -31,7 +31,7 @@
   },
   "classes": {
     "OFFICIAL_METADATA_LINK": {
-      "rights_status": "UNKNOWN",
+      "rights_status": "OWNER_ASSERTED_PERMISSION",
       "public_projection": "METADATA_LINK_ONLY",
       "public_fields": [
         "source_id",
@@ -50,15 +50,15 @@
       "excerpt_allowed": false,
       "raw_retention_class": "SOURCE_TERMS_REVIEW",
       "canonical_retention_class": "PROVENANCE_HISTORY",
-      "review_required": true,
+      "review_required": false,
       "withdrawal_behavior": "KEEP_HASH_MARK_SOURCE_UNAVAILABLE",
-      "terms_status": "CATALOG_ENTRYPOINT_NOT_A_LICENSE",
+      "terms_status": "OWNER_DECISION_TERMS_NOT_VERIFIED",
       "archive_eligibility": "EVIDENCE_ARCHIVE",
       "sensitive_default": false,
       "withdrawal_projection": "SOURCE_NO_LONGER_AVAILABLE"
     },
     "OFFICIAL_MEDIA_LINK": {
-      "rights_status": "UNKNOWN",
+      "rights_status": "OWNER_ASSERTED_PERMISSION",
       "public_projection": "LINK_ONLY",
       "public_fields": [
         "source_id",
@@ -73,15 +73,15 @@
       "excerpt_allowed": false,
       "raw_retention_class": "SHORT_LIVED_SOURCE_TERMS_REVIEW",
       "canonical_retention_class": "PROVENANCE_HISTORY",
-      "review_required": true,
+      "review_required": false,
       "withdrawal_behavior": "KEEP_LOCATOR_MARK_SOURCE_UNAVAILABLE",
-      "terms_status": "CATALOG_ENTRYPOINT_NOT_A_LICENSE",
+      "terms_status": "OWNER_DECISION_TERMS_NOT_VERIFIED",
       "archive_eligibility": "PROVENANCE_ONLY",
       "sensitive_default": false,
       "withdrawal_projection": "SOURCE_NO_LONGER_AVAILABLE"
     },
     "OFFICIAL_TRANSIENT_METADATA": {
-      "rights_status": "UNKNOWN",
+      "rights_status": "OWNER_ASSERTED_PERMISSION",
       "public_projection": "METADATA_LINK_ONLY",
       "public_fields": [
         "source_id",
@@ -97,15 +97,15 @@
       "excerpt_allowed": false,
       "raw_retention_class": "SHORT_LIVED_SOURCE_TERMS_REVIEW",
       "canonical_retention_class": "PROVENANCE_HISTORY",
-      "review_required": true,
+      "review_required": false,
       "withdrawal_behavior": "KEEP_HASH_MARK_SOURCE_UNAVAILABLE",
-      "terms_status": "CATALOG_ENTRYPOINT_NOT_A_LICENSE",
+      "terms_status": "OWNER_DECISION_TERMS_NOT_VERIFIED",
       "archive_eligibility": "PROVENANCE_ONLY",
       "sensitive_default": false,
       "withdrawal_projection": "SOURCE_NO_LONGER_AVAILABLE"
     },
     "REFERENCE_METADATA": {
-      "rights_status": "UNKNOWN",
+      "rights_status": "OWNER_ASSERTED_PERMISSION",
       "public_projection": "METADATA_LINK_ONLY",
       "public_fields": [
         "source_id",
@@ -121,9 +121,9 @@
       "excerpt_allowed": false,
       "raw_retention_class": "SOURCE_TERMS_REVIEW",
       "canonical_retention_class": "PERIOD_AND_PROVENANCE_HISTORY",
-      "review_required": true,
+      "review_required": false,
       "withdrawal_behavior": "KEEP_DATASET_ID_MARK_SOURCE_UNAVAILABLE",
-      "terms_status": "CATALOG_ENTRYPOINT_NOT_A_LICENSE",
+      "terms_status": "OWNER_DECISION_TERMS_NOT_VERIFIED",
       "archive_eligibility": "EVIDENCE_ARCHIVE",
       "sensitive_default": true,
       "withdrawal_projection": "SOURCE_NO_LONGER_AVAILABLE"
@@ -275,12 +275,14 @@
   ],
   "terms_status_values": {
     "CATALOG_ENTRYPOINT_NOT_A_LICENSE": "Only the source catalog entrypoint is known; it is a collection locator, not a reuse permission.",
-    "PROJECT_OWNED_NO_THIRD_PARTY_LICENSE": "No third-party license applies because the project owns the derivation."
+    "PROJECT_OWNED_NO_THIRD_PARTY_LICENSE": "No third-party license applies because the project owns the derivation.",
+    "OWNER_DECISION_TERMS_NOT_VERIFIED": "Released by project owner decision (2026-11-13) without per-source terms verification; the catalog entrypoint is still not a licence."
   },
   "rights_status_values": {
     "UNKNOWN": "No third-party reuse permission verified; metadata/link projection only and review_required stays true.",
     "PROJECT_CONTROLLED": "Artifact derived and owned inside this project; not a third-party license grant.",
     "VERIFIED_METADATA_PERMISSION": "Source-specific metadata use permission has been reviewed; never inferred from a catalog entry or public readability.",
-    "OPEN_DATA_LICENSED": "An applicable open-data licence has been verified for the specific source and fields; this enum never approves a source by itself."
+    "OPEN_DATA_LICENSED": "An applicable open-data licence has been verified for the specific source and fields; this enum never approves a source by itself.",
+    "OWNER_ASSERTED_PERMISSION": "Use asserted by the project owner's recorded decision (2026-11-13); not a verified third-party licence or legal determination."
   }
 }

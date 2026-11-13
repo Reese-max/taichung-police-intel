@@ -67,6 +67,12 @@ def make_governed_policy_fixture(root, *, source_root=ROOT, rights_reviewed=True
         "public": root / "apps/web/public/data",
     }
     matrix = json.loads(paths["rights_matrix"].read_text(encoding="utf-8"))
+    # Fixtures start from unreviewed UNKNOWN rights whatever the checked-in owner decision is,
+    # so both the refusal and the reviewed paths stay under test.
+    for class_id in ("OFFICIAL_METADATA_LINK", "OFFICIAL_MEDIA_LINK", "OFFICIAL_TRANSIENT_METADATA", "REFERENCE_METADATA"):
+        matrix["classes"][class_id].update(rights_status="UNKNOWN", review_required=True,
+                                           terms_status="CATALOG_ENTRYPOINT_NOT_A_LICENSE")
+    paths["rights_matrix"].write_text(json.dumps(matrix, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     if rights_reviewed:
         # Explicitly fictional permission; retain the exact #39 field whitelist.
         matrix["classes"]["OFFICIAL_METADATA_LINK"].update(

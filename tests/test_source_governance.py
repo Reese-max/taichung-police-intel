@@ -27,7 +27,7 @@ class SourceGovernanceTests(unittest.TestCase):
         gateway_module = load("current_governance_health", "scripts/query-gateway.py")
         health = gateway_module.QueryGateway().execute("get_source_health", {})
         self.assertEqual(len(health["sources"]), 5)
-        self.assertTrue(all(row["rights_status"] == "UNKNOWN" and row["review_required"] for row in health["source_rights"]))
+        self.assertTrue(all(row["rights_status"] == "OWNER_ASSERTED_PERMISSION" and not row["review_required"] for row in health["source_rights"]))
         self.assertEqual(health["formal_admission"]["status"], "UNKNOWN")
 
     def test_governed_candidate_keeps_active_sources_and_capabilities(self):
@@ -43,12 +43,17 @@ class SourceGovernanceTests(unittest.TestCase):
         sp.validate_catalog_binding(candidate, catalog)
         self.assertEqual(sp.load_current_policy(), old)
 
-    def test_all_actual_rights_unknown_remain_refused(self):
+    def test_owner_released_rights_admit_a_governed_candidate_but_not_the_legacy_policy(self):
         old = sp.load_current_policy()
         candidate = sp.compile_governed_policy(sp.load_catalog(), previous=old)
         result = sp.formal_admission(candidate)
-        self.assertEqual(result["status"], "RIGHTS_BLOCKED")
-        self.assertEqual(result["blocked_sources"], old["active_source_ids"])
+        self.assertEqual(result["status"], "ADMITTED")
+        self.assertEqual(result["blocked_sources"], [])
+        for row in candidate["active_sources"]:
+            rights = row["rights_retention_public_policy_refs"]
+            self.assertEqual(rights["rights_status"], "OWNER_ASSERTED_PERMISSION")
+            self.assertFalse(rights["full_text_allowed"] or rights["excerpt_allowed"])
+            self.assertFalse(rights["may_claim_open_permission"])
         self.assertEqual(sp.formal_admission(old)["reason"], "APPROVED_GOVERNANCE_MISSING")
 
     def test_resigned_source_governance_tampering_cannot_change_trusted_inputs(self):

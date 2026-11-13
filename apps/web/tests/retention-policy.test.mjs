@@ -36,7 +36,9 @@ test("self-check receipt reports facts derived from the compiled policy", () => 
   assert.match(result.stdout, new RegExp(`rights_status=${binding.rights_status}`));
   assert.match(result.stdout, new RegExp(`terms_status=${binding.terms_status}`));
   assert.equal(binding.full_text_allowed, false);
-  assert.equal(binding.rights_status, "UNKNOWN");
+  // Owner decision 2026-11-13: quoted as an owner assertion, never as a verified licence.
+  assert.equal(binding.rights_status, "OWNER_ASSERTED_PERMISSION");
+  assert.equal(binding.terms_status, "OWNER_DECISION_TERMS_NOT_VERIFIED");
   assert.match(result.stdout, /purge_executed=false dry_run=true/);
 });
 
@@ -56,7 +58,9 @@ test("compiled policy binds a versioned matrix, terms and archive eligibility", 
   assert.equal(contentTypes.length, 5);
   for (const [sourceId, source] of Object.entries(policy.source_policies)) {
     assert.match(source.terms_url, /^https:\/\//, sourceId);
-    assert.ok(source.review_required, sourceId);
+    assert.equal(source.review_required, false, sourceId);
+    assert.equal(source.rights_status, "OWNER_ASSERTED_PERMISSION", sourceId);
+    assert.equal(source.full_text_allowed || source.excerpt_allowed, false, sourceId);
     assert.ok(source.data_types.length > 0, sourceId);
     if (source.rights_status === "UNKNOWN") {
       assert.equal(source.terms_status, "CATALOG_ENTRYPOINT_NOT_A_LICENSE", sourceId);
