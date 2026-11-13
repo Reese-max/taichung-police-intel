@@ -74,6 +74,22 @@ test("governed policy rejects unapproved documents and mismatched policy binding
   assert.equal(validateSourceStatus(sourceStatusWithOfficialRevision(), selfApprovingPolicy).sources.length, sourceStatus.sources.length);
 });
 
+test("a policy and status replaced together cannot validate each other", () => {
+  const cases = {
+    policy_hash: [{policy_hash: "0".repeat(64)}, {policy_hash: "0".repeat(64)}],
+    catalog_hash: [{catalog_hash: "1".repeat(64)}, {catalog_hash: "1".repeat(64)}],
+    governance_hash: [{governance_binding: {...policy.governance_binding, governance_hash: "2".repeat(64)}}, {governance_hash: "2".repeat(64)}],
+    retention_policy_hash: [{governance_binding: {...policy.governance_binding, retention_policy: {...policy.governance_binding.retention_policy, policy_hash: "3".repeat(64)}}},
+      {retention_policy_hash: "3".repeat(64)}],
+  };
+  for (const [name, [policyChange, bindingChange]] of Object.entries(cases)) {
+    const forgedPolicy = {...policy, ...policyChange};
+    const forgedStatus = {...structuredClone(sourceStatus), source_policy: {...sourceStatus.source_policy, ...bindingChange}};
+    assert.throws(() => validateSourceStatus(forgedStatus, forgedPolicy), /與核准快照不符/, name);
+  }
+  assert.equal(validateSourceStatus(structuredClone(sourceStatus), structuredClone(policy)).sources.length, sourceStatus.sources.length);
+});
+
 test("public source status requires a non-empty, identified snapshot", () => {
   assert.throws(() => validateSourceStatus({ schema_version: 1, sources: [] }), /來源狀態/);
   assert.throws(() => validateSourceStatus({ ...sourceStatus, sources: [{}] }, policy), /source_id/);
