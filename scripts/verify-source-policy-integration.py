@@ -174,7 +174,8 @@ def run_promoted_fixture(catalog, current, old_store, query_store) -> dict[str, 
         # promotion receipt does not establish real publication rights.
         matrix_path = fixture / "docs/govintel/retention-rights-policy.v1.json"
         matrix = json.loads(matrix_path.read_text(encoding="utf-8"))
-        matrix["classes"]["OFFICIAL_METADATA_LINK"].update(rights_status="VERIFIED_METADATA_PERMISSION", review_required=False)
+        matrix["classes"]["OFFICIAL_METADATA_LINK"].update(rights_status="VERIFIED_METADATA_PERMISSION", review_required=False,
+                                                       terms_status="CATALOG_ENTRYPOINT_NOT_A_LICENSE")
         matrix_path.write_text(json.dumps(matrix, ensure_ascii=False), encoding="utf-8")
         (fixture / "docs/govintel/source-catalog.v2.json").write_text(json.dumps(promoted_catalog, ensure_ascii=False), encoding="utf-8")
         spec = importlib.util.spec_from_file_location("fixture_transition_compiler", fixture / "scripts/source-policy.py")

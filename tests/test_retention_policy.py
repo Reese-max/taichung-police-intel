@@ -13,7 +13,30 @@ retention = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(retention)
 
 
+THIRD_PARTY_CLASSES = ("OFFICIAL_METADATA_LINK", "OFFICIAL_MEDIA_LINK", "OFFICIAL_TRANSIENT_METADATA", "REFERENCE_METADATA")
+
+
 class RetentionPolicyTests(unittest.TestCase):
+    def unknown_rights_policy(self):
+        """The checked-in policy with third-party classes put back to unreviewed UNKNOWN rights."""
+        policy = copy.deepcopy(retention.load_json(retention.POLICY))
+        for class_id in THIRD_PARTY_CLASSES:
+            policy["classes"][class_id].update(rights_status="UNKNOWN", review_required=True,
+                                               terms_status="CATALOG_ENTRYPOINT_NOT_A_LICENSE")
+        return policy
+
+    def test_checked_in_policy_releases_third_party_classes_by_owner_decision_only(self):
+        compiled = retention.compile_policy()
+        for class_id in THIRD_PARTY_CLASSES:
+            value = compiled["classes"][class_id]
+            self.assertEqual(value["rights_status"], "OWNER_ASSERTED_PERMISSION", class_id)
+            self.assertEqual(value["terms_status"], "OWNER_DECISION_TERMS_NOT_VERIFIED", class_id)
+            self.assertFalse(value["review_required"], class_id)
+            self.assertFalse(value["full_text_allowed"] or value["excerpt_allowed"], class_id)
+        # The conservative matrix still compiles, so reverting the owner decision is a data change.
+        reverted = retention.compile_policy(policy=self.unknown_rights_policy())
+        self.assertTrue(all(reverted["classes"][class_id]["review_required"] for class_id in THIRD_PARTY_CLASSES))
+
     def reviewed_policy(self):
         policy = copy.deepcopy(retention.load_json(retention.POLICY))
         policy["terms_status_values"]["HUMAN_REVIEWED_SOURCE_TERMS"] = "Explicit source-bound human metadata review."
@@ -152,7 +175,7 @@ class RetentionPolicyTests(unittest.TestCase):
         self.assertRegex(first["catalog_hash"], r"^[0-9a-f]{64}$")
 
     def test_unknown_rights_cannot_become_unreviewed_full_text(self):
-        policy = retention.load_json(retention.POLICY)
+        policy = self.unknown_rights_policy()
         mutated = copy.deepcopy(policy)
         mutated["classes"]["OFFICIAL_METADATA_LINK"]["review_required"] = False
         with self.assertRaisesRegex(ValueError, "unknown rights"):
@@ -253,7 +276,7 @@ class RetentionPolicyTests(unittest.TestCase):
 
     def test_versioned_matrix_covers_every_declared_data_type_and_layer(self):
         compiled = retention.compile_policy()
-        self.assertEqual(compiled["policy_version"], 2)
+        self.assertEqual(compiled["policy_version"], 3)
         matrix = compiled["data_types"]
         self.assertEqual(
             set(matrix),
@@ -314,7 +337,7 @@ class RetentionPolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "withdrawal projection must match withdrawal behavior"):
             retention.compile_policy(policy=undated)
         untyped = copy.deepcopy(policy)
-        untyped["rights_status_values"].pop("UNKNOWN")
+        untyped["rights_status_values"].pop("OWNER_ASSERTED_PERMISSION")
         with self.assertRaisesRegex(ValueError, "rights status is undocumented"):
             retention.compile_policy(policy=untyped)
         project_owned = copy.deepcopy(policy)
@@ -384,13 +407,22 @@ class RetentionPolicyTests(unittest.TestCase):
             self.assertTrue(source_policy["data_types"])
 
     def test_unknown_rights_cannot_be_declared_an_open_license(self):
-        compiled = retention.compile_policy()
-        for source_id, source_policy in compiled["source_policies"].items():
-            if source_policy["rights_status"] != "UNKNOWN":
-                continue
+        policy = self.unknown_rights_policy()
+        unknown_sources = retention.compile_policy(policy=policy)["source_policies"]
+        self.assertEqual(len(unknown_sources), 20)
+        for source_id, source_policy in unknown_sources.items():
+            self.assertEqual(source_policy["rights_status"], "UNKNOWN", source_id)
             self.assertTrue(source_policy["review_required"], source_id)
             self.assertEqual(source_policy["terms_status"], "CATALOG_ENTRYPOINT_NOT_A_LICENSE", source_id)
-        policy = retention.load_json(retention.POLICY)
+        # The checked-in owner assertion cannot borrow another label in either direction.
+        for field, value in (("terms_status", "CATALOG_ENTRYPOINT_NOT_A_LICENSE"),
+                             ("terms_status", "PROJECT_OWNED_NO_THIRD_PARTY_LICENSE"),
+                             ("rights_status", "OPEN_DATA_LICENSED"), ("rights_status", "UNKNOWN")):
+            with self.subTest(field=field, value=value):
+                borrowed = retention.load_json(retention.POLICY)
+                borrowed["classes"]["OFFICIAL_MEDIA_LINK"][field] = value
+                with self.assertRaisesRegex(ValueError, "open permission"):
+                    retention.compile_policy(policy=borrowed)
         mutated = copy.deepcopy(policy)
         mutated["classes"]["OFFICIAL_MEDIA_LINK"]["terms_status"] = "VERIFIED_OPEN_PERMISSION"
         with self.assertRaisesRegex(ValueError, "open permission"):
@@ -413,8 +445,8 @@ class RetentionPolicyTests(unittest.TestCase):
             "body": "html",
         })
         self.assertEqual(projection["public_projection"], "LINK_ONLY")
-        self.assertTrue(projection["review_required"])
-        self.assertEqual(projection["rights_status"], "UNKNOWN")
+        self.assertFalse(projection["review_required"])
+        self.assertEqual(projection["rights_status"], "OWNER_ASSERTED_PERMISSION")
         self.assertEqual(projection["projected_fields"], {
             "title": "議會質詢影音",
             "official_url": "https://www.tccc.gov.tw/",
@@ -694,7 +726,7 @@ class RetentionPolicyTests(unittest.TestCase):
             retention.project_public_record(dict(record, class_id="DERIVED_SUMMARY"))
         aggregate = retention.project_public_record(dict(record, aggregate_only=True))
         self.assertEqual(aggregate["class_id"], "REFERENCE_METADATA")
-        self.assertEqual(aggregate["rights_status"], "UNKNOWN")
+        self.assertEqual(aggregate["rights_status"], "OWNER_ASSERTED_PERMISSION")
 
     def test_non_serializable_projection_value_is_reported_not_crashed(self):
         with self.assertRaisesRegex(ValueError, "not JSON serializable"):
@@ -902,13 +934,17 @@ class RetentionPolicyTests(unittest.TestCase):
         self.assertFalse(binding["excerpt_allowed"])
         self.assertFalse(binding["query_index_extends_source_retention"])
         self.assertTrue(binding["review_required"])
-        # Conservative by construction: the strictest class wins, never the most permissive.
-        self.assertEqual(binding["rights_status"], "UNKNOWN")
-        self.assertEqual(binding["terms_status"], "CATALOG_ENTRYPOINT_NOT_A_LICENSE")
+        # Owner decision 2026-11-13: quoted as an owner assertion, never as a verified licence.
+        self.assertEqual(binding["rights_status"], "OWNER_ASSERTED_PERMISSION")
+        self.assertEqual(binding["terms_status"], "OWNER_DECISION_TERMS_NOT_VERIFIED")
+        self.assertNotIn("OPEN_DATA_LICENSED", binding["rights_status_values"])
+        # Conservative by construction: any UNKNOWN class wins over a more permissive one.
+        unknown = retention.policy_binding(retention.compile_policy(policy=self.unknown_rights_policy()))
+        self.assertEqual(unknown["rights_status"], "UNKNOWN")
+        self.assertEqual(unknown["terms_status"], "CATALOG_ENTRYPOINT_NOT_A_LICENSE")
         self.assertIn("PROJECT_CONTROLLED", binding["rights_status_values"])
-        for value in compiled["classes"].values():
-            if value["rights_status"] == "UNKNOWN":
-                self.assertEqual(value["terms_status"], "CATALOG_ENTRYPOINT_NOT_A_LICENSE")
+        for class_id in THIRD_PARTY_CLASSES:
+            self.assertEqual(compiled["classes"][class_id]["terms_status"], "OWNER_DECISION_TERMS_NOT_VERIFIED", class_id)
 
     def test_checked_in_binding_matches_the_compiled_policy(self):
         compiled = retention.compile_policy()
@@ -1087,7 +1123,7 @@ class RetentionPolicyTests(unittest.TestCase):
                     retention.compile_policy(**{keyword: value})
 
     def test_binding_review_required_quotes_the_strictest_class(self):
-        policy = retention.load_json(retention.POLICY)
+        policy = self.unknown_rights_policy()
         policy["classes"]["DERIVED_SUMMARY"]["review_required"] = False
         compiled = retention.compile_policy(policy=policy)
         self.assertTrue(retention.policy_binding(compiled)["review_required"])

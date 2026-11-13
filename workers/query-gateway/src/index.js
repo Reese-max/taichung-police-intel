@@ -241,7 +241,7 @@ function formalAdmission(policy) {
   const perSource = {};
   for (const row of policy.active_sources) {
     const rights = row.rights_retention_public_policy_refs;
-    if (!["VERIFIED_METADATA_PERMISSION", "OPEN_DATA_LICENSED"].includes(rights.rights_status) || rights.review_required !== false) perSource[row.source_id] = "RIGHTS_UNKNOWN_OR_UNREVIEWED";
+    if (!["VERIFIED_METADATA_PERMISSION", "OPEN_DATA_LICENSED", "OWNER_ASSERTED_PERMISSION"].includes(rights.rights_status) || rights.review_required !== false) perSource[row.source_id] = "RIGHTS_UNKNOWN_OR_UNREVIEWED";
     else if (rights.full_text_allowed || rights.excerpt_allowed || rights.public_fields.some(field => prohibited.has(field))) perSource[row.source_id] = "PUBLIC_FIELDS_PROHIBITED";
   }
   return { status: Object.keys(perSource).length ? "RIGHTS_BLOCKED" : "ADMITTED", reason: null,
@@ -250,7 +250,7 @@ function formalAdmission(policy) {
 
 function briefAdmission(policy, brief) {
   const summary = policy.governance_binding?.derived_summary_policy;
-  if (!summary || summary.review_required !== false || !["PROJECT_CONTROLLED", "VERIFIED_METADATA_PERMISSION", "OPEN_DATA_LICENSED"].includes(summary.rights_status)
+  if (!summary || summary.review_required !== false || !["PROJECT_CONTROLLED", "VERIFIED_METADATA_PERMISSION", "OPEN_DATA_LICENSED", "OWNER_ASSERTED_PERMISSION"].includes(summary.rights_status)
       || summary.public_projection !== "EVIDENCE_BOUND_SUMMARY_ONLY") return false;
   const fields = new Set(summary.public_fields);
   function allowed(value) {

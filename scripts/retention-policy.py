@@ -23,7 +23,8 @@ EXPIRY_ACTIONS = {"REVIEW_REQUIRED", "PURGE_RAW_KEEP_AUDIT", "KEEP_AUDIT_LINKAGE
 HASH_CHARS = set("0123456789abcdef")
 ARCHIVE_ELIGIBILITY = {"NOT_ARCHIVABLE", "PROVENANCE_ONLY", "EVIDENCE_ARCHIVE"}
 WITHDRAWAL_PROJECTIONS = {"SOURCE_NO_LONGER_AVAILABLE", "RETRACTED"}
-TERMS_STATUSES = {"CATALOG_ENTRYPOINT_NOT_A_LICENSE", "PROJECT_OWNED_NO_THIRD_PARTY_LICENSE", "HUMAN_REVIEWED_SOURCE_TERMS", "AI_REVIEWED_SOURCE_TERMS"}
+TERMS_STATUSES = {"CATALOG_ENTRYPOINT_NOT_A_LICENSE", "PROJECT_OWNED_NO_THIRD_PARTY_LICENSE", "HUMAN_REVIEWED_SOURCE_TERMS", "AI_REVIEWED_SOURCE_TERMS",
+                  "OWNER_DECISION_TERMS_NOT_VERIFIED"}
 UNKNOWN_RIGHTS_TERMS_STATUS = "CATALOG_ENTRYPOINT_NOT_A_LICENSE"
 DATA_TYPE_KINDS = {"CONTENT", "LAYER"}
 LAYER_POLICY_FIELDS = {"retention_class_source", "archive_eligibility", "public_projection"}
@@ -39,7 +40,7 @@ REPLAY_LIMITATION_REASONS = {
 }
 # A retention sweep must never quietly outrank a window that still demands human review.
 NON_OVERRIDABLE_EXPIRY_ACTIONS = {"REVIEW_REQUIRED"}
-RIGHTS_STATUSES = {"UNKNOWN", "PROJECT_CONTROLLED", "VERIFIED_METADATA_PERMISSION", "OPEN_DATA_LICENSED"}
+RIGHTS_STATUSES = {"UNKNOWN", "PROJECT_CONTROLLED", "VERIFIED_METADATA_PERMISSION", "OPEN_DATA_LICENSED", "OWNER_ASSERTED_PERMISSION"}
 UNKNOWN_RIGHTS = "UNKNOWN"
 LAYER_PROJECTIONS = PUBLIC_PROJECTIONS | {NO_PUBLIC_PROJECTION}
 QUERY_INDEX_LAYER = "query_index"
@@ -323,6 +324,11 @@ def compile_policy(catalog: dict[str, Any] | None = None, policy: dict[str, Any]
             raise ValueError(f"retention class fields do not match the compiled vocabulary: {class_id}")
         if value["rights_status"] == "UNKNOWN" and value["terms_status"] != UNKNOWN_RIGHTS_TERMS_STATUS:
             raise ValueError(f"unknown rights must not be presented as an open permission: {class_id}")
+        # An owner assertion is its own label: never borrowed by, or dressed up as, another status.
+        if (value["rights_status"] == "OWNER_ASSERTED_PERMISSION") != (value["terms_status"] == "OWNER_DECISION_TERMS_NOT_VERIFIED"):
+            raise ValueError(f"an owner assertion must not be presented as an open permission or verified terms: {class_id}")
+        if value["terms_status"] == "PROJECT_OWNED_NO_THIRD_PARTY_LICENSE" and value["rights_status"] != "PROJECT_CONTROLLED":
+            raise ValueError(f"third-party rights must not be presented as an open permission: {class_id}")
         if value["rights_status"] not in rights_status_values:
             raise ValueError(f"rights status is undocumented: {class_id}")
         if value["terms_status"] not in terms_status_values:
