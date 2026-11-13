@@ -111,12 +111,15 @@ export function validateSourceStatus(data, policy) {
         throw new Error(`來源狀態時間無法驗證：${source.source_id}`);
       }
     }
-    // The public schema1 policy intentionally omits source rows. Its binding
-    // must match the repository-approved snapshot before using those origins.
-    const boundLegacyPolicy = policy.schema_version === 1 && approvedSourcePolicy.schema_version === 1
+    // Origins always come from the repository-approved snapshot, never from the
+    // caller's policy rows: a public policy file can be replaced together with the
+    // status file, so its own active_sources must not approve its own evidence.
+    const boundPolicy = policy.schema_version === approvedSourcePolicy.schema_version
       && ["policy_version", "policy_hash", "catalog_hash"].every(key => policy[key] === approvedSourcePolicy[key])
-      && JSON.stringify([...expected].sort()) === JSON.stringify(approvedSourcePolicy.active_source_ids);
-    const sourceRows = policy.schema_version === 2 ? policy.active_sources : boundLegacyPolicy ? approvedSourcePolicy.active_sources : [];
+      && JSON.stringify([...expected].sort()) === JSON.stringify([...approvedSourcePolicy.active_source_ids].sort())
+      && (policy.schema_version === 1
+        || policy.governance_binding.governance_hash === approvedSourcePolicy.governance_binding?.governance_hash);
+    const sourceRows = boundPolicy ? approvedSourcePolicy.active_sources : [];
     const policySource = sourceRows?.find(row => row.source_id === source.source_id);
     const approvedOrigins = policySource?.approved_origins || (policySource?.entrypoint ? [new URL(policySource.entrypoint).origin] : []);
     projectSourceDates(source, approvedOrigins);

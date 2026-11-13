@@ -62,6 +62,16 @@ test("governed policy rejects unapproved documents and mismatched policy binding
   }
   const poisonedPolicy = {...policy, active_sources: [{source_id: "S-006", entrypoint: "https://unapproved.example.test/fixture.pdf"}]};
   assert.throws(() => validateSourceStatus(sourceStatusWithOfficialRevision(), poisonedPolicy), /治理政策無法驗證/);
+  // A complete policy whose own rows approve another origin must not approve evidence from it.
+  const selfApprovingPolicy = {...policy, active_sources: policy.active_sources.map(row => row.source_id === "S-006"
+    ? {...row, entrypoint: "https://unapproved.example.test/fixture.pdf", approved_origins: ["https://unapproved.example.test"]} : row)};
+  const unapproved = sourceStatusWithOfficialRevision();
+  const poisonedSource = unapproved.sources.find(row => row.source_id === "S-006");
+  poisonedSource.data_as_of_evidence.official_url = "https://unapproved.example.test/fixture.pdf";
+  poisonedSource.source_url = "https://unapproved.example.test/fixture.pdf";
+  assert.throws(() => validateSourceStatus(unapproved, selfApprovingPolicy), /official date evidence origin/);
+  // The same self-approving rows change nothing for evidence from the approved origin.
+  assert.equal(validateSourceStatus(sourceStatusWithOfficialRevision(), selfApprovingPolicy).sources.length, sourceStatus.sources.length);
 });
 
 test("public source status requires a non-empty, identified snapshot", () => {

@@ -256,6 +256,10 @@ def run_checks() -> dict[str, Any]:
     projections["query_gateway"] = binding(gateway.store["policy"])
     ui_policy = json.loads((ROOT / "apps/web/public/data/source-policy.json").read_text(encoding="utf-8"))
     projections["ui"] = binding(ui_policy)
+    if ui_policy["active_source_ids"] != current["active_source_ids"]:
+        raise ValueError("UI source policy reorders the approved active sources")
+    if current.get("schema_version") == 2 and ui_policy != current:
+        raise ValueError("UI source policy differs from the approved governed snapshot")
     if any(value != expected for value in projections.values()):
         raise ValueError("source policy binding differs between consumers")
     if set(collect.P0_SOURCES) != set(expected["active_source_ids"]):
