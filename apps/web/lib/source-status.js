@@ -89,8 +89,10 @@ export function validateSourceStatus(data, policy) {
       throw new Error("來源狀態治理世代無法驗證");
     }
   }
-  // The caller's policy is only a claim. It must be the repository-approved snapshot,
-  // otherwise a policy file replaced together with the status file would validate itself.
+  // The caller's policy is only a claim: its version, hashes and active source set must
+  // match the repository-approved snapshot, otherwise a policy file replaced together with
+  // the status file would validate itself. Its other fields are never read below, so rows
+  // that differ under matching hashes cannot change the outcome.
   const boundPolicy = policy.schema_version === approvedSourcePolicy.schema_version
     && ["policy_version", "policy_hash", "catalog_hash"].every(key => policy[key] === approvedSourcePolicy[key])
     && JSON.stringify([...expected].sort()) === JSON.stringify([...approvedSourcePolicy.active_source_ids].sort())

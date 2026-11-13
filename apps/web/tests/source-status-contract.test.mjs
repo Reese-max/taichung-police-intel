@@ -76,6 +76,7 @@ test("governed policy rejects unapproved documents and mismatched policy binding
 
 test("a policy and status replaced together cannot validate each other", () => {
   const cases = {
+    policy_version: [{policy_version: policy.policy_version + 1}, {policy_version: policy.policy_version + 1}],
     policy_hash: [{policy_hash: "0".repeat(64)}, {policy_hash: "0".repeat(64)}],
     catalog_hash: [{catalog_hash: "1".repeat(64)}, {catalog_hash: "1".repeat(64)}],
     governance_hash: [{governance_binding: {...policy.governance_binding, governance_hash: "2".repeat(64)}}, {governance_hash: "2".repeat(64)}],
