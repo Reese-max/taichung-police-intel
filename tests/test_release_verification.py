@@ -20,9 +20,10 @@ from governed_policy_fixture import (
 )
 
 ROOT = Path(__file__).resolve().parents[1]
-spec = importlib.util.spec_from_file_location("production_query", Path(os.environ.get("TAI398_VERIFIER_SOURCE", ROOT / "scripts/verify-query-gateway-production.py")))
+spec = importlib.util.spec_from_file_location("production_query", ROOT / "scripts/verify-query-gateway-production.py")
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
+real_module = module
 PUBLIC = "https://reese-max.github.io/taichung-police-intel"
 
 
@@ -62,19 +63,19 @@ class PublicationClient:
         self.feed = json.loads(self.raw["intelligence-feed.json"])
         self.status = json.loads(self.raw["source-status.json"])
         self.policy = json.loads((root / "apps/web/public/data/source-policy.json").read_bytes())
+        self.approved = json.loads((root / "docs/govintel/source-policy.approved.json").read_text())
         policy_module = load_fixture_module(
             PublicationClient.legacy_fixture if blocked else PublicationClient.fixture,
             "release_client_source_policy",
             "scripts/source-policy.py",
         )
-        self.admission = policy_module.formal_admission(self.policy)
+        self.admission = policy_module.formal_admission(self.approved)
         self.binding = {key: self.policy[key] for key in ("policy_version", "policy_hash", "catalog_hash", "active_source_ids")}
         if not blocked:
             self.binding["governance_hash"] = self.policy["governance_binding"]["governance_hash"]
             self.binding["retention_policy_hash"] = self.policy["governance_binding"]["retention_policy"]["policy_hash"]
         ids = self.policy["active_source_ids"]
         self.store_module = load_fixture_module({"root": root}, "release_fixture_store", "scripts/query-store.py")
-        self.approved = json.loads((root / "docs/govintel/source-policy.approved.json").read_text())
         self.store = self.store_module.build_store(self.feed, self.status, json.loads(self.raw["v2-daily-brief.json"]), self.hashes, policy=self.approved)
         self.coverage = self.store_module._query_coverage(self.store, "publication_metadata", policy=self.approved)
         self.coverage.setdefault("collection_coverage_status", self.coverage["status"])
@@ -184,6 +185,17 @@ spec.loader.exec_module(module)
 
 
 class ReleaseVerificationTests(unittest.TestCase):
+    @classmethod
+    def tearDownClass(cls):
+        if PublicationClient.legacy_fixture is not None:
+            PublicationClient.legacy_fixture["cleanup"]()
+        if PublicationClient.fixture is not None:
+            PublicationClient.fixture["cleanup"]()
+        if PublicationClient.legacy_fixture_directory is not None:
+            PublicationClient.legacy_fixture_directory.cleanup()
+        if PublicationClient.fixture_directory is not None:
+            PublicationClient.fixture_directory.cleanup()
+
     def test_receipt_and_health_hashes_cannot_disagree_with_the_release(self):
         for route in ("health", "get_publication_receipt", "search_evidence", "tools/call"):
             with self.subTest(route=route):
@@ -460,9 +472,15 @@ class ReleaseVerificationTests(unittest.TestCase):
             self.assertNotIn("PRODUCTION_QUERY_RECEIPT_OK", printed.call_args[0][0])
 
     def test_self_signed_governed_public_policy_cannot_replace_current_approval(self):
-        # All fake remote hashes/releases agree, but the real local approval is 1.
+        # The fixture verifier must not attest in place of the real schema-2 approval.
+        self.assertEqual(
+            Path(real_module.__file__).resolve(),
+            (ROOT / "scripts/verify-query-gateway-production.py").resolve(),
+        )
+        approved = json.loads((ROOT / "docs/govintel/source-policy.approved.json").read_text(encoding="utf-8"))
+        self.assertEqual(approved["schema_version"], 2)
         with self.assertRaisesRegex(RuntimeError, "approved repository"):
-            native_module.verify("https://gateway.example", PUBLIC, PublicationClient())
+            real_module.verify("https://gateway.example", PUBLIC, PublicationClient())
 
     def test_json_client_accepts_only_the_declared_bounded_status(self):
         client = module.JsonClient()

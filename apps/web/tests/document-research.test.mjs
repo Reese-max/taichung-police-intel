@@ -4,7 +4,7 @@ import test, { before, after } from 'node:test';
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { createGovernedPolicyFixture } from './governed-policy-fixture.mjs';
-import { createLegacyPublicArtifacts } from './legacy-policy-fixture.mjs';
+import { createLegacyPublicArtifacts, readWorkerEmbeddedRetentionBinding } from './legacy-policy-fixture.mjs';
 import { createDocumentResearchFixture, refreshDocumentResearchFixture, rehashDocumentPermission, completion, supportedProducer, supportedCritic } from './document-research-fixture.mjs';
 import { parseResearchInput } from '../../../workers/query-gateway/src/research.js';
 import { buildSnapshot, executeResearch } from '../../../workers/query-gateway/src/index.js';
@@ -60,8 +60,15 @@ test('current governed publication admits only whitelisted metadata', async () =
   }
 });
 
-test('legacy schema1 is zero-admission in all modes, even with a poison bundle getter', async () => {
+test('legacy public artifacts are zero-admission without restoring the Worker-embedded retention binding', async () => {
+  // This fixture restores only source policy and public artifacts; it does not restore the Worker-embedded retention binding.
   const artifacts = await createLegacyPublicArtifacts();
+  const publicPolicy = JSON.parse(artifacts['source-policy.json'].toString('utf8'));
+  assert.equal(Object.hasOwn(publicPolicy, 'active_sources'), false);
+  const retentionBinding = await readWorkerEmbeddedRetentionBinding();
+  assert.equal(retentionBinding.policy_version, 3);
+  assert.equal(retentionBinding.rights_status, 'OWNER_ASSERTED_PERMISSION');
+  assert.equal(retentionBinding.review_required, true);
   const legacy = await buildSnapshot({ PUBLIC_ORIGIN: 'https://example.test' }, async name => {
     const bytes = artifacts[name]; return { bytes, hash: createHash('sha256').update(bytes).digest('hex') };
   });

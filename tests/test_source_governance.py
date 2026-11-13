@@ -25,6 +25,7 @@ class SourceGovernanceTests(unittest.TestCase):
         directory = tempfile.TemporaryDirectory(prefix="legacy-source-governance-")
         self.addCleanup(directory.cleanup)
         fixture = make_legacy_policy_fixture(Path(directory.name) / "legacy", source_root=ROOT)
+        self.addCleanup(fixture["cleanup"])
         legacy_store = load_fixture_module(fixture, "legacy_governance_store", "scripts/query-store.py")
         store = legacy_store.build_from_paths(
             legacy_store.DEFAULT_FEED, legacy_store.DEFAULT_STATUS, legacy_store.DEFAULT_BRIEF,
@@ -99,7 +100,10 @@ class SourceGovernanceTests(unittest.TestCase):
     def legacy_policy():
         with tempfile.TemporaryDirectory(prefix="legacy-source-policy-") as directory:
             fixture = make_legacy_policy_fixture(Path(directory) / "legacy", source_root=ROOT)
-            return json.loads(fixture["paths"]["approved"].read_text(encoding="utf-8"))
+            try:
+                return json.loads(fixture["paths"]["approved"].read_text(encoding="utf-8"))
+            finally:
+                fixture["cleanup"]()
 
     def test_resigned_source_governance_tampering_cannot_change_trusted_inputs(self):
         candidate = sp.compile_governed_policy(sp.load_catalog(), previous=sp.load_current_policy())

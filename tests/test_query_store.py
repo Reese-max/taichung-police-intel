@@ -27,6 +27,7 @@ class QueryStoreTests(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory(prefix="fictional-query-positive-")
         self.addCleanup(temporary.cleanup)
         fixture = bind_checked_in_publication(make_governed_policy_fixture(temporary.name))
+        self.addCleanup(fixture["cleanup"])
         qs = load_fixture_module(fixture, "fictional_query_positive", "scripts/query-store.py")
 
     def test_checked_in_publication_rebuild_is_deterministic(self):
@@ -177,6 +178,7 @@ class QueryStoreTests(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory(prefix="legacy-query-refusal-")
         self.addCleanup(temporary.cleanup)
         fixture = make_legacy_policy_fixture(Path(temporary.name) / "legacy", source_root=ROOT)
+        self.addCleanup(fixture["cleanup"])
         native = load_fixture_module(fixture, "legacy_query_refusal", "scripts/query-store.py")
         store = native.build_from_paths(native.DEFAULT_FEED, native.DEFAULT_STATUS, native.DEFAULT_BRIEF)
         self.assertEqual(store["formal_admission"]["status"], "UNKNOWN")

@@ -6,6 +6,16 @@ const legacyPolicy = new URL(
   "../../../docs/govintel/source-policy-history/3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501.json",
   import.meta.url,
 );
+const legacyPublicPolicyFields = [
+  "schema_version",
+  "catalog_schema_version",
+  "catalog_updated_at",
+  "policy_version",
+  "policy_hash",
+  "catalog_hash",
+  "active_source_ids",
+];
+const workerRetentionBinding = new URL("../public/data/retention-policy-binding.json", import.meta.url);
 const publicationFiles = [
   "intelligence-feed.json",
   "source-status.json",
@@ -19,6 +29,13 @@ export async function createLegacyPublicArtifacts() {
     delete value.source_policy;
     return [name, Buffer.from(JSON.stringify(value))];
   })));
-  artifacts["source-policy.json"] = await readFile(legacyPolicy);
+  const archivedPolicy = JSON.parse(await readFile(legacyPolicy, "utf8"));
+  const publicPolicy = Object.fromEntries(legacyPublicPolicyFields.map(key => [key, archivedPolicy[key]]));
+  artifacts["source-policy.json"] = Buffer.from(`${JSON.stringify(publicPolicy, null, 2)}\n`);
   return artifacts;
+}
+
+export async function readWorkerEmbeddedRetentionBinding() {
+  // This is the exact JSON file statically imported by workers/query-gateway/src/index.js.
+  return JSON.parse(await readFile(workerRetentionBinding, "utf8"));
 }

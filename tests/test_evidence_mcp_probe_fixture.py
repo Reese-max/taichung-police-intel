@@ -13,6 +13,7 @@ import tempfile
 import unittest
 
 from governed_policy_fixture import (
+    LEGACY_PUBLIC_POLICY_FIELDS,
     make_governed_policy_fixture,
     make_legacy_policy_fixture,
     load_fixture_module,
@@ -37,13 +38,19 @@ class EvidenceMCPProbeFixtureTests(unittest.TestCase):
         self.assertEqual({p: p.read_bytes() for p in self.receipts}, self.receipts)
 
     def fixture(self, **options):
-        return make_governed_policy_fixture(Path(self.owned.name) / "fixture", source_root=ROOT, **options)
+        fixture = make_governed_policy_fixture(Path(self.owned.name) / "fixture", source_root=ROOT, **options)
+        self.addCleanup(fixture["cleanup"])
+        return fixture
 
     def test_legacy_policy_fixture_refuses_formal_brief_and_answer(self):
         fixture = make_legacy_policy_fixture(
             Path(self.owned.name) / "legacy",
             source_root=ROOT,
         )
+        self.addCleanup(fixture["cleanup"])
+        public_policy = json.loads((fixture["paths"]["public"] / "source-policy.json").read_text(encoding="utf-8"))
+        self.assertEqual(set(public_policy), set(LEGACY_PUBLIC_POLICY_FIELDS))
+        self.assertNotIn("active_sources", public_policy)
         g = load_fixture_module(fixture, "probe_legacy_gateway", "scripts/query-gateway.py")
         gateway = g.QueryGateway()
         result = gateway.execute("search_evidence", {"limit": 1})
@@ -60,6 +67,19 @@ class EvidenceMCPProbeFixtureTests(unittest.TestCase):
         self.assertEqual(admitted["query_coverage"]["formal_admission"]["status"], "ADMITTED")
         self.assertEqual(admitted["query_coverage"]["formal_admission"]["blocked_sources"], [])
         self.assertGreater(admitted["result_count"], 0)
+        policy = json.loads((ROOT / "docs/govintel/source-policy.approved.json").read_text(encoding="utf-8"))
+        allowed_fields = {
+            row["source_id"]: set(row["rights_retention_public_policy_refs"]["public_fields"])
+            for row in policy["active_sources"]
+        }
+        system_fields = {
+            "record_type", "canonical_id", "source_role", "trust_tier",
+            "verification_status", "canonical_ref",
+        }
+        for row in admitted["results"]:
+            self.assertLessEqual(set(row) - system_fields, allowed_fields[row["source_id"]])
+            for field in ("full_text", "excerpt", "body"):
+                self.assertNotIn(field, row)
 
     def test_explicit_separate_review_uses_real_compiler_ids_origins_and_two_rows(self):
         result = probe.prepare_fictional_fixture(ROOT, Path(self.owned.name) / "fictional")

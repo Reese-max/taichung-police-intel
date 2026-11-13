@@ -115,6 +115,7 @@ class SourcePolicyReplayTests(unittest.TestCase):
             Path(directory.name) / "legacy",
             source_root=ROOT,
         )
+        self.addCleanup(fixture["cleanup"])
         self.qs = load_fixture_module(fixture, "legacy_unsupported_query", "scripts/query-store.py")
         store = self.zero_store()
         supported = self.qs.query_store(store, now=self.clock)

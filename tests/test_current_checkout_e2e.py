@@ -515,6 +515,7 @@ class GovernanceAdmissionTests(unittest.TestCase):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         fixture = make_legacy_policy_fixture(Path(directory.name) / "legacy", source_root=ROOT)
+        self.addCleanup(fixture["cleanup"])
         modules = vc.load_checkout_modules(fixture["root"])
         ctx = vc.build_candidate_context(fixture["root"], modules)
         self.assertEqual(ctx["policy"]["schema_version"], 1)

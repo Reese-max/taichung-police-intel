@@ -75,6 +75,7 @@ class QueryGatewayDomainTests(unittest.TestCase):
         self.addCleanup(directory.cleanup)
         fixture = bind_checked_in_publication(make_governed_policy_fixture(
             directory.name, domain_source_ids=("S-001", "S-028", "S-032")))
+        self.addCleanup(fixture["cleanup"])
         gateway_module = load_fixture_module(fixture, "fictional_domain_permissions", "scripts/query-gateway.py")
         snapshot = gateway_module.load_snapshot()
         snapshot["event_store"] = gateway_module.query_domain.build_event_store([event()])
@@ -431,6 +432,7 @@ class QueryGatewayConversationTests(unittest.TestCase):
         directory = tempfile.TemporaryDirectory(prefix="legacy-chat-refusal-")
         self.addCleanup(directory.cleanup)
         fixture = make_legacy_policy_fixture(Path(directory.name) / "legacy", source_root=ROOT)
+        self.addCleanup(fixture["cleanup"])
         module = load_fixture_module(fixture, "unreviewed_chat_control", "scripts/query-gateway.py")
         snapshot = module.load_snapshot()
         snapshot["event_store"] = module.query_domain.build_event_store([chat_event()])

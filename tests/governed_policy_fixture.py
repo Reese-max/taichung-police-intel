@@ -14,16 +14,28 @@ import json
 from pathlib import Path
 import shutil
 import sys
+import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
 LEGACY_POLICY_HASH = "3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501"
+LEGACY_PUBLIC_POLICY_FIELDS = (
+    "schema_version",
+    "catalog_schema_version",
+    "catalog_updated_at",
+    "policy_version",
+    "policy_hash",
+    "catalog_hash",
+    "active_source_ids",
+)
+_FIXTURE_MODULES = {}
 RUNTIME_PATHS = (
     "scripts/source-policy.py", "scripts/source-governance.py", "scripts/system-health.py",
     "scripts/retention-policy.py", "scripts/query-store.py", "scripts/query-gateway.py",
     "scripts/answer-gate-runner.mjs", "scripts/query-gateway-stdio.py",
     "intel_v2/__init__.py", "intel_v2/semantics.py", "intel_v2/query_domain.py",
     "intel_v2/located_facts.py", "intel_v2/freshness_policy.py", "intel_v2/public_brief.py",
-    "intel_v2/conversation.py", "intel_v2/entity_binding.py", "scripts/entity-registry.py", "config/entity-registry.v1.json",
+    "intel_v2/conversation.py", "intel_v2/entity_binding.py", "intel_v2/review.py",
+    "scripts/entity-registry.py", "config/entity-registry.v1.json",
     "workers/query-gateway/src/index.js", "apps/web/lib/answer-evidence-gate.js",
     "apps/web/lib/publication-dates.js",
     "workers/query-gateway/src/public-brief.js", "workers/query-gateway/src/research.js",
@@ -36,13 +48,41 @@ RUNTIME_PATHS = (
 
 
 def load_fixture_module(fixture, name, relative):
-    spec = importlib.util.spec_from_file_location(name, fixture["root"] / relative)
+    root = Path(fixture["root"]).resolve()
+    unique_name = f"{name}_{uuid.uuid4().hex}"
+    spec = importlib.util.spec_from_file_location(unique_name, root / relative)
     if spec is None or spec.loader is None:
         raise ValueError("fixture module unavailable")
     module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
-    spec.loader.exec_module(module)
+    sys.modules[unique_name] = module
+    _FIXTURE_MODULES.setdefault(root, set()).add(unique_name)
+    try:
+        spec.loader.exec_module(module)
+    except BaseException:
+        sys.modules.pop(unique_name, None)
+        _FIXTURE_MODULES.get(root, set()).discard(unique_name)
+        raise
     return module
+
+
+def cleanup_fixture_modules(fixture):
+    root = Path(fixture["root"]).resolve()
+    for name in _FIXTURE_MODULES.pop(root, set()):
+        sys.modules.pop(name, None)
+    for name, module in tuple(sys.modules.items()):
+        module_path = getattr(module, "__file__", None)
+        if module_path:
+            try:
+                if Path(module_path).resolve().is_relative_to(root):
+                    sys.modules.pop(name, None)
+            except (OSError, RuntimeError):
+                pass
+    for entry in tuple(sys.path):
+        try:
+            if Path(entry or ".").resolve().is_relative_to(root):
+                sys.path.remove(entry)
+        except (OSError, RuntimeError):
+            pass
 
 
 def make_governed_policy_fixture(root, *, source_root=ROOT, rights_reviewed=True, domain_source_ids=(), brief_reviewed=False, per_source_review=False):
@@ -186,6 +226,7 @@ def make_governed_policy_fixture(root, *, source_root=ROOT, rights_reviewed=True
     compiler.validate_catalog_binding(policy, catalog)
     assert compiler.load_current_policy() == policy
     fixture.update(policy=policy, binding=binding, catalog=catalog, publication=publication)
+    fixture["cleanup"] = lambda: cleanup_fixture_modules(fixture)
     return fixture
 
 
@@ -217,7 +258,6 @@ def make_legacy_policy_fixture(root, *, source_root=ROOT):
     }
     legacy_path = history / f"{LEGACY_POLICY_HASH}.json"
     shutil.copyfile(legacy_path, paths["approved"])
-    shutil.copyfile(legacy_path, public / "source-policy.json")
 
     matrix = json.loads(paths["rights_matrix"].read_text(encoding="utf-8"))
     for class_id in ("OFFICIAL_METADATA_LINK", "OFFICIAL_MEDIA_LINK",
@@ -247,13 +287,29 @@ def make_legacy_policy_fixture(root, *, source_root=ROOT):
         publication[name] = value
 
     policy = json.loads(paths["approved"].read_text(encoding="utf-8"))
+    public_policy = {key: policy[key] for key in LEGACY_PUBLIC_POLICY_FIELDS}
+    with (public / "source-policy.json").open("w", encoding="utf-8", newline="\n") as stream:
+        json.dump(public_policy, stream, ensure_ascii=False, indent=2)
+        stream.write("\n")
     compiler = load_fixture_module({"root": root}, "legacy_fixture_source_policy", "scripts/source-policy.py")
-    catalog = compiler.load_catalog()
-    retention = load_fixture_module({"root": root}, "legacy_fixture_retention_policy", "scripts/retention-policy.py")
-    retention_binding = retention.policy_binding(retention.compile_policy(catalog, matrix))
+    try:
+        catalog = compiler.load_catalog()
+        retention = load_fixture_module({"root": root}, "legacy_fixture_retention_policy", "scripts/retention-policy.py")
+        try:
+            retention_binding = retention.policy_binding(retention.compile_policy(catalog, matrix))
+        finally:
+            sys.modules.pop(retention.__name__, None)
+            _FIXTURE_MODULES.get(root, set()).discard(retention.__name__)
+    finally:
+        sys.modules.pop(compiler.__name__, None)
+        _FIXTURE_MODULES.get(root, set()).discard(compiler.__name__)
     with (public / "retention-policy-binding.json").open("w", encoding="utf-8", newline="\n") as stream:
         json.dump(retention_binding, stream, ensure_ascii=False, separators=(",", ":"))
         stream.write("\n")
+
+    def cleanup():
+        cleanup_fixture_modules({"root": root})
+
     return {
         "root": root,
         "paths": paths,
@@ -263,6 +319,7 @@ def make_legacy_policy_fixture(root, *, source_root=ROOT):
         "retention_binding": retention_binding,
         "catalog": catalog,
         "publication": publication,
+        "cleanup": cleanup,
     }
 
 
