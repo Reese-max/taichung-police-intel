@@ -39,16 +39,16 @@ test("checked-in public source status has a validated source snapshot", () => {
   assert.equal(validateSourceStatus(sourceStatus, policy), sourceStatus);
 });
 
-test("fresh official revision validates against the compact public schema1 policy", () => {
+test("fresh official revision validates against the current governed policy", () => {
   const candidate = sourceStatusWithOfficialRevision();
   const before = structuredClone(candidate);
-  assert.equal(policy.schema_version, 1);
-  assert.equal(policy.active_sources, undefined);
+  assert.equal(policy.schema_version, 2);
+  assert.equal(policy.active_sources.length, policy.active_source_ids.length);
   assert.equal(validateSourceStatus(candidate, policy), candidate);
   assert.deepEqual(candidate, before);
 });
 
-test("compact policy revision validation rejects unapproved documents and mismatched policy bindings", () => {
+test("governed policy rejects unapproved documents and mismatched policy bindings", () => {
   for (const url of ["https://unapproved.example.test/fixture.pdf", "https://www.tccc.gov.tw/fixture.doc", "https://user:secret@www.tccc.gov.tw/fixture.pdf"]) {
     const candidate = sourceStatusWithOfficialRevision();
     const source = candidate.sources.find(row => row.source_id === "S-006");
@@ -58,10 +58,20 @@ test("compact policy revision validation rejects unapproved documents and mismat
   }
   for (const key of ["policy_hash", "catalog_hash", "policy_version"]) {
     const candidatePolicy = {...policy, [key]: key === "policy_version" ? policy[key] + 1 : "0".repeat(64)};
-    assert.throws(() => validateSourceStatus(sourceStatusWithOfficialRevision(), candidatePolicy), /official date evidence origin/, key);
+    assert.throws(() => validateSourceStatus(sourceStatusWithOfficialRevision(), candidatePolicy), /治理世代無法驗證/, key);
   }
   const poisonedPolicy = {...policy, active_sources: [{source_id: "S-006", entrypoint: "https://unapproved.example.test/fixture.pdf"}]};
-  assert.equal(validateSourceStatus(sourceStatusWithOfficialRevision(), poisonedPolicy).sources.length, sourceStatus.sources.length);
+  assert.throws(() => validateSourceStatus(sourceStatusWithOfficialRevision(), poisonedPolicy), /治理政策無法驗證/);
+  // A complete policy whose own rows approve another origin must not approve evidence from it.
+  const selfApprovingPolicy = {...policy, active_sources: policy.active_sources.map(row => row.source_id === "S-006"
+    ? {...row, entrypoint: "https://unapproved.example.test/fixture.pdf", approved_origins: ["https://unapproved.example.test"]} : row)};
+  const unapproved = sourceStatusWithOfficialRevision();
+  const poisonedSource = unapproved.sources.find(row => row.source_id === "S-006");
+  poisonedSource.data_as_of_evidence.official_url = "https://unapproved.example.test/fixture.pdf";
+  poisonedSource.source_url = "https://unapproved.example.test/fixture.pdf";
+  assert.throws(() => validateSourceStatus(unapproved, selfApprovingPolicy), /official date evidence origin/);
+  // The same self-approving rows change nothing for evidence from the approved origin.
+  assert.equal(validateSourceStatus(sourceStatusWithOfficialRevision(), selfApprovingPolicy).sources.length, sourceStatus.sources.length);
 });
 
 test("public source status requires a non-empty, identified snapshot", () => {

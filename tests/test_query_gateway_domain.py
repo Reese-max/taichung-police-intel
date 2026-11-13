@@ -6,7 +6,12 @@ import subprocess
 import sys
 import unittest
 import tempfile
-from governed_policy_fixture import make_governed_policy_fixture, load_fixture_module, bind_checked_in_publication
+from governed_policy_fixture import (
+    make_governed_policy_fixture,
+    make_legacy_policy_fixture,
+    load_fixture_module,
+    bind_checked_in_publication,
+)
 
 from intel_v2.entity_binding import registry_runtime
 from intel_v2.discovery_adapter import ingest_feed
@@ -70,6 +75,7 @@ class QueryGatewayDomainTests(unittest.TestCase):
         self.addCleanup(directory.cleanup)
         fixture = bind_checked_in_publication(make_governed_policy_fixture(
             directory.name, domain_source_ids=("S-001", "S-028", "S-032")))
+        self.addCleanup(fixture["cleanup"])
         gateway_module = load_fixture_module(fixture, "fictional_domain_permissions", "scripts/query-gateway.py")
         snapshot = gateway_module.load_snapshot()
         snapshot["event_store"] = gateway_module.query_domain.build_event_store([event()])
@@ -423,9 +429,11 @@ class QueryGatewayConversationTests(unittest.TestCase):
         self.assert_chat_error(gateway, {"text": "今天有什麼事件", "injected": True}, "INVALID_ARGUMENTS")
 
     def test_unreviewed_domain_chat_cannot_bypass_formal_admission(self):
-        spec = importlib.util.spec_from_file_location("unreviewed_chat_control", ROOT / "scripts/query-gateway.py")
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
+        directory = tempfile.TemporaryDirectory(prefix="legacy-chat-refusal-")
+        self.addCleanup(directory.cleanup)
+        fixture = make_legacy_policy_fixture(Path(directory.name) / "legacy", source_root=ROOT)
+        self.addCleanup(fixture["cleanup"])
+        module = load_fixture_module(fixture, "unreviewed_chat_control", "scripts/query-gateway.py")
         snapshot = module.load_snapshot()
         snapshot["event_store"] = module.query_domain.build_event_store([chat_event()])
         gateway = module.QueryGateway(snapshot, clock=lambda: datetime(2026, 9, 21, 9, tzinfo=timezone.utc))

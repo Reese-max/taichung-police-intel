@@ -8,6 +8,8 @@ import sys
 import tempfile
 import unittest
 
+from governed_policy_fixture import make_legacy_policy_fixture, load_fixture_module
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -99,12 +101,22 @@ class SourcePolicyReplayTests(unittest.TestCase):
                 if field == "generation_id":
                     changed[field] = "0" * 64
                 else:
-                    changed["generated_from"][field] = "0" * 64
+                    changed["generated_from"][field] = "f" * 64
+                    for row in changed["items"]:
+                        row["canonical_ref"]["artifact_sha256"] = "f" * 64
                 seal(changed, self.qs)
                 with self.assertRaisesRegex(ValueError, "generation binding"):
                     self.qs.query_store(changed, now=self.clock)
 
     def test_unsupported_traffic_zero_is_not_answerable(self):
+        directory = tempfile.TemporaryDirectory(prefix="legacy-unsupported-query-")
+        self.addCleanup(directory.cleanup)
+        fixture = make_legacy_policy_fixture(
+            Path(directory.name) / "legacy",
+            source_root=ROOT,
+        )
+        self.addCleanup(fixture["cleanup"])
+        self.qs = load_fixture_module(fixture, "legacy_unsupported_query", "scripts/query-store.py")
         store = self.zero_store()
         supported = self.qs.query_store(store, now=self.clock)
         self.assertFalse(supported["answerable_no_match"])
