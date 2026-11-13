@@ -66,6 +66,47 @@ class RetentionPolicyTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, reason):
                     retention.compile_policy(policy=policy)
 
+    def ai_reviewed_policy(self):
+        policy = self.reviewed_policy()
+        policy["terms_status_values"]["AI_REVIEWED_SOURCE_TERMS"] = "Source-bound AI metadata review under owner delegation."
+        review = policy["source_reviews"]["S-032"]
+        del review["human_review"]
+        review["ai_review"] = {"agent": "Fictional agent for tests", "model": "FICTIONAL_TEST_MODEL", "delegated_by": "Fictional owner",
+            "delegation_recorded_at": "2026-09-20T10:00:00+08:00", "reviewed_at": "2026-09-21T10:00:00+08:00"}
+        return policy
+
+    def test_ai_review_is_accepted_and_never_labelled_human(self):
+        policy = self.ai_reviewed_policy()
+        source = retention.compile_policy(policy=policy)["source_policies"]["S-032"]
+        self.assertFalse(source["review_required"])
+        self.assertEqual(source["terms_status"], "AI_REVIEWED_SOURCE_TERMS")
+        self.assertFalse(source["full_text_allowed"])
+        self.assertFalse(source["excerpt_allowed"])
+        human = retention.compile_policy(policy=self.reviewed_policy())["source_policies"]["S-032"]
+        self.assertEqual(human["terms_status"], "HUMAN_REVIEWED_SOURCE_TERMS")
+        del policy["terms_status_values"]["AI_REVIEWED_SOURCE_TERMS"]
+        with self.assertRaisesRegex(ValueError, "must be documented"):
+            retention.compile_policy(policy=policy)
+
+    def test_ai_review_keeps_every_evidence_and_identity_check(self):
+        human = self.reviewed_policy()["source_reviews"]["S-032"]["human_review"]
+        mutations = [
+            (lambda r: r.update(human_review=human), "exactly one reviewer"),
+            (lambda r: r.pop("ai_review"), "exactly one reviewer"),
+            (lambda r: r["ai_review"].pop("model"), "identified AI reviewer"),
+            (lambda r: r["ai_review"].update(agent=" "), "identified AI reviewer"),
+            (lambda r: r["ai_review"].update(delegation_recorded_at="2026-09-22T10:00:00+08:00"), "delegation"),
+            (lambda r: r["terms_evidence"].update(http_status=503), "successful original capture"),
+            (lambda r: r["terms_evidence"].update(fetched_at="2026-09-22T09:00:00+08:00"), "predates"),
+            (lambda r: r.update(public_fields=["full_text"]), "widen public fields"),
+        ]
+        for mutate, reason in mutations:
+            with self.subTest(reason=reason):
+                policy = self.ai_reviewed_policy()
+                mutate(policy["source_reviews"]["S-032"])
+                with self.assertRaisesRegex(ValueError, reason):
+                    retention.compile_policy(policy=policy)
+
     def test_review_scope_and_any_grant_metadata_are_hash_bound(self):
         policy = self.reviewed_policy()
         first = retention.compile_policy(policy=policy)
