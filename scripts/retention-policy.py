@@ -23,7 +23,7 @@ EXPIRY_ACTIONS = {"REVIEW_REQUIRED", "PURGE_RAW_KEEP_AUDIT", "KEEP_AUDIT_LINKAGE
 HASH_CHARS = set("0123456789abcdef")
 ARCHIVE_ELIGIBILITY = {"NOT_ARCHIVABLE", "PROVENANCE_ONLY", "EVIDENCE_ARCHIVE"}
 WITHDRAWAL_PROJECTIONS = {"SOURCE_NO_LONGER_AVAILABLE", "RETRACTED"}
-TERMS_STATUSES = {"CATALOG_ENTRYPOINT_NOT_A_LICENSE", "PROJECT_OWNED_NO_THIRD_PARTY_LICENSE", "HUMAN_REVIEWED_SOURCE_TERMS"}
+TERMS_STATUSES = {"CATALOG_ENTRYPOINT_NOT_A_LICENSE", "PROJECT_OWNED_NO_THIRD_PARTY_LICENSE", "HUMAN_REVIEWED_SOURCE_TERMS", "AI_REVIEWED_SOURCE_TERMS"}
 UNKNOWN_RIGHTS_TERMS_STATUS = "CATALOG_ENTRYPOINT_NOT_A_LICENSE"
 DATA_TYPE_KINDS = {"CONTENT", "LAYER"}
 LAYER_POLICY_FIELDS = {"retention_class_source", "archive_eligibility", "public_projection"}
@@ -189,7 +189,10 @@ def _review_url(value: Any, field: str) -> str:
 
 
 def _compile_source_reviews(reviews: Any, source_policies: dict[str, Any], catalog_terms: dict[str, str]) -> dict[str, Any]:
-    """Consume trusted, explicit human decisions; evidence discovery is not approval.
+    """Consume trusted, explicit reviewer decisions; evidence discovery is not approval.
+
+    Owner decision 2026-11-13: an AI agent may be the deciding reviewer under a
+    recorded delegation. It is labelled AI_REVIEWED_SOURCE_TERMS, never as human.
 
     This configuration is part of the compiled policy hash. It is never read from
     a query or source payload. A review can only narrow its class field allowlist;
@@ -198,12 +201,15 @@ def _compile_source_reviews(reviews: Any, source_policies: dict[str, Any], catal
     if not isinstance(reviews, dict):
         raise ValueError("source_reviews must be an object keyed by catalog source ID")
     compiled = {}
-    fields = {"decision", "rights_status", "resource_url", "public_fields", "human_review", "terms_evidence", "exceptions_reviewed", "attribution"}
+    fields = {"decision", "rights_status", "resource_url", "public_fields", "terms_evidence", "exceptions_reviewed", "attribution"}
+    reviewer_keys = {"human_review", "ai_review"}
     for source_id, review in sorted(reviews.items()):
         if source_id not in source_policies:
             raise ValueError(f"source review references unknown source: {source_id}")
-        if not isinstance(review, dict) or set(review) != fields:
+        if not isinstance(review, dict) or set(review) - reviewer_keys != fields:
             raise ValueError(f"source review fields are incomplete: {source_id}")
+        if len(set(review) & reviewer_keys) != 1:
+            raise ValueError(f"source review needs exactly one reviewer (human_review or ai_review): {source_id}")
         if review["decision"] != "APPROVE_METADATA_ONLY" or review["rights_status"] not in {"VERIFIED_METADATA_PERMISSION", "OPEN_DATA_LICENSED"}:
             raise ValueError(f"source review must be an explicit metadata approval: {source_id}")
         # Exact catalog binding requires a fresh review when the resource changes.
@@ -212,10 +218,21 @@ def _compile_source_reviews(reviews: Any, source_policies: dict[str, Any], catal
         allowed = _require_field_list(review["public_fields"], f"review public_fields:{source_id}")
         if not set(allowed) <= set(source_policies[source_id]["public_fields"]):
             raise ValueError(f"source review cannot widen public fields: {source_id}")
-        human = review["human_review"]
-        if not isinstance(human, dict) or set(human) != {"reviewer", "role", "reviewed_at"} or any(not isinstance(human.get(key), str) or not human[key].strip() for key in ("reviewer", "role")):
-            raise ValueError(f"source review needs an identified human reviewer and role: {source_id}")
-        reviewed = _timestamp(human.get("reviewed_at"), f"human reviewed_at:{source_id}")
+        if "ai_review" in review:
+            ai = review["ai_review"]
+            named = ("agent", "model", "delegated_by")
+            if not isinstance(ai, dict) or set(ai) != {*named, "reviewed_at", "delegation_recorded_at"} or any(not isinstance(ai.get(key), str) or not ai[key].strip() for key in named):
+                raise ValueError(f"source review needs an identified AI reviewer, model and delegation: {source_id}")
+            reviewed = _timestamp(ai.get("reviewed_at"), f"ai reviewed_at:{source_id}")
+            if _timestamp(ai.get("delegation_recorded_at"), f"ai delegation_recorded_at:{source_id}") > reviewed:
+                raise ValueError(f"source review predates its owner delegation: {source_id}")
+            reviewed_terms_status = "AI_REVIEWED_SOURCE_TERMS"
+        else:
+            human = review["human_review"]
+            if not isinstance(human, dict) or set(human) != {"reviewer", "role", "reviewed_at"} or any(not isinstance(human.get(key), str) or not human[key].strip() for key in ("reviewer", "role")):
+                raise ValueError(f"source review needs an identified human reviewer and role: {source_id}")
+            reviewed = _timestamp(human.get("reviewed_at"), f"human reviewed_at:{source_id}")
+            reviewed_terms_status = "HUMAN_REVIEWED_SOURCE_TERMS"
         evidence = review["terms_evidence"]
         required = {"requested_url", "final_url", "fetched_at", "http_status", "body_sha256", "locator", "license_scope", "license_id"}
         if not isinstance(evidence, dict) or set(evidence) != required:
@@ -238,7 +255,7 @@ def _compile_source_reviews(reviews: Any, source_policies: dict[str, Any], catal
             raise ValueError(f"source review attribution is required: {source_id}")
         compiled[source_id] = json.loads(json.dumps(review))
         source_policies[source_id].update({
-            "rights_status": review["rights_status"], "terms_status": "HUMAN_REVIEWED_SOURCE_TERMS",
+            "rights_status": review["rights_status"], "terms_status": reviewed_terms_status,
             "terms_url": evidence["final_url"], "review_required": False,
             "public_fields": list(allowed), "source_review_sha256": sha256(review),
             "attribution": review["attribution"],
@@ -376,7 +393,7 @@ def compile_policy(catalog: dict[str, Any] | None = None, policy: dict[str, Any]
         for source_id, class_id in sorted(source_classes.items())
     }
     source_reviews = _compile_source_reviews(policy.get("source_reviews", {}), source_policies, catalog_terms)
-    if source_reviews and "HUMAN_REVIEWED_SOURCE_TERMS" not in terms_status_values:
+    if {source_policies[source_id]["terms_status"] for source_id in source_reviews} - set(terms_status_values):
         raise ValueError("reviewed source terms status must be documented")
     material = {
         "schema_version": policy["schema_version"],
