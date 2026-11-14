@@ -74,6 +74,7 @@ export function projectToHomepageCandidates(feed) {
 
 /**
  * Returns a summary of sources from the feed for the empty-state display.
+ * The input must be the complete intelligence feed, not the home projection.
  * @param {object} feed
  * @returns {object} - { total_items, source_summary }
  */

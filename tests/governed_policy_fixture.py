@@ -32,6 +32,7 @@ RUNTIME_PATHS = (
     "scripts/source-policy.py", "scripts/source-governance.py", "scripts/system-health.py",
     "scripts/retention-policy.py", "scripts/query-store.py", "scripts/query-gateway.py",
     "scripts/answer-gate-runner.mjs", "scripts/query-gateway-stdio.py",
+    "apps/web/scripts/sync-home-feed.mjs",
     "intel_v2/__init__.py", "intel_v2/semantics.py", "intel_v2/query_domain.py",
     "intel_v2/located_facts.py", "intel_v2/freshness_policy.py", "intel_v2/public_brief.py",
     "intel_v2/conversation.py", "intel_v2/entity_binding.py", "intel_v2/review.py",
@@ -205,6 +206,7 @@ def make_governed_policy_fixture(root, *, source_root=ROOT, rights_reviewed=True
     source = policy["active_sources"][0]
     sid = source["source_id"]
     feed = {"schema_version": 1, "source_policy": binding, "collection_run_id": run, "generated_at": stamp,
+        "source_summary": {},
         "items": [{"stable_id": f"WORKER-FIXTURE-{i}", "title": f"測試官方標題 {i}",
             "source_id": sid, "source_role": "PRIMARY_OFFICIAL",
             "official_url": source["approved_origins"][0] + f"/fictional-governance/notices/{i}",

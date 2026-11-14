@@ -221,6 +221,12 @@ def prepare_serve_dir(ctx: dict[str, Any], dest: Path, site_dir: Path | None = N
             else:
                 shutil.copy2(entry, target)
     else:
+        root = ctx["root"]
+        subprocess.run(
+            ["node", str(root / "apps" / "web" / "scripts" / "sync-home-feed.mjs")],
+            cwd=root,
+            check=True,
+        )
         (dest / "data").mkdir(parents=True, exist_ok=True)
         data_dir = ctx["root"] / "apps" / "web" / "public" / "data"
         for artifact in data_dir.iterdir() if data_dir.is_dir() else []:

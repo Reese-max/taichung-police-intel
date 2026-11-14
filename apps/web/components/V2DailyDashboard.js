@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { assessPublication } from "../lib/publication-freshness.mjs";
-import { searchArchive } from "../lib/archive-search.js";
+import { getArchiveSearchView, shouldLoadFullArchive } from "../lib/archive-search.js";
 import {
   formatSloMetric,
   sloMetricEntries,
@@ -573,13 +573,15 @@ export default function V2DailyDashboard() {
   const [archive, setArchive] = useState(null);
   const [fullArchive, setFullArchive] = useState(null);
   const [fullArchiveLoadState, setFullArchiveLoadState] = useState("idle");
-  const fullArchiveRequestStarted = useRef(false);
+  const fullArchiveLastRequestedRevision = useRef(-1);
+  const fullArchiveRequestCancelled = useRef(() => true);
   const [sourceStatus, setSourceStatus] = useState(null);
   const [systemHealth, setSystemHealth] = useState(null);
   const [candidate, setCandidate] = useState(null);
   const [loadState, setLoadState] = useState("loading");
   const [loadError, setLoadError] = useState("");
   const [archiveQuery, setArchiveQuery] = useState("");
+  const [archiveQueryRevision, setArchiveQueryRevision] = useState(0);
   const [selectedProfileId, setSelectedProfileId] = useState("general");
   const [nowMs, setNowMs] = useState(null);
   const [localHandoff, setLocalHandoff] = useState(null);
@@ -638,6 +640,14 @@ export default function V2DailyDashboard() {
   }, [systemHealth]);
 
   const assessment = assessPublication(publication, sourceStatus, nowMs);
+
+  useEffect(() => {
+    let cancelled = false;
+    fullArchiveRequestCancelled.current = () => cancelled;
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -714,18 +724,21 @@ export default function V2DailyDashboard() {
   }, []);
 
   useEffect(() => {
-    if (
-      !archiveQuery.trim()
-      || !archive
-      || fullArchive
-      || fullArchiveLoadState !== "idle"
-      || fullArchiveRequestStarted.current
-    ) return;
+    if (!shouldLoadFullArchive({
+      homeFeed: archive,
+      fullFeed: fullArchive,
+      query: archiveQuery,
+      loadState: fullArchiveLoadState,
+      queryRevision: archiveQueryRevision,
+      lastRequestedRevision: fullArchiveLastRequestedRevision.current,
+    })) return;
 
-    fullArchiveRequestStarted.current = true;
+    fullArchiveLastRequestedRevision.current = archiveQueryRevision;
     setFullArchiveLoadState("loading");
+    const isCancelled = fullArchiveRequestCancelled.current;
     fetchJson(ARCHIVE_URL)
       .then((data) => {
+        if (isCancelled()) return;
         if (data?.schema_version !== 1 || !Array.isArray(data?.items)) {
           throw new Error("invalid full archive");
         }
@@ -735,21 +748,21 @@ export default function V2DailyDashboard() {
         setFullArchive(data);
         setFullArchiveLoadState("loaded");
       })
-      .catch(() => setFullArchiveLoadState("failed"));
-  }, [archiveQuery, archive, fullArchive, fullArchiveLoadState]);
+      .catch(() => {
+        if (!isCancelled()) setFullArchiveLoadState("failed");
+      });
+  }, [archiveQuery, archive, fullArchive, fullArchiveLoadState, archiveQueryRevision]);
 
-  const archiveSearch = useMemo(
-    () => searchArchive({ homeFeed: archive, fullFeed: fullArchive, query: archiveQuery }),
-    [archive, fullArchive, archiveQuery],
+  const archiveSearchView = useMemo(
+    () => getArchiveSearchView({
+      homeFeed: archive,
+      fullFeed: fullArchive,
+      query: archiveQuery,
+      loadState: fullArchiveLoadState,
+    }),
+    [archive, fullArchive, archiveQuery, fullArchiveLoadState],
   );
-  const filteredArchive = archiveSearch.items;
-  const archiveSearchMessage = archiveQuery.trim()
-    ? fullArchiveLoadState === "loading"
-      ? "正在載入完整歷史索引…"
-      : fullArchiveLoadState === "failed" || archiveSearch.kind === "generation_mismatch"
-        ? "完整歷史索引載入失敗，請稍後再試。"
-        : null
-    : null;
+  const filteredArchive = archiveSearchView.items;
 
   const profileViews = Array.isArray(publication?.profile_views) ? publication.profile_views : [];
   const activeView = profileViews.find((view) => view?.profile?.profile_id === selectedProfileId) || publication || {};
@@ -1111,14 +1124,18 @@ export default function V2DailyDashboard() {
               <input
                 type="search"
                 value={archiveQuery}
-                onChange={(event) => setArchiveQuery(event.target.value)}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  if (value !== archiveQuery) setArchiveQueryRevision((revision) => revision + 1);
+                  setArchiveQuery(value);
+                }}
                 placeholder="輸入分局、交通、警力、提案等關鍵字"
               />
             </label>}
             {archive ? (
-              <div className="v2-archive-list">
-                {archiveSearchMessage && (
-                  <p className="v2-archive-unavailable" role="status">{archiveSearchMessage}</p>
+              <div className="v2-archive-list" data-archive-search-state={archiveSearchView.state}>
+                {archiveSearchView.statusMessage && (
+                  <p className="v2-archive-unavailable" role="status">{archiveSearchView.statusMessage}</p>
                 )}
                 {filteredArchive.map((item) => (
                   <a key={item.stable_id} href={item.official_url} target="_blank" rel="noreferrer">
@@ -1127,8 +1144,8 @@ export default function V2DailyDashboard() {
                     <small>歷史資料 · 開啟官方來源</small>
                   </a>
                 ))}
-                {filteredArchive.length === 0 && archiveSearch.kind !== "needs_full_index" && (
-                  <p>找不到符合關鍵字的歷史資料。</p>
+                {archiveSearchView.showNoResults && (
+                  <p data-testid="archive-no-results">找不到符合關鍵字的歷史資料。</p>
                 )}
               </div>
             ) : (

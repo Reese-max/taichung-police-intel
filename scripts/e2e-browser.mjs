@@ -96,7 +96,10 @@ async function main() {
     const archiveInput = page.locator(".v2-archive-search input");
     const initialCount = await page.locator(".v2-archive-list a").count();
     await archiveInput.fill("S-009");
-    await page.waitForTimeout(100);
+    await page.waitForFunction(() => {
+      const state = document.querySelector(".v2-archive-list")?.dataset.archiveSearchState;
+      return state === "loaded" || state === "failed";
+    }, null, { timeout: 15000 });
     const filteredCount = await page.locator(".v2-archive-list a").count();
     const filteredLabels = await page.locator(".v2-archive-list a span").allInnerTexts();
     record("browser_archive_filters_results", filteredCount > 0 && filteredLabels.every((label) => /提案/.test(label)), `${initialCount} -> ${filteredCount}`);
@@ -127,9 +130,17 @@ async function main() {
     await shot(page, "source");
 
     await archiveInput.fill("zzzqqq-no-such-record");
-    await page.waitForSelector(".v2-archive-list p", { timeout: 10000 }).catch(() => {});
-    const emptyText = await page.locator(".v2-archive-list").innerText();
-    record("valid_empty_is_distinct", /找不到符合關鍵字的歷史資料/.test(emptyText) && !/無法安全呈現|錯誤/.test(emptyText), emptyText);
+    await page.waitForFunction(() => {
+      const state = document.querySelector(".v2-archive-list")?.dataset.archiveSearchState;
+      return state === "loaded" || state === "failed";
+    }, null, { timeout: 10000 }).catch(() => {});
+    const emptyText = await page.locator('[data-testid="archive-no-results"]').innerText().catch(() => "");
+    const statusText = await page.locator(".v2-archive-list [role=status]").innerText().catch(() => "");
+    record(
+      "valid_empty_is_distinct",
+      /找不到符合關鍵字的歷史資料/.test(emptyText) && !statusText,
+      statusText || emptyText,
+    );
     await shot(page, "empty");
 
     await page.reload({ waitUntil: "networkidle" });

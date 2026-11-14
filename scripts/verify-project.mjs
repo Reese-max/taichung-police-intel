@@ -364,6 +364,7 @@ if (["quick", "full"].includes(mode) && !failures.length) {
   if (publicationWorkflow) {
     console.log("VERIFY_NOTE current-checkout runtime skipped for the generated Pages publication workspace");
   }
+  run("node", ["apps/web/scripts/sync-home-feed.mjs"], "home-feed-sync");
   runNpm(["--prefix", "apps/web", "test"], "web-tests");
   if (python) {
     const checks = [
