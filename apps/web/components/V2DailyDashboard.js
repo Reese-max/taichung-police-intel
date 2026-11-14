@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { assessPublication } from "../lib/publication-freshness.mjs";
+import { searchArchive } from "../lib/archive-search.js";
 import {
   formatSloMetric,
   sloMetricEntries,
@@ -41,6 +42,7 @@ import DiscoverySignalsPanel from "./DiscoverySignalsPanel.js";
 
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
 const BRIEF_URL = `${BASE_PATH}/data/v2-daily-brief.json`;
+const HOME_ARCHIVE_URL = `${BASE_PATH}/data/intelligence-feed-home.json`;
 const ARCHIVE_URL = `${BASE_PATH}/data/intelligence-feed.json`;
 const STATUS_URL = `${BASE_PATH}/data/source-status.json`;
 const SYSTEM_HEALTH_URL = `${BASE_PATH}/data/system-health.json`;
@@ -569,6 +571,9 @@ function collectPublishedItems(publication) {
 export default function V2DailyDashboard() {
   const [publication, setPublication] = useState(null);
   const [archive, setArchive] = useState(null);
+  const [fullArchive, setFullArchive] = useState(null);
+  const [fullArchiveLoadState, setFullArchiveLoadState] = useState("idle");
+  const fullArchiveRequestStarted = useRef(false);
   const [sourceStatus, setSourceStatus] = useState(null);
   const [systemHealth, setSystemHealth] = useState(null);
   const [candidate, setCandidate] = useState(null);
@@ -669,9 +674,15 @@ export default function V2DailyDashboard() {
         setLoadError(`無法讀取本期 V2 情報：${error.message}`);
       });
 
-    fetchJson(ARCHIVE_URL)
+    fetchJson(HOME_ARCHIVE_URL)
       .then((data) => {
-        if (!cancelled && data?.schema_version === 1 && Array.isArray(data?.items)) {
+        if (
+          !cancelled
+          && data?.schema_version === 1
+          && data?.kind === "GOVINTEL_HOME_FEED"
+          && Array.isArray(data?.archive_preview)
+          && Number.isInteger(data?.total_item_count)
+        ) {
           setArchive(data);
         }
       })
@@ -702,20 +713,43 @@ export default function V2DailyDashboard() {
     };
   }, []);
 
-  const filteredArchive = useMemo(() => {
-    const items = Array.isArray(archive?.items) ? archive.items : [];
-    const needle = archiveQuery.trim().toLocaleLowerCase("zh-Hant");
-    if (!needle) return items.slice(0, 8);
-    return items
-      .filter((item) => {
-        const haystack = [item.title, item.committee, item.source_id]
-          .filter(Boolean)
-          .join(" ")
-          .toLocaleLowerCase("zh-Hant");
-        return haystack.includes(needle);
+  useEffect(() => {
+    if (
+      !archiveQuery.trim()
+      || !archive
+      || fullArchive
+      || fullArchiveLoadState !== "idle"
+      || fullArchiveRequestStarted.current
+    ) return;
+
+    fullArchiveRequestStarted.current = true;
+    setFullArchiveLoadState("loading");
+    fetchJson(ARCHIVE_URL)
+      .then((data) => {
+        if (data?.schema_version !== 1 || !Array.isArray(data?.items)) {
+          throw new Error("invalid full archive");
+        }
+        if (data.collection_run_id !== archive.collection_run_id) {
+          throw new Error("archive generation mismatch");
+        }
+        setFullArchive(data);
+        setFullArchiveLoadState("loaded");
       })
-      .slice(0, 20);
-  }, [archive, archiveQuery]);
+      .catch(() => setFullArchiveLoadState("failed"));
+  }, [archiveQuery, archive, fullArchive, fullArchiveLoadState]);
+
+  const archiveSearch = useMemo(
+    () => searchArchive({ homeFeed: archive, fullFeed: fullArchive, query: archiveQuery }),
+    [archive, fullArchive, archiveQuery],
+  );
+  const filteredArchive = archiveSearch.items;
+  const archiveSearchMessage = archiveQuery.trim()
+    ? fullArchiveLoadState === "loading"
+      ? "正在載入完整歷史索引…"
+      : fullArchiveLoadState === "failed" || archiveSearch.kind === "generation_mismatch"
+        ? "完整歷史索引載入失敗，請稍後再試。"
+        : null
+    : null;
 
   const profileViews = Array.isArray(publication?.profile_views) ? publication.profile_views : [];
   const activeView = profileViews.find((view) => view?.profile?.profile_id === selectedProfileId) || publication || {};
@@ -1067,7 +1101,7 @@ export default function V2DailyDashboard() {
                 <p className="v2-eyebrow">背景資料</p>
                 <h2 id="v2-archive-title">歷史資料庫</h2>
               </div>
-              <span>{archive ? `${archive.items.length} 筆歷史索引` : "歷史索引尚未取得"}</span>
+              <span>{archive ? `${archive.total_item_count} 筆歷史索引` : "歷史索引尚未取得"}</span>
             </div>
             <p className="v2-archive-note">
               以下資料是目前可查詢的官方歷史索引，不代表本期新增，也不會自動列入今日重點。
@@ -1083,6 +1117,9 @@ export default function V2DailyDashboard() {
             </label>}
             {archive ? (
               <div className="v2-archive-list">
+                {archiveSearchMessage && (
+                  <p className="v2-archive-unavailable" role="status">{archiveSearchMessage}</p>
+                )}
                 {filteredArchive.map((item) => (
                   <a key={item.stable_id} href={item.official_url} target="_blank" rel="noreferrer">
                     <span>{SOURCE_NAMES[item.source_id] || item.source_id}</span>
@@ -1090,7 +1127,9 @@ export default function V2DailyDashboard() {
                     <small>歷史資料 · 開啟官方來源</small>
                   </a>
                 ))}
-                {filteredArchive.length === 0 && <p>找不到符合關鍵字的歷史資料。</p>}
+                {filteredArchive.length === 0 && archiveSearch.kind !== "needs_full_index" && (
+                  <p>找不到符合關鍵字的歷史資料。</p>
+                )}
               </div>
             ) : (
               <p className="v2-archive-unavailable">歷史索引尚未載入或暫不可用；這不是零筆資料，請稍後重試。</p>

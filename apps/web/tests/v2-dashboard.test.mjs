@@ -4,7 +4,7 @@ import test from "node:test";
 
 
 const briefUrl = new URL("../public/data/v2-daily-brief.json", import.meta.url);
-const feedUrl = new URL("../public/data/intelligence-feed.json", import.meta.url);
+const feedUrl = new URL("../public/data/intelligence-feed-home.json", import.meta.url);
 const statusUrl = new URL("../public/data/source-status.json", import.meta.url);
 const componentUrl = new URL("../components/V2DailyDashboard.js", import.meta.url);
 const queryGatewayUrl = new URL("../components/QueryGatewayPanel.js", import.meta.url);
@@ -54,7 +54,7 @@ test("generated brief separates current changes from the historical archive", as
     ...brief.other_changes,
   ];
 
-  assert.equal(brief.overview.archive_total, feed.items.length);
+  assert.equal(brief.overview.archive_total, feed.total_item_count);
   assert.ok(
     publishedChanges.length <= brief.overview.current_change_count,
     "the UI may cap displayed changes but must not exceed the detected total",
@@ -112,6 +112,10 @@ test("V2 dashboard is police-first, Top 3 capped, and evidence-bound", async () 
   assert.match(source, /加入追蹤/);
   assert.match(source, /確認／更新交班版本/);
   assert.match(source, /本機保存 · 不會寫入公開網站/);
+  assert.match(source, /intelligence-feed-home\.json/);
+  assert.match(source, /intelligence-feed\.json/);
+  assert.match(source, /正在載入完整歷史索引…/);
+  assert.match(source, /完整歷史索引載入失敗，請稍後再試。/);
   assert.match(source, /標記已處理/);
   assert.match(source, /匯出 Markdown/);
   assert.match(source, /DETERMINISTIC_PASS/);
@@ -167,6 +171,12 @@ test("historical feed is explicitly labelled archive rather than current intelli
   assert.match(source, /歷史資料庫/);
   assert.match(source, /不代表本期新增/);
   assert.match(source, /歷史資料 · 開啟官方來源/);
+  assert.match(source, /archive_preview/);
+  assert.match(source, /archive\.total_item_count/);
+  assert.match(source, /role="status"\>\{archiveSearchMessage\}/);
+  assert.match(source, /!archiveQuery\.trim\(\)/);
+  assert.match(source, /fullArchiveRequestStarted\.current/);
+  assert.match(source, /data\.collection_run_id !== archive\.collection_run_id/);
 });
 
 test("V2 dashboard surfaces Taiwan-relayed stage evidence with its own capture time", async () => {
