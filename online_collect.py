@@ -400,9 +400,14 @@ def paginated_api(
                 retry_after = getattr(error_response, "headers", {}).get("Retry-After")
                 try:
                     delay = float(retry_after)
-                    if not math.isfinite(delay) or delay < 0:
-                        delay = fallback
                 except (TypeError, ValueError):
+                    try:
+                        # RFC 9110 also allows an HTTP-date.
+                        retry_at = parsedate_to_datetime(retry_after)
+                        delay = (retry_at - datetime.now(retry_at.tzinfo)).total_seconds()
+                    except (TypeError, ValueError):
+                        delay = fallback
+                if not math.isfinite(delay) or delay < 0:
                     delay = fallback
                 sleep_fn(min(delay, 120))
                 retries += 1
@@ -2335,12 +2340,16 @@ def generate_feed_csv(feed_items: list[dict], raw_items_by_source: dict[str, lis
     # Map source_id to source_name
     source_names = {sid: name for sid, (name, _) in P0_SOURCES.items()}
 
-    # Build a lookup from stable_key to raw payload
+    # Index raw payloads by the stable_id project_feed_item derives from them, so the
+    # export stays linear when a source carries thousands of items. The first non-empty
+    # payload wins, as the previous per-item scan did.
     raw_lookup: dict[str, dict] = {}
     for source_id, items in raw_items_by_source.items():
         for item in items:
-            key = f"{source_id}:{item['stable_key']}"
-            raw_lookup[key] = item.get("payload", {})
+            stable_key_hash = canonical_sha256(f"{source_id}:{item['stable_key']}")[:16]
+            key = f"FEED-{source_id}-{stable_key_hash}"
+            if not raw_lookup.get(key):
+                raw_lookup[key] = item.get("payload", {})
 
     buf = io.StringIO()
     writer = csv.DictWriter(buf, fieldnames=fieldnames, extrasaction="ignore")
@@ -2349,17 +2358,7 @@ def generate_feed_csv(feed_items: list[dict], raw_items_by_source: dict[str, lis
         source_id = item.get("source_id", "")
         # Recover the stable_key from stable_id: "FEED-S-009-xxxx" -> lookup
         stable_id = item.get("stable_id", "")
-        # Try to find matching raw payload by content_sha256
-        payload = {}
-        for sid, raw_items in raw_items_by_source.items():
-            if sid != source_id:
-                continue
-            for raw in raw_items:
-                if canonical_sha256(f"{sid}:{raw['stable_key']}")[:16] in stable_id:
-                    payload = raw.get("payload", {})
-                    break
-            if payload:
-                break
+        payload = raw_lookup.get(stable_id) or {}
 
         # Extract S-009 specific fields
         proposal_rationale = ""

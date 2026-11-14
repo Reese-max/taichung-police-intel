@@ -300,6 +300,69 @@ class ProposalDateTruthTests(unittest.TestCase):
                 self.assertEqual(len(session.calls), 2)
                 self.assertEqual(result["snapshot_item_count"], 1)
 
+    def test_s009_retry_after_accepts_http_dates_and_falls_back_on_unusable_values(self):
+        import online_collect as oc
+
+        cases = (
+            ("Wed, 21 Oct 2099 07:28:00 GMT", 120),   # far future HTTP-date: capped
+            ("Wed, 21 Oct 2015 07:28:00 GMT", 5),     # already past: first fallback
+            ("-3", 5), ("nan", 5), ("soon", 5), (None, 5),
+        )
+        for retry_after, expected_wait in cases:
+            with self.subTest(retry_after=retry_after):
+                headers = {} if retry_after is None else {"Retry-After": retry_after}
+                throttled = ApiResponse(oc.API_S009, status_code=429, headers=headers, content=b"")
+                session = Session([throttled, self.api_page([self.proposal("proposal-001")], 1, 1)])
+                sleeps = []
+                oc.collect_s009(session, date(2026, 9, 29), date(2026, 10, 4), sleep_fn=sleeps.append)
+                self.assertEqual(sleeps, [expected_wait])
+
+    def test_feed_csv_export_hashes_each_raw_item_once_and_keeps_payload_matching(self):
+        import csv
+        import tempfile
+        from pathlib import Path
+        from unittest import mock
+
+        import online_collect as oc
+
+        count = 400
+        raw = [{"stable_key": f"bill-{index}", "payload": {"committee": f"委員會-{index}", "proposalRationale": f"<p>案由 {index}</p>"}}
+               for index in range(count)]
+        # A second source reuses the same stable keys; its payloads must never leak across sources.
+        other = [{"stable_key": f"bill-{index}", "payload": {"committee": "其他來源"}} for index in range(3)]
+        feed_items = [{"source_id": "S-009", "stable_id": f"FEED-S-009-{oc.canonical_sha256(f'S-009:bill-{index}')[:16]}",
+                       "title": f"提案 {index}"} for index in reversed(range(count))]
+        feed_items.append({"source_id": "S-009", "stable_id": "FEED-S-009-0000000000000000", "title": "無對應原始資料"})
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "feed-export.csv"
+            with mock.patch.object(oc, "canonical_sha256", wraps=oc.canonical_sha256) as hashed:
+                oc.generate_feed_csv(feed_items, {"S-009": raw, "S-004": other}, target)
+            self.assertLessEqual(hashed.call_count, count + len(other))
+            with target.open(encoding="utf-8-sig", newline="") as handle:
+                rows = list(csv.DictReader(handle))
+        self.assertEqual(len(rows), count + 1)
+        by_title = {row["title"]: row for row in rows}
+        for index in (0, 1, count - 1):
+            self.assertEqual(by_title[f"提案 {index}"]["committee"], f"委員會-{index}")
+            self.assertEqual(by_title[f"提案 {index}"]["proposal_rationale"], f"案由 {index}")
+        self.assertEqual(by_title["無對應原始資料"]["committee"], "")
+
+    def test_production_verifier_reads_artifacts_up_to_the_query_store_budget(self):
+        import importlib.util
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parents[1]
+
+        def load(name, relative):
+            spec = importlib.util.spec_from_file_location(name, root / relative)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            return module
+
+        verifier = load("budget_production_verifier", "scripts/verify-query-gateway-production.py")
+        store = load("budget_query_store", "scripts/query-store.py")
+        self.assertEqual(verifier.MAX_BYTES, store.MAX_BYTES)
+
     def test_s009_stops_after_three_429_retries_without_returning_partial_data(self):
         import online_collect as oc
         import requests
