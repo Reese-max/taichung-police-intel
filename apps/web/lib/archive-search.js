@@ -5,7 +5,8 @@ export function searchArchive({ homeFeed, fullFeed, query }) {
   const needle = (query || "").trim().toLocaleLowerCase("zh-Hant");
   if (!needle) return { kind: "preview", items: preview };
   if (!fullFeed) return { kind: "needs_full_index", items: [] };
-  if (!homeFeed?.collection_run_id || homeFeed.collection_run_id !== fullFeed.collection_run_id) {
+  if (!homeFeed?.collection_run_id || homeFeed.collection_run_id !== fullFeed.collection_run_id
+      || (homeFeed.feed_sha256 && fullFeed.feed_sha256 && homeFeed.feed_sha256 !== fullFeed.feed_sha256)) {
     return { kind: "generation_mismatch", items: [] };
   }
   if (!Array.isArray(fullFeed.items)) return { kind: "invalid_full_index", items: [] };

@@ -43,7 +43,8 @@ import DiscoverySignalsPanel from "./DiscoverySignalsPanel.js";
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
 const BRIEF_URL = `${BASE_PATH}/data/v2-daily-brief.json`;
 const HOME_ARCHIVE_URL = `${BASE_PATH}/data/intelligence-feed-home.json`;
-const ARCHIVE_URL = `${BASE_PATH}/data/intelligence-feed.json`;
+// Only the fields the archive list renders and searches; the complete feed stays a download.
+const ARCHIVE_URL = `${BASE_PATH}/data/intelligence-feed-search.json`;
 const STATUS_URL = `${BASE_PATH}/data/source-status.json`;
 const SYSTEM_HEALTH_URL = `${BASE_PATH}/data/system-health.json`;
 
@@ -741,10 +742,10 @@ export default function V2DailyDashboard() {
     fetchJson(ARCHIVE_URL)
       .then((data) => {
         if (isCancelled()) return;
-        if (data?.schema_version !== 1 || !Array.isArray(data?.items)) {
+        if (data?.schema_version !== 1 || data?.kind !== "GOVINTEL_ARCHIVE_SEARCH_INDEX" || !Array.isArray(data?.items)) {
           throw new Error("invalid full archive");
         }
-        if (data.collection_run_id !== archive.collection_run_id) {
+        if (data.collection_run_id !== archive.collection_run_id || data.feed_sha256 !== archive.feed_sha256) {
           throw new Error("archive generation mismatch");
         }
         setFullArchive(data);

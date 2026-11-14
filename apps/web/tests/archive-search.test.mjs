@@ -116,6 +116,14 @@ test("archive search does not repeat a failed request for an unchanged query", (
   }), false);
 });
 
+test("archive search rejects an index built from different feed bytes in the same run", () => {
+  const bound = { ...homeFeed, feed_sha256: "a".repeat(64) };
+  const index = { collection_run_id: homeFeed.collection_run_id, feed_sha256: "b".repeat(64), items: [{ title: "交通" }] };
+
+  assert.equal(searchArchive({ homeFeed: bound, fullFeed: index, query: "交通" }).kind, "generation_mismatch");
+  assert.equal(searchArchive({ homeFeed: bound, fullFeed: { ...index, feed_sha256: "a".repeat(64) }, query: "交通" }).kind, "results");
+});
+
 test("archive search rejects full indexes from another generation without results", () => {
   const view = getArchiveSearchView({
     homeFeed,
