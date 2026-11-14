@@ -4,7 +4,7 @@ import test from "node:test";
 
 
 const briefUrl = new URL("../public/data/v2-daily-brief.json", import.meta.url);
-const feedUrl = new URL("../public/data/intelligence-feed-home.json", import.meta.url);
+const feedUrl = new URL("../public/data/intelligence-feed.json", import.meta.url);
 const statusUrl = new URL("../public/data/source-status.json", import.meta.url);
 const componentUrl = new URL("../components/V2DailyDashboard.js", import.meta.url);
 const queryGatewayUrl = new URL("../components/QueryGatewayPanel.js", import.meta.url);
@@ -54,7 +54,7 @@ test("generated brief separates current changes from the historical archive", as
     ...brief.other_changes,
   ];
 
-  assert.equal(brief.overview.archive_total, feed.total_item_count);
+  assert.equal(brief.overview.archive_total, feed.items.length);
   assert.ok(
     publishedChanges.length <= brief.overview.current_change_count,
     "the UI may cap displayed changes but must not exceed the detected total",

@@ -12,8 +12,8 @@ import { buildHomeFeed, renderHomeFeed } from "../scripts/sync-home-feed.mjs";
 
 const scriptPath = fileURLToPath(new URL("../scripts/sync-home-feed.mjs", import.meta.url));
 const fullFeedPath = new URL("../public/data/intelligence-feed.json", import.meta.url);
-const homeFeedPath = new URL("../public/data/intelligence-feed-home.json", import.meta.url);
-const testFilePath = fileURLToPath(import.meta.url);
+const gitignorePath = new URL("../../../.gitignore", import.meta.url);
+const packagePath = new URL("../package.json", import.meta.url);
 
 async function withTempDirectory(callback) {
   const directory = await mkdtemp(join(tmpdir(), "govintel-home-feed-"));
@@ -35,14 +35,19 @@ function assertSortedObjectKeys(value) {
   Object.values(value).forEach(assertSortedObjectKeys);
 }
 
-test("checked-in home feed is the deterministic projection of the complete feed", async () => {
-  const [feedBytes, checkedInBytes] = await Promise.all([
-    readFile(fullFeedPath),
-    readFile(homeFeedPath),
-  ]);
+test("the script writes the deterministic projection of the complete feed", async () => {
+  const feedBytes = await readFile(fullFeedPath);
   const feed = JSON.parse(feedBytes.toString("utf8"));
   const expected = buildHomeFeed(feed, feedBytes);
-  const checkedIn = JSON.parse(checkedInBytes.toString("utf8"));
+  let written;
+  let checkedInBytes;
+  await withTempDirectory(async (directory) => {
+    const output = join(directory, "intelligence-feed-home.json");
+    execFileSync(process.execPath, [scriptPath, "--feed", fileURLToPath(fullFeedPath), "--output", output], { encoding: "utf8" });
+    checkedInBytes = await readFile(output);
+    written = JSON.parse(checkedInBytes.toString("utf8"));
+  });
+  const checkedIn = written;
 
   assert.deepEqual(checkedIn, expected);
   assertSortedObjectKeys(checkedIn);
@@ -80,19 +85,23 @@ test("sync script is idempotent when run repeatedly", async () => {
   });
 });
 
-test("running the home-feed test file leaves the checked-in projection byte-identical", {
-  skip: process.env.GOVINTEL_SKIP_HOME_FEED_PURITY_CHECK === "1",
-}, async () => {
-  const before = await readFile(homeFeedPath);
-  const env = { ...process.env, GOVINTEL_SKIP_HOME_FEED_PURITY_CHECK: "1" };
-  delete env.NODE_TEST_CONTEXT;
-  execFileSync(process.execPath, ["--test", testFilePath], {
+test("the home feed is generated for dev, test and build and is never checked in", async () => {
+  const [gitignore, packageJson] = await Promise.all([
+    readFile(gitignorePath, "utf8"),
+    readFile(packagePath, "utf8"),
+  ]);
+  // A checked-in copy goes stale whenever a pipeline rewrites the feed, and regenerating a
+  // tracked file would dirty the worktree that the checkout verifier requires to be clean.
+  assert.match(gitignore, /^apps\/web\/public\/data\/intelligence-feed-home\.json$/m);
+  const tracked = execFileSync("git", ["ls-files", "--", "apps/web/public/data/intelligence-feed-home.json"], {
+    cwd: fileURLToPath(new URL("../../../", import.meta.url)),
     encoding: "utf8",
-    env,
   });
-  const after = await readFile(homeFeedPath);
-
-  assert.deepEqual(after, before);
+  assert.equal(tracked.trim(), "");
+  const scripts = JSON.parse(packageJson).scripts;
+  for (const hook of ["predev", "pretest", "prebuild"]) {
+    assert.match(scripts[hook], /node scripts\/sync-home-feed\.mjs/, hook);
+  }
 });
 
 test("home-feed projection rejects malformed required metadata and item entries", () => {

@@ -95,6 +95,16 @@ test("archive search allows one retry after the query changes", () => {
   assert.equal(shouldLoadFullArchive({ ...request, queryRevision: 1 }), false);
 });
 
+test("archive search starts the first download regardless of revision bookkeeping", () => {
+  const request = { homeFeed, fullFeed: null, loadState: "idle", query: "交通" };
+
+  assert.equal(shouldLoadFullArchive(request), true);
+  assert.equal(shouldLoadFullArchive({ ...request, queryRevision: 3, lastRequestedRevision: 3 }), true);
+  assert.equal(shouldLoadFullArchive({ ...request, loadState: "loading", queryRevision: 4, lastRequestedRevision: 3 }), false);
+  assert.equal(shouldLoadFullArchive({ ...request, query: "   " }), false);
+  assert.equal(shouldLoadFullArchive({ ...request, fullFeed: { items: [] } }), false);
+});
+
 test("archive search does not repeat a failed request for an unchanged query", () => {
   assert.equal(shouldLoadFullArchive({
     homeFeed,

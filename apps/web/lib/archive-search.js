@@ -64,11 +64,9 @@ export function shouldLoadFullArchive({
   queryRevision,
   lastRequestedRevision,
 }) {
-  return Boolean(
-    (query || "").trim()
-      && homeFeed
-      && !fullFeed
-      && ["idle", "failed"].includes(loadState)
-      && queryRevision !== lastRequestedRevision,
-  );
+  if (!(query || "").trim() || !homeFeed || fullFeed) return false;
+  // Nothing has been requested yet.
+  if (loadState === "idle") return true;
+  // After a failure, only a query edited since that failure retries.
+  return loadState === "failed" && queryRevision !== lastRequestedRevision;
 }

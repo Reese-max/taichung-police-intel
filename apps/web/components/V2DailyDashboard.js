@@ -574,6 +574,7 @@ export default function V2DailyDashboard() {
   const [fullArchive, setFullArchive] = useState(null);
   const [fullArchiveLoadState, setFullArchiveLoadState] = useState("idle");
   const fullArchiveLastRequestedRevision = useRef(-1);
+  const latestArchiveQueryRevision = useRef(0);
   const fullArchiveRequestCancelled = useRef(() => true);
   const [sourceStatus, setSourceStatus] = useState(null);
   const [systemHealth, setSystemHealth] = useState(null);
@@ -582,6 +583,7 @@ export default function V2DailyDashboard() {
   const [loadError, setLoadError] = useState("");
   const [archiveQuery, setArchiveQuery] = useState("");
   const [archiveQueryRevision, setArchiveQueryRevision] = useState(0);
+  latestArchiveQueryRevision.current = archiveQueryRevision;
   const [selectedProfileId, setSelectedProfileId] = useState("general");
   const [nowMs, setNowMs] = useState(null);
   const [localHandoff, setLocalHandoff] = useState(null);
@@ -749,7 +751,10 @@ export default function V2DailyDashboard() {
         setFullArchiveLoadState("loaded");
       })
       .catch(() => {
-        if (!isCancelled()) setFullArchiveLoadState("failed");
+        if (isCancelled()) return;
+        // Edits made while this download was in flight do not count as a retry request.
+        fullArchiveLastRequestedRevision.current = latestArchiveQueryRevision.current;
+        setFullArchiveLoadState("failed");
       });
   }, [archiveQuery, archive, fullArchive, fullArchiveLoadState, archiveQueryRevision]);
 
@@ -1145,7 +1150,7 @@ export default function V2DailyDashboard() {
                   </a>
                 ))}
                 {archiveSearchView.showNoResults && (
-                  <p data-testid="archive-no-results">找不到符合關鍵字的歷史資料。</p>
+                  <p data-testid="archive-no-results" role="status">找不到符合關鍵字的歷史資料。</p>
                 )}
               </div>
             ) : (
