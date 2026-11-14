@@ -47,7 +47,7 @@ const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
 const DATA_URL = `${BASE_PATH}/data/groq-asr-canary-2026-08-14.json`;
 const CER_URL = `${BASE_PATH}/data/groq-asr-cer-2026-08-14.json`;
 const REFERENCE_URL = `${BASE_PATH}/data/groq-asr-reference-2026-08-14.json`;
-const FEED_URL = `${BASE_PATH}/data/intelligence-feed.json`;
+const FEED_URL = `${BASE_PATH}/data/intelligence-feed-home.json`;
 const SUMMARY_URL = `${BASE_PATH}/data/intelligence-summary.json`;
 const HLS_LOAD_TIMEOUT_MS = 10_000;
 

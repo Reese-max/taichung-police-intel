@@ -33,6 +33,12 @@
 
 原則：**官方原始資料優先；結構化 API／CSV／JSON 優先；可回查版本與日期者優先；媒體與社群只作發現，不作單一事實來源。**
 
+### 首頁 feed 衍生檔
+
+`intelligence-feed-home.json` 是由完整 `intelligence-feed.json` 建置產生的衍生檔，不應手動維護。
+其中 `feed_sha256` 綁定產生當下完整 feed 的原始位元組；更新 feed 後須先重產再驗證或建置。
+此衍生檔不屬於 `publication-state` 的 `STATE_PATHS`，也不納入 release manifest。
+
 ## 3. 第一優先來源矩陣
 
 ### A. 即時／高頻公共事件

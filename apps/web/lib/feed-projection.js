@@ -74,13 +74,14 @@ export function projectToHomepageCandidates(feed) {
 
 /**
  * Returns a summary of sources from the feed for the empty-state display.
+ * Accepts the complete feed or its home projection, whose total is total_item_count.
  * @param {object} feed
  * @returns {object} - { total_items, source_summary }
  */
 export function feedSourceSummary(feed) {
   if (!feed) return { total_items: 0, source_summary: {} };
   return {
-    total_items: feed.items?.length || 0,
+    total_items: Number.isInteger(feed.total_item_count) ? feed.total_item_count : (feed.items?.length || 0),
     source_summary: feed.source_summary || {},
   };
 }

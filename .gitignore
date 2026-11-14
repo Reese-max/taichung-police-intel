@@ -30,3 +30,6 @@ coverage/
 *.pre-sequential-fix-*.csv
 .DS_Store
 Thumbs.db
+
+# Derived at dev/test/build time from intelligence-feed.json (apps/web/scripts/sync-home-feed.mjs)
+apps/web/public/data/intelligence-feed-home.json

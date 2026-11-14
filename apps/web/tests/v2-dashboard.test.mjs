@@ -112,6 +112,12 @@ test("V2 dashboard is police-first, Top 3 capped, and evidence-bound", async () 
   assert.match(source, /加入追蹤/);
   assert.match(source, /確認／更新交班版本/);
   assert.match(source, /本機保存 · 不會寫入公開網站/);
+  assert.match(source, /intelligence-feed-home\.json/);
+  assert.match(source, /intelligence-feed\.json/);
+  const archiveSearch = await readFile(new URL("../lib/archive-search.js", import.meta.url), "utf8");
+  assert.match(archiveSearch, /正在載入完整歷史索引…/);
+  assert.match(archiveSearch, /完整歷史索引載入失敗，請稍後再試。/);
+  assert.match(source, /getArchiveSearchView\(/);
   assert.match(source, /標記已處理/);
   assert.match(source, /匯出 Markdown/);
   assert.match(source, /DETERMINISTIC_PASS/);
@@ -167,6 +173,14 @@ test("historical feed is explicitly labelled archive rather than current intelli
   assert.match(source, /歷史資料庫/);
   assert.match(source, /不代表本期新增/);
   assert.match(source, /歷史資料 · 開啟官方來源/);
+  assert.match(source, /archive_preview/);
+  assert.match(source, /archive\.total_item_count/);
+  assert.match(source, /role="status"\>\{archiveSearchView\.statusMessage\}/);
+  // The download decision is delegated to the tested pure function, and a full index from
+  // another collection run is refused before it reaches component state.
+  assert.match(source, /shouldLoadFullArchive\(\{/);
+  assert.match(source, /data\.collection_run_id !== archive\.collection_run_id/);
+  assert.match(source, /isCancelled\(\)/);
 });
 
 test("V2 dashboard surfaces Taiwan-relayed stage evidence with its own capture time", async () => {

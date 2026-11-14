@@ -510,6 +510,71 @@ class ServerTests(unittest.TestCase):
         self.assertNotEqual(health["lanes"]["publication"], "HEALTHY")
 
 
+class HomeFeedServePreparationTests(unittest.TestCase):
+    def build_context(self, root):
+        data_dir = root / "apps" / "web" / "public" / "data"
+        data_dir.mkdir(parents=True)
+        (data_dir / "intelligence-feed.json").write_text("{}", encoding="utf-8")
+        query_store = type("QueryStoreStub", (), {
+            "atomic_write_json": lambda self, *_args, **_kwargs: None,
+            "assess_scope": lambda self, **_kwargs: ("UNKNOWN", None),
+        })()
+        return {
+            "root": root,
+            "store": {"generation_id": "generation-1", "projection_version": "v1",
+                      "formal_admission": {}},
+            "policy": {"policy_version": "policy-1", "policy_hash": "a" * 64},
+            "formal_admission": {},
+            "brief_admission": False,
+            "enabled_capabilities": [],
+            "unavailable_capabilities": [],
+            "candidate_id": "candidate-1",
+            "identity": {"code_sha": "b" * 40},
+            "test_mode": "CURRENT_CHECKOUT_LOOPBACK_HTTP",
+            "modules": {"query_store": query_store},
+        }
+
+    def test_home_feed_sync_precedes_public_data_copy(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ctx = self.build_context(root)
+            events = []
+            copy_file = vc.shutil.copy2
+
+            def sync(args, cwd, check):
+                events.append(("sync", args, cwd, check))
+                return subprocess.CompletedProcess(args, 0)
+
+            def copy(src, dst):
+                events.append(("copy", src, dst))
+                return copy_file(src, dst)
+
+            with patch.object(vc.subprocess, "run", side_effect=sync), \
+                    patch.object(vc.shutil, "copy2", side_effect=copy):
+                vc.prepare_serve_dir(ctx, root / "served")
+
+            self.assertEqual(events[0][0], "sync")
+            self.assertEqual(events[0][1][0], "node")
+            self.assertIn(str(root / "apps" / "web" / "scripts" / "sync-home-feed.mjs"),
+                          events[0][1])
+            self.assertEqual(events[0][2], root)
+            self.assertTrue(events[0][3])
+            self.assertEqual(events[1][0], "copy")
+
+    def test_home_feed_sync_failure_stops_before_public_data_copy(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ctx = self.build_context(root)
+            failure = subprocess.CalledProcessError(1, ["node", "sync-home-feed.mjs"])
+
+            with patch.object(vc.subprocess, "run", side_effect=failure), \
+                    patch.object(vc.shutil, "copy2") as copy:
+                with self.assertRaises(subprocess.CalledProcessError):
+                    vc.prepare_serve_dir(ctx, root / "served")
+
+            copy.assert_not_called()
+
+
 class GovernanceAdmissionTests(unittest.TestCase):
     def test_legacy_policy_fixture_refuses_formal_rows_and_bounded_zero(self):
         directory = tempfile.TemporaryDirectory()
