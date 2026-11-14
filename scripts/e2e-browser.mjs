@@ -135,7 +135,8 @@ async function main() {
       return state === "loaded" || state === "failed";
     }, null, { timeout: 10000 }).catch(() => {});
     const emptyText = await page.locator('[data-testid="archive-no-results"]').innerText().catch(() => "");
-    const statusText = await page.locator(".v2-archive-list [role=status]").innerText().catch(() => "");
+    // Only the loading/failure line counts here; the zero-result message is itself announced as a status.
+    const statusText = await page.locator(".v2-archive-list .v2-archive-unavailable[role=status]").innerText().catch(() => "");
     record(
       "valid_empty_is_distinct",
       /找不到符合關鍵字的歷史資料/.test(emptyText) && !statusText,
