@@ -405,6 +405,37 @@ class ProposalDateTruthTests(unittest.TestCase):
 
         self.assertEqual(set(oc.COLLECTION_SCOPES), {"S-009"})
 
+    def test_proposal_title_uses_the_full_rationale_as_plain_text(self):
+        import online_collect as oc
+
+        full = "經濟部水利署「前瞻基礎建設計畫–縣市管河川及區域排水整體改善計畫」–「114年度應急工程工作計畫」補助本府辦理案"
+        payload = {
+            "billId": "proposal-001",
+            "proposalRationale": "經濟部水利署「前瞻基礎建設計畫&ndash;縣市管河川及區域排水整體改善計畫」&",
+            "proposalRationaleSort": "<p>經濟部水利署「前瞻基礎建設計畫&ndash;縣市管河川及區域排水整體改善計畫」&ndash;「114年度應急工程工作計畫」補助本府辦理案</p>",
+        }
+        self.assertEqual(oc.proposal_text(payload), full)
+        self.assertEqual(oc.proposal_text({"proposalRationale": "  一、路面破損  <br/>二、廁所老舊  "}), "一、路面破損 二、廁所老舊")
+        self.assertEqual(oc.proposal_text({"proposalRationaleSort": "<p> </p>", "proposalRationale": "短案由"}), "短案由")
+        self.assertEqual(oc.proposal_text({"proposalRationaleSort": "案由關鍵字包含：交通"}), "案由")
+        self.assertEqual(oc.proposal_text({}), "")
+
+        item = {"stable_key": "proposal-001", "payload": payload, "content_sha256": "c" * 64, "published_at": None}
+        def project(raw):
+            return oc.project_feed_item(
+                raw, source_id="S-009", source_name="提案", source_url="https://yishi.tccc.gov.tw/",
+                source_role="PRIMARY_OFFICIAL", integration_status="PRODUCTION_ACTIVE", freshness="NO_DATA",
+                source_health="PASS", window_completeness="PARTIAL", data_as_of=None,
+                fetched_at="2026-11-15T00:00:00+08:00", previous_sha256s=set(),
+            )
+
+        self.assertEqual(project(item)["title"], full)
+
+        long_text = "甲" * 300
+        projected = project({**item, "payload": {"proposalRationaleSort": long_text}})
+        self.assertEqual(len(projected["title"]), 198)
+        self.assertTrue(projected["title"].endswith("…"))
+
     def test_s009_stops_after_three_429_retries_without_returning_partial_data(self):
         import online_collect as oc
         import requests
