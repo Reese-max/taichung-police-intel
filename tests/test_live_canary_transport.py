@@ -24,10 +24,12 @@ s028_spec.loader.exec_module(s028)
 
 
 class Response:
-    def __init__(self, url, *, status_code=200, location=None, content=b"ok"):
+    def __init__(self, url, *, status_code=200, location=None, content=b"ok", headers=None):
         self.url = url
         self.status_code = status_code
-        self.headers = {"location": location} if location else {}
+        self.headers = dict(headers or {})
+        if location:
+            self.headers["location"] = location
         self.content = content
         self.request = SimpleNamespace(url=url)
         self.closed = False
@@ -40,6 +42,14 @@ class Response:
 
     def json(self):
         return json.loads(self.content)
+
+
+class ApiResponse(Response):
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            import requests
+
+            raise requests.HTTPError(f"HTTP {self.status_code}", response=self)
 
 
 class Session:
@@ -230,6 +240,209 @@ class ProposalDateTruthTests(unittest.TestCase):
         self.assertEqual(len(session.calls), 1)
         return result
 
+    @staticmethod
+    def api_page(records, total_count, total_pages):
+        body = {"success": True, "data": {
+            "data": records, "totalCount": total_count, "totalPages": total_pages,
+        }}
+        return ApiResponse(
+            "https://yishi.tccc.gov.tw/api/Proposal/FrontList",
+            content=json.dumps(body).encode(),
+        )
+
+    @staticmethod
+    def proposal(bill_id):
+        return {"billId": bill_id, "proposalRationale": "公開提案測試"}
+
+    def test_http_session_preserves_other_source_retries_but_leaves_s009_429_to_collector(self):
+        import online_collect as oc
+
+        session = oc.http_session()
+        self.addCleanup(session.close)
+        self.assertIn(429, session.get_adapter(oc.API_S007).max_retries.status_forcelist)
+        self.assertNotIn(429, session.get_adapter(oc.API_S009).max_retries.status_forcelist)
+
+    def test_s009_collects_all_pages_without_keyword_and_injects_page_sleep(self):
+        import online_collect as oc
+
+        session = Session([
+            self.api_page([self.proposal("proposal-001")], 2, 2),
+            self.api_page([self.proposal("proposal-002")], 2, 2),
+        ])
+        sleeps = []
+        result = oc.collect_s009(session, date(2026, 9, 29), date(2026, 10, 4), sleep_fn=sleeps.append)
+
+        self.assertEqual([call[1]["params"] for call in session.calls], [
+            {"pageNumber": 1, "pageSize": 200},
+            {"pageNumber": 2, "pageSize": 200},
+        ])
+        self.assertEqual(sleeps, [1.5])
+        self.assertEqual(result["snapshot_item_count"], 2)
+        self.assertEqual(result["window_item_count"], 0)
+        self.assertEqual(result["window_completeness"], "PARTIAL")
+        self.assertTrue(all(item["published_at"] is None for item in result["items"]))
+
+    def test_s009_retries_429_using_retry_after(self):
+        import online_collect as oc
+
+        for retry_after, expected_wait in (("7", 7.0), ("150", 120)):
+            with self.subTest(retry_after=retry_after):
+                throttled = ApiResponse(
+                    oc.API_S009, status_code=429, headers={"Retry-After": retry_after}, content=b"",
+                )
+                session = Session([throttled, self.api_page([self.proposal("proposal-001")], 1, 1)])
+                sleeps = []
+                result = oc.collect_s009(
+                    session, date(2026, 9, 29), date(2026, 10, 4), sleep_fn=sleeps.append,
+                )
+
+                self.assertEqual(sleeps, [expected_wait])
+                self.assertEqual(len(session.calls), 2)
+                self.assertEqual(result["snapshot_item_count"], 1)
+
+    def test_s009_retry_after_accepts_http_dates_and_falls_back_on_unusable_values(self):
+        import online_collect as oc
+
+        cases = (
+            ("Wed, 21 Oct 2099 07:28:00 GMT", 120),   # far future HTTP-date: capped
+            ("Wed, 21 Oct 2015 07:28:00 GMT", 5),     # already past: first fallback
+            ("-3", 5), ("nan", 5), ("soon", 5), (None, 5),
+        )
+        for retry_after, expected_wait in cases:
+            with self.subTest(retry_after=retry_after):
+                headers = {} if retry_after is None else {"Retry-After": retry_after}
+                throttled = ApiResponse(oc.API_S009, status_code=429, headers=headers, content=b"")
+                session = Session([throttled, self.api_page([self.proposal("proposal-001")], 1, 1)])
+                sleeps = []
+                oc.collect_s009(session, date(2026, 9, 29), date(2026, 10, 4), sleep_fn=sleeps.append)
+                self.assertEqual(sleeps, [expected_wait])
+
+    def test_feed_csv_export_hashes_each_raw_item_once_and_keeps_payload_matching(self):
+        import csv
+        import tempfile
+        from pathlib import Path
+        from unittest import mock
+
+        import online_collect as oc
+
+        count = 400
+        raw = [{"stable_key": f"bill-{index}", "payload": {"committee": f"委員會-{index}", "proposalRationale": f"<p>案由 {index}</p>"}}
+               for index in range(count)]
+        # A second source reuses the same stable keys; its payloads must never leak across sources.
+        other = [{"stable_key": f"bill-{index}", "payload": {"committee": "其他來源"}} for index in range(3)]
+        feed_items = [{"source_id": "S-009", "stable_id": f"FEED-S-009-{oc.canonical_sha256(f'S-009:bill-{index}')[:16]}",
+                       "title": f"提案 {index}"} for index in reversed(range(count))]
+        feed_items.append({"source_id": "S-009", "stable_id": "FEED-S-009-0000000000000000", "title": "無對應原始資料"})
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "feed-export.csv"
+            with mock.patch.object(oc, "canonical_sha256", wraps=oc.canonical_sha256) as hashed:
+                oc.generate_feed_csv(feed_items, {"S-009": raw, "S-004": other}, target)
+            self.assertLessEqual(hashed.call_count, count + len(other))
+            with target.open(encoding="utf-8-sig", newline="") as handle:
+                rows = list(csv.DictReader(handle))
+        self.assertEqual(len(rows), count + 1)
+        by_title = {row["title"]: row for row in rows}
+        for index in (0, 1, count - 1):
+            self.assertEqual(by_title[f"提案 {index}"]["committee"], f"委員會-{index}")
+            self.assertEqual(by_title[f"提案 {index}"]["proposal_rationale"], f"案由 {index}")
+        self.assertEqual(by_title["無對應原始資料"]["committee"], "")
+
+    def test_production_verifier_reads_artifacts_up_to_the_query_store_budget(self):
+        import importlib.util
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parents[1]
+
+        def load(name, relative):
+            spec = importlib.util.spec_from_file_location(name, root / relative)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            return module
+
+        verifier = load("budget_production_verifier", "scripts/verify-query-gateway-production.py")
+        store = load("budget_query_store", "scripts/query-store.py")
+        self.assertEqual(verifier.MAX_BYTES, store.MAX_BYTES)
+
+    def test_widening_the_s009_scope_rebaselines_once_and_then_reports_new_proposals(self):
+        import online_collect as oc
+
+        def run(directory, proposal_ids):
+            session = Session([self.api_page([self.proposal(pid) for pid in proposal_ids], len(proposal_ids), 1)])
+            collected = oc.collect_s009(session, date(2026, 9, 29), date(2026, 10, 4), sleep_fn=lambda _: None)
+            output = Path(directory) / "source-status.json"
+            with mock.patch.object(oc, "P0_SOURCES", {"S-009": oc.P0_SOURCES["S-009"]}), mock.patch.object(
+                oc, "collect_source", return_value=collected
+            ), contextlib.redirect_stdout(io.StringIO()):
+                state = oc.build_demo_status(output, "EVENING", date(2026, 10, 4), "manual")
+            feed = json.loads((Path(directory) / "intelligence-feed.json").read_text(encoding="utf-8"))
+            return state["sources"][0], {item["official_url"].rsplit("/", 1)[-1]: item for item in feed["items"]}
+
+        with tempfile.TemporaryDirectory() as directory:
+            # State left by the keyword-filtered collector: a last good snapshot without a scope label.
+            _, legacy = run(directory, ["old-police-1"])
+            status_path = Path(directory) / "source-status.json"
+            state = json.loads(status_path.read_text(encoding="utf-8"))
+            state["sources"][0]["last_known_good"].pop("collection_scope", None)
+            status_path.write_text(json.dumps(state), encoding="utf-8")
+            self.assertEqual(set(legacy), {"old-police-1"})
+
+            # First run after the scope widened: everything is baseline, nothing is "new today".
+            source, widened = run(directory, ["old-police-1", "old-traffic-1", "old-fire-1"])
+            self.assertEqual({item["eligibility"] for item in widened.values()}, {"INELIGIBLE_BASELINE"})
+            self.assertTrue(all(item["change_type"] != "NEW" for item in widened.values()))
+            self.assertTrue(all("FIRST_OBSERVATION_BASELINE" in item["reason_codes"] for item in widened.values()))
+            self.assertEqual(source["last_known_good"]["collection_scope"], oc.COLLECTION_SCOPES["S-009"])
+            self.assertNotEqual(source["result"], "NEW_ITEM")
+
+            # Next run under the same scope: only the genuinely new proposal is reported as new.
+            source, later = run(directory, ["old-police-1", "old-traffic-1", "old-fire-1", "brand-new-1"])
+            self.assertEqual(later["brand-new-1"]["change_type"], "NEW")
+            self.assertTrue(all(later[pid]["change_type"] != "NEW" for pid in ("old-police-1", "old-traffic-1", "old-fire-1")))
+            self.assertEqual(source["last_known_good"]["collection_scope"], oc.COLLECTION_SCOPES["S-009"])
+
+    def test_sources_without_a_declared_scope_keep_the_original_baseline_rule(self):
+        import online_collect as oc
+
+        self.assertEqual(set(oc.COLLECTION_SCOPES), {"S-009"})
+
+    def test_s009_stops_after_three_429_retries_without_returning_partial_data(self):
+        import online_collect as oc
+        import requests
+
+        session = Session([ApiResponse(oc.API_S009, status_code=429, content=b"")] * 4)
+        sleeps = []
+        with self.assertRaises(requests.HTTPError):
+            oc.collect_s009(session, date(2026, 9, 29), date(2026, 10, 4), sleep_fn=sleeps.append)
+
+        self.assertEqual(len(session.calls), 4)
+        self.assertEqual(sleeps, [5, 15, 45])
+
+    def test_other_paginated_sources_do_not_sleep_by_default(self):
+        import online_collect as oc
+
+        session = Session([
+            self.api_page([self.proposal("record-001")], 2, 2),
+            self.api_page([self.proposal("record-002")], 2, 2),
+        ])
+        sleeps = []
+        records, _ = oc.paginated_api(
+            session, oc.API_S007, {}, source_id="S-007", sleep_fn=sleeps.append,
+        )
+        self.assertEqual(len(records), 2)
+        self.assertEqual(sleeps, [])
+        self.assertTrue(all("keywordList" not in call[1]["params"] for call in session.calls))
+
+    def test_s009_rejects_total_count_changes_between_pages(self):
+        import online_collect as oc
+
+        session = Session([
+            self.api_page([self.proposal("proposal-001")], 2, 2),
+            self.api_page([self.proposal("proposal-002")], 3, 2),
+        ])
+        with self.assertRaisesRegex(ValueError, "inconsistent API totalCount"):
+            oc.collect_s009(session, date(2026, 9, 29), date(2026, 10, 4), sleep_fn=lambda _: None)
+        self.assertEqual(len(session.calls), 2)
+
     def test_observed_undated_schema_cannot_prove_zero_items_in_date_window(self):
         result = self.collect()
         self.assertEqual(result["source_health"], "PASS")
@@ -280,7 +493,7 @@ class ProposalDateTruthTests(unittest.TestCase):
             ("S-009", oc.collect_s009, oc.API_S009),
         ):
             with self.subTest(source_id=source_id):
-                payload = {"success": True, "data": {"data": [], "totalPages": 1, "totalCount": 108}}
+                payload = {"success": True, "data": {"data": [], "totalPages": 1, "totalCount": 2}}
                 session = Session([Response(url, content=json.dumps(payload).encode())])
                 with self.assertRaisesRegex(ValueError, "API count mismatch"):
                     collector(session, date(2026, 9, 29), date(2026, 10, 4))

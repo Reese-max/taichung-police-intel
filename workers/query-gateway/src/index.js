@@ -12,6 +12,7 @@ import retentionMatrix from "../../../docs/govintel/retention-rights-policy.v1.j
 const MAX_REQUEST_BYTES = 64 * 1024;
 const MAX_RESPONSE_BYTES = 256 * 1024;
 const MAX_SNAPSHOT_AGE_MS = 16 * 60 * 60 * 1000;
+const MAX_ROWS = 20000;
 const SERVER_VERSION = "query-gateway-v1-workers";
 const ANSWER_VALIDATOR_VERSION = "answer-evidence-gate/3";
 const MCP_PROTOCOL_VERSION = "2025-06-18";
@@ -30,6 +31,12 @@ const rateWindows = new Map();
 let snapshotCache = null;
 let snapshotBuild = null;
 let degradedSince = null;
+
+export function assertPublicationRowCount(count) {
+  if (!Number.isSafeInteger(count) || count < 0 || count > MAX_ROWS) {
+    throw new Error("publication arrays are invalid");
+  }
+}
 
 const CAPABILITY_DEFINITIONS = [
   ["publication_metadata", "只代表 policy 中已啟用來源，不代表世界完整性。", () => true],
@@ -334,7 +341,8 @@ async function buildSnapshotFromArtifacts(fetched) {
   }
   if ([status.latest_collection_run.status, brief.publication_status].some(value => value != null && typeof value !== "string")) throw new Error("publication status fields must be scalar strings or null");
   if (brief.snapshot_complete != null && typeof brief.snapshot_complete !== "boolean") throw new Error("publication snapshot_complete must be boolean or null");
-  if (!Array.isArray(feed.items) || feed.items.length > 10000 || !Array.isArray(status.sources)) throw new Error("publication arrays are invalid");
+  if (!Array.isArray(feed.items) || !Array.isArray(status.sources)) throw new Error("publication arrays are invalid");
+  assertPublicationRowCount(feed.items.length);
   // Only object rows contribute a freshness fallback; malformed rows are still rejected below.
   const sourceFreshness = new Map(status.sources.filter((source) => source && typeof source === "object")
     .map((source) => [source.source_id, String(source.freshness_status || "UNKNOWN").toUpperCase()]));
@@ -559,7 +567,7 @@ async function queryStore(snapshot, { q: text = null, canonical_id: canonicalId 
     try {
       if (typeof cursor !== "string" || cursor.length > 1024) throw new Error();
       const token = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(cursor.replace(/-/g, "+").replace(/_/g, "/")), (char) => char.charCodeAt(0))));
-      if (token.generation !== snapshot.generationId || token.filters !== filterHash || !Number.isInteger(token.offset) || token.offset < 0 || token.offset > 10000) throw new Error();
+      if (token.generation !== snapshot.generationId || token.filters !== filterHash || !Number.isInteger(token.offset) || token.offset < 0 || token.offset > MAX_ROWS) throw new Error();
       offset = token.offset;
     } catch { throw new GatewayError("INVALID_ARGUMENTS", "invalid cursor: generation/filter/offset mismatch"); }
   }

@@ -1031,7 +1031,7 @@ def _fetch_live_source(session, source_id: str):
             session,
             API_S009,
             source_id=source_id,
-            params={"keywordList": "警察局", "pageNumber": 1, "pageSize": 200},
+            params={"pageNumber": 1, "pageSize": 200},
         ), None
 
     canary = _load_s028_module()

@@ -81,6 +81,12 @@ def statistic(statistic_id, period, *, provisional=False):
 
 
 class QueryDomainTests(unittest.TestCase):
+    def test_row_budget_accepts_20000_and_rejects_20001(self):
+        self.assertEqual(domain.MAX_ROWS, 20000)
+        domain._enforce_row_limit(20000, "public_events")
+        with self.assertRaisesRegex(ValueError, "public_events must be a bounded array"):
+            domain._enforce_row_limit(20001, "public_events")
+
     def test_event_store_is_hashed_and_event_query_is_deterministic(self):
         store = domain.build_event_store([event("PE-2", district="location:east"), event("PE-1")])
         self.assertEqual([row["public_event_id"] for row in store["public_events"]], ["PE-1", "PE-2"])

@@ -3,7 +3,7 @@
     "official_url": "https://yishi.tccc.gov.tw/api/Proposal/FrontList?keywordList=%E8%AD%A6%E5%AF%9F%E5%B1%80&pageNumber=1&pageSize=1",
     "observed_at": "2026-10-04T18:38:53+00:00",
     "observed_body_sha256": "aac151fb05589360a0c17e77c1a03e6dc0294d7dbd3f0881c9b5df1f23dff203",
-    "transformation": "Preserve the observed record field names; replace identifiers and text with synthetic values and adjust pagination to a one-record test inventory. Official inventory totalCount was 108."
+    "transformation": "Preserve the observed record field names; replace identifiers and text with synthetic values and adjust pagination to a one-record schema fixture. The source observation used an earlier keyword-filtered inventory and does not constrain the current unfiltered collector."
   },
   "success": true,
   "message": "",
@@ -26,7 +26,7 @@
         "execution": "",
         "executionSort": "",
         "jointSignatory": "",
-        "proposalRationale": "警察局公開提案測試",
+        "proposalRationale": "公開提案測試",
         "proposalRationaleSort": "",
         "resolution": "",
         "resolutionSort": "",
