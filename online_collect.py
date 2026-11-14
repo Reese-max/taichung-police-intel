@@ -2394,6 +2394,12 @@ def generate_feed_csv(feed_items: list[dict], raw_items_by_source: dict[str, lis
     output_path.write_text(buf.getvalue(), encoding="utf-8-sig")
 
 
+# What a source's inventory covers. When this label differs from the one stored with the
+# last good snapshot, the collection query changed: the next snapshot is a new baseline, so
+# long-standing records that merely entered scope are not published as today's changes.
+COLLECTION_SCOPES = {"S-009": "ALL_PROPOSALS"}
+
+
 def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) -> dict:
     now = datetime.now(TZ)
     # Refuse a future completed window before reading state or making requests.
@@ -2427,6 +2433,9 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
         baseline_only = previous_lkg is None and not any(
             item.get("source_id") == source_id for item in (prior_feed or {}).get("items", [])
         )
+        collection_scope = COLLECTION_SCOPES.get(source_id)
+        if collection_scope and (previous_lkg or {}).get("collection_scope") != collection_scope:
+            baseline_only = True
         retained_data_as_of = previous.get("data_as_of")
         retained_date_metadata = {
             key: previous[key]
@@ -2493,6 +2502,8 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
                 "snapshot_item_count": collected["snapshot_item_count"],
                 "snapshot_count": len(collected["snapshots"]),
             }
+            if collection_scope:
+                lkg["collection_scope"] = collection_scope
             record = {
                 "source_id": source_id,
                 "source_name": source_name,

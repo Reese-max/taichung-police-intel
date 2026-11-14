@@ -363,6 +363,48 @@ class ProposalDateTruthTests(unittest.TestCase):
         store = load("budget_query_store", "scripts/query-store.py")
         self.assertEqual(verifier.MAX_BYTES, store.MAX_BYTES)
 
+    def test_widening_the_s009_scope_rebaselines_once_and_then_reports_new_proposals(self):
+        import online_collect as oc
+
+        def run(directory, proposal_ids):
+            session = Session([self.api_page([self.proposal(pid) for pid in proposal_ids], len(proposal_ids), 1)])
+            collected = oc.collect_s009(session, date(2026, 9, 29), date(2026, 10, 4), sleep_fn=lambda _: None)
+            output = Path(directory) / "source-status.json"
+            with mock.patch.object(oc, "P0_SOURCES", {"S-009": oc.P0_SOURCES["S-009"]}), mock.patch.object(
+                oc, "collect_source", return_value=collected
+            ), contextlib.redirect_stdout(io.StringIO()):
+                state = oc.build_demo_status(output, "EVENING", date(2026, 10, 4), "manual")
+            feed = json.loads((Path(directory) / "intelligence-feed.json").read_text(encoding="utf-8"))
+            return state["sources"][0], {item["official_url"].rsplit("/", 1)[-1]: item for item in feed["items"]}
+
+        with tempfile.TemporaryDirectory() as directory:
+            # State left by the keyword-filtered collector: a last good snapshot without a scope label.
+            _, legacy = run(directory, ["old-police-1"])
+            status_path = Path(directory) / "source-status.json"
+            state = json.loads(status_path.read_text(encoding="utf-8"))
+            state["sources"][0]["last_known_good"].pop("collection_scope", None)
+            status_path.write_text(json.dumps(state), encoding="utf-8")
+            self.assertEqual(set(legacy), {"old-police-1"})
+
+            # First run after the scope widened: everything is baseline, nothing is "new today".
+            source, widened = run(directory, ["old-police-1", "old-traffic-1", "old-fire-1"])
+            self.assertEqual({item["eligibility"] for item in widened.values()}, {"INELIGIBLE_BASELINE"})
+            self.assertTrue(all(item["change_type"] != "NEW" for item in widened.values()))
+            self.assertTrue(all("FIRST_OBSERVATION_BASELINE" in item["reason_codes"] for item in widened.values()))
+            self.assertEqual(source["last_known_good"]["collection_scope"], oc.COLLECTION_SCOPES["S-009"])
+            self.assertNotEqual(source["result"], "NEW_ITEM")
+
+            # Next run under the same scope: only the genuinely new proposal is reported as new.
+            source, later = run(directory, ["old-police-1", "old-traffic-1", "old-fire-1", "brand-new-1"])
+            self.assertEqual(later["brand-new-1"]["change_type"], "NEW")
+            self.assertTrue(all(later[pid]["change_type"] != "NEW" for pid in ("old-police-1", "old-traffic-1", "old-fire-1")))
+            self.assertEqual(source["last_known_good"]["collection_scope"], oc.COLLECTION_SCOPES["S-009"])
+
+    def test_sources_without_a_declared_scope_keep_the_original_baseline_rule(self):
+        import online_collect as oc
+
+        self.assertEqual(set(oc.COLLECTION_SCOPES), {"S-009"})
+
     def test_s009_stops_after_three_429_retries_without_returning_partial_data(self):
         import online_collect as oc
         import requests
