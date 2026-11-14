@@ -6,6 +6,7 @@ from email.utils import parsedate_to_datetime
 import importlib.util
 import io
 import json
+import math
 import os
 import re
 import time
@@ -88,6 +89,9 @@ def http_session() -> requests.Session:
     session = requests.Session()
     session.headers.update({"User-Agent": USER_AGENT, "Accept-Language": "zh-TW,zh;q=0.9"})
     session.mount("https://", HTTPAdapter(max_retries=retry))
+    # Let S-009's paginated collector own the bounded 429 backoff budget.
+    s009_retry = retry.new(status_forcelist=(500, 502, 503, 504))
+    session.mount(API_S009, HTTPAdapter(max_retries=s009_retry))
     return session
 
 
@@ -361,18 +365,52 @@ def paginated_api(
     *,
     source_id: str | None = None,
     page_size: int = 200,
+    min_page_interval: float = 0,
+    retry_backoff: tuple[float, ...] | None = None,
+    sleep_fn=time.sleep,
 ) -> tuple[list[dict], list[dict]]:
+    if min_page_interval < 0:
+        raise ValueError("minimum page interval cannot be negative")
+    if retry_backoff is not None and (
+        not retry_backoff or any(delay < 0 for delay in retry_backoff)
+    ):
+        raise ValueError("429 retry backoff must contain non-negative delays")
     records = []
     responses = []
     page = 1
     total_pages = 1
+    expected_total_count = None
     while page <= total_pages:
-        response = get(
-            session,
-            url,
-            source_id=source_id,
-            params={**params, "pageNumber": page, "pageSize": page_size},
-        )
+        retries = 0
+        while True:
+            try:
+                response = get(
+                    session,
+                    url,
+                    source_id=source_id,
+                    params={**params, "pageNumber": page, "pageSize": page_size},
+                )
+                break
+            except requests.HTTPError as error:
+                error_response = error.response
+                if (retry_backoff is None or retries >= 3
+                        or getattr(error_response, "status_code", None) != 429):
+                    raise
+                fallback = retry_backoff[min(retries, len(retry_backoff) - 1)]
+                retry_after = getattr(error_response, "headers", {}).get("Retry-After")
+                try:
+                    delay = float(retry_after)
+                except (TypeError, ValueError):
+                    try:
+                        # RFC 9110 also allows an HTTP-date.
+                        retry_at = parsedate_to_datetime(retry_after)
+                        delay = (retry_at - datetime.now(retry_at.tzinfo)).total_seconds()
+                    except (TypeError, ValueError):
+                        delay = fallback
+                if not math.isfinite(delay) or delay < 0:
+                    delay = fallback
+                sleep_fn(min(delay, 120))
+                retries += 1
         responses.append(snapshot(response, "API"))
         payload = response.json()
         if payload.get("success") is not True or not isinstance(payload.get("data", {}).get("data"), list):
@@ -384,10 +422,18 @@ def paginated_api(
             raise ValueError(f"API page guard exceeded: {total_pages}")
         if type(total_count) is not int or total_count < 0:
             raise ValueError(f"invalid API totalCount: {total_count}")
+        if expected_total_count is None:
+            expected_total_count = total_count
+        elif total_count != expected_total_count:
+            raise ValueError(
+                f"inconsistent API totalCount across pages: {expected_total_count} != {total_count}"
+            )
         records.extend(data["data"])
+        if page < total_pages and min_page_interval:
+            sleep_fn(min_page_interval)
         page += 1
-    if len(records) != total_count:
-        raise ValueError(f"API count mismatch: {len(records)} != {total_count}")
+    if len(records) != expected_total_count:
+        raise ValueError(f"API count mismatch: {len(records)} != {expected_total_count}")
     return records, responses
 
 
@@ -450,10 +496,16 @@ def collect_s007(session: requests.Session, start: date, end: date) -> dict:
     }
 
 
-def collect_s009(session: requests.Session, start: date, end: date) -> dict:
+def collect_s009(session: requests.Session, start: date, end: date, *, sleep_fn=time.sleep) -> dict:
     del start, end
     records, responses = paginated_api(
-        session, API_S009, {"keywordList": "警察局"}, source_id="S-009"
+        session,
+        API_S009,
+        {},
+        source_id="S-009",
+        min_page_interval=1.5,
+        retry_backoff=(5, 15, 45),
+        sleep_fn=sleep_fn,
     )
     items = []
     for record in records:
@@ -2288,12 +2340,16 @@ def generate_feed_csv(feed_items: list[dict], raw_items_by_source: dict[str, lis
     # Map source_id to source_name
     source_names = {sid: name for sid, (name, _) in P0_SOURCES.items()}
 
-    # Build a lookup from stable_key to raw payload
+    # Index raw payloads by the stable_id project_feed_item derives from them, so the
+    # export stays linear when a source carries thousands of items. The first non-empty
+    # payload wins, as the previous per-item scan did.
     raw_lookup: dict[str, dict] = {}
     for source_id, items in raw_items_by_source.items():
         for item in items:
-            key = f"{source_id}:{item['stable_key']}"
-            raw_lookup[key] = item.get("payload", {})
+            stable_key_hash = canonical_sha256(f"{source_id}:{item['stable_key']}")[:16]
+            key = f"FEED-{source_id}-{stable_key_hash}"
+            if not raw_lookup.get(key):
+                raw_lookup[key] = item.get("payload", {})
 
     buf = io.StringIO()
     writer = csv.DictWriter(buf, fieldnames=fieldnames, extrasaction="ignore")
@@ -2302,17 +2358,7 @@ def generate_feed_csv(feed_items: list[dict], raw_items_by_source: dict[str, lis
         source_id = item.get("source_id", "")
         # Recover the stable_key from stable_id: "FEED-S-009-xxxx" -> lookup
         stable_id = item.get("stable_id", "")
-        # Try to find matching raw payload by content_sha256
-        payload = {}
-        for sid, raw_items in raw_items_by_source.items():
-            if sid != source_id:
-                continue
-            for raw in raw_items:
-                if canonical_sha256(f"{sid}:{raw['stable_key']}")[:16] in stable_id:
-                    payload = raw.get("payload", {})
-                    break
-            if payload:
-                break
+        payload = raw_lookup.get(stable_id) or {}
 
         # Extract S-009 specific fields
         proposal_rationale = ""
@@ -2348,6 +2394,12 @@ def generate_feed_csv(feed_items: list[dict], raw_items_by_source: dict[str, lis
     output_path.write_text(buf.getvalue(), encoding="utf-8-sig")
 
 
+# What a source's inventory covers. When this label differs from the one stored with the
+# last good snapshot, the collection query changed: the next snapshot is a new baseline, so
+# long-standing records that merely entered scope are not published as today's changes.
+COLLECTION_SCOPES = {"S-009": "ALL_PROPOSALS"}
+
+
 def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) -> dict:
     now = datetime.now(TZ)
     # Refuse a future completed window before reading state or making requests.
@@ -2381,6 +2433,9 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
         baseline_only = previous_lkg is None and not any(
             item.get("source_id") == source_id for item in (prior_feed or {}).get("items", [])
         )
+        collection_scope = COLLECTION_SCOPES.get(source_id)
+        if collection_scope and (previous_lkg or {}).get("collection_scope") != collection_scope:
+            baseline_only = True
         retained_data_as_of = previous.get("data_as_of")
         retained_date_metadata = {
             key: previous[key]
@@ -2447,6 +2502,8 @@ def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) ->
                 "snapshot_item_count": collected["snapshot_item_count"],
                 "snapshot_count": len(collected["snapshots"]),
             }
+            if collection_scope:
+                lkg["collection_scope"] = collection_scope
             record = {
                 "source_id": source_id,
                 "source_name": source_name,

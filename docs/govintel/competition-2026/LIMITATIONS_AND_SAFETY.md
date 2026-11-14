@@ -8,6 +8,8 @@
 - **新鮮度不是健康。** 成功連線的來源仍可能 `STALE`；`PARTIAL`、`FAILED`、`UNKNOWN`、valid zero-result 與 `NO_DATA_AS_OF` 要分開看。LKG 保護可讀性，但不把舊資料變 current。
 - **#20 尚未全收斂。** [固定正式驗收](closure-20261007-pr177/README.md)與[真實 upload drill](closure-20261006/alert-drill.json)分別保存成功發布及隔離 artifact 失敗／恢復；實際 deploy、source 與 public mismatch 恢復仍需逐項留證。不能繼續稱流程尚未合併，也不能用成功 run 取代失敗路徑驗收。
 - **正式正值查詢仍受權利 gate 阻擋。** 固定正式收據的 `RIGHTS_BLOCKED`／provider `DISABLED`、`deployment_verified=true`／`production_verified=false` 並存；受限拒答與已部署介面不證明來源權利、原文正值查詢或 AI／真人效益。本次文件核對不更新正式收據版本。
+
+  **2026-11-13 擁有者決定（尚未合併、尚未部署驗證）。** 專案擁有者決定放寬來源權利規定，變更在 draft PR [#237](https://github.com/Reese-max/taichung-police-intel/pull/237)、[#238](https://github.com/Reese-max/taichung-police-intel/pull/238)、[#239](https://github.com/Reese-max/taichung-police-intel/pull/239)。合併後 repo 內的核准政策為 governed schema 2，五個正式來源的 `formal_admission` 為 `ADMITTED`，權利狀態標為 `OWNER_ASSERTED_PERMISSION`／`OWNER_DECISION_TERMS_NOT_VERIFIED`：這是擁有者主張，不是逐來源條款查核或法律判斷，其中四個來源屬臺中市議會，其網站未提供開放宣告。公開範圍仍只有 metadata 與連結；全文、摘錄與模型傳輸未開放，provider 仍停用。上方 `RIGHTS_BLOCKED` 是 2026-10-07 固定正式收據的結果，在重新部署並完成正式環境驗收之前仍是正式環境的已驗證狀態；`ADMITTED` 目前只有 repo 內測試與驗證腳本的結果，沒有正式環境收據。
 - **候選不是 production。** Open PR、Issue、catalog entry、一次 canary、fixture 或設定檔不能升級 source status。候選 promotion 需要完整性、權利、敏感資料、重播與 current publication evidence。
 - **事件融合是受限核心。** `public-event-demo.json` 是 `FIXTURE_ONLY`；它不證明 live multi-agency coverage、event accuracy、背景資料效益或正式交班服務。
 - **首期追蹤是同瀏覽器功能。** 保存使用者明確選擇的條件與已讀版本；開站／刷新才比對，不含關站推播、跨裝置帳號或敏感身分側寫。清除瀏覽器資料可能失去本機清單。有限合成 UI 與受限正式頁面各有收據，真實官方新版本／解除的完整流程與真人效益仍另驗。

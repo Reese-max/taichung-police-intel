@@ -37,7 +37,7 @@ test("current-checkout runtime contract passes", {
   assert.match(result.stderr, /OK/);
 });
 
-test("actual current unreviewed policy has no VERIFIED rows or answerable zero", () => {
+test("actual current governed policy admits only whitelisted public rows", () => {
   const source = `import importlib.util,json,pathlib
 root=pathlib.Path.cwd()
 p=root/'scripts/verify-current-checkout.py'
@@ -45,14 +45,22 @@ spec=importlib.util.spec_from_file_location('current_governance_bridge',p)
 module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
 modules=module.load_checkout_modules(root)
 ctx=module.build_candidate_context(root,modules)
-result=modules['query_store'].query_store(ctx['store'],text='NO-FICTIONAL-MATCH')
+allowed={row['source_id']:set(row['rights_retention_public_policy_refs']['public_fields']) for row in ctx['policy']['active_sources']}
+system={'record_type','canonical_id','source_role','trust_tier','verification_status','canonical_ref'}
+rows=ctx['store']['items']
 print(json.dumps({'policy_schema':ctx['policy']['schema_version'],'admission':ctx['formal_admission']['status'],
- 'rows':ctx['store']['counts']['publication_items'],'health_sources':len(ctx['store']['sources']),
- 'answerable_no_match':result['answerable_no_match'],'bounded_zero':result['query_coverage']['can_state_bounded_no_match']}))`;
+ 'blocked_sources':ctx['formal_admission']['blocked_sources'],'rows':len(rows),
+ 'public_fields_ok':all(set(row)-system <= allowed[row['source_id']] for row in rows),
+ 'private_fields_present':any('full_text' in row or 'excerpt' in row for row in rows)}))`;
   const result = spawnSync(python(), ["-B", "-c", source], { cwd: repo, encoding: "utf8", timeout: 30000 });
   assert.equal(result.status, 0, result.stdout + result.stderr);
-  assert.deepEqual(JSON.parse(result.stdout), { policy_schema: 1, admission: "UNKNOWN", rows: 0,
-    health_sources: 5, answerable_no_match: false, bounded_zero: false });
+  const current = JSON.parse(result.stdout);
+  assert.equal(current.policy_schema, 2);
+  assert.equal(current.admission, "ADMITTED");
+  assert.deepEqual(current.blocked_sources, []);
+  assert.ok(current.rows > 0);
+  assert.equal(current.public_fields_ok, true);
+  assert.equal(current.private_fields_present, false);
 });
 
 test("dashboard refuses mixed publication generations", async () => {

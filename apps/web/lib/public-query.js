@@ -1,5 +1,7 @@
 // The live path uses the existing Gateway. The saved path only filters bounded,
 // Query Domain projections; it never acquires sources or generates an AI answer.
+const MAX_ROWS = 20000;
+
 export function canonicalJson(value) {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
   if (value && typeof value === "object") {
@@ -25,7 +27,7 @@ export async function validateReplay(bundle) {
     throw new Error("保存快照 hash 混版或內容遭變更，已拒絕使用");
   }
   for (const snapshot of Object.values(bundle.snapshots)) {
-    if (!Array.isArray(snapshot.events) || snapshot.events.length > 10000 || !snapshot.generation_id
+    if (!Array.isArray(snapshot.events) || snapshot.events.length > MAX_ROWS || !snapshot.generation_id
         || new Set(snapshot.events.map((event) => event.public_event_id)).size !== snapshot.events.length) {
       throw new Error("保存快照事件結構無法驗證");
     }

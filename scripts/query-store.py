@@ -26,7 +26,7 @@ PROJECTION_VERSION = "publication-metadata-v4-governance"
 LEGACY_PROJECTION_VERSION = "publication-metadata-v3"
 SOURCE_POLICY = ROOT / "scripts/source-policy.py"
 MAX_BYTES = 32 * 1024 * 1024
-MAX_ROWS = 10000
+MAX_ROWS = 20000
 MAX_AGE_SECONDS = 16 * 60 * 60
 HASH = re.compile(r"[a-f0-9]{64}\Z")
 CHANGES = frozenset(("NEW", "REVISED", "STATUS_CHANGED", "DEADLINE_CHANGED", "CONFIRMED", "UNCHANGED", "LKG", "REMOVED"))
@@ -83,6 +83,11 @@ def load_json(path: Path) -> tuple[Any, str]:
 
 def _string(value: Any) -> str | None:
     return value if isinstance(value, str) and value.strip() else None
+
+
+def _enforce_row_limit(count: int, message: str) -> None:
+    if type(count) is not int or not 0 <= count <= MAX_ROWS:
+        raise ValueError(message)
 
 
 def instant(value):
@@ -286,8 +291,9 @@ def build_store(feed: dict[str, Any], status: dict[str, Any], brief: dict[str, A
             raise ValueError("canonical artifact governed policy binding mismatch")
     active_source_ids = frozenset(policy["active_source_ids"])
     rows, sources = feed.get("items"), status.get("sources")
-    if not isinstance(rows, list) or not isinstance(sources, list) or len(rows) > MAX_ROWS:
+    if not isinstance(rows, list) or not isinstance(sources, list):
         raise ValueError("invalid or unbounded canonical arrays")
+    _enforce_row_limit(len(rows), "invalid or unbounded canonical arrays")
     # Only object rows contribute a freshness fallback; malformed rows are still
     # rejected by the projection below instead of being skipped here.
     source_freshness = {
@@ -501,8 +507,7 @@ def _validate_store(store, approved_policy, *, historical=False):
     expected_sources = frozenset(approved_policy["active_source_ids"])
     if {s.get("source_id") for s in store["sources"]} != expected_sources or len(store["sources"]) != len(expected_sources):
         raise ValueError("query store source coverage mismatch")
-    if len(store["items"]) > MAX_ROWS:
-        raise ValueError("query store item budget exceeded")
+    _enforce_row_limit(len(store["items"]), "query store item budget exceeded")
 
 
 def build_from_paths(feed_path: Path, status_path: Path, brief_path: Path) -> dict[str, Any]:

@@ -3,9 +3,10 @@ import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import test, { after } from "node:test";
 import { createGovernedPolicyFixture } from "./governed-policy-fixture.mjs";
+import { createLegacyPublicArtifacts, readWorkerEmbeddedRetentionBinding } from "./legacy-policy-fixture.mjs";
 const governedFixture = await createGovernedPolicyFixture();
 after(() => governedFixture.cleanup());
-const { default: worker, buildSnapshot, createReleaseManifest } = await governedFixture.loadWorker("suite");
+const { default: worker, buildSnapshot, createReleaseManifest, assertPublicationRowCount } = await governedFixture.loadWorker("suite");
 
 const base = governedFixture.publicRoot;
 const origin = "https://reese-max.github.io/taichung-police-intel";
@@ -13,6 +14,11 @@ const endpoint = "https://govintel-query-gateway.example/query";
 const mcpEndpoint = "https://govintel-query-gateway.example/mcp";
 const env = { PUBLIC_ORIGIN: origin, ALLOWED_ORIGINS: "https://reese-max.github.io", CF_VERSION_METADATA: { id: "test-worker", tag: "a".repeat(40) } };
 const artifactNames = ["intelligence-feed.json", "source-status.json", "v2-daily-brief.json", "source-policy.json"];
+
+test("Worker publication row budget accepts 20,000 and rejects 20,001", () => {
+  assert.doesNotThrow(() => assertPublicationRowCount(20000));
+  assert.throws(() => assertPublicationRowCount(20001), /publication arrays are invalid/);
+});
 
 test("Worker binds source-specific metadata reviews to the compiler policy hash", async () => {
   for (const changed of [false, true]) {
@@ -273,14 +279,20 @@ test("served schema2 cannot self-authorize different public fields or a mixed go
   await assert.rejects(buildSnapshot(env, read), /governed policy binding mismatch/);
 });
 
-test("current legacy1 and unknown-rights2 keep health but refuse CURRENT formal answers", async () => {
+test("legacy public artifacts keep health but refuse answers without restoring the Worker-embedded retention binding", async () => {
+  // The legacy fixture restores only source policy and public artifacts, not the Worker-embedded retention binding.
+  const retentionBinding = await readWorkerEmbeddedRetentionBinding();
+  assert.equal(retentionBinding.policy_version, 3);
+  assert.equal(retentionBinding.rights_status, "OWNER_ASSERTED_PERMISSION");
+  assert.equal(retentionBinding.review_required, true);
   for (const kind of ["legacy1", "unknown2"]) {
     const fixture = await createGovernedPolicyFixture({ rightsReviewed: false });
     try {
       const values = await fixture.publication();
       let module = await fixture.loadWorker(`rights-denied-${kind}`);
       if (kind === "legacy1") {
-        values["source-policy.json"] = await readFile(new URL("../../../docs/govintel/source-policy.approved.json", import.meta.url));
+        Object.assign(values, await createLegacyPublicArtifacts());
+        assert.equal(Object.hasOwn(JSON.parse(values["source-policy.json"].toString("utf8")), "active_sources"), false);
         module = await import("../../../workers/query-gateway/src/index.js?actual-legacy-refusal");
       }
       const snapshot = await module.buildSnapshot(env, async name => ({ bytes: values[name], hash: createHash("sha256").update(values[name]).digest("hex") }));

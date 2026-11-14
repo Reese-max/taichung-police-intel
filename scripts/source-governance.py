@@ -10,7 +10,7 @@ from urllib.parse import urlsplit
 ROOT = Path(__file__).resolve().parents[1]
 RETENTION_PATH = ROOT / "docs/govintel/retention-rights-policy.v1.json"
 FRESHNESS_PATH = ROOT / "intel_v2/freshness_policy.py"
-FORMAL_RIGHTS = {"VERIFIED_METADATA_PERMISSION", "OPEN_DATA_LICENSED"}
+FORMAL_RIGHTS = {"VERIFIED_METADATA_PERMISSION", "OPEN_DATA_LICENSED", "OWNER_ASSERTED_PERMISSION"}
 
 
 def canonical(value):

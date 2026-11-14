@@ -152,30 +152,18 @@
       "S-037"
     ],
     "formal_admission": {
-      "status": "UNKNOWN",
-      "reason": "APPROVED_GOVERNANCE_MISSING",
-      "governance_hash": null,
-      "blocked_sources": [
-        "S-004",
-        "S-006",
-        "S-007",
-        "S-009",
-        "S-029"
-      ],
-      "per_source": {
-        "S-004": "APPROVED_GOVERNANCE_MISSING",
-        "S-006": "APPROVED_GOVERNANCE_MISSING",
-        "S-007": "APPROVED_GOVERNANCE_MISSING",
-        "S-009": "APPROVED_GOVERNANCE_MISSING",
-        "S-029": "APPROVED_GOVERNANCE_MISSING"
-      }
+      "status": "ADMITTED",
+      "reason": null,
+      "governance_hash": "640d40cf18e32e561273d9525c7235888aa931a8c5be9f29700ae880d8b6f09d",
+      "blocked_sources": [],
+      "per_source": {}
     },
     "model_transmission_allowed": false,
     "canonical_policy_changed": false,
-    "retention_policy_hash": "9c7f589c80df456d4b547151a1e3a5eb7d29258fee6ed2268613598de820729d",
+    "retention_policy_hash": "6a52c17625af49cf4b618bbcd22a4909c23df3efd2f92ff70ae2935e8643cf13",
     "approved_policy_binding": {
-      "policy_version": 1,
-      "policy_hash": "3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501",
+      "policy_version": 2,
+      "policy_hash": "f027315e3fcb17d2e8825ad5d797a7c7aa60113e1a2562880f9a6bc6b8aaa62b",
       "catalog_hash": "5088623df5af4b8a30f4c597c51235c0f36a3dfd8bc4f2aea9af8f26d10213ef",
       "active_source_ids": [
         "S-004",
@@ -183,7 +171,9 @@
         "S-007",
         "S-009",
         "S-029"
-      ]
+      ],
+      "governance_hash": "640d40cf18e32e561273d9525c7235888aa931a8c5be9f29700ae880d8b6f09d",
+      "retention_policy_hash": "6a52c17625af49cf4b618bbcd22a4909c23df3efd2f92ff70ae2935e8643cf13"
     }
   },
   "dependency_scope": {
@@ -301,7 +291,7 @@
     "retention_rights": {
       "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
       "path": "docs/govintel/retention-rights-policy.v1.json",
-      "sha256": "87a9e9d0e91881d17e840e8e34e2c7249836bc4a6b5baa67585ac2bfff2ce845"
+      "sha256": "da6fbe0e4fa92b03cab4f6e8069922d2ce5c0f81d32ecfce2e8dccafc9cff218"
     },
     "source_review": {
       "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
@@ -311,7 +301,7 @@
     "approved_source_policy": {
       "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
       "path": "docs/govintel/source-policy.approved.json",
-      "sha256": "7dffabb2c5869d71cff202e653edd35416bd81b343243793d910ec53e39b65c5"
+      "sha256": "9cc53b2f77a2eb728408214fcab9b04be0662f6893316a52fd28dfb743708e09"
     },
     "model_diagnostic": {
       "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",

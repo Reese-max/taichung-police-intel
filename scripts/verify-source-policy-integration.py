@@ -174,7 +174,8 @@ def run_promoted_fixture(catalog, current, old_store, query_store) -> dict[str, 
         # promotion receipt does not establish real publication rights.
         matrix_path = fixture / "docs/govintel/retention-rights-policy.v1.json"
         matrix = json.loads(matrix_path.read_text(encoding="utf-8"))
-        matrix["classes"]["OFFICIAL_METADATA_LINK"].update(rights_status="VERIFIED_METADATA_PERMISSION", review_required=False)
+        matrix["classes"]["OFFICIAL_METADATA_LINK"].update(rights_status="VERIFIED_METADATA_PERMISSION", review_required=False,
+                                                       terms_status="CATALOG_ENTRYPOINT_NOT_A_LICENSE")
         matrix_path.write_text(json.dumps(matrix, ensure_ascii=False), encoding="utf-8")
         (fixture / "docs/govintel/source-catalog.v2.json").write_text(json.dumps(promoted_catalog, ensure_ascii=False), encoding="utf-8")
         spec = importlib.util.spec_from_file_location("fixture_transition_compiler", fixture / "scripts/source-policy.py")
@@ -254,7 +255,11 @@ def run_checks() -> dict[str, Any]:
     gateway = query_gateway.QueryGateway()
     projections["query_gateway"] = binding(gateway.store["policy"])
     ui_policy = json.loads((ROOT / "apps/web/public/data/source-policy.json").read_text(encoding="utf-8"))
-    projections["ui"] = {key: ui_policy[key] for key in expected}
+    projections["ui"] = binding(ui_policy)
+    if ui_policy["active_source_ids"] != current["active_source_ids"]:
+        raise ValueError("UI source policy reorders the approved active sources")
+    if current.get("schema_version") == 2 and ui_policy != current:
+        raise ValueError("UI source policy differs from the approved governed snapshot")
     if any(value != expected for value in projections.values()):
         raise ValueError("source policy binding differs between consumers")
     if set(collect.P0_SOURCES) != set(expected["active_source_ids"]):
@@ -324,8 +329,10 @@ def run_checks() -> dict[str, Any]:
     if unsupported["status"] != "CAPABILITY_NOT_AVAILABLE" or unsupported["can_state_bounded_no_match"]:
         raise ValueError("unsupported capability was presented as a bounded empty result")
 
-    if query["result_count"] != 0 or query["query_coverage"]["status"] != "UNKNOWN" or query["answerable_no_match"]:
-        raise ValueError("legacy current policy incorrectly admits formal public rows")
+    admission = query["query_coverage"]["formal_admission"]
+    if (query["result_count"] <= 0 or admission["status"] != "ADMITTED"
+            or admission["blocked_sources"] or query["answerable_no_match"]):
+        raise ValueError("current governed policy failed its formal publication query")
     original_store = json.loads((ROOT / "tests/fixtures/source-policy/publication-metadata-v3.json").read_text(encoding="utf-8"))
     if len(original_store["items"]) != 118:
         raise ValueError("original historical publication was discarded")

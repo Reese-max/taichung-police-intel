@@ -1,0 +1,712 @@
+{
+  "active_source_ids": [
+    "S-004",
+    "S-006",
+    "S-007",
+    "S-009",
+    "S-029"
+  ],
+  "active_sources": [
+    {
+      "approved_origins": [
+        "https://www.tccc.gov.tw"
+      ],
+      "authority": "臺中市議會",
+      "cadence_class": "DAILY_EVENT",
+      "entrypoint": "https://www.tccc.gov.tw/wb_download13.asp?uno=&cno=49",
+      "freshness_policy": {
+        "cadence_class": "DAILY_EVENT",
+        "collection_recency_is_not_event_or_world_completeness": true,
+        "fresh_hours": 1080,
+        "query_snapshot_max_age_seconds": 57600,
+        "rule_ref": {
+          "file_sha256": "8b1067f516ee4b4c2c2def20cf24cbf5818c046aa3494470a637dbe2db1f4b63",
+          "path": "intel_v2/freshness_policy.py"
+        },
+        "rule_status": "EXISTING_CONTROLLED_RULE",
+        "stale_hours": 2160
+      },
+      "geographic_scope": {
+        "declared_scope": null,
+        "may_infer_citywide_coverage": false,
+        "status": "UNKNOWN"
+      },
+      "integration_status": "PRODUCTION_ACTIVE",
+      "name": "臺中市議會議事日程",
+      "original_source_identity": {
+        "authority": "臺中市議會",
+        "entrypoint": "https://www.tccc.gov.tw/wb_download13.asp?uno=&cno=49",
+        "name": "臺中市議會議事日程",
+        "source_id": "S-004"
+      },
+      "rights_retention_public_policy_refs": {
+        "archive_eligibility": "EVIDENCE_ARCHIVE",
+        "canonical_retention_class": "PROVENANCE_HISTORY",
+        "canonical_retention_window": {
+          "expired_action": "KEEP_AUDIT_LINKAGE",
+          "max_age_days": null
+        },
+        "class_id": "OFFICIAL_METADATA_LINK",
+        "data_types": [
+          "OFFICIAL_HTML_PDF_ATTACHMENT"
+        ],
+        "excerpt_allowed": false,
+        "file_sha256": "da6fbe0e4fa92b03cab4f6e8069922d2ce5c0f81d32ecfce2e8dccafc9cff218",
+        "full_text_allowed": false,
+        "may_claim_open_permission": false,
+        "path": "docs/govintel/retention-rights-policy.v1.json",
+        "policy_hash": "6a52c17625af49cf4b618bbcd22a4909c23df3efd2f92ff70ae2935e8643cf13",
+        "policy_version": 3,
+        "public_fields": [
+          "source_id",
+          "source_name",
+          "title",
+          "official_url",
+          "published_at",
+          "data_as_of",
+          "fetched_at",
+          "freshness_status",
+          "change_type",
+          "evidence_count",
+          "content_sha256"
+        ],
+        "public_projection": "METADATA_LINK_ONLY",
+        "raw_retention_class": "SOURCE_TERMS_REVIEW",
+        "raw_retention_window": {
+          "expired_action": "REVIEW_REQUIRED",
+          "max_age_days": null
+        },
+        "review_required": false,
+        "rights_status": "OWNER_ASSERTED_PERMISSION",
+        "sensitive_default": false,
+        "terms_status": "OWNER_DECISION_TERMS_NOT_VERIFIED",
+        "terms_url": "https://www.tccc.gov.tw/wb_download13.asp?uno=&cno=49",
+        "withdrawal_behavior": "KEEP_HASH_MARK_SOURCE_UNAVAILABLE",
+        "withdrawal_projection": "SOURCE_NO_LONGER_AVAILABLE"
+      },
+      "role": "PRIMARY_EVENT",
+      "source_id": "S-004",
+      "status": "PRODUCTION_ACTIVE",
+      "temporal_semantics": {
+        "catalog_collection_rule": "Track the latest session and attachment hashes; preserve revisions.",
+        "catalog_evidence_rule": "Official attachment is authoritative.",
+        "fetched_at_is_observation_only": true,
+        "may_infer_event_valid_time": false,
+        "status": "UNKNOWN",
+        "valid_time_semantics": null
+      }
+    },
+    {
+      "approved_origins": [
+        "https://www.tccc.gov.tw"
+      ],
+      "authority": "臺中市議會",
+      "cadence_class": "DAILY_EVENT",
+      "entrypoint": "https://www.tccc.gov.tw/wb_download13.asp?uno=&cno=50",
+      "freshness_policy": {
+        "cadence_class": "DAILY_EVENT",
+        "collection_recency_is_not_event_or_world_completeness": true,
+        "fresh_hours": 336,
+        "query_snapshot_max_age_seconds": 57600,
+        "rule_ref": {
+          "file_sha256": "8b1067f516ee4b4c2c2def20cf24cbf5818c046aa3494470a637dbe2db1f4b63",
+          "path": "intel_v2/freshness_policy.py"
+        },
+        "rule_status": "EXISTING_CONTROLLED_RULE",
+        "stale_hours": 720
+      },
+      "geographic_scope": {
+        "declared_scope": null,
+        "may_infer_citywide_coverage": false,
+        "status": "UNKNOWN"
+      },
+      "integration_status": "PRODUCTION_ACTIVE",
+      "name": "臺中市議會質詢順序表",
+      "original_source_identity": {
+        "authority": "臺中市議會",
+        "entrypoint": "https://www.tccc.gov.tw/wb_download13.asp?uno=&cno=50",
+        "name": "臺中市議會質詢順序表",
+        "source_id": "S-006"
+      },
+      "rights_retention_public_policy_refs": {
+        "archive_eligibility": "EVIDENCE_ARCHIVE",
+        "canonical_retention_class": "PROVENANCE_HISTORY",
+        "canonical_retention_window": {
+          "expired_action": "KEEP_AUDIT_LINKAGE",
+          "max_age_days": null
+        },
+        "class_id": "OFFICIAL_METADATA_LINK",
+        "data_types": [
+          "OFFICIAL_HTML_PDF_ATTACHMENT"
+        ],
+        "excerpt_allowed": false,
+        "file_sha256": "da6fbe0e4fa92b03cab4f6e8069922d2ce5c0f81d32ecfce2e8dccafc9cff218",
+        "full_text_allowed": false,
+        "may_claim_open_permission": false,
+        "path": "docs/govintel/retention-rights-policy.v1.json",
+        "policy_hash": "6a52c17625af49cf4b618bbcd22a4909c23df3efd2f92ff70ae2935e8643cf13",
+        "policy_version": 3,
+        "public_fields": [
+          "source_id",
+          "source_name",
+          "title",
+          "official_url",
+          "published_at",
+          "data_as_of",
+          "fetched_at",
+          "freshness_status",
+          "change_type",
+          "evidence_count",
+          "content_sha256"
+        ],
+        "public_projection": "METADATA_LINK_ONLY",
+        "raw_retention_class": "SOURCE_TERMS_REVIEW",
+        "raw_retention_window": {
+          "expired_action": "REVIEW_REQUIRED",
+          "max_age_days": null
+        },
+        "review_required": false,
+        "rights_status": "OWNER_ASSERTED_PERMISSION",
+        "sensitive_default": false,
+        "terms_status": "OWNER_DECISION_TERMS_NOT_VERIFIED",
+        "terms_url": "https://www.tccc.gov.tw/wb_download13.asp?uno=&cno=50",
+        "withdrawal_behavior": "KEEP_HASH_MARK_SOURCE_UNAVAILABLE",
+        "withdrawal_projection": "SOURCE_NO_LONGER_AVAILABLE"
+      },
+      "role": "PRIMARY_EVENT",
+      "source_id": "S-006",
+      "status": "PRODUCTION_ACTIVE",
+      "temporal_semantics": {
+        "catalog_collection_rule": "Track current-session attachment versions; allow higher cadence during sessions.",
+        "catalog_evidence_rule": "Official attachment is authoritative.",
+        "fetched_at_is_observation_only": true,
+        "may_infer_event_valid_time": false,
+        "status": "UNKNOWN",
+        "valid_time_semantics": null
+      }
+    },
+    {
+      "approved_origins": [
+        "https://yishi.tccc.gov.tw"
+      ],
+      "authority": "臺中市議會",
+      "cadence_class": "DAILY_EVENT",
+      "entrypoint": "https://yishi.tccc.gov.tw/api/ProceedingsBackWeb/FrontList",
+      "freshness_policy": {
+        "cadence_class": "DAILY_EVENT",
+        "collection_recency_is_not_event_or_world_completeness": true,
+        "fresh_hours": 2160,
+        "query_snapshot_max_age_seconds": 57600,
+        "rule_ref": {
+          "file_sha256": "8b1067f516ee4b4c2c2def20cf24cbf5818c046aa3494470a637dbe2db1f4b63",
+          "path": "intel_v2/freshness_policy.py"
+        },
+        "rule_status": "EXISTING_CONTROLLED_RULE",
+        "stale_hours": 4320
+      },
+      "geographic_scope": {
+        "declared_scope": null,
+        "may_infer_citywide_coverage": false,
+        "status": "UNKNOWN"
+      },
+      "integration_status": "PRODUCTION_ACTIVE",
+      "name": "臺中市議會議事資訊系統－議事錄",
+      "original_source_identity": {
+        "authority": "臺中市議會",
+        "entrypoint": "https://yishi.tccc.gov.tw/api/ProceedingsBackWeb/FrontList",
+        "name": "臺中市議會議事資訊系統－議事錄",
+        "source_id": "S-007"
+      },
+      "rights_retention_public_policy_refs": {
+        "archive_eligibility": "EVIDENCE_ARCHIVE",
+        "canonical_retention_class": "PROVENANCE_HISTORY",
+        "canonical_retention_window": {
+          "expired_action": "KEEP_AUDIT_LINKAGE",
+          "max_age_days": null
+        },
+        "class_id": "OFFICIAL_METADATA_LINK",
+        "data_types": [
+          "OFFICIAL_HTML_PDF_ATTACHMENT"
+        ],
+        "excerpt_allowed": false,
+        "file_sha256": "da6fbe0e4fa92b03cab4f6e8069922d2ce5c0f81d32ecfce2e8dccafc9cff218",
+        "full_text_allowed": false,
+        "may_claim_open_permission": false,
+        "path": "docs/govintel/retention-rights-policy.v1.json",
+        "policy_hash": "6a52c17625af49cf4b618bbcd22a4909c23df3efd2f92ff70ae2935e8643cf13",
+        "policy_version": 3,
+        "public_fields": [
+          "source_id",
+          "source_name",
+          "title",
+          "official_url",
+          "published_at",
+          "data_as_of",
+          "fetched_at",
+          "freshness_status",
+          "change_type",
+          "evidence_count",
+          "content_sha256"
+        ],
+        "public_projection": "METADATA_LINK_ONLY",
+        "raw_retention_class": "SOURCE_TERMS_REVIEW",
+        "raw_retention_window": {
+          "expired_action": "REVIEW_REQUIRED",
+          "max_age_days": null
+        },
+        "review_required": false,
+        "rights_status": "OWNER_ASSERTED_PERMISSION",
+        "sensitive_default": false,
+        "terms_status": "OWNER_DECISION_TERMS_NOT_VERIFIED",
+        "terms_url": "https://yishi.tccc.gov.tw/api/ProceedingsBackWeb/FrontList",
+        "withdrawal_behavior": "KEEP_HASH_MARK_SOURCE_UNAVAILABLE",
+        "withdrawal_projection": "SOURCE_NO_LONGER_AVAILABLE"
+      },
+      "role": "PRIMARY_EVENT",
+      "source_id": "S-007",
+      "status": "PRODUCTION_ACTIVE",
+      "temporal_semantics": {
+        "catalog_collection_rule": "Use API item identity and exact-dedup hash; keep date-window completeness separate from endpoint health.",
+        "catalog_evidence_rule": "Official meeting record API is primary evidence.",
+        "fetched_at_is_observation_only": true,
+        "may_infer_event_valid_time": false,
+        "status": "UNKNOWN",
+        "valid_time_semantics": null
+      }
+    },
+    {
+      "approved_origins": [
+        "https://yishi.tccc.gov.tw"
+      ],
+      "authority": "臺中市議會",
+      "cadence_class": "DAILY_EVENT",
+      "entrypoint": "https://yishi.tccc.gov.tw/api/Proposal/FrontList",
+      "freshness_policy": {
+        "cadence_class": "DAILY_EVENT",
+        "collection_recency_is_not_event_or_world_completeness": true,
+        "fresh_hours": 336,
+        "query_snapshot_max_age_seconds": 57600,
+        "rule_ref": {
+          "file_sha256": "8b1067f516ee4b4c2c2def20cf24cbf5818c046aa3494470a637dbe2db1f4b63",
+          "path": "intel_v2/freshness_policy.py"
+        },
+        "rule_status": "EXISTING_CONTROLLED_RULE",
+        "stale_hours": 1440
+      },
+      "geographic_scope": {
+        "declared_scope": null,
+        "may_infer_citywide_coverage": false,
+        "status": "UNKNOWN"
+      },
+      "integration_status": "PRODUCTION_ACTIVE",
+      "name": "臺中市議會議事資訊系統－各項提案",
+      "original_source_identity": {
+        "authority": "臺中市議會",
+        "entrypoint": "https://yishi.tccc.gov.tw/api/Proposal/FrontList",
+        "name": "臺中市議會議事資訊系統－各項提案",
+        "source_id": "S-009"
+      },
+      "rights_retention_public_policy_refs": {
+        "archive_eligibility": "EVIDENCE_ARCHIVE",
+        "canonical_retention_class": "PROVENANCE_HISTORY",
+        "canonical_retention_window": {
+          "expired_action": "KEEP_AUDIT_LINKAGE",
+          "max_age_days": null
+        },
+        "class_id": "OFFICIAL_METADATA_LINK",
+        "data_types": [
+          "OFFICIAL_HTML_PDF_ATTACHMENT"
+        ],
+        "excerpt_allowed": false,
+        "file_sha256": "da6fbe0e4fa92b03cab4f6e8069922d2ce5c0f81d32ecfce2e8dccafc9cff218",
+        "full_text_allowed": false,
+        "may_claim_open_permission": false,
+        "path": "docs/govintel/retention-rights-policy.v1.json",
+        "policy_hash": "6a52c17625af49cf4b618bbcd22a4909c23df3efd2f92ff70ae2935e8643cf13",
+        "policy_version": 3,
+        "public_fields": [
+          "source_id",
+          "source_name",
+          "title",
+          "official_url",
+          "published_at",
+          "data_as_of",
+          "fetched_at",
+          "freshness_status",
+          "change_type",
+          "evidence_count",
+          "content_sha256"
+        ],
+        "public_projection": "METADATA_LINK_ONLY",
+        "raw_retention_class": "SOURCE_TERMS_REVIEW",
+        "raw_retention_window": {
+          "expired_action": "REVIEW_REQUIRED",
+          "max_age_days": null
+        },
+        "review_required": false,
+        "rights_status": "OWNER_ASSERTED_PERMISSION",
+        "sensitive_default": false,
+        "terms_status": "OWNER_DECISION_TERMS_NOT_VERIFIED",
+        "terms_url": "https://yishi.tccc.gov.tw/api/Proposal/FrontList",
+        "withdrawal_behavior": "KEEP_HASH_MARK_SOURCE_UNAVAILABLE",
+        "withdrawal_projection": "SOURCE_NO_LONGER_AVAILABLE"
+      },
+      "role": "PRIMARY_EVENT",
+      "source_id": "S-009",
+      "status": "PRODUCTION_ACTIVE",
+      "temporal_semantics": {
+        "catalog_collection_rule": "Proposal records without verifiable dates must not be promoted into a date-window NEW event.",
+        "catalog_evidence_rule": "Preserve proposal ID, official URL and current payload hash.",
+        "fetched_at_is_observation_only": true,
+        "may_infer_event_valid_time": false,
+        "status": "UNKNOWN",
+        "valid_time_semantics": null
+      }
+    },
+    {
+      "approved_origins": [
+        "https://www.rdec.taichung.gov.tw"
+      ],
+      "authority": "臺中市政府研究發展考核委員會",
+      "cadence_class": "DAILY_EVENT",
+      "entrypoint": "https://www.rdec.taichung.gov.tw/12047/12142/12145",
+      "freshness_policy": {
+        "cadence_class": "DAILY_EVENT",
+        "collection_recency_is_not_event_or_world_completeness": true,
+        "fresh_hours": 1080,
+        "query_snapshot_max_age_seconds": 57600,
+        "rule_ref": {
+          "file_sha256": "8b1067f516ee4b4c2c2def20cf24cbf5818c046aa3494470a637dbe2db1f4b63",
+          "path": "intel_v2/freshness_policy.py"
+        },
+        "rule_status": "EXISTING_CONTROLLED_RULE",
+        "stale_hours": 2160
+      },
+      "geographic_scope": {
+        "declared_scope": null,
+        "may_infer_citywide_coverage": false,
+        "status": "UNKNOWN"
+      },
+      "integration_status": "PRODUCTION_ACTIVE",
+      "name": "臺中市政府議會專案報告",
+      "original_source_identity": {
+        "authority": "臺中市政府研究發展考核委員會",
+        "entrypoint": "https://www.rdec.taichung.gov.tw/12047/12142/12145",
+        "name": "臺中市政府議會專案報告",
+        "source_id": "S-029"
+      },
+      "rights_retention_public_policy_refs": {
+        "archive_eligibility": "EVIDENCE_ARCHIVE",
+        "canonical_retention_class": "PROVENANCE_HISTORY",
+        "canonical_retention_window": {
+          "expired_action": "KEEP_AUDIT_LINKAGE",
+          "max_age_days": null
+        },
+        "class_id": "OFFICIAL_METADATA_LINK",
+        "data_types": [
+          "OFFICIAL_HTML_PDF_ATTACHMENT"
+        ],
+        "excerpt_allowed": false,
+        "file_sha256": "da6fbe0e4fa92b03cab4f6e8069922d2ce5c0f81d32ecfce2e8dccafc9cff218",
+        "full_text_allowed": false,
+        "may_claim_open_permission": false,
+        "path": "docs/govintel/retention-rights-policy.v1.json",
+        "policy_hash": "6a52c17625af49cf4b618bbcd22a4909c23df3efd2f92ff70ae2935e8643cf13",
+        "policy_version": 3,
+        "public_fields": [
+          "source_id",
+          "source_name",
+          "title",
+          "official_url",
+          "published_at",
+          "data_as_of",
+          "fetched_at",
+          "freshness_status",
+          "change_type",
+          "evidence_count",
+          "content_sha256"
+        ],
+        "public_projection": "METADATA_LINK_ONLY",
+        "raw_retention_class": "SOURCE_TERMS_REVIEW",
+        "raw_retention_window": {
+          "expired_action": "REVIEW_REQUIRED",
+          "max_age_days": null
+        },
+        "review_required": false,
+        "rights_status": "OWNER_ASSERTED_PERMISSION",
+        "sensitive_default": false,
+        "terms_status": "OWNER_DECISION_TERMS_NOT_VERIFIED",
+        "terms_url": "https://www.rdec.taichung.gov.tw/12047/12142/12145",
+        "withdrawal_behavior": "KEEP_HASH_MARK_SOURCE_UNAVAILABLE",
+        "withdrawal_projection": "SOURCE_NO_LONGER_AVAILABLE"
+      },
+      "role": "PRIMARY_REFERENCE",
+      "source_id": "S-029",
+      "status": "PRODUCTION_ACTIVE",
+      "temporal_semantics": {
+        "catalog_collection_rule": "Enumerate the latest council session and hash police-related official PDFs.",
+        "catalog_evidence_rule": "Official PDF is authoritative.",
+        "fetched_at_is_observation_only": true,
+        "may_infer_event_valid_time": false,
+        "status": "UNKNOWN",
+        "valid_time_semantics": null
+      }
+    }
+  ],
+  "candidate_source_governance": [
+    {
+      "approved_origins": [
+        "https://www.traffic.taichung.gov.tw"
+      ],
+      "freshness_policy": {
+        "cadence_class": "FAST_EVENT",
+        "collection_recency_is_not_event_or_world_completeness": true,
+        "fresh_hours": 13,
+        "query_snapshot_max_age_seconds": 57600,
+        "rule_ref": {
+          "file_sha256": "8b1067f516ee4b4c2c2def20cf24cbf5818c046aa3494470a637dbe2db1f4b63",
+          "path": "intel_v2/freshness_policy.py"
+        },
+        "rule_status": "EXISTING_CONTROLLED_RULE",
+        "stale_hours": 24
+      },
+      "geographic_scope": {
+        "declared_scope": null,
+        "may_infer_citywide_coverage": false,
+        "status": "UNKNOWN"
+      },
+      "integration_status": "VERIFIED_CANDIDATE",
+      "original_source_identity": {
+        "authority": "臺中市政府交通局",
+        "entrypoint": "https://www.traffic.taichung.gov.tw/",
+        "name": "臺中市政府交通局最新消息",
+        "source_id": "S-032"
+      },
+      "rights_retention_public_policy_refs": {
+        "archive_eligibility": "EVIDENCE_ARCHIVE",
+        "canonical_retention_class": "PROVENANCE_HISTORY",
+        "canonical_retention_window": {
+          "expired_action": "KEEP_AUDIT_LINKAGE",
+          "max_age_days": null
+        },
+        "class_id": "OFFICIAL_METADATA_LINK",
+        "data_types": [
+          "OFFICIAL_HTML_PDF_ATTACHMENT"
+        ],
+        "excerpt_allowed": false,
+        "file_sha256": "da6fbe0e4fa92b03cab4f6e8069922d2ce5c0f81d32ecfce2e8dccafc9cff218",
+        "full_text_allowed": false,
+        "may_claim_open_permission": false,
+        "path": "docs/govintel/retention-rights-policy.v1.json",
+        "policy_hash": "6a52c17625af49cf4b618bbcd22a4909c23df3efd2f92ff70ae2935e8643cf13",
+        "policy_version": 3,
+        "public_fields": [
+          "source_id",
+          "source_name",
+          "title",
+          "official_url",
+          "published_at",
+          "data_as_of",
+          "fetched_at",
+          "freshness_status",
+          "change_type",
+          "evidence_count",
+          "content_sha256"
+        ],
+        "public_projection": "METADATA_LINK_ONLY",
+        "raw_retention_class": "SOURCE_TERMS_REVIEW",
+        "raw_retention_window": {
+          "expired_action": "REVIEW_REQUIRED",
+          "max_age_days": null
+        },
+        "review_required": false,
+        "rights_status": "OWNER_ASSERTED_PERMISSION",
+        "sensitive_default": false,
+        "terms_status": "OWNER_DECISION_TERMS_NOT_VERIFIED",
+        "terms_url": "https://www.traffic.taichung.gov.tw/",
+        "withdrawal_behavior": "KEEP_HASH_MARK_SOURCE_UNAVAILABLE",
+        "withdrawal_projection": "SOURCE_NO_LONGER_AVAILABLE"
+      },
+      "source_id": "S-032",
+      "temporal_semantics": {
+        "catalog_collection_rule": "Use the official latest-news list; fetch details only for new/changed IDs and capture publish date/unit.",
+        "catalog_evidence_rule": "Official detail page is primary evidence.",
+        "fetched_at_is_observation_only": true,
+        "may_infer_event_valid_time": false,
+        "status": "UNKNOWN",
+        "valid_time_semantics": null
+      }
+    }
+  ],
+  "capabilities": [
+    {
+      "candidate_or_optional_sources": [
+        "CTX-165",
+        "CTX-POP",
+        "S-001",
+        "S-010",
+        "S-011",
+        "S-019",
+        "S-026",
+        "S-028",
+        "S-031",
+        "S-032",
+        "S-033",
+        "S-034",
+        "S-035",
+        "S-036",
+        "S-037"
+      ],
+      "capability_id": "publication_metadata",
+      "coverage_limitation": "只代表 policy 中已啟用來源，不代表世界完整性。",
+      "label": "目前核准來源的 publication metadata",
+      "required_sources": [
+        "S-004",
+        "S-006",
+        "S-007",
+        "S-009",
+        "S-029"
+      ],
+      "supported": true
+    },
+    {
+      "candidate_or_optional_sources": [
+        "CTX-165",
+        "CTX-POP",
+        "S-001",
+        "S-010",
+        "S-011",
+        "S-019",
+        "S-026",
+        "S-028",
+        "S-031",
+        "S-032",
+        "S-033",
+        "S-034",
+        "S-035",
+        "S-036",
+        "S-037"
+      ],
+      "capability_id": "source_health",
+      "coverage_limitation": "健康來源不等於該問題領域具完整覆蓋。",
+      "label": "目前核准來源的來源健康狀態",
+      "required_sources": [
+        "S-004",
+        "S-006",
+        "S-007",
+        "S-009",
+        "S-029"
+      ],
+      "supported": true
+    },
+    {
+      "candidate_or_optional_sources": [
+        "S-010",
+        "S-011"
+      ],
+      "capability_id": "council_affairs",
+      "coverage_limitation": "只涵蓋 policy 中符合議會語意且已啟用的來源。",
+      "label": "議會／質詢相關公開資料",
+      "required_sources": [
+        "S-004",
+        "S-006",
+        "S-007",
+        "S-009",
+        "S-029"
+      ],
+      "supported": true
+    },
+    {
+      "candidate_or_optional_sources": [
+        "S-032"
+      ],
+      "capability_id": "traffic_events",
+      "coverage_limitation": "僅涵蓋已啟用且明確屬交通事件的來源；不代表所有臨時交通事件。",
+      "label": "交通事件公開資料",
+      "required_sources": [],
+      "supported": false
+    },
+    {
+      "candidate_or_optional_sources": [
+        "CTX-165"
+      ],
+      "capability_id": "fraud_reference",
+      "coverage_limitation": "僅作已啟用官方資料範圍內的反詐參考，不推論本地案件量。",
+      "label": "反詐公開參考資料",
+      "required_sources": [],
+      "supported": false
+    }
+  ],
+  "catalog_hash": "5088623df5af4b8a30f4c597c51235c0f36a3dfd8bc4f2aea9af8f26d10213ef",
+  "catalog_schema_version": 2,
+  "catalog_updated_at": "2026-10-06",
+  "governance_binding": {
+    "catalog_hash": "5088623df5af4b8a30f4c597c51235c0f36a3dfd8bc4f2aea9af8f26d10213ef",
+    "derived_summary_policy": {
+      "archive_eligibility": "EVIDENCE_ARCHIVE",
+      "canonical_retention_class": "DERIVATION_HISTORY",
+      "excerpt_allowed": false,
+      "full_text_allowed": false,
+      "policy_ref": {
+        "file_sha256": "da6fbe0e4fa92b03cab4f6e8069922d2ce5c0f81d32ecfce2e8dccafc9cff218",
+        "policy_hash": "6a52c17625af49cf4b618bbcd22a4909c23df3efd2f92ff70ae2935e8643cf13"
+      },
+      "public_fields": [
+        "claim_id",
+        "evidence_ids",
+        "publication_hash",
+        "generated_at"
+      ],
+      "public_projection": "EVIDENCE_BOUND_SUMMARY_ONLY",
+      "raw_retention_class": "DERIVATION_RECEIPT_ONLY",
+      "review_required": true,
+      "rights_status": "PROJECT_CONTROLLED",
+      "sensitive_default": false,
+      "terms_status": "PROJECT_OWNED_NO_THIRD_PARTY_LICENSE",
+      "withdrawal_behavior": "RETRACT_PROJECTION_KEEP_AUDIT_RECEIPT",
+      "withdrawal_projection": "RETRACTED"
+    },
+    "formal_rights_statuses": [
+      "OPEN_DATA_LICENSED",
+      "OWNER_ASSERTED_PERMISSION",
+      "VERIFIED_METADATA_PERMISSION"
+    ],
+    "freshness_rules": {
+      "file_sha256": "8b1067f516ee4b4c2c2def20cf24cbf5818c046aa3494470a637dbe2db1f4b63",
+      "path": "intel_v2/freshness_policy.py"
+    },
+    "governance_hash": "640d40cf18e32e561273d9525c7235888aa931a8c5be9f29700ae880d8b6f09d",
+    "prohibited_public_fields": [
+      "body",
+      "credentials",
+      "full_text",
+      "operational_fields",
+      "personal_data",
+      "private_notes",
+      "raw_bytes",
+      "raw_payload"
+    ],
+    "query_snapshot_max_age_seconds": 57600,
+    "retention_policy": {
+      "file_sha256": "da6fbe0e4fa92b03cab4f6e8069922d2ce5c0f81d32ecfce2e8dccafc9cff218",
+      "path": "docs/govintel/retention-rights-policy.v1.json",
+      "policy_hash": "6a52c17625af49cf4b618bbcd22a4909c23df3efd2f92ff70ae2935e8643cf13",
+      "policy_version": 3
+    }
+  },
+  "parent_policy_hash": "3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501",
+  "policy_hash": "f027315e3fcb17d2e8825ad5d797a7c7aa60113e1a2562880f9a6bc6b8aaa62b",
+  "policy_version": 2,
+  "rules": {
+    "candidate_sources_are_verified": false,
+    "legacy_policy_may_answer_current_formal_query": false,
+    "runtime_may_drop_failed_required_source": false,
+    "unknown_rights_are_formal_query_admitted": false,
+    "zero_result_scope": "BOUNDED_TO_REQUIRED_SOURCES_ONLY"
+  },
+  "schema_version": 2,
+  "transition": {
+    "promoted": [],
+    "retired": []
+  }
+}

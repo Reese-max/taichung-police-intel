@@ -17,7 +17,8 @@ from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 
-MAX_BYTES = 2 * 1024 * 1024
+# Same artifact budget as scripts/query-store.py; a full proposal inventory is about 16 MiB.
+MAX_BYTES = 32 * 1024 * 1024
 # Worker artifact fetches cache for 30 seconds. Three attempts span 40 seconds
 # while preserving every release/hash/admission check and the failure receipt.
 RELEASE_BINDING_RETRY_DELAY_SECONDS = 20
@@ -196,7 +197,10 @@ def check_blocked_sources(document: dict, policy: dict, expected: dict, public_s
     sources, rights = document.get("sources"), document.get("source_rights")
     if (document.get("formal_admission") != expected or not isinstance(sources, list) or
             [row.get("source_id") for row in sources if isinstance(row, dict)] != ids or
-            len(sources) != len(ids) or rights != [{"source_id": sid, "rights_status": "UNKNOWN", "review_required": True} for sid in ids] or
+            len(sources) != len(ids) or rights not in (
+                [{"source_id": sid, "rights_status": "UNKNOWN", "review_required": True} for sid in ids],
+                # Owner decision 2026-11-13; admission can still be blocked by the legacy approved policy.
+                [{"source_id": sid, "rights_status": "OWNER_ASSERTED_PERMISSION", "review_required": False} for sid in ids]) or
             document.get("receipt", {}).get("result_count") != len(ids)):
         raise RuntimeError("Rights-blocked source health does not preserve the exact approved source identities")
     original = {row["source_id"]: row for row in public_status.get("sources", [])}

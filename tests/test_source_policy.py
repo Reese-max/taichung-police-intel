@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from governed_policy_fixture import make_legacy_policy_fixture, load_fixture_module
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "source-policy.py"
@@ -13,13 +14,31 @@ spec = importlib.util.spec_from_file_location("source_policy", SCRIPT)
 sp = importlib.util.module_from_spec(spec)
 assert spec and spec.loader
 spec.loader.exec_module(sp)
+real_sp = sp
 
 
 class SourcePolicyTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.catalog = sp.load_catalog()
-        cls.baseline = sp.load_current_policy()
+        cls.legacy_directory = tempfile.TemporaryDirectory(prefix="legacy-source-policy-")
+        cls.legacy_fixture = make_legacy_policy_fixture(
+            Path(cls.legacy_directory.name) / "legacy",
+            source_root=ROOT,
+        )
+        cls.real_catalog = real_sp.load_catalog()
+        cls.real_baseline = real_sp.load_current_policy()
+        cls.legacy_sp = load_fixture_module(
+            cls.legacy_fixture,
+            "legacy_source_policy_tests",
+            "scripts/source-policy.py",
+        )
+        cls.catalog = cls.legacy_sp.load_catalog()
+        cls.baseline = cls.legacy_sp.load_current_policy()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.legacy_fixture["cleanup"]()
+        cls.legacy_directory.cleanup()
 
     def good_states(self, policy=None):
         policy = policy or self.baseline
@@ -49,9 +68,10 @@ class SourcePolicyTests(unittest.TestCase):
                 self.assertEqual(sp.normalize_freshness(raw), expected)
 
     def test_active_set_is_derived_from_catalog_not_parallel_list(self):
-        expected = sorted(row["source_id"] for row in self.catalog["sources"] if row["status"] == "PRODUCTION_ACTIVE")
-        self.assertEqual(self.baseline["active_source_ids"], expected)
-        self.assertEqual([row["source_id"] for row in self.baseline["active_sources"]], expected)
+        expected = sorted(row["source_id"] for row in self.real_catalog["sources"] if row["status"] == "PRODUCTION_ACTIVE")
+        self.assertEqual(self.real_baseline["active_source_ids"], expected)
+        self.assertEqual([row["source_id"] for row in self.real_baseline["active_sources"]], expected)
+        self.assertEqual(self.real_baseline["schema_version"], 2)
 
     def test_collector_inventory_matches_active_catalog_rows(self):
         from collect import P0_SOURCES
@@ -59,35 +79,40 @@ class SourcePolicyTests(unittest.TestCase):
 
         expected = {
             row["source_id"]: (row["name"], row["entrypoint"])
-            for row in self.catalog["sources"]
+            for row in self.real_catalog["sources"]
             if row["status"] == "PRODUCTION_ACTIVE"
         }
         self.assertEqual(P0_SOURCES, expected)
         self.assertTrue(set(expected) <= set(COLLECTORS))
-        self.assertEqual(self.baseline["catalog_hash"], sp.digest(self.catalog))
+        self.assertEqual(self.real_baseline["catalog_hash"], real_sp.digest(self.real_catalog))
 
     def test_policy_build_is_deterministic(self):
-        second = sp.compile_policy(copy.deepcopy(self.catalog), bootstrap=True)
+        second = self.legacy_sp.compile_policy(copy.deepcopy(self.catalog), bootstrap=True)
         self.assertEqual(self.baseline, second)
-        sp.validate_policy(second)
+        self.legacy_sp.validate_policy(second)
 
     def test_bootstrap_requires_explicit_mode(self):
         with self.assertRaisesRegex(ValueError, "bootstrap must be explicit"):
-            sp.compile_policy(self.catalog)
+            self.legacy_sp.compile_policy(self.catalog)
 
     def test_approved_snapshot_rejects_catalog_drift_or_missing_anchor(self):
-        changed = copy.deepcopy(self.catalog)
+        self.assertEqual(real_sp.ROOT, ROOT)
+        self.assertEqual(real_sp.APPROVED_POLICY.resolve(), (ROOT / "docs/govintel/source-policy.approved.json").resolve())
+        self.assertEqual(self.real_baseline, real_sp.load_current_policy())
+        self.assertEqual(self.real_baseline["schema_version"], 2)
+        changed = copy.deepcopy(self.real_catalog)
         next(row for row in changed["sources"] if row["source_id"] == "S-032")["status"] = "PRODUCTION_ACTIVE"
         with tempfile.TemporaryDirectory() as directory:
             catalog_path = Path(directory) / "changed-catalog.json"
-            catalog_path.write_text(json.dumps(changed), encoding="utf-8")
+            with catalog_path.open("w", encoding="utf-8", newline="\n") as stream:
+                json.dump(changed, stream)
             with self.assertRaisesRegex(ValueError, "policy/catalog binding mismatch"):
-                sp.load_current_policy(catalog_path=catalog_path)
+                real_sp.load_current_policy(catalog_path=catalog_path)
             with self.assertRaises(FileNotFoundError):
-                sp.load_current_policy(policy_path=Path(directory) / "missing-policy.json")
+                real_sp.load_current_policy(policy_path=Path(directory) / "missing-policy.json")
 
     def test_cli_requires_previous_policy_and_exact_transition_receipt(self):
-        promoted_catalog = copy.deepcopy(self.catalog)
+        promoted_catalog = copy.deepcopy(self.real_catalog)
         next(row for row in promoted_catalog["sources"] if row["source_id"] == "S-032")["status"] = "PRODUCTION_ACTIVE"
         with tempfile.TemporaryDirectory() as directory:
             catalog_path = Path(directory) / "catalog.json"
@@ -109,7 +134,10 @@ class SourcePolicyTests(unittest.TestCase):
                                      cwd=ROOT, text=True, capture_output=True)
             self.assertEqual(allowed.returncode, 0, allowed.stderr)
             policy = json.loads(output_path.read_text(encoding="utf-8"))
-            self.assertEqual(policy["policy_version"], self.baseline["policy_version"] + 1)
+            current_policy = json.loads(
+                (ROOT / "docs/govintel/source-policy.approved.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(policy["policy_version"], current_policy["policy_version"] + 1)
             self.assertIn("S-032", policy["active_source_ids"])
             self.assertEqual(policy["transition"]["promoted"][0]["source_id"], "S-032")
 
@@ -124,8 +152,8 @@ class SourcePolicyTests(unittest.TestCase):
         promoted_catalog = copy.deepcopy(self.catalog)
         next(row for row in promoted_catalog["sources"] if row["source_id"] == "S-032")["status"] = "PRODUCTION_ACTIVE"
         with self.assertRaisesRegex(ValueError, "promotion receipts"):
-            sp.compile_policy(promoted_catalog, previous=self.baseline)
-        policy = sp.compile_policy(
+            self.legacy_sp.compile_policy(promoted_catalog, previous=self.baseline)
+        policy = self.legacy_sp.compile_policy(
             promoted_catalog,
             previous=self.baseline,
             promotions=[{"source_id": "S-032", "receipt_id": "review:22-canary", "reason": "approved candidate promotion fixture"}],
@@ -137,14 +165,14 @@ class SourcePolicyTests(unittest.TestCase):
         self.assertEqual(traffic["required_sources"], ["S-032"])
 
     def test_runtime_cannot_make_policy_green_by_dropping_source(self):
-        capability = sp.assess_query(self.baseline, "publication_metadata", self.good_states())
+        capability = self.legacy_sp.assess_query(self.baseline, "publication_metadata", self.good_states())
         self.assertEqual(capability["collection_coverage_status"], "COVERED_BOUNDED_SCOPE")
         self.assertEqual(capability["status"], "UNKNOWN")
         self.assertFalse(capability["can_state_bounded_no_match"])
         states = self.good_states()
         removed = self.baseline["active_source_ids"][0]
         states.pop(removed)
-        degraded = sp.assess_query(self.baseline, "publication_metadata", states)
+        degraded = self.legacy_sp.assess_query(self.baseline, "publication_metadata", states)
         self.assertEqual(degraded["collection_coverage_status"], "PARTIAL")
         self.assertEqual(degraded["status"], "UNKNOWN")
         self.assertIn(removed, degraded["missing_required_sources"])
@@ -154,7 +182,7 @@ class SourcePolicyTests(unittest.TestCase):
         states = self.good_states()
         target = self.baseline["active_source_ids"][0]
         states[target]["result"] = "PARTIAL"
-        result = sp.assess_query(self.baseline, "publication_metadata", states)
+        result = self.legacy_sp.assess_query(self.baseline, "publication_metadata", states)
         self.assertEqual(result["collection_coverage_status"], "PARTIAL")
         self.assertEqual(result["status"], "UNKNOWN")
         self.assertIn(target, result["missing_required_sources"])
@@ -165,8 +193,8 @@ class SourcePolicyTests(unittest.TestCase):
         source_id = self.baseline["active_source_ids"][0]
         next(row for row in retired_catalog["sources"] if row["source_id"] == source_id)["status"] = "AUDITED_EXISTING"
         with self.assertRaisesRegex(ValueError, "retirement receipts"):
-            sp.compile_policy(retired_catalog, previous=self.baseline)
-        policy = sp.compile_policy(
+            self.legacy_sp.compile_policy(retired_catalog, previous=self.baseline)
+        policy = self.legacy_sp.compile_policy(
             retired_catalog,
             previous=self.baseline,
             retirements=[{"source_id": source_id, "receipt_id": "retire:test", "reason": "explicit retirement fixture with coverage loss"}],
@@ -179,13 +207,13 @@ class SourcePolicyTests(unittest.TestCase):
         target = self.baseline["active_source_ids"][0]
         states[target]["window_completeness"] = "PARTIAL"
         states[target]["freshness"] = "STALE"
-        partial = sp.assess_query(self.baseline, "publication_metadata", states)
+        partial = self.legacy_sp.assess_query(self.baseline, "publication_metadata", states)
         self.assertEqual(partial["collection_coverage_status"], "PARTIAL")
         self.assertEqual(partial["status"], "UNKNOWN")
         self.assertIn(target, partial["missing_required_sources"])
         self.assertIn(target, partial["stale_required_sources"])
         states[target]["window_completeness"] = "COMPLETE_WITH_ITEMS"
-        stale = sp.assess_query(self.baseline, "publication_metadata", states)
+        stale = self.legacy_sp.assess_query(self.baseline, "publication_metadata", states)
         self.assertEqual(stale["collection_coverage_status"], "STALE")
         self.assertEqual(stale["status"], "UNKNOWN")
         self.assertFalse(stale["can_state_bounded_no_match"])
@@ -200,7 +228,7 @@ class SourcePolicyTests(unittest.TestCase):
                 else:
                     states[target]["freshness_status"] = freshness
                     states[target].pop("freshness")
-                result = sp.assess_query(self.baseline, "publication_metadata", states)
+                result = self.legacy_sp.assess_query(self.baseline, "publication_metadata", states)
                 self.assertEqual(result["collection_coverage_status"], "STALE" if freshness == "VERY_STALE" else "PARTIAL")
                 self.assertEqual(result["status"], "UNKNOWN")
                 self.assertFalse(result["can_state_bounded_no_match"])
@@ -210,14 +238,14 @@ class SourcePolicyTests(unittest.TestCase):
                     self.assertIn(target, result["missing_required_sources"])
 
     def test_unsupported_query_never_returns_fake_empty(self):
-        result = sp.assess_query(self.baseline, "traffic_events", self.good_states())
+        result = self.legacy_sp.assess_query(self.baseline, "traffic_events", self.good_states())
         self.assertEqual(result["status"], "CAPABILITY_NOT_AVAILABLE")
         self.assertFalse(result["can_state_bounded_no_match"])
-        unknown = sp.assess_query(self.baseline, "not-a-capability", self.good_states())
+        unknown = self.legacy_sp.assess_query(self.baseline, "not-a-capability", self.good_states())
         self.assertEqual(unknown["status"], "CAPABILITY_NOT_AVAILABLE")
 
     def test_policy_only_without_runtime_states_cannot_assert_no_match(self):
-        result = sp.assess_query(self.baseline, "publication_metadata")
+        result = self.legacy_sp.assess_query(self.baseline, "publication_metadata")
         self.assertEqual(result["collection_coverage_status"], "POLICY_ONLY")
         self.assertEqual(result["status"], "UNKNOWN")
         self.assertFalse(result["can_state_bounded_no_match"])
@@ -227,14 +255,14 @@ class SourcePolicyTests(unittest.TestCase):
         tampered = copy.deepcopy(self.baseline)
         tampered["active_source_ids"] = tampered["active_source_ids"][:-1]
         with self.assertRaisesRegex(ValueError, "hash"):
-            sp.validate_policy(tampered)
+            self.legacy_sp.validate_policy(tampered)
 
     def test_recomputed_tampered_projection_fails_closed(self):
         tampered = copy.deepcopy(self.baseline)
         tampered["active_source_ids"] = tampered["active_source_ids"][:-1]
-        tampered["policy_hash"] = sp.digest({key: value for key, value in tampered.items() if key != "policy_hash"})
+        tampered["policy_hash"] = self.legacy_sp.digest({key: value for key, value in tampered.items() if key != "policy_hash"})
         with self.assertRaisesRegex(ValueError, "active_sources"):
-            sp.validate_policy(tampered)
+            self.legacy_sp.validate_policy(tampered)
 
     def test_recomputed_capability_and_candidate_forgery_fail_catalog_binding(self):
         states = self.good_states()
@@ -247,31 +275,48 @@ class SourcePolicyTests(unittest.TestCase):
                 if capability_id == "traffic_events":
                     tampered["active_source_ids"].append("S-032")
                     candidate = next(row for row in self.catalog["sources"] if row["source_id"] == "S-032")
-                    tampered["active_sources"].append(sp._project_source({**candidate, "status": "PRODUCTION_ACTIVE"}))
+                    tampered["active_sources"].append(
+                        self.legacy_sp._project_source({**candidate, "status": "PRODUCTION_ACTIVE"})
+                    )
                 capability = next(row for row in tampered["capabilities"] if row["capability_id"] == capability_id)
                 capability["required_sources"] = required
                 capability["candidate_or_optional_sources"] = optional
                 capability["supported"] = True
-                tampered["policy_hash"] = sp.digest({key: value for key, value in tampered.items() if key != "policy_hash"})
-                sp.validate_policy(tampered)
+                tampered["policy_hash"] = self.legacy_sp.digest({key: value for key, value in tampered.items() if key != "policy_hash"})
+                self.legacy_sp.validate_policy(tampered)
                 with self.assertRaisesRegex(ValueError, "approved catalog-bound snapshot"):
-                    sp.assess_query(tampered, capability_id, states)
+                    self.legacy_sp.assess_query(tampered, capability_id, states)
 
     def test_malformed_projection_types_fail_closed(self):
         cases = []
         for key, value in (("active_source_ids", [None]), ("capabilities", [None])):
             tampered = copy.deepcopy(self.baseline)
             tampered[key] = value
-            tampered["policy_hash"] = sp.digest({name: item for name, item in tampered.items() if name != "policy_hash"})
+            tampered["policy_hash"] = self.legacy_sp.digest({name: item for name, item in tampered.items() if name != "policy_hash"})
             cases.append(tampered)
         tampered = copy.deepcopy(self.baseline)
         tampered["capabilities"][0]["required_sources"] = [None]
-        tampered["policy_hash"] = sp.digest({name: item for name, item in tampered.items() if name != "policy_hash"})
+        tampered["policy_hash"] = self.legacy_sp.digest({name: item for name, item in tampered.items() if name != "policy_hash"})
         cases.append(tampered)
         for policy in cases:
             with self.subTest(policy=policy):
                 with self.assertRaises(ValueError):
-                    sp.validate_policy(policy)
+                    self.legacy_sp.validate_policy(policy)
+
+    def test_legacy_fixture_cleanup_removes_deleted_root_from_sys_path(self):
+        temporary = tempfile.TemporaryDirectory(prefix="legacy-cleanup-")
+        self.addCleanup(temporary.cleanup)
+        fixture = make_legacy_policy_fixture(Path(temporary.name) / "legacy", source_root=ROOT)
+        self.addCleanup(fixture["cleanup"])
+        fixture_root = fixture["root"]
+        module = load_fixture_module(fixture, "legacy_cleanup_gateway", "scripts/query-gateway.py")
+        self.assertIn(str(fixture_root), sys.path)
+
+        fixture["cleanup"]()
+        temporary.cleanup()
+        self.assertFalse(fixture_root.exists())
+        self.assertNotIn(str(fixture_root), sys.path)
+        self.assertNotIn(module.__name__, sys.modules)
 
 
 if __name__ == "__main__":
