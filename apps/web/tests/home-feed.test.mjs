@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
-import { buildHomeFeed, renderHomeFeed } from "../scripts/sync-home-feed.mjs";
+import { buildHomeFeed, buildSearchIndex, renderHomeFeed } from "../scripts/sync-home-feed.mjs";
 
 const scriptPath = fileURLToPath(new URL("../scripts/sync-home-feed.mjs", import.meta.url));
 const fullFeedPath = new URL("../public/data/intelligence-feed.json", import.meta.url);
@@ -98,6 +98,12 @@ test("the home feed is generated for dev, test and build and is never checked in
     encoding: "utf8",
   });
   assert.equal(tracked.trim(), "");
+  assert.match(gitignore, /^apps\/web\/public\/data\/intelligence-feed-search\.json$/m);
+  const trackedIndex = execFileSync("git", ["ls-files", "--", "apps/web/public/data/intelligence-feed-search.json"], {
+    cwd: fileURLToPath(new URL("../../../", import.meta.url)),
+    encoding: "utf8",
+  });
+  assert.equal(trackedIndex.trim(), "");
   const scripts = JSON.parse(packageJson).scripts;
   for (const hook of ["predev", "pretest", "prebuild"]) {
     assert.match(scripts[hook], /node scripts\/sync-home-feed\.mjs/, hook);
@@ -157,6 +163,34 @@ test("invalid feed metadata exits unsuccessfully without creating output", async
       { encoding: "utf8", stdio: "pipe" },
     ));
     assert.equal(existsSync(outputPath), false);
+    assert.equal(existsSync(join(directory, "intelligence-feed-search.json")), false);
+  });
+});
+
+test("the search index keeps only the rendered and searched fields of every feed item", async () => {
+  const feedBytes = await readFile(fullFeedPath);
+  const feed = JSON.parse(feedBytes.toString("utf8"));
+  const home = buildHomeFeed(feed, feedBytes);
+  await withTempDirectory(async (directory) => {
+    const output = join(directory, "intelligence-feed-home.json");
+    execFileSync(process.execPath, [scriptPath, "--feed", fileURLToPath(fullFeedPath), "--output", output], { encoding: "utf8" });
+    const indexText = await readFile(join(directory, "intelligence-feed-search.json"), "utf8");
+    const index = JSON.parse(indexText);
+
+    assert.deepEqual(index, buildSearchIndex(feed, feedBytes));
+    assert.equal(index.kind, "GOVINTEL_ARCHIVE_SEARCH_INDEX");
+    assert.equal(index.collection_run_id, home.collection_run_id);
+    assert.equal(index.feed_sha256, home.feed_sha256);
+    assert.equal(index.items.length, feed.items.length);
+    const allowed = new Set(["stable_id", "title", "committee", "source_id", "official_url"]);
+    index.items.forEach((row, position) => {
+      assert.ok(Object.keys(row).every((key) => allowed.has(key)), JSON.stringify(row));
+      for (const key of Object.keys(row)) assert.deepEqual(row[key], feed.items[position][key]);
+      assert.equal(row.stable_id, feed.items[position].stable_id);
+      assert.equal(row.official_url, feed.items[position].official_url);
+    });
+    assert.ok(!indexText.includes("\n  "), "search index is written compactly");
+    assert.ok(Buffer.byteLength(indexText) < feedBytes.length);
   });
 });
 

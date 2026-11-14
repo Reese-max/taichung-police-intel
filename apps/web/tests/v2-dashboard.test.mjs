@@ -113,7 +113,9 @@ test("V2 dashboard is police-first, Top 3 capped, and evidence-bound", async () 
   assert.match(source, /確認／更新交班版本/);
   assert.match(source, /本機保存 · 不會寫入公開網站/);
   assert.match(source, /intelligence-feed-home\.json/);
-  assert.match(source, /intelligence-feed\.json/);
+  // The first archive search downloads the compact search index, not the complete feed.
+  assert.match(source, /intelligence-feed-search\.json/);
+  assert.doesNotMatch(source, /data\/intelligence-feed\.json/);
   const archiveSearch = await readFile(new URL("../lib/archive-search.js", import.meta.url), "utf8");
   assert.match(archiveSearch, /正在載入完整歷史索引…/);
   assert.match(archiveSearch, /完整歷史索引載入失敗，請稍後再試。/);

@@ -33,3 +33,4 @@ Thumbs.db
 
 # Derived at dev/test/build time from intelligence-feed.json (apps/web/scripts/sync-home-feed.mjs)
 apps/web/public/data/intelligence-feed-home.json
+apps/web/public/data/intelligence-feed-search.json

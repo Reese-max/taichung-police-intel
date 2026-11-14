@@ -8,6 +8,7 @@ import io
 import json
 import math
 import os
+import html
 import re
 import time
 import urllib.parse
@@ -2070,6 +2071,25 @@ def check_feed_archive(item: dict, source_id: str, record_id: str) -> None:
             raise ValueError(f"record is not allowed into the public archive: {decision['reason']}")
 
 
+def proposal_text(payload: dict) -> str:
+    """Full proposal rationale as plain text.
+
+    The council API's proposalRationale is cut at 40 characters and keeps HTML
+    entities; proposalRationaleSort carries the full text as HTML.
+    """
+    for key in ("proposalRationaleSort", "proposalRationale"):
+        text = payload.get(key)
+        if not isinstance(text, str) or not text.strip():
+            continue
+        text = html.unescape(re.sub(r"<[^>]+>", " ", text))
+        if "關鍵字包含" in text:
+            text = text.split("關鍵字包含")[0]
+        text = " ".join(text.split())
+        if text:
+            return text
+    return ""
+
+
 def project_feed_item(
     item: dict,
     source_id: str,
@@ -2112,7 +2132,7 @@ def project_feed_item(
         if not title:
             # For API records, use proposalRationale/content/subject/billName
             title = (
-                item["payload"].get("proposalRationale")
+                proposal_text(item["payload"])
                 or item["payload"].get("subject")
                 or item["payload"].get("billName")
                 or item["payload"].get("content", "")[:100]
@@ -2363,14 +2383,7 @@ def generate_feed_csv(feed_items: list[dict], raw_items_by_source: dict[str, lis
         # Extract S-009 specific fields
         proposal_rationale = ""
         if isinstance(payload, dict):
-            rationale = payload.get("proposalRationale") or payload.get("proposalRationaleSort") or ""
-            # Clean HTML tags
-            if "<" in rationale:
-                rationale = re.sub(r"<[^>]+>", "", rationale)
-            # Remove keyword highlight suffix
-            if "關鍵字包含" in rationale:
-                rationale = rationale.split("關鍵字包含")[0].strip()
-            proposal_rationale = rationale.strip()
+            proposal_rationale = proposal_text(payload)
 
         row = {
             "stable_id": stable_id,
@@ -2397,7 +2410,10 @@ def generate_feed_csv(feed_items: list[dict], raw_items_by_source: dict[str, lis
 # What a source's inventory covers. When this label differs from the one stored with the
 # last good snapshot, the collection query changed: the next snapshot is a new baseline, so
 # long-standing records that merely entered scope are not published as today's changes.
-COLLECTION_SCOPES = {"S-009": "ALL_PROPOSALS"}
+# Bump a label whenever the collection query or the projected fields change, e.g. the
+# 2026-11-15 switch to full-rationale titles; otherwise the daily brief reports the
+# projection change as an official revision.
+COLLECTION_SCOPES = {"S-009": "ALL_PROPOSALS_FULL_RATIONALE"}
 
 
 def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) -> dict:
