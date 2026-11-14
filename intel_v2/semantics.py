@@ -446,6 +446,12 @@ def compare_snapshot(
                 missing_streak=0,
                 is_current=True,
             )
+            if identity in first_observations:
+                # The collector re-baselined this source (its collection scope or
+                # projection changed), so the difference reflects how GovIntel reads
+                # the source, not an official revision. Record it without an event.
+                next_items[identity] = current.to_state()
+                continue
             events.append(
                 _make_event(
                     current=current,

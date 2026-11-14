@@ -2410,7 +2410,10 @@ def generate_feed_csv(feed_items: list[dict], raw_items_by_source: dict[str, lis
 # What a source's inventory covers. When this label differs from the one stored with the
 # last good snapshot, the collection query changed: the next snapshot is a new baseline, so
 # long-standing records that merely entered scope are not published as today's changes.
-COLLECTION_SCOPES = {"S-009": "ALL_PROPOSALS"}
+# Bump a label whenever the collection query or the projected fields change, e.g. the
+# 2026-11-15 switch to full-rationale titles; otherwise the daily brief reports the
+# projection change as an official revision.
+COLLECTION_SCOPES = {"S-009": "ALL_PROPOSALS_FULL_RATIONALE"}
 
 
 def build_demo_status(output: Path, slot: str, slot_date: date, trigger: str) -> dict:
