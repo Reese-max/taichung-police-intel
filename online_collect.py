@@ -6,6 +6,7 @@ from email.utils import parsedate_to_datetime
 import importlib.util
 import io
 import json
+import math
 import os
 import re
 import time
@@ -88,6 +89,9 @@ def http_session() -> requests.Session:
     session = requests.Session()
     session.headers.update({"User-Agent": USER_AGENT, "Accept-Language": "zh-TW,zh;q=0.9"})
     session.mount("https://", HTTPAdapter(max_retries=retry))
+    # Let S-009's paginated collector own the bounded 429 backoff budget.
+    s009_retry = retry.new(status_forcelist=(500, 502, 503, 504))
+    session.mount(API_S009, HTTPAdapter(max_retries=s009_retry))
     return session
 
 
@@ -361,18 +365,47 @@ def paginated_api(
     *,
     source_id: str | None = None,
     page_size: int = 200,
+    min_page_interval: float = 0,
+    retry_backoff: tuple[float, ...] | None = None,
+    sleep_fn=time.sleep,
 ) -> tuple[list[dict], list[dict]]:
+    if min_page_interval < 0:
+        raise ValueError("minimum page interval cannot be negative")
+    if retry_backoff is not None and (
+        not retry_backoff or any(delay < 0 for delay in retry_backoff)
+    ):
+        raise ValueError("429 retry backoff must contain non-negative delays")
     records = []
     responses = []
     page = 1
     total_pages = 1
+    expected_total_count = None
     while page <= total_pages:
-        response = get(
-            session,
-            url,
-            source_id=source_id,
-            params={**params, "pageNumber": page, "pageSize": page_size},
-        )
+        retries = 0
+        while True:
+            try:
+                response = get(
+                    session,
+                    url,
+                    source_id=source_id,
+                    params={**params, "pageNumber": page, "pageSize": page_size},
+                )
+                break
+            except requests.HTTPError as error:
+                error_response = error.response
+                if (retry_backoff is None or retries >= 3
+                        or getattr(error_response, "status_code", None) != 429):
+                    raise
+                fallback = retry_backoff[min(retries, len(retry_backoff) - 1)]
+                retry_after = getattr(error_response, "headers", {}).get("Retry-After")
+                try:
+                    delay = float(retry_after)
+                    if not math.isfinite(delay) or delay < 0:
+                        delay = fallback
+                except (TypeError, ValueError):
+                    delay = fallback
+                sleep_fn(min(delay, 120))
+                retries += 1
         responses.append(snapshot(response, "API"))
         payload = response.json()
         if payload.get("success") is not True or not isinstance(payload.get("data", {}).get("data"), list):
@@ -384,10 +417,18 @@ def paginated_api(
             raise ValueError(f"API page guard exceeded: {total_pages}")
         if type(total_count) is not int or total_count < 0:
             raise ValueError(f"invalid API totalCount: {total_count}")
+        if expected_total_count is None:
+            expected_total_count = total_count
+        elif total_count != expected_total_count:
+            raise ValueError(
+                f"inconsistent API totalCount across pages: {expected_total_count} != {total_count}"
+            )
         records.extend(data["data"])
+        if page < total_pages and min_page_interval:
+            sleep_fn(min_page_interval)
         page += 1
-    if len(records) != total_count:
-        raise ValueError(f"API count mismatch: {len(records)} != {total_count}")
+    if len(records) != expected_total_count:
+        raise ValueError(f"API count mismatch: {len(records)} != {expected_total_count}")
     return records, responses
 
 
@@ -450,10 +491,16 @@ def collect_s007(session: requests.Session, start: date, end: date) -> dict:
     }
 
 
-def collect_s009(session: requests.Session, start: date, end: date) -> dict:
+def collect_s009(session: requests.Session, start: date, end: date, *, sleep_fn=time.sleep) -> dict:
     del start, end
     records, responses = paginated_api(
-        session, API_S009, {"keywordList": "警察局"}, source_id="S-009"
+        session,
+        API_S009,
+        {},
+        source_id="S-009",
+        min_page_interval=1.5,
+        retry_backoff=(5, 15, 45),
+        sleep_fn=sleep_fn,
     )
     items = []
     for record in records:

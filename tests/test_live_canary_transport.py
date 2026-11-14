@@ -24,10 +24,12 @@ s028_spec.loader.exec_module(s028)
 
 
 class Response:
-    def __init__(self, url, *, status_code=200, location=None, content=b"ok"):
+    def __init__(self, url, *, status_code=200, location=None, content=b"ok", headers=None):
         self.url = url
         self.status_code = status_code
-        self.headers = {"location": location} if location else {}
+        self.headers = dict(headers or {})
+        if location:
+            self.headers["location"] = location
         self.content = content
         self.request = SimpleNamespace(url=url)
         self.closed = False
@@ -40,6 +42,14 @@ class Response:
 
     def json(self):
         return json.loads(self.content)
+
+
+class ApiResponse(Response):
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            import requests
+
+            raise requests.HTTPError(f"HTTP {self.status_code}", response=self)
 
 
 class Session:
@@ -230,6 +240,104 @@ class ProposalDateTruthTests(unittest.TestCase):
         self.assertEqual(len(session.calls), 1)
         return result
 
+    @staticmethod
+    def api_page(records, total_count, total_pages):
+        body = {"success": True, "data": {
+            "data": records, "totalCount": total_count, "totalPages": total_pages,
+        }}
+        return ApiResponse(
+            "https://yishi.tccc.gov.tw/api/Proposal/FrontList",
+            content=json.dumps(body).encode(),
+        )
+
+    @staticmethod
+    def proposal(bill_id):
+        return {"billId": bill_id, "proposalRationale": "公開提案測試"}
+
+    def test_http_session_preserves_other_source_retries_but_leaves_s009_429_to_collector(self):
+        import online_collect as oc
+
+        session = oc.http_session()
+        self.addCleanup(session.close)
+        self.assertIn(429, session.get_adapter(oc.API_S007).max_retries.status_forcelist)
+        self.assertNotIn(429, session.get_adapter(oc.API_S009).max_retries.status_forcelist)
+
+    def test_s009_collects_all_pages_without_keyword_and_injects_page_sleep(self):
+        import online_collect as oc
+
+        session = Session([
+            self.api_page([self.proposal("proposal-001")], 2, 2),
+            self.api_page([self.proposal("proposal-002")], 2, 2),
+        ])
+        sleeps = []
+        result = oc.collect_s009(session, date(2026, 9, 29), date(2026, 10, 4), sleep_fn=sleeps.append)
+
+        self.assertEqual([call[1]["params"] for call in session.calls], [
+            {"pageNumber": 1, "pageSize": 200},
+            {"pageNumber": 2, "pageSize": 200},
+        ])
+        self.assertEqual(sleeps, [1.5])
+        self.assertEqual(result["snapshot_item_count"], 2)
+        self.assertEqual(result["window_item_count"], 0)
+        self.assertEqual(result["window_completeness"], "PARTIAL")
+        self.assertTrue(all(item["published_at"] is None for item in result["items"]))
+
+    def test_s009_retries_429_using_retry_after(self):
+        import online_collect as oc
+
+        for retry_after, expected_wait in (("7", 7.0), ("150", 120)):
+            with self.subTest(retry_after=retry_after):
+                throttled = ApiResponse(
+                    oc.API_S009, status_code=429, headers={"Retry-After": retry_after}, content=b"",
+                )
+                session = Session([throttled, self.api_page([self.proposal("proposal-001")], 1, 1)])
+                sleeps = []
+                result = oc.collect_s009(
+                    session, date(2026, 9, 29), date(2026, 10, 4), sleep_fn=sleeps.append,
+                )
+
+                self.assertEqual(sleeps, [expected_wait])
+                self.assertEqual(len(session.calls), 2)
+                self.assertEqual(result["snapshot_item_count"], 1)
+
+    def test_s009_stops_after_three_429_retries_without_returning_partial_data(self):
+        import online_collect as oc
+        import requests
+
+        session = Session([ApiResponse(oc.API_S009, status_code=429, content=b"")] * 4)
+        sleeps = []
+        with self.assertRaises(requests.HTTPError):
+            oc.collect_s009(session, date(2026, 9, 29), date(2026, 10, 4), sleep_fn=sleeps.append)
+
+        self.assertEqual(len(session.calls), 4)
+        self.assertEqual(sleeps, [5, 15, 45])
+
+    def test_other_paginated_sources_do_not_sleep_by_default(self):
+        import online_collect as oc
+
+        session = Session([
+            self.api_page([self.proposal("record-001")], 2, 2),
+            self.api_page([self.proposal("record-002")], 2, 2),
+        ])
+        sleeps = []
+        records, _ = oc.paginated_api(
+            session, oc.API_S007, {}, source_id="S-007", sleep_fn=sleeps.append,
+        )
+        self.assertEqual(len(records), 2)
+        self.assertEqual(sleeps, [])
+        self.assertTrue(all("keywordList" not in call[1]["params"] for call in session.calls))
+
+    def test_s009_rejects_total_count_changes_between_pages(self):
+        import online_collect as oc
+
+        session = Session([
+            self.api_page([self.proposal("proposal-001")], 2, 2),
+            self.api_page([self.proposal("proposal-002")], 3, 2),
+        ])
+        with self.assertRaisesRegex(ValueError, "inconsistent API totalCount"):
+            oc.collect_s009(session, date(2026, 9, 29), date(2026, 10, 4), sleep_fn=lambda _: None)
+        self.assertEqual(len(session.calls), 2)
+
     def test_observed_undated_schema_cannot_prove_zero_items_in_date_window(self):
         result = self.collect()
         self.assertEqual(result["source_health"], "PASS")
@@ -280,7 +388,7 @@ class ProposalDateTruthTests(unittest.TestCase):
             ("S-009", oc.collect_s009, oc.API_S009),
         ):
             with self.subTest(source_id=source_id):
-                payload = {"success": True, "data": {"data": [], "totalPages": 1, "totalCount": 108}}
+                payload = {"success": True, "data": {"data": [], "totalPages": 1, "totalCount": 2}}
                 session = Session([Response(url, content=json.dumps(payload).encode())])
                 with self.assertRaisesRegex(ValueError, "API count mismatch"):
                     collector(session, date(2026, 9, 29), date(2026, 10, 4))
