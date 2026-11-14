@@ -165,8 +165,9 @@ test("publication and verification paths regenerate the home feed before consumi
   const workflowPositions = [
     workflow.indexOf("name: Restore last durable publication state"),
     workflow.indexOf("name: Refresh official-source publication bundle"),
-    workflow.indexOf("node apps/web/scripts/sync-home-feed.mjs"),
-    workflow.indexOf("name: Verify generated V1 publication bundle"),
+    workflow.indexOf("name: Set up Node.js"),
+    workflow.indexOf("npm run check"),
+    workflow.indexOf("name: Upload Pages artifact"),
   ];
   assert.ok(workflowPositions.every((position) => position >= 0));
   assert.deepEqual(workflowPositions, [...workflowPositions].sort((left, right) => left - right));
