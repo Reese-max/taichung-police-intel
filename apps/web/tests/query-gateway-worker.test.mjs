@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import test, { after } from "node:test";
 import { createGovernedPolicyFixture } from "./governed-policy-fixture.mjs";
+import { createLegacyPublicArtifacts, readWorkerEmbeddedRetentionBinding } from "./legacy-policy-fixture.mjs";
 const governedFixture = await createGovernedPolicyFixture();
 after(() => governedFixture.cleanup());
 const { default: worker, buildSnapshot, createReleaseManifest } = await governedFixture.loadWorker("suite");
@@ -273,14 +274,20 @@ test("served schema2 cannot self-authorize different public fields or a mixed go
   await assert.rejects(buildSnapshot(env, read), /governed policy binding mismatch/);
 });
 
-test("current legacy1 and unknown-rights2 keep health but refuse CURRENT formal answers", async () => {
+test("legacy public artifacts keep health but refuse answers without restoring the Worker-embedded retention binding", async () => {
+  // The legacy fixture restores only source policy and public artifacts, not the Worker-embedded retention binding.
+  const retentionBinding = await readWorkerEmbeddedRetentionBinding();
+  assert.equal(retentionBinding.policy_version, 3);
+  assert.equal(retentionBinding.rights_status, "OWNER_ASSERTED_PERMISSION");
+  assert.equal(retentionBinding.review_required, true);
   for (const kind of ["legacy1", "unknown2"]) {
     const fixture = await createGovernedPolicyFixture({ rightsReviewed: false });
     try {
       const values = await fixture.publication();
       let module = await fixture.loadWorker(`rights-denied-${kind}`);
       if (kind === "legacy1") {
-        values["source-policy.json"] = await readFile(new URL("../../../docs/govintel/source-policy.approved.json", import.meta.url));
+        Object.assign(values, await createLegacyPublicArtifacts());
+        assert.equal(Object.hasOwn(JSON.parse(values["source-policy.json"].toString("utf8")), "active_sources"), false);
         module = await import("../../../workers/query-gateway/src/index.js?actual-legacy-refusal");
       }
       const snapshot = await module.buildSnapshot(env, async name => ({ bytes: values[name], hash: createHash("sha256").update(values[name]).digest("hex") }));

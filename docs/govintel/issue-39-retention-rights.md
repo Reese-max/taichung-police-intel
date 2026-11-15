@@ -42,6 +42,17 @@ layer 的規則會**優先於** class：`raw_snapshot`／`normalized_document` �
 
 class 的欄位集合是**精確比對**：多一個或少一個欄位都會讓 compile 失敗，避免未知欄位在 merge 時蓋掉 source 層事實（`terms_url`、`data_types`）。
 
+## AI 覆核者（2026-11-13 擁有者決定）
+
+專案擁有者於 2026-11-13 決定：來源權利覆核可由 AI agent 擔任決定者，不再強制真人覆核。
+
+- `source_reviews[source_id]` 必須恰好帶 `human_review` 或 `ai_review` 其中一個。
+- `ai_review` 記錄 `agent`、`model`、`delegated_by`、`delegation_recorded_at`、`reviewed_at`；授權時間不得晚於覆核時間。
+- AI 覆核通過的來源標為 `AI_REVIEWED_SOURCE_TERMS`，與 `HUMAN_REVIEWED_SOURCE_TERMS` 分開，不會把 AI 的決定寫成真人。
+- 原始條款證據（網址、HTTP 200、body SHA-256、定位、授權範圍）、catalog 綁定、例外覆核與出處標示的檢查完全相同。
+- 這不是法律判斷，也不放寬用途：覆核只能核准 metadata／連結，`full_text_allowed`、`excerpt_allowed` 仍為 `false`。
+- 本次未新增任何來源覆核紀錄；`AI_REVIEWED_SOURCE_TERMS` 會在第一筆 AI 覆核寫入政策檔時一併宣告，因此現行 `policy_hash` 不變。
+
 ## 撤稿與歷史留存
 
 官方來源把頁面拿掉不代表 GovIntel 假裝它從未存在。`project_public_record()` 在 `source_available: false` 時：

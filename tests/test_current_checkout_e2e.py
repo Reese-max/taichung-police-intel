@@ -11,7 +11,7 @@ import urllib.error
 import urllib.request
 from unittest.mock import patch
 
-from governed_policy_fixture import make_governed_policy_fixture
+from governed_policy_fixture import make_governed_policy_fixture, make_legacy_policy_fixture
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "verify-current-checkout.py"
@@ -191,7 +191,8 @@ class DependencyInstallTests(unittest.TestCase):
             inherited = {"NEXT_PUBLIC_QUERY_GATEWAY_URL": "https://other-deployment.invalid/query",
                          "NEXT_PUBLIC_RELEASE_CODE_SHA": "f" * 40,
                          "PAGES_BASE_PATH": "/different-site", "NEXT_PUBLIC_BASE_PATH": "/different-site"}
-            with patch.dict(vc.os.environ, inherited), patch.object(vc, "run", side_effect=install), \
+            build_environment = {**vc.os.environ, **inherited}
+            with patch.object(vc.os, "environ", build_environment), patch.object(vc, "run", side_effect=install), \
                     patch.object(vc.subprocess, "run", return_value=build) as built:
                 result = vc.build_web_site(root, root / "logs")
 
@@ -275,9 +276,14 @@ class CandidateContextTests(unittest.TestCase):
     def test_policy_p0_set_matches_query_store(self):
         policy = self.ctx["policy"]
         qs = self.modules["query_store"]
-        self.assertEqual(policy["active_source_ids"], qs.load_current_policy()["active_source_ids"])
-        self.assertEqual(policy["policy_version"], 1)
+        current = qs.load_current_policy()
+        self.assertEqual(policy["active_source_ids"], current["active_source_ids"])
+        self.assertEqual(policy["schema_version"], 2)
+        self.assertEqual(policy["policy_version"], current["policy_version"])
         self.assertRegex(policy["policy_hash"], r"^[0-9a-f]{64}$")
+        self.assertEqual(self.ctx["formal_admission"]["status"], "ADMITTED")
+        self.assertEqual(self.ctx["formal_admission"]["blocked_sources"], [])
+        self.assertGreater(len(self.ctx["store"]["items"]), 0)
 
     def test_store_generation_binds_all_canonical_hashes(self):
         temporary, _, reviewed = governed_context()
@@ -504,10 +510,14 @@ class ServerTests(unittest.TestCase):
         self.assertNotEqual(health["lanes"]["publication"], "HEALTHY")
 
 
-class CurrentUnreviewedGovernanceTests(unittest.TestCase):
-    def test_actual_current_policy_refuses_formal_rows_and_bounded_zero(self):
-        modules = vc.load_checkout_modules(ROOT)
-        ctx = vc.build_candidate_context(ROOT, modules)
+class GovernanceAdmissionTests(unittest.TestCase):
+    def test_legacy_policy_fixture_refuses_formal_rows_and_bounded_zero(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        fixture = make_legacy_policy_fixture(Path(directory.name) / "legacy", source_root=ROOT)
+        self.addCleanup(fixture["cleanup"])
+        modules = vc.load_checkout_modules(fixture["root"])
+        ctx = vc.build_candidate_context(fixture["root"], modules)
         self.assertEqual(ctx["policy"]["schema_version"], 1)
         self.assertEqual(ctx["formal_admission"]["status"], "UNKNOWN")
         self.assertEqual(ctx["store"]["items"], [])
@@ -529,6 +539,25 @@ class CurrentUnreviewedGovernanceTests(unittest.TestCase):
                 self.assertEqual(len(doc["sources"]), 5)
             finally:
                 server.shutdown(); server.server_close()
+
+    def test_actual_governed_policy_admits_only_whitelisted_public_fields(self):
+        modules = vc.load_checkout_modules(ROOT)
+        ctx = vc.build_candidate_context(ROOT, modules)
+        self.assertEqual(ctx["formal_admission"]["status"], "ADMITTED")
+        self.assertEqual(ctx["formal_admission"]["blocked_sources"], [])
+        self.assertGreater(len(ctx["store"]["items"]), 0)
+        allowed_fields = {
+            row["source_id"]: set(row["rights_retention_public_policy_refs"]["public_fields"])
+            for row in ctx["policy"]["active_sources"]
+        }
+        system_fields = {
+            "record_type", "canonical_id", "source_role", "trust_tier",
+            "verification_status", "canonical_ref",
+        }
+        for row in ctx["store"]["items"]:
+            self.assertLessEqual(set(row) - system_fields, allowed_fields[row["source_id"]])
+            self.assertNotIn("full_text", row)
+            self.assertNotIn("excerpt", row)
 
     def test_metadata_review_alone_does_not_authorize_a_derived_brief(self):
         temporary, modules, ctx = governed_context()

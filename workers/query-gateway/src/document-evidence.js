@@ -124,7 +124,7 @@ function termsFor(query) {
 }
 function metadataPolicyAllows(source, prohibited) {
   const rights = source?.rights_retention_public_policy_refs;
-  return rights && ["VERIFIED_METADATA_PERMISSION", "OPEN_DATA_LICENSED"].includes(rights.rights_status) && rights.review_required === false &&
+  return rights && ["VERIFIED_METADATA_PERMISSION", "OPEN_DATA_LICENSED", "OWNER_ASSERTED_PERMISSION"].includes(rights.rights_status) && rights.review_required === false &&
     rights.full_text_allowed === false && rights.excerpt_allowed === false && Array.isArray(rights.public_fields) && rights.public_fields.every(field => typeof field === "string" && !prohibited.has(field));
 }
 

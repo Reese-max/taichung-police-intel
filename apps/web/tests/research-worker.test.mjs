@@ -4,6 +4,7 @@ import test from 'node:test';
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { createGovernedPolicyFixture } from './governed-policy-fixture.mjs';
+import { createLegacyPublicArtifacts, readWorkerEmbeddedRetentionBinding } from './legacy-policy-fixture.mjs';
 import { parseResearchInput, researchProviderState, selectResearchSources, readBoundedJson, RESEARCH_LIMITS } from '../../../workers/query-gateway/src/research.js';
 import { buildSnapshot, executeResearch } from '../../../workers/query-gateway/src/index.js';
 const input = { question: '測試官方標題', public_data_only: true };
@@ -65,9 +66,39 @@ test('upstream errors never reflect credentials or provider body and never retry
   await assert.rejects(selectResearchSources(parseResearchInput(input), [source], env(), request(), async () => { calls++; return new Response('OFFLINE_FAKE_KEY SECRET_PROVIDER_TEXT', { status: 429 }); }), error => error.code === 'PROVIDER_UNAVAILABLE' && !error.message.includes('SECRET') && !error.message.includes('FAKE_KEY'));
   assert.equal(calls, 1);
 });
-test('real checked-in governance is blocked, returns no sources and performs no AI calls', async () => {
+test('current governed publication admits formal metadata', async () => {
   const root = new URL('../public/data/', import.meta.url);
   const snapshot = await buildSnapshot({ PUBLIC_ORIGIN: 'https://example.test' }, async name => { const bytes = await readFile(new URL(name, root)); return { bytes, hash: createHash('sha256').update(bytes).digest('hex') }; });
+  assert.equal(snapshot.formalAdmission.status, 'ADMITTED');
+  assert.deepEqual(snapshot.formalAdmission.blocked_sources, []);
+  assert.ok(snapshot.items.length > 0);
+  const allowed = new Map(snapshot.policy.active_sources.map(row => [
+    row.source_id, new Set(row.rights_retention_public_policy_refs.public_fields),
+  ]));
+  const system = new Set(['record_type', 'canonical_id', 'source_role', 'trust_tier', 'verification_status', 'canonical_ref']);
+  for (const row of snapshot.items) {
+    assert.ok([...Object.keys(row)].filter(key => !system.has(key)).every(key => allowed.get(row.source_id).has(key)));
+    for (const field of ['full_text', 'excerpt', 'body']) assert.equal(Object.hasOwn(row, field), false, field);
+  }
+});
+test('legacy policy/publication fixture is blocked without restoring the Worker-embedded retention binding', async () => {
+  // This fixture restores only source policy and public artifacts; it does not restore the Worker-embedded retention binding.
+  const artifacts = await createLegacyPublicArtifacts();
+  const publicPolicy = JSON.parse(artifacts['source-policy.json'].toString('utf8'));
+  assert.deepEqual(Object.keys(publicPolicy).sort(), [
+    'active_source_ids', 'catalog_hash', 'catalog_schema_version', 'catalog_updated_at',
+    'policy_hash', 'policy_version', 'schema_version',
+  ]);
+  assert.equal(Object.hasOwn(publicPolicy, 'active_sources'), false);
+  const retentionBinding = await readWorkerEmbeddedRetentionBinding();
+  assert.equal(retentionBinding.policy_version, 3);
+  assert.equal(retentionBinding.rights_status, 'OWNER_ASSERTED_PERMISSION');
+  assert.equal(retentionBinding.review_required, true);
+  assert.equal(retentionBinding.full_text_allowed, false);
+  assert.equal(retentionBinding.excerpt_allowed, false);
+  const snapshot = await buildSnapshot({ PUBLIC_ORIGIN: 'https://example.test' }, async name => {
+    const bytes = artifacts[name]; return { bytes, hash: createHash('sha256').update(bytes).digest('hex') };
+  });
   let calls = 0;
   const result = await executeResearch(snapshot, input, env(), request(), async () => { calls++; });
   assert.equal(result.reason_code, 'RIGHTS_BLOCKED'); assert.equal(result.status, 'METADATA_ONLY');

@@ -2954,6 +2954,20 @@
     }
   ],
   "schema_version": 1,
+  "source_policy": {
+    "active_source_ids": [
+      "S-004",
+      "S-006",
+      "S-007",
+      "S-009",
+      "S-029"
+    ],
+    "catalog_hash": "5088623df5af4b8a30f4c597c51235c0f36a3dfd8bc4f2aea9af8f26d10213ef",
+    "governance_hash": "640d40cf18e32e561273d9525c7235888aa931a8c5be9f29700ae880d8b6f09d",
+    "policy_hash": "f027315e3fcb17d2e8825ad5d797a7c7aa60113e1a2562880f9a6bc6b8aaa62b",
+    "policy_version": 2,
+    "retention_policy_hash": "6a52c17625af49cf4b618bbcd22a4909c23df3efd2f92ff70ae2935e8643cf13"
+  },
   "source_summary": {
     "S-004": {
       "freshness": "STALE",

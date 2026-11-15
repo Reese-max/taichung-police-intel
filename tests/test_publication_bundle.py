@@ -31,8 +31,11 @@ EXPECTED_SOURCES = {"S-004"}
 
 
 def valid_bundle():
+    policy_module, policy = module.load_source_policy()
+    source_policy = policy_module.policy_binding(policy)
     status = {
         "schema_version": 1,
+        "source_policy": source_policy,
         "mode": "COMPETITION_DEMO",
         "generated_at": "2026-09-11T08:23:26+08:00",
         "latest_collection_run": {"collection_run_id": "CR-1"},
@@ -60,6 +63,7 @@ def valid_bundle():
     }
     feed = {
         "schema_version": 1,
+        "source_policy": source_policy,
         "generated_at": "2026-09-11T08:23:26+08:00",
         "collection_run_id": "CR-1",
         "items": [
@@ -79,6 +83,7 @@ def valid_bundle():
     }
     summary = {
         "schema_version": 1,
+        "source_policy": source_policy,
         "generated_at": "2026-09-11T08:23:26+08:00",
         "collection_run_id": "CR-1",
         "total_items": 1,
