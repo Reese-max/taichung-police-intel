@@ -1,6 +1,12 @@
+import csv
 import importlib.util
+import json
 from pathlib import Path
+import subprocess
+import sys
+import tempfile
 import unittest
+from unittest import mock
 
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts/verify-publication-bundle.py"
@@ -164,6 +170,52 @@ class BundleRoleStatusTests(unittest.TestCase):
 
 
 class PublicationBundleTests(unittest.TestCase):
+    def test_publication_workflow_builds_v2_before_checking_the_whole_bundle(self):
+        workflow = (SCRIPT.parents[1] / ".github/workflows/pages.yml").read_text(encoding="utf-8")
+        build_v2 = workflow.index("- name: Build persistent V2 daily intelligence")
+        verify_bundle = workflow.index("- name: Verify generated V1 publication bundle")
+        verify_v2 = workflow.index("- name: Verify persistent V2 publication")
+        persist = workflow.index("- name: Persist pending V1 and V2 state outside protected main")
+        self.assertLess(build_v2, verify_bundle)
+        self.assertLess(verify_bundle, verify_v2)
+        self.assertLess(verify_v2, persist)
+
+    def test_new_v2_brief_replaces_old_policy_before_full_bundle_verification(self):
+        root = SCRIPT.parents[1]
+        data = root / "apps/web/public/data"
+        status = json.loads((data / "source-status.json").read_text(encoding="utf-8"))
+        feed = json.loads((data / "intelligence-feed.json").read_text(encoding="utf-8"))
+        summary = json.loads((data / "intelligence-summary.json").read_text(encoding="utf-8"))
+        with (data / "feed-export.csv").open(encoding="utf-8-sig", newline="") as handle:
+            rows = list(csv.DictReader(handle))
+        catalog = module.load_catalog()
+        expected = module.load_expected_sources()
+        stale_brief = json.loads((data / "v2-daily-brief.json").read_text(encoding="utf-8"))
+        stale_brief.pop("source_policy", None)
+        with mock.patch.object(module, "load_json", return_value=stale_brief):
+            errors = module.bundle_errors(status, feed, summary, rows, catalog, expected)
+        self.assertIn("publication artifacts have mixed or missing governed policy bindings", errors)
+
+        with tempfile.TemporaryDirectory() as directory:
+            temp = Path(directory)
+            state, handoff, brief = (temp / name for name in ("state.json", "handoff.json", "brief.json"))
+            subprocess.run([
+                sys.executable, "-X", "utf8", str(root / "scripts/build-v2-shadow-brief.py"),
+                "--input", str(data / "intelligence-feed.json"),
+                "--source-status", str(data / "source-status.json"),
+                "--state", str(state), "--handoff-state", str(handoff),
+                "--output", str(brief), "--reset-baseline",
+            ], cwd=root, check=True, capture_output=True, text=True)
+            generated = json.loads(brief.read_text(encoding="utf-8"))
+            with mock.patch.object(module, "load_json", return_value=generated):
+                self.assertEqual(module.bundle_errors(status, feed, summary, rows, catalog, expected), [])
+            subprocess.run([
+                sys.executable, "-X", "utf8", str(root / "scripts/verify-v2-publication.py"),
+                "--feed", str(data / "intelligence-feed.json"),
+                "--status", str(data / "source-status.json"),
+                "--state", str(state), "--handoff-state", str(handoff), "--brief", str(brief),
+            ], cwd=root, check=True, capture_output=True, text=True)
+
     def test_source_rows_are_not_silently_filtered(self):
         with self.assertRaisesRegex(ValueError, "only objects"):
             module.source_ids([{"source_id": "S-004"}, None])
