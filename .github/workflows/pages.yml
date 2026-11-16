@@ -117,10 +117,6 @@ jobs:
             --demo-output apps/web/public/data/source-status.json \
             --trigger "${{ github.event_name == 'schedule' && 'schedule' || 'manual' }}"
 
-      - name: Verify generated V1 publication bundle
-        id: v1
-        run: python -X utf8 scripts/verify-publication-bundle.py --require-candidate-lane
-
       - name: Build persistent V2 daily intelligence
         id: v2
         shell: bash
@@ -142,6 +138,12 @@ jobs:
           else
             echo "Using the restored durable V2 publication for this code-only push."
           fi
+
+      # The bundle verifier checks the governed policy binding on V1 and V2.
+      # V2 must belong to this collection before that full check can pass.
+      - name: Verify generated V1 publication bundle
+        id: v1
+        run: python -X utf8 scripts/verify-publication-bundle.py --require-candidate-lane
 
       - name: Verify persistent V2 publication
         id: v2_verify
