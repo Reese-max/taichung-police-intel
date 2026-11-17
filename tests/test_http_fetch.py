@@ -1,0 +1,163 @@
+import unittest
+from datetime import datetime, timedelta, timezone
+from email.utils import format_datetime
+from unittest.mock import Mock, patch
+
+import requests
+
+from intel_v2 import http_fetch as http
+
+
+URL = "https://official.test/start"
+HOSTS = {"official.test"}
+
+
+def response(status=200, *, url=URL, body=b"ok", headers=None, chunks=None):
+    result = requests.Response()
+    result.status_code = status
+    result.url = url
+    result._content = body
+    result._content_consumed = True
+    result.headers.update(headers or {})
+    result.close = Mock()
+    if chunks is not None:
+        result.iter_content = Mock(return_value=iter(chunks))
+    return result
+
+
+class HttpFetchTests(unittest.TestCase):
+    def setUp(self):
+        state = patch.object(http, "_last_request", {})
+        state.start()
+        self.addCleanup(state.stop)
+
+    def test_rejects_unapproved_https_port_and_credentials_before_send(self):
+        for url in ("http://official.test/", "https://official.test:444/", "https://other.test/",
+                    "https://user@official.test/", "https://@official.test/"):
+            session = Mock()
+            with self.subTest(url=url), self.assertRaisesRegex(RuntimeError, "非白名單來源"):
+                http.get(session, url, HOSTS, bearer_token="private-token")
+            session.get.assert_not_called()
+
+    def test_redirect_escape_never_receives_token(self):
+        redirect = response(302, headers={"Location": "https://outside.test/"})
+        session = Mock(get=Mock(return_value=redirect))
+        with self.assertRaisesRegex(RuntimeError, "非白名單來源"):
+            http.get(session, URL, HOSTS, bearer_token="private-token")
+        session.get.assert_called_once_with(URL, timeout=60, allow_redirects=False,
+                                            headers={"Authorization": "Bearer private-token"})
+        redirect.close.assert_called()
+
+    def test_token_is_not_forwarded_even_to_a_second_allowlisted_host(self):
+        session = Mock(get=Mock(side_effect=[response(302, headers={"Location": "https://cdn.test/file"}),
+                                            response(url="https://cdn.test/file")]))
+        result = http.get(session, URL, HOSTS | {"cdn.test"}, bearer_token="private-token")
+        self.assertNotIn("headers", session.get.call_args_list[1].kwargs)
+        self.assertEqual(result._govintel_requested_url, URL)
+
+    def test_redirect_budget_is_three_and_default_call_is_unchanged(self):
+        session = Mock(get=Mock(side_effect=[response(302, headers={"Location": "/next"}) for _ in range(4)]))
+        with self.assertRaisesRegex(RuntimeError, "redirect budget exhausted"):
+            http.get(session, URL, HOSTS)
+        self.assertEqual(session.get.call_count, 4)
+        self.assertEqual(session.get.call_args_list[0].kwargs, {"timeout": 60, "allow_redirects": False})
+
+    def test_success_after_three_redirects_and_response_url_revalidated(self):
+        replies = [response(302, headers={"Location": "/next"}) for _ in range(3)]
+        session = Mock(get=Mock(side_effect=replies + [response(url="https://official.test/next")]))
+        self.assertEqual(http.get(session, URL, HOSTS)._govintel_requested_url, URL)
+        invalid = response(url="https://outside.test/final")
+        with self.assertRaisesRegex(RuntimeError, "非白名單來源"):
+            http.get(Mock(get=Mock(return_value=invalid)), URL, HOSTS)
+        invalid.close.assert_called()
+
+    def test_retry_after_seconds_date_and_cap(self):
+        now = datetime(2026, 11, 17, tzinfo=timezone.utc)
+        for value, expected in (("8", 8), ("999", 60),
+                                (format_datetime(now + timedelta(seconds=12), usegmt=True), 12),
+                                ("bad-date", 1), ("-2", 1)):
+            session = Mock(get=Mock(side_effect=[response(429, headers={"Retry-After": value}), response()]))
+            with self.subTest(value=value), patch.object(http, "datetime") as clock, patch.object(http.time, "sleep") as sleep:
+                clock.now.return_value = now
+                http.get(session, URL, HOSTS)
+                sleep.assert_called_once_with(expected)
+
+    def test_retry_5xx_empty_and_connection_errors_but_not_4xx(self):
+        for bad in (response(503), response(body=b""), requests.ConnectionError("offline")):
+            session = Mock(get=Mock(side_effect=[bad, response()]))
+            with self.subTest(bad=bad), patch.object(http.time, "sleep") as sleep:
+                self.assertEqual(http.get(session, URL, HOSTS).content, b"ok")
+                sleep.assert_called_once_with(1)
+        session = Mock(get=Mock(return_value=response(403)))
+        with self.assertRaises(requests.HTTPError):
+            http.get(session, URL, HOSTS)
+        self.assertEqual(session.get.call_count, 1)
+        session = Mock(get=Mock(side_effect=[response(500) for _ in range(3)]))
+        with patch.object(http.time, "sleep"), self.assertRaises(requests.HTTPError):
+            http.get(session, URL, HOSTS)
+        self.assertEqual(session.get.call_count, 3)
+
+    def test_interval_shared_between_calls_and_sessions_but_separate_hosts(self):
+        now = [100.0]
+        def sleep(seconds):
+            now[0] += seconds
+        with patch.object(http.time, "monotonic", side_effect=lambda: now[0]), patch.object(http.time, "sleep", side_effect=sleep) as wait:
+            for url in (URL, URL, "https://second.test/"):
+                http.get(Mock(get=Mock(return_value=response(url=url))), url,
+                         HOSTS | {"second.test"}, min_interval_seconds=3)
+            wait.assert_called_once_with(3)
+
+    def test_stream_limit_enforced_without_content_length_and_closes(self):
+        oversized = response(chunks=[b"12", b"345"])
+        session = Mock(get=Mock(return_value=oversized))
+        with self.assertRaisesRegex(ValueError, "max_bytes"):
+            http.get(session, URL, HOSTS, max_bytes=4)
+        self.assertTrue(session.get.call_args.kwargs["stream"])
+        self.assertEqual(session.get.call_count, 1)
+        oversized.close.assert_called()
+        bounded = response(chunks=[b"12", b"34"])
+        result = http.get(Mock(get=Mock(return_value=bounded)), URL, HOSTS, max_bytes=4)
+        self.assertEqual(result.content, b"1234")
+        bounded.close.assert_called()
+
+    def test_robots_disallow_and_cache(self):
+        fetcher = Mock(return_value="User-agent: *\nDisallow: /api/\nCrawl-delay: 3\n")
+        policy = http.RobotsPolicy(fetcher)
+        session = Mock()
+        for path in ("/api/bills", "/api/meets"):
+            with self.assertRaises(http.RobotsDisallowed):
+                http.get(session, "https://official.test" + path, HOSTS,
+                         robots_policy=policy, bearer_token="private-token")
+        session.get.assert_not_called()
+        fetcher.assert_called_once_with("https://official.test/robots.txt")
+
+    def test_robots_failure_denies_configured_prefix_and_default_denies_all(self):
+        for fetcher in (Mock(side_effect=requests.ConnectionError("offline")), Mock(return_value="<html>error</html>")):
+            policy = http.RobotsPolicy(fetcher, forbidden_prefixes=("/api/",))
+            session = Mock(get=Mock(return_value=response()))
+            with self.assertRaises(http.RobotsDisallowed):
+                http.get(session, "https://official.test/api/bills", HOSTS, robots_policy=policy)
+            http.get(session, URL, HOSTS, robots_policy=policy)
+            self.assertEqual(fetcher.call_count, 1)
+        with self.assertRaises(http.RobotsDisallowed):
+            http.get(Mock(), URL, HOSTS, robots_policy=http.RobotsPolicy(Mock(side_effect=RuntimeError())))
+
+    def test_default_robots_fetch_is_bounded_tokenless_and_crawl_delay_applies(self):
+        robots = b"User-agent: *\nDisallow: /api/\nCrawl-delay: 3\n"
+        session = Mock(get=Mock(side_effect=[response(url="https://official.test/robots.txt", chunks=[robots]), response()]))
+        with patch.object(http.time, "monotonic", return_value=100), patch.object(http.time, "sleep") as sleep:
+            http.get(session, URL, HOSTS, bearer_token="private-token", robots_policy=http.RobotsPolicy())
+        self.assertNotIn("headers", session.get.call_args_list[0].kwargs)
+        self.assertTrue(session.get.call_args_list[0].kwargs["stream"])
+        sleep.assert_called_once_with(3)
+
+    def test_robots_rechecked_after_redirect(self):
+        policy = http.RobotsPolicy(Mock(return_value="User-agent: *\nDisallow: /api/\n"))
+        session = Mock(get=Mock(return_value=response(302, headers={"Location": "/api/bills"})))
+        with self.assertRaises(http.RobotsDisallowed):
+            http.get(session, URL, HOSTS, robots_policy=policy)
+        self.assertEqual(session.get.call_count, 1)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -9,16 +9,17 @@ import hashlib
 import io
 import json
 import re
-import time
 from collections import Counter
 from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
-from urllib.parse import parse_qs, urljoin, urlparse
+from urllib.parse import parse_qs, urlparse
 from zoneinfo import ZoneInfo
 
 import requests
 from bs4 import BeautifulSoup
+
+from intel_v2.http_fetch import get
 
 
 TZ = ZoneInfo("Asia/Taipei")
@@ -40,8 +41,6 @@ POPULATION_FIELDS = {
     "女_共同事業戶", "男_單獨生活戶", "女_單獨生活戶",
 }
 FRAUD_FIELDS = {"民國年月", "網域", "網站性質", "法律依據", "聲請單位"}
-REDIRECT_STATUSES = {301, 302, 303, 307, 308}
-MAX_REDIRECTS = 3
 
 
 def sha256(data: bytes) -> str:
@@ -51,55 +50,6 @@ def sha256(data: bytes) -> str:
 def manifest_sha256(value: object) -> str:
     body = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return sha256(body)
-
-
-def _approved_url(url: str, allowed_hosts: set[str]) -> None:
-    try:
-        parsed = urlparse(url)
-        port = parsed.port
-    except ValueError as error:
-        raise RuntimeError(f"網址格式無效：{url}") from error
-    if (
-        parsed.scheme.lower() != "https"
-        or parsed.hostname is None
-        or parsed.hostname.lower().rstrip(".") not in {host.lower().rstrip(".") for host in allowed_hosts}
-        or parsed.username
-        or parsed.password
-        or port not in (None, 443)
-    ):
-        raise RuntimeError(f"非白名單來源：{url}")
-
-
-def get(session: requests.Session, url: str, allowed_hosts: set[str], timeout: int = 60) -> requests.Response:
-    _approved_url(url, allowed_hosts)
-    last_error: requests.RequestException | None = None
-    for attempt in range(3):
-        current_url = url
-        try:
-            for _ in range(MAX_REDIRECTS + 1):
-                _approved_url(current_url, allowed_hosts)
-                response = session.get(current_url, timeout=timeout, allow_redirects=False)
-                _approved_url(str(response.url or current_url), allowed_hosts)
-                if response.status_code in REDIRECT_STATUSES:
-                    location = response.headers.get("location")
-                    response.close()
-                    if not location:
-                        raise RuntimeError("redirect response 沒有 location")
-                    current_url = urljoin(current_url, location)
-                    continue
-                response.raise_for_status()
-                if not response.content:
-                    raise requests.RequestException("HTTP 成功但內容為空")
-                response._govintel_requested_url = url
-                return response
-            raise RuntimeError("redirect budget exhausted")
-        except requests.RequestException as exc:
-            last_error = exc
-            status = exc.response.status_code if exc.response is not None else None
-            if attempt == 2 or (status is not None and status != 429 and status < 500):
-                raise
-            time.sleep(attempt + 1)
-    raise RuntimeError(f"取得失敗：{url}：{last_error}")
 
 
 def response_evidence(response: requests.Response) -> dict:
