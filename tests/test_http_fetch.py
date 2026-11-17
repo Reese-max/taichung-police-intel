@@ -132,7 +132,7 @@ class HttpFetchTests(unittest.TestCase):
         fetcher.assert_called_once_with("https://official.test/robots.txt")
 
     def test_robots_failure_denies_all_even_for_open_api(self):
-        for fetcher in (Mock(side_effect=requests.ConnectionError("offline")), Mock(return_value="<html>error</html>")):
+        for fetcher in (Mock(side_effect=requests.ConnectionError("offline")), Mock(return_value="User-agent *\nDisallow /")):
             policy = http.RobotsPolicy(fetcher, documented_open_api=True)
             session = Mock(get=Mock(return_value=response()))
             for url in (URL, "https://official.test/api/bills"):
@@ -153,6 +153,7 @@ class HttpFetchTests(unittest.TestCase):
                 (429, b"", False, True, "NO_ROBOTS_RESOURCE"),
                 (500, b"", True, True, "ROBOTS_SERVER_ERROR_OPEN_API_ALLOWED"),
                 (503, b"", False, False, "ROBOTS_SERVER_ERROR"),
+                (200, b"<!doctype html><html>SPA fallback</html>", False, True, "HTML_NOT_ROBOTS"),
                 (200, b"User-agent: *\nDisallow: /", True, False, "PARSED")):
             with self.subTest(status=status, open_api=open_api, body=body):
                 policy = http.RobotsPolicy(documented_open_api=open_api)
@@ -193,6 +194,16 @@ class HttpFetchTests(unittest.TestCase):
             with self.subTest(location=location), self.assertRaises(http.RobotsDisallowed):
                 http.RobotsPolicy(documented_open_api=True).check(session, URL, HOSTS, 10)
             self.assertEqual(session.get.call_count, count)
+
+    def test_robots_same_host_http_redirect_is_upgraded_to_https(self):
+        robots_url = "https://official.test/robots.txt"
+        replies = [response(302, url=robots_url, headers={"Location": "http://official.test/home"}),
+                   response(200, url="https://official.test/home", body=b"<html>home</html>")]
+        session = Mock(get=Mock(side_effect=replies))
+        policy = http.RobotsPolicy()
+        self.assertEqual(policy.check(session, URL, HOSTS, 10), 0)
+        self.assertEqual(session.get.call_args_list[1].args[0], "https://official.test/home")
+        self.assertEqual(policy._cache["official.test"][0], "HTML_NOT_ROBOTS")
 
     def test_robots_body_limit_is_fail_closed(self):
         reply = response(url="https://official.test/robots.txt", chunks=[b"x" * (http.RobotsPolicy.MAX_BYTES + 1)])

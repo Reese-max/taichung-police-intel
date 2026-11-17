@@ -204,7 +204,9 @@ class PreflightTests(unittest.TestCase):
         row = preflight.observation("https://example.org/robots.txt", "HTTP_ERROR")
         row["http_status"] = 404
         self.assertEqual(preflight.robots_policy(row), ("NO_ROBOTS_RESOURCE", None))
-        for body in ("<html>home</html>", "oops", "User-agent: *\nDisallow: /*.pdf$", "User-agent: *\nAllow: /\nDisallow: /private"):
+        row.update(status="OK", http_status=200, robots_content="<html>home</html>")
+        self.assertEqual(preflight.robots_policy(row), ("HTML_NOT_ROBOTS", None))
+        for body in ("oops", "User-agent: *\nDisallow: /*.pdf$", "User-agent: *\nAllow: /\nDisallow: /private"):
             row.update(status="OK", http_status=200, robots_content=body)
             self.assertEqual(preflight.robots_policy(row), ("UNVERIFIED", None))
 

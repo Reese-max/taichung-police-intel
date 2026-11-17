@@ -73,7 +73,7 @@ class RobotsPolicy:
 
     MAX_REDIRECTS = 5
     MAX_BYTES = 256 * 1024
-    ALLOWED = {"PARSED", "EMPTY_ROBOTS", "NO_ROBOTS_RESOURCE",
+    ALLOWED = {"PARSED", "EMPTY_ROBOTS", "NO_ROBOTS_RESOURCE", "HTML_NOT_ROBOTS",
                "ROBOTS_SERVER_ERROR_OPEN_API_ALLOWED"}
 
     def __init__(self, fetcher=None, *, user_agent="*", documented_open_api=False):
@@ -96,7 +96,8 @@ class RobotsPolicy:
         if not body.strip():
             return "EMPTY_ROBOTS", None
         if body.lstrip().startswith("<"):
-            return "UNVERIFIED", None
+            # RFC 9309: an HTML page (soft 404 / SPA fallback) holds no robots groups, so no rules apply.
+            return "HTML_NOT_ROBOTS", None
         lines = body.splitlines()
         directives = [line.split("#", 1)[0].strip().split(":", 1) for line in lines]
         rules = [(p[0].strip().lower(), p[1].strip()) for p in directives if len(p) == 2]
@@ -115,6 +116,9 @@ class RobotsPolicy:
         if not location or followed >= RobotsPolicy.MAX_REDIRECTS:
             raise RuntimeError("robots redirect missing location or budget exhausted")
         target = urljoin(url, location)
+        parsed = urlparse(target)
+        if parsed.scheme == "http" and parsed.hostname == urlparse(url).hostname and parsed.port is None:
+            target = parsed._replace(scheme="https").geturl()  # same-host downgrade: stay on HTTPS
         _approved_url(target, {urlparse(target).hostname or ""})
         return target
 
