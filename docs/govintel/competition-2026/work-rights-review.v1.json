@@ -287,12 +287,12 @@
     "source_catalog": {
       "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
       "path": "docs/govintel/source-catalog.v2.json",
-      "sha256": "aa30cbd61e76f14d5d9f48402bea46f7c96fb117ae5c3a7e21463a6d1b0b9afa"
+      "sha256": "752f79ff5dc1ed7d0d17d8eddb1d7ed3449bb362056aa3c3ec267bea1b28e042"
     },
     "retention_rights": {
       "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
       "path": "docs/govintel/retention-rights-policy.v1.json",
-      "sha256": "da6fbe0e4fa92b03cab4f6e8069922d2ce5c0f81d32ecfce2e8dccafc9cff218"
+      "sha256": "8fe0ca4ca63ee6b332fedf985dda08df3f2022273625602fdf8f36761edbaf13"
     },
     "source_review": {
       "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
@@ -302,7 +302,7 @@
     "approved_source_policy": {
       "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
       "path": "docs/govintel/source-policy.approved.json",
-      "sha256": "9cc53b2f77a2eb728408214fcab9b04be0662f6893316a52fd28dfb743708e09"
+      "sha256": "322c6cd4ee33fad27ab8271ea62126dc02688c52956cd0f4d5873956e700639d"
     },
     "model_diagnostic": {
       "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",

@@ -277,7 +277,7 @@ test("served schema2 cannot self-authorize different public fields or a mixed go
 test("legacy public artifacts keep health but refuse answers without restoring the Worker-embedded retention binding", async () => {
   // The legacy fixture restores only source policy and public artifacts, not the Worker-embedded retention binding.
   const retentionBinding = await readWorkerEmbeddedRetentionBinding();
-  assert.equal(retentionBinding.policy_version, 3);
+  assert.equal(retentionBinding.policy_version, 4);
   assert.equal(retentionBinding.rights_status, "OWNER_ASSERTED_PERMISSION");
   assert.equal(retentionBinding.review_required, true);
   for (const kind of ["legacy1", "unknown2"]) {

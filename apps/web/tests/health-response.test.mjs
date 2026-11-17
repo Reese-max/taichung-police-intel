@@ -17,7 +17,7 @@ test("health endpoint does not call a stale checked-in snapshot ok", {
   assert.equal(response.status, "stale");
   assert.equal(response.health, "STALE");
   assert.equal(response.can_reassure, false);
-  assert.equal(response.stale_sources, 3);
+  assert.equal(response.stale_sources, 2);
   assert.equal(response.deployment_verified, false);
   assert.equal(response.public_http_verified, false);
   assert.deepEqual(response.policy, PUBLICATION_POLICY_BINDING);

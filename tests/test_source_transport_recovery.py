@@ -167,18 +167,20 @@ class OfficialTransportRecoveryTests(unittest.TestCase):
             output = Path(directory) / "source-status.json"
             output.write_text(json.dumps({
                 "schema_version": 1, "mode": "COMPETITION_DEMO", "sources": [{
-                    "source_id": "S-009", "last_success_at": prior_lkg["completed_at"],
+                    "source_id": "S-007", "last_success_at": prior_lkg["completed_at"],
                     "last_known_good": prior_lkg, "data_as_of": "2026-07-24T00:00:00+08:00",
+                    "data_as_of_basis": "OFFICIAL_API_RECORD_DATE",
+                    "data_as_of_scope": "OBSERVED_API_PAGE",
                     "snapshot_item_count": 35,
                 }],
             }))
             (Path(directory) / "intelligence-feed.json").write_text(json.dumps({"items": [{
-                "source_id": "S-009", "stable_id": "prior-police-report", "title": "official report",
+                "source_id": "S-007", "stable_id": "prior-council-record", "title": "fictional official API record",
                 "content_sha256": "b" * 64, "published_at": "2026-07-24T00:00:00+08:00",
             }]}))
-            failed = response(canary.S026_CURRENT_URL, 503)
+            failed = response(oc.P0_SOURCES["S-007"][1], 503)
             error = requests.HTTPError("503 upstream timeout", response=failed)
-            with mock.patch.object(oc, "P0_SOURCES", {"S-009": oc.P0_SOURCES["S-009"]}), mock.patch.object(
+            with mock.patch.object(oc, "P0_SOURCES", {"S-007": oc.P0_SOURCES["S-007"]}), mock.patch.object(
                 oc, "collect_source", side_effect=error
             ), contextlib.redirect_stdout(io.StringIO()):
                 state = oc.build_demo_status(output, "MORNING", date(2026, 10, 5), "manual")
@@ -191,6 +193,8 @@ class OfficialTransportRecoveryTests(unittest.TestCase):
         self.assertEqual(source["last_known_good"], prior_lkg)
         self.assertEqual(source["last_success_at"], prior_lkg["completed_at"])
         self.assertEqual(source["data_as_of"], "2026-07-24T00:00:00+08:00")
+        self.assertEqual(source["data_as_of_basis"], "OFFICIAL_API_RECORD_DATE")
+        self.assertEqual(source["data_as_of_scope"], "OBSERVED_API_PAGE")
         self.assertEqual(feed["items"][0]["change_type"], "LKG")
         self.assertEqual(feed["items"][0]["eligibility"], "INELIGIBLE_SOURCE_FAILED")
 

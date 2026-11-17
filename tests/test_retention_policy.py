@@ -276,7 +276,7 @@ class RetentionPolicyTests(unittest.TestCase):
 
     def test_versioned_matrix_covers_every_declared_data_type_and_layer(self):
         compiled = retention.compile_policy()
-        self.assertEqual(compiled["policy_version"], 3)
+        self.assertEqual(compiled["policy_version"], 4)
         matrix = compiled["data_types"]
         self.assertEqual(
             set(matrix),
@@ -409,7 +409,7 @@ class RetentionPolicyTests(unittest.TestCase):
     def test_unknown_rights_cannot_be_declared_an_open_license(self):
         policy = self.unknown_rights_policy()
         unknown_sources = retention.compile_policy(policy=policy)["source_policies"]
-        self.assertEqual(len(unknown_sources), 20)
+        self.assertEqual(len(unknown_sources), 16)
         for source_id, source_policy in unknown_sources.items():
             self.assertEqual(source_policy["rights_status"], "UNKNOWN", source_id)
             self.assertTrue(source_policy["review_required"], source_id)
