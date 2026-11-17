@@ -22,12 +22,15 @@
         "https://gaz.tcc.gov.tw"
       ],
       "robots": {
-        "status": "NO_RULE_OBSERVED",
+        "status": "NO_ROBOTS_RESOURCE",
         "failure_disallow_prefixes": [
           "/"
         ],
         "url": "https://ifddoc2.tcc.gov.tw/robots.txt",
-        "observed_text": "無"
+        "observed_text": "Taiwan network: HTTP 404; GitHub Actions and Oracle Japan: unreachable (user-provided 2026-11-17/18 tests).",
+        "observed_at": "2026-11-18",
+        "observed_runner": "taiwan-network",
+        "http_status": 404
       },
       "min_request_interval_seconds": 3,
       "license": "非開放授權；依網站條款",
@@ -71,7 +74,9 @@
         "https://gaz.tcc.gov.tw/"
       ],
       "preflight_url": "https://ifddoc2.tcc.gov.tw/TCCMIS_Front",
-      "known_bill_count": null
+      "known_bill_count": null,
+      "runner": "xisx-pc",
+      "documented_open_api": false
     },
     {
       "national_source_id": "N-COUNCIL-NWT",
@@ -90,12 +95,15 @@
         "https://bms1.ntp.gov.tw"
       ],
       "robots": {
-        "status": "NO_RULE_OBSERVED",
+        "status": "NO_ROBOTS_RESOURCE",
         "failure_disallow_prefixes": [
           "/"
         ],
         "url": "https://bms1.ntp.gov.tw/robots.txt",
-        "observed_text": "無"
+        "observed_text": "Taiwan network: HTTP 404; GitHub Actions and Oracle Japan: unreachable (user-provided 2026-11-17/18 tests).",
+        "observed_at": "2026-11-18",
+        "observed_runner": "taiwan-network",
+        "http_status": 404
       },
       "min_request_interval_seconds": 3,
       "license": "非開放授權；依網站條款",
@@ -135,7 +143,9 @@
         "https://bms1.ntp.gov.tw/billsystem/councilbillquery"
       ],
       "preflight_url": "https://bms1.ntp.gov.tw/billsystem/councilbillquery",
-      "known_bill_count": null
+      "known_bill_count": null,
+      "runner": "xisx-pc",
+      "documented_open_api": false
     },
     {
       "national_source_id": "N-COUNCIL-TAO",
@@ -154,12 +164,16 @@
         "https://www.tycc.gov.tw"
       ],
       "robots": {
-        "status": "NOT_VERIFIED",
+        "status": "REDIRECT_UNVERIFIED",
         "failure_disallow_prefixes": [
           "/"
         ],
         "url": "https://www.tycc.gov.tw/robots.txt",
-        "observed_text": "查不到"
+        "observed_text": "Taiwan network: HTTP 302; GitHub Actions and Oracle Japan: unreachable (user-provided 2026-11-17/18 tests).",
+        "observed_at": "2026-11-18",
+        "observed_runner": "taiwan-network",
+        "http_status": 302,
+        "redirect_target": "https://www.tycc.gov.tw/TC/404.html"
       },
       "min_request_interval_seconds": 3,
       "license": "非開放授權；依網站條款",
@@ -201,7 +215,9 @@
         "https://www.tycc.gov.tw/TC/"
       ],
       "preflight_url": "https://www.tycc.gov.tw/TC/",
-      "known_bill_count": null
+      "known_bill_count": null,
+      "runner": "xisx-pc",
+      "documented_open_api": false
     },
     {
       "national_source_id": "N-COUNCIL-TXG",
@@ -221,12 +237,15 @@
         "https://yishi.tccc.gov.tw"
       ],
       "robots": {
-        "status": "NOT_DISALLOWED_OBSERVED",
+        "status": "EMPTY_ROBOTS",
         "failure_disallow_prefixes": [
           "/"
         ],
         "url": "https://yishi.tccc.gov.tw/robots.txt",
-        "observed_text": "未禁"
+        "observed_text": "HTTP 200; empty robots (CRLF only).",
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 200
       },
       "min_request_interval_seconds": 3,
       "license": "非開放授權；依網站條款",
@@ -267,7 +286,9 @@
         "https://yishi.tccc.gov.tw"
       ],
       "preflight_url": "https://yishi.tccc.gov.tw",
-      "known_bill_count": 15496
+      "known_bill_count": 15496,
+      "runner": "github-actions",
+      "documented_open_api": false
     },
     {
       "national_source_id": "N-COUNCIL-TNN",
@@ -286,12 +307,15 @@
         "https://www.tncc.gov.tw"
       ],
       "robots": {
-        "status": "NOT_VERIFIED",
+        "status": "REDIRECT_UNVERIFIED",
         "failure_disallow_prefixes": [
           "/"
         ],
         "url": "https://www.tncc.gov.tw/robots.txt",
-        "observed_text": "查不到"
+        "observed_text": "HTTP 302; terminal response not measured by this CI run.",
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 302
       },
       "min_request_interval_seconds": 3,
       "license": "非開放授權；依網站條款",
@@ -332,7 +356,9 @@
         "https://www.tncc.gov.tw/motion1.asp"
       ],
       "preflight_url": "https://www.tncc.gov.tw/motion1.asp",
-      "known_bill_count": null
+      "known_bill_count": null,
+      "runner": "github-actions",
+      "documented_open_api": false
     },
     {
       "national_source_id": "N-COUNCIL-KHH",
@@ -351,12 +377,15 @@
         "https://cissearch.kcc.gov.tw"
       ],
       "robots": {
-        "status": "NO_RULE_OBSERVED",
+        "status": "NO_ROBOTS_RESOURCE",
         "failure_disallow_prefixes": [
           "/"
         ],
         "url": "https://cissearch.kcc.gov.tw/robots.txt",
-        "observed_text": "無"
+        "observed_text": "HTTP 404",
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 404
       },
       "min_request_interval_seconds": 3,
       "license": "非開放授權；依網站條款",
@@ -401,7 +430,9 @@
         "https://cissearch.kcc.gov.tw/"
       ],
       "preflight_url": "https://cissearch.kcc.gov.tw/",
-      "known_bill_count": 1636
+      "known_bill_count": 1636,
+      "runner": "github-actions",
+      "documented_open_api": false
     },
     {
       "national_source_id": "N-COUNCIL-KEE",
@@ -420,12 +451,15 @@
         "https://www.kmc.gov.tw"
       ],
       "robots": {
-        "status": "NOT_DISALLOWED_OBSERVED",
+        "status": "PARSED",
         "failure_disallow_prefixes": [
           "/"
         ],
         "url": "https://www.kmc.gov.tw/robots.txt",
-        "observed_text": "未禁"
+        "observed_text": "未禁",
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 200
       },
       "min_request_interval_seconds": 3,
       "license": "非開放授權；依網站條款",
@@ -467,7 +501,9 @@
         "https://www.kmc.gov.tw/kmcweb/#/motion"
       ],
       "preflight_url": "https://www.kmc.gov.tw/kmcweb/",
-      "known_bill_count": 4998
+      "known_bill_count": 4998,
+      "runner": "github-actions",
+      "documented_open_api": false
     },
     {
       "national_source_id": "N-COUNCIL-HSZ",
@@ -486,12 +522,15 @@
         "https://www.hsinchu-cc.gov.tw"
       ],
       "robots": {
-        "status": "NOT_DISALLOWED_OBSERVED",
+        "status": "PARSED",
         "failure_disallow_prefixes": [
           "/"
         ],
         "url": "https://www.hsinchu-cc.gov.tw/robots.txt",
-        "observed_text": "未禁"
+        "observed_text": "未禁",
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 200
       },
       "min_request_interval_seconds": 3,
       "license": "網站資料開放宣告（無償、非專屬、可再授權、需註明出處）",
@@ -534,7 +573,9 @@
         "https://www.hsinchu-cc.gov.tw/tc/proposal.aspx?mid=42"
       ],
       "preflight_url": "https://www.hsinchu-cc.gov.tw/tc/proposal.aspx?mid=42",
-      "known_bill_count": null
+      "known_bill_count": null,
+      "runner": "github-actions",
+      "documented_open_api": false
     },
     {
       "national_source_id": "N-COUNCIL-CYI",
@@ -560,7 +601,10 @@
         ],
         "disallow": [
           "/"
-        ]
+        ],
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 200
       },
       "min_request_interval_seconds": 3,
       "license": "非開放授權；依網站條款",
@@ -600,7 +644,9 @@
         "https://www.cycc.gov.tw/"
       ],
       "preflight_url": "https://www.cycc.gov.tw/",
-      "known_bill_count": null
+      "known_bill_count": null,
+      "runner": "github-actions",
+      "documented_open_api": false
     },
     {
       "national_source_id": "N-COUNCIL-HSQ",
@@ -619,12 +665,15 @@
         "https://www.hcc.gov.tw"
       ],
       "robots": {
-        "status": "NO_RULE_OBSERVED",
+        "status": "NO_ROBOTS_RESOURCE",
         "failure_disallow_prefixes": [
           "/"
         ],
         "url": "https://www.hcc.gov.tw/robots.txt",
-        "observed_text": "無"
+        "observed_text": "HTTP 404",
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 404
       },
       "min_request_interval_seconds": 3,
       "license": "非開放授權；依網站條款",
@@ -666,7 +715,9 @@
         "https://www.hcc.gov.tw/"
       ],
       "preflight_url": "https://www.hcc.gov.tw/",
-      "known_bill_count": null
+      "known_bill_count": null,
+      "runner": "github-actions",
+      "documented_open_api": false
     },
     {
       "national_source_id": "N-COUNCIL-MIA",
@@ -685,12 +736,15 @@
         "https://www.mcc.gov.tw"
       ],
       "robots": {
-        "status": "NOT_DISALLOWED_OBSERVED",
+        "status": "PARSED",
         "failure_disallow_prefixes": [
           "/"
         ],
         "url": "https://www.mcc.gov.tw/robots.txt",
-        "observed_text": "未禁"
+        "observed_text": "未禁",
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 200
       },
       "min_request_interval_seconds": 3,
       "license": "非開放授權；依網站條款",
@@ -729,7 +783,9 @@
         "https://www.mcc.gov.tw/"
       ],
       "preflight_url": "https://www.mcc.gov.tw/",
-      "known_bill_count": null
+      "known_bill_count": null,
+      "runner": "github-actions",
+      "documented_open_api": false
     },
     {
       "national_source_id": "N-COUNCIL-CHA",
@@ -748,12 +804,15 @@
         "https://www.chcc.gov.tw"
       ],
       "robots": {
-        "status": "NOT_VERIFIED",
+        "status": "REDIRECT_UNVERIFIED",
         "failure_disallow_prefixes": [
           "/"
         ],
         "url": "https://www.chcc.gov.tw/robots.txt",
-        "observed_text": "查不到"
+        "observed_text": "HTTP 302; terminal response not measured by this CI run.",
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 302
       },
       "min_request_interval_seconds": 3,
       "license": "非開放授權；依網站條款",
@@ -794,7 +853,9 @@
         "https://www.chcc.gov.tw/council/"
       ],
       "preflight_url": "https://www.chcc.gov.tw/council/",
-      "known_bill_count": null
+      "known_bill_count": null,
+      "runner": "github-actions",
+      "documented_open_api": false
     },
     {
       "national_source_id": "N-COUNCIL-NAN",
@@ -813,12 +874,15 @@
         "https://www.ntcc.gov.tw"
       ],
       "robots": {
-        "status": "NO_RULE_OBSERVED",
+        "status": "NO_ROBOTS_RESOURCE",
         "failure_disallow_prefixes": [
           "/"
         ],
         "url": "https://www.ntcc.gov.tw/robots.txt",
-        "observed_text": "無"
+        "observed_text": "HTTP 404",
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 404
       },
       "min_request_interval_seconds": 3,
       "license": "非開放授權；依網站條款",
@@ -857,7 +921,9 @@
         "https://www.ntcc.gov.tw/tw/proposal/index.aspx"
       ],
       "preflight_url": "https://www.ntcc.gov.tw/tw/proposal/index.aspx",
-      "known_bill_count": null
+      "known_bill_count": null,
+      "runner": "github-actions",
+      "documented_open_api": false
     },
     {
       "national_source_id": "N-COUNCIL-YUN",
@@ -876,12 +942,15 @@
         "https://www.ylcc.gov.tw"
       ],
       "robots": {
-        "status": "NO_RULE_OBSERVED",
+        "status": "NO_ROBOTS_RESOURCE",
         "failure_disallow_prefixes": [
           "/"
         ],
         "url": "https://www.ylcc.gov.tw/robots.txt",
-        "observed_text": "無"
+        "observed_text": "HTTP 404",
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 404
       },
       "min_request_interval_seconds": 3,
       "license": "非開放授權；依網站條款",
@@ -920,7 +989,9 @@
         "https://www.ylcc.gov.tw/"
       ],
       "preflight_url": "https://www.ylcc.gov.tw/",
-      "known_bill_count": null
+      "known_bill_count": null,
+      "runner": "github-actions",
+      "documented_open_api": false
     },
     {
       "national_source_id": "N-COUNCIL-CYQ",
@@ -940,15 +1011,18 @@
         "https://api.cyscc.gov.tw"
       ],
       "robots": {
-        "status": "API_NOT_VERIFIED_WWW_BLOCKED",
+        "status": "ROBOTS_SERVER_ERROR",
         "failure_disallow_prefixes": [
           "/"
         ],
         "url": "https://api.cyscc.gov.tw/robots.txt",
-        "observed_text": "www 全禁",
+        "observed_text": "HTTP 500",
         "blocked_origins": [
           "https://www.cyscc.gov.tw"
-        ]
+        ],
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 500
       },
       "min_request_interval_seconds": 3,
       "license": "非開放授權；依網站條款",
@@ -981,7 +1055,7 @@
         "來源：#247 NATIONAL_COUNCIL_EXPANSION.md 第二節（2026-11-15 盤點）；未重新連網查證。",
         "rights_note 照錄總表網站文字；總表未提供本議會宣告頁精確網址，license_source_url 留 null。",
         "容量按已知議案數 × 約 0.8KB 含索引估算；不是實測資料庫大小。",
-        "API 與 www 分開：API robots 未查，preflight 只查 robots；API 精確路徑及分頁待 W2a，endpoints 根網址僅標示官方 API origin。www 必須發函取得書面同意後再加入。"
+        "API 與 www 分開：CI 的 API robots 回 500，未設 documented_open_api，禁止內容擷取；preflight 只查 robots。API 精確路徑及分頁待 W2a，endpoints 根網址僅標示官方 API origin。www 必須發函取得書面同意後再加入。"
       ],
       "official_url": "https://www.cyscc.gov.tw/News/114",
       "official_system_urls": [
@@ -993,7 +1067,9 @@
         "status": "BLOCKED_BY_ROBOTS_NEEDS_CONSENT",
         "endpoints": [],
         "robots_url": "https://www.cyscc.gov.tw/robots.txt"
-      }
+      },
+      "runner": "github-actions",
+      "documented_open_api": false
     },
     {
       "national_source_id": "N-COUNCIL-PIF",
@@ -1012,12 +1088,15 @@
         "https://www.ptcc.gov.tw"
       ],
       "robots": {
-        "status": "NO_RULE_OBSERVED",
+        "status": "NO_ROBOTS_RESOURCE",
         "failure_disallow_prefixes": [
           "/"
         ],
         "url": "https://www.ptcc.gov.tw/robots.txt",
-        "observed_text": "無"
+        "observed_text": "Taiwan network: HTTP 404; GitHub Actions and Oracle Japan: unreachable (user-provided 2026-11-17/18 tests).",
+        "observed_at": "2026-11-18",
+        "observed_runner": "taiwan-network",
+        "http_status": 404
       },
       "min_request_interval_seconds": 3,
       "license": "非開放授權；依網站條款",
@@ -1056,7 +1135,9 @@
         "https://www.ptcc.gov.tw/"
       ],
       "preflight_url": "https://www.ptcc.gov.tw/",
-      "known_bill_count": null
+      "known_bill_count": null,
+      "runner": "xisx-pc",
+      "documented_open_api": false
     },
     {
       "national_source_id": "N-COUNCIL-ILA",
@@ -1075,12 +1156,15 @@
         "https://www.ilcc.gov.tw"
       ],
       "robots": {
-        "status": "NO_RULE_OBSERVED",
+        "status": "NO_ROBOTS_RESOURCE",
         "failure_disallow_prefixes": [
           "/"
         ],
         "url": "https://www.ilcc.gov.tw/robots.txt",
-        "observed_text": "無"
+        "observed_text": "Taiwan network: HTTP 404; GitHub Actions and Oracle Japan: unreachable (user-provided 2026-11-17/18 tests).",
+        "observed_at": "2026-11-18",
+        "observed_runner": "taiwan-network",
+        "http_status": 404
       },
       "min_request_interval_seconds": 3,
       "license": "非開放授權；依網站條款",
@@ -1121,7 +1205,9 @@
         "https://www.ilcc.gov.tw/"
       ],
       "preflight_url": "https://www.ilcc.gov.tw/",
-      "known_bill_count": null
+      "known_bill_count": null,
+      "runner": "xisx-pc",
+      "documented_open_api": false
     },
     {
       "national_source_id": "N-COUNCIL-HUA",
@@ -1140,12 +1226,15 @@
         "https://www.hlcc.gov.tw"
       ],
       "robots": {
-        "status": "NO_RULE_OBSERVED",
+        "status": "NO_ROBOTS_RESOURCE",
         "failure_disallow_prefixes": [
           "/"
         ],
         "url": "https://www.hlcc.gov.tw/robots.txt",
-        "observed_text": "無"
+        "observed_text": "HTTP 404",
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 404
       },
       "min_request_interval_seconds": 3,
       "license": "非開放授權；依網站條款",
@@ -1185,7 +1274,9 @@
         "https://www.hlcc.gov.tw/"
       ],
       "preflight_url": "https://www.hlcc.gov.tw/",
-      "known_bill_count": null
+      "known_bill_count": null,
+      "runner": "github-actions",
+      "documented_open_api": false
     },
     {
       "national_source_id": "N-COUNCIL-TTT",
@@ -1204,12 +1295,15 @@
         "https://www.taitungcc.gov.tw"
       ],
       "robots": {
-        "status": "NOT_DISALLOWED_OBSERVED",
+        "status": "PARSED",
         "failure_disallow_prefixes": [
           "/"
         ],
         "url": "https://www.taitungcc.gov.tw/robots.txt",
-        "observed_text": "未禁"
+        "observed_text": "未禁",
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 200
       },
       "min_request_interval_seconds": 3,
       "license": "非開放授權；依網站條款",
@@ -1249,7 +1343,9 @@
         "https://www.taitungcc.gov.tw/1/meeting"
       ],
       "preflight_url": "https://www.taitungcc.gov.tw/1/meeting",
-      "known_bill_count": null
+      "known_bill_count": null,
+      "runner": "github-actions",
+      "documented_open_api": false
     },
     {
       "national_source_id": "N-COUNCIL-PEN",
@@ -1277,7 +1373,10 @@
         "blocked_resources": [
           "附件目錄"
         ],
-        "attachment_paths": null
+        "attachment_paths": null,
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 200
       },
       "min_request_interval_seconds": 3,
       "license": "非開放授權；依網站條款",
@@ -1318,7 +1417,9 @@
         "https://www.phcouncil.gov.tw/"
       ],
       "preflight_url": "https://www.phcouncil.gov.tw/",
-      "known_bill_count": null
+      "known_bill_count": null,
+      "runner": "github-actions",
+      "documented_open_api": false
     },
     {
       "national_source_id": "N-COUNCIL-KIN",
@@ -1337,12 +1438,15 @@
         "https://agenda.kmcc.gov.tw"
       ],
       "robots": {
-        "status": "NO_RULE_OBSERVED",
+        "status": "NO_ROBOTS_RESOURCE",
         "failure_disallow_prefixes": [
           "/"
         ],
         "url": "https://agenda.kmcc.gov.tw/robots.txt",
-        "observed_text": "無"
+        "observed_text": "HTTP 404",
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 404
       },
       "min_request_interval_seconds": 3,
       "license": "非開放授權；依網站條款",
@@ -1382,7 +1486,9 @@
         "https://agenda.kmcc.gov.tw/CouncilManage/AgendaBill"
       ],
       "preflight_url": "https://agenda.kmcc.gov.tw/CouncilManage/AgendaBill",
-      "known_bill_count": null
+      "known_bill_count": null,
+      "runner": "github-actions",
+      "documented_open_api": false
     },
     {
       "national_source_id": "N-COUNCIL-LIE",
@@ -1401,12 +1507,15 @@
         "https://www.mtcc.gov.tw"
       ],
       "robots": {
-        "status": "NO_RULE_OBSERVED",
+        "status": "NO_ROBOTS_RESOURCE",
         "failure_disallow_prefixes": [
           "/"
         ],
         "url": "https://www.mtcc.gov.tw/robots.txt",
-        "observed_text": "無"
+        "observed_text": "HTTP 404",
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 404
       },
       "min_request_interval_seconds": 3,
       "license": "非開放授權；依網站條款",
@@ -1446,7 +1555,9 @@
         "https://www.mtcc.gov.tw/"
       ],
       "preflight_url": "https://www.mtcc.gov.tw/",
-      "known_bill_count": null
+      "known_bill_count": null,
+      "runner": "github-actions",
+      "documented_open_api": false
     },
     {
       "national_source_id": "N-LY-ID20-BILLS",
@@ -1465,14 +1576,18 @@
         "https://data.ly.gov.tw"
       ],
       "robots": {
-        "status": "NOT_VERIFIED",
+        "status": "ROBOTS_SERVER_ERROR_OPEN_API_ALLOWED",
         "failure_disallow_prefixes": [
           "/"
         ],
         "url": "https://data.ly.gov.tw/robots.txt",
         "blocked_origins": [
           "https://ppg.ly.gov.tw"
-        ]
+        ],
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 500,
+        "observed_text": "HTTP 500"
       },
       "min_request_interval_seconds": 3,
       "license": "政府資料開放授權條款第 1 版",
@@ -1500,7 +1615,9 @@
       "notes": [
         "ppg.ly.gov.tw robots 全禁，不抓；只用官方開放資料 API。",
         "分頁參數效果、schema 與完整性待實際驗收；容量為預留估算。"
-      ]
+      ],
+      "runner": "github-actions",
+      "documented_open_api": true
     },
     {
       "national_source_id": "N-LY-ID6-INTERP",
@@ -1519,14 +1636,18 @@
         "https://data.ly.gov.tw"
       ],
       "robots": {
-        "status": "NOT_VERIFIED",
+        "status": "ROBOTS_SERVER_ERROR_OPEN_API_ALLOWED",
         "failure_disallow_prefixes": [
           "/"
         ],
         "url": "https://data.ly.gov.tw/robots.txt",
         "blocked_origins": [
           "https://ppg.ly.gov.tw"
-        ]
+        ],
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 500,
+        "observed_text": "HTTP 500"
       },
       "min_request_interval_seconds": 3,
       "license": "政府資料開放授權條款第 1 版",
@@ -1555,7 +1676,9 @@
         "ppg.ly.gov.tw robots 全禁，不抓；只用官方開放資料 API。",
         "分頁參數效果、schema 與完整性待實際驗收；容量為預留估算。"
       ],
-      "known_gap": "第 11 屆第 3–6 會期官方回空（2026-11-17 實測）"
+      "known_gap": "第 11 屆第 3–6 會期官方回空（2026-11-17 實測）",
+      "runner": "github-actions",
+      "documented_open_api": true
     },
     {
       "national_source_id": "N-PCC-WEB",
@@ -1574,13 +1697,17 @@
         "https://web.pcc.gov.tw"
       ],
       "robots": {
-        "status": "REDIRECT_TO_HOME_NO_RESTRICTIONS_OBSERVED",
+        "status": "REDIRECT_UNVERIFIED",
         "failure_disallow_prefixes": [
           "/"
         ],
         "url": "https://web.pcc.gov.tw/robots.txt",
         "redirect_target": "https://web.pcc.gov.tw/",
-        "disallow": []
+        "disallow": [],
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 302,
+        "observed_text": "HTTP 302; terminal response not measured by this CI run."
       },
       "min_request_interval_seconds": 3,
       "license": "採購網著作權聲明（非開放授權）",
@@ -1615,8 +1742,10 @@
       "notes": [
         "每次請求間隔至少 3 秒；只存中繼資料與官方連結。",
         "2 年約 40MB，涵蓋 GPA 去重後資料；檢索表單路徑與欄位待 W4 盤點。",
-        "robots 轉到首頁，沒有觀察到限制；preflight 只接受轉到同 origin 首頁的已知情況，不跟隨轉址。"
-      ]
+        "CI robots 回 302，終點回應待驗證；preflight 最多跟隨 5 次 HTTPS 轉址，以終點狀態與規則判斷，不再因轉到首頁而放行。"
+      ],
+      "runner": "github-actions",
+      "documented_open_api": false
     },
     {
       "national_source_id": "N-PCC-GPA",
@@ -1636,13 +1765,17 @@
         "https://web.pcc.gov.tw"
       ],
       "robots": {
-        "status": "REDIRECT_TO_HOME_NO_RESTRICTIONS_OBSERVED",
+        "status": "REDIRECT_UNVERIFIED",
         "failure_disallow_prefixes": [
           "/"
         ],
         "url": "https://web.pcc.gov.tw/robots.txt",
         "redirect_target": "https://web.pcc.gov.tw/",
-        "disallow": []
+        "disallow": [],
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 302,
+        "observed_text": "HTTP 302; terminal response not measured by this CI run."
       },
       "min_request_interval_seconds": 3,
       "license": "政府資料開放授權條款第 1 版",
@@ -1681,7 +1814,9 @@
       "notes": [
         "另一授權來源：https://data.gov.tw/dataset/172023",
         "下載模板日期以 YYYYMMDD 代入；與公告資料去重，容量納入 N-PCC-WEB 的 40MB。"
-      ]
+      ],
+      "runner": "github-actions",
+      "documented_open_api": true
     },
     {
       "national_source_id": "N-ODP-CATALOG",
@@ -1700,7 +1835,7 @@
         "https://data.gov.tw"
       ],
       "robots": {
-        "status": "PARTIALLY_OBSERVED",
+        "status": "ROBOTS_SERVER_ERROR_OPEN_API_ALLOWED",
         "blocked_origins": [
           "https://data.kcg.gov.tw",
           "https://data.tainan.gov.tw"
@@ -1710,7 +1845,12 @@
         ],
         "failure_disallow_prefixes": [
           "/"
-        ]
+        ],
+        "url": "https://data.gov.tw/robots.txt",
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 500,
+        "observed_text": "HTTP 500"
       },
       "min_request_interval_seconds": 3,
       "license": "依各資料集授權欄位；未確認者不推定為開放授權",
@@ -1755,7 +1895,9 @@
         "data.kcg.gov.tw 與 data.tainan.gov.tw robots 全禁；不爬入口，同 host 的資源亦不抓，待同意或官方其他資源位置。"
       ],
       "status": "PLANNED_API",
-      "rights_note": "依各資料集授權欄位；未確認者不推定為開放授權"
+      "rights_note": "依各資料集授權欄位；未確認者不推定為開放授權",
+      "runner": "github-actions",
+      "documented_open_api": true
     },
     {
       "national_source_id": "N-TDX-EVENTS",
@@ -1773,10 +1915,14 @@
         "https://tdx.transportdata.tw"
       ],
       "robots": {
-        "status": "NOT_VERIFIED",
+        "status": "UNVERIFIED",
         "failure_disallow_prefixes": [
           "/"
-        ]
+        ],
+        "url": "https://tdx.transportdata.tw/robots.txt",
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 200
       },
       "min_request_interval_seconds": 3,
       "license": "待確認 TDX 服務及資料授權條款",
@@ -1806,7 +1952,9 @@
         "W0 只探測根路徑，不申請憑證。"
       ],
       "status": "PLANNED_API",
-      "rights_note": "待確認 TDX 服務及資料授權條款"
+      "rights_note": "待確認 TDX 服務及資料授權條款",
+      "runner": "github-actions",
+      "documented_open_api": false
     },
     {
       "national_source_id": "N-TWINKLE-MANUAL",
@@ -1849,7 +1997,9 @@
         "授權與額度無文件記載；Twinkle 與官方路徑算同一個來源，不是獨立佐證。"
       ],
       "status": "MANUAL_ONLY",
-      "rights_note": "未確認，不授權自動化"
+      "rights_note": "未確認，不授權自動化",
+      "runner": "github-actions",
+      "documented_open_api": false
     }
   ]
 }

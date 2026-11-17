@@ -13,7 +13,8 @@ PUBLIC_FIELDS = {"title", "case_number", "event_date", "jurisdiction", "authorit
                  "official_url", "provider_url", "license"}
 REQUIRED = set("national_source_id provider official_authority tier transport endpoints allowed_hosts "
                "official_url_hosts robots min_request_interval_seconds license license_source_url "
-               "rights_class rights_note status public_fields required_secret scope capacity_estimate_mb verified_at notes".split())
+               "rights_class rights_note status public_fields required_secret scope capacity_estimate_mb verified_at notes "
+               "runner documented_open_api".split())
 
 
 def check_direct_sources(value):
@@ -65,6 +66,12 @@ def validate(registry):
         if not isinstance(sid, str) or not re.fullmatch(r"N-[A-Z0-9]+(?:-[A-Z0-9]+)*", sid) or sid in seen:
             raise ValueError("invalid or duplicate national_source_id")
         seen.add(sid)
+        if row["runner"] not in ("github-actions", "xisx-pc"):
+            raise ValueError(f"invalid runner: {sid}")
+        if type(row["documented_open_api"]) is not bool:
+            raise ValueError(f"documented_open_api must be boolean: {sid}")
+        if row["documented_open_api"] and row["status"] == "BLOCKED_BY_ROBOTS_NEEDS_CONSENT":
+            raise ValueError(f"documented_open_api cannot override robots block: {sid}")
         if row["tier"] not in {"REFERENCE", "DISCOVERY_ONLY"}:
             raise ValueError(f"invalid tier: {sid}")
         if row["required_secret"] not in (None, "TDX_CLIENT_ID+TDX_CLIENT_SECRET"):

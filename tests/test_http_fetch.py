@@ -131,16 +131,74 @@ class HttpFetchTests(unittest.TestCase):
         session.get.assert_not_called()
         fetcher.assert_called_once_with("https://official.test/robots.txt")
 
-    def test_robots_failure_denies_configured_prefix_and_default_denies_all(self):
+    def test_robots_failure_denies_all_even_for_open_api(self):
         for fetcher in (Mock(side_effect=requests.ConnectionError("offline")), Mock(return_value="<html>error</html>")):
-            policy = http.RobotsPolicy(fetcher, forbidden_prefixes=("/api/",))
+            policy = http.RobotsPolicy(fetcher, documented_open_api=True)
             session = Mock(get=Mock(return_value=response()))
-            with self.assertRaises(http.RobotsDisallowed):
-                http.get(session, "https://official.test/api/bills", HOSTS, robots_policy=policy)
-            http.get(session, URL, HOSTS, robots_policy=policy)
+            for url in (URL, "https://official.test/api/bills"):
+                with self.assertRaises(http.RobotsDisallowed):
+                    http.get(session, url, HOSTS, robots_policy=policy)
+            session.get.assert_not_called()
             self.assertEqual(fetcher.call_count, 1)
         with self.assertRaises(http.RobotsDisallowed):
             http.get(Mock(), URL, HOSTS, robots_policy=http.RobotsPolicy(Mock(side_effect=RuntimeError())))
+
+    def test_robots_http_decisions_and_explicit_disallow(self):
+        robots_url = "https://official.test/robots.txt"
+        for status, body, open_api, allowed, state in (
+                (200, b"", False, True, "EMPTY_ROBOTS"),
+                (204, b"\r\n", False, True, "EMPTY_ROBOTS"),
+                (404, b"", False, True, "NO_ROBOTS_RESOURCE"),
+                (403, b"", False, True, "NO_ROBOTS_RESOURCE"),
+                (429, b"", False, True, "NO_ROBOTS_RESOURCE"),
+                (500, b"", True, True, "ROBOTS_SERVER_ERROR_OPEN_API_ALLOWED"),
+                (503, b"", False, False, "ROBOTS_SERVER_ERROR"),
+                (200, b"User-agent: *\nDisallow: /", True, False, "PARSED")):
+            with self.subTest(status=status, open_api=open_api, body=body):
+                policy = http.RobotsPolicy(documented_open_api=open_api)
+                reply = response(status, url=robots_url, body=body)
+                session = Mock(get=Mock(return_value=reply))
+                if allowed:
+                    self.assertEqual(policy.check(session, URL, HOSTS, 10), 0)
+                else:
+                    with self.assertRaises(http.RobotsDisallowed):
+                        policy.check(session, URL, HOSTS, 10)
+                self.assertEqual(policy._cache["official.test"][0], state)
+                self.assertEqual(session.get.call_count, 1)
+                reply.close.assert_called()
+
+    def test_robots_redirects_cross_host_to_404_or_rules_and_enforce_budget(self):
+        robots_url = "https://official.test/robots.txt"
+        target = "https://cdn.test/policy"
+        for status, body, allowed in ((404, b"", True), (200, b"", True),
+                                      (200, b"User-agent: *\nDisallow: /", False)):
+            replies = [response(302, url=robots_url, headers={"Location": target})]
+            replies += [response(302, url=target, headers={"Location": "/policy"}) for _ in range(4)]
+            replies += [response(status, url=target, body=body)]
+            session = Mock(get=Mock(side_effect=replies))
+            policy = http.RobotsPolicy(documented_open_api=True)
+            with self.subTest(status=status, body=body):
+                if allowed:
+                    policy.check(session, URL, HOSTS, 10)
+                else:
+                    with self.assertRaises(http.RobotsDisallowed):
+                        policy.check(session, URL, HOSTS, 10)
+                self.assertEqual(session.get.call_count, 6)
+                self.assertTrue(all(r.close.called for r in replies))
+                self.assertTrue(all("headers" not in c.kwargs for c in session.get.call_args_list))
+        for location, count in (("/loop", 6), ("http://cdn.test/policy", 1),
+                                ("https://user@cdn.test/policy", 1), (None, 1)):
+            session = Mock(get=Mock(return_value=response(302, url=robots_url,
+                                                          headers={"Location": location} if location else {})))
+            with self.subTest(location=location), self.assertRaises(http.RobotsDisallowed):
+                http.RobotsPolicy(documented_open_api=True).check(session, URL, HOSTS, 10)
+            self.assertEqual(session.get.call_count, count)
+
+    def test_robots_body_limit_is_fail_closed(self):
+        reply = response(url="https://official.test/robots.txt", chunks=[b"x" * (http.RobotsPolicy.MAX_BYTES + 1)])
+        with self.assertRaises(http.RobotsDisallowed):
+            http.RobotsPolicy(documented_open_api=True).check(Mock(get=Mock(return_value=reply)), URL, HOSTS, 10)
+        reply.close.assert_called()
 
     def test_default_robots_fetch_is_bounded_tokenless_and_crawl_delay_applies(self):
         robots = b"User-agent: *\nDisallow: /api/\nCrawl-delay: 3\n"

@@ -10,10 +10,10 @@
 
 ## 官方來源
 
-議會的官方／議事系統網址、資料種類、取得方式、網站條款與 robots 觀察均照錄 #247 分支 `origin/docs/national-council-plan-20261115` 的 `docs/govintel/NATIONAL_COUNCIL_EXPANSION.md` 第二節（2026-11-15 盤點）。本輪未重新連網查證。`rights_note` 保留該表網站文字；原表沒有提供宣告頁精確網址者，`license_source_url` 留 null，不把入口頁冒充授權證據。
+議會的官方／議事系統網址、資料種類、取得方式與網站條款照錄 #247 分支 `origin/docs/national-council-plan-20261115` 的 `docs/govintel/NATIONAL_COUNCIL_EXPANSION.md` 第二節（2026-11-15 盤點）；robots 狀態依 2026-11-17／18 的 CI 與使用者提供之台灣網路實測更新。本輪未重新連網查證。`rights_note` 保留該表網站文字；原表沒有提供宣告頁精確網址者，`license_source_url` 留 null，不把入口頁冒充授權證據。
 
 - 22 個地方議會各一筆 `N-COUNCIL-{ISO 縣市縮寫}`。有 API 的臺中、基隆與嘉義縣 API 使用 `OFFICIAL_JSON_API`；新北使用 `HTML_HEADLESS`；其餘使用 `HTML` 或 `HTML_FILES`。完整狀態、資料種類與來源網址以登記檔為準。
-- 嘉義縣保留單一 `N-COUNCIL-CYQ`：主來源是 `PLANNED_API`，`www_access` 另外標成 `BLOCKED_BY_ROBOTS_NEEDS_CONSENT` 且 endpoints 為空。API 根網址只標示官方 origin，精確路徑／分頁待 W2a；它的 robots 未查，preflight 另行取得，不發出 API 內容請求。
+- 嘉義縣保留單一 `N-COUNCIL-CYQ`：主來源是 `PLANNED_API`，`www_access` 另外標成 `BLOCKED_BY_ROBOTS_NEEDS_CONSENT` 且 endpoints 為空。API 根網址只標示官方 origin，精確路徑／分頁待 W2a；CI 的 API robots 回 500，沒有 documented open API 旗標，維持禁止內容請求。preflight 仍只探測其 robots。
 - `N-LY-ID20-BILLS`：官方 data.ly.gov.tw ID20 議案，政府資料開放授權條款第 1 版。preflight 只請求一頁；遠端是否採用分頁參數、資料 schema 與完整筆數仍待驗證。
 - `N-LY-ID6-INTERP`：官方 ID6 委員質詢；已知缺口為「第 11 屆第 3–6 會期官方回空（2026-11-17 實測）」。這是指定會期的觀察，不推定所有會期永久停更，也不以第三方資料補齊。
 - `N-PCC-WEB`：直接抓 web.pcc.gov.tw 官方公告檢索 HTML；每次請求間隔至少 3 秒，近 2 年只收機關名稱含「警察」「消防」「交通局」或以「臺中市政府」開頭的公告。不用廣泛的「交通」條件。容量預留 40MB，檢索表單欄位與正式路徑留待 W4；preflight 僅抓首頁。
@@ -21,6 +21,24 @@
 - `N-ODP-CATALOG`：data.gov.tw 資料集 6564，`https://data.gov.tw/datasets/export/csv`。只篩臺北、新北、桃園、臺中、臺南、高雄的警察、消防、交通、治安資料集。W6 儲存目錄中繼資料；需要資料本身時只從各機關的官方資源網址取得，逐一核准 host、授權及 robots，不爬被禁的市府入口或透過轉址繞過限制。
 - `N-TDX-EVENTS`：保留六都即時路況事件，30 天保留期；未設定 `TDX_CLIENT_ID`／`TDX_CLIENT_SECRET` 時記錄 `NOT_CONFIGURED`。W0 僅探測官方根網址，不申請憑證。
 - `N-TWINKLE-MANUAL`：保留作開發時人工交叉驗證工具，不納入自動資料層或 Actions；與官方路徑算同一來源，不能當獨立佐證。帳號、授權與額度依既有紀錄仍待確認。
+
+## 執行位置
+
+來源登記的 `runner` 僅接受 `github-actions` 與 `xisx-pc`。臺北、新北、桃園、屏東、宜蘭議會指定由 Windows 主機 **xisx-pc**（台灣 IP）排程擷取；其他來源維持 GitHub Actions。這是執行位置規劃，本輪沒有連線遠端主機、安裝程式或建立排程。
+
+2026-11-17／18 實測：GitHub Actions（美國）對下列五站皆發生 `URLError`，Oracle 日本主機也連不到；使用者提供的本機、lab5090、lab301、lab6000、xisx-pc 台灣網路測試皆可連線，因此按使用者決定視為國外 IP 存取限制，改由台灣節點執行。
+
+| 議會 | 官方 host | 台灣網路 robots 回應 |
+|---|---|---|
+| 臺北 | `ifddoc2.tcc.gov.tw` | 404 |
+| 新北 | `bms1.ntp.gov.tw` | 404 |
+| 桃園 | `www.tycc.gov.tw` | 302 至 `/TC/404.html`；終點 HTTP 狀態待驗證 |
+| 屏東 | `www.ptcc.gov.tw` | 404 |
+| 宜蘭 | `www.ilcc.gov.tw` | 404 |
+
+preflight 依環境變數 `NATIONAL_RUNNER` 選取該 runner 的來源，預設 `github-actions`，並在報告頂層記錄 `runner`。GitHub Actions 規劃 22 個 robots 與 22 個頁面目標；`NATIONAL_RUNNER=xisx-pc` 規劃 5 個 robots 與 5 個頁面目標。URLError／timeout 記為 `UNREACHABLE_FROM_RUNNER`；robots 無法連線時，其依賴頁面也記此狀態及 `blocked_by=robots_fetch`，不聲稱曾請求頁面，也不當成明文禁止。
+
+CI 證據來自 `national-preflight-44096423260/egress.json`；台灣與 Oracle 日本對照來自本次使用者提供的實測結果。本輪只讀取既有收據及執行離線驗收。
 
 ## robots 與同意
 
@@ -34,9 +52,24 @@
 
 上述被擋資源須向主管機關發函取得書面同意後，再審核同意的 host、路徑、用途與速率，更新登記及存取策略後才加入。即使最新 robots 暫時回空或開放，也不自動解除已登記的禁止狀態。
 
-preflight 先 GET 每個探測 origin 的 `/robots.txt` 並記錄內容，才決定是否 GET 內容頁。明文禁止者記 `BLOCKED_BY_ROBOTS_NEEDS_CONSENT`；抓取失敗、過大、HTML 或無法判讀者記 `SKIPPED_ROBOTS_UNVERIFIED` 並跳過頁面。404／410 表示沒有 robots 資源。採購網已知 `/robots.txt` 轉至同 origin 首頁且沒有觀察到限制，僅此精確轉址情況可通過；仍不跟隨轉址。
+preflight 與 `intel_v2/http_fetch.py` 的 `RobotsPolicy` 共用判定。HTTP 狀態與轉址依本輪指定的 RFC 9309 處理方式，另有明確限定來源的 5xx 例外：
 
-preflight 使用 stdlib robots parser；含萬用字元、結尾錨點或混合 Allow／Disallow 的複雜規則，保守視為未驗證並跳過頁面。這可能減少即時探測覆蓋，不能把跳過視為成功。解析成功時也尊重 Crawl-delay，且請求間隔不低於 3 秒。
+- 2xx 空內容（含純空白）全部允許，記 `EMPTY_ROBOTS`。臺中 `yishi.tccc.gov.tw` 的 CI 回應為 200、僅 CRLF，修正先前誤判。
+- 3xx 最多跟隨 5 次轉址，可跨 host，但每一跳都必須是 HTTPS，拒絕帳密 URL 與非標準 port。終點 2xx 解析內容，終點 4xx 全部允許。報告保存轉址鏈與 `final_url`；缺少 Location、超過上限或不安全轉址皆停止並禁止內容擷取。
+- 所有 4xx（含 401／403／404／410／429）視為 robots 資源不可用而允許，記 `NO_ROBOTS_RESOURCE`。
+- 5xx 預設全部禁止，記 `ROBOTS_SERVER_ERROR`；連線失敗也全部禁止，preflight 另記 `UNREACHABLE_FROM_RUNNER`，避免與 robots 明文禁止混淆。
+- 僅 `documented_open_api: true` 的來源遇到 5xx 時允許，記 `ROBOTS_SERVER_ERROR_OPEN_API_ALLOWED`。旗標只設於 `N-LY-ID20-BILLS`、`N-LY-ID6-INTERP`、`N-PCC-GPA`、`N-ODP-CATALOG`：理由為機關以公開文件化開放資料宣告授權程式存取，而 5xx 並非明文禁止。這是本專案明定的例外，不宣稱為 RFC 的 5xx 預設行為，也不適用於連線失敗。
+- 明文 Disallow 一律遵守，open API 旗標不能覆蓋。例外按來源判斷：同在 `web.pcc.gov.tw` 的 GPA 下載與一般採購 HTML 不共用例外。登記自檢拒絕不合法 runner、非布林旗標及 open API 來源標為 `BLOCKED_BY_ROBOTS_NEEDS_CONSENT` 的矛盾設定。
+
+移除採購網「轉到首頁就允許」的特例；必須實際取得轉址終點回應。台南、彰化、桃園及採購網既有 302 收據均保留為 `REDIRECT_UNVERIFIED`，不把未驗證終點當成 404。`data.ly.gov.tw` 與 `data.gov.tw` 的 CI robots 500 適用指定來源的例外；`api.cyscc.gov.tw` 的 500 不適用。
+
+共用判定使用 stdlib robots parser；含萬用字元、結尾錨點或混合 Allow／Disallow 的複雜規則，以及過大、HTML 或無法判讀的內容，保守視為未驗證並跳過頁面（`SKIPPED_ROBOTS_UNVERIFIED`）。因此這不是完整 RFC 規則解析器；不能把跳過視為成功或空 robots。解析成功時也尊重 Crawl-delay，且 preflight 每個 host 的請求間隔不低於 3 秒（包含 robots 轉址）。
+
+## D1 權限待使用者 wrangler login
+
+CI `national-preflight-44096423260/d1-permissions.json` 實測 `wrangler d1 list` 回 `LIST_FAILED`、`can_list: false`、結束碼 1。依本次確認，現有 token 沒有可用的 D1 權限；尚無列出、寫入或遠端 FTS5 的成功驗收。
+
+D1 後續移至 W1，由使用者在本機執行 `wrangler login` 後處理。本輪不登入、不修改憑證、不建立雲端資源；既有 workflow 的唯讀列出探測不構成建立或寫入授權。
 
 ## 網站條款風險
 
@@ -94,7 +127,7 @@ robots 允許不代表網站已授權重製或再利用。#247 記錄高雄為�
 
 - 2026-11-17 提供的 data.gov.tw 紀錄：6564 CSV 約 68.9MB、52,609 筆、每日更新；六都關鍵字命中北 234、新北 266、桃 178、中 610、南 228、高 792。各市 CKAN 匿名 API 當時回 401／404；本輪未重測。採購 172020／172023 僅 GPA，6155 前 5 大、6573 優先採購也不能替代全量公告。
 - 第一輪紀錄：wrangler 4.131.2 本機 D1 的 `fts5(title, tokenize='trigram')` 能以「警察局」查到中文標題。這不是遠端驗收；本輪未重新測試 D1。
-- preflight 計畫含 27 個 robots URL、27 個頁面目標（22 議會＋ID20＋採購首頁＋一個 GPA 檔＋6564 metadata＋TDX），嘉義縣 API 另含在 robots URL 中。兩個已知全禁議會頁面必定跳過；其餘仍依即時 robots 判斷，最多 52 次 GET。每個 URL 最多一次 GET、無重試、不跟隨 redirect、10 秒 timeout、256KiB 讀取上限（多讀 1 byte 偵測超限）。頁面不保存正文，robots 保存有界內容。
+- 兩種 runner 合計規劃 27 個 robots URL、27 個頁面目標（22 議會＋ID20＋採購首頁＋一個 GPA 檔＋6564 metadata＋TDX），嘉義縣 API 另含在 robots URL 中。兩個已知全禁議會頁面必定跳過；沒有轉址時最多 52 次 GET。robots 每條鏈最多 6 次 GET（初始請求加 5 次轉址），頁面最多一次 GET、不跟隨轉址；全部無重試、每次 10 秒 timeout、256KiB 讀取上限（多讀 1 byte 偵測超限）。頁面不保存正文，robots 保存有界內容。
 - `--dry-run` 完全不連網；HTTP 可達不代表資料筆數、內容 schema、授權或匯入正確。報告中的跳過列沒有 HTTP 回應，不冒充成功。
-- D1 workflow 保留唯讀 `d1 list --json`，僅驗證列出權限，不能證明寫入權限或遠端 FTS5。Actions 真實 egress、D1 token 權限與遠端 FTS5 均未在本輪驗證。
-- 第一輪 `intel_v2/http_fetch.py` 與 `canary-s028-165.py` 保持原樣。preflight 採 stdlib 一次性探測，以維持不重試、不跟隨 redirect 的界線；正式匯入器留待各批次實作與驗收。
+- D1 workflow 保留唯讀 `d1 list --json`，CI 結果為失敗；不能證明寫入權限或遠端 FTS5。此輪沒有重新執行 Actions 或任何遠端驗收。
+- `intel_v2/http_fetch.py` 的 robots 判定已更新；一般 `get` transport 的重試、內容轉址與 canary 行為維持原規則。preflight 以 stdlib 探測並共用 robots 判定，不新增安裝依賴；正式匯入器留待各批次實作與驗收。

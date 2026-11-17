@@ -6,10 +6,12 @@ import threading
 import time
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
+from typing import TYPE_CHECKING
 from urllib.parse import urljoin, urlparse
 from urllib.robotparser import RobotFileParser
 
-import requests
+if TYPE_CHECKING:
+    import requests
 
 REDIRECT_STATUSES = {301, 302, 303, 307, 308}
 MAX_REDIRECTS = 3
@@ -64,21 +66,85 @@ def _retry_after(value: str | None) -> float:
 
 
 class RobotsPolicy:
-    """Cache robots per host for this policy's lifetime.
+    """Cache robots per source; failures deny all paths except documented API 5xx.
 
-    fetcher(url) returns robots text. On failure, deny configured path prefixes
-    (default: all paths). No bearer token is sent when fetching robots.
+    An optional fetcher(url) returns robots text (an HTTP 2xx response).
     """
 
-    def __init__(self, fetcher=None, *, forbidden_prefixes=("/",), user_agent="*"):
-        if any(not prefix.startswith("/") for prefix in forbidden_prefixes):
-            raise ValueError("robots fallback prefixes must start with /")
+    MAX_REDIRECTS = 5
+    MAX_BYTES = 256 * 1024
+    ALLOWED = {"PARSED", "EMPTY_ROBOTS", "NO_ROBOTS_RESOURCE",
+               "ROBOTS_SERVER_ERROR_OPEN_API_ALLOWED"}
+
+    def __init__(self, fetcher=None, *, user_agent="*", documented_open_api=False):
+        if type(documented_open_api) is not bool:
+            raise ValueError("documented_open_api must be boolean")
         self.fetcher = fetcher
-        self.forbidden_prefixes = tuple(forbidden_prefixes)
         self.user_agent = user_agent
-        self._cache: dict[str, RobotFileParser | None] = {}
+        self.documented_open_api = documented_open_api
+        self._cache: dict[str, tuple[str, RobotFileParser | None]] = {}
+
+    @staticmethod
+    def evaluate(url, status, body, *, documented_open_api=False):
+        if status is not None and 400 <= status < 500:
+            return "NO_ROBOTS_RESOURCE", None
+        if status is not None and 500 <= status < 600:
+            return ("ROBOTS_SERVER_ERROR_OPEN_API_ALLOWED" if documented_open_api is True
+                    else "ROBOTS_SERVER_ERROR"), None
+        if status is None or not 200 <= status < 300 or not isinstance(body, str):
+            return "UNVERIFIED", None
+        if not body.strip():
+            return "EMPTY_ROBOTS", None
+        if body.lstrip().startswith("<"):
+            return "UNVERIFIED", None
+        lines = body.splitlines()
+        directives = [line.split("#", 1)[0].strip().split(":", 1) for line in lines]
+        rules = [(p[0].strip().lower(), p[1].strip()) for p in directives if len(p) == 2]
+        # ponytail: stdlib lacks wildcard/longest-match rules; deny until a full parser is needed.
+        if (not any(key == "user-agent" for key, _ in rules)
+                or any(key in ("allow", "disallow") and ("*" in value or "$" in value)
+                       for key, value in rules)
+                or {key for key, value in rules if value} >= {"allow", "disallow"}):
+            return "UNVERIFIED", None
+        parser = RobotFileParser(url)
+        parser.parse(lines)
+        return "PARSED", parser
+
+    @staticmethod
+    def redirect_target(url, location, followed):
+        if not location or followed >= RobotsPolicy.MAX_REDIRECTS:
+            raise RuntimeError("robots redirect missing location or budget exhausted")
+        target = urljoin(url, location)
+        _approved_url(target, {urlparse(target).hostname or ""})
+        return target
+
+    def _fetch(self, session, url, timeout, interval):
+        current = url
+        for followed in range(self.MAX_REDIRECTS + 1):
+            host = urlparse(current).hostname
+            _approved_url(current, {host})
+            _wait_for_host(host, interval)
+            response = session.get(current, timeout=timeout, allow_redirects=False, stream=True)
+            try:
+                _approved_url(str(response.url or current), {host})
+                status = response.status_code
+                if 300 <= status < 400:
+                    current = self.redirect_target(current, response.headers.get("Location"), followed)
+                    continue
+                body = bytearray()
+                if 200 <= status < 300:
+                    for chunk in response.iter_content(chunk_size=64 * 1024):
+                        if len(body) + len(chunk) > self.MAX_BYTES:
+                            raise ValueError("robots response exceeds max_bytes")
+                        body.extend(chunk)
+                return self.evaluate(url, status, body.decode("utf-8-sig"),
+                                     documented_open_api=self.documented_open_api)
+            finally:
+                response.close()
 
     def check(self, session, url, allowed_hosts, timeout, min_interval_seconds=0) -> float:
+        import requests
+
         _approved_url(url, allowed_hosts)
         parsed = urlparse(url)
         host = parsed.hostname.lower().rstrip(".")
@@ -86,34 +152,25 @@ class RobotsPolicy:
             robots_url = f"https://{host}/robots.txt"
             try:
                 if self.fetcher is None:
-                    response = get(session, robots_url, {host}, timeout,
-                                   min_interval_seconds=min_interval_seconds, max_bytes=256 * 1024)
-                    try:
-                        body = response.content.decode("utf-8-sig")
-                    finally:
-                        response.close()
+                    self._cache[host] = self._fetch(session, robots_url, timeout, min_interval_seconds)
                 else:
-                    body = self.fetcher(robots_url)
-                if not isinstance(body, str) or not body.strip() or body.lstrip().startswith("<"):
-                    raise ValueError("invalid robots response")
-                parser = RobotFileParser(robots_url)
-                parser.parse(body.splitlines())
-                self._cache[host] = parser
+                    self._cache[host] = self.evaluate(robots_url, 200, self.fetcher(robots_url),
+                                                     documented_open_api=self.documented_open_api)
             except (requests.RequestException, RuntimeError, ValueError, OSError):
-                self._cache[host] = None
-        parser = self._cache[host]
-        if parser is None:
-            if (parsed.path or "/").startswith(self.forbidden_prefixes):
-                raise RobotsDisallowed(f"robots unavailable; forbidden prefix: {url}")
-            return 0
-        if not parser.can_fetch(self.user_agent, url):
+                self._cache[host] = "UNVERIFIED", None
+        state, parser = self._cache[host]
+        if state not in self.ALLOWED:
+            raise RobotsDisallowed(f"{state}: {url}")
+        if parser and not parser.can_fetch(self.user_agent, url):
             raise RobotsDisallowed(f"robots disallow: {url}")
-        return parser.crawl_delay(self.user_agent) or 0
+        return (parser.crawl_delay(self.user_agent) or 0) if parser else 0
 
 
 def get(session: requests.Session, url: str, allowed_hosts: set[str], timeout: int = 60, *,
         min_interval_seconds: float = 0, bearer_token: str | None = None,
         max_bytes: int | None = None, robots_policy: RobotsPolicy | None = None) -> requests.Response:
+    import requests
+
     _approved_url(url, allowed_hosts)
     if not math.isfinite(min_interval_seconds) or min_interval_seconds < 0:
         raise ValueError("min_interval_seconds must be finite and nonnegative")
