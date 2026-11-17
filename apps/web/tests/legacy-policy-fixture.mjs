@@ -1,9 +1,9 @@
 import { readFile } from "node:fs/promises";
 
 const publicRoot = new URL("../public/data/", import.meta.url);
-// Keep this immutable history pin in sync with tests/governed_policy_fixture.py.
+// Schema-1 refusal control compiled from the current catalog; replay history stays immutable.
 const legacyPolicy = new URL(
-  "../../../docs/govintel/source-policy-history/3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501.json",
+  "../../../tests/fixtures/source-policy/retired-catalog-legacy-policy.json",
   import.meta.url,
 );
 const legacyPublicPolicyFields = [

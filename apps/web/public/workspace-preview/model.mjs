@@ -3,7 +3,7 @@ export const VIEWS = Object.freeze(['overview', 'ask', 'event', 'handoff', 'sour
 export const STORAGE_KEY = 'govintel:synthetic-workspace:v1';
 export const EVENT_IDS = Object.freeze(['demo-activity', 'demo-council', 'demo-fraud']);
 export const SCENARIOS = Object.freeze(['conflict', 'aligned', 'stale']);
-export const EXPECTED_SOURCES = Object.freeze(['S-004', 'S-006', 'S-007', 'S-009', 'S-029']);
+export const EXPECTED_SOURCES = Object.freeze(['S-004', 'S-006', 'S-007', 'S-009']);
 export const MAX_AGE_MS = 16 * 60 * 60 * 1000;
 export const DEMO_EVENTS = Object.freeze([
   { id: 'demo-activity', title: '西屯週末活動', tag: '交通', district: '西屯區', summary: '道路管制開始時間有新版本，請先比對再更新交班。', reason: '示例：交班稿 v1 的交通時間引用受到影響。' },
@@ -98,7 +98,7 @@ export function inspectSnapshot(feed, status, brief, now = Date.now()) {
   if (!Number.isFinite(time(feed.generated_at)) || !Number.isFinite(time(brief.generated_at))) throw new Error('TIME_INVALID');
   if (!Array.isArray(feed.items) || feed.items.length > 10000 || !Array.isArray(status.sources)) throw new Error('ARRAY_INVALID');
   const ids = status.sources.map(s => s?.source_id);
-  if (ids.length !== 5 || new Set(ids).size !== 5 || ids.some(id => !EXPECTED_SOURCES.includes(id))) throw new Error('SOURCE_COVERAGE_INVALID');
+  if (ids.length !== EXPECTED_SOURCES.length || new Set(ids).size !== EXPECTED_SOURCES.length || ids.some(id => !EXPECTED_SOURCES.includes(id))) throw new Error('SOURCE_COVERAGE_INVALID');
   if (feed.items.some(i => !i || typeof i.stable_id !== 'string' || typeof i.title !== 'string' || !ids.includes(i.source_id)) || new Set(feed.items.map(i => i.stable_id)).size !== feed.items.length) throw new Error('ROW_INVALID');
   const sourceGap = status.sources.some(s =>
     s.source_health !== 'PASS' ||

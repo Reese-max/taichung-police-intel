@@ -266,9 +266,7 @@ class SourceIngestionContractTests(unittest.TestCase):
             self.assertEqual((s009["current_source_health"], s009["result"]), ("PASS", "PARTIAL"))
             self.assertIn("WINDOW_PARTIAL", s009["intelligence_gaps"])
             self.assertIsNotNone(s009["last_known_good"])
-            s029 = state["source_status"]["S-029"]
-            self.assertEqual(s029["freshness_status"], "FRESH")
-            self.assertEqual(s029["last_known_good"]["snapshot_item_count"], 19)
+            self.assertNotIn("S-029", state["source_status"])
             self.assertEqual(len(state["current_items"]), 2)
 
     def test_d2_failure_is_isolated_and_does_not_overwrite_lkg(self) -> None:

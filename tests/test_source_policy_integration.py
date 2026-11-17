@@ -52,7 +52,7 @@ class SourcePolicyIntegrationTests(unittest.TestCase):
     def test_fictional_promotion_preserves_the_remaining_candidate_lane(self):
         source = ROOT / "scripts/candidate_publication.py"
         original = source.read_bytes()
-        rows = [{"source_id": sid, "marker": sid} for sid in ("S-001", "S-019", "S-032")]
+        rows = [{"source_id": sid, "marker": sid} for sid in ("S-001", "S-032")]
         status = {"candidate_sources": copy.deepcopy(rows)}
         feed = {"candidate_items": copy.deepcopy(rows),
                 "candidate_source_summary": {row["source_id"]: {"item_count": 1} for row in rows}}
@@ -66,12 +66,12 @@ class SourcePolicyIntegrationTests(unittest.TestCase):
             scope = {}
             exec(compile((fixture / "scripts/candidate_publication.py").read_text(), str(source), "exec"),
                  {"__file__": str(fixture / "scripts/candidate_publication.py")}, scope)
-            self.assertEqual(scope["CANDIDATE_PUBLICATION_SOURCE_IDS"], ("S-001", "S-019"))
-        self.assertEqual(status["candidate_sources"], rows[:2])
-        self.assertEqual(feed["candidate_items"], rows[:2])
-        self.assertEqual(feed["candidate_source_summary"], {sid: {"item_count": 1} for sid in ("S-001", "S-019")})
+            self.assertEqual(scope["CANDIDATE_PUBLICATION_SOURCE_IDS"], ("S-001",))
+        self.assertEqual(status["candidate_sources"], rows[:1])
+        self.assertEqual(feed["candidate_items"], rows[:1])
+        self.assertEqual(feed["candidate_source_summary"], {sid: {"item_count": 1} for sid in ("S-001",)})
         self.assertEqual(source.read_bytes(), original)
-        self.assertEqual(brief["candidate_source_context"], {"sources": rows[:2], "items": rows[:2],
+        self.assertEqual(brief["candidate_source_context"], {"sources": rows[:1], "items": rows[:1],
                                                             "promotion_eligible": False})
 
     def test_candidate_reconciliation_refuses_the_real_checkout(self):

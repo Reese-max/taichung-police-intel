@@ -3,8 +3,7 @@
     "S-004",
     "S-006",
     "S-007",
-    "S-009",
-    "S-029"
+    "S-009"
   ],
   "active_sources": [
     {
@@ -20,7 +19,7 @@
         "fresh_hours": 1080,
         "query_snapshot_max_age_seconds": 57600,
         "rule_ref": {
-          "file_sha256": "8b1067f516ee4b4c2c2def20cf24cbf5818c046aa3494470a637dbe2db1f4b63",
+          "file_sha256": "a4de1a6e17233ce0af2ca383416587a7d02b2e9966815186ae6c990f817ef4fc",
           "path": "intel_v2/freshness_policy.py"
         },
         "rule_status": "EXISTING_CONTROLLED_RULE",
@@ -51,12 +50,12 @@
           "OFFICIAL_HTML_PDF_ATTACHMENT"
         ],
         "excerpt_allowed": false,
-        "file_sha256": "da6fbe0e4fa92b03cab4f6e8069922d2ce5c0f81d32ecfce2e8dccafc9cff218",
+        "file_sha256": "8fe0ca4ca63ee6b332fedf985dda08df3f2022273625602fdf8f36761edbaf13",
         "full_text_allowed": false,
         "may_claim_open_permission": false,
         "path": "docs/govintel/retention-rights-policy.v1.json",
-        "policy_hash": "6a52c17625af49cf4b618bbcd22a4909c23df3efd2f92ff70ae2935e8643cf13",
-        "policy_version": 3,
+        "policy_hash": "18809f223924adaa70b3015768717f0c36a76ab7e26bb660f2fa9c0479529727",
+        "policy_version": 4,
         "public_fields": [
           "source_id",
           "source_name",
@@ -109,7 +108,7 @@
         "fresh_hours": 336,
         "query_snapshot_max_age_seconds": 57600,
         "rule_ref": {
-          "file_sha256": "8b1067f516ee4b4c2c2def20cf24cbf5818c046aa3494470a637dbe2db1f4b63",
+          "file_sha256": "a4de1a6e17233ce0af2ca383416587a7d02b2e9966815186ae6c990f817ef4fc",
           "path": "intel_v2/freshness_policy.py"
         },
         "rule_status": "EXISTING_CONTROLLED_RULE",
@@ -140,12 +139,12 @@
           "OFFICIAL_HTML_PDF_ATTACHMENT"
         ],
         "excerpt_allowed": false,
-        "file_sha256": "da6fbe0e4fa92b03cab4f6e8069922d2ce5c0f81d32ecfce2e8dccafc9cff218",
+        "file_sha256": "8fe0ca4ca63ee6b332fedf985dda08df3f2022273625602fdf8f36761edbaf13",
         "full_text_allowed": false,
         "may_claim_open_permission": false,
         "path": "docs/govintel/retention-rights-policy.v1.json",
-        "policy_hash": "6a52c17625af49cf4b618bbcd22a4909c23df3efd2f92ff70ae2935e8643cf13",
-        "policy_version": 3,
+        "policy_hash": "18809f223924adaa70b3015768717f0c36a76ab7e26bb660f2fa9c0479529727",
+        "policy_version": 4,
         "public_fields": [
           "source_id",
           "source_name",
@@ -198,7 +197,7 @@
         "fresh_hours": 2160,
         "query_snapshot_max_age_seconds": 57600,
         "rule_ref": {
-          "file_sha256": "8b1067f516ee4b4c2c2def20cf24cbf5818c046aa3494470a637dbe2db1f4b63",
+          "file_sha256": "a4de1a6e17233ce0af2ca383416587a7d02b2e9966815186ae6c990f817ef4fc",
           "path": "intel_v2/freshness_policy.py"
         },
         "rule_status": "EXISTING_CONTROLLED_RULE",
@@ -229,12 +228,12 @@
           "OFFICIAL_HTML_PDF_ATTACHMENT"
         ],
         "excerpt_allowed": false,
-        "file_sha256": "da6fbe0e4fa92b03cab4f6e8069922d2ce5c0f81d32ecfce2e8dccafc9cff218",
+        "file_sha256": "8fe0ca4ca63ee6b332fedf985dda08df3f2022273625602fdf8f36761edbaf13",
         "full_text_allowed": false,
         "may_claim_open_permission": false,
         "path": "docs/govintel/retention-rights-policy.v1.json",
-        "policy_hash": "6a52c17625af49cf4b618bbcd22a4909c23df3efd2f92ff70ae2935e8643cf13",
-        "policy_version": 3,
+        "policy_hash": "18809f223924adaa70b3015768717f0c36a76ab7e26bb660f2fa9c0479529727",
+        "policy_version": 4,
         "public_fields": [
           "source_id",
           "source_name",
@@ -287,7 +286,7 @@
         "fresh_hours": 336,
         "query_snapshot_max_age_seconds": 57600,
         "rule_ref": {
-          "file_sha256": "8b1067f516ee4b4c2c2def20cf24cbf5818c046aa3494470a637dbe2db1f4b63",
+          "file_sha256": "a4de1a6e17233ce0af2ca383416587a7d02b2e9966815186ae6c990f817ef4fc",
           "path": "intel_v2/freshness_policy.py"
         },
         "rule_status": "EXISTING_CONTROLLED_RULE",
@@ -318,12 +317,12 @@
           "OFFICIAL_HTML_PDF_ATTACHMENT"
         ],
         "excerpt_allowed": false,
-        "file_sha256": "da6fbe0e4fa92b03cab4f6e8069922d2ce5c0f81d32ecfce2e8dccafc9cff218",
+        "file_sha256": "8fe0ca4ca63ee6b332fedf985dda08df3f2022273625602fdf8f36761edbaf13",
         "full_text_allowed": false,
         "may_claim_open_permission": false,
         "path": "docs/govintel/retention-rights-policy.v1.json",
-        "policy_hash": "6a52c17625af49cf4b618bbcd22a4909c23df3efd2f92ff70ae2935e8643cf13",
-        "policy_version": 3,
+        "policy_hash": "18809f223924adaa70b3015768717f0c36a76ab7e26bb660f2fa9c0479529727",
+        "policy_version": 4,
         "public_fields": [
           "source_id",
           "source_name",
@@ -362,95 +361,6 @@
         "status": "UNKNOWN",
         "valid_time_semantics": null
       }
-    },
-    {
-      "approved_origins": [
-        "https://www.rdec.taichung.gov.tw"
-      ],
-      "authority": "臺中市政府研究發展考核委員會",
-      "cadence_class": "DAILY_EVENT",
-      "entrypoint": "https://www.rdec.taichung.gov.tw/12047/12142/12145",
-      "freshness_policy": {
-        "cadence_class": "DAILY_EVENT",
-        "collection_recency_is_not_event_or_world_completeness": true,
-        "fresh_hours": 1080,
-        "query_snapshot_max_age_seconds": 57600,
-        "rule_ref": {
-          "file_sha256": "8b1067f516ee4b4c2c2def20cf24cbf5818c046aa3494470a637dbe2db1f4b63",
-          "path": "intel_v2/freshness_policy.py"
-        },
-        "rule_status": "EXISTING_CONTROLLED_RULE",
-        "stale_hours": 2160
-      },
-      "geographic_scope": {
-        "declared_scope": null,
-        "may_infer_citywide_coverage": false,
-        "status": "UNKNOWN"
-      },
-      "integration_status": "PRODUCTION_ACTIVE",
-      "name": "臺中市政府議會專案報告",
-      "original_source_identity": {
-        "authority": "臺中市政府研究發展考核委員會",
-        "entrypoint": "https://www.rdec.taichung.gov.tw/12047/12142/12145",
-        "name": "臺中市政府議會專案報告",
-        "source_id": "S-029"
-      },
-      "rights_retention_public_policy_refs": {
-        "archive_eligibility": "EVIDENCE_ARCHIVE",
-        "canonical_retention_class": "PROVENANCE_HISTORY",
-        "canonical_retention_window": {
-          "expired_action": "KEEP_AUDIT_LINKAGE",
-          "max_age_days": null
-        },
-        "class_id": "OFFICIAL_METADATA_LINK",
-        "data_types": [
-          "OFFICIAL_HTML_PDF_ATTACHMENT"
-        ],
-        "excerpt_allowed": false,
-        "file_sha256": "da6fbe0e4fa92b03cab4f6e8069922d2ce5c0f81d32ecfce2e8dccafc9cff218",
-        "full_text_allowed": false,
-        "may_claim_open_permission": false,
-        "path": "docs/govintel/retention-rights-policy.v1.json",
-        "policy_hash": "6a52c17625af49cf4b618bbcd22a4909c23df3efd2f92ff70ae2935e8643cf13",
-        "policy_version": 3,
-        "public_fields": [
-          "source_id",
-          "source_name",
-          "title",
-          "official_url",
-          "published_at",
-          "data_as_of",
-          "fetched_at",
-          "freshness_status",
-          "change_type",
-          "evidence_count",
-          "content_sha256"
-        ],
-        "public_projection": "METADATA_LINK_ONLY",
-        "raw_retention_class": "SOURCE_TERMS_REVIEW",
-        "raw_retention_window": {
-          "expired_action": "REVIEW_REQUIRED",
-          "max_age_days": null
-        },
-        "review_required": false,
-        "rights_status": "OWNER_ASSERTED_PERMISSION",
-        "sensitive_default": false,
-        "terms_status": "OWNER_DECISION_TERMS_NOT_VERIFIED",
-        "terms_url": "https://www.rdec.taichung.gov.tw/12047/12142/12145",
-        "withdrawal_behavior": "KEEP_HASH_MARK_SOURCE_UNAVAILABLE",
-        "withdrawal_projection": "SOURCE_NO_LONGER_AVAILABLE"
-      },
-      "role": "PRIMARY_REFERENCE",
-      "source_id": "S-029",
-      "status": "PRODUCTION_ACTIVE",
-      "temporal_semantics": {
-        "catalog_collection_rule": "Enumerate the latest council session and hash police-related official PDFs.",
-        "catalog_evidence_rule": "Official PDF is authoritative.",
-        "fetched_at_is_observation_only": true,
-        "may_infer_event_valid_time": false,
-        "status": "UNKNOWN",
-        "valid_time_semantics": null
-      }
     }
   ],
   "candidate_source_governance": [
@@ -464,7 +374,7 @@
         "fresh_hours": 13,
         "query_snapshot_max_age_seconds": 57600,
         "rule_ref": {
-          "file_sha256": "8b1067f516ee4b4c2c2def20cf24cbf5818c046aa3494470a637dbe2db1f4b63",
+          "file_sha256": "a4de1a6e17233ce0af2ca383416587a7d02b2e9966815186ae6c990f817ef4fc",
           "path": "intel_v2/freshness_policy.py"
         },
         "rule_status": "EXISTING_CONTROLLED_RULE",
@@ -494,12 +404,12 @@
           "OFFICIAL_HTML_PDF_ATTACHMENT"
         ],
         "excerpt_allowed": false,
-        "file_sha256": "da6fbe0e4fa92b03cab4f6e8069922d2ce5c0f81d32ecfce2e8dccafc9cff218",
+        "file_sha256": "8fe0ca4ca63ee6b332fedf985dda08df3f2022273625602fdf8f36761edbaf13",
         "full_text_allowed": false,
         "may_claim_open_permission": false,
         "path": "docs/govintel/retention-rights-policy.v1.json",
-        "policy_hash": "6a52c17625af49cf4b618bbcd22a4909c23df3efd2f92ff70ae2935e8643cf13",
-        "policy_version": 3,
+        "policy_hash": "18809f223924adaa70b3015768717f0c36a76ab7e26bb660f2fa9c0479529727",
+        "policy_version": 4,
         "public_fields": [
           "source_id",
           "source_name",
@@ -546,13 +456,10 @@
         "S-001",
         "S-010",
         "S-011",
-        "S-019",
         "S-026",
         "S-028",
         "S-031",
         "S-032",
-        "S-033",
-        "S-034",
         "S-035",
         "S-036",
         "S-037"
@@ -564,8 +471,7 @@
         "S-004",
         "S-006",
         "S-007",
-        "S-009",
-        "S-029"
+        "S-009"
       ],
       "supported": true
     },
@@ -576,13 +482,10 @@
         "S-001",
         "S-010",
         "S-011",
-        "S-019",
         "S-026",
         "S-028",
         "S-031",
         "S-032",
-        "S-033",
-        "S-034",
         "S-035",
         "S-036",
         "S-037"
@@ -594,8 +497,7 @@
         "S-004",
         "S-006",
         "S-007",
-        "S-009",
-        "S-029"
+        "S-009"
       ],
       "supported": true
     },
@@ -611,8 +513,7 @@
         "S-004",
         "S-006",
         "S-007",
-        "S-009",
-        "S-029"
+        "S-009"
       ],
       "supported": true
     },
@@ -637,19 +538,19 @@
       "supported": false
     }
   ],
-  "catalog_hash": "5088623df5af4b8a30f4c597c51235c0f36a3dfd8bc4f2aea9af8f26d10213ef",
+  "catalog_hash": "e301a29664700b6e4b31d52d835dd7a0b97a6bac93c6187fa49e6efed3f27231",
   "catalog_schema_version": 2,
-  "catalog_updated_at": "2026-10-06",
+  "catalog_updated_at": "2026-11-17",
   "governance_binding": {
-    "catalog_hash": "5088623df5af4b8a30f4c597c51235c0f36a3dfd8bc4f2aea9af8f26d10213ef",
+    "catalog_hash": "e301a29664700b6e4b31d52d835dd7a0b97a6bac93c6187fa49e6efed3f27231",
     "derived_summary_policy": {
       "archive_eligibility": "EVIDENCE_ARCHIVE",
       "canonical_retention_class": "DERIVATION_HISTORY",
       "excerpt_allowed": false,
       "full_text_allowed": false,
       "policy_ref": {
-        "file_sha256": "da6fbe0e4fa92b03cab4f6e8069922d2ce5c0f81d32ecfce2e8dccafc9cff218",
-        "policy_hash": "6a52c17625af49cf4b618bbcd22a4909c23df3efd2f92ff70ae2935e8643cf13"
+        "file_sha256": "8fe0ca4ca63ee6b332fedf985dda08df3f2022273625602fdf8f36761edbaf13",
+        "policy_hash": "18809f223924adaa70b3015768717f0c36a76ab7e26bb660f2fa9c0479529727"
       },
       "public_fields": [
         "claim_id",
@@ -672,10 +573,10 @@
       "VERIFIED_METADATA_PERMISSION"
     ],
     "freshness_rules": {
-      "file_sha256": "8b1067f516ee4b4c2c2def20cf24cbf5818c046aa3494470a637dbe2db1f4b63",
+      "file_sha256": "a4de1a6e17233ce0af2ca383416587a7d02b2e9966815186ae6c990f817ef4fc",
       "path": "intel_v2/freshness_policy.py"
     },
-    "governance_hash": "640d40cf18e32e561273d9525c7235888aa931a8c5be9f29700ae880d8b6f09d",
+    "governance_hash": "0c665cbd4bbb6cbeac930043b07e4e894f0a386a0aa79874670b29e85e9e405b",
     "prohibited_public_fields": [
       "body",
       "credentials",
@@ -688,15 +589,15 @@
     ],
     "query_snapshot_max_age_seconds": 57600,
     "retention_policy": {
-      "file_sha256": "da6fbe0e4fa92b03cab4f6e8069922d2ce5c0f81d32ecfce2e8dccafc9cff218",
+      "file_sha256": "8fe0ca4ca63ee6b332fedf985dda08df3f2022273625602fdf8f36761edbaf13",
       "path": "docs/govintel/retention-rights-policy.v1.json",
-      "policy_hash": "6a52c17625af49cf4b618bbcd22a4909c23df3efd2f92ff70ae2935e8643cf13",
-      "policy_version": 3
+      "policy_hash": "18809f223924adaa70b3015768717f0c36a76ab7e26bb660f2fa9c0479529727",
+      "policy_version": 4
     }
   },
-  "parent_policy_hash": "3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501",
-  "policy_hash": "f027315e3fcb17d2e8825ad5d797a7c7aa60113e1a2562880f9a6bc6b8aaa62b",
-  "policy_version": 2,
+  "parent_policy_hash": "f027315e3fcb17d2e8825ad5d797a7c7aa60113e1a2562880f9a6bc6b8aaa62b",
+  "policy_hash": "8cf9a92e5a3a14850e3c34d37b55e739883b20ee20fd19d1c61d4a040265aae8",
+  "policy_version": 3,
   "rules": {
     "candidate_sources_are_verified": false,
     "legacy_policy_may_answer_current_formal_query": false,
@@ -707,6 +608,12 @@
   "schema_version": 2,
   "transition": {
     "promoted": [],
-    "retired": []
+    "retired": [
+      {
+        "reason": "Owner decision 2026-11-17: 無法用就刪除. Retire S-029 from collection and current publication. Owner-supplied observations on 2026-11-17 Asia/Taipei: rdec.taichung.gov.tw/12047/12142/12145 has TLS hostname mismatch; bypassed verification yielded only a 571-byte live.taichung.gov.tw announcement, not project reports. source-status records CONNECTTIMEOUT / SOURCE_FAILED; last success 2026-11-15. No new collection or independent network verification was performed for this retirement. S-019 has the same TLS/announcement failure and CI http_status=0 since 2026-11-16T16:31Z; S-033 returned announcement HTML instead of RSS; S-034 datacenter.taichung.gov.tw is NXDOMAIN (including 8.8.8.8), alternate newdatacenter same path returns 502. All four removed by this owner decision; historical evidence remains unchanged.",
+        "receipt_id": "owner-decision:2026-11-17:retire-unavailable-sources",
+        "source_id": "S-029"
+      }
+    ]
   }
 }

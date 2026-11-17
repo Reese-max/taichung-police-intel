@@ -6,9 +6,8 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-# Keep this issue's publication scope bounded. S-031 and S-033 remain observation
-# candidates in the canary workflow but are intentionally not part of the Pages lane.
-CANDIDATE_PUBLICATION_SOURCE_IDS = ("S-001", "S-019", "S-032")
+# S-031 remains an observation candidate outside the Pages lane.
+CANDIDATE_PUBLICATION_SOURCE_IDS = ("S-001", "S-032")
 CANDIDATE_CATALOG_STATUSES = {"AUDITED_EXISTING", "VERIFIED_CANDIDATE"}
 
 

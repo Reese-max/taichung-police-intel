@@ -616,29 +616,7 @@
       "independent_source_id": "NPA-165-FAMILY",
       "batch": "EXISTING"
     },
-    {
-      "inventory_id": "NPA-TAICHUNG-ACCIDENTS",
-      "source_key": "S-034",
-      "name": "臺中市政府警察局交通事故逐案公開資料",
-      "authority": "臺中市政府警察局",
-      "official_url": "https://datacenter.taichung.gov.tw/swagger/yaml/387130000C",
-      "transport": "official OAS metadata + monthly resource",
-      "update_cadence": "MONTHLY_RESOURCE_UPDATE",
-      "fields": ["事故編號", "事故時間", "事故地點", "事故類別", "資料期別"],
-      "source_terms": "TAICHUNG_DATA_TERMS_REVIEW_REQUIRED",
-      "contains_personal_data": false,
-      "role": "PRIMARY_REFERENCE",
-      "geographic_scope": "TAICHUNG",
-      "temporal_semantics": "ACCIDENT_TIME_AND_PERIOD",
-      "realtime_allowed": false,
-      "use_case": "local_accident_reference_preferred_over_national_copy",
-      "related_source_ids": ["NPA-12818", "NPA-57023", "NPA-13139"],
-      "dedupe_group": "TRAFFIC_ACCIDENT",
-      "integration_status": "EXISTING_CATALOG",
-      "catalog_source_id": "S-034",
-      "independent_source_id": "TAICHUNG-ACCIDENTS-DIRECT",
-      "batch": "EXISTING"
-    },
+
     {
       "inventory_id": "NPA-14420",
       "dataset_id": "14420",

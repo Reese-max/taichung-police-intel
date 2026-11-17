@@ -1,6 +1,6 @@
 {
   "schema_version": 2,
-  "updated_at": "2026-10-06",
+  "updated_at": "2026-11-17",
   "purpose": "GovIntel AI prioritized public-source catalog for event detection, evidence, policy/reference data, and enrichment.",
   "status_semantics": {
     "PRODUCTION_ACTIVE": "Already used by the current production collector path.",
@@ -115,21 +115,6 @@
       "evidence_rule": "Official video and meeting page are authoritative."
     },
     {
-      "source_id": "S-019",
-      "name": "臺中市政府市政會議紀錄與專案報告",
-      "authority": "臺中市政府研究發展考核委員會",
-      "role": "PRIMARY_EVENT",
-      "priority": 1,
-      "status": "AUDITED_EXISTING",
-      "entrypoint": "https://www.rdec.taichung.gov.tw/12047/12142/12186",
-      "transport": "HTML list + PDF/ODT attachments",
-      "cadence_class": "DAILY_EVENT",
-      "recommended_interval_minutes": 1440,
-      "collection_rule": "Track meeting number, official publish date, final attachment hash and revision date.",
-      "evidence_rule": "Meeting record and official attachments are primary evidence.",
-      "promotion_order": 1
-    },
-    {
       "source_id": "S-026",
       "name": "臺中市政府主管法規共用系統",
       "authority": "臺中市政府",
@@ -157,20 +142,6 @@
       "recommended_interval_minutes": 1440,
       "collection_rule": "Check metadata/resource ID first; download only when a new resource or period appears.",
       "evidence_rule": "Store statistical period, resource ID, full-resource hash and publisher metadata."
-    },
-    {
-      "source_id": "S-029",
-      "name": "臺中市政府議會專案報告",
-      "authority": "臺中市政府研究發展考核委員會",
-      "role": "PRIMARY_REFERENCE",
-      "priority": 1,
-      "status": "PRODUCTION_ACTIVE",
-      "entrypoint": "https://www.rdec.taichung.gov.tw/12047/12142/12145",
-      "transport": "HTML list + PDF attachments",
-      "cadence_class": "DAILY_EVENT",
-      "recommended_interval_minutes": 720,
-      "collection_rule": "Enumerate the latest council session and hash police-related official PDFs.",
-      "evidence_rule": "Official PDF is authoritative."
     },
     {
       "source_id": "S-031",
@@ -204,36 +175,6 @@
       "collection_rule": "Use the official latest-news list; fetch details only for new/changed IDs and capture publish date/unit.",
       "evidence_rule": "Official detail page is primary evidence.",
       "promotion_order": 3
-    },
-    {
-      "source_id": "S-033",
-      "name": "臺中市政府市政新聞",
-      "authority": "臺中市政府",
-      "role": "PRIMARY_EVENT",
-      "priority": 1,
-      "status": "VERIFIED_CANDIDATE",
-      "entrypoint": "https://www.taichung.gov.tw/",
-      "transport": "Official RSS feed + HTML detail",
-      "list_endpoint": "https://www.taichung.gov.tw/10179/564770/rss?nodeId=9962",
-      "cadence_class": "FAST_EVENT",
-      "recommended_interval_minutes": 30,
-      "collection_rule": "Use the official citywide RSS for cross-agency discovery; preserve its publication date and detail link. Do not treat syndicated agency posts as independent corroboration.",
-      "evidence_rule": "The linked city-government detail page is the primary official evidence for that post.",
-      "promotion_order": 4
-    },
-    {
-      "source_id": "S-034",
-      "name": "臺中市政府警察局交通事故逐案公開資料／OAS",
-      "authority": "臺中市政府警察局",
-      "role": "PRIMARY_REFERENCE",
-      "priority": 2,
-      "status": "VERIFIED_CANDIDATE",
-      "entrypoint": "https://datacenter.taichung.gov.tw/swagger/yaml/387130000C",
-      "transport": "OAS-described public data resources",
-      "cadence_class": "REFERENCE",
-      "recommended_interval_minutes": 1440,
-      "collection_rule": "Discover the latest monthly accident resource through official metadata; do not hard-code one month's dataset ID as the permanent source.",
-      "evidence_rule": "Preserve month, resource ID, schema version and raw resource hash."
     },
     {
       "source_id": "S-035",
@@ -310,10 +251,8 @@
     }
   ],
   "promotion_plan": [
-    "S-019",
     "S-001",
     "S-032",
-    "S-033",
     "S-031"
   ],
   "global_collection_guards": [

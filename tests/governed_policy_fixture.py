@@ -17,7 +17,7 @@ import sys
 import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
-LEGACY_POLICY_HASH = "3866b8d3a062291240bb2c8540d68055ed0cdfaf3ac5a72ffb570875327c8501"
+LEGACY_POLICY_FIXTURE = "tests/fixtures/source-policy/retired-catalog-legacy-policy.json"
 LEGACY_PUBLIC_POLICY_FIELDS = (
     "schema_version",
     "catalog_schema_version",
@@ -256,8 +256,11 @@ def make_legacy_policy_fixture(root, *, source_root=ROOT):
         "approved": root / "docs/govintel/source-policy.approved.json",
         "public": public,
     }
-    legacy_path = history / f"{LEGACY_POLICY_HASH}.json"
+    # A schema-1 refusal control for the current catalog; historical replay pins stay immutable.
+    legacy_path = source_root / LEGACY_POLICY_FIXTURE
     shutil.copyfile(legacy_path, paths["approved"])
+    legacy_policy = json.loads(legacy_path.read_text(encoding="utf-8"))
+    shutil.copyfile(legacy_path, root / "docs/govintel/source-policy-history" / f"{legacy_policy['policy_hash']}.json")
 
     matrix = json.loads(paths["rights_matrix"].read_text(encoding="utf-8"))
     for class_id in ("OFFICIAL_METADATA_LINK", "OFFICIAL_MEDIA_LINK",

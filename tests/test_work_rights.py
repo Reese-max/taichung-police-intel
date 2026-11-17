@@ -81,7 +81,10 @@ class WorkRightsTests(unittest.TestCase):
         self.assertEqual(sources["formal_admission"], policy.formal_admission(approved))
         review = json.loads((ROOT / self.packet["evidence"]["source_review"]["path"]).read_text(encoding="utf-8"))
         self.assertEqual(sorted(sources["source_ids"]), sorted(row["source_id"] for row in catalog["sources"]))
-        self.assertEqual(sorted(sources["source_ids"]), sorted(row["source_id"] for row in review["source_reviews"]))
+        self.assertEqual(sources["retired_source_ids"], ["S-019", "S-029", "S-033", "S-034"])
+        self.assertEqual(sorted(sources["source_ids"]), sorted(
+            row["source_id"] for row in review["source_reviews"]
+            if row["source_id"] not in sources["retired_source_ids"]))
         self.assertIs(sources["model_transmission_allowed"], False)
         self.assertTrue(all(row["review_required"] and not row["model_transmission_allowed"]
                             for row in review["source_reviews"]))

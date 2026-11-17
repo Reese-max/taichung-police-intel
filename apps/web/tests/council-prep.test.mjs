@@ -144,11 +144,9 @@ test("council fixture has oral answer with evidence ID and locator", () => {
   assert.ok(COUNCIL_FIXTURE.oral_answer.official_url.startsWith("https://"));
 });
 
-test("council fixture has project report with evidence ID and locator", () => {
-  assert.ok(COUNCIL_FIXTURE.project_report.evidence_id);
-  assert.equal(COUNCIL_FIXTURE.project_report.evidence_type, "WRITTEN_OFFICIAL");
-  assert.ok(COUNCIL_FIXTURE.project_report.locator);
-  assert.ok(COUNCIL_FIXTURE.project_report.official_url.startsWith("https://"));
+test("council fixture excludes the retired project report", () => {
+  assert.equal(COUNCIL_FIXTURE.project_report, undefined);
+  assert.ok(getFixtureEvidenceChain().every((row) => row.source_id !== "S-029"));
 });
 
 test("council fixture has meeting record with evidence ID and locator", () => {
@@ -166,7 +164,7 @@ test("council fixture has derived transcript labelled GROQ_ASR with navigation-o
 
 test("every fixture evidence has an evidence ID and official locator", () => {
   const chain = getFixtureEvidenceChain();
-  assert.ok(chain.length >= 5, "Fixture must have at least 5 evidence records");
+  assert.ok(chain.length === 4, "Fixture must retain all 4 available evidence records");
   for (const evidence of chain) {
     assert.ok(evidence.evidence_id, `Missing evidence_id in chain`);
     assert.ok(evidence.locator, `Missing locator for ${evidence.evidence_id}`);
@@ -263,7 +261,7 @@ test("claims without post-meeting evidence get UNVERIFIED_AFTER_MEETING", () => 
 });
 
 test("claims with valid post-meeting source are allowed", () => {
-  const result = enforceGap001({ post_meeting_evidence_source: "S-029" });
+  const result = enforceGap001({ post_meeting_evidence_source: "S-007" });
   assert.equal(result.allowed, true);
   assert.equal(result.gap, undefined);
 });

@@ -1,9 +1,7 @@
 // Temporary, authenticated diagnostic. The workflow deletes this Worker after
-// three fixed official GETs. No origin bytes or authentication are published.
+// a fixed official GET. No origin bytes or authentication are published.
 export const SOURCE_URLS = Object.freeze({
-  "S-029": "https://www.rdec.taichung.gov.tw/12047/12142/12145",
   "S-001": "https://www.police.taichung.gov.tw/ch/home.jsp?id=1&parentpath=0&mcustomize=news_list.jsp",
-  "S-019": "https://www.rdec.taichung.gov.tw/12047/12142/12186",
 });
 const MAX_BYTES = 2 * 1024 * 1024;
 const reply = (data, status = 200) => Response.json(data, {status, headers:{"Cache-Control":"no-store"}});

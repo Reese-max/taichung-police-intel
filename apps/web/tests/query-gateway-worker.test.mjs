@@ -50,7 +50,7 @@ test("Worker refuses canonical nested source-health payloads before returning ga
       const build = () => module.buildSnapshot(env, async artifact => ({bytes: bytes[artifact],
         hash: createHash("sha256").update(bytes[artifact]).digest("hex")}));
       if (field) await assert.rejects(build, /source.*(scalar|field|timestamp)/);
-      else assert.equal((await build()).sources.length, 5);
+      else assert.equal((await build()).sources.length, 4);
       globalThis.fetch = async url => {
         const name = String(url).split("/").at(-1);
         if (name === "release.json") {
@@ -65,7 +65,7 @@ test("Worker refuses canonical nested source-health payloads before returning ga
       const result = await response.json();
       assert.equal(response.status, field ? 503 : 200, field || "lawful health positive");
       assert.equal(JSON.stringify(result).includes("SYNTHETIC_SOURCE_PRIVATE_MARKER"), false);
-      if (!field) assert.equal(result.sources.length, 5);
+      if (!field) assert.equal(result.sources.length, 4);
     } finally { globalThis.fetch = originalFetch; await fixture.cleanup(); }
   }
 });
@@ -292,7 +292,7 @@ test("legacy public artifacts keep health but refuse answers without restoring t
       }
       const snapshot = await module.buildSnapshot(env, async name => ({ bytes: values[name], hash: createHash("sha256").update(values[name]).digest("hex") }));
       assert.equal(snapshot.items.length, 0, kind);
-      assert.equal(snapshot.sources.length, 5, kind);
+      assert.equal(snapshot.sources.length, 4, kind);
       assert.equal(snapshot.formalAdmission.status, kind === "legacy1" ? "UNKNOWN" : "RIGHTS_BLOCKED");
       const release = await module.createReleaseManifest(snapshot, env.CF_VERSION_METADATA.tag);
       const originalFetch = globalThis.fetch;
@@ -310,7 +310,7 @@ test("legacy public artifacts keep health but refuse answers without restoring t
         assert.equal(empty.body.query_coverage.can_state_bounded_no_match, false);
         const health = await call("get_source_health", {});
         assert.equal(health.status, 200);
-        assert.equal(health.body.sources.length, 5);
+        assert.equal(health.body.sources.length, 4);
         for (const tool of ["get_current_brief", "validate_answer"]) {
           const denied = await call(tool, tool === "validate_answer" ? { claims: [{ schema_version: 1, claim_id: "fictional-denied", text: "fictional",
             claim_type: "STATUS", temporal_scope: "CURRENT", proposition: { subject: "publication:WORKER-FIXTURE-1:title", value: "fictional" } }] } : {});

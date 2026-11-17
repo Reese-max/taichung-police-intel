@@ -482,48 +482,6 @@ def collect_s009(session: requests.Session, start: date, end: date) -> dict:
     }
 
 
-def load_canary_module():
-    path = ROOT / "canary-s026-s029.py"
-    spec = importlib.util.spec_from_file_location("canary_s026_s029", path)
-    if spec is None or spec.loader is None:
-        raise RuntimeError("cannot load S-029 canary")
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
-def collect_s029(session: requests.Session, start: date, end: date) -> dict:
-    # Preserve the bytes already validated by the canary. Fetching each URL a
-    # second time both doubles the official traffic and can make the stored
-    # snapshot disagree with the attachment hash in this observation.
-    responses = []
-    source = load_canary_module().fetch_s029(
-        session, start, end,
-        on_response=lambda response, purpose: responses.append(snapshot(response, purpose)),
-    )
-    items = []
-    for item in source["police_attachments"]:
-        payload = {key: item[key] for key in sorted(item)}
-        items.append(
-            {
-                "stable_key": item["item_id"],
-                "source_url": item["url"],
-                "published_at": published_at(item["published_at"]),
-                "content_sha256": canonical_sha256(payload),
-                "payload": payload,
-            }
-        )
-    return {
-        "source_health": source["source_health"],
-        "window_completeness": source["window_completeness"],
-        "window_item_count": len(source["window_items"]),
-        "snapshot_item_count": source["latest_session"]["parsed_count"],
-        "items": items,
-        "snapshots": responses,
-        "manifest_sha256": source["manifest_sha256"],
-    }
-
-
 # Candidate official news lists use a list-first rule: only a new or changed
 # list row fetches its detail page. They stay outside P0 publication until the
 # catalog promotion gates have fresh live evidence.
@@ -535,22 +493,11 @@ NEWS_LIST_SOURCES = {
         "fallback_list_url": "https://www.police.taichung.gov.tw/ch/home.jsp?id=1",
         "id_pattern": r"news_view\.jsp[^\"']*dataserno=(\d+)",
     },
-    "S-019": {
-        "name": "臺中市政府市政會議紀錄與專案報告",
-        "pages_candidate": True,
-        "list_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186",
-        "id_pattern": r"/(\d+)/post\b",
-    },
     "S-032": {
         "name": "臺中市政府交通局最新消息",
         "pages_candidate": True,
         "list_url": "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,20",
         "id_pattern": r"index-1\.asp\?Parser=9,4,20,,,,(\d+)",
-    },
-    "S-033": {
-        "name": "臺中市政府市政新聞",
-        "list_url": "https://www.taichung.gov.tw/10179/564770/rss?nodeId=9962",
-        "format": "rss",
     },
     "S-031": {
         "name": "臺中市政府消防局即時災情",
@@ -743,7 +690,7 @@ def next_news_list_page(html: bytes, base_url: str, source_id: str) -> tuple[str
         rel = {str(value).lower() for value in control.get("rel", [])}
         href = str(control.get("href") or "").strip()
         labels = (label, title, aria_label)
-        # S019's friendly utility bar says 回上一頁 but invokes browser history;
+        # A friendly utility bar says 回上一頁 but invokes browser history;
         # it is not the list's 上一頁 control. Exclude only the observed exact
         # utility, outside any actual pagination context; unknown JS stays unsafe.
         in_pager = any(
@@ -1159,11 +1106,8 @@ COLLECTORS = {
     "S-006": collect_download_list,
     "S-007": collect_s007,
     "S-009": collect_s009,
-    "S-029": collect_s029,
     "S-001": collect_news_list,
-    "S-019": collect_news_list,
     "S-032": collect_news_list,
-    "S-033": collect_news_list,
     "S-031": collect_fire_live,
 }
 
@@ -2100,8 +2044,6 @@ def project_feed_item(
         reason_codes.append("NEAR_MILESTONE")
     elif source_id in ("S-009",):
         reason_codes.append("POLICY_CHANGE")
-    elif source_id in ("S-029",):
-        reason_codes.append("CROSS_SOURCE")
     if baseline_only:
         reason_codes.append("FIRST_OBSERVATION_BASELINE")
     if not reason_codes:

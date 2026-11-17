@@ -357,7 +357,9 @@ class EntityRegistryTests(unittest.TestCase):
         "named_event:tc-council-regular-2026q4",
         "named_event:tc-council-regular-2027q1",
     )
-    NAME_DERIVATION_EVIDENCE = {"administrative-name", "official-road-name"}
+    NAME_DERIVATION_EVIDENCE = {"administrative-name", "official-road-name",
+                                "retired-source-catalog:2026-11-17:S-019",
+                                "retired-source-catalog:2026-11-17:S-033"}
 
     def test_shipped_registry_resolves_core_agencies_from_label_and_alias(self):
         """Pins #31 criterion 1: the core agency fixture set resolves as claimed.

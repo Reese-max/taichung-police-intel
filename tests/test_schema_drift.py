@@ -65,7 +65,6 @@ class SchemaDriftTests(unittest.TestCase):
     def test_all_required_news_contracts_use_real_parser_shapes(self):
         html = {
             "S-001": '<li><a href="news_view.jsp?dataserno=1">警政新聞 115-09-10</a></li>',
-            "S-019": '<li><a href="/12047/12142/12186/873338/post">會議紀錄</a></li>',
             "S-032": '<li><a href="index-1.asp?Parser=9,4,20,,,,21750">交通消息 115-09-10</a></li>',
         }
         for source_id, body in html.items():
@@ -79,7 +78,7 @@ class SchemaDriftTests(unittest.TestCase):
                 self.assertEqual(result["status"], "NO_DRIFT")
                 self.assertEqual(result["window_completeness"], "PARTIAL")
         result = drift.observe(
-            drift.CONTRACTS["S-033"], RSS, content_type="application/xml", final_url="https://official.test/rss"
+            drift._rss_news("TEST-RSS", "Synthetic RSS parser check"), RSS, content_type="application/xml", final_url="https://official.test/rss"
         )
         self.assertEqual(result["status"], "NO_DRIFT")
         self.assertEqual(result["window_completeness"], "PARTIAL")
@@ -92,7 +91,6 @@ class SchemaDriftTests(unittest.TestCase):
     def test_html_schema_samples_do_not_claim_a_complete_window_from_pager_shape(self):
         fixtures = {
             "S-001": '<li><a href="news_view.jsp?dataserno=1">警政新聞 115-09-10</a></li>',
-            "S-019": '<li><a href="/12047/12142/12186/873338/post">會議紀錄</a></li>',
             "S-032": '<li><a href="index-1.asp?Parser=9,4,20,,,,21750">交通消息 115-09-10</a></li>',
         }
         pagers = (
@@ -125,7 +123,7 @@ class SchemaDriftTests(unittest.TestCase):
         ):
             with self.subTest(body=body):
                 result = drift.observe(
-                    drift.CONTRACTS["S-033"], body,
+                    drift._rss_news("TEST-RSS", "Synthetic RSS parser check"), body,
                     content_type="application/xml", final_url="https://official.test/rss",
                 )
                 self.assertEqual(result["status"], "NO_DRIFT")
@@ -136,17 +134,17 @@ class SchemaDriftTests(unittest.TestCase):
 
     def test_partial_news_sample_keeps_good_schema_baseline_without_drift_alert(self):
         receipt, state = drift.build_receipt(
-            [{"source_id": "S-033", "body": RSS, "content_type": "application/xml"}],
-            contracts={"S-033": drift.CONTRACTS["S-033"]},
+            [{"source_id": "TEST-RSS", "body": RSS, "content_type": "application/xml"}],
+            contracts={"TEST-RSS": drift._rss_news("TEST-RSS", "Synthetic RSS parser check")},
         )
         self.assertEqual(receipt["overall"], "HEALTHY")
         self.assertEqual(receipt["sources"][0]["window_completeness"], "PARTIAL")
         self.assertEqual(receipt["review_inbox"], [])
-        self.assertEqual(state["sources"]["S-033"]["last_known_good"]["status"], "NO_DRIFT")
+        self.assertEqual(state["sources"]["TEST-RSS"]["last_known_good"]["status"], "NO_DRIFT")
 
     def test_rss_shape_break_is_fail_closed(self):
         result = drift.observe(
-            drift.CONTRACTS["S-033"], b"<rss><channel><item><title>missing identity</title></item></channel></rss>",
+            drift._rss_news("TEST-RSS", "Synthetic RSS parser check"), b"<rss><channel><item><title>missing identity</title></item></channel></rss>",
             content_type="application/xml",
         )
         self.assertEqual(result["status"], "BREAKING_DRIFT")
@@ -450,16 +448,16 @@ class SchemaDriftTests(unittest.TestCase):
         broken_html = "<html><body>200 but changed</body></html>"
         fingerprints = {
             drift.observe(contract, broken_html, content_type="text/html")["observed_schema_fingerprint"]
-            for contract in (drift.CONTRACTS["S-001"], drift.CONTRACTS["S-019"], drift.CONTRACTS["S-032"])
+            for contract in (drift.CONTRACTS["S-001"], drift.CONTRACTS["S-032"])
         }
-        self.assertEqual(len(fingerprints), 3)
+        self.assertEqual(len(fingerprints), 2)
 
     def test_every_fingerprinted_outcome_records_the_signature_it_hashed(self):
         api_result = drift.observe(drift.CONTRACTS["S-007"], json.dumps(API), content_type="application/json")
         self.assertIsNotNone(api_result["fingerprint_signature"])
         for contract, body, content_type in (
             (drift.CONTRACTS["S-001"], b"<html>no list</html>", "text/html"),
-            (drift.CONTRACTS["S-033"], b"<rss><channel></channel></rss>", "application/xml"),
+            (drift._rss_news("TEST-RSS", "Synthetic RSS parser check"), b"<rss><channel></channel></rss>", "application/xml"),
             (drift.CONTRACTS["S-031"], b"<div>no live list</div>", "text/html"),
             (drift.CONTRACTS["S-007"], b"not-json", "application/json"),
         ):

@@ -104,7 +104,7 @@ test("missing status and empty coverage remain unknown", () => {
 });
 test("missing one required source cannot masquerade as complete coverage", () => {
   const f = fixture();
-  f.status.sources = f.status.sources.filter((s) => s.source_id !== "S-029");
+  f.status.sources = f.status.sources.filter((s) => s.source_id !== "S-007");
   assert.equal(check(f).state, "UNKNOWN");
   assert.equal(check(f).canReassure, false);
 });

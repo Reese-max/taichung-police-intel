@@ -57,7 +57,7 @@ class RetentionPolicyTests(unittest.TestCase):
         compiled = retention.compile_policy(policy=self.reviewed_policy())
         self.assertFalse(compiled["source_policies"]["S-032"]["review_required"])
         self.assertEqual(compiled["source_policies"]["S-032"]["public_fields"], ["title", "official_url"])
-        self.assertEqual(compiled["source_policies"]["S-033"], default["source_policies"]["S-033"])
+        self.assertEqual(compiled["source_policies"]["S-001"], default["source_policies"]["S-001"])
         self.assertEqual(compiled["classes"], default["classes"])
         self.assertNotEqual(compiled["policy_hash"], default["policy_hash"])
         self.assertFalse(compiled["source_policies"]["S-032"]["full_text_allowed"])

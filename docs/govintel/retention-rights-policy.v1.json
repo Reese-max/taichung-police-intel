@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "policy_version": 3,
-  "updated_at": "2026-11-13",
+  "policy_version": 4,
+  "updated_at": "2026-11-17",
   "purpose": "Public projection and retention rules. Since 2026-11-13 third-party source classes are released by project owner decision; not a legal rights determination and not a per-source terms verification.",
   "retention_windows": {
     "SOURCE_TERMS_REVIEW": {
@@ -157,14 +157,10 @@
     "S-009": "OFFICIAL_METADATA_LINK",
     "S-010": "OFFICIAL_MEDIA_LINK",
     "S-011": "OFFICIAL_MEDIA_LINK",
-    "S-019": "OFFICIAL_METADATA_LINK",
     "S-026": "OFFICIAL_METADATA_LINK",
     "S-028": "REFERENCE_METADATA",
-    "S-029": "OFFICIAL_METADATA_LINK",
     "S-031": "OFFICIAL_TRANSIENT_METADATA",
     "S-032": "OFFICIAL_METADATA_LINK",
-    "S-033": "OFFICIAL_METADATA_LINK",
-    "S-034": "REFERENCE_METADATA",
     "S-035": "REFERENCE_METADATA",
     "S-036": "OFFICIAL_METADATA_LINK",
     "S-037": "REFERENCE_METADATA",

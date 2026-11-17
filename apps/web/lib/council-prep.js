@@ -191,7 +191,7 @@ export function resolveDegradedState(claim) {
 }
 
 // ── Council preparation fixture ───────────────────────────────────────────────
-// Fixed end-to-end fixture: agenda -> historical oral answer -> project report.
+// Fixed end-to-end fixture: agenda -> historical oral answer -> meeting record.
 // Every displayed fact has an evidence ID and official locator.
 export const COUNCIL_FIXTURE = Object.freeze({
   agenda_item: {
@@ -219,15 +219,6 @@ export const COUNCIL_FIXTURE = Object.freeze({
     locator: "timestamp:1335-1365",
     summary: "Chief answered: 'Will handle after reviewing the relevant regulations.'",
     content_label: "ORAL_OFFICIAL",
-  },
-  project_report: {
-    evidence_id: "EV-S029-20260724-R001",
-    evidence_type: "WRITTEN_OFFICIAL",
-    source_id: "S-029",
-    official_url: "https://www.rdec.taichung.gov.tw/12047/12142/12145",
-    locator: "page:1",
-    summary: "City government council project report listing police-related sessions.",
-    content_label: "WRITTEN_OFFICIAL",
   },
   meeting_record: {
     evidence_id: "EV-S007-20260427-MR001",
@@ -266,7 +257,6 @@ export function getFixtureEvidenceChain() {
   return [
     COUNCIL_FIXTURE.historical_question,
     COUNCIL_FIXTURE.oral_answer,
-    COUNCIL_FIXTURE.project_report,
     COUNCIL_FIXTURE.meeting_record,
     COUNCIL_FIXTURE.derived_transcript,
   ];

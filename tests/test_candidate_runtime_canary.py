@@ -15,7 +15,7 @@ spec = importlib.util.spec_from_file_location("candidate_runtime_canary", SCRIPT
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 NOW = datetime(2026, 9, 17, tzinfo=timezone.utc)
-SOURCES = ("S-001", "S-019", "S-032")
+SOURCES = ("S-001", "S-031", "S-032")
 
 
 class FakeSession:
@@ -140,7 +140,7 @@ class CanaryContractTests(unittest.TestCase):
             self.assertNotIn("body", str(item))
 
     def test_one_source_failure_preserves_other_observations_and_null_counts(self):
-        report = module.run_canary(collector("S-019"), list(SOURCES), NOW, session_factory=FakeSession)
+        report = module.run_canary(collector("S-031"), list(SOURCES), NOW, session_factory=FakeSession)
         self.assertEqual(report["failed_count"], 1)
         failed = report["sources"][1]
         self.assertEqual(failed["source_health"], "FAILED")
@@ -177,7 +177,7 @@ class CanaryContractTests(unittest.TestCase):
             observed.append(max_list_pages)
             return original(*args, **kwargs)
         fixture.collect_source = collect
-        report = module.run_canary(fixture, ["S-019"], NOW, session_factory=FakeSession, max_list_pages=25)
+        report = module.run_canary(fixture, ["S-031"], NOW, session_factory=FakeSession, max_list_pages=25)
         self.assertEqual(observed, [25])
         self.assertEqual(report["failed_count"], 0)
         self.assertFalse(report["sources"][0]["coverage_independently_verified"])
@@ -186,7 +186,7 @@ class CanaryContractTests(unittest.TestCase):
     def test_invalid_list_budget_rejected_before_session_creation(self):
         for value in (0, -1, True, 1.5, "6", 41):
             with self.subTest(value=value), self.assertRaises(ValueError):
-                module.run_canary(collector(), ["S-019"], NOW, session_factory=lambda _: self.fail("unexpected session"), max_list_pages=value)
+                module.run_canary(collector(), ["S-031"], NOW, session_factory=lambda _: self.fail("unexpected session"), max_list_pages=value)
 
     def test_explicit_http_budget_is_bounded_and_enforced(self):
         from unittest import mock
@@ -297,8 +297,8 @@ class CanaryContractTests(unittest.TestCase):
     def test_catalog_candidate_inventory_includes_live_adapters(self):
         import online_collect
 
-        self.assertIn("S-033", module.candidate_source_ids(online_collect))
-        self.assertIs(online_collect.COLLECTORS["S-033"], online_collect.collect_news_list)
+        self.assertNotIn("S-033", module.candidate_source_ids(online_collect))
+        self.assertNotIn("S-033", online_collect.COLLECTORS)
         self.assertIn("S-031", module.candidate_source_ids(online_collect))
         self.assertIs(online_collect.COLLECTORS["S-031"], online_collect.collect_fire_live)
 
@@ -312,7 +312,7 @@ class CanaryContractTests(unittest.TestCase):
         self.assertIsNotNone(matrix_match, "workflow must keep a source matrix")
         matrix = {item.strip() for item in matrix_match.group(1).split(",")}
         expected = set(module.candidate_source_ids(online_collect))
-        self.assertEqual(expected, {"S-001", "S-019", "S-031", "S-032", "S-033"})
+        self.assertEqual(expected, {"S-001", "S-031", "S-032"})
         self.assertEqual(matrix, expected)
 
     def test_existing_items_are_threaded_into_collect_source(self):
@@ -337,18 +337,18 @@ class CanaryContractTests(unittest.TestCase):
         )
 
     def test_failed_source_preserves_state_for_the_next_observation(self):
-        prior = {"S-019": {"old-item": {"content_sha256": "c" * 64}}}
+        prior = {"S-031": {"old-item": {"content_sha256": "c" * 64}}}
         report = module.run_canary(
-            collector(fail="S-019"), list(SOURCES), NOW,
+            collector(fail="S-031"), list(SOURCES), NOW,
             session_factory=FakeSession, existing_items=prior,
         )
         self.assertEqual(report["failed_count"], 1)
-        self.assertEqual(report["item_state"]["S-019"], {"old-item": "c" * 64})
+        self.assertEqual(report["item_state"]["S-031"], {"old-item": "c" * 64})
         self.assertEqual(report["item_state"]["S-032"], {"S-032-item-1": "b" * 64})
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "previous.json"
             path.write_text(json.dumps(report), encoding="utf-8")
-            self.assertEqual(module.load_existing_items(path)["S-019"], prior["S-019"])
+            self.assertEqual(module.load_existing_items(path)["S-031"], prior["S-031"])
 
     def test_rejected_observation_does_not_replace_prior_hashes(self):
         prior = {"S-001": {"S-001-item-1": {"content_sha256": "c" * 64}}}

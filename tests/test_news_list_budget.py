@@ -20,7 +20,7 @@ class NewsListBudgetTests(unittest.TestCase):
         for n, url in enumerate(urls, 1):
             day = date(2026, 9, 12 - n).isoformat()
             key = str(22000 - n)
-            href = f'index-1.asp?Parser=9,4,20,,,,{key}' if source_id == "S-032" else f'/12047/12142/12186/{key}/post'
+            href = f'index-1.asp?Parser=9,4,20,,,,{key}' if source_id == "S-032" else f'home.jsp?mcustomize=news_view.jsp&dataserno={key}'
             body = f'<li><a href="{href}">News {day}</a></li>'
             if n < length:
                 body += f'<a rel="next" href="{urls[n]}">Next</a>'
@@ -40,36 +40,36 @@ class NewsListBudgetTests(unittest.TestCase):
         return result, session, urls
 
     def test_navigation_header_footer_and_aside_are_not_list_rows(self):
-        html = f._page('<header><nav><li><a href="/447345/post">Undated menu</a></li></nav></header>'
+        html = f._page('<header><nav><li><a href="home.jsp?mcustomize=news_view.jsp&dataserno=447345">Undated menu</a></li></nav></header>'
             '<main id="center" class="center"><section class="list"><ul>'
-            '<li><a href="/3377338/post">Meeting 2026-09-10</a></li>'
-            '<li><a href="/3377300/post">Meeting 2026-09-01</a></li>'
+            '<li><a href="home.jsp?mcustomize=news_view.jsp&dataserno=3377338">Meeting 2026-09-10</a></li>'
+            '<li><a href="home.jsp?mcustomize=news_view.jsp&dataserno=3377300">Meeting 2026-09-01</a></li>'
             '</ul></section></main>'
-            '<aside><a href="/999999/post">Related 2026-10-07</a></aside>'
-            '<footer><a href="/443956/post">Undated contact</a></footer>')
-        entries=oc.parse_news_list(html,oc.NEWS_LIST_SOURCES['S-019']['list_url'],oc.NEWS_LIST_SOURCES['S-019']['id_pattern'])
+            '<aside><a href="home.jsp?mcustomize=news_view.jsp&dataserno=999999">Related 2026-10-07</a></aside>'
+            '<footer><a href="home.jsp?mcustomize=news_view.jsp&dataserno=443956">Undated contact</a></footer>')
+        entries=oc.parse_news_list(html,oc.NEWS_LIST_SOURCES['S-001']['list_url'],oc.NEWS_LIST_SOURCES['S-001']['id_pattern'])
         self.assertEqual([r['stable_key'] for r in entries], ['3377338','3377300'])
 
     def test_nav_same_id_cannot_shadow_dated_content_row(self):
-        html=f._page('<header><nav class="menu"><li><a href="/3377338/post">Menu</a></li></nav></header>'
-            '<main id="center"><section class="list"><ul><li><a href="/3377338/post">Meeting 2026-09-10</a></li></ul></section></main>')
-        entries=oc.parse_news_list(html,oc.NEWS_LIST_SOURCES['S-019']['list_url'],oc.NEWS_LIST_SOURCES['S-019']['id_pattern'])
+        html=f._page('<header><nav class="menu"><li><a href="home.jsp?mcustomize=news_view.jsp&dataserno=3377338">Menu</a></li></nav></header>'
+            '<main id="center"><section class="list"><ul><li><a href="home.jsp?mcustomize=news_view.jsp&dataserno=3377338">Meeting 2026-09-10</a></li></ul></section></main>')
+        entries=oc.parse_news_list(html,oc.NEWS_LIST_SOURCES['S-001']['list_url'],oc.NEWS_LIST_SOURCES['S-001']['id_pattern'])
         self.assertEqual(len(entries),1)
         self.assertEqual(entries[0]['published'], date(2026,9,10))
         self.assertEqual(entries[0]['title'],'Meeting 2026-09-10')
 
     def test_true_content_missing_date_still_retained_and_partial(self):
         html=f._page('<main id="center"><section class="list"><ul>'
-            '<li><a href="/3377338/post">Meeting 2026-09-10</a></li>'
-            '<li><a href="/3377300/post">Unknown date</a></li>'
-            '<li><a href="/3377000/post">Meeting 2026-09-01</a></li>'
+            '<li><a href="home.jsp?mcustomize=news_view.jsp&dataserno=3377338">Meeting 2026-09-10</a></li>'
+            '<li><a href="home.jsp?mcustomize=news_view.jsp&dataserno=3377300">Unknown date</a></li>'
+            '<li><a href="home.jsp?mcustomize=news_view.jsp&dataserno=3377000">Meeting 2026-09-01</a></li>'
             '</ul></section></main>')
-        result,_=f._collect('S-019',html,max_details=0)
+        result,_=f._collect('S-001',html,max_details=0)
         self.assertEqual(result['snapshot_item_count'],3)
         self.assertEqual(result['window_completeness'],'PARTIAL')
 
     def test_explicit_six_page_budget_reaches_terminal_for_both_sources(self):
-        for sid in ("S-019", "S-032"):
+        for sid in ("S-001", "S-032"):
             with self.subTest(source_id=sid):
                 result, session, urls = self.collect(sid, max_list_pages=6)
                 self.assertEqual(result['window_completeness'], 'COMPLETE_WITH_ITEMS')
