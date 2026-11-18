@@ -1,5 +1,19 @@
 # GovIntel 全國資料層：只直連機關官方系統
 
+## W4 政府採購
+
+`N-PCC-WEB` 與 `N-PCC-GPA` 已實作，由 `github-actions` 執行；本機受 PCC WAF 阻擋。本次 worker 僅使用主對話 2026-11-18 runner 留下的回應做離線驗收，尚未完成 runner 的兩次正式同步。以下 W4 說明取代早期章節的 PCC 待實作狀態及 GPA JSON 下載規劃。
+
+- `pcc_gpa` 使用官方 `https://web.pcc.gov.tw/tps/tp/OpenData/showList` 所列 XML，授權來源同頁。官方說明每月 5 日產出兩個月前資料；檔名為 `tender_YYYYMM01/02.xml`、`award_YYYYMM01/02.xml`，分別涵蓋上、下半月。從今天往前兩個月的下半月起，讀取 `scope.months=24`；最新空檔或 404 最多向前試兩檔，空缺記入 warnings。游標使用不含副檔名的檔名；恢復時重建快照，維持跨檔去重結果。同一識別碼保留讀取順序最後一筆。
+- XML 欄位與 GPA JSON 相同，推定為 GPA 適用標案子集，不能代表全量採購。近半年 GPA JSON 未另行實作。XML 單檔上限 5 MiB，解析前拒絕 DOCTYPE／ENTITY；輸出只含類型、名稱、案號、機關、日期及官方列表連結，捨棄地址、電話、聯絡人、廠商及金額。招標日期依指定欄位 `TENDER_SPDT`（截標日），決標使用 `AWARD_NOTICE_DATE`。
+- `pcc_web` 的招標依警察、消防、交通局、臺中市政府逐一查詢，將窗口切為單一曆月，累計原始列數必須等於頁面總筆數。主對話實測 1／3 個月可用，1 年被拒；缺少結果表或查詢區間過長均回報錯誤，不視為零筆。決標以警察局、消防局、交通局、臺中市政府及窗口涵蓋的民國年查詢，依 `AWARD_NOTICE_DATE` 排序，從頁面讀取下一頁參數，使用第 6 欄（cells[5]）決標或無法決標公告日期，取開頭的民國日期；日期空白、格式錯誤或無效日期均報錯。第 5 欄招標公告日期不參與解析或早停；決標公告日早於窗口時停止。「無法決標」仍保留 kind=award，另記 PCC_NO_AWARD <pk> 警告。兩者均再次套用登記檔機關範圍，解析民國日期、標案名稱與更正公告警告，只保留 `tpam`／`atm`／`nonAtm` 的 pk 官方連結。
+- 轄區（`jurisdiction`）依機關名稱開頭推定：以 22 個縣市名稱之一開頭（「台」視同「臺」）就填該縣市，其餘（中央機關、國營事業、國立學校）填「全國」。只看名稱前綴，不查機關隸屬。
+- 網頁預設 `scope.daily_months=2`（當月及前一個曆月）；`national-sync.py --backfill` 改用 `scope.months=24`。XML 固定讀取 24 個月，其他來源不受此參數影響。工作流程只有手動 `workflow_dispatch` 的布林 `backfill=true` 才傳入此參數；排程不傳入。手動 backfill=true 的 job 上限為 180 分鐘，其餘為 30 分鐘（schedule 沒有 inputs.backfill，空值為 false）。24 個月回填粗估數十分鐘至 2 小時，尚非實測：僅請求間隔就約為 3 × 請求數 ÷ 60 分鐘，例如 1,000 次約 50 分鐘，另加 HTTP 回應、重試及資料庫寫入時間；實際筆數與耗時仍須由 runner 驗收。
+- 兩個來源均至少間隔 3 秒。內容請求限於列表／下載路徑，連轉址也不可進入 pk 詳情頁。只存中繼資料與連結，不存全文、廠商或個資。
+- robots 的特定例外有 2026-11-18 `github-actions` 證據：僅 301／302 且 `Location` 完全等於 `http://web.pcc.gov.tw/pis` 視為沒有 robots 資源，不跟隨該轉址。不同 Location 或其他轉址狀態均禁止；200 的 robots 規則仍須遵守。網路失敗保持禁止，5xx 沿用既有 `documented_open_api` 判定。登記自檢要求例外為同 host 的 HTTP／HTTPS URL、非 `/robots.txt`，且附觀察日期與 runner。
+
+離線 fixture 位於 `tests/fixtures/national/pcc/`；來源與縮減／合成欄位列於該目錄 README。原始 award XML 沒有符合機關範圍的資料，因此測試的兩筆 scoped 機關為明確標註的合成值，不是額外的真實採購證據。測試涵蓋例外邊界、分頁計數、窗口／游標、XML 安全與欄位限制，以及 SqliteStore 同步兩次後 `changed=0`。preflight 仍是有界探測，固定探測已觀察的 `tender_20260902.xml`，不代表完整同步或最新資料驗收。
+
 ## 2026-11-17 方向修訂與定位
 
 依使用者 2026-11-17 決定，資料層只直連各機關官方系統。data.gov.tw 是官方平台，可以作資料集目錄及官方資源發現入口。22 個地方議會全部登記，但 robots 明文禁止者不得抓取，列入待取得同意項目。任何 token 都不構成繞過 robots 的許可。

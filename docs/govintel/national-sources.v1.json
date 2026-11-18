@@ -1720,10 +1720,11 @@
       "provider": "行政院公共工程委員會政府電子採購網",
       "official_authority": "行政院公共工程委員會政府電子採購網",
       "tier": "DISCOVERY_ONLY",
-      "status": "PLANNED_HTML",
+      "status": "IMPLEMENTED_HTML",
       "transport": "HTML",
       "endpoints": [
-        "https://web.pcc.gov.tw/"
+        "https://web.pcc.gov.tw/prkms/tender/common/basic/readTenderBasic",
+        "https://web.pcc.gov.tw/prkms/tender/common/bulletion/readBulletion"
       ],
       "allowed_hosts": [
         "https://web.pcc.gov.tw"
@@ -1732,17 +1733,17 @@
         "https://web.pcc.gov.tw"
       ],
       "robots": {
-        "status": "REDIRECT_UNVERIFIED",
+        "status": "NO_ROBOTS_RESOURCE",
         "failure_disallow_prefixes": [
           "/"
         ],
         "url": "https://web.pcc.gov.tw/robots.txt",
-        "redirect_target": "https://web.pcc.gov.tw/",
         "disallow": [],
-        "observed_at": "2026-11-17",
+        "observed_at": "2026-11-18",
         "observed_runner": "github-actions",
         "http_status": 302,
-        "observed_text": "HTTP 302; terminal response not measured by this CI run."
+        "observed_text": "HTTP 302; Location: http://web.pcc.gov.tw/pis; redirect not followed.",
+        "absent_when_redirect_to": "http://web.pcc.gov.tw/pis"
       },
       "min_request_interval_seconds": 3,
       "license": "採購網著作權聲明（非開放授權）",
@@ -1761,7 +1762,6 @@
       ],
       "required_secret": null,
       "scope": {
-        "years": 2,
         "authority_contains_any": [
           "警察",
           "消防",
@@ -1770,14 +1770,17 @@
         "authority_startswith_any": [
           "臺中市政府"
         ],
-        "mode": "官方公告檢索網頁 HTML"
+        "mode": "官方公告檢索網頁 HTML",
+        "months": 24,
+        "daily_months": 2
       },
       "capacity_estimate_mb": 40,
-      "verified_at": "2026-11-17",
+      "verified_at": "2026-11-18",
       "notes": [
-        "每次請求間隔至少 3 秒；只存中繼資料與官方連結。",
-        "2 年約 40MB，涵蓋 GPA 去重後資料；檢索表單路徑與欄位待 W4 盤點。",
-        "CI robots 回 302，終點回應待驗證；preflight 最多跟隨 5 次 HTTPS 轉址，以終點狀態與規則判斷，不再因轉到首頁而放行。"
+        "W4 僅存標案中繼資料與官方連結；不存廠商、金額、地址、電話、聯絡人，不請求 pk 詳情頁。",
+        "本機受 WAF 阻擋；runner 使用 github-actions。2026-11-18 主對話 runner 原始回應為依據，本 worker 僅離線驗收。",
+        "官方 XML 推定為 GPA 適用標案子集，不代表全量；每月 5 日產出兩個月前資料。近半年 GPA JSON 是相同子集，未另行實作。",
+        "招標日期一律切成單月窗口；實測 1／3 個月可用、1 年被拒；決標依公告日期排序，讀至窗口外即停。"
       ],
       "runner": "github-actions",
       "documented_open_api": false
@@ -1787,11 +1790,11 @@
       "provider": "政府電子採購網／政府資料開放平臺",
       "official_authority": "政府電子採購網／政府資料開放平臺",
       "tier": "REFERENCE",
-      "status": "PLANNED_API",
-      "transport": "OFFICIAL_JSON_API",
+      "status": "IMPLEMENTED_API",
+      "transport": "OFFICIAL_XML",
       "endpoints": [
-        "https://web.pcc.gov.tw/tps/tp/OpenData/downloadFile?fileName=GPAtender_YYYYMMDD.json",
-        "https://web.pcc.gov.tw/tps/tp/OpenData/downloadFile?fileName=GPAaward_YYYYMMDD.json"
+        "https://web.pcc.gov.tw/tps/tp/OpenData/downloadFile?fileName=tender_YYYYMM02.xml",
+        "https://web.pcc.gov.tw/tps/tp/OpenData/downloadFile?fileName=award_YYYYMM02.xml"
       ],
       "allowed_hosts": [
         "https://web.pcc.gov.tw"
@@ -1800,21 +1803,21 @@
         "https://web.pcc.gov.tw"
       ],
       "robots": {
-        "status": "REDIRECT_UNVERIFIED",
+        "status": "NO_ROBOTS_RESOURCE",
         "failure_disallow_prefixes": [
           "/"
         ],
         "url": "https://web.pcc.gov.tw/robots.txt",
-        "redirect_target": "https://web.pcc.gov.tw/",
         "disallow": [],
-        "observed_at": "2026-11-17",
+        "observed_at": "2026-11-18",
         "observed_runner": "github-actions",
         "http_status": 302,
-        "observed_text": "HTTP 302; terminal response not measured by this CI run."
+        "observed_text": "HTTP 302; Location: http://web.pcc.gov.tw/pis; redirect not followed.",
+        "absent_when_redirect_to": "http://web.pcc.gov.tw/pis"
       },
       "min_request_interval_seconds": 3,
       "license": "政府資料開放授權條款第 1 版",
-      "license_source_url": "https://data.gov.tw/dataset/172020",
+      "license_source_url": "https://web.pcc.gov.tw/tps/tp/OpenData/showList",
       "rights_note": "政府資料開放授權條款第 1 版",
       "rights_class": "OPEN_METADATA",
       "public_fields": [
@@ -1833,8 +1836,7 @@
           172020,
           172023
         ],
-        "years": 2,
-        "coverage": "僅 GPA 招標／決標；不是全量採購",
+        "coverage": "推定為 GPA 招標／決標子集；不是全量採購",
         "authority_contains_any": [
           "警察",
           "消防",
@@ -1842,13 +1844,17 @@
         ],
         "authority_startswith_any": [
           "臺中市政府"
-        ]
+        ],
+        "months": 24,
+        "daily_months": 2
       },
       "capacity_estimate_mb": 0,
-      "verified_at": "2026-11-17",
+      "verified_at": "2026-11-18",
       "notes": [
-        "另一授權來源：https://data.gov.tw/dataset/172023",
-        "下載模板日期以 YYYYMMDD 代入；與公告資料去重，容量納入 N-PCC-WEB 的 40MB。"
+        "W4 僅存標案中繼資料與官方連結；不存廠商、金額、地址、電話、聯絡人，不請求 pk 詳情頁。",
+        "本機受 WAF 阻擋；runner 使用 github-actions。2026-11-18 主對話 runner 原始回應為依據，本 worker 僅離線驗收。",
+        "官方 XML 推定為 GPA 適用標案子集，不代表全量；每月 5 日產出兩個月前資料。近半年 GPA JSON 是相同子集，未另行實作。",
+        "招標日期一律切成單月窗口；實測 1／3 個月可用、1 年被拒；決標依公告日期排序，讀至窗口外即停。"
       ],
       "runner": "github-actions",
       "documented_open_api": true
