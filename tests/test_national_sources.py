@@ -94,8 +94,9 @@ class NationalSourcesTests(unittest.TestCase):
 
     def test_source_safety_decisions_are_explicit(self):
         rows = self.rows
-        for code in ("TXG", "KEE", "CYQ"):
-            self.assertEqual(rows["N-COUNCIL-" + code]["status"], "PLANNED_API")
+        for code in ("TXG", "KEE"):
+            self.assertEqual(rows["N-COUNCIL-" + code]["status"], "IMPLEMENTED_API")
+        self.assertEqual(rows["N-COUNCIL-CYQ"]["status"], "PLANNED_API")
         self.assertEqual(rows["N-COUNCIL-NWT"]["status"], "PLANNED_HEADLESS")
         self.assertEqual(rows["N-COUNCIL-CYI"]["status"], "BLOCKED_BY_ROBOTS_NEEDS_CONSENT")
         self.assertEqual(rows["N-COUNCIL-CYQ"]["www_access"]["endpoints"], [])

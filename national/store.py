@@ -144,7 +144,7 @@ class WranglerD1Store(Store):
             return int(info["file_size"] if "file_size" in info else info["database_size"])
         # d1 info is remote-only and D1 denies PRAGMA page_count (SQLITE_AUTH); size the miniflare files.
         # shortcut: sums every local D1 file in this worker's state, fine while it binds one database.
-        return sum(path.stat().st_size for path in (self.cwd / ".wrangler/state/v3/d1").rglob("*.sqlite*"))
+        return sum(path.stat().st_size for path in (self.cwd / ".wrangler/state/v3/d1").rglob("*.sqlite"))  # WAL/SHM are uncheckpointed scratch, not database size
 
     def close(self):
         pass

@@ -13,7 +13,7 @@
 議會的官方／議事系統網址、資料種類、取得方式與網站條款照錄 #247 分支 `origin/docs/national-council-plan-20261115` 的 `docs/govintel/NATIONAL_COUNCIL_EXPANSION.md` 第二節（2026-11-15 盤點）；robots 狀態依 2026-11-17／18 的 CI 與使用者提供之台灣網路實測更新。本輪未重新連網查證。`rights_note` 保留該表網站文字；原表沒有提供宣告頁精確網址者，`license_source_url` 留 null，不把入口頁冒充授權證據。
 
 - 22 個地方議會各一筆 `N-COUNCIL-{ISO 縣市縮寫}`。有 API 的臺中、基隆與嘉義縣 API 使用 `OFFICIAL_JSON_API`；新北使用 `HTML_HEADLESS`；其餘使用 `HTML` 或 `HTML_FILES`。完整狀態、資料種類與來源網址以登記檔為準。
-- 嘉義縣保留單一 `N-COUNCIL-CYQ`：主來源是 `PLANNED_API`，`www_access` 另外標成 `BLOCKED_BY_ROBOTS_NEEDS_CONSENT` 且 endpoints 為空。API 根網址只標示官方 origin，精確路徑／分頁待 W2a；CI 的 API robots 回 500，沒有 documented open API 旗標，維持禁止內容請求。preflight 仍只探測其 robots。
+- 嘉義縣保留單一 `N-COUNCIL-CYQ`：主來源是 `PLANNED_API`，`www_access` 另外標成 `BLOCKED_BY_ROBOTS_NEEDS_CONSENT` 且 endpoints 為空。API 根網址只標示官方 origin；CI 的 API robots 回 500，沒有 documented open API 旗標，維持禁止內容請求。W2a 不實作，待書面同意或確認公開文件化 API 並重新審核登記。preflight 仍只探測其 robots。
 - `N-LY-ID20-BILLS`：官方 data.ly.gov.tw ID20 議案，政府資料開放授權條款第 1 版。preflight 只請求一頁；遠端是否採用分頁參數、資料 schema 與完整筆數仍待驗證。
 - `N-LY-ID6-INTERP`：官方 ID6 委員質詢；已知缺口為「第 11 屆第 3–6 會期官方回空（2026-11-17 實測）」。這是指定會期的觀察，不推定所有會期永久停更，也不以第三方資料補齊。
 - `N-PCC-WEB`：直接抓 web.pcc.gov.tw 官方公告檢索 HTML；每次請求間隔至少 3 秒，近 2 年只收機關名稱含「警察」「消防」「交通局」或以「臺中市政府」開頭的公告。不用廣泛的「交通」條件。容量預留 40MB，檢索表單欄位與正式路徑留待 W4；preflight 僅抓首頁。
@@ -138,7 +138,7 @@ python -X utf8 scripts/national-sync.py --source N-COUNCIL-TXG --adapter fixture
 ```
 
 `NATIONAL_RUNNER` 預設 `github-actions`，不相符的來源在報告標記 `RUNNER_MISMATCH`。
-W1 唯一 adapter 是明確指定的 fixture；未指定 adapter 時報「無可同步來源」並 exit 0。
+W1 唯一 adapter 是明確指定的 fixture；W2a 起未指定 adapter 時會同步已註冊且 runner 相符的來源。
 `.github/workflows/national-sync.yml` 每日排程及手動執行皆須先設定 repository variable
 `NATIONAL_SYNC_ENABLED=true`；未開啟前整個 job 跳過。token 需 **Account → D1 → Edit**，
 使用既有 `CLOUDFLARE_API_TOKEN`、account ID 與 Wrangler 4.149.0。
@@ -156,7 +156,7 @@ binding 存在不代表資料新鮮度或資料庫健康驗證。
 |---|---|
 | W0 | 官方登記、robots gate、preflight、共用 transport；本輪範圍。 |
 | W1 | D1 schema、匯入與查詢骨架；每日寫入 9 萬列、容量 400MB 守門；驗證冪等性。 |
-| W2a | 臺中、基隆、嘉義縣 API；先確認 robots、精確端點、分頁及官方筆數。 |
+| W2a | 臺中、基隆議案 API；完整分頁驗證與中繼資料匯入。嘉義縣因 robots 500 且非文件化開放 API 而延後。 |
 | W2b | 六都其餘一般網頁：臺北、桃園、臺南、高雄；新北另列 W2d。 |
 | W2c | 其他縣市；blocked 來源先取得書面同意，澎湖附件維持停用，盤點未知筆數。 |
 | W2d | 新北 Blazor Server 無頭瀏覽器；確認會話與欄位，不繞過 robots。 |
@@ -166,6 +166,56 @@ binding 存在不代表資料新鮮度或資料庫健康驗證。
 | W6 | data.gov.tw 六都相關目錄；各機關官方資源另行查核。 |
 | W7 | 從各議會官方系統取得逐字稿／議事錄，建立本機 SQLite FTS5；目前 #247 僅確認臺中有議事錄 API，其餘依 W2 盤點。全文不進 D1、CI 發布或公開頁面，受 robots 與網站條款限制。 |
 | W8 | 全國查詢前端與來源說明；只公開核准中繼資料與官方連結。 |
+
+### W2a 臺中、基隆官方議案 API
+
+`txg`、`kee` 已註冊，登記狀態為 `IMPLEMENTED_API`（實作完成，不代表真實連網驗收完成）。
+依主對話提供的 2026-11-18 官方回應結構製作離線 fixture；本 worker 不連網、不部署。
+未指定 `--source` 時只同步已註冊且符合 `NATIONAL_RUNNER` 的來源；指定來源可自動選擇 adapter，
+亦可明確使用 `--adapter txg` 或 `--adapter kee`，必須與來源相符。
+`--adapter fixture` 保留離線用途；網路 adapter 的 `--dry-run` 仍會讀取 API，但不寫資料庫。
+單獨 `--apply-schema` 維持只建 schema，不觸發網路同步。
+
+| 欄位 | 臺中 TXG | 基隆 KEE |
+|---|---|---|
+| 入口 | GET `https://yishi.tccc.gov.tw/api/Proposal/FrontList?pageNumber=N&pageSize=200` | POST `https://www.kmc.gov.tw/kmcwebapi/motion/getlist`，JSON `{}` |
+| `kind` | `bill` | `bill` |
+| `external_id` | `billId`（GUID） | `kmc-` + UTF-8 `sha256(expkd\|seqkd\|seqno\|3c\|1c)[:24]`，欄位均來自 `sm1_` 前綴 |
+| `title` | `proposalRationale.strip()[:200]`；空白時改用 `billType + billNumber`，同樣最多 200 字 | `sm1_3c.strip()[:300]` |
+| `case_number` | `session + " " + billNumber` | `sm1_title` |
+| `event_date` | null，官方回應沒有日期 | null，官方回應沒有日期 |
+| `official_url` | `https://yishi.tccc.gov.tw/proposals/{billId}` | `https://www.kmc.gov.tw/kmcweb/#/motion`（只有列表頁） |
+
+兩者共用 `http_fetch.get`，從登記讀取白名單、robots 與至少 3 秒間隔；
+每個 adapter 使用 `GovIntelNationalBot/1.0` 識別與獨立 RobotsPolicy，
+`documented_open_api` 沿用來源設定，不放寬 robots 禁止。
+臺中每頁上限 2MiB、基隆單次 8MiB；POST 使用 JSON Content-Type，任何 3xx 皆拒絕且不跟隨。
+既有 GET 預設與 retry 規則維持不變。HTML 全文 `proposalRationaleSort`、議事錄、
+決議、連署人與其他原始欄位不進 record；只保留以上投影。
+
+臺中先讀完最多 100 頁，檢查頁碼、穩定的總頁數／總筆數、跨頁重複 ID 與實際 `totalCount`，
+全部通過才交給 loader 寫入。錯誤或 robots 禁止時不寫 sources／records，仍保留失敗 run 稽核。
+記憶體只保留經投影的中繼資料頁；預算中止的游標是下一個未完成頁碼，部分頁批次可重播。
+新程序續跑會重新讀完並驗證全部頁面，再從游標頁寫入；完成後下一輪從頭比對雜湊。
+頁碼不是官方快照版本：若兩次執行間頁面排序改動，續跑可能漏掉前頁新增資料，需下一次完整輪巡補齊。
+相同筆數但擷取期間持續變動的資料也無法證明快照一致性。
+
+基隆沒有官方 ID；完全相同組合依出現順序加 `-2`、`-3` 等後綴。
+案由或提案人等雜湊輸入一改就成為新的一筆，舊資料仍保留；不推定官方刪除，也不自動清除。
+以 `|` 串接是本次指定規格，欄位本身含分隔符時存在歧義，雜湊也不是官方唯一鍵。
+回傳至少 4,990 筆時，JSON run 報告附 `warnings: ["POSSIBLE_ROW_CAP"]`；
+既有 runs 表不新增 warnings 欄位，須保存 CLI `--report` 產物取得警告。
+主對話觀察到 4,998 筆，是否存在 5,000 上限及屆別查詢參數均未驗證；本輪不讀官方 JS、不猜參數或繞過上限。
+
+基隆網站條款「未經同意不得重製、散佈」仍有再利用風險；只存中繼資料與官方連結是使用者指定界線，
+並非完整權利授權。標題最多 300 字，短案由可能全部落入標題；不另存完整案由欄位。
+嘉義縣 API robots 回 500，且 `documented_open_api=false`，W2a 不寫擷取器；
+須先取得議會書面同意，或確認為公開文件化 API 並重新審核來源設定後再做。
+
+離線驗收使用注入的假 session，驗證欄位、筆數守門、POST 轉址拒絕、robots 拒絕、
+重複 ID、警告、頁碼續跑，以及 SqliteStore 完整同步兩次後第二次 `changed=0`。
+真實 API 筆數與兩次 `d1-local` 同步由主對話另外驗收；仍受既有每日預算與容量守門約束，
+`BUDGET_STOPPED` 不代表全量匯入完成。
 
 ## 評估過但不採用（使用者決定只直連官方）
 

@@ -224,11 +224,10 @@
       "provider": "臺中市議會",
       "official_authority": "臺中市議會",
       "tier": "REFERENCE",
-      "status": "PLANNED_API",
+      "status": "IMPLEMENTED_API",
       "transport": "OFFICIAL_JSON_API",
       "endpoints": [
-        "https://yishi.tccc.gov.tw/api/Proposal/FrontList",
-        "https://yishi.tccc.gov.tw/api/ProceedingsBackWeb/FrontList"
+        "https://yishi.tccc.gov.tw/api/Proposal/FrontList"
       ],
       "allowed_hosts": [
         "https://yishi.tccc.gov.tw"
@@ -271,7 +270,15 @@
           "影音"
         ],
         "transcripts": "僅本機索引，不進 D1；W2 盤點官方供應方式",
-        "known_proceedings_segments": 971552
+        "known_proceedings_segments": 971552,
+        "api_method": "GET",
+        "field_mapping": {
+          "external_id": "billId",
+          "title": "proposalRationale.strip()[:200] or (billType + billNumber)[:200]",
+          "case_number": "session + space + billNumber",
+          "event_date": null,
+          "official_url": "https://yishi.tccc.gov.tw/proposals/{billId}"
+        }
       },
       "capacity_estimate_mb": 12.4,
       "verified_at": "2026-11-15",
@@ -279,7 +286,8 @@
         "來源：#247 NATIONAL_COUNCIL_EXPANSION.md 第二節（2026-11-15 盤點）；未重新連網查證。",
         "rights_note 照錄總表網站文字；總表未提供本議會宣告頁精確網址，license_source_url 留 null。",
         "容量按已知議案數 × 約 0.8KB 含索引估算；不是實測資料庫大小。",
-        "目前盤點只有臺中有議事錄 API；段落不計入 D1。"
+        "目前盤點只有臺中有議事錄 API；段落不計入 D1。",
+        "W2a 已實作官方議案 API；pageSize=200、最多 100 頁、完整核對 totalCount 後才寫入。無日期，HTML 全文與議事錄不入庫。2026-11-18 主對話提供結構，本 worker 僅離線驗收。"
       ],
       "official_url": "https://yishi.tccc.gov.tw",
       "official_system_urls": [
@@ -439,7 +447,7 @@
       "provider": "基隆市議會",
       "official_authority": "基隆市議會",
       "tier": "REFERENCE",
-      "status": "PLANNED_API",
+      "status": "IMPLEMENTED_API",
       "transport": "OFFICIAL_JSON_API",
       "endpoints": [
         "https://www.kmc.gov.tw/kmcwebapi/motion/getlist"
@@ -486,7 +494,14 @@
           "影音"
         ],
         "transcripts": "僅本機索引，不進 D1；W2 盤點官方供應方式",
-        "api_method": "POST"
+        "api_method": "POST",
+        "field_mapping": {
+          "external_id": "kmc- + sha256(expkd|seqkd|seqno|3c|1c)[:24]; duplicate suffix -2, -3, ...",
+          "title": "sm1_3c.strip()[:300]",
+          "case_number": "sm1_title",
+          "event_date": null,
+          "official_url": "https://www.kmc.gov.tw/kmcweb/#/motion"
+        }
       },
       "capacity_estimate_mb": 4.0,
       "verified_at": "2026-11-15",
@@ -494,7 +509,8 @@
         "來源：#247 NATIONAL_COUNCIL_EXPANSION.md 第二節（2026-11-15 盤點）；未重新連網查證。",
         "rights_note 照錄總表網站文字；總表未提供本議會宣告頁精確網址，license_source_url 留 null。",
         "容量按已知議案數 × 約 0.8KB 含索引估算；不是實測資料庫大小。",
-        "約 4,998 筆（第 15–20 屆）；是否有 5,000 筆上限與分頁尚未驗證。preflight 只 GET 議事頁。"
+        "約 4,998 筆（第 15–20 屆）；是否有 5,000 筆上限與分頁尚未驗證。preflight 只 GET 議事頁。",
+        "W2a 已實作單次 POST {}。API 無 ID，以 expkd|seqkd|seqno|3c|1c 雜湊 ID 加重複列序號；可能有 5,000 筆上限，回傳至少 4,990 筆時警告 POSSIBLE_ROW_CAP。無日期；不存決議、連署人或完整案由。屆別過濾參數未驗證。"
       ],
       "official_url": "https://www.kmc.gov.tw/kmcweb/#/motion",
       "official_system_urls": [
@@ -1055,7 +1071,8 @@
         "來源：#247 NATIONAL_COUNCIL_EXPANSION.md 第二節（2026-11-15 盤點）；未重新連網查證。",
         "rights_note 照錄總表網站文字；總表未提供本議會宣告頁精確網址，license_source_url 留 null。",
         "容量按已知議案數 × 約 0.8KB 含索引估算；不是實測資料庫大小。",
-        "API 與 www 分開：CI 的 API robots 回 500，未設 documented_open_api，禁止內容擷取；preflight 只查 robots。API 精確路徑及分頁待 W2a，endpoints 根網址僅標示官方 API origin。www 必須發函取得書面同意後再加入。"
+        "API 與 www 分開：CI 的 API robots 回 500，未設 documented_open_api，禁止內容擷取；preflight 只查 robots。API 精確路徑及分頁待 W2a，endpoints 根網址僅標示官方 API origin。www 必須發函取得書面同意後再加入。",
+        "W2a 不實作：API robots HTTP 500 且 documented_open_api=false，禁止擷取；需議會書面同意，或確認是公開文件化的 API 並重新審核登記後再做。"
       ],
       "official_url": "https://www.cyscc.gov.tw/News/114",
       "official_system_urls": [

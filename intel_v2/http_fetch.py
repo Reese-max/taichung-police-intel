@@ -172,10 +172,13 @@ class RobotsPolicy:
 
 def get(session: requests.Session, url: str, allowed_hosts: set[str], timeout: int = 60, *,
         min_interval_seconds: float = 0, bearer_token: str | None = None,
-        max_bytes: int | None = None, robots_policy: RobotsPolicy | None = None) -> requests.Response:
+        max_bytes: int | None = None, robots_policy: RobotsPolicy | None = None,
+        method: str = "GET", json_body=None) -> requests.Response:
     import requests
 
     _approved_url(url, allowed_hosts)
+    if method not in {"GET", "POST"}:
+        raise ValueError("method must be GET or POST")
     if not math.isfinite(min_interval_seconds) or min_interval_seconds < 0:
         raise ValueError("min_interval_seconds must be finite and nonnegative")
     if max_bytes is not None and (type(max_bytes) is not int or max_bytes <= 0):
@@ -198,8 +201,11 @@ def get(session: requests.Session, url: str, allowed_hosts: set[str], timeout: i
                     kwargs["headers"] = {"Authorization": f"Bearer {bearer_token}"}
                 if max_bytes is not None:
                     kwargs["stream"] = True
-                response = session.get(current_url, **kwargs)
+                response = (session.post(current_url, json=json_body, **kwargs) if method == "POST"
+                            else session.get(current_url, **kwargs))
                 _approved_url(str(response.url or current_url), allowed_hosts)
+                if method == "POST" and 300 <= response.status_code < 400:
+                    raise RuntimeError("POST redirect forbidden")
                 if response.status_code in REDIRECT_STATUSES:
                     location = response.headers.get("location")
                     response.close()

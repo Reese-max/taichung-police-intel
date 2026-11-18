@@ -127,7 +127,7 @@ def load(store, source, adapter, *, capacity_limit_mb=400, daily_limit=DAILY_WRI
     runner = runner or os.environ.get("NATIONAL_RUNNER", "github-actions")
     run = dict(run_id=str(uuid4()), source_id=source["national_source_id"], started_at=utc_now(),
                finished_at=None, status="OK", fetched=0, changed=0, rows_written=0,
-               cursor_before=None, cursor_after=None, error=None, exit_code=0)
+               cursor_before=None, cursor_after=None, error=None, exit_code=0, warnings=[])
     if source["runner"] != runner:
         return {**run, "finished_at": utc_now(), "status": "NOT_CONFIGURED",
                 "reason": "RUNNER_MISMATCH", "runner": runner, "expected_runner": source["runner"]}
@@ -154,16 +154,10 @@ def load(store, source, adapter, *, capacity_limit_mb=400, daily_limit=DAILY_WRI
     try:
         if not dry_run and not permitted(0):
             return run
-        sql = source_sql(source)
-        if dry_run:
-            emit(sql)
-        elif store.source_hash(run["source_id"]) != digest(source):
-            if not permitted(SOURCE_WRITE_ESTIMATE):
-                return run
-            accounted += store.execute_batch(sql)
-            run["rows_written"] = accounted
+        source_pending = True
         while True:
             records, next_cursor = adapter.fetch(source, cursor)
+            run["warnings"] = list(getattr(adapter, "warnings", []))
             run["fetched"] += len(records)
             normalized = [normalize(source, record) for record in records]
             ids = [record["external_id"] for record in normalized]
@@ -173,6 +167,16 @@ def load(store, source, adapter, *, capacity_limit_mb=400, daily_limit=DAILY_WRI
             changed = [record for record in normalized if hashes.get(record["external_id"]) != record["content_sha256"]]
             # Validate all statement sizes before writing any part of the page.
             page_batches = list(batches(changed))
+            if source_pending:
+                sql = source_sql(source)
+                if dry_run:
+                    emit(sql)
+                elif store.source_hash(run["source_id"]) != digest(source):
+                    if not permitted(SOURCE_WRITE_ESTIMATE):
+                        return run
+                    accounted += store.execute_batch(sql)
+                    run["rows_written"] = accounted
+                source_pending = False
             for sql, count in page_batches:
                 if dry_run:
                     emit(sql)
@@ -190,6 +194,7 @@ def load(store, source, adapter, *, capacity_limit_mb=400, daily_limit=DAILY_WRI
         # Keep the current page cursor; committed sub-batches are skipped on replay.
         run.update(status="ERROR", exit_code=1, error=type(error).__name__ + ": " + str(error))
     finally:
+        run["warnings"] = list(getattr(adapter, "warnings", []))
         run["finished_at"] = utc_now()
         if not dry_run:
             if accounted == 0 and store.rows_written_today() + RUN_WRITE_RESERVE > daily_limit:
