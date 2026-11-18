@@ -196,6 +196,27 @@ class NationalAdapterTests(unittest.TestCase):
                 for constructor in constructors.values():
                     constructor.assert_not_called()
 
+    def test_cli_skips_sources_without_fetching_when_budget_or_time_is_spent(self):
+        spec = importlib.util.spec_from_file_location("national_sync", ROOT / "scripts/national-sync.py")
+        cli = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cli)
+        for argv, remaining, reason in (([], cli.MIN_SOURCE_BUDGET - 1, "DAILY_BUDGET"),
+                                        (["--stop-after-minutes", "0"], 90_000, "TIME_BUDGET")):
+            constructors = {"txg": Mock(), "kee": Mock()}
+            output = io.StringIO()
+            with patch.object(cli, "ADAPTERS", constructors), patch.object(cli, "SOURCE_ADAPTERS", {
+                    "N-COUNCIL-TXG": "txg", "N-COUNCIL-KEE": "kee"}), \
+                    patch.object(cli, "check_guards", return_value={"remaining_rows": remaining}), \
+                    patch.dict(cli.os.environ, {"NATIONAL_RUNNER": "github-actions"}), \
+                    patch.object(cli.sys, "argv", ["national-sync", "--store", "sqlite::memory:", *argv]), \
+                    contextlib.redirect_stdout(output), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(cli.main(), 0)
+            runs = json.loads(output.getvalue())["runs"]
+            self.assertEqual({(run["source_id"], run["status"], run["reason"]) for run in runs},
+                             {("N-COUNCIL-TXG", "SKIPPED", reason), ("N-COUNCIL-KEE", "SKIPPED", reason)})
+            for constructor in constructors.values():
+                constructor.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()
