@@ -20,7 +20,8 @@ concurrency:
   cancel-in-progress: true
 jobs:
   browser:
-    runs-on: ubuntu-latest
+    # Playwright 1.57 cannot install chromium deps on ubuntu-latest (26.04); pin until playwright is bumped.
+    runs-on: ubuntu-24.04
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
