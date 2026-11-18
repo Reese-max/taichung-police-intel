@@ -7,6 +7,7 @@ import V2DailyDashboard from "./V2DailyDashboard.js";
 const destinations = [
   ["/", "概覽"],
   ["/public-query/", "公開查詢"],
+  ["/national/", "全國資料"],
   ["/research/", "公開研究"],
   ["/tracking/", "我的追蹤"],
   ["/live/", "會議導航"],
@@ -24,7 +25,7 @@ export default function GovIntelFrame({ children }) {
   return (
     <>
       <a className="govintel-skip" href="#govintel-content">跳至主要內容</a>
-      <header className="govintel-header">
+      <header className={`govintel-header${normalized === "/national" ? " national-header" : ""}`}>
         <Link href="/" className="govintel-brand">
           <strong>GovIntel AI</strong>
           <span>公共資訊查詢與個人化追蹤</span>

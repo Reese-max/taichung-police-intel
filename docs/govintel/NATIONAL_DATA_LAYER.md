@@ -1,5 +1,19 @@
 # GovIntel 全國資料層：只直連機關官方系統
 
+## W4 政府採購
+
+`N-PCC-WEB` 與 `N-PCC-GPA` 已實作，由 `github-actions` 執行；本機受 PCC WAF 阻擋。本次 worker 僅使用主對話 2026-11-18 runner 留下的回應做離線驗收，尚未完成 runner 的兩次正式同步。以下 W4 說明取代早期章節的 PCC 待實作狀態及 GPA JSON 下載規劃。
+
+- `pcc_gpa` 使用官方 `https://web.pcc.gov.tw/tps/tp/OpenData/showList` 所列 XML，授權來源同頁。官方說明每月 5 日產出兩個月前資料；檔名為 `tender_YYYYMM01/02.xml`、`award_YYYYMM01/02.xml`，分別涵蓋上、下半月。從今天往前兩個月的下半月起，讀取 `scope.months=24`；最新空檔或 404 最多向前試兩檔，空缺記入 warnings。游標使用不含副檔名的檔名；恢復時重建快照，維持跨檔去重結果。同一識別碼保留讀取順序最後一筆。
+- XML 欄位與 GPA JSON 相同，推定為 GPA 適用標案子集，不能代表全量採購。近半年 GPA JSON 未另行實作。XML 單檔上限 5 MiB，解析前拒絕 DOCTYPE／ENTITY；輸出只含類型、名稱、案號、機關、日期及官方列表連結，捨棄地址、電話、聯絡人、廠商及金額。招標日期依指定欄位 `TENDER_SPDT`（截標日），決標使用 `AWARD_NOTICE_DATE`。
+- `pcc_web` 的招標依警察、消防、交通局、臺中市政府逐一查詢，將窗口切為單一曆月，累計原始列數必須等於頁面總筆數。主對話實測 1／3 個月可用，1 年被拒；缺少結果表或查詢區間過長均回報錯誤，不視為零筆。決標以警察局、消防局、交通局、臺中市政府及窗口涵蓋的民國年查詢，依 `AWARD_NOTICE_DATE` 排序，從頁面讀取下一頁參數，使用第 6 欄（cells[5]）決標或無法決標公告日期，取開頭的民國日期；日期空白、格式錯誤或無效日期均報錯。第 5 欄招標公告日期不參與解析或早停；決標公告日早於窗口時停止。「無法決標」仍保留 kind=award，另記 PCC_NO_AWARD <pk> 警告。兩者均再次套用登記檔機關範圍，解析民國日期、標案名稱與更正公告警告，只保留 `tpam`／`atm`／`nonAtm` 的 pk 官方連結。
+- 轄區（`jurisdiction`）依機關名稱開頭推定：以 22 個縣市名稱之一開頭（「台」視同「臺」）就填該縣市，其餘（中央機關、國營事業、國立學校）填「全國」。只看名稱前綴，不查機關隸屬。
+- 網頁預設 `scope.daily_months=2`（當月及前一個曆月）；`national-sync.py --backfill` 改用 `scope.months=24`。XML 固定讀取 24 個月，其他來源不受此參數影響。工作流程只有手動 `workflow_dispatch` 的布林 `backfill=true` 才傳入此參數；排程不傳入。手動 backfill=true 的 job 上限為 180 分鐘，其餘為 30 分鐘（schedule 沒有 inputs.backfill，空值為 false）。24 個月回填粗估數十分鐘至 2 小時，尚非實測：僅請求間隔就約為 3 × 請求數 ÷ 60 分鐘，例如 1,000 次約 50 分鐘，另加 HTTP 回應、重試及資料庫寫入時間；實際筆數與耗時仍須由 runner 驗收。
+- 兩個來源均至少間隔 3 秒。內容請求限於列表／下載路徑，連轉址也不可進入 pk 詳情頁。只存中繼資料與連結，不存全文、廠商或個資。
+- robots 的特定例外有 2026-11-18 `github-actions` 證據：僅 301／302 且 `Location` 完全等於 `http://web.pcc.gov.tw/pis` 視為沒有 robots 資源，不跟隨該轉址。不同 Location 或其他轉址狀態均禁止；200 的 robots 規則仍須遵守。網路失敗保持禁止，5xx 沿用既有 `documented_open_api` 判定。登記自檢要求例外為同 host 的 HTTP／HTTPS URL、非 `/robots.txt`，且附觀察日期與 runner。
+
+離線 fixture 位於 `tests/fixtures/national/pcc/`；來源與縮減／合成欄位列於該目錄 README。原始 award XML 沒有符合機關範圍的資料，因此測試的兩筆 scoped 機關為明確標註的合成值，不是額外的真實採購證據。測試涵蓋例外邊界、分頁計數、窗口／游標、XML 安全與欄位限制，以及 SqliteStore 同步兩次後 `changed=0`。preflight 仍是有界探測，固定探測已觀察的 `tender_20260902.xml`，不代表完整同步或最新資料驗收。
+
 ## 2026-11-17 方向修訂與定位
 
 依使用者 2026-11-17 決定，資料層只直連各機關官方系統。data.gov.tw 是官方平台，可以作資料集目錄及官方資源發現入口。22 個地方議會全部登記，但 robots 明文禁止者不得抓取，列入待取得同意項目。任何 token 都不構成繞過 robots 的許可。
@@ -290,6 +304,175 @@ DetailPage.aspx 直接 GET 回403；不請求 DetailPage.aspx／PrintDetailPage.
 離線驗收包含 BOM、日期空值、計數失敗、跨頁游標、hidden 狀態鏈、分組標題排除、穩定 SN、
 臺北逐屆及未結案筆數完全核對、超過500列正常回應、截斷訊息失敗、去重警告與詳情請求禁制；三站各以 SqliteStore 同步兩次，第二次 changed=0。
 真實網路、臺南／高雄 d1-local 全量及臺北 xisx-pc 匯入由主對話另驗收；本 worker 不連網、不碰雲端。
+
+### W3 立法院
+
+`ly20`（`N-LY-ID20-BILLS`）與 `ly6`（`N-LY-ID6-INTERP`）已註冊，狀態為
+`IMPLEMENTED_API`。本輪以主對話提供的 2026-11-18 結構製作離線 fixture，尚未實際連網驗收。
+共用 W2a `HttpAdapter`／`http_fetch.get`，依登記檔每次請求間隔 3 秒、每次最多 8MiB。
+JSON 前置大量空白與換行先 strip 再解析。`sessionPeriod` 必須補零（`01`，不能是 `1`）；
+分頁參數無效，每會期只請求一次 `page=1&limit=20000&fileType=json`。
+
+| 欄位 | ID20 議案 | ID6 質詢 |
+|---|---|---|
+| `kind` | `ly_bill` | `ly_interp` |
+| `external_id` | `billNo`；全範圍取 `sessionTimes` 數值最大者，同值取最後出現者 | `ly6-` + UTF-8 `sha256(term\|sessionPeriod\|sessionTimes\|item)[:24]`；完全重複列依順序加 `-2`、`-3` |
+| `title` | `billName.strip()[:300]` | `item.strip()[:300]`；只有 `甲、`／`乙、` 開頭且短於 20 字的列才當標題列排除 |
+| `case_number` | `第{term}屆第{int(sessionPeriod)}會期 {billNo}` | `第{term}屆第{int(sessionPeriod)}會期第{int(sessionTimes)}次會議` |
+| `authority` | `billOrg.strip()[:200]` | 沿用登記的官方機關 |
+| `official_url` | 安全的 HTTPS `ppg.ly.gov.tw` `pdfUrl`；否則 `https://data.ly.gov.tw/getds.action?id=20` | `https://data.ly.gov.tw/getds.action?id=6` |
+| `event_date` | null（無官方日期欄位） | null（無官方日期欄位） |
+
+ppg 只作官方連結、不連線；只加入 `official_url_hosts`，不加入 `allowed_hosts`。
+登記自檢拒絕將 `blocked_origins` 放入 `allowed_hosts`，內容與 robots 轉址至 ppg 也在送出前拒絕。
+不擷取 PDF／DOC，也不儲存 `billCosignatory`、`docUrl` 或其他未核准原始欄位。
+
+從 `scope.from_term`（目前 10）第 01 會期開始，逐期至 08，再換下一屆；
+每一屆都讀完 01–08 會期，屆中的空期是官方缺口、不停止；某屆 01 與 02 都為空才視為該屆尚未開議並停止，保護上限為第 12 屆第 08 會期。
+標題列過濾或議案去重後為空，不算官方空期。先讀完有界範圍，驗證並保留公開投影，
+完成跨會期議案去重後才交給 loader 寫入；游標 `term-sessionPeriod` 指向尚未完成的會期。
+預算停止後新程序會重新讀取範圍，以重建全域去重，再從游標續寫；
+部分批次重播會以既有內容雜湊跳過。這會重讀已完成會期，並非免網路成本的續跑。
+官方內容若在續跑間改變、使議案移至游標前方，須下一次完整掃描才能補齊。
+
+ID6 有官方缺口：主對話提供第 11 屆第 01 會期 74 筆、03／05／06 會期為 0。
+每個實際讀取的空會期在 JSON run 報告加 `EMPTY_PERIOD term=11 sessionPeriod=03` 等警告；
+不以第三方補資料。2026-11-18 主對話實測：舊的「連續兩個空期即停」會在第 11 屆 03／04 停下，之後會期補上資料就永遠掃不到，已改為整屆掃描；
+未開議屆別的空期不產生警告。這仍不代表已證明全歷史完整性。警告須保存 CLI `--report`，既有 runs 表未新增 warnings 欄位。
+ID6 雜湊使用完整原始 `item`，不使用截短標題；內容改動會產生新 ID，舊列不自動刪除。
+`|` 串接及 24 字元雜湊依本次規格，不等同官方識別碼。
+
+離線驗收涵蓋去重、補零、跨屆與上限、空期停止、預算續跑、標題列與穩定 ID、警告、
+ppg 僅連結、欄位限制及 SqliteStore 兩次完整同步第二次 `changed=0`。
+實際連網及 `--store d1-local` 兩次同步留由主對話驗收，`BUDGET_STOPPED` 不算全量完成。
+
+### W5 TDX
+
+`tdx`（`N-TDX-EVENTS`）已註冊為 `IMPLEMENTED_API`，表示離線實作通過，尚非帶金鑰的實網驗收。
+缺 `TDX_CLIENT_ID` 或 `TDX_CLIENT_SECRET` 時，CLI 回報 `NOT_CONFIGURED`／`MISSING_SECRET`、exit 0；
+該來源不建立 adapter、不請求 robots／token／事件，單獨同步它時也不建立資料庫連線。
+workflow 僅在 sync 步驟傳入這兩個 secrets，未建立或申請任何憑證。
+
+每次 run 透過官方 OAuth2 token endpoint POST `grant_type=client_credentials` 表單一次，
+驗證非空字串 token，再依臺北、新北、桃園、臺中、臺南、高雄順序請求
+`/api/basic/v1/Traffic/RoadEvent/LiveEvent/City/{City}?$format=JSON&$top=1000`。
+每市一頁，檢查 Count 等於 Items 長度且不超過 1,000；缺欄、重複 ID、截斷或異常資料皆失敗。
+游標為下一個尚未完成的城市名，預算停止後重新取得 token 並從該城市重播。
+城市間並非同一時間快照；先前已完成城市的變動要等下一輪完整同步補齊。
+共用既有白名單、robots、3 秒間隔與重試規則；token 回應上限 64KiB、事件回應上限 8MiB。
+認證及事件錯誤只回報固定訊息，不保存可能反射 secret／token 的底層例外或回應內容。
+
+僅保存 `traffic_event`、`tdx-{City}-{EventID}`、最多 300 字標題、中文事件類型（未知類型用 `類型{n}`）、
+EffectiveTime 日期（缺值改用 PublishTime）、AuthorityCode＋Source、城市中文名及 TDX 首頁連結。
+不保存 Description、Location、Positions、Geometry、AttachmentURLs，不下載附件。
+因官方沒有逐筆網址，`official_url` 固定為 `https://tdx.transportdata.tw/`。
+
+loader 對設定 `scope.retention_days` 的來源，在所有頁面成功後才清除該來源
+`event_date < UTC 當天日期減 N 天` 的資料；TDX 設 30 天，邊界當天及日期不明者保留。
+每批最多刪除 100 筆，刪除前按既有每筆 64 列預留檢查每日預算，容量及 UTC 換日守門同樣適用；不足就
+`BUDGET_STOPPED`，不執行該批，保留已完成批次的計帳。SQL delete trigger 同步 FTS，實際含 trigger 寫入量計入
+`rows_written` 與每日預算；JSON 報告另列 `deleted`。dry-run 僅輸出刪除 SQL。
+未設定保留期的來源行為不變；擷取 ERROR 或尚未完成全部頁面時不執行清除。
+
+2026-11-18 主對話提供的實測：匿名 LiveEvent 回 401 純文字；robots 回 HTML SPA，
+依既有規則登記 `HTML_NOT_ROBOTS`，執行時仍重新檢查。v2 News 缺高雄，因此不用。
+token 成功回應仍未實測。條款頁 `https://tdx.transportdata.tw/term` 要求標示來源，
+亦寫有償提供；**加入金鑰前要先確認費用**，本輪未付費或連線驗證授權內容。
+
+### W6 資料集目錄
+
+`odp`（`N-ODP-CATALOG`）已註冊為 `IMPLEMENTED_API`，只下載 data.gov.tw 官方全量 CSV，
+一個 run 為單頁，游標僅 `None`。保留 6564 metadata API 作登記參考，adapter 不額外呼叫它。
+提供機關須以六都市政府開頭，接受「台／臺」並將轄區統一為「臺」；資料集名稱須含
+`scope.keywords` 任一詞（警察、消防、交通、治安）。不依 CSV 列順序或 ID 大小篩選。
+
+`http_fetch.get(output_file=...)` 逐塊寫入可 seek 的二進位暫存檔，最多 100MiB，
+無 Content-Length 也逐塊計數；重試清空前次片段，失敗清空檔案，呼叫端負責關閉。
+未指定 output_file 的既有行為不變。adapter 用 `io.TextIOWrapper(encoding="utf-8-sig", newline="")`
+配合 `csv.DictReader` 逐列讀取，不將約 69MB 的原始 CSV 整份載入記憶體。
+僅保留過濾後的中繼資料清單；CSV 欄位缺少、列長度錯誤、ID 非數字或格式錯誤均失敗。
+必要欄位為資料集識別碼、資料集名稱、提供機關、更新頻率、授權方式、資料下載網址、
+檔案格式、詮釋資料更新時間。保留官方其他欄名（含「資資料集上架方式」），但不匯入。
+
+保存 `dataset`、`odp-{id}`、名稱、機關、轄區、詮釋資料更新日期、最多 100 字更新頻率、
+授權方式及 `https://data.gov.tw/dataset/{id}`。空白授權明記「未標示（不推定開放）」。
+不存聯絡人、電話、描述及下載網址，不連資源網址、不爬各市入口。
+原始 CSV 的換行欄位、BOM、資源欄以 `;` 串接及結尾分號均按 CSV 處理；
+不依錯標的 Content-Type 判定內容。沒有可匿名使用的列表／增量 API，每輪仍需全量下載。
+data.gov.tw robots 500 沿用已登記的 documented open API 例外，不放寬其他 robots 限制。
+
+`tests/test_national_tdx_odp.py` 全部使用假 session，意外真實請求會立即失敗。
+TDX fixture 依提供的 LiveEvent schema 自造兩市各兩筆，其餘四市回空頁；
+ODP fixture 從提供的 `export-csv.head300k.csv` 留下 136493、135546、135997、139224 四筆，
+另以樣本欄位衍生六筆人工邊界案例（900005–900010），聯絡資訊及描述均改為測試字串。
+驗證六都、臺／台、換行、BOM、分號、排除條件、授權空白、串流上限、重試片段替換、
+憑證錯誤遮蔽、城市續跑、保留期與 FTS／預算，以及兩來源各同步兩次後第二次 `changed=0`。
+實網 ODP 兩次同步、TDX 憑證及遠端 D1 的成本與效能均留由主對話另行驗收。
+
+### W7 逐字稿本機索引
+
+`scripts/national-transcript-index.py` 只供內部研究：**不進 D1、不進 CI、不公開全文**。
+不接入 loader、公開 gateway 或任何 workflow；全文、搜尋片段與資料庫留在本機。
+沿用 `N-COUNCIL-TXG` 登記的主機、robots 與 3 秒請求間隔，以及既有
+`HttpAdapter`／`http_fetch.get`。執行時仍檢查 robots；列表最多 8MiB，detail 最多 4MiB。
+
+預設資料庫 `~/.cache/govintel/transcripts.sqlite`；所有子指令拒絕 repo 內路徑，
+包含解析後的符號連結／junction 及其他 Git checkout。search、stats 唯讀開庫，
+不存在就報錯，不建立空庫；`.gitignore` 另排除逐字稿資料庫與 journal／WAL 側檔。
+
+```powershell
+python -X utf8 scripts/national-transcript-index.py sync --since 2026-08-01 --max-meetings 3
+python -X utf8 scripts/national-transcript-index.py sync --since 2026-08-01 --until 2026-08-31 --page-size 1000
+python -X utf8 scripts/national-transcript-index.py search "交通安全" --limit 20 --json
+python -X utf8 scripts/national-transcript-index.py search "議員" --speaker "主席(張議長清照)" --from 2026-08-01 --to 2026-08-31
+python -X utf8 scripts/national-transcript-index.py stats
+# --db 放在子指令後，位置須在所有 Git checkout 外
+python -X utf8 scripts/national-transcript-index.py stats --db C:\Users\Administrator\.cache\govintel\transcripts.sqlite
+```
+
+空庫且未給 `--since` 時全量回填；完成後未給 `--since`，從最新會議日減 14 天增量掃描。
+先完整掃描日期範圍的列表，核對頁碼、pageSize、穩定總數與每頁
+`min(pageSize, totalCount 剩餘)`，成功後才抓全文。pageSize 接受 1–1000，預設 1000。
+只抓未索引或段數不同的會議；`--max-meetings` 限制 detail 嘗試數（含段數不符的嘗試），
+不限制列表掃描。JSON 摘要含掃描列數、新增／更新數、跳過原因、警告與 complete。
+段數不符時 `complete=false` 且保留舊會議；結束碼 0 不代表全量完整。
+
+`sync_state` 保留未完成的 since／until，包括全量的空 since；受限額或中斷後，
+重跑相同指令，或不帶日期參數續跑，仍掃描原範圍並跳過已完成且段數相同的會議，
+避免切成 14 天增量而漏掉舊資料。明確傳日期可選擇新範圍；重新掃描會重複列表請求。
+完整處理後清除進度，有段數警告則保留待重試。每場以一個 transaction 刪除舊段落再重寫；
+寫入失敗復原該場與 FTS，較早提交的會議仍保留。insert／update／delete trigger
+同步 external-content FTS5 trigram。stats 顯示會議數、段落數、最早／最新日期與主檔 bytes。
+
+API 陷阱與處理：
+
+- 列表 content 截成 40 字，不能當全文；內容只取 FrontDetail。
+- `proceedingContentId` 可為 null、`seq` 全為 0，同場有完全相同發言。
+  鍵用 `(proceedingsId, 原始陣列 ordinal)`（0 起），不依內容去重，deleted 留下序位缺口。
+- 排除 `isDeleted=true` 後段數必須等於完整列表的該場列數，否則整場警告、跳過、不寫入。
+- `sessionType` 列表是字串、detail 是整數；不靠此欄判斷，保存 `sessionDisplay`。
+- 列表日期為無時區 ISO、detail 為民國中文字串；採列表的 ISO 日，不猜時區或解析民國顯示文字。
+- `term` 參數需要 ID，不是屆次數字；不傳此參數。
+- 官方連結只到 `/meeting-records/{proceedingsId}`，不捏造段落永久網址。
+- 相同段數的內容修訂不觸發重抓，14 天以前的變動也可能漏掉；歷史重查需明確給 `--since`。
+  若要重抓段數未變的內容，可用 repo 外的新資料庫重建，目前沒有強制刷新選項。
+- 列表無快照 token；即使總數穩定，等量增刪或排序變更仍可能漏列。
+  段數核對只能攔部分問題，不能據此宣稱歷史完整。
+
+搜尋 3 字以上用 FTS5 literal phrase（加引號、跳脫雙引號）；1–2 字用 LIKE，
+跳脫 `\`、`%`、`_`，與 W1 gateway 一致。發言人精確比對完整名稱，日期含起訖當日。
+每筆列出日期、會期、會議類型、名稱、發言人、命中前後約 40 字與官方連結。
+
+依主對話提供的 2026-11-18 總數 971,552、pageSize=1000，列表約 **972 次**；
+僅 3 秒節流約 **48.6 分鐘**，每場 detail 再加一次。若 M 場需抓，約 `972 + M` 次 API
+請求、`3 × (972 + M)` 秒，另加 robots、網路、重試與寫入時間；每多 1,000 場約加 50 分鐘。
+會議總數尚未實測。max-meetings 不免除完整列表成本；pageSize=1000 是否給足列數待主對話
+連網驗收，不足即報錯，可改較小 pageSize 重跑。
+
+離線 fixture 縮減自 `proc-detail-83bac000.json` 與 `proc-p2-s100.json`，保留兩筆實際重複發言，
+另人工標一段 deleted；第二場沒有 raw detail，以三筆 raw 列表摘錄合成 detail 外殼，
+不冒充第二場完整逐字稿收據。測試僅用 fixture、假 session、記憶體 SQLite，攔截意外真實請求。
+實際連網 `--since 2026-08-01 --max-meetings 3` 與搜尋由主對話另行驗收，本 worker 未連網。
 
 ## 評估過但不採用（使用者決定只直連官方）
 

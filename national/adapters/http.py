@@ -1,4 +1,5 @@
 """Registry-governed transport for official national metadata adapters."""
+import json
 from urllib.parse import urlsplit
 
 import requests
@@ -17,6 +18,32 @@ def text(row, key):
     return str(value)
 
 
+class RegistryRobotsPolicy(http_fetch.RobotsPolicy):
+    def __init__(self, blocked_origins, *, absent_when_redirect_to=None, **kwargs):
+        super().__init__(**kwargs)
+        self.blocked_hosts = {urlsplit(origin).hostname for origin in blocked_origins}
+        self.absent_when_redirect_to = absent_when_redirect_to
+
+    def redirect_is_absent(self, url, status, location):
+        if self.absent_when_redirect_to is None:
+            return False
+        target = urlsplit(self.absent_when_redirect_to)
+        if (status in (301, 302) and location == self.absent_when_redirect_to
+                and target.scheme in {"http", "https"}
+                and target.hostname == urlsplit(url).hostname
+                and target.hostname not in self.blocked_hosts
+                and target.path != "/robots.txt" and target.username is None
+                and target.password is None and target.port in (None, 80, 443)):
+            return True
+        raise http_fetch.RobotsDisallowed("registry robots redirect does not match observed absence")
+
+    def redirect_target(self, url, location, followed):
+        target = super().redirect_target(url, location, followed)
+        if urlsplit(target).hostname in self.blocked_hosts:
+            raise http_fetch.RobotsDisallowed("registry blocks robots redirect origin")
+        return target
+
+
 class HttpAdapter:
     def __init__(self, source, *, session=None):
         self.source = source
@@ -24,11 +51,13 @@ class HttpAdapter:
         self.session.headers.update({"User-Agent": USER_AGENT})
         self.allowed_hosts = {urlsplit(origin).hostname for origin in source["allowed_hosts"]}
         self.robots = source["robots"]
-        self.policy = http_fetch.RobotsPolicy(
+        self.policy = RegistryRobotsPolicy(self.robots.get("blocked_origins", []),
+            absent_when_redirect_to=self.robots.get("absent_when_redirect_to"),
             user_agent=USER_AGENT, documented_open_api=source["documented_open_api"])
         self.warnings = []
 
-    def response(self, url, *, max_bytes, method="GET", json_body=None, form_body=None):
+    def response(self, url, *, max_bytes, method="GET", json_body=None, form_body=None, allow_empty=False,
+                 bearer_token=None, output_file=None):
         if (self.source["status"] == "BLOCKED_BY_ROBOTS_NEEDS_CONSENT"
                 or self.robots["status"] not in http_fetch.RobotsPolicy.ALLOWED
                 and not (self.robots["status"] == "ROBOTS_SERVER_ERROR"
@@ -40,12 +69,14 @@ class HttpAdapter:
             self.session, url, self.allowed_hosts,
             min_interval_seconds=self.source["min_request_interval_seconds"],
             max_bytes=max_bytes, robots_policy=self.policy, method=method,
-            json_body=json_body, form_body=form_body)
+            json_body=json_body, form_body=form_body, allow_empty=allow_empty,
+            allowed_paths=getattr(self, "REQUEST_PATHS", None), bearer_token=bearer_token,
+            output_file=output_file)
 
     def request(self, url, *, max_bytes, method="GET", json_body=None):
         response = self.response(url, max_bytes=max_bytes, method=method, json_body=json_body)
         try:
-            payload = response.json()
+            payload = json.loads(response.content.strip())
             if not isinstance(payload, dict):
                 raise ValueError("API response must be an object")
             return payload
