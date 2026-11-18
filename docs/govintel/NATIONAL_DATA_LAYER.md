@@ -318,6 +318,71 @@ ID6 雜湊使用完整原始 `item`，不使用截短標題；內容改動會產
 ppg 僅連結、欄位限制及 SqliteStore 兩次完整同步第二次 `changed=0`。
 實際連網及 `--store d1-local` 兩次同步留由主對話驗收，`BUDGET_STOPPED` 不算全量完成。
 
+### W7 逐字稿本機索引
+
+`scripts/national-transcript-index.py` 只供內部研究：**不進 D1、不進 CI、不公開全文**。
+不接入 loader、公開 gateway 或任何 workflow；全文、搜尋片段與資料庫留在本機。
+沿用 `N-COUNCIL-TXG` 登記的主機、robots 與 3 秒請求間隔，以及既有
+`HttpAdapter`／`http_fetch.get`。執行時仍檢查 robots；列表最多 8MiB，detail 最多 4MiB。
+
+預設資料庫 `~/.cache/govintel/transcripts.sqlite`；所有子指令拒絕 repo 內路徑，
+包含解析後的符號連結／junction 及其他 Git checkout。search、stats 唯讀開庫，
+不存在就報錯，不建立空庫；`.gitignore` 另排除逐字稿資料庫與 journal／WAL 側檔。
+
+```powershell
+python -X utf8 scripts/national-transcript-index.py sync --since 2026-08-01 --max-meetings 3
+python -X utf8 scripts/national-transcript-index.py sync --since 2026-08-01 --until 2026-08-31 --page-size 1000
+python -X utf8 scripts/national-transcript-index.py search "交通安全" --limit 20 --json
+python -X utf8 scripts/national-transcript-index.py search "議員" --speaker "主席(張議長清照)" --from 2026-08-01 --to 2026-08-31
+python -X utf8 scripts/national-transcript-index.py stats
+# --db 放在子指令後，位置須在所有 Git checkout 外
+python -X utf8 scripts/national-transcript-index.py stats --db C:\Users\Administrator\.cache\govintel\transcripts.sqlite
+```
+
+空庫且未給 `--since` 時全量回填；完成後未給 `--since`，從最新會議日減 14 天增量掃描。
+先完整掃描日期範圍的列表，核對頁碼、pageSize、穩定總數與每頁
+`min(pageSize, totalCount 剩餘)`，成功後才抓全文。pageSize 接受 1–1000，預設 1000。
+只抓未索引或段數不同的會議；`--max-meetings` 限制 detail 嘗試數（含段數不符的嘗試），
+不限制列表掃描。JSON 摘要含掃描列數、新增／更新數、跳過原因、警告與 complete。
+段數不符時 `complete=false` 且保留舊會議；結束碼 0 不代表全量完整。
+
+`sync_state` 保留未完成的 since／until，包括全量的空 since；受限額或中斷後，
+重跑相同指令，或不帶日期參數續跑，仍掃描原範圍並跳過已完成且段數相同的會議，
+避免切成 14 天增量而漏掉舊資料。明確傳日期可選擇新範圍；重新掃描會重複列表請求。
+完整處理後清除進度，有段數警告則保留待重試。每場以一個 transaction 刪除舊段落再重寫；
+寫入失敗復原該場與 FTS，較早提交的會議仍保留。insert／update／delete trigger
+同步 external-content FTS5 trigram。stats 顯示會議數、段落數、最早／最新日期與主檔 bytes。
+
+API 陷阱與處理：
+
+- 列表 content 截成 40 字，不能當全文；內容只取 FrontDetail。
+- `proceedingContentId` 可為 null、`seq` 全為 0，同場有完全相同發言。
+  鍵用 `(proceedingsId, 原始陣列 ordinal)`（0 起），不依內容去重，deleted 留下序位缺口。
+- 排除 `isDeleted=true` 後段數必須等於完整列表的該場列數，否則整場警告、跳過、不寫入。
+- `sessionType` 列表是字串、detail 是整數；不靠此欄判斷，保存 `sessionDisplay`。
+- 列表日期為無時區 ISO、detail 為民國中文字串；採列表的 ISO 日，不猜時區或解析民國顯示文字。
+- `term` 參數需要 ID，不是屆次數字；不傳此參數。
+- 官方連結只到 `/meeting-records/{proceedingsId}`，不捏造段落永久網址。
+- 相同段數的內容修訂不觸發重抓，14 天以前的變動也可能漏掉；歷史重查需明確給 `--since`。
+  若要重抓段數未變的內容，可用 repo 外的新資料庫重建，目前沒有強制刷新選項。
+- 列表無快照 token；即使總數穩定，等量增刪或排序變更仍可能漏列。
+  段數核對只能攔部分問題，不能據此宣稱歷史完整。
+
+搜尋 3 字以上用 FTS5 literal phrase（加引號、跳脫雙引號）；1–2 字用 LIKE，
+跳脫 `\`、`%`、`_`，與 W1 gateway 一致。發言人精確比對完整名稱，日期含起訖當日。
+每筆列出日期、會期、會議類型、名稱、發言人、命中前後約 40 字與官方連結。
+
+依主對話提供的 2026-11-18 總數 971,552、pageSize=1000，列表約 **972 次**；
+僅 3 秒節流約 **48.6 分鐘**，每場 detail 再加一次。若 M 場需抓，約 `972 + M` 次 API
+請求、`3 × (972 + M)` 秒，另加 robots、網路、重試與寫入時間；每多 1,000 場約加 50 分鐘。
+會議總數尚未實測。max-meetings 不免除完整列表成本；pageSize=1000 是否給足列數待主對話
+連網驗收，不足即報錯，可改較小 pageSize 重跑。
+
+離線 fixture 縮減自 `proc-detail-83bac000.json` 與 `proc-p2-s100.json`，保留兩筆實際重複發言，
+另人工標一段 deleted；第二場沒有 raw detail，以三筆 raw 列表摘錄合成 detail 外殼，
+不冒充第二場完整逐字稿收據。測試僅用 fixture、假 session、記憶體 SQLite，攔截意外真實請求。
+實際連網 `--since 2026-08-01 --max-meetings 3` 與搜尋由主對話另行驗收，本 worker 未連網。
+
 ## 評估過但不採用（使用者決定只直連官方）
 
 以下保留第一輪提供的 **2026-11-17 實測紀錄**作規模參考，本輪沒有重新連網驗證；不是本輪官方來源的筆數或驗收收據，也不作後續擷取入口。
