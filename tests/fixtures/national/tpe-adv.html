@@ -1,0 +1,39 @@
+<!-- Reduced from official 2026-11-18 tpe/adv.html.
+Kept form1 hidden names/defaults, printForm and MainTable structure; removed scripts/layout/other controls.
+sele_DETR reduced to 14,12; distinct synthetic VIEWSTATE/EVENTVALIDATION per response.
+Rows selected from original response (fixture grouping is synthetic), counts rewritten to 2.
+14: whitespace added to member kind; 12: one kind changed to spaced government kind.
+POST fixtures retain a checked date filter to catch accidental non-hidden replay. -->
+<form method="post" action="./Adv_SearchInput.aspx" id="form1">
+<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="replay-0-__VIEWSTATE" />
+<input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" value="275377EF" />
+<input type="hidden" name="__EVENTVALIDATION" id="__EVENTVALIDATION" value="replay-0-__EVENTVALIDATION" />
+<input name="afterClick" type="hidden" id="afterClick" />
+<input name="isFini" type="hidden" id="isFini" />
+<select name="sele_DETR" id="sele_DETR" data-trigger="">
+	<option selected="selected" value="14">第14屆</option>
+
+	<option value="12">第12屆</option>
+
+
+
+
+
+
+
+
+
+
+
+
+</select>
+</form>
+<form name="printForm" target="_blank" method="post" action="PrintDetailPage.aspx">
+        <input type="hidden" name="ListType" value="OM" />
+        <input type="hidden" name="PrintType" />
+        <input type="hidden" name="SYSN" />
+        <input type="hidden" name="orderColumn" />
+        <input type="hidden" name="orderR" />
+        <input name="WhereStr" type="hidden" id="WhereStr" />
+        <input name="DisplayType" type="hidden" id="DisplayType" value="OM" />
+    </form>

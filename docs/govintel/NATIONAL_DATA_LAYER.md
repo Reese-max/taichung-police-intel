@@ -227,13 +227,13 @@ HTML 保留 hidden 狀態與列表結構，計數與選單縮至測試資料範�
 | 欄位 | 臺南 TNN | 高雄 KHH | 臺北 TPE |
 |---|---|---|---|
 | `external_id` | `tnn:` + ProNo GUID | `khh:` + hidProposalSN；不以加密網址為 ID | `tpe:` + SYSN |
-| `kind` | KidTitle 前半：市府提案 → bill_gov、議員提案 → bill，其餘 bill_other | 分頁名：市政府提案 → bill_gov、議員提案 → bill，其餘 bill_other | 案別：市府提案 → bill_gov、議員提案 → bill，其餘 bill_other |
+| `kind` | KidTitle 前半：市府提案 → bill_gov、議員提案 → bill，其餘 bill_other | 分頁名：市政府提案 → bill_gov、議員提案 → bill，其餘 bill_other | 案別去除所有空白：市府提案 → bill_gov、議員提案 → bill，其餘 bill_other |
 | `title` | CaseCause，最多 300 字 | 案由，最多 300 字；分組標題不是資料列 | MainTable 的 text 欄 |
-| `case_number` | GradeTime + KidTitle + 第 CaseNumber 案 | 分組標題 + 第編號號 | 第屆屆第次次 案號 acno |
+| `case_number` | GradeTime + KidTitle + 第 CaseNumber 案 | 分組標題 + 第編號號 | 已結案：`第{屆}屆結案 案號{acno}`；未結案：`未結案 案號{acno}` |
 | `authority` | OrgTitle，最多 200 字 | 主辦單位／提案議員，最多 200 字，可空白 | 沿用來源機關 |
 | `event_date` | DoneDate 的 yyyy/mm/dd 轉 ISO；空值為 null | null | null |
 | `official_url` | `https://www.tncc.gov.tw/motionpage1.asp?ProNo=...` | onclick 的 Detail_RWD.aspx 連結；無法解析時用入口 | `https://ifddoc2.tcc.gov.tw/TCCMIS_Front/` |
-| 游標 | `grdno-topage` | 會期明碼 | `屆-次` |
+| 游標 | `grdno-topage` | 會期明碼 | 兩位數屆別（如 `12`），最後為 `open` |
 
 三站共用既有 UA、robots、請求間隔、白名單及有界 transport，每次回應最多 8MiB。
 `http_fetch.get(form_body=...)` 用 requests 的表單編碼，與 `json_body` 互斥，限 POST；
@@ -260,21 +260,35 @@ WebForms 欄位名稱、狀態簽章、選單及伺服器 Session 改動皆可�
 高雄條款「僅供個人、非商業用途，不可重製、改作、散布」仍有索引及再利用風險；
 robots 允許與只存中繼資料，不等同完整授權。
 
-臺北先逐屆 POST 首頁查 OMCount，再按屆＋次 POST searchlist，資料依 MainTable 的 data-field 表頭映射。
-優先取回應選單；缺次數選單時從 01 遞增，連續兩次空列表才停，最多 99 次，耗盡仍不停止則失敗。
-每片出現「超過 500 筆」就回 `TPE_ROW_CAP term=XX session=YY`，不把被截斷列表當完整資料。
-每屆切片總和與 OMCount 差距超過 1% 時，JSON 報告附
-`warnings: ["TPE_COUNT_MISMATCH term=XX got=N expected=M"]`，不讓整輪失敗；請保存 `--report`，
-既有 runs 表未新增 warnings 欄位。結案屆次篩選可能漏掉未結案件，此語意尚未驗證，W2b 不補抓。
-DetailPage.aspx 直接 GET 回 403，沒有可直接開啟的逐筆網址；不補 Referer、不換 UA、不以其他途徑繞過，
-只儲存首頁連結。臺北網路、真實全量筆數與未結案覆蓋率仍須主對話在 xisx-pc 驗收。
+臺北 GET `Adv_SearchInput.aspx`，從 `sele_DETR` 讀取兩位數屆別；POST 同頁先查未結案全部，再逐屆整批查已結案。
+未結案要先查：實測 59 筆未結案中有 58 筆也列在第 14 屆的結案屆次清單，先查才能保留「未結案」標示。已結案送 `useisFi=on`、`isFini=F`、`useCOTE=useCOTE`、`sele_DETR=屆`；
+未結案送 `useunFi=on`、`isFini=U`、`NotZ99All=NotZ99All`，不帶屆；兩者均送 `btnSubmit=查詢`。
+其他欄位僅沿用上一回應 form1 的 hidden 狀態，不送 printForm 或其他篩選控制項。
+缺 VIEWSTATE／EVENTVALIDATION 回 `TPE_POSTBACK_CHAIN_BROKEN`；不再請求首頁 OMCount 或 searchlist。
+MainTable 依 data-field 表頭映射，每頁先按 `OutputWhereStr` 的「共N筆」核對實際列數必須完全相等，
+缺計數回 `TPE_COUNT_MISSING`，不符回 `TPE_COUNT_MISMATCH` 並使整輪失敗，沒有 1% 容差。
+沒有固定 500 列上限，但出現「超過 500 筆」仍回 `TPE_ROW_CAP term=XX` 或 `TPE_ROW_CAP open`。
+核對後才跨屆與已結／未結去重，SYSN 保留首筆（未結案優先）並回 `TPE_DUPLICATE_SYSN <id>` 警告；
+請保存 CLI `--report`，既有 runs 表未新增 warnings 欄位。
+
+舊屆＋次篩選會漏掉結案屆次符合、卻不屬於任何一次大會的案件，也未抓未結案件。
+主對話 2026-11-18 在 xisx-pc 實測第12屆整屆1,579筆，臨時大會236＋定期大會675＝911，
+各次加總912；第5屆整屆1,994、各次加總1,972。逐次結果即使與該次 OMCount 相等，仍不能證明整屆完整。
+進階檢索第1屆3,898列／2,029,868 bytes、第14屆1,716列／1,088,155 bytes、第12屆1,579列；
+未結案59列／73,810 bytes。
+主對話 2026-11-18 在 xisx-pc 以新做法同步：第10～14屆寫入筆數 992／1,200／1,579／1,727／1,716，與官方各屆總數完全相同；
+寫到第9屆時碰到每日寫入上限（`BUDGET_STOPPED`），重跑 changed=0。
+日期切片備案是 `REDTChk=on`、`REDTstartdate`／`REDTenddate` 使用民國日期（如 `103/01/01`）；
+第12屆逐年切片加總亦為1,579。此次不實作日期切片，單次回應仍限8MiB。
+DetailPage.aspx 直接 GET 回403；不請求 DetailPage.aspx／PrintDetailPage.aspx，不補 Referer、不換 UA，
+只儲存入口連結。第1～9屆因每日寫入上限分日續跑，全量匯入尚未完成。
 
 桃園登記為「無結構化議案」，不實作 adapter、endpoints 留空。可替代的
 `schedule.aspx?mid=40`、`meeting.aspx?mid=41`、`file.aspx?mid=44` 屬議事日程與 PDF 清單，
 不能當成結構化提案檢索，也不在本輪抓取。
 
 離線驗收包含 BOM、日期空值、計數失敗、跨頁游標、hidden 狀態鏈、分組標題排除、穩定 SN、
-臺北上限與連續空片停止、警告與詳情請求禁制；三站各以 SqliteStore 同步兩次，第二次 changed=0。
+臺北逐屆及未結案筆數完全核對、超過500列正常回應、截斷訊息失敗、去重警告與詳情請求禁制；三站各以 SqliteStore 同步兩次，第二次 changed=0。
 真實網路、臺南／高雄 d1-local 全量及臺北 xisx-pc 匯入由主對話另驗收；本 worker 不連網、不碰雲端。
 
 ## 評估過但不採用（使用者決定只直連官方）

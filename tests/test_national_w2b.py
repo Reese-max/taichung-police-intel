@@ -65,9 +65,9 @@ def steps(code):
                 ("GET", "Default_RWD.aspx", fixture("khh-entry.html")),
                 *[("POST", "Default_RWD.aspx", fixture(name)) for name in
                   ("khh-selected.html", "khh-query.html", "khh-page.html", "khh-query.html")]]
-    return [("GET", "TCCMIS_Front/", fixture("tpe-home.html")),
-            ("POST", "TCCMIS_Front/", fixture("tpe-count.html")),
-            ("POST", "searchlist.aspx", fixture("tpe-list.html"))]
+    return [("GET", "Adv_SearchInput.aspx", fixture("tpe-adv.html")),
+            *[("POST", "Adv_SearchInput.aspx", fixture(name)) for name in
+              ("tpe-adv-open.html", "tpe-adv-14.html", "tpe-adv-12.html")]]
 
 
 class W2bTests(unittest.TestCase):
@@ -93,7 +93,7 @@ class W2bTests(unittest.TestCase):
         return run, session
 
     def test_each_city_two_sqlite_syncs_and_mappings(self):
-        for code, count in (("TNN", 3), ("KHH", 3), ("TPE", 2)):
+        for code, count in (("TNN", 3), ("KHH", 3), ("TPE", 6)):
             with self.subTest(code=code):
                 first, replay = self.run_load(code)
                 self.assertEqual((first["status"], first["changed"]), ("OK", count), first)
@@ -110,9 +110,16 @@ class W2bTests(unittest.TestCase):
         self.assertIn("第4屆第8次定期大會議員提案 第1號", rows[1]["case_number"])
         self.assertTrue(all(r["event_date"] is None for r in rows))
         rows = self.store.query("SELECT * FROM records WHERE source_id='N-COUNCIL-TPE' ORDER BY id")
-        self.assertEqual(rows[0]["external_id"], "tpe:35439")
-        self.assertEqual(rows[0]["case_number"], "第14屆第08次 案號140669")
-        self.assertEqual(rows[0]["official_url"], SOURCES["N-COUNCIL-TPE"]["endpoints"][0])
+        rows = {r["external_id"]: r for r in rows}
+        self.assertEqual(rows["tpe:35481"]["case_number"], "第14屆結案 案號140291")
+        self.assertEqual(rows["tpe:35472"]["case_number"], "第12屆結案 案號140648")
+        self.assertEqual(rows["tpe:35485"]["case_number"], "未結案 案號140659")
+        self.assertEqual(rows["tpe:35479"]["kind"], "bill")
+        self.assertEqual(rows["tpe:35472"]["kind"], "bill_gov")
+        self.assertEqual(rows["tpe:35481"]["kind"], "bill_other")
+        self.assertTrue(all(r["event_date"] is None for r in rows.values()))
+        self.assertTrue(all(r["official_url"] == SOURCES["N-COUNCIL-TPE"]["endpoints"][0]
+                            for r in rows.values()))
 
     def test_tnn_bom_count_mismatch_and_duplicate_ids_fail_before_writes(self):
         self.assertTrue(fixture("tnn-list.json").startswith(b"\xef\xbb\xbf"))
@@ -160,32 +167,90 @@ class W2bTests(unittest.TestCase):
         self.assertIn("KHH_COUNT_MISMATCH", run["error"])
         self.assertEqual(run["changed"], 0)
 
-    def test_tpe_cap_fails_and_count_warning_is_reported(self):
-        replay = steps("TPE")
-        replay[-1] = (*replay[-1][:2], fixture("tpe-cap.html"))
-        run, _ = self.run_load("TPE", replay)
-        self.assertIn("TPE_ROW_CAP term=14 session=08", run["error"])
-        self.assertEqual(run["changed"], 0)
-        replay = steps("TPE")
-        replay[1] = (*replay[1][:2], replay[1][2].replace(b'id="OMCount">2<', b'id="OMCount">200<'))
-        run, _ = self.run_load("TPE", replay)
-        self.assertEqual(run["status"], "OK", run)
-        self.assertEqual(run["warnings"], ["TPE_COUNT_MISMATCH term=14 got=2 expected=200"])
+    def test_tpe_advanced_search_forms_and_previous_hidden_state(self):
+        run, replay = self.run_load("TPE")
+        self.assertEqual((run["status"], run["changed"]), ("OK", 6), run)
+        self.assertFalse(replay.steps)
+        self.assertEqual([m for m, _, _ in replay.calls], ["GET", "POST", "POST", "POST"])
+        self.assertTrue(all(url == SOURCES["N-COUNCIL-TPE"]["endpoints"][1]
+                            for _, url, _ in replay.calls))
+        self.assertFalse(any(forbidden in url for _, url, _ in replay.calls
+                             for forbidden in ("searchlist.aspx", "DetailPage.aspx", "PrintDetailPage.aspx")))
+        forms = [kw["data"] for method, _, kw in replay.calls if method == "POST"]
+        for form, previous, term in zip(forms, steps("TPE"), ("open", "14", "12")):
+            doc = Document(previous[2].decode())
+            expected = {n.attrs["name"]: n.attrs.get("value", "")
+                        for n in doc.one("form", id="form1").find("input", type="hidden")}
+            if term == "open":
+                expected.update(useunFi="on", isFini="U", NotZ99All="NotZ99All", btnSubmit="查詢")
+            else:
+                expected.update(useisFi="on", isFini="F", useCOTE="useCOTE", sele_DETR=term, btnSubmit="查詢")
+            self.assertEqual(form, expected)
 
-    def test_tpe_fallback_stops_after_two_consecutive_empty_slices(self):
-        replay = steps("TPE")[:2]
-        replay[1] = (*replay[1][:2], re.sub(rb'<select name="sele_DETM".*?</select>', b'', replay[1][2], flags=re.S))
-        empty = re.sub(rb'<tr\b.*?</tr>', b'', fixture("tpe-list.html"), flags=re.S)
-        replay.extend(("POST", "searchlist.aspx", body) for body in
-                      [empty, fixture("tpe-list.html"), empty, empty])
-        run, session = self.run_load("TPE", replay)
-        self.assertEqual(run["status"], "OK", run)
-        forms = [kw["data"] for _, url, kw in session.calls if "searchlist.aspx" in url]
-        self.assertEqual([f["HDETM"] for f in forms], ["01", "02", "03", "04"])
-        self.assertFalse(session.steps)
+    def test_tpe_count_and_cap_errors_fail_before_writes(self):
+        for index, context in ((1, "open"), (2, "term=14")):
+            for replacement, error in (("共3筆", "TPE_COUNT_MISMATCH"),
+                                       ("筆數未知", "TPE_COUNT_MISSING"),
+                                       ("超過 500 筆", "TPE_ROW_CAP")):
+                with self.subTest(index=index, error=error):
+                    replay = steps("TPE")
+                    replay[index] = (*replay[index][:2], replay[index][2].replace(
+                        "共2筆".encode(), replacement.encode()))
+                    run, _ = self.run_load("TPE", replay)
+                    self.assertEqual(run["status"], "ERROR", run)
+                    self.assertIn(error + " " + context, run["error"])
+                    self.assertEqual(run["changed"], 0)
+        self.assertEqual(self.store.query("SELECT count(*) AS n FROM records")[0]["n"], 0)
+
+    def test_tpe_missing_postback_state_fails_before_writes(self):
+        for index in range(4):
+            for token in (b"__VIEWSTATE", b"__EVENTVALIDATION"):
+                with self.subTest(index=index, token=token):
+                    replay = steps("TPE")
+                    replay[index] = (*replay[index][:2], replay[index][2].replace(token, b"REMOVED"))
+                    run, session = self.run_load("TPE", replay)
+                    self.assertIn("TPE_POSTBACK_CHAIN_BROKEN", run["error"])
+                    self.assertEqual(run["changed"], 0)
+                    self.assertEqual(len(session.calls), index + 1)
+
+    def test_tpe_duplicate_sysn_keeps_first_after_checking_raw_count(self):
+        replay = steps("TPE")
+        for index, old in ((1, b"35485"), (3, b"35472")):
+            replay[index] = (*replay[index][:2], replay[index][2].replace(old, b"35481"))
+        run, _ = self.run_load("TPE", replay)
+        self.assertEqual((run["status"], run["changed"]), ("OK", 4), run)
+        self.assertEqual(run["warnings"], ["TPE_DUPLICATE_SYSN 35481"] * 2)
+        rows = self.store.query("SELECT * FROM records WHERE external_id='tpe:35481'")
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["case_number"], "未結案 案號140659")
+
+    def test_tpe_resume_open_then_terms(self):
+        source, adapter, replay = self.adapter("TPE")
+        records, cursor = adapter.fetch(source, "14")
+        self.assertEqual(([r["external_id"] for r in records], cursor),
+                         (["tpe:35481", "tpe:35479"], "12"))
+        records, cursor = adapter.fetch(source, cursor)
+        self.assertEqual(([r["external_id"] for r in records], cursor),
+                         (["tpe:35472", "tpe:35483"], None))
+        self.assertEqual(len(replay.calls), 4)
+        self.assertFalse(replay.steps)
+
+    def test_tpe_more_than_500_rows_and_exact_count(self):
+        replay = steps("TPE")
+        body = replay[2][2].decode()
+        rows = re.findall(r'<tr\b.*?</tr>', body, re.S)
+        many = "".join(rows[0].replace("35481", str(90000 + n)) for n in range(501))
+        body = body.replace(rows[0], many).replace(rows[1], "").replace("共2筆", "共501筆")
+        replay[2] = (*replay[2][:2], body.encode())
+        run, _ = self.run_load("TPE", replay)
+        self.assertEqual((run["status"], run["changed"]), ("OK", 505), run)
+        replay[2] = (*replay[2][:2], body.replace("共501筆", "共502筆").encode())
+        run, _ = self.run_load("TPE", replay)
+        self.assertIn("TPE_COUNT_MISMATCH", run["error"])
+        self.assertEqual(run["changed"], 0)
 
     def test_cursors_resume_metadata_pages(self):
-        for code, cursor, expected in (("TNN", "4-1", 3), ("KHH", "07040800", 3), ("TPE", "14-08", 2)):
+        for code, cursor, expected in (("TNN", "4-1", 3), ("KHH", "07040800", 3), ("TPE", "12", 2)):
             source, adapter, replay = self.adapter(code)
             records, next_cursor = adapter.fetch(source, cursor)
             self.assertEqual(len(records), expected)

@@ -13,7 +13,7 @@
       "transport": "HTML",
       "endpoints": [
         "https://ifddoc2.tcc.gov.tw/TCCMIS_Front/",
-        "https://ifddoc2.tcc.gov.tw/TCCMIS_Front/searchlist.aspx"
+        "https://ifddoc2.tcc.gov.tw/TCCMIS_Front/Adv_SearchInput.aspx"
       ],
       "allowed_hosts": [
         "https://ifddoc2.tcc.gov.tw"
@@ -68,8 +68,8 @@
         "來源：#247 NATIONAL_COUNCIL_EXPANSION.md 第二節（2026-11-15 盤點）；未重新連網查證。",
         "rights_note 照錄總表網站文字；總表未提供本議會宣告頁精確網址，license_source_url 留 null。",
         "議案筆數與容量未知，W2 盤點；null 不代表零，容量另計全域預留。",
-        "W2b：依 2026-11-18 台灣 IP 原始回應離線實作；尚未完成真實全量匯入驗收。",
-        "runner=xisx-pc；沒有可直接開啟的逐筆網址，詳情直接 GET 回403，不繞過。屆＋次依結案屆次篩選，未結案件可能漏掉（尚未驗證）；OMCount 差異超過1%僅警告，每片500筆上限則失敗。"
+        "W2b：依 2026-11-18 台灣 IP 原始回應改用 Adv_SearchInput.aspx，沿用 form1 hidden 狀態先查未結案全部（59 筆中 58 筆也列在第14屆結案屆次清單，先查以保留未結案標示），再逐屆整批查已結案；每頁實際列數必須等於 OutputWhereStr 的共N筆，否則失敗，跨屆或已結／未結重複 SYSN 保留首筆（未結案優先）並警告。主對話實測第1屆3,898列／2,029,868 bytes、第14屆1,716列／1,088,155 bytes、第12屆1,579列，未結案59列／73,810 bytes；無500列固定上限，仍拒絕超過500筆的截斷訊息，單次最多8MiB。舊屆＋次篩選漏掉不屬任何大會的結案：第12屆臨時236＋定期675＝911，各次加總912，少於整屆1,579；第5屆各次1,972少於整屆1,994。日期切片 REDTChk 與民國日期為備案，未實作。2026-11-18 xisx-pc 實跑第10～14屆寫入筆數與官方各屆總數完全相同，第9屆起因每日寫入上限分日續跑。",
+        "runner=xisx-pc；沒有可直接開啟的逐筆網址，詳情直接 GET 回403，不繞過；只儲存入口連結，不請求 DetailPage.aspx 或 PrintDetailPage.aspx。"
       ],
       "official_url": "https://ifddoc2.tcc.gov.tw/TCCMIS_Front",
       "official_system_urls": [
