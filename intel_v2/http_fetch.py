@@ -173,12 +173,14 @@ class RobotsPolicy:
 def get(session: requests.Session, url: str, allowed_hosts: set[str], timeout: int = 60, *,
         min_interval_seconds: float = 0, bearer_token: str | None = None,
         max_bytes: int | None = None, robots_policy: RobotsPolicy | None = None,
-        method: str = "GET", json_body=None) -> requests.Response:
+        method: str = "GET", json_body=None, form_body=None) -> requests.Response:
     import requests
 
     _approved_url(url, allowed_hosts)
     if method not in {"GET", "POST"}:
         raise ValueError("method must be GET or POST")
+    if form_body is not None and (json_body is not None or method != "POST"):
+        raise ValueError("form_body requires POST and cannot accompany json_body")
     if not math.isfinite(min_interval_seconds) or min_interval_seconds < 0:
         raise ValueError("min_interval_seconds must be finite and nonnegative")
     if max_bytes is not None and (type(max_bytes) is not int or max_bytes <= 0):
@@ -201,7 +203,8 @@ def get(session: requests.Session, url: str, allowed_hosts: set[str], timeout: i
                     kwargs["headers"] = {"Authorization": f"Bearer {bearer_token}"}
                 if max_bytes is not None:
                     kwargs["stream"] = True
-                response = (session.post(current_url, json=json_body, **kwargs) if method == "POST"
+                body = {"data": form_body} if form_body is not None else {"json": json_body}
+                response = (session.post(current_url, **body, **kwargs) if method == "POST"
                             else session.get(current_url, **kwargs))
                 _approved_url(str(response.url or current_url), allowed_hosts)
                 if method == "POST" and 300 <= response.status_code < 400:

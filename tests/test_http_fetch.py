@@ -90,6 +90,28 @@ class HttpFetchTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             http.get(blocked, URL, HOSTS, method="DELETE")
 
+    def test_form_post_encoding_exclusion_and_redirect_guard(self):
+        form = {"__VIEWSTATE": "a+b/=", "query": "臺灣 & 空白"}
+        session = Mock(post=Mock(return_value=response()))
+        http.get(session, URL, HOSTS, method="POST", form_body=form)
+        session.post.assert_called_once_with(URL, data=form, timeout=60, allow_redirects=False)
+        prepared = requests.Request("POST", URL, data=session.post.call_args.kwargs["data"]).prepare()
+        from urllib.parse import parse_qs
+        self.assertEqual(prepared.headers["Content-Type"], "application/x-www-form-urlencoded")
+        self.assertEqual(parse_qs(prepared.body), {k: [v] for k, v in form.items()})
+        for kwargs in ({"method": "POST", "json_body": {}}, {"method": "GET"}):
+            blocked = Mock()
+            with self.assertRaisesRegex(ValueError, "form_body"):
+                http.get(blocked, URL, HOSTS, form_body=form, **kwargs)
+            blocked.post.assert_not_called()
+            blocked.get.assert_not_called()
+        for status in (301, 302, 303, 307, 308):
+            session = Mock(post=Mock(return_value=response(status, headers={"Location": "/next"})))
+            with self.assertRaisesRegex(RuntimeError, "POST redirect forbidden"):
+                http.get(session, URL, HOSTS, method="POST", form_body=form)
+            self.assertEqual(session.post.call_count, 1)
+            session.get.assert_not_called()
+
     def test_success_after_three_redirects_and_response_url_revalidated(self):
         replies = [response(302, headers={"Location": "/next"}) for _ in range(3)]
         session = Mock(get=Mock(side_effect=replies + [response(url="https://official.test/next")]))

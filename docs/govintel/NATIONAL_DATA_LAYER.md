@@ -217,6 +217,66 @@ binding 存在不代表資料新鮮度或資料庫健康驗證。
 真實 API 筆數與兩次 `d1-local` 同步由主對話另外驗收；仍受既有每日預算與容量守門約束，
 `BUDGET_STOPPED` 不代表全量匯入完成。
 
+### W2b 臺南、高雄、臺北官方議案列表
+
+`tnn`、`khh`、`tpe` 已註冊；狀態 `IMPLEMENTED_API`／`IMPLEMENTED_HTML` 只表示離線實作，
+不代表真實全量匯入驗收。fixture 縮減自 2026-11-18 台灣 IP 的官方原始回應，檔頭記錄來源；
+HTML 保留 hidden 狀態與列表結構，計數與選單縮至測試資料範圍。沒有抓取任何詳情頁。
+臺北維持 `runner=xisx-pc`；在 github-actions 指定臺北時回 `NOT_CONFIGURED`／`RUNNER_MISMATCH`。
+
+| 欄位 | 臺南 TNN | 高雄 KHH | 臺北 TPE |
+|---|---|---|---|
+| `external_id` | `tnn:` + ProNo GUID | `khh:` + hidProposalSN；不以加密網址為 ID | `tpe:` + SYSN |
+| `kind` | KidTitle 前半：市府提案 → bill_gov、議員提案 → bill，其餘 bill_other | 分頁名：市政府提案 → bill_gov、議員提案 → bill，其餘 bill_other | 案別：市府提案 → bill_gov、議員提案 → bill，其餘 bill_other |
+| `title` | CaseCause，最多 300 字 | 案由，最多 300 字；分組標題不是資料列 | MainTable 的 text 欄 |
+| `case_number` | GradeTime + KidTitle + 第 CaseNumber 案 | 分組標題 + 第編號號 | 第屆屆第次次 案號 acno |
+| `authority` | OrgTitle，最多 200 字 | 主辦單位／提案議員，最多 200 字，可空白 | 沿用來源機關 |
+| `event_date` | DoneDate 的 yyyy/mm/dd 轉 ISO；空值為 null | null | null |
+| `official_url` | `https://www.tncc.gov.tw/motionpage1.asp?ProNo=...` | onclick 的 Detail_RWD.aspx 連結；無法解析時用入口 | `https://ifddoc2.tcc.gov.tw/TCCMIS_Front/` |
+| 游標 | `grdno-topage` | 會期明碼 | `屆-次` |
+
+三站共用既有 UA、robots、請求間隔、白名單及有界 transport，每次回應最多 8MiB。
+`http_fetch.get(form_body=...)` 用 requests 的表單編碼，與 `json_body` 互斥，限 POST；
+所有 POST 3xx 仍直接失敗，cookie 沿用同一 requests.Session 的預設 cookie jar。
+先驗證整輪有界中繼資料，再提供 loader 寫入頁面；不快取 HTML 或詳情全文。
+新程序續跑重新查詢整輪、驗證後跳至保存游標；來源排序或會期集合變動仍可能使續跑缺漏，
+完整輪巡才能補齊。既有每日 90,000 列／400MB 守門不變，`BUDGET_STOPPED` 並非全量完成。
+
+臺南先查官方屆別清單，再逐屆以 pagerow=1 的 PagesAll 取得確切總數，列表每頁 1,500 筆。
+檢查每頁實際筆數、PagesAll 與跨頁 ID，不將最後不足一頁錯算為整頁；不符即失敗。
+每屆最多 100 頁、屆數最多 100。JSON 用 utf-8-sig 去 BOM，DoneDate 空值不推定日期。
+raw count_g1..g4 的總數為 2,437／2,143／5,999／7,861，合計 18,440；
+這是提供的歷史探查值，本 worker 未重新連網驗證。逐屆 count probe 會比純列表多一個請求。
+www robots 轉向 blank.asp 的終點為 HTML；bill 主機 robots 回 404；執行時仍重新檢查各請求主機。
+
+高雄 Statistics 的會期連結是加密值，依會期名稱對照選屆 postback 回應的 ddlMeeting 明碼。
+先取非空會期，再依 hidCount01..09（及出現時的 010）逐分頁以 500 筆翻頁，每分頁最多 100 頁。
+各分頁實際筆數必須等於 hidCount，跨頁重複 SN 或計數變動也失敗；不把分組標題列當 record。
+每次 POST 都帶緊接上一個回應的 VIEWSTATE、VIEWSTATEGENERATOR、VIEWSTATEENCRYPTED、
+EVENTVALIDATION 與同一 Session cookie；缺 VIEWSTATE／EVENTVALIDATION 回 `KHH_POSTBACK_CHAIN_BROKEN`。
+WebForms 欄位名稱、狀態簽章、選單及伺服器 Session 改動皆可能使鏈中斷，不能假裝空結果成功。
+四份 raw Statistics 離線加總為 32,430；登記原有 1,636 與 1.31MB 仍是舊本會期估算，
+歷史新增量由全域預留承接，實際資料庫容量須全量驗收後重估。
+高雄條款「僅供個人、非商業用途，不可重製、改作、散布」仍有索引及再利用風險；
+robots 允許與只存中繼資料，不等同完整授權。
+
+臺北先逐屆 POST 首頁查 OMCount，再按屆＋次 POST searchlist，資料依 MainTable 的 data-field 表頭映射。
+優先取回應選單；缺次數選單時從 01 遞增，連續兩次空列表才停，最多 99 次，耗盡仍不停止則失敗。
+每片出現「超過 500 筆」就回 `TPE_ROW_CAP term=XX session=YY`，不把被截斷列表當完整資料。
+每屆切片總和與 OMCount 差距超過 1% 時，JSON 報告附
+`warnings: ["TPE_COUNT_MISMATCH term=XX got=N expected=M"]`，不讓整輪失敗；請保存 `--report`，
+既有 runs 表未新增 warnings 欄位。結案屆次篩選可能漏掉未結案件，此語意尚未驗證，W2b 不補抓。
+DetailPage.aspx 直接 GET 回 403，沒有可直接開啟的逐筆網址；不補 Referer、不換 UA、不以其他途徑繞過，
+只儲存首頁連結。臺北網路、真實全量筆數與未結案覆蓋率仍須主對話在 xisx-pc 驗收。
+
+桃園登記為「無結構化議案」，不實作 adapter、endpoints 留空。可替代的
+`schedule.aspx?mid=40`、`meeting.aspx?mid=41`、`file.aspx?mid=44` 屬議事日程與 PDF 清單，
+不能當成結構化提案檢索，也不在本輪抓取。
+
+離線驗收包含 BOM、日期空值、計數失敗、跨頁游標、hidden 狀態鏈、分組標題排除、穩定 SN、
+臺北上限與連續空片停止、警告與詳情請求禁制；三站各以 SqliteStore 同步兩次，第二次 changed=0。
+真實網路、臺南／高雄 d1-local 全量及臺北 xisx-pc 匯入由主對話另驗收；本 worker 不連網、不碰雲端。
+
 ## 評估過但不採用（使用者決定只直連官方）
 
 以下保留第一輪提供的 **2026-11-17 實測紀錄**作規模參考，本輪沒有重新連網驗證；不是本輪官方來源的筆數或驗收收據，也不作後續擷取入口。

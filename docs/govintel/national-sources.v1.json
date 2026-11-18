@@ -9,10 +9,11 @@
       "provider": "臺北市議會",
       "official_authority": "臺北市議會",
       "tier": "REFERENCE",
-      "status": "PLANNED_HTML",
+      "status": "IMPLEMENTED_HTML",
       "transport": "HTML",
       "endpoints": [
-        "https://ifddoc2.tcc.gov.tw/TCCMIS_Front"
+        "https://ifddoc2.tcc.gov.tw/TCCMIS_Front/",
+        "https://ifddoc2.tcc.gov.tw/TCCMIS_Front/searchlist.aspx"
       ],
       "allowed_hosts": [
         "https://ifddoc2.tcc.gov.tw"
@@ -66,7 +67,9 @@
       "notes": [
         "來源：#247 NATIONAL_COUNCIL_EXPANSION.md 第二節（2026-11-15 盤點）；未重新連網查證。",
         "rights_note 照錄總表網站文字；總表未提供本議會宣告頁精確網址，license_source_url 留 null。",
-        "議案筆數與容量未知，W2 盤點；null 不代表零，容量另計全域預留。"
+        "議案筆數與容量未知，W2 盤點；null 不代表零，容量另計全域預留。",
+        "W2b：依 2026-11-18 台灣 IP 原始回應離線實作；尚未完成真實全量匯入驗收。",
+        "runner=xisx-pc；沒有可直接開啟的逐筆網址，詳情直接 GET 回403，不繞過。屆＋次依結案屆次篩選，未結案件可能漏掉（尚未驗證）；OMCount 差異超過1%僅警告，每片500筆上限則失敗。"
       ],
       "official_url": "https://ifddoc2.tcc.gov.tw/TCCMIS_Front",
       "official_system_urls": [
@@ -152,11 +155,9 @@
       "provider": "桃園市議會",
       "official_authority": "桃園市議會",
       "tier": "REFERENCE",
-      "status": "PLANNED_HTML",
+      "status": "無結構化議案",
       "transport": "HTML_FILES",
-      "endpoints": [
-        "https://www.tycc.gov.tw/TC/"
-      ],
+      "endpoints": [],
       "allowed_hosts": [
         "https://www.tycc.gov.tw"
       ],
@@ -208,7 +209,9 @@
         "來源：#247 NATIONAL_COUNCIL_EXPANSION.md 第二節（2026-11-15 盤點）；未重新連網查證。",
         "rights_note 照錄總表網站文字；總表未提供本議會宣告頁精確網址，license_source_url 留 null。",
         "議案筆數與容量未知，W2 盤點；null 不代表零，容量另計全域預留。",
-        "未找到提案檢索，不把會議檔案筆數當成議案筆數。"
+        "未找到提案檢索，不把會議檔案筆數當成議案筆數。",
+        "W2b：依 2026-11-18 台灣 IP 原始回應離線實作；尚未完成真實全量匯入驗收。",
+        "沒有提案檢索，W2b 不實作。可替代資料為 https://www.tycc.gov.tw/TC/schedule.aspx?mid=40、https://www.tycc.gov.tw/TC/meeting.aspx?mid=41、https://www.tycc.gov.tw/TC/file.aspx?mid=44；屬議事日程與PDF清單，不當作結構化議案。"
       ],
       "official_url": "https://www.tycc.gov.tw/TC/",
       "official_system_urls": [
@@ -303,27 +306,29 @@
       "provider": "臺南市議會",
       "official_authority": "臺南市議會",
       "tier": "REFERENCE",
-      "status": "PLANNED_HTML",
-      "transport": "HTML",
+      "status": "IMPLEMENTED_API",
+      "transport": "OFFICIAL_JSON_API",
       "endpoints": [
-        "https://www.tncc.gov.tw/motion1.asp"
+        "https://bill.tncc.gov.tw/NoPaperMeeting_TNCC/api/WEB014_GetProposalList.ashx",
+        "https://bill.tncc.gov.tw/NoPaperMeeting_TNCC/Api/WEB004_GetProMeetGradeList.ashx"
       ],
       "allowed_hosts": [
-        "https://www.tncc.gov.tw"
+        "https://www.tncc.gov.tw",
+        "https://bill.tncc.gov.tw"
       ],
       "official_url_hosts": [
         "https://www.tncc.gov.tw"
       ],
       "robots": {
-        "status": "REDIRECT_UNVERIFIED",
+        "status": "HTML_NOT_ROBOTS",
         "failure_disallow_prefixes": [
           "/"
         ],
         "url": "https://www.tncc.gov.tw/robots.txt",
-        "observed_text": "HTTP 302; terminal response not measured by this CI run.",
-        "observed_at": "2026-11-17",
-        "observed_runner": "github-actions",
-        "http_status": 302
+        "observed_text": "2026-11-18 raw: www robots 302 -> blank.asp HTML; bill.tncc.gov.tw/robots.txt 404; both allowed.",
+        "observed_at": "2026-11-18",
+        "observed_runner": "taiwan-network",
+        "http_status": 200
       },
       "min_request_interval_seconds": 3,
       "license": "非開放授權；依網站條款",
@@ -357,14 +362,16 @@
       "notes": [
         "來源：#247 NATIONAL_COUNCIL_EXPANSION.md 第二節（2026-11-15 盤點）；未重新連網查證。",
         "rights_note 照錄總表網站文字；總表未提供本議會宣告頁精確網址，license_source_url 留 null。",
-        "議案筆數與容量未知，W2 盤點；null 不代表零，容量另計全域預留。"
+        "2026-11-18 原始回應議案共18,440筆；實際容量未驗證，仍計全域預留。",
+        "W2b：依 2026-11-18 台灣 IP 原始回應離線實作；尚未完成真實全量匯入驗收。",
+        "第1–4屆探查計18,440筆；每屆以 pagerow=1 的 PagesAll 核對列表；只取列表中繼資料，不抓詳情。"
       ],
       "official_url": "https://www.tncc.gov.tw/motion1.asp",
       "official_system_urls": [
         "https://www.tncc.gov.tw/motion1.asp"
       ],
       "preflight_url": "https://www.tncc.gov.tw/motion1.asp",
-      "known_bill_count": null,
+      "known_bill_count": 18440,
       "runner": "github-actions",
       "documented_open_api": false
     },
@@ -373,10 +380,11 @@
       "provider": "高雄市議會",
       "official_authority": "高雄市議會",
       "tier": "REFERENCE",
-      "status": "PLANNED_HTML",
+      "status": "IMPLEMENTED_HTML",
       "transport": "HTML",
       "endpoints": [
-        "https://cissearch.kcc.gov.tw/"
+        "https://cissearch.kcc.gov.tw/System/Proposal/Default_RWD.aspx",
+        "https://cissearch.kcc.gov.tw/System/Proposal/Statistics.aspx"
       ],
       "allowed_hosts": [
         "https://cissearch.kcc.gov.tw"
@@ -431,7 +439,9 @@
         "來源：#247 NATIONAL_COUNCIL_EXPANSION.md 第二節（2026-11-15 盤點）；未重新連網查證。",
         "rights_note 照錄總表網站文字；總表未提供本議會宣告頁精確網址，license_source_url 留 null。",
         "容量按已知議案數 × 約 0.8KB 含索引估算；不是實測資料庫大小。",
-        "僅本會期議員提案 1,537＋市府提案 99＝1,636，非全歷史總數。"
+        "僅本會期議員提案 1,537＋市府提案 99＝1,636，非全歷史總數。",
+        "W2b：依 2026-11-18 台灣 IP 原始回應離線實作；尚未完成真實全量匯入驗收。",
+        "歷史探查約32,430筆，舊 known_bill_count=1,636 僅當時本會期，不是歷史總量；全量仍待核。SN 為穩定 ID，postback 須沿用最新 hidden 值及 Session cookie；不抓詳情。條款僅供個人非商業，索引再利用仍有權利風險。"
       ],
       "official_url": "https://cissearch.kcc.gov.tw/",
       "official_system_urls": [
