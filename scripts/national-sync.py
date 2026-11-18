@@ -103,10 +103,18 @@ def main():
                 open_store()
                 options = {"backfill": args.backfill} if adapter_name == "pcc_web" else {}
                 adapter = ADAPTERS[adapter_name](source, **options)
+                # Progress on stderr: the JSON report only prints at the end, so a timeout would show nothing.
+                # Skipped for --dry-run, whose stderr carries the report itself.
+                progress = sys.stderr if not args.dry_run else None
+                if progress:
+                    print("START " + source["national_source_id"], file=progress, flush=True)
                 try:
                     result = load(store, source, adapter, runner=runner,
                                   capacity_limit_mb=registry["capacity_limit_mb"], dry_run=args.dry_run)
                     report["runs"].append(result)
+                    if progress:
+                        print("DONE", source["national_source_id"], *(f"{key}={result.get(key)}" for key in
+                              ("status", "fetched", "changed", "rows_written", "cursor_after")), file=progress, flush=True)
                     report["exit_code"] = max(report["exit_code"], result["exit_code"])
                 finally:
                     adapter.close()
