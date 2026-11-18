@@ -795,7 +795,7 @@
       "status": "PLANNED_HTML",
       "transport": "HTML",
       "endpoints": [
-        "https://www.chcc.gov.tw/council/"
+        "https://www.chcc.gov.tw/"
       ],
       "allowed_hosts": [
         "https://www.chcc.gov.tw"
@@ -848,11 +848,11 @@
         "rights_note 照錄總表網站文字；總表未提供本議會宣告頁精確網址，license_source_url 留 null。",
         "議案筆數與容量未知，W2 盤點；null 不代表零，容量另計全域預留。"
       ],
-      "official_url": "https://www.chcc.gov.tw/council/",
+      "official_url": "https://www.chcc.gov.tw/",
       "official_system_urls": [
-        "https://www.chcc.gov.tw/council/"
+        "https://www.chcc.gov.tw/"
       ],
-      "preflight_url": "https://www.chcc.gov.tw/council/",
+      "preflight_url": "https://www.chcc.gov.tw/",
       "known_bill_count": null,
       "runner": "github-actions",
       "documented_open_api": false
