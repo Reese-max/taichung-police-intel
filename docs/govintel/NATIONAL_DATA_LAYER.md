@@ -1,5 +1,19 @@
 # GovIntel 全國資料層：只直連機關官方系統
 
+## W4 政府採購
+
+`N-PCC-WEB` 與 `N-PCC-GPA` 已實作，由 `github-actions` 執行；本機受 PCC WAF 阻擋。本次 worker 僅使用主對話 2026-11-18 runner 留下的回應做離線驗收，尚未完成 runner 的兩次正式同步。以下 W4 說明取代早期章節的 PCC 待實作狀態及 GPA JSON 下載規劃。
+
+- `pcc_gpa` 使用官方 `https://web.pcc.gov.tw/tps/tp/OpenData/showList` 所列 XML，授權來源同頁。官方說明每月 5 日產出兩個月前資料；檔名為 `tender_YYYYMM01/02.xml`、`award_YYYYMM01/02.xml`，分別涵蓋上、下半月。從今天往前兩個月的下半月起，讀取 `scope.months=24`；最新空檔或 404 最多向前試兩檔，空缺記入 warnings。游標使用不含副檔名的檔名；恢復時重建快照，維持跨檔去重結果。同一識別碼保留讀取順序最後一筆。
+- XML 欄位與 GPA JSON 相同，推定為 GPA 適用標案子集，不能代表全量採購。近半年 GPA JSON 未另行實作。XML 單檔上限 5 MiB，解析前拒絕 DOCTYPE／ENTITY；輸出只含類型、名稱、案號、機關、日期及官方列表連結，捨棄地址、電話、聯絡人、廠商及金額。招標日期依指定欄位 `TENDER_SPDT`（截標日），決標使用 `AWARD_NOTICE_DATE`。
+- `pcc_web` 的招標依警察、消防、交通局、臺中市政府逐一查詢，將窗口切為單一曆月，累計原始列數必須等於頁面總筆數。主對話實測 1／3 個月可用，1 年被拒；缺少結果表或查詢區間過長均回報錯誤，不視為零筆。決標以警察局、消防局、交通局、臺中市政府及窗口涵蓋的民國年查詢，依 `AWARD_NOTICE_DATE` 排序，從頁面讀取下一頁參數，使用第 6 欄（cells[5]）決標或無法決標公告日期，取開頭的民國日期；日期空白、格式錯誤或無效日期均報錯。第 5 欄招標公告日期不參與解析或早停；決標公告日早於窗口時停止。「無法決標」仍保留 kind=award，另記 PCC_NO_AWARD <pk> 警告。兩者均再次套用登記檔機關範圍，解析民國日期、標案名稱與更正公告警告，只保留 `tpam`／`atm`／`nonAtm` 的 pk 官方連結。
+- 轄區（`jurisdiction`）依機關名稱開頭推定：以 22 個縣市名稱之一開頭（「台」視同「臺」）就填該縣市，其餘（中央機關、國營事業、國立學校）填「全國」。只看名稱前綴，不查機關隸屬。
+- 網頁預設 `scope.daily_months=2`（當月及前一個曆月）；`national-sync.py --backfill` 改用 `scope.months=24`。XML 固定讀取 24 個月，其他來源不受此參數影響。工作流程只有手動 `workflow_dispatch` 的布林 `backfill=true` 才傳入此參數；排程不傳入。手動 backfill=true 的 job 上限為 180 分鐘，其餘為 30 分鐘（schedule 沒有 inputs.backfill，空值為 false）。24 個月回填粗估數十分鐘至 2 小時，尚非實測：僅請求間隔就約為 3 × 請求數 ÷ 60 分鐘，例如 1,000 次約 50 分鐘，另加 HTTP 回應、重試及資料庫寫入時間；實際筆數與耗時仍須由 runner 驗收。
+- 兩個來源均至少間隔 3 秒。內容請求限於列表／下載路徑，連轉址也不可進入 pk 詳情頁。只存中繼資料與連結，不存全文、廠商或個資。
+- robots 的特定例外有 2026-11-18 `github-actions` 證據：僅 301／302 且 `Location` 完全等於 `http://web.pcc.gov.tw/pis` 視為沒有 robots 資源，不跟隨該轉址。不同 Location 或其他轉址狀態均禁止；200 的 robots 規則仍須遵守。網路失敗保持禁止，5xx 沿用既有 `documented_open_api` 判定。登記自檢要求例外為同 host 的 HTTP／HTTPS URL、非 `/robots.txt`，且附觀察日期與 runner。
+
+離線 fixture 位於 `tests/fixtures/national/pcc/`；來源與縮減／合成欄位列於該目錄 README。原始 award XML 沒有符合機關範圍的資料，因此測試的兩筆 scoped 機關為明確標註的合成值，不是額外的真實採購證據。測試涵蓋例外邊界、分頁計數、窗口／游標、XML 安全與欄位限制，以及 SqliteStore 同步兩次後 `changed=0`。preflight 仍是有界探測，固定探測已觀察的 `tender_20260902.xml`，不代表完整同步或最新資料驗收。
+
 ## 2026-11-17 方向修訂與定位
 
 依使用者 2026-11-17 決定，資料層只直連各機關官方系統。data.gov.tw 是官方平台，可以作資料集目錄及官方資源發現入口。22 個地方議會全部登記，但 robots 明文禁止者不得抓取，列入待取得同意項目。任何 token 都不構成繞過 robots 的許可。
@@ -317,6 +331,69 @@ ID6 雜湊使用完整原始 `item`，不使用截短標題；內容改動會產
 離線驗收涵蓋去重、補零、跨屆與上限、空期停止、預算續跑、標題列與穩定 ID、警告、
 ppg 僅連結、欄位限制及 SqliteStore 兩次完整同步第二次 `changed=0`。
 實際連網及 `--store d1-local` 兩次同步留由主對話驗收，`BUDGET_STOPPED` 不算全量完成。
+
+### W5 TDX
+
+`tdx`（`N-TDX-EVENTS`）已註冊為 `IMPLEMENTED_API`，表示離線實作通過，尚非帶金鑰的實網驗收。
+缺 `TDX_CLIENT_ID` 或 `TDX_CLIENT_SECRET` 時，CLI 回報 `NOT_CONFIGURED`／`MISSING_SECRET`、exit 0；
+該來源不建立 adapter、不請求 robots／token／事件，單獨同步它時也不建立資料庫連線。
+workflow 僅在 sync 步驟傳入這兩個 secrets，未建立或申請任何憑證。
+
+每次 run 透過官方 OAuth2 token endpoint POST `grant_type=client_credentials` 表單一次，
+驗證非空字串 token，再依臺北、新北、桃園、臺中、臺南、高雄順序請求
+`/api/basic/v1/Traffic/RoadEvent/LiveEvent/City/{City}?$format=JSON&$top=1000`。
+每市一頁，檢查 Count 等於 Items 長度且不超過 1,000；缺欄、重複 ID、截斷或異常資料皆失敗。
+游標為下一個尚未完成的城市名，預算停止後重新取得 token 並從該城市重播。
+城市間並非同一時間快照；先前已完成城市的變動要等下一輪完整同步補齊。
+共用既有白名單、robots、3 秒間隔與重試規則；token 回應上限 64KiB、事件回應上限 8MiB。
+認證及事件錯誤只回報固定訊息，不保存可能反射 secret／token 的底層例外或回應內容。
+
+僅保存 `traffic_event`、`tdx-{City}-{EventID}`、最多 300 字標題、中文事件類型（未知類型用 `類型{n}`）、
+EffectiveTime 日期（缺值改用 PublishTime）、AuthorityCode＋Source、城市中文名及 TDX 首頁連結。
+不保存 Description、Location、Positions、Geometry、AttachmentURLs，不下載附件。
+因官方沒有逐筆網址，`official_url` 固定為 `https://tdx.transportdata.tw/`。
+
+loader 對設定 `scope.retention_days` 的來源，在所有頁面成功後才清除該來源
+`event_date < UTC 當天日期減 N 天` 的資料；TDX 設 30 天，邊界當天及日期不明者保留。
+每批最多刪除 100 筆，刪除前按既有每筆 64 列預留檢查每日預算，容量及 UTC 換日守門同樣適用；不足就
+`BUDGET_STOPPED`，不執行該批，保留已完成批次的計帳。SQL delete trigger 同步 FTS，實際含 trigger 寫入量計入
+`rows_written` 與每日預算；JSON 報告另列 `deleted`。dry-run 僅輸出刪除 SQL。
+未設定保留期的來源行為不變；擷取 ERROR 或尚未完成全部頁面時不執行清除。
+
+2026-11-18 主對話提供的實測：匿名 LiveEvent 回 401 純文字；robots 回 HTML SPA，
+依既有規則登記 `HTML_NOT_ROBOTS`，執行時仍重新檢查。v2 News 缺高雄，因此不用。
+token 成功回應仍未實測。條款頁 `https://tdx.transportdata.tw/term` 要求標示來源，
+亦寫有償提供；**加入金鑰前要先確認費用**，本輪未付費或連線驗證授權內容。
+
+### W6 資料集目錄
+
+`odp`（`N-ODP-CATALOG`）已註冊為 `IMPLEMENTED_API`，只下載 data.gov.tw 官方全量 CSV，
+一個 run 為單頁，游標僅 `None`。保留 6564 metadata API 作登記參考，adapter 不額外呼叫它。
+提供機關須以六都市政府開頭，接受「台／臺」並將轄區統一為「臺」；資料集名稱須含
+`scope.keywords` 任一詞（警察、消防、交通、治安）。不依 CSV 列順序或 ID 大小篩選。
+
+`http_fetch.get(output_file=...)` 逐塊寫入可 seek 的二進位暫存檔，最多 100MiB，
+無 Content-Length 也逐塊計數；重試清空前次片段，失敗清空檔案，呼叫端負責關閉。
+未指定 output_file 的既有行為不變。adapter 用 `io.TextIOWrapper(encoding="utf-8-sig", newline="")`
+配合 `csv.DictReader` 逐列讀取，不將約 69MB 的原始 CSV 整份載入記憶體。
+僅保留過濾後的中繼資料清單；CSV 欄位缺少、列長度錯誤、ID 非數字或格式錯誤均失敗。
+必要欄位為資料集識別碼、資料集名稱、提供機關、更新頻率、授權方式、資料下載網址、
+檔案格式、詮釋資料更新時間。保留官方其他欄名（含「資資料集上架方式」），但不匯入。
+
+保存 `dataset`、`odp-{id}`、名稱、機關、轄區、詮釋資料更新日期、最多 100 字更新頻率、
+授權方式及 `https://data.gov.tw/dataset/{id}`。空白授權明記「未標示（不推定開放）」。
+不存聯絡人、電話、描述及下載網址，不連資源網址、不爬各市入口。
+原始 CSV 的換行欄位、BOM、資源欄以 `;` 串接及結尾分號均按 CSV 處理；
+不依錯標的 Content-Type 判定內容。沒有可匿名使用的列表／增量 API，每輪仍需全量下載。
+data.gov.tw robots 500 沿用已登記的 documented open API 例外，不放寬其他 robots 限制。
+
+`tests/test_national_tdx_odp.py` 全部使用假 session，意外真實請求會立即失敗。
+TDX fixture 依提供的 LiveEvent schema 自造兩市各兩筆，其餘四市回空頁；
+ODP fixture 從提供的 `export-csv.head300k.csv` 留下 136493、135546、135997、139224 四筆，
+另以樣本欄位衍生六筆人工邊界案例（900005–900010），聯絡資訊及描述均改為測試字串。
+驗證六都、臺／台、換行、BOM、分號、排除條件、授權空白、串流上限、重試片段替換、
+憑證錯誤遮蔽、城市續跑、保留期與 FTS／預算，以及兩來源各同步兩次後第二次 `changed=0`。
+實網 ODP 兩次同步、TDX 憑證及遠端 D1 的成本與效能均留由主對話另行驗收。
 
 ### W7 逐字稿本機索引
 
