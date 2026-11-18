@@ -133,6 +133,8 @@ class RobotsPolicy:
                 _approved_url(str(response.url or current), {host})
                 status = response.status_code
                 if 300 <= status < 400:
+                    if self.redirect_is_absent(current, status, response.headers.get("Location")):
+                        return "NO_ROBOTS_RESOURCE", None
                     current = self.redirect_target(current, response.headers.get("Location"), followed)
                     continue
                 body = bytearray()
@@ -145,6 +147,9 @@ class RobotsPolicy:
                                      documented_open_api=self.documented_open_api)
             finally:
                 response.close()
+
+    def redirect_is_absent(self, url, status, location):
+        return False
 
     def check(self, session, url, allowed_hosts, timeout, min_interval_seconds=0) -> float:
         import requests
@@ -173,7 +178,8 @@ class RobotsPolicy:
 def get(session: requests.Session, url: str, allowed_hosts: set[str], timeout: int = 60, *,
         min_interval_seconds: float = 0, bearer_token: str | None = None,
         max_bytes: int | None = None, robots_policy: RobotsPolicy | None = None,
-        method: str = "GET", json_body=None, form_body=None) -> requests.Response:
+        method: str = "GET", json_body=None, form_body=None, allow_empty=False,
+        allowed_paths=None) -> requests.Response:
     import requests
 
     _approved_url(url, allowed_hosts)
@@ -192,6 +198,8 @@ def get(session: requests.Session, url: str, allowed_hosts: set[str], timeout: i
         try:
             for _ in range(MAX_REDIRECTS + 1):
                 _approved_url(current_url, allowed_hosts)
+                if allowed_paths is not None and urlparse(current_url).path not in allowed_paths:
+                    raise RuntimeError("request path outside adapter allowlist")
                 host = urlparse(current_url).hostname.lower().rstrip(".")
                 interval = min_interval_seconds
                 if robots_policy is not None:
@@ -226,7 +234,7 @@ def get(session: requests.Session, url: str, allowed_hosts: set[str], timeout: i
                     response._content = bytes(body)
                     response._content_consumed = True
                     response.close()
-                if not response.content:
+                if not response.content and not allow_empty:
                     raise requests.RequestException("HTTP 成功但內容為空")
                 response._govintel_requested_url = url
                 return response

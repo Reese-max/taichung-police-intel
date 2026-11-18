@@ -41,7 +41,7 @@ def configuration(runner=None):
     for sid in ("N-LY-ID20-BILLS", "N-PCC-WEB", "N-PCC-GPA", "N-ODP-CATALOG", "N-TDX-EVENTS"):
         row = rows[sid]
         url = ("https://data.gov.tw/api/v2/rest/dataset/6564" if sid == "N-ODP-CATALOG"
-               else row["endpoints"][0].replace("YYYYMMDD", "20261117"))
+               else row["endpoints"][0].replace("YYYYMMDD", "20261117").replace("YYYYMM", "202609"))
         targets[url] = row
     targets = {url: row for url, row in targets.items() if row["runner"] == runner}
     pages = list(targets)

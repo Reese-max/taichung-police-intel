@@ -6,7 +6,7 @@ import json
 import math
 from pathlib import Path
 import re
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 REGISTRY = Path(__file__).resolve().parents[1] / "docs/govintel/national-sources.v1.json"
 PUBLIC_FIELDS = {"title", "case_number", "event_date", "jurisdiction", "authority",
@@ -102,6 +102,20 @@ def validate(registry):
             raise ValueError(f"invalid public_fields: {sid}")
         if "url" in row["robots"]:
             https_url(row["robots"]["url"])
+        if "absent_when_redirect_to" in row["robots"]:
+            value = row["robots"]["absent_when_redirect_to"]
+            if not isinstance(value, str):
+                raise ValueError("invalid robots absence redirect")
+            target = urlsplit(value)
+            if (target.scheme not in {"http", "https"}
+                    or https_url(target._replace(scheme="https").geturl()) !=
+                    https_url(row["robots"]["url"])
+                    or unquote(target.path).rstrip("/").lower() == "/robots.txt"
+                    or "\\" in value):
+                raise ValueError("invalid robots absence redirect")
+            date.fromisoformat(row["robots"]["observed_at"])
+            if row["robots"].get("observed_runner") not in {"github-actions", "xisx-pc"}:
+                raise ValueError("robots absence redirect requires evidence")
         for origin in row["robots"].get("blocked_origins", []):
             https_url(origin, origin=True)
         for key in ("min_request_interval_seconds", "capacity_estimate_mb"):
