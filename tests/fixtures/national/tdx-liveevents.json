@@ -1,0 +1,106 @@
+{
+  "Taipei": {
+    "UpdateTime": "2026-11-18T09:00:00+08:00",
+    "UpdateInterval": 60,
+    "SrcUpdateTime": "2026-11-18T09:00:00+08:00",
+    "SrcUpdateInterval": 60,
+    "AuthorityCode": "TPE",
+    "Count": 2,
+    "Items": [
+      {
+        "EventID": "fixture-1",
+        "EventTitle": "Taipei道路交通測試1",
+        "Description": "禁止儲存描述",
+        "EventType": 1,
+        "EffectiveTime": "2026-11-18T08:00:00+08:00",
+        "ExpireTime": null,
+        "PublishTime": "2026-11-17T08:00:00+08:00",
+        "LastUpdateTime": "2026-11-18T09:00:00+08:00",
+        "Location": {
+          "Road": {
+            "RoadName": "禁止儲存位置"
+          }
+        },
+        "Positions": "禁止儲存座標",
+        "Geometry": "禁止儲存幾何",
+        "AttachmentURLs": [
+          "https://tdx.transportdata.tw/private-attachment"
+        ],
+        "Source": "測試通報機關"
+      },
+      {
+        "EventID": "fixture-2",
+        "EventTitle": "Taipei道路交通測試2",
+        "Description": "禁止儲存描述",
+        "EventType": 2,
+        "EffectiveTime": null,
+        "ExpireTime": null,
+        "PublishTime": "2026-11-17T08:00:00+08:00",
+        "LastUpdateTime": "2026-11-18T09:00:00+08:00",
+        "Location": {
+          "Road": {
+            "RoadName": "禁止儲存位置"
+          }
+        },
+        "Positions": "禁止儲存座標",
+        "Geometry": "禁止儲存幾何",
+        "AttachmentURLs": [
+          "https://tdx.transportdata.tw/private-attachment"
+        ],
+        "Source": "測試通報機關"
+      }
+    ]
+  },
+  "NewTaipei": {
+    "UpdateTime": "2026-11-18T09:00:00+08:00",
+    "UpdateInterval": 60,
+    "SrcUpdateTime": "2026-11-18T09:00:00+08:00",
+    "SrcUpdateInterval": 60,
+    "AuthorityCode": "NWT",
+    "Count": 2,
+    "Items": [
+      {
+        "EventID": "fixture-1",
+        "EventTitle": "NewTaipei道路交通測試1",
+        "Description": "禁止儲存描述",
+        "EventType": 1,
+        "EffectiveTime": "2026-11-18T08:00:00+08:00",
+        "ExpireTime": null,
+        "PublishTime": "2026-11-17T08:00:00+08:00",
+        "LastUpdateTime": "2026-11-18T09:00:00+08:00",
+        "Location": {
+          "Road": {
+            "RoadName": "禁止儲存位置"
+          }
+        },
+        "Positions": "禁止儲存座標",
+        "Geometry": "禁止儲存幾何",
+        "AttachmentURLs": [
+          "https://tdx.transportdata.tw/private-attachment"
+        ],
+        "Source": "測試通報機關"
+      },
+      {
+        "EventID": "fixture-2",
+        "EventTitle": "NewTaipei道路交通測試2",
+        "Description": "禁止儲存描述",
+        "EventType": 2,
+        "EffectiveTime": null,
+        "ExpireTime": null,
+        "PublishTime": "2026-11-17T08:00:00+08:00",
+        "LastUpdateTime": "2026-11-18T09:00:00+08:00",
+        "Location": {
+          "Road": {
+            "RoadName": "禁止儲存位置"
+          }
+        },
+        "Positions": "禁止儲存座標",
+        "Geometry": "禁止儲存幾何",
+        "AttachmentURLs": [
+          "https://tdx.transportdata.tw/private-attachment"
+        ],
+        "Source": "測試通報機關"
+      }
+    ]
+  }
+}

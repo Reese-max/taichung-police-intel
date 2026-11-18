@@ -1,4 +1,5 @@
 import { executeDocumentResearch } from "./document-research.js";
+import { handleNational } from "./national.js";
 import { parseResearchInput, researchProviderState, researchTerms, selectResearchSources, ResearchError, readBoundedJson, RESEARCH_LIMITS } from "./research.js";
 import { CHAT_INTENT_PARSER, CHAT_RULES_PARSER, planChatIntent } from "./chat-assist.js";
 import { gateAnswer } from "../../../apps/web/lib/answer-evidence-gate.js";
@@ -1033,6 +1034,7 @@ export default {
     if (!originState.allowed) return responseJson(jsonError("ORIGIN_NOT_ALLOWED", "browser origin is not allowed"), 403, request, env);
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: { ...corsHeaders(request, env), "Access-Control-Allow-Methods": "GET,POST,OPTIONS", "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Max-Age": "600" } });
     if (limited(request)) return responseJson(jsonError("RATE_LIMITED", "request rate limit exceeded"), 429, request, env);
+    if (url.pathname.startsWith("/national/")) return handleNational(request, env, responseJson);
     try {
       const snapshot = await getSnapshot(env);
       if (request.method === "GET" && url.pathname === "/health") {
@@ -1040,7 +1042,7 @@ export default {
         return responseJson({ schema_version: 1, service: "govintel-query-gateway", server_version: SERVER_VERSION, status: snapshot.degradedSince ? "degraded" : "ok", release: snapshot.release, publication_freshness: freshness(scope.dataStatus), publication_id: snapshot.generatedFrom.collection_run_id, publication_hash: snapshot.generatedFrom.brief_sha256, query_coverage: queryCoverage(snapshot, "publication_metadata"), policy: snapshot.policyBinding, retention: retentionPolicy(snapshot), source_gaps: scope.gaps, read_only: true }, 200, request, env);
 
       }
-      if (request.method === "GET" && url.pathname === "/capabilities") return responseJson({ schema_version: 1, server_version: SERVER_VERSION, read_only: true, release: snapshot.release, capabilities: mcpTools().map(tool => tool.name), unavailable_capabilities: DOMAIN_CAPABILITIES, policy: snapshot.policyBinding, retention: retentionPolicy(snapshot) }, 200, request, env);
+      if (request.method === "GET" && url.pathname === "/capabilities") return responseJson({ schema_version: 1, server_version: SERVER_VERSION, read_only: true, release: snapshot.release, capabilities: mcpTools().map(tool => tool.name), unavailable_capabilities: DOMAIN_CAPABILITIES, policy: snapshot.policyBinding, retention: retentionPolicy(snapshot), national: { search: "/national/search", record: "/national/record/{id}", available: Boolean(env.NATIONAL_DB), read_only: true } }, 200, request, env);
       if (request.method !== "POST" || !["/query", "/mcp", "/research", "/chat"].includes(url.pathname)) return responseJson(jsonError("NOT_FOUND", "route not found"), 404, request, env);
       if (url.pathname === "/research") {
         const input = await readBoundedJson(request, 8192);

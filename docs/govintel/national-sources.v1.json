@@ -1,0 +1,2055 @@
+{
+  "schema_version": 1,
+  "capacity_limit_mb": 400,
+  "capacity_reserve_mb": 170,
+  "capacity_reserve_notes": "未知議會議案預留 140MB，其他議會中繼資料預留 30MB；不是實測，W2 盤點後重算；逐字稿不進 D1。",
+  "sources": [
+    {
+      "national_source_id": "N-COUNCIL-TPE",
+      "provider": "臺北市議會",
+      "official_authority": "臺北市議會",
+      "tier": "REFERENCE",
+      "status": "IMPLEMENTED_HTML",
+      "transport": "HTML",
+      "endpoints": [
+        "https://ifddoc2.tcc.gov.tw/TCCMIS_Front/",
+        "https://ifddoc2.tcc.gov.tw/TCCMIS_Front/Adv_SearchInput.aspx"
+      ],
+      "allowed_hosts": [
+        "https://ifddoc2.tcc.gov.tw"
+      ],
+      "official_url_hosts": [
+        "https://ifddoc2.tcc.gov.tw",
+        "https://gaz.tcc.gov.tw"
+      ],
+      "robots": {
+        "status": "NO_ROBOTS_RESOURCE",
+        "failure_disallow_prefixes": [
+          "/"
+        ],
+        "url": "https://ifddoc2.tcc.gov.tw/robots.txt",
+        "observed_text": "Taiwan network: HTTP 404; GitHub Actions and Oracle Japan: unreachable (user-provided 2026-11-17/18 tests).",
+        "observed_at": "2026-11-18",
+        "observed_runner": "taiwan-network",
+        "http_status": 404
+      },
+      "min_request_interval_seconds": 3,
+      "license": "非開放授權；依網站條款",
+      "license_source_url": null,
+      "rights_note": "受著作權法保護，可合理使用、需註明出處",
+      "rights_class": "METADATA_ONLY",
+      "public_fields": [
+        "title",
+        "case_number",
+        "event_date",
+        "jurisdiction",
+        "authority",
+        "official_url",
+        "provider_url",
+        "license"
+      ],
+      "required_secret": null,
+      "scope": {
+        "jurisdiction": "臺北市",
+        "available_data_types": [
+          "議案",
+          "附帶決議",
+          "公報",
+          "書面質詢",
+          "速記錄",
+          "市府報告",
+          "影音"
+        ],
+        "transcripts": "僅本機索引，不進 D1；W2 盤點官方供應方式"
+      },
+      "capacity_estimate_mb": null,
+      "verified_at": "2026-11-15",
+      "notes": [
+        "來源：#247 NATIONAL_COUNCIL_EXPANSION.md 第二節（2026-11-15 盤點）；未重新連網查證。",
+        "rights_note 照錄總表網站文字；總表未提供本議會宣告頁精確網址，license_source_url 留 null。",
+        "議案筆數與容量未知，W2 盤點；null 不代表零，容量另計全域預留。",
+        "W2b：依 2026-11-18 台灣 IP 原始回應改用 Adv_SearchInput.aspx，沿用 form1 hidden 狀態先查未結案全部（59 筆中 58 筆也列在第14屆結案屆次清單，先查以保留未結案標示），再逐屆整批查已結案；每頁實際列數必須等於 OutputWhereStr 的共N筆，否則失敗，跨屆或已結／未結重複 SYSN 保留首筆（未結案優先）並警告。主對話實測第1屆3,898列／2,029,868 bytes、第14屆1,716列／1,088,155 bytes、第12屆1,579列，未結案59列／73,810 bytes；無500列固定上限，仍拒絕超過500筆的截斷訊息，單次最多8MiB。舊屆＋次篩選漏掉不屬任何大會的結案：第12屆臨時236＋定期675＝911，各次加總912，少於整屆1,579；第5屆各次1,972少於整屆1,994。日期切片 REDTChk 與民國日期為備案，未實作。2026-11-18 xisx-pc 實跑第10～14屆寫入筆數與官方各屆總數完全相同，第9屆起因每日寫入上限分日續跑。",
+        "runner=xisx-pc；沒有可直接開啟的逐筆網址，詳情直接 GET 回403，不繞過；只儲存入口連結，不請求 DetailPage.aspx 或 PrintDetailPage.aspx。"
+      ],
+      "official_url": "https://ifddoc2.tcc.gov.tw/TCCMIS_Front",
+      "official_system_urls": [
+        "https://ifddoc2.tcc.gov.tw/TCCMIS_Front",
+        "https://gaz.tcc.gov.tw/"
+      ],
+      "preflight_url": "https://ifddoc2.tcc.gov.tw/TCCMIS_Front",
+      "known_bill_count": null,
+      "runner": "xisx-pc",
+      "documented_open_api": false
+    },
+    {
+      "national_source_id": "N-COUNCIL-NWT",
+      "provider": "新北市議會",
+      "official_authority": "新北市議會",
+      "tier": "REFERENCE",
+      "status": "PLANNED_HEADLESS",
+      "transport": "HTML_HEADLESS",
+      "endpoints": [
+        "https://bms1.ntp.gov.tw/billsystem/councilbillquery"
+      ],
+      "allowed_hosts": [
+        "https://bms1.ntp.gov.tw"
+      ],
+      "official_url_hosts": [
+        "https://bms1.ntp.gov.tw"
+      ],
+      "robots": {
+        "status": "NO_ROBOTS_RESOURCE",
+        "failure_disallow_prefixes": [
+          "/"
+        ],
+        "url": "https://bms1.ntp.gov.tw/robots.txt",
+        "observed_text": "Taiwan network: HTTP 404; GitHub Actions and Oracle Japan: unreachable (user-provided 2026-11-17/18 tests).",
+        "observed_at": "2026-11-18",
+        "observed_runner": "taiwan-network",
+        "http_status": 404
+      },
+      "min_request_interval_seconds": 3,
+      "license": "非開放授權；依網站條款",
+      "license_source_url": null,
+      "rights_note": "All Rights Reserved；宣告頁查不到",
+      "rights_class": "METADATA_ONLY",
+      "public_fields": [
+        "title",
+        "case_number",
+        "event_date",
+        "jurisdiction",
+        "authority",
+        "official_url",
+        "provider_url",
+        "license"
+      ],
+      "required_secret": null,
+      "scope": {
+        "jurisdiction": "新北市",
+        "available_data_types": [
+          "議案",
+          "議事錄",
+          "直播"
+        ],
+        "transcripts": "僅本機索引，不進 D1；W2 盤點官方供應方式"
+      },
+      "capacity_estimate_mb": null,
+      "verified_at": "2026-11-15",
+      "notes": [
+        "來源：#247 NATIONAL_COUNCIL_EXPANSION.md 第二節（2026-11-15 盤點）；未重新連網查證。",
+        "rights_note 照錄總表網站文字；總表未提供本議會宣告頁精確網址，license_source_url 留 null。",
+        "議案筆數與容量未知，W2 盤點；null 不代表零，容量另計全域預留。",
+        "Blazor Server，W2d 使用無頭瀏覽器。"
+      ],
+      "official_url": "https://bms1.ntp.gov.tw/billsystem/councilbillquery",
+      "official_system_urls": [
+        "https://bms1.ntp.gov.tw/billsystem/councilbillquery"
+      ],
+      "preflight_url": "https://bms1.ntp.gov.tw/billsystem/councilbillquery",
+      "known_bill_count": null,
+      "runner": "xisx-pc",
+      "documented_open_api": false
+    },
+    {
+      "national_source_id": "N-COUNCIL-TAO",
+      "provider": "桃園市議會",
+      "official_authority": "桃園市議會",
+      "tier": "REFERENCE",
+      "status": "無結構化議案",
+      "transport": "HTML_FILES",
+      "endpoints": [],
+      "allowed_hosts": [
+        "https://www.tycc.gov.tw"
+      ],
+      "official_url_hosts": [
+        "https://www.tycc.gov.tw"
+      ],
+      "robots": {
+        "status": "REDIRECT_UNVERIFIED",
+        "failure_disallow_prefixes": [
+          "/"
+        ],
+        "url": "https://www.tycc.gov.tw/robots.txt",
+        "observed_text": "Taiwan network: HTTP 302; GitHub Actions and Oracle Japan: unreachable (user-provided 2026-11-17/18 tests).",
+        "observed_at": "2026-11-18",
+        "observed_runner": "taiwan-network",
+        "http_status": 302,
+        "redirect_target": "https://www.tycc.gov.tw/TC/404.html"
+      },
+      "min_request_interval_seconds": 3,
+      "license": "非開放授權；依網站條款",
+      "license_source_url": null,
+      "rights_note": "著作權法第 9 條標的可自由利用，其餘需合理使用或授權",
+      "rights_class": "METADATA_ONLY",
+      "public_fields": [
+        "title",
+        "case_number",
+        "event_date",
+        "jurisdiction",
+        "authority",
+        "official_url",
+        "provider_url",
+        "license"
+      ],
+      "required_secret": null,
+      "scope": {
+        "jurisdiction": "桃園市",
+        "available_data_types": [
+          "議事日程",
+          "會議紀錄",
+          "議事錄檔案",
+          "總質詢（新聞形式）",
+          "影音"
+        ],
+        "transcripts": "僅本機索引，不進 D1；W2 盤點官方供應方式"
+      },
+      "capacity_estimate_mb": null,
+      "verified_at": "2026-11-15",
+      "notes": [
+        "來源：#247 NATIONAL_COUNCIL_EXPANSION.md 第二節（2026-11-15 盤點）；未重新連網查證。",
+        "rights_note 照錄總表網站文字；總表未提供本議會宣告頁精確網址，license_source_url 留 null。",
+        "議案筆數與容量未知，W2 盤點；null 不代表零，容量另計全域預留。",
+        "未找到提案檢索，不把會議檔案筆數當成議案筆數。",
+        "W2b：依 2026-11-18 台灣 IP 原始回應離線實作；尚未完成真實全量匯入驗收。",
+        "沒有提案檢索，W2b 不實作。可替代資料為 https://www.tycc.gov.tw/TC/schedule.aspx?mid=40、https://www.tycc.gov.tw/TC/meeting.aspx?mid=41、https://www.tycc.gov.tw/TC/file.aspx?mid=44；屬議事日程與PDF清單，不當作結構化議案。"
+      ],
+      "official_url": "https://www.tycc.gov.tw/TC/",
+      "official_system_urls": [
+        "https://www.tycc.gov.tw/TC/"
+      ],
+      "preflight_url": "https://www.tycc.gov.tw/TC/",
+      "known_bill_count": null,
+      "runner": "xisx-pc",
+      "documented_open_api": false
+    },
+    {
+      "national_source_id": "N-COUNCIL-TXG",
+      "provider": "臺中市議會",
+      "official_authority": "臺中市議會",
+      "tier": "REFERENCE",
+      "status": "IMPLEMENTED_API",
+      "transport": "OFFICIAL_JSON_API",
+      "endpoints": [
+        "https://yishi.tccc.gov.tw/api/Proposal/FrontList"
+      ],
+      "allowed_hosts": [
+        "https://yishi.tccc.gov.tw"
+      ],
+      "official_url_hosts": [
+        "https://yishi.tccc.gov.tw"
+      ],
+      "robots": {
+        "status": "EMPTY_ROBOTS",
+        "failure_disallow_prefixes": [
+          "/"
+        ],
+        "url": "https://yishi.tccc.gov.tw/robots.txt",
+        "observed_text": "HTTP 200; empty robots (CRLF only).",
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 200
+      },
+      "min_request_interval_seconds": 3,
+      "license": "非開放授權；依網站條款",
+      "license_source_url": null,
+      "rights_note": "All rights reserved，無開放宣告",
+      "rights_class": "METADATA_ONLY",
+      "public_fields": [
+        "title",
+        "case_number",
+        "event_date",
+        "jurisdiction",
+        "authority",
+        "official_url",
+        "provider_url",
+        "license"
+      ],
+      "required_secret": null,
+      "scope": {
+        "jurisdiction": "臺中市",
+        "available_data_types": [
+          "提案",
+          "議事錄（發言段落）",
+          "影音"
+        ],
+        "transcripts": "僅本機索引，不進 D1；W2 盤點官方供應方式",
+        "known_proceedings_segments": 971552,
+        "api_method": "GET",
+        "field_mapping": {
+          "external_id": "billId",
+          "title": "proposalRationale.strip()[:200] or (billType + billNumber)[:200]",
+          "case_number": "session + space + billNumber",
+          "event_date": null,
+          "official_url": "https://yishi.tccc.gov.tw/proposals/{billId}"
+        }
+      },
+      "capacity_estimate_mb": 12.4,
+      "verified_at": "2026-11-15",
+      "notes": [
+        "來源：#247 NATIONAL_COUNCIL_EXPANSION.md 第二節（2026-11-15 盤點）；未重新連網查證。",
+        "rights_note 照錄總表網站文字；總表未提供本議會宣告頁精確網址，license_source_url 留 null。",
+        "容量按已知議案數 × 約 0.8KB 含索引估算；不是實測資料庫大小。",
+        "目前盤點只有臺中有議事錄 API；段落不計入 D1。",
+        "W2a 已實作官方議案 API；pageSize=200、最多 100 頁、完整核對 totalCount 後才寫入。無日期，HTML 全文與議事錄不入庫。2026-11-18 主對話提供結構，本 worker 僅離線驗收。"
+      ],
+      "official_url": "https://yishi.tccc.gov.tw",
+      "official_system_urls": [
+        "https://yishi.tccc.gov.tw"
+      ],
+      "preflight_url": "https://yishi.tccc.gov.tw",
+      "known_bill_count": 15496,
+      "runner": "github-actions",
+      "documented_open_api": false
+    },
+    {
+      "national_source_id": "N-COUNCIL-TNN",
+      "provider": "臺南市議會",
+      "official_authority": "臺南市議會",
+      "tier": "REFERENCE",
+      "status": "IMPLEMENTED_API",
+      "transport": "OFFICIAL_JSON_API",
+      "endpoints": [
+        "https://bill.tncc.gov.tw/NoPaperMeeting_TNCC/api/WEB014_GetProposalList.ashx",
+        "https://bill.tncc.gov.tw/NoPaperMeeting_TNCC/Api/WEB004_GetProMeetGradeList.ashx"
+      ],
+      "allowed_hosts": [
+        "https://www.tncc.gov.tw",
+        "https://bill.tncc.gov.tw"
+      ],
+      "official_url_hosts": [
+        "https://www.tncc.gov.tw"
+      ],
+      "robots": {
+        "status": "HTML_NOT_ROBOTS",
+        "failure_disallow_prefixes": [
+          "/"
+        ],
+        "url": "https://www.tncc.gov.tw/robots.txt",
+        "observed_text": "2026-11-18 raw: www robots 302 -> blank.asp HTML; bill.tncc.gov.tw/robots.txt 404; both allowed.",
+        "observed_at": "2026-11-18",
+        "observed_runner": "taiwan-network",
+        "http_status": 200
+      },
+      "min_request_interval_seconds": 3,
+      "license": "非開放授權；依網站條款",
+      "license_source_url": null,
+      "rights_note": "All Rights Reserved；開放宣告連結無內容",
+      "rights_class": "METADATA_ONLY",
+      "public_fields": [
+        "title",
+        "case_number",
+        "event_date",
+        "jurisdiction",
+        "authority",
+        "official_url",
+        "provider_url",
+        "license"
+      ],
+      "required_secret": null,
+      "scope": {
+        "jurisdiction": "臺南市",
+        "available_data_types": [
+          "議案",
+          "勘查",
+          "會議紀錄",
+          "議事錄",
+          "影音"
+        ],
+        "transcripts": "僅本機索引，不進 D1；W2 盤點官方供應方式"
+      },
+      "capacity_estimate_mb": null,
+      "verified_at": "2026-11-15",
+      "notes": [
+        "來源：#247 NATIONAL_COUNCIL_EXPANSION.md 第二節（2026-11-15 盤點）；未重新連網查證。",
+        "rights_note 照錄總表網站文字；總表未提供本議會宣告頁精確網址，license_source_url 留 null。",
+        "2026-11-18 原始回應議案共18,440筆；實際容量未驗證，仍計全域預留。",
+        "W2b：依 2026-11-18 台灣 IP 原始回應離線實作；尚未完成真實全量匯入驗收。",
+        "第1–4屆探查計18,440筆；每屆以 pagerow=1 的 PagesAll 核對列表；只取列表中繼資料，不抓詳情。"
+      ],
+      "official_url": "https://www.tncc.gov.tw/motion1.asp",
+      "official_system_urls": [
+        "https://www.tncc.gov.tw/motion1.asp"
+      ],
+      "preflight_url": "https://www.tncc.gov.tw/motion1.asp",
+      "known_bill_count": 18440,
+      "runner": "github-actions",
+      "documented_open_api": false
+    },
+    {
+      "national_source_id": "N-COUNCIL-KHH",
+      "provider": "高雄市議會",
+      "official_authority": "高雄市議會",
+      "tier": "REFERENCE",
+      "status": "IMPLEMENTED_HTML",
+      "transport": "HTML",
+      "endpoints": [
+        "https://cissearch.kcc.gov.tw/System/Proposal/Default_RWD.aspx",
+        "https://cissearch.kcc.gov.tw/System/Proposal/Statistics.aspx"
+      ],
+      "allowed_hosts": [
+        "https://cissearch.kcc.gov.tw"
+      ],
+      "official_url_hosts": [
+        "https://cissearch.kcc.gov.tw"
+      ],
+      "robots": {
+        "status": "NO_ROBOTS_RESOURCE",
+        "failure_disallow_prefixes": [
+          "/"
+        ],
+        "url": "https://cissearch.kcc.gov.tw/robots.txt",
+        "observed_text": "HTTP 404",
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 404
+      },
+      "min_request_interval_seconds": 3,
+      "license": "非開放授權；依網站條款",
+      "license_source_url": null,
+      "rights_note": "僅供個人、非商業用途，不可重製、改作、散布",
+      "rights_class": "METADATA_ONLY",
+      "public_fields": [
+        "title",
+        "case_number",
+        "event_date",
+        "jurisdiction",
+        "authority",
+        "official_url",
+        "provider_url",
+        "license"
+      ],
+      "required_secret": null,
+      "scope": {
+        "jurisdiction": "高雄市",
+        "available_data_types": [
+          "提案",
+          "質詢",
+          "議事錄",
+          "專案報告",
+          "譯文",
+          "公報",
+          "執行情形",
+          "影音"
+        ],
+        "transcripts": "僅本機索引，不進 D1；W2 盤點官方供應方式"
+      },
+      "capacity_estimate_mb": 1.31,
+      "verified_at": "2026-11-15",
+      "notes": [
+        "來源：#247 NATIONAL_COUNCIL_EXPANSION.md 第二節（2026-11-15 盤點）；未重新連網查證。",
+        "rights_note 照錄總表網站文字；總表未提供本議會宣告頁精確網址，license_source_url 留 null。",
+        "容量按已知議案數 × 約 0.8KB 含索引估算；不是實測資料庫大小。",
+        "僅本會期議員提案 1,537＋市府提案 99＝1,636，非全歷史總數。",
+        "W2b：依 2026-11-18 台灣 IP 原始回應離線實作；尚未完成真實全量匯入驗收。",
+        "歷史探查約32,430筆，舊 known_bill_count=1,636 僅當時本會期，不是歷史總量；全量仍待核。SN 為穩定 ID，postback 須沿用最新 hidden 值及 Session cookie；不抓詳情。條款僅供個人非商業，索引再利用仍有權利風險。"
+      ],
+      "official_url": "https://cissearch.kcc.gov.tw/",
+      "official_system_urls": [
+        "https://cissearch.kcc.gov.tw/"
+      ],
+      "preflight_url": "https://cissearch.kcc.gov.tw/",
+      "known_bill_count": 1636,
+      "runner": "github-actions",
+      "documented_open_api": false
+    },
+    {
+      "national_source_id": "N-COUNCIL-KEE",
+      "provider": "基隆市議會",
+      "official_authority": "基隆市議會",
+      "tier": "REFERENCE",
+      "status": "IMPLEMENTED_API",
+      "transport": "OFFICIAL_JSON_API",
+      "endpoints": [
+        "https://www.kmc.gov.tw/kmcwebapi/motion/getlist"
+      ],
+      "allowed_hosts": [
+        "https://www.kmc.gov.tw"
+      ],
+      "official_url_hosts": [
+        "https://www.kmc.gov.tw"
+      ],
+      "robots": {
+        "status": "PARSED",
+        "failure_disallow_prefixes": [
+          "/"
+        ],
+        "url": "https://www.kmc.gov.tw/robots.txt",
+        "observed_text": "未禁",
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 200
+      },
+      "min_request_interval_seconds": 3,
+      "license": "非開放授權；依網站條款",
+      "license_source_url": null,
+      "rights_note": "未經同意不得重製、散佈",
+      "rights_class": "METADATA_ONLY",
+      "public_fields": [
+        "title",
+        "case_number",
+        "event_date",
+        "jurisdiction",
+        "authority",
+        "official_url",
+        "provider_url",
+        "license"
+      ],
+      "required_secret": null,
+      "scope": {
+        "jurisdiction": "基隆市",
+        "available_data_types": [
+          "提案",
+          "決議",
+          "議事錄",
+          "影音"
+        ],
+        "transcripts": "僅本機索引，不進 D1；W2 盤點官方供應方式",
+        "api_method": "POST",
+        "field_mapping": {
+          "external_id": "kmc- + sha256(expkd|seqkd|seqno|3c|1c)[:24]; duplicate suffix -2, -3, ...",
+          "title": "sm1_3c.strip()[:300]",
+          "case_number": "sm1_title",
+          "event_date": null,
+          "official_url": "https://www.kmc.gov.tw/kmcweb/#/motion"
+        }
+      },
+      "capacity_estimate_mb": 4.0,
+      "verified_at": "2026-11-15",
+      "notes": [
+        "來源：#247 NATIONAL_COUNCIL_EXPANSION.md 第二節（2026-11-15 盤點）；未重新連網查證。",
+        "rights_note 照錄總表網站文字；總表未提供本議會宣告頁精確網址，license_source_url 留 null。",
+        "容量按已知議案數 × 約 0.8KB 含索引估算；不是實測資料庫大小。",
+        "約 4,998 筆（第 15–20 屆）；是否有 5,000 筆上限與分頁尚未驗證。preflight 只 GET 議事頁。",
+        "W2a 已實作單次 POST {}。API 無 ID，以 expkd|seqkd|seqno|3c|1c 雜湊 ID 加重複列序號；可能有 5,000 筆上限，回傳至少 4,990 筆時警告 POSSIBLE_ROW_CAP。無日期；不存決議、連署人或完整案由。屆別過濾參數未驗證。"
+      ],
+      "official_url": "https://www.kmc.gov.tw/kmcweb/#/motion",
+      "official_system_urls": [
+        "https://www.kmc.gov.tw/kmcweb/#/motion"
+      ],
+      "preflight_url": "https://www.kmc.gov.tw/kmcweb/",
+      "known_bill_count": 4998,
+      "runner": "github-actions",
+      "documented_open_api": false
+    },
+    {
+      "national_source_id": "N-COUNCIL-HSZ",
+      "provider": "新竹市議會",
+      "official_authority": "新竹市議會",
+      "tier": "REFERENCE",
+      "status": "PLANNED_HTML",
+      "transport": "HTML",
+      "endpoints": [
+        "https://www.hsinchu-cc.gov.tw/tc/proposal.aspx?mid=42"
+      ],
+      "allowed_hosts": [
+        "https://www.hsinchu-cc.gov.tw"
+      ],
+      "official_url_hosts": [
+        "https://www.hsinchu-cc.gov.tw"
+      ],
+      "robots": {
+        "status": "PARSED",
+        "failure_disallow_prefixes": [
+          "/"
+        ],
+        "url": "https://www.hsinchu-cc.gov.tw/robots.txt",
+        "observed_text": "未禁",
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 200
+      },
+      "min_request_interval_seconds": 3,
+      "license": "網站資料開放宣告（無償、非專屬、可再授權、需註明出處）",
+      "license_source_url": null,
+      "rights_note": "網站資料開放宣告（無償、非專屬、可再授權、需註明出處）",
+      "rights_class": "METADATA_ONLY",
+      "public_fields": [
+        "title",
+        "case_number",
+        "event_date",
+        "jurisdiction",
+        "authority",
+        "official_url",
+        "provider_url",
+        "license"
+      ],
+      "required_secret": null,
+      "scope": {
+        "jurisdiction": "新竹市",
+        "available_data_types": [
+          "提案",
+          "臨時動議",
+          "請願",
+          "質詢紀錄",
+          "報告案",
+          "議事錄",
+          "影音"
+        ],
+        "transcripts": "僅本機索引，不進 D1；W2 盤點官方供應方式"
+      },
+      "capacity_estimate_mb": null,
+      "verified_at": "2026-11-15",
+      "notes": [
+        "來源：#247 NATIONAL_COUNCIL_EXPANSION.md 第二節（2026-11-15 盤點）；未重新連網查證。",
+        "rights_note 照錄總表網站文字；總表未提供本議會宣告頁精確網址，license_source_url 留 null。",
+        "議案筆數與容量未知，W2 盤點；null 不代表零，容量另計全域預留。"
+      ],
+      "official_url": "https://www.hsinchu-cc.gov.tw/tc/proposal.aspx?mid=42",
+      "official_system_urls": [
+        "https://www.hsinchu-cc.gov.tw/tc/proposal.aspx?mid=42"
+      ],
+      "preflight_url": "https://www.hsinchu-cc.gov.tw/tc/proposal.aspx?mid=42",
+      "known_bill_count": null,
+      "runner": "github-actions",
+      "documented_open_api": false
+    },
+    {
+      "national_source_id": "N-COUNCIL-CYI",
+      "provider": "嘉義市議會",
+      "official_authority": "嘉義市議會",
+      "tier": "REFERENCE",
+      "status": "BLOCKED_BY_ROBOTS_NEEDS_CONSENT",
+      "transport": "HTML",
+      "endpoints": [],
+      "allowed_hosts": [],
+      "official_url_hosts": [
+        "https://www.cycc.gov.tw"
+      ],
+      "robots": {
+        "status": "DISALLOWED",
+        "failure_disallow_prefixes": [
+          "/"
+        ],
+        "url": "https://www.cycc.gov.tw/robots.txt",
+        "observed_text": "全禁（只開放主要搜尋引擎）",
+        "blocked_origins": [
+          "https://www.cycc.gov.tw"
+        ],
+        "disallow": [
+          "/"
+        ],
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 200
+      },
+      "min_request_interval_seconds": 3,
+      "license": "非開放授權；依網站條款",
+      "license_source_url": null,
+      "rights_note": "All Rights Reserved",
+      "rights_class": "METADATA_ONLY",
+      "public_fields": [
+        "title",
+        "case_number",
+        "event_date",
+        "jurisdiction",
+        "authority",
+        "official_url",
+        "provider_url",
+        "license"
+      ],
+      "required_secret": null,
+      "scope": {
+        "jurisdiction": "嘉義市",
+        "available_data_types": [
+          "議決案",
+          "會議紀錄",
+          "議事日程",
+          "質詢影音"
+        ],
+        "transcripts": "僅本機索引，不進 D1；W2 盤點官方供應方式"
+      },
+      "capacity_estimate_mb": null,
+      "verified_at": "2026-11-15",
+      "notes": [
+        "來源：#247 NATIONAL_COUNCIL_EXPANSION.md 第二節（2026-11-15 盤點）；未重新連網查證。",
+        "rights_note 照錄總表網站文字；總表未提供本議會宣告頁精確網址，license_source_url 留 null。",
+        "議案筆數與容量未知，W2 盤點；null 不代表零，容量另計全域預留。"
+      ],
+      "official_url": "https://www.cycc.gov.tw/",
+      "official_system_urls": [
+        "https://www.cycc.gov.tw/"
+      ],
+      "preflight_url": "https://www.cycc.gov.tw/",
+      "known_bill_count": null,
+      "runner": "github-actions",
+      "documented_open_api": false
+    },
+    {
+      "national_source_id": "N-COUNCIL-HSQ",
+      "provider": "新竹縣議會",
+      "official_authority": "新竹縣議會",
+      "tier": "REFERENCE",
+      "status": "PLANNED_HTML",
+      "transport": "HTML",
+      "endpoints": [
+        "https://www.hcc.gov.tw/"
+      ],
+      "allowed_hosts": [
+        "https://www.hcc.gov.tw"
+      ],
+      "official_url_hosts": [
+        "https://www.hcc.gov.tw"
+      ],
+      "robots": {
+        "status": "NO_ROBOTS_RESOURCE",
+        "failure_disallow_prefixes": [
+          "/"
+        ],
+        "url": "https://www.hcc.gov.tw/robots.txt",
+        "observed_text": "HTTP 404",
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 404
+      },
+      "min_request_interval_seconds": 3,
+      "license": "非開放授權；依網站條款",
+      "license_source_url": null,
+      "rights_note": "All Rights Reserved",
+      "rights_class": "METADATA_ONLY",
+      "public_fields": [
+        "title",
+        "case_number",
+        "event_date",
+        "jurisdiction",
+        "authority",
+        "official_url",
+        "provider_url",
+        "license"
+      ],
+      "required_secret": null,
+      "scope": {
+        "jurisdiction": "新竹縣",
+        "available_data_types": [
+          "縣府與議員提案",
+          "質詢",
+          "專案報告",
+          "請願",
+          "議事錄",
+          "直播"
+        ],
+        "transcripts": "僅本機索引，不進 D1；W2 盤點官方供應方式"
+      },
+      "capacity_estimate_mb": null,
+      "verified_at": "2026-11-15",
+      "notes": [
+        "來源：#247 NATIONAL_COUNCIL_EXPANSION.md 第二節（2026-11-15 盤點）；未重新連網查證。",
+        "rights_note 照錄總表網站文字；總表未提供本議會宣告頁精確網址，license_source_url 留 null。",
+        "議案筆數與容量未知，W2 盤點；null 不代表零，容量另計全域預留。"
+      ],
+      "official_url": "https://www.hcc.gov.tw/",
+      "official_system_urls": [
+        "https://www.hcc.gov.tw/"
+      ],
+      "preflight_url": "https://www.hcc.gov.tw/",
+      "known_bill_count": null,
+      "runner": "github-actions",
+      "documented_open_api": false
+    },
+    {
+      "national_source_id": "N-COUNCIL-MIA",
+      "provider": "苗栗縣議會",
+      "official_authority": "苗栗縣議會",
+      "tier": "REFERENCE",
+      "status": "PLANNED_HTML",
+      "transport": "HTML_FILES",
+      "endpoints": [
+        "https://www.mcc.gov.tw/"
+      ],
+      "allowed_hosts": [
+        "https://www.mcc.gov.tw"
+      ],
+      "official_url_hosts": [
+        "https://www.mcc.gov.tw"
+      ],
+      "robots": {
+        "status": "PARSED",
+        "failure_disallow_prefixes": [
+          "/"
+        ],
+        "url": "https://www.mcc.gov.tw/robots.txt",
+        "observed_text": "未禁",
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 200
+      },
+      "min_request_interval_seconds": 3,
+      "license": "非開放授權；依網站條款",
+      "license_source_url": null,
+      "rights_note": "查不到",
+      "rights_class": "METADATA_ONLY",
+      "public_fields": [
+        "title",
+        "case_number",
+        "event_date",
+        "jurisdiction",
+        "authority",
+        "official_url",
+        "provider_url",
+        "license"
+      ],
+      "required_secret": null,
+      "scope": {
+        "jurisdiction": "苗栗縣",
+        "available_data_types": [
+          "會議日程與紀錄檔案",
+          "直播"
+        ],
+        "transcripts": "僅本機索引，不進 D1；W2 盤點官方供應方式"
+      },
+      "capacity_estimate_mb": null,
+      "verified_at": "2026-11-15",
+      "notes": [
+        "來源：#247 NATIONAL_COUNCIL_EXPANSION.md 第二節（2026-11-15 盤點）；未重新連網查證。",
+        "rights_note 照錄總表網站文字；總表未提供本議會宣告頁精確網址，license_source_url 留 null。",
+        "議案筆數與容量未知，W2 盤點；null 不代表零，容量另計全域預留。",
+        "未找到提案檢索，不把會議檔案筆數當成議案筆數。"
+      ],
+      "official_url": "https://www.mcc.gov.tw/",
+      "official_system_urls": [
+        "https://www.mcc.gov.tw/"
+      ],
+      "preflight_url": "https://www.mcc.gov.tw/",
+      "known_bill_count": null,
+      "runner": "github-actions",
+      "documented_open_api": false
+    },
+    {
+      "national_source_id": "N-COUNCIL-CHA",
+      "provider": "彰化縣議會",
+      "official_authority": "彰化縣議會",
+      "tier": "REFERENCE",
+      "status": "PLANNED_HTML",
+      "transport": "HTML",
+      "endpoints": [
+        "https://www.chcc.gov.tw/"
+      ],
+      "allowed_hosts": [
+        "https://www.chcc.gov.tw"
+      ],
+      "official_url_hosts": [
+        "https://www.chcc.gov.tw"
+      ],
+      "robots": {
+        "status": "REDIRECT_UNVERIFIED",
+        "failure_disallow_prefixes": [
+          "/"
+        ],
+        "url": "https://www.chcc.gov.tw/robots.txt",
+        "observed_text": "HTTP 302; terminal response not measured by this CI run.",
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 302
+      },
+      "min_request_interval_seconds": 3,
+      "license": "非開放授權；依網站條款",
+      "license_source_url": null,
+      "rights_note": "版權所有",
+      "rights_class": "METADATA_ONLY",
+      "public_fields": [
+        "title",
+        "case_number",
+        "event_date",
+        "jurisdiction",
+        "authority",
+        "official_url",
+        "provider_url",
+        "license"
+      ],
+      "required_secret": null,
+      "scope": {
+        "jurisdiction": "彰化縣",
+        "available_data_types": [
+          "議案審查",
+          "議事錄全文檢索",
+          "會議紀錄",
+          "公報",
+          "影音"
+        ],
+        "transcripts": "僅本機索引，不進 D1；W2 盤點官方供應方式"
+      },
+      "capacity_estimate_mb": null,
+      "verified_at": "2026-11-15",
+      "notes": [
+        "來源：#247 NATIONAL_COUNCIL_EXPANSION.md 第二節（2026-11-15 盤點）；未重新連網查證。",
+        "rights_note 照錄總表網站文字；總表未提供本議會宣告頁精確網址，license_source_url 留 null。",
+        "議案筆數與容量未知，W2 盤點；null 不代表零，容量另計全域預留。"
+      ],
+      "official_url": "https://www.chcc.gov.tw/",
+      "official_system_urls": [
+        "https://www.chcc.gov.tw/"
+      ],
+      "preflight_url": "https://www.chcc.gov.tw/",
+      "known_bill_count": null,
+      "runner": "github-actions",
+      "documented_open_api": false
+    },
+    {
+      "national_source_id": "N-COUNCIL-NAN",
+      "provider": "南投縣議會",
+      "official_authority": "南投縣議會",
+      "tier": "REFERENCE",
+      "status": "PLANNED_HTML",
+      "transport": "HTML",
+      "endpoints": [
+        "https://www.ntcc.gov.tw/tw/proposal/index.aspx"
+      ],
+      "allowed_hosts": [
+        "https://www.ntcc.gov.tw"
+      ],
+      "official_url_hosts": [
+        "https://www.ntcc.gov.tw"
+      ],
+      "robots": {
+        "status": "NO_ROBOTS_RESOURCE",
+        "failure_disallow_prefixes": [
+          "/"
+        ],
+        "url": "https://www.ntcc.gov.tw/robots.txt",
+        "observed_text": "HTTP 404",
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 404
+      },
+      "min_request_interval_seconds": 3,
+      "license": "非開放授權；依網站條款",
+      "license_source_url": null,
+      "rights_note": "All rights reserved",
+      "rights_class": "METADATA_ONLY",
+      "public_fields": [
+        "title",
+        "case_number",
+        "event_date",
+        "jurisdiction",
+        "authority",
+        "official_url",
+        "provider_url",
+        "license"
+      ],
+      "required_secret": null,
+      "scope": {
+        "jurisdiction": "南投縣",
+        "available_data_types": [
+          "提案（第 10–25 屆）",
+          "會議紀錄與影音",
+          "議事錄"
+        ],
+        "transcripts": "僅本機索引，不進 D1；W2 盤點官方供應方式"
+      },
+      "capacity_estimate_mb": null,
+      "verified_at": "2026-11-15",
+      "notes": [
+        "來源：#247 NATIONAL_COUNCIL_EXPANSION.md 第二節（2026-11-15 盤點）；未重新連網查證。",
+        "rights_note 照錄總表網站文字；總表未提供本議會宣告頁精確網址，license_source_url 留 null。",
+        "議案筆數與容量未知，W2 盤點；null 不代表零，容量另計全域預留。"
+      ],
+      "official_url": "https://www.ntcc.gov.tw/tw/proposal/index.aspx",
+      "official_system_urls": [
+        "https://www.ntcc.gov.tw/tw/proposal/index.aspx"
+      ],
+      "preflight_url": "https://www.ntcc.gov.tw/tw/proposal/index.aspx",
+      "known_bill_count": null,
+      "runner": "github-actions",
+      "documented_open_api": false
+    },
+    {
+      "national_source_id": "N-COUNCIL-YUN",
+      "provider": "雲林縣議會",
+      "official_authority": "雲林縣議會",
+      "tier": "REFERENCE",
+      "status": "PLANNED_HTML",
+      "transport": "HTML",
+      "endpoints": [
+        "https://www.ylcc.gov.tw/"
+      ],
+      "allowed_hosts": [
+        "https://www.ylcc.gov.tw"
+      ],
+      "official_url_hosts": [
+        "https://www.ylcc.gov.tw"
+      ],
+      "robots": {
+        "status": "NO_ROBOTS_RESOURCE",
+        "failure_disallow_prefixes": [
+          "/"
+        ],
+        "url": "https://www.ylcc.gov.tw/robots.txt",
+        "observed_text": "HTTP 404",
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 404
+      },
+      "min_request_interval_seconds": 3,
+      "license": "非開放授權；依網站條款",
+      "license_source_url": null,
+      "rights_note": "All Rights Reserved",
+      "rights_class": "METADATA_ONLY",
+      "public_fields": [
+        "title",
+        "case_number",
+        "event_date",
+        "jurisdiction",
+        "authority",
+        "official_url",
+        "provider_url",
+        "license"
+      ],
+      "required_secret": null,
+      "scope": {
+        "jurisdiction": "雲林縣",
+        "available_data_types": [
+          "議案審查",
+          "議事錄",
+          "影音"
+        ],
+        "transcripts": "僅本機索引，不進 D1；W2 盤點官方供應方式"
+      },
+      "capacity_estimate_mb": null,
+      "verified_at": "2026-11-15",
+      "notes": [
+        "來源：#247 NATIONAL_COUNCIL_EXPANSION.md 第二節（2026-11-15 盤點）；未重新連網查證。",
+        "rights_note 照錄總表網站文字；總表未提供本議會宣告頁精確網址，license_source_url 留 null。",
+        "議案筆數與容量未知，W2 盤點；null 不代表零，容量另計全域預留。"
+      ],
+      "official_url": "https://www.ylcc.gov.tw/",
+      "official_system_urls": [
+        "https://www.ylcc.gov.tw/"
+      ],
+      "preflight_url": "https://www.ylcc.gov.tw/",
+      "known_bill_count": null,
+      "runner": "github-actions",
+      "documented_open_api": false
+    },
+    {
+      "national_source_id": "N-COUNCIL-CYQ",
+      "provider": "嘉義縣議會",
+      "official_authority": "嘉義縣議會",
+      "tier": "REFERENCE",
+      "status": "PLANNED_API",
+      "transport": "OFFICIAL_JSON_API",
+      "endpoints": [
+        "https://api.cyscc.gov.tw/"
+      ],
+      "allowed_hosts": [
+        "https://api.cyscc.gov.tw"
+      ],
+      "official_url_hosts": [
+        "https://www.cyscc.gov.tw",
+        "https://api.cyscc.gov.tw"
+      ],
+      "robots": {
+        "status": "ROBOTS_SERVER_ERROR",
+        "failure_disallow_prefixes": [
+          "/"
+        ],
+        "url": "https://api.cyscc.gov.tw/robots.txt",
+        "observed_text": "HTTP 500",
+        "blocked_origins": [
+          "https://www.cyscc.gov.tw"
+        ],
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 500
+      },
+      "min_request_interval_seconds": 3,
+      "license": "非開放授權；依網站條款",
+      "license_source_url": null,
+      "rights_note": "宣告頁查不到",
+      "rights_class": "METADATA_ONLY",
+      "public_fields": [
+        "title",
+        "case_number",
+        "event_date",
+        "jurisdiction",
+        "authority",
+        "official_url",
+        "provider_url",
+        "license"
+      ],
+      "required_secret": null,
+      "scope": {
+        "jurisdiction": "嘉義縣",
+        "available_data_types": [
+          "縣府與議員提案",
+          "議事日程",
+          "直播"
+        ],
+        "transcripts": "僅本機索引，不進 D1；W2 盤點官方供應方式"
+      },
+      "capacity_estimate_mb": 1.0,
+      "verified_at": "2026-11-15",
+      "notes": [
+        "來源：#247 NATIONAL_COUNCIL_EXPANSION.md 第二節（2026-11-15 盤點）；未重新連網查證。",
+        "rights_note 照錄總表網站文字；總表未提供本議會宣告頁精確網址，license_source_url 留 null。",
+        "容量按已知議案數 × 約 0.8KB 含索引估算；不是實測資料庫大小。",
+        "API 與 www 分開：CI 的 API robots 回 500，未設 documented_open_api，禁止內容擷取；preflight 只查 robots。API 精確路徑及分頁待 W2a，endpoints 根網址僅標示官方 API origin。www 必須發函取得書面同意後再加入。",
+        "W2a 不實作：API robots HTTP 500 且 documented_open_api=false，禁止擷取；需議會書面同意，或確認是公開文件化的 API 並重新審核登記後再做。"
+      ],
+      "official_url": "https://www.cyscc.gov.tw/News/114",
+      "official_system_urls": [
+        "https://www.cyscc.gov.tw/News/114"
+      ],
+      "preflight_url": "https://www.cyscc.gov.tw/News/114",
+      "known_bill_count": 1246,
+      "www_access": {
+        "status": "BLOCKED_BY_ROBOTS_NEEDS_CONSENT",
+        "endpoints": [],
+        "robots_url": "https://www.cyscc.gov.tw/robots.txt"
+      },
+      "runner": "github-actions",
+      "documented_open_api": false
+    },
+    {
+      "national_source_id": "N-COUNCIL-PIF",
+      "provider": "屏東縣議會",
+      "official_authority": "屏東縣議會",
+      "tier": "REFERENCE",
+      "status": "PLANNED_HTML",
+      "transport": "HTML",
+      "endpoints": [
+        "https://www.ptcc.gov.tw/"
+      ],
+      "allowed_hosts": [
+        "https://www.ptcc.gov.tw"
+      ],
+      "official_url_hosts": [
+        "https://www.ptcc.gov.tw"
+      ],
+      "robots": {
+        "status": "NO_ROBOTS_RESOURCE",
+        "failure_disallow_prefixes": [
+          "/"
+        ],
+        "url": "https://www.ptcc.gov.tw/robots.txt",
+        "observed_text": "Taiwan network: HTTP 404; GitHub Actions and Oracle Japan: unreachable (user-provided 2026-11-17/18 tests).",
+        "observed_at": "2026-11-18",
+        "observed_runner": "taiwan-network",
+        "http_status": 404
+      },
+      "min_request_interval_seconds": 3,
+      "license": "非開放授權；依網站條款",
+      "license_source_url": null,
+      "rights_note": "版權所有",
+      "rights_class": "METADATA_ONLY",
+      "public_fields": [
+        "title",
+        "case_number",
+        "event_date",
+        "jurisdiction",
+        "authority",
+        "official_url",
+        "provider_url",
+        "license"
+      ],
+      "required_secret": null,
+      "scope": {
+        "jurisdiction": "屏東縣",
+        "available_data_types": [
+          "議決議案一覽",
+          "議事日程與紀錄",
+          "影音"
+        ],
+        "transcripts": "僅本機索引，不進 D1；W2 盤點官方供應方式"
+      },
+      "capacity_estimate_mb": null,
+      "verified_at": "2026-11-15",
+      "notes": [
+        "來源：#247 NATIONAL_COUNCIL_EXPANSION.md 第二節（2026-11-15 盤點）；未重新連網查證。",
+        "rights_note 照錄總表網站文字；總表未提供本議會宣告頁精確網址，license_source_url 留 null。",
+        "議案筆數與容量未知，W2 盤點；null 不代表零，容量另計全域預留。"
+      ],
+      "official_url": "https://www.ptcc.gov.tw/",
+      "official_system_urls": [
+        "https://www.ptcc.gov.tw/"
+      ],
+      "preflight_url": "https://www.ptcc.gov.tw/",
+      "known_bill_count": null,
+      "runner": "xisx-pc",
+      "documented_open_api": false
+    },
+    {
+      "national_source_id": "N-COUNCIL-ILA",
+      "provider": "宜蘭縣議會",
+      "official_authority": "宜蘭縣議會",
+      "tier": "REFERENCE",
+      "status": "PLANNED_HTML",
+      "transport": "HTML",
+      "endpoints": [
+        "https://www.ilcc.gov.tw/"
+      ],
+      "allowed_hosts": [
+        "https://www.ilcc.gov.tw"
+      ],
+      "official_url_hosts": [
+        "https://www.ilcc.gov.tw"
+      ],
+      "robots": {
+        "status": "NO_ROBOTS_RESOURCE",
+        "failure_disallow_prefixes": [
+          "/"
+        ],
+        "url": "https://www.ilcc.gov.tw/robots.txt",
+        "observed_text": "Taiwan network: HTTP 404; GitHub Actions and Oracle Japan: unreachable (user-provided 2026-11-17/18 tests).",
+        "observed_at": "2026-11-18",
+        "observed_runner": "taiwan-network",
+        "http_status": 404
+      },
+      "min_request_interval_seconds": 3,
+      "license": "非開放授權；依網站條款",
+      "license_source_url": null,
+      "rights_note": "查不到",
+      "rights_class": "METADATA_ONLY",
+      "public_fields": [
+        "title",
+        "case_number",
+        "event_date",
+        "jurisdiction",
+        "authority",
+        "official_url",
+        "provider_url",
+        "license"
+      ],
+      "required_secret": null,
+      "scope": {
+        "jurisdiction": "宜蘭縣",
+        "available_data_types": [
+          "議決案",
+          "待議決案",
+          "待審查案",
+          "影音"
+        ],
+        "transcripts": "僅本機索引，不進 D1；W2 盤點官方供應方式"
+      },
+      "capacity_estimate_mb": null,
+      "verified_at": "2026-11-15",
+      "notes": [
+        "來源：#247 NATIONAL_COUNCIL_EXPANSION.md 第二節（2026-11-15 盤點）；未重新連網查證。",
+        "rights_note 照錄總表網站文字；總表未提供本議會宣告頁精確網址，license_source_url 留 null。",
+        "議案筆數與容量未知，W2 盤點；null 不代表零，容量另計全域預留。",
+        "frameset 舊站（Big5）；frame 內頁待 W2 盤點。"
+      ],
+      "official_url": "https://www.ilcc.gov.tw/",
+      "official_system_urls": [
+        "https://www.ilcc.gov.tw/"
+      ],
+      "preflight_url": "https://www.ilcc.gov.tw/",
+      "known_bill_count": null,
+      "runner": "xisx-pc",
+      "documented_open_api": false
+    },
+    {
+      "national_source_id": "N-COUNCIL-HUA",
+      "provider": "花蓮縣議會",
+      "official_authority": "花蓮縣議會",
+      "tier": "REFERENCE",
+      "status": "PLANNED_HTML",
+      "transport": "HTML",
+      "endpoints": [
+        "https://www.hlcc.gov.tw/"
+      ],
+      "allowed_hosts": [
+        "https://www.hlcc.gov.tw"
+      ],
+      "official_url_hosts": [
+        "https://www.hlcc.gov.tw"
+      ],
+      "robots": {
+        "status": "NO_ROBOTS_RESOURCE",
+        "failure_disallow_prefixes": [
+          "/"
+        ],
+        "url": "https://www.hlcc.gov.tw/robots.txt",
+        "observed_text": "HTTP 404",
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 404
+      },
+      "min_request_interval_seconds": 3,
+      "license": "非開放授權；依網站條款",
+      "license_source_url": null,
+      "rights_note": "All rights reserved",
+      "rights_class": "METADATA_ONLY",
+      "public_fields": [
+        "title",
+        "case_number",
+        "event_date",
+        "jurisdiction",
+        "authority",
+        "official_url",
+        "provider_url",
+        "license"
+      ],
+      "required_secret": null,
+      "scope": {
+        "jurisdiction": "花蓮縣",
+        "available_data_types": [
+          "提案（附決議）",
+          "定期大會書面質詢",
+          "會議紀錄",
+          "議事錄"
+        ],
+        "transcripts": "僅本機索引，不進 D1；W2 盤點官方供應方式"
+      },
+      "capacity_estimate_mb": null,
+      "verified_at": "2026-11-15",
+      "notes": [
+        "來源：#247 NATIONAL_COUNCIL_EXPANSION.md 第二節（2026-11-15 盤點）；未重新連網查證。",
+        "rights_note 照錄總表網站文字；總表未提供本議會宣告頁精確網址，license_source_url 留 null。",
+        "議案筆數與容量未知，W2 盤點；null 不代表零，容量另計全域預留。"
+      ],
+      "official_url": "https://www.hlcc.gov.tw/",
+      "official_system_urls": [
+        "https://www.hlcc.gov.tw/"
+      ],
+      "preflight_url": "https://www.hlcc.gov.tw/",
+      "known_bill_count": null,
+      "runner": "github-actions",
+      "documented_open_api": false
+    },
+    {
+      "national_source_id": "N-COUNCIL-TTT",
+      "provider": "臺東縣議會",
+      "official_authority": "臺東縣議會",
+      "tier": "REFERENCE",
+      "status": "PLANNED_HTML",
+      "transport": "HTML",
+      "endpoints": [
+        "https://www.taitungcc.gov.tw/1/meeting"
+      ],
+      "allowed_hosts": [
+        "https://www.taitungcc.gov.tw"
+      ],
+      "official_url_hosts": [
+        "https://www.taitungcc.gov.tw"
+      ],
+      "robots": {
+        "status": "PARSED",
+        "failure_disallow_prefixes": [
+          "/"
+        ],
+        "url": "https://www.taitungcc.gov.tw/robots.txt",
+        "observed_text": "未禁",
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 200
+      },
+      "min_request_interval_seconds": 3,
+      "license": "非開放授權；依網站條款",
+      "license_source_url": null,
+      "rights_note": "版權所有",
+      "rights_class": "METADATA_ONLY",
+      "public_fields": [
+        "title",
+        "case_number",
+        "event_date",
+        "jurisdiction",
+        "authority",
+        "official_url",
+        "provider_url",
+        "license"
+      ],
+      "required_secret": null,
+      "scope": {
+        "jurisdiction": "臺東縣",
+        "available_data_types": [
+          "議事錄",
+          "議程",
+          "縣政總質詢"
+        ],
+        "transcripts": "僅本機索引，不進 D1；W2 盤點官方供應方式"
+      },
+      "capacity_estimate_mb": null,
+      "verified_at": "2026-11-15",
+      "notes": [
+        "來源：#247 NATIONAL_COUNCIL_EXPANSION.md 第二節（2026-11-15 盤點）；未重新連網查證。",
+        "rights_note 照錄總表網站文字；總表未提供本議會宣告頁精確網址，license_source_url 留 null。",
+        "議案筆數與容量未知，W2 盤點；null 不代表零，容量另計全域預留。",
+        "議案查詢連結 404，W2 盤點。"
+      ],
+      "official_url": "https://www.taitungcc.gov.tw/1/meeting",
+      "official_system_urls": [
+        "https://www.taitungcc.gov.tw/1/meeting"
+      ],
+      "preflight_url": "https://www.taitungcc.gov.tw/1/meeting",
+      "known_bill_count": null,
+      "runner": "github-actions",
+      "documented_open_api": false
+    },
+    {
+      "national_source_id": "N-COUNCIL-PEN",
+      "provider": "澎湖縣議會",
+      "official_authority": "澎湖縣議會",
+      "tier": "REFERENCE",
+      "status": "PARTIAL_ROBOTS",
+      "transport": "HTML_FILES",
+      "endpoints": [
+        "https://www.phcouncil.gov.tw/"
+      ],
+      "allowed_hosts": [
+        "https://www.phcouncil.gov.tw"
+      ],
+      "official_url_hosts": [
+        "https://www.phcouncil.gov.tw"
+      ],
+      "robots": {
+        "status": "PARTIAL_ROBOTS",
+        "failure_disallow_prefixes": [
+          "/"
+        ],
+        "url": "https://www.phcouncil.gov.tw/robots.txt",
+        "observed_text": "擋附件目錄",
+        "blocked_resources": [
+          "附件目錄"
+        ],
+        "attachment_paths": null,
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 200
+      },
+      "min_request_interval_seconds": 3,
+      "license": "非開放授權；依網站條款",
+      "license_source_url": null,
+      "rights_note": "版權所有",
+      "rights_class": "METADATA_ONLY",
+      "public_fields": [
+        "title",
+        "case_number",
+        "event_date",
+        "jurisdiction",
+        "authority",
+        "official_url",
+        "provider_url",
+        "license"
+      ],
+      "required_secret": null,
+      "scope": {
+        "jurisdiction": "澎湖縣",
+        "available_data_types": [
+          "議事錄",
+          "影音",
+          "會議紀錄（SharePoint）"
+        ],
+        "transcripts": "僅本機索引，不進 D1；W2 盤點官方供應方式",
+        "fetch_attachments": false
+      },
+      "capacity_estimate_mb": null,
+      "verified_at": "2026-11-15",
+      "notes": [
+        "來源：#247 NATIONAL_COUNCIL_EXPANSION.md 第二節（2026-11-15 盤點）；未重新連網查證。",
+        "rights_note 照錄總表網站文字；總表未提供本議會宣告頁精確網址，license_source_url 留 null。",
+        "議案筆數與容量未知，W2 盤點；null 不代表零，容量另計全域預留。",
+        "總表未列附件目錄精確路徑；先禁抓所有附件及 SharePoint 資源，W2 查 robots 並取得書面同意後才加入。"
+      ],
+      "official_url": "https://www.phcouncil.gov.tw/",
+      "official_system_urls": [
+        "https://www.phcouncil.gov.tw/"
+      ],
+      "preflight_url": "https://www.phcouncil.gov.tw/",
+      "known_bill_count": null,
+      "runner": "github-actions",
+      "documented_open_api": false
+    },
+    {
+      "national_source_id": "N-COUNCIL-KIN",
+      "provider": "金門縣議會",
+      "official_authority": "金門縣議會",
+      "tier": "REFERENCE",
+      "status": "PLANNED_HTML",
+      "transport": "HTML",
+      "endpoints": [
+        "https://agenda.kmcc.gov.tw/CouncilManage/AgendaBill"
+      ],
+      "allowed_hosts": [
+        "https://agenda.kmcc.gov.tw"
+      ],
+      "official_url_hosts": [
+        "https://agenda.kmcc.gov.tw"
+      ],
+      "robots": {
+        "status": "NO_ROBOTS_RESOURCE",
+        "failure_disallow_prefixes": [
+          "/"
+        ],
+        "url": "https://agenda.kmcc.gov.tw/robots.txt",
+        "observed_text": "HTTP 404",
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 404
+      },
+      "min_request_interval_seconds": 3,
+      "license": "非開放授權；依網站條款",
+      "license_source_url": null,
+      "rights_note": "與桃園相同的著作權聲明",
+      "rights_class": "METADATA_ONLY",
+      "public_fields": [
+        "title",
+        "case_number",
+        "event_date",
+        "jurisdiction",
+        "authority",
+        "official_url",
+        "provider_url",
+        "license"
+      ],
+      "required_secret": null,
+      "scope": {
+        "jurisdiction": "金門縣",
+        "available_data_types": [
+          "縣府與議員提案",
+          "請願",
+          "臨時動議"
+        ],
+        "transcripts": "僅本機索引，不進 D1；W2 盤點官方供應方式"
+      },
+      "capacity_estimate_mb": null,
+      "verified_at": "2026-11-15",
+      "notes": [
+        "來源：#247 NATIONAL_COUNCIL_EXPANSION.md 第二節（2026-11-15 盤點）；未重新連網查證。",
+        "rights_note 照錄總表網站文字；總表未提供本議會宣告頁精確網址，license_source_url 留 null。",
+        "議案筆數與容量未知，W2 盤點；null 不代表零，容量另計全域預留。",
+        "HTML 表單需 AntiForgery token；總表稱與桃園相同：著作權法第 9 條標的可自由利用，其餘需合理使用或授權。"
+      ],
+      "official_url": "https://agenda.kmcc.gov.tw/CouncilManage/AgendaBill",
+      "official_system_urls": [
+        "https://agenda.kmcc.gov.tw/CouncilManage/AgendaBill"
+      ],
+      "preflight_url": "https://agenda.kmcc.gov.tw/CouncilManage/AgendaBill",
+      "known_bill_count": null,
+      "runner": "github-actions",
+      "documented_open_api": false
+    },
+    {
+      "national_source_id": "N-COUNCIL-LIE",
+      "provider": "連江縣議會",
+      "official_authority": "連江縣議會",
+      "tier": "REFERENCE",
+      "status": "PLANNED_HTML",
+      "transport": "HTML_FILES",
+      "endpoints": [
+        "https://www.mtcc.gov.tw/"
+      ],
+      "allowed_hosts": [
+        "https://www.mtcc.gov.tw"
+      ],
+      "official_url_hosts": [
+        "https://www.mtcc.gov.tw"
+      ],
+      "robots": {
+        "status": "NO_ROBOTS_RESOURCE",
+        "failure_disallow_prefixes": [
+          "/"
+        ],
+        "url": "https://www.mtcc.gov.tw/robots.txt",
+        "observed_text": "HTTP 404",
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 404
+      },
+      "min_request_interval_seconds": 3,
+      "license": "非開放授權；依網站條款",
+      "license_source_url": null,
+      "rights_note": "All rights reserved",
+      "rights_class": "METADATA_ONLY",
+      "public_fields": [
+        "title",
+        "case_number",
+        "event_date",
+        "jurisdiction",
+        "authority",
+        "official_url",
+        "provider_url",
+        "license"
+      ],
+      "required_secret": null,
+      "scope": {
+        "jurisdiction": "連江縣",
+        "available_data_types": [
+          "提案（每位議員一則公告）",
+          "議事錄",
+          "會議紀錄",
+          "影音"
+        ],
+        "transcripts": "僅本機索引，不進 D1；W2 盤點官方供應方式"
+      },
+      "capacity_estimate_mb": null,
+      "verified_at": "2026-11-15",
+      "notes": [
+        "來源：#247 NATIONAL_COUNCIL_EXPANSION.md 第二節（2026-11-15 盤點）；未重新連網查證。",
+        "rights_note 照錄總表網站文字；總表未提供本議會宣告頁精確網址，license_source_url 留 null。",
+        "議案筆數與容量未知，W2 盤點；null 不代表零，容量另計全域預留。"
+      ],
+      "official_url": "https://www.mtcc.gov.tw/",
+      "official_system_urls": [
+        "https://www.mtcc.gov.tw/"
+      ],
+      "preflight_url": "https://www.mtcc.gov.tw/",
+      "known_bill_count": null,
+      "runner": "github-actions",
+      "documented_open_api": false
+    },
+    {
+      "national_source_id": "N-LY-ID20-BILLS",
+      "provider": "立法院開放資料服務平台",
+      "official_authority": "立法院開放資料服務平台",
+      "tier": "REFERENCE",
+      "status": "IMPLEMENTED_API",
+      "transport": "OFFICIAL_JSON_API",
+      "endpoints": [
+        "https://data.ly.gov.tw/odw/ID20Action.action?term=11&sessionPeriod=01&page=1&limit=20000&fileType=json"
+      ],
+      "allowed_hosts": [
+        "https://data.ly.gov.tw"
+      ],
+      "official_url_hosts": [
+        "https://data.ly.gov.tw",
+        "https://ppg.ly.gov.tw"
+      ],
+      "robots": {
+        "status": "ROBOTS_SERVER_ERROR_OPEN_API_ALLOWED",
+        "failure_disallow_prefixes": [
+          "/"
+        ],
+        "url": "https://data.ly.gov.tw/robots.txt",
+        "blocked_origins": [
+          "https://ppg.ly.gov.tw"
+        ],
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 500,
+        "observed_text": "HTTP 500"
+      },
+      "min_request_interval_seconds": 3,
+      "license": "政府資料開放授權條款第 1 版",
+      "license_source_url": "https://data.ly.gov.tw/copyprotection.action",
+      "rights_note": "立法院網站資料開放宣告：無償、非專屬、可再授權、需註明出處",
+      "rights_class": "OPEN_METADATA",
+      "public_fields": [
+        "title",
+        "case_number",
+        "event_date",
+        "jurisdiction",
+        "authority",
+        "official_url",
+        "provider_url",
+        "license"
+      ],
+      "required_secret": null,
+      "scope": {
+        "dataset_id": 20,
+        "from_term": 10,
+        "jurisdiction": "立法院",
+        "kind": "ly_bill"
+      },
+      "capacity_estimate_mb": 50,
+      "verified_at": "2026-11-17",
+      "notes": [
+        "ppg 只作官方連結、不連線；robots 全禁，不擷取文件或附件。",
+        "分頁參數無效；每會期只請求一次，sessionPeriod 補零為兩位數，limit=20000。",
+        "ID6 缺口：主對話 2026-11-18 提供第 11 屆 01 會期 74 筆，03、05、06 會期為 0；遇空期輸出 EMPTY_PERIOD，不以第三方補齊。",
+        "W3 已實作；from_term 起逐屆掃完 01–08 會期，某屆 01、02 皆空即視為未開議並停止，最多第 12 屆第 08 會期；本 worker 僅離線驗收，實際連網完整性由主對話驗收。"
+      ],
+      "runner": "github-actions",
+      "documented_open_api": true
+    },
+    {
+      "national_source_id": "N-LY-ID6-INTERP",
+      "provider": "立法院開放資料服務平台",
+      "official_authority": "立法院開放資料服務平台",
+      "tier": "REFERENCE",
+      "status": "IMPLEMENTED_API",
+      "transport": "OFFICIAL_JSON_API",
+      "endpoints": [
+        "https://data.ly.gov.tw/odw/ID6Action.action?term=11&sessionPeriod=01&page=1&limit=20000&fileType=json"
+      ],
+      "allowed_hosts": [
+        "https://data.ly.gov.tw"
+      ],
+      "official_url_hosts": [
+        "https://data.ly.gov.tw",
+        "https://ppg.ly.gov.tw"
+      ],
+      "robots": {
+        "status": "ROBOTS_SERVER_ERROR_OPEN_API_ALLOWED",
+        "failure_disallow_prefixes": [
+          "/"
+        ],
+        "url": "https://data.ly.gov.tw/robots.txt",
+        "blocked_origins": [
+          "https://ppg.ly.gov.tw"
+        ],
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 500,
+        "observed_text": "HTTP 500"
+      },
+      "min_request_interval_seconds": 3,
+      "license": "政府資料開放授權條款第 1 版",
+      "license_source_url": "https://data.ly.gov.tw/copyprotection.action",
+      "rights_note": "立法院網站資料開放宣告：無償、非專屬、可再授權、需註明出處",
+      "rights_class": "OPEN_METADATA",
+      "public_fields": [
+        "title",
+        "case_number",
+        "event_date",
+        "jurisdiction",
+        "authority",
+        "official_url",
+        "provider_url",
+        "license"
+      ],
+      "required_secret": null,
+      "scope": {
+        "dataset_id": 6,
+        "from_term": 10,
+        "jurisdiction": "立法院",
+        "kind": "ly_interp"
+      },
+      "capacity_estimate_mb": 5,
+      "verified_at": "2026-11-17",
+      "notes": [
+        "ppg 只作官方連結、不連線；robots 全禁，不擷取文件或附件。",
+        "分頁參數無效；每會期只請求一次，sessionPeriod 補零為兩位數，limit=20000。",
+        "ID6 缺口：主對話 2026-11-18 提供第 11 屆 01 會期 74 筆，03、05、06 會期為 0；遇空期輸出 EMPTY_PERIOD，不以第三方補齊。",
+        "W3 已實作；from_term 起逐屆掃完 01–08 會期，某屆 01、02 皆空即視為未開議並停止，最多第 12 屆第 08 會期；本 worker 僅離線驗收，實際連網完整性由主對話驗收。"
+      ],
+      "known_gap": "第 11 屆第 03、05、06 會期官方回空（2026-11-18 主對話提供）",
+      "runner": "github-actions",
+      "documented_open_api": true
+    },
+    {
+      "national_source_id": "N-PCC-WEB",
+      "provider": "行政院公共工程委員會政府電子採購網",
+      "official_authority": "行政院公共工程委員會政府電子採購網",
+      "tier": "DISCOVERY_ONLY",
+      "status": "IMPLEMENTED_HTML",
+      "transport": "HTML",
+      "endpoints": [
+        "https://web.pcc.gov.tw/prkms/tender/common/basic/readTenderBasic",
+        "https://web.pcc.gov.tw/prkms/tender/common/bulletion/readBulletion"
+      ],
+      "allowed_hosts": [
+        "https://web.pcc.gov.tw"
+      ],
+      "official_url_hosts": [
+        "https://web.pcc.gov.tw"
+      ],
+      "robots": {
+        "status": "NO_ROBOTS_RESOURCE",
+        "failure_disallow_prefixes": [
+          "/"
+        ],
+        "url": "https://web.pcc.gov.tw/robots.txt",
+        "disallow": [],
+        "observed_at": "2026-11-18",
+        "observed_runner": "github-actions",
+        "http_status": 302,
+        "observed_text": "HTTP 302; Location: http://web.pcc.gov.tw/pis; redirect not followed.",
+        "absent_when_redirect_to": "http://web.pcc.gov.tw/pis"
+      },
+      "min_request_interval_seconds": 3,
+      "license": "採購網著作權聲明（非開放授權）",
+      "license_source_url": "https://web.pcc.gov.tw/",
+      "rights_note": "採購網著作權聲明（非開放授權）；聲明精確頁址與逐條原文待核",
+      "rights_class": "RESTRICTED_METADATA_ONLY",
+      "public_fields": [
+        "title",
+        "case_number",
+        "event_date",
+        "jurisdiction",
+        "authority",
+        "official_url",
+        "provider_url",
+        "license"
+      ],
+      "required_secret": null,
+      "scope": {
+        "authority_contains_any": [
+          "警察",
+          "消防",
+          "交通局"
+        ],
+        "authority_startswith_any": [
+          "臺中市政府"
+        ],
+        "mode": "官方公告檢索網頁 HTML",
+        "months": 24,
+        "daily_months": 2
+      },
+      "capacity_estimate_mb": 40,
+      "verified_at": "2026-11-18",
+      "notes": [
+        "W4 僅存標案中繼資料與官方連結；不存廠商、金額、地址、電話、聯絡人，不請求 pk 詳情頁。",
+        "本機受 WAF 阻擋；runner 使用 github-actions。2026-11-18 主對話 runner 原始回應為依據，本 worker 僅離線驗收。",
+        "官方 XML 推定為 GPA 適用標案子集，不代表全量；每月 5 日產出兩個月前資料。近半年 GPA JSON 是相同子集，未另行實作。",
+        "招標日期一律切成單月窗口；實測 1／3 個月可用、1 年被拒；決標依公告日期排序，讀至窗口外即停。"
+      ],
+      "runner": "github-actions",
+      "documented_open_api": false
+    },
+    {
+      "national_source_id": "N-PCC-GPA",
+      "provider": "政府電子採購網／政府資料開放平臺",
+      "official_authority": "政府電子採購網／政府資料開放平臺",
+      "tier": "REFERENCE",
+      "status": "IMPLEMENTED_API",
+      "transport": "OFFICIAL_XML",
+      "endpoints": [
+        "https://web.pcc.gov.tw/tps/tp/OpenData/downloadFile?fileName=tender_YYYYMM02.xml",
+        "https://web.pcc.gov.tw/tps/tp/OpenData/downloadFile?fileName=award_YYYYMM02.xml"
+      ],
+      "allowed_hosts": [
+        "https://web.pcc.gov.tw"
+      ],
+      "official_url_hosts": [
+        "https://web.pcc.gov.tw"
+      ],
+      "robots": {
+        "status": "NO_ROBOTS_RESOURCE",
+        "failure_disallow_prefixes": [
+          "/"
+        ],
+        "url": "https://web.pcc.gov.tw/robots.txt",
+        "disallow": [],
+        "observed_at": "2026-11-18",
+        "observed_runner": "github-actions",
+        "http_status": 302,
+        "observed_text": "HTTP 302; Location: http://web.pcc.gov.tw/pis; redirect not followed.",
+        "absent_when_redirect_to": "http://web.pcc.gov.tw/pis"
+      },
+      "min_request_interval_seconds": 3,
+      "license": "政府資料開放授權條款第 1 版",
+      "license_source_url": "https://web.pcc.gov.tw/tps/tp/OpenData/showList",
+      "rights_note": "政府資料開放授權條款第 1 版",
+      "rights_class": "OPEN_METADATA",
+      "public_fields": [
+        "title",
+        "case_number",
+        "event_date",
+        "jurisdiction",
+        "authority",
+        "official_url",
+        "provider_url",
+        "license"
+      ],
+      "required_secret": null,
+      "scope": {
+        "dataset_ids": [
+          172020,
+          172023
+        ],
+        "coverage": "推定為 GPA 招標／決標子集；不是全量採購",
+        "authority_contains_any": [
+          "警察",
+          "消防",
+          "交通局"
+        ],
+        "authority_startswith_any": [
+          "臺中市政府"
+        ],
+        "months": 24,
+        "daily_months": 2
+      },
+      "capacity_estimate_mb": 0,
+      "verified_at": "2026-11-18",
+      "notes": [
+        "W4 僅存標案中繼資料與官方連結；不存廠商、金額、地址、電話、聯絡人，不請求 pk 詳情頁。",
+        "本機受 WAF 阻擋；runner 使用 github-actions。2026-11-18 主對話 runner 原始回應為依據，本 worker 僅離線驗收。",
+        "官方 XML 推定為 GPA 適用標案子集，不代表全量；每月 5 日產出兩個月前資料。近半年 GPA JSON 是相同子集，未另行實作。",
+        "招標日期一律切成單月窗口；實測 1／3 個月可用、1 年被拒；決標依公告日期排序，讀至窗口外即停。"
+      ],
+      "runner": "github-actions",
+      "documented_open_api": true
+    },
+    {
+      "national_source_id": "N-ODP-CATALOG",
+      "provider": "政府資料開放平臺 data.gov.tw",
+      "official_authority": "六都各資料提供機關",
+      "tier": "REFERENCE",
+      "transport": "HTTPS_CSV",
+      "endpoints": [
+        "https://data.gov.tw/datasets/export/csv",
+        "https://data.gov.tw/api/v2/rest/dataset/6564"
+      ],
+      "allowed_hosts": [
+        "https://data.gov.tw"
+      ],
+      "official_url_hosts": [
+        "https://data.gov.tw"
+      ],
+      "robots": {
+        "status": "ROBOTS_SERVER_ERROR_OPEN_API_ALLOWED",
+        "blocked_origins": [
+          "https://data.kcg.gov.tw",
+          "https://data.tainan.gov.tw"
+        ],
+        "blocked_origins_disallow": [
+          "/"
+        ],
+        "failure_disallow_prefixes": [
+          "/"
+        ],
+        "url": "https://data.gov.tw/robots.txt",
+        "observed_at": "2026-11-17",
+        "observed_runner": "github-actions",
+        "http_status": 500,
+        "observed_text": "HTTP 500"
+      },
+      "min_request_interval_seconds": 3,
+      "license": "依各資料集授權欄位；未確認者不推定為開放授權",
+      "license_source_url": "https://data.gov.tw/dataset/6564",
+      "rights_class": "METADATA_ONLY",
+      "public_fields": [
+        "title",
+        "case_number",
+        "event_date",
+        "jurisdiction",
+        "authority",
+        "official_url",
+        "provider_url",
+        "license"
+      ],
+      "required_secret": null,
+      "scope": {
+        "jurisdictions": [
+          "臺北市",
+          "新北市",
+          "桃園市",
+          "臺中市",
+          "臺南市",
+          "高雄市"
+        ],
+        "keywords": [
+          "警察",
+          "消防",
+          "交通",
+          "治安"
+        ],
+        "metadata_only": true,
+        "crawl_city_portals": false,
+        "dataset_id": 6564,
+        "resource_policy": "資料本身只從各機關官方資源網址取得；逐一核准 host 與 robots，禁止轉往第三方或被禁入口"
+      },
+      "capacity_estimate_mb": 2,
+      "verified_at": "2026-11-17",
+      "notes": [
+        "2026-11-17 提供紀錄：全國清單 68.9MB、52,609 筆、每日更新；本輪未重測。",
+        "六都命中：北 234、新北 266、桃 178、中 610、南 228、高 792；約 2,300 筆 metadata 預留 2MB。",
+        "data.kcg.gov.tw 與 data.tainan.gov.tw robots 全禁；不爬入口，同 host 的資源亦不抓，待同意或官方其他資源位置。",
+        "2026-11-18 主對話實測：CSV 全量約 69MB、UTF-8 BOM，chunked 且 Content-Type 錯標 text/html；以暫存檔串流解析，限制 100MiB。",
+        "CSV 欄位可含換行，多資源的網址／格式／編碼以 ; 串接且可能有結尾分號；沒有可匿名使用的列表或增量 API。",
+        "只收六都市政府提供且名稱含指定關鍵字的中繼資料；不存聯絡人、電話、描述、下載網址，不連資源或各市入口。"
+      ],
+      "status": "IMPLEMENTED_API",
+      "rights_note": "依各資料集授權欄位；未確認者不推定為開放授權",
+      "runner": "github-actions",
+      "documented_open_api": true
+    },
+    {
+      "national_source_id": "N-TDX-EVENTS",
+      "provider": "交通部 TDX",
+      "official_authority": "交通部／六都交通主管機關",
+      "tier": "REFERENCE",
+      "transport": "HTTPS_OAUTH2",
+      "endpoints": [
+        "https://tdx.transportdata.tw/auth/realms/TDXConnect/protocol/openid-connect/token",
+        "https://tdx.transportdata.tw/api/basic/v1/Traffic/RoadEvent/LiveEvent/City/{City}?$format=JSON&$top=1000"
+      ],
+      "allowed_hosts": [
+        "https://tdx.transportdata.tw"
+      ],
+      "official_url_hosts": [
+        "https://tdx.transportdata.tw"
+      ],
+      "robots": {
+        "status": "HTML_NOT_ROBOTS",
+        "failure_disallow_prefixes": [
+          "/"
+        ],
+        "url": "https://tdx.transportdata.tw/robots.txt",
+        "observed_at": "2026-11-18",
+        "observed_runner": "provided-recon",
+        "http_status": 200,
+        "observed_text": "HTML SPA fallback; supplied raw/tdx/robots.txt"
+      },
+      "min_request_interval_seconds": 13,
+      "license": "待確認 TDX 服務及資料授權條款",
+      "license_source_url": "https://tdx.transportdata.tw/term",
+      "rights_class": "METADATA_ONLY",
+      "public_fields": [
+        "title",
+        "case_number",
+        "event_date",
+        "jurisdiction",
+        "authority",
+        "official_url",
+        "provider_url",
+        "license"
+      ],
+      "required_secret": "TDX_CLIENT_ID+TDX_CLIENT_SECRET",
+      "scope": {
+        "jurisdictions": "六都",
+        "kind": "traffic_event",
+        "retention_days": 30,
+        "missing_secret_status": "NOT_CONFIGURED"
+      },
+      "capacity_estimate_mb": 1,
+      "verified_at": "2026-11-17",
+      "notes": [
+        "1MB 為預留，實際用量待 W5；未設定憑證時不得呼叫事件 API。",
+        "W0 只探測根路徑，不申請憑證。",
+        "2026-11-18 主對話實測：匿名 LiveEvent 回 401（純文字）；token 成功回應尚未實測。",
+        "條款依政府資料開放授權條款並要求標示來源。收費要點（113-03-22 修正）：基礎會員免費、每月 3 點，不需綁卡，點數用完只停用到月底；本端點屬基礎服務（1,500 次/點），六都每日 1 輪約 0.12 點/月。基礎會員速率 5 次/分/金鑰，故請求間隔 13 秒。2026-11-18 查 https://tdx.transportdata.tw/pricing 。",
+        "沒有逐筆官方網址，統一連回 TDX；v2 News 缺高雄，改用 v1 LiveEvent 六都城市頁。",
+        "每次 run 取一次 token；缺任一憑證零請求，回報 NOT_CONFIGURED / MISSING_SECRET；成功後依 retention_days 清除舊資料。"
+      ],
+      "status": "IMPLEMENTED_API",
+      "rights_note": "待確認 TDX 服務及資料授權條款",
+      "runner": "github-actions",
+      "documented_open_api": false
+    },
+    {
+      "national_source_id": "N-TWINKLE-MANUAL",
+      "provider": "TwinkleAI MCP",
+      "official_authority": "依人工查核的原始官方來源",
+      "tier": "DISCOVERY_ONLY",
+      "transport": "MANUAL_MCP",
+      "endpoints": [],
+      "allowed_hosts": [],
+      "official_url_hosts": [],
+      "robots": {
+        "status": "NOT_APPLICABLE",
+        "failure_disallow_prefixes": [
+          "/"
+        ]
+      },
+      "min_request_interval_seconds": 0,
+      "license": "未確認，不授權自動化",
+      "license_source_url": null,
+      "rights_class": "MANUAL_REFERENCE_ONLY",
+      "public_fields": [
+        "title",
+        "case_number",
+        "event_date",
+        "jurisdiction",
+        "authority",
+        "official_url",
+        "provider_url",
+        "license"
+      ],
+      "required_secret": null,
+      "scope": {
+        "automated": false,
+        "purpose": "開發時人工交叉驗證工具"
+      },
+      "capacity_estimate_mb": 0,
+      "verified_at": "2026-11-17",
+      "notes": [
+        "綁定使用者 session，無法部署到 Actions；帳號需要重新驗證。",
+        "授權與額度無文件記載；Twinkle 與官方路徑算同一個來源，不是獨立佐證。"
+      ],
+      "status": "MANUAL_ONLY",
+      "rights_note": "未確認，不授權自動化",
+      "runner": "github-actions",
+      "documented_open_api": false
+    }
+  ]
+}

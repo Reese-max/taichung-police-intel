@@ -1,0 +1,69 @@
+name: National data layer preflight
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/national-preflight.yml'
+      - 'national/**'
+      - 'docs/govintel/national-sources.v1.json'
+      - 'scripts/national-preflight.py'
+      - 'scripts/national-sources.py'
+      - 'tests/test_national_sources.py'
+permissions:
+  contents: read
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Validate official source registry
+        run: python -X utf8 scripts/national-sources.py --self-check
+      - name: Probe 22 official councils and national sources after robots checks
+        run: python -X utf8 scripts/national-preflight.py --output preflight-reports/egress.json
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Read-only D1 permission probe
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          npm_config_yes: 'true'
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+
+          report = {"status": "NOT_CONFIGURED", "can_list": False, "database_count": None}
+          if os.environ.get("CLOUDFLARE_API_TOKEN"):
+              try:
+                  result = subprocess.run(
+                      ["npx", "wrangler@4", "d1", "list", "--json"],
+                      capture_output=True, text=True, timeout=120, check=False,
+                  )
+                  report["exit_code"] = result.returncode
+                  databases = json.loads(result.stdout) if result.returncode == 0 else None
+                  if not isinstance(databases, list):
+                      report["status"] = "LIST_FAILED"
+                  else:
+                      report.update(status="PASS", can_list=True, database_count=len(databases))
+              except (OSError, subprocess.TimeoutExpired, ValueError):
+                  report["status"] = "LIST_FAILED"
+          output = Path("preflight-reports/d1-permissions.json")
+          output.parent.mkdir(parents=True, exist_ok=True)
+          output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+          print(json.dumps(report))
+          PY
+      - name: Upload preflight reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: national-preflight-${{ github.run_id }}
+          path: preflight-reports/*.json
+          if-no-files-found: warn
+          retention-days: 14
