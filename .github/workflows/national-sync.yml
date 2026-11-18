@@ -1,0 +1,58 @@
+name: Sync national metadata
+
+on:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+    inputs:
+      backfill:
+        description: Backfill the full PCC web window
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: govintel-national-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: vars.NATIONAL_SYNC_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ inputs.backfill && 180 || 30 }}
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: '03d40efd3c60181edea80af8d927ddc1'
+      NATIONAL_RUNNER: github-actions
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: Install pinned Wrangler
+        run: npm install --global wrangler@4.149.0
+      - name: Apply idempotent schema
+        run: python -X utf8 scripts/national-sync.py --store d1-remote --apply-schema --report reports/national/schema.json
+      - name: Check capacity and UTC daily budget
+        run: python -X utf8 scripts/national-sync.py --store d1-remote --check-guards --report reports/national/guards.json
+      - name: Sync sources with configured adapters
+        env:
+          TDX_CLIENT_ID: ${{ secrets.TDX_CLIENT_ID }}
+          TDX_CLIENT_SECRET: ${{ secrets.TDX_CLIENT_SECRET }}
+          PCC_BACKFILL: ${{ github.event_name == 'workflow_dispatch' && inputs.backfill }}
+        run: |
+          args=()
+          if [ "$PCC_BACKFILL" = "true" ]; then args+=(--backfill); fi
+          python -X utf8 scripts/national-sync.py --store d1-remote --report reports/national/sync.json "${args[@]}"
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: national-sync-${{ github.run_id }}
+          path: reports/national/
+          if-no-files-found: warn

@@ -1,0 +1,11 @@
+
+
+  {
+  "dataList": [
+    {"term":"10","sessionPeriod":"01","sessionTimes":"2","meetingTimes":"1","billNo":"B100","billName":"舊版議案","billOrg":"立法院","billProposer":"測試提案人","billCosignatory":"禁止儲存連署人","billStatus":"交付審查","pdfUrl":"https://ppg.ly.gov.tw/ppg/bills/B100.pdf","docUrl":"https://ppg.ly.gov.tw/forbidden.doc"},
+    {"term":"10","sessionPeriod":"01","sessionTimes":"10","billNo":"B100","billName":"較新議案","billOrg":"立法院","pdfUrl":"https://ppg.ly.gov.tw/ppg/bills/B100.pdf"},
+    {"term":"10","sessionPeriod":"01","sessionTimes":"10","billNo":"B100","billName":"同次會議最後版本","billOrg":"內政委員會","pdfUrl":"https://ppg.ly.gov.tw/ppg/bills/B100.pdf"},
+    {"term":"10","sessionPeriod":"01","sessionTimes":"3","billNo":"B100","billName":"較低次數不得覆蓋","billOrg":"立法院"},
+    {"term":"10","sessionPeriod":"01","sessionTimes":"1","billNo":"B200","billName":"改善通學安全","billOrg":"行政院","pdfUrl":"http://ppg.ly.gov.tw/unsafe.pdf","docUrl":"https://ppg.ly.gov.tw/forbidden.doc"}
+  ]
+}

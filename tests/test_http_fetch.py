@@ -62,6 +62,56 @@ class HttpFetchTests(unittest.TestCase):
         self.assertEqual(session.get.call_count, 4)
         self.assertEqual(session.get.call_args_list[0].kwargs, {"timeout": 60, "allow_redirects": False})
 
+    def test_post_never_follows_any_redirect(self):
+        for status in (300, 301, 302, 303, 304, 307, 308):
+            reply = response(status, headers={"Location": "/next"})
+            session = Mock(post=Mock(return_value=reply))
+            with self.subTest(status=status), self.assertRaisesRegex(RuntimeError, "POST redirect forbidden"):
+                http.get(session, URL, HOSTS, method="POST", json_body={})
+            session.post.assert_called_once_with(URL, json={}, timeout=60, allow_redirects=False)
+            session.get.assert_not_called()
+            reply.close.assert_called()
+
+    def test_post_reuses_transport_guards_and_retry(self):
+        session = Mock(post=Mock(side_effect=[response(503), response(body=b"{}")]))
+        with patch.object(http.time, "sleep"):
+            self.assertEqual(http.get(session, URL, HOSTS, method="POST", json_body={}, max_bytes=2).content, b"{}")
+        self.assertEqual(session.post.call_count, 2)
+        self.assertTrue(session.post.call_args.kwargs["stream"])
+        with self.assertRaisesRegex(ValueError, "max_bytes"):
+            http.get(Mock(post=Mock(return_value=response(body=b"123"))), URL, HOSTS, method="POST", max_bytes=2)
+        blocked = Mock()
+        with self.assertRaises(http.RobotsDisallowed):
+            http.get(blocked, URL, HOSTS, method="POST", robots_policy=http.RobotsPolicy(
+                Mock(return_value="User-agent: *\nDisallow: /")))
+        blocked.post.assert_not_called()
+        with self.assertRaises(RuntimeError):
+            http.get(blocked, "https://outside.test/", HOSTS, method="POST")
+        with self.assertRaises(ValueError):
+            http.get(blocked, URL, HOSTS, method="DELETE")
+
+    def test_form_post_encoding_exclusion_and_redirect_guard(self):
+        form = {"__VIEWSTATE": "a+b/=", "query": "臺灣 & 空白"}
+        session = Mock(post=Mock(return_value=response()))
+        http.get(session, URL, HOSTS, method="POST", form_body=form)
+        session.post.assert_called_once_with(URL, data=form, timeout=60, allow_redirects=False)
+        prepared = requests.Request("POST", URL, data=session.post.call_args.kwargs["data"]).prepare()
+        from urllib.parse import parse_qs
+        self.assertEqual(prepared.headers["Content-Type"], "application/x-www-form-urlencoded")
+        self.assertEqual(parse_qs(prepared.body), {k: [v] for k, v in form.items()})
+        for kwargs in ({"method": "POST", "json_body": {}}, {"method": "GET"}):
+            blocked = Mock()
+            with self.assertRaisesRegex(ValueError, "form_body"):
+                http.get(blocked, URL, HOSTS, form_body=form, **kwargs)
+            blocked.post.assert_not_called()
+            blocked.get.assert_not_called()
+        for status in (301, 302, 303, 307, 308):
+            session = Mock(post=Mock(return_value=response(status, headers={"Location": "/next"})))
+            with self.assertRaisesRegex(RuntimeError, "POST redirect forbidden"):
+                http.get(session, URL, HOSTS, method="POST", form_body=form)
+            self.assertEqual(session.post.call_count, 1)
+            session.get.assert_not_called()
+
     def test_success_after_three_redirects_and_response_url_revalidated(self):
         replies = [response(302, headers={"Location": "/next"}) for _ in range(3)]
         session = Mock(get=Mock(side_effect=replies + [response(url="https://official.test/next")]))

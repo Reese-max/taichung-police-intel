@@ -20,6 +20,19 @@ A real isolated artifact packaging failure and upload recovery both delivered co
 
 The organizer confirmed supplement receipt on October 5 and did not accept renaming. Original registration title, representative eligibility, dataset requirements and team/IP approvals still need actual evidence. Do not claim 100–200 new items/day or turn the proposal's 85%/90%/30% goals into results.
 
+## 全國資料層與 `/national/`
+
+`/national/` 提供獨立的全國中繼資料搜尋入口，可依關鍵字、縣市／機關、類型與日期篩選，
+每頁 20 筆，以「載入更多」續查。只顯示標題、案號、日期、機關、授權等中繼資料與官方連結，
+不公開全文、摘錄或逐字稿，也不是治理回答的唯一證據；不取代既有發布與治理資料鏈。
+
+建置時以 `NEXT_PUBLIC_QUERY_GATEWAY_URL` 指定 Query Gateway（根網址或既有 `/query` 網址），
+頁面透過 `GET /national/search` 查詢；未設定時顯示服務未設定，不發出請求。
+資料層採每日更新，部分來源有每日寫入上限，首次回填需要數天；TDX 未設定金鑰，
+來源登記不代表已完成匯入或可查到資料，503 也不等於零筆結果。本節不宣稱已部署或完成遠端驗收。
+來源、存取限制及取得方式見[全國資料層](docs/govintel/NATIONAL_DATA_LAYER.md)、
+[來源登記](docs/govintel/national-sources.v1.json)與[資料來源策略](docs/govintel/DATA_SOURCE_STRATEGY.md#全國資料層)。
+
 ## Quick judge path
 
 1. Read the [current status and claim/evidence table](./docs/govintel/competition-2026/CURRENT_STATUS.md).

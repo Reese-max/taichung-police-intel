@@ -1,0 +1,189 @@
+{
+  "provenance": "Reduced from 2026-11-18 proc-detail-83bac000.json and proc-p2-s100.json. First meeting retains two actual duplicate speeches; deleted flag is synthetic. Second detail is a synthetic envelope around three raw list excerpts (full second detail was unavailable). Pagination totals are reduced test data.",
+  "rows": [
+    {
+      "proceedingsId": "83bac000-07ee-44c8-b7ec-ddd06fd35f6d",
+      "term": 4,
+      "subTerm": 8,
+      "sessionType": "定期會",
+      "sessionDisplay": "第4屆第8次定期會",
+      "meetingTypeName": "大會",
+      "name": "第8次會議",
+      "date": "2026-08-10T07:18:00",
+      "speaker": "翁議政顧問文德",
+      "content": "奉議長指示向大會報告，現在簽到議員人數已達法定開會額數，現在請主席宣布開會。"
+    },
+    {
+      "proceedingsId": "83bac000-07ee-44c8-b7ec-ddd06fd35f6d",
+      "term": 4,
+      "subTerm": 8,
+      "sessionType": "定期會",
+      "sessionDisplay": "第4屆第8次定期會",
+      "meetingTypeName": "大會",
+      "name": "第8次會議",
+      "date": "2026-08-10T07:18:00",
+      "speaker": "主席(張議長清照)",
+      "content": "再來請陳淑華議員發言。"
+    },
+    {
+      "proceedingsId": "83bac000-07ee-44c8-b7ec-ddd06fd35f6d",
+      "term": 4,
+      "subTerm": 8,
+      "sessionType": "定期會",
+      "sessionDisplay": "第4屆第8次定期會",
+      "meetingTypeName": "大會",
+      "name": "第8次會議",
+      "date": "2026-08-10T07:18:00",
+      "speaker": "主席(張議長清照)",
+      "content": "再來請陳淑華議員發言。"
+    },
+    {
+      "proceedingsId": "9780d4c9-aea6-470e-9bbb-389b501c6f67",
+      "term": 4,
+      "subTerm": 8,
+      "sessionType": "定期會",
+      "sessionDisplay": "第4屆第8次定期會",
+      "meetingTypeName": "各委員會審查議案",
+      "name": "都發建設水利委員會",
+      "date": "2026-08-06T07:15:00",
+      "speaker": "主席(施召集人志昌)",
+      "content": "好，臺中市議會第4屆第8次定期會，都建水委員會宣布開會，都發局李局長、建設局陳局"
+    },
+    {
+      "proceedingsId": "9780d4c9-aea6-470e-9bbb-389b501c6f67",
+      "term": 4,
+      "subTerm": 8,
+      "sessionType": "定期會",
+      "sessionDisplay": "第4屆第8次定期會",
+      "meetingTypeName": "各委員會審查議案",
+      "name": "都發建設水利委員會",
+      "date": "2026-08-06T07:15:00",
+      "speaker": "都發建設水利委員會",
+      "content": "114年度臺中市總決算暨附屬單位決算及綜計表審核報告，有關都市發展局、建設局、水"
+    },
+    {
+      "proceedingsId": "9780d4c9-aea6-470e-9bbb-389b501c6f67",
+      "term": 4,
+      "subTerm": 8,
+      "sessionType": "定期會",
+      "sessionDisplay": "第4屆第8次定期會",
+      "meetingTypeName": "各委員會審查議案",
+      "name": "都發建設水利委員會",
+      "date": "2026-08-06T07:15:00",
+      "speaker": "主席(施召集人志昌)",
+      "content": "好，現在請都發局李局長，針對決算審核報告做簡要說明。"
+    }
+  ],
+  "details": {
+    "83bac000-07ee-44c8-b7ec-ddd06fd35f6d": {
+      "success": true,
+      "message": "",
+      "data": {
+        "proceedingsId": "83bac000-07ee-44c8-b7ec-ddd06fd35f6d",
+        "term": 4,
+        "subTerm": 8,
+        "sessionType": 1,
+        "sessionDisplay": "第4屆第8次定期會",
+        "date": "中華民國115年08月10日星期一",
+        "name": "第8次會議",
+        "record": "洪怡芳",
+        "meetingTypeName": "大會",
+        "proceedingContents": [
+          {
+            "proceedingContentId": null,
+            "seq": 0,
+            "speaker": {
+              "id": null,
+              "name": "翁議政顧問文德"
+            },
+            "isProofread": false,
+            "content": "奉議長指示向大會報告，現在簽到議員人數已達法定開會額數，現在請主席宣布開會。",
+            "isDeleted": false
+          },
+          {
+            "proceedingContentId": null,
+            "seq": 0,
+            "speaker": {
+              "id": null,
+              "name": "主席(張議長清照)"
+            },
+            "isProofread": false,
+            "content": "再來請陳淑華議員發言。",
+            "isDeleted": false
+          },
+          {
+            "proceedingContentId": null,
+            "seq": 0,
+            "speaker": {
+              "id": null,
+              "name": "主席(張議長清照)"
+            },
+            "isProofread": false,
+            "content": "盧市長、黃副市長、市府各機關首長、本會議員同仁、各位媒體記者朋友，大家好，現在開始開會。",
+            "isDeleted": true
+          },
+          {
+            "proceedingContentId": null,
+            "seq": 0,
+            "speaker": {
+              "id": null,
+              "name": "主席(張議長清照)"
+            },
+            "isProofread": false,
+            "content": "再來請陳淑華議員發言。",
+            "isDeleted": false
+          }
+        ]
+      }
+    },
+    "9780d4c9-aea6-470e-9bbb-389b501c6f67": {
+      "success": true,
+      "message": "",
+      "data": {
+        "proceedingsId": "9780d4c9-aea6-470e-9bbb-389b501c6f67",
+        "term": 4,
+        "subTerm": 8,
+        "sessionType": 1,
+        "sessionDisplay": "第4屆第8次定期會",
+        "meetingTypeName": "各委員會審查議案",
+        "name": "都發建設水利委員會",
+        "date": "中華民國115年08月06日星期四",
+        "proceedingContents": [
+          {
+            "proceedingContentId": null,
+            "seq": 0,
+            "speaker": {
+              "id": null,
+              "name": "主席(施召集人志昌)"
+            },
+            "isProofread": false,
+            "content": "好，臺中市議會第4屆第8次定期會，都建水委員會宣布開會，都發局李局長、建設局陳局",
+            "isDeleted": false
+          },
+          {
+            "proceedingContentId": null,
+            "seq": 0,
+            "speaker": {
+              "id": null,
+              "name": "都發建設水利委員會"
+            },
+            "isProofread": false,
+            "content": "114年度臺中市總決算暨附屬單位決算及綜計表審核報告，有關都市發展局、建設局、水",
+            "isDeleted": false
+          },
+          {
+            "proceedingContentId": null,
+            "seq": 0,
+            "speaker": {
+              "id": null,
+              "name": "主席(施召集人志昌)"
+            },
+            "isProofread": false,
+            "content": "好，現在請都發局李局長，針對決算審核報告做簡要說明。",
+            "isDeleted": false
+          }
+        ]
+      }
+    }
+  }
+}
