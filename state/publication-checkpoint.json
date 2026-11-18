@@ -11,9 +11,85 @@
     "state/v2-shadow-state.json": "fd3fc1d1729a55a13408ec09a170502991a2588935f8464f119212c8c891c846"
   },
   "generation_id": "e4166be61b2ba126aab77f90e83045db27362aace1c52e827b9d8880cacc76d7",
+  "http_verification": {
+    "attempt": 1,
+    "base_url": "https://reese-max.github.io/taichung-police-intel/",
+    "generation_id": "e4166be61b2ba126aab77f90e83045db27362aace1c52e827b9d8880cacc76d7",
+    "verification_attempts": [
+      {
+        "attempt": 1,
+        "elapsed_seconds": 0.65,
+        "files": [
+          {
+            "age": "0",
+            "budget_exceeded": false,
+            "expected_sha256": "fff38d6dbbc847046fad1834b7e1697117639da563dd21294fe7341fe157f453",
+            "http_status": 200,
+            "last_modified": "Wed, 18 Nov 2026 03:55:41 GMT",
+            "observed_sha256": "fff38d6dbbc847046fad1834b7e1697117639da563dd21294fe7341fe157f453",
+            "oversized": false,
+            "path": "data/source-status.json",
+            "received_bytes": 15726
+          },
+          {
+            "age": "0",
+            "budget_exceeded": false,
+            "expected_sha256": "97266d8e48f7d70a7bb3fff19e72e14f68649048b8a776061642d2d8f8b1e6b0",
+            "http_status": 200,
+            "last_modified": "Wed, 18 Nov 2026 03:55:41 GMT",
+            "observed_sha256": "97266d8e48f7d70a7bb3fff19e72e14f68649048b8a776061642d2d8f8b1e6b0",
+            "oversized": false,
+            "path": "data/intelligence-feed.json",
+            "received_bytes": 181625
+          },
+          {
+            "age": "0",
+            "budget_exceeded": false,
+            "expected_sha256": "7debab86754b5f0550b09d6ee5743a8495bf679ad23b2cb506c7393472ac5fd2",
+            "http_status": 200,
+            "last_modified": "Wed, 18 Nov 2026 03:55:41 GMT",
+            "observed_sha256": "7debab86754b5f0550b09d6ee5743a8495bf679ad23b2cb506c7393472ac5fd2",
+            "oversized": false,
+            "path": "data/intelligence-summary.json",
+            "received_bytes": 7082
+          },
+          {
+            "age": "0",
+            "budget_exceeded": false,
+            "expected_sha256": "86d054d34783dbe9b73d668d658adfd7fe90f72eb4a8562c87ec1164ba51a052",
+            "http_status": 200,
+            "last_modified": "Wed, 18 Nov 2026 03:55:41 GMT",
+            "observed_sha256": "86d054d34783dbe9b73d668d658adfd7fe90f72eb4a8562c87ec1164ba51a052",
+            "oversized": false,
+            "path": "data/feed-export.csv",
+            "received_bytes": 63565
+          },
+          {
+            "age": "0",
+            "budget_exceeded": false,
+            "expected_sha256": "9aeae25fef276ecc344cdbc6ccd09d439cca99613a4a7c4899bf7e2c0cd9ddf9",
+            "http_status": 200,
+            "last_modified": "Wed, 18 Nov 2026 03:55:41 GMT",
+            "observed_sha256": "9aeae25fef276ecc344cdbc6ccd09d439cca99613a4a7c4899bf7e2c0cd9ddf9",
+            "oversized": false,
+            "path": "data/v2-daily-brief.json",
+            "received_bytes": 37911
+          }
+        ]
+      }
+    ],
+    "verified_at": "2026-11-18T03:55:47.468201+00:00",
+    "verified_files": {
+      "apps/web/public/data/feed-export.csv": "86d054d34783dbe9b73d668d658adfd7fe90f72eb4a8562c87ec1164ba51a052",
+      "apps/web/public/data/intelligence-feed.json": "97266d8e48f7d70a7bb3fff19e72e14f68649048b8a776061642d2d8f8b1e6b0",
+      "apps/web/public/data/intelligence-summary.json": "7debab86754b5f0550b09d6ee5743a8495bf679ad23b2cb506c7393472ac5fd2",
+      "apps/web/public/data/source-status.json": "fff38d6dbbc847046fad1834b7e1697117639da563dd21294fe7341fe157f453",
+      "apps/web/public/data/v2-daily-brief.json": "9aeae25fef276ecc344cdbc6ccd09d439cca99613a4a7c4899bf7e2c0cd9ddf9"
+    }
+  },
   "producer_attempt": "1",
   "producer_run_id": "44232848090",
   "schema_version": 1,
   "slot": "morning",
-  "state": "PENDING_PUBLICATION"
+  "state": "PUBLISHED"
 }
