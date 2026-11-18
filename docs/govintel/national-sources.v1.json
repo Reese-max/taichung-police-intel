@@ -1636,6 +1636,7 @@
       "scope": {
         "dataset_id": 20,
         "from_term": 10,
+        "jurisdiction": "立法院",
         "kind": "ly_bill"
       },
       "capacity_estimate_mb": 50,
@@ -1699,6 +1700,7 @@
       "scope": {
         "dataset_id": 6,
         "from_term": 10,
+        "jurisdiction": "立法院",
         "kind": "ly_interp"
       },
       "capacity_estimate_mb": 5,

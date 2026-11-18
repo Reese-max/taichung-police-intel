@@ -88,6 +88,7 @@ class NationalLyTests(unittest.TestCase):
             self.assertEqual((second["status"], second["changed"], second["rows_written"]), ("OK", 0, 0), second)
             rows = self.store.query("SELECT * FROM records WHERE source_id='" + source["national_source_id"] + "' ORDER BY id")
             self.assertTrue(all(row["event_date"] is None for row in rows))
+            self.assertTrue(all(row["jurisdiction"] == "立法院" for row in rows))
             self.assertNotIn("禁止儲存", json.dumps(rows, ensure_ascii=False))
             self.assertNotIn("forbidden.doc", json.dumps(rows))
             if dataset == 20:
