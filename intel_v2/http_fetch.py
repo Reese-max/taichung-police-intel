@@ -179,7 +179,12 @@ def get(session: requests.Session, url: str, allowed_hosts: set[str], timeout: i
         min_interval_seconds: float = 0, bearer_token: str | None = None,
         max_bytes: int | None = None, robots_policy: RobotsPolicy | None = None,
         method: str = "GET", json_body=None, form_body=None, allow_empty=False,
-        allowed_paths=None) -> requests.Response:
+        allowed_paths=None, output_file=None) -> requests.Response:
+    """Optionally replace a seekable binary file with bounded response chunks.
+
+    The caller owns the file; retries replace partial content, failures clear it.
+    In file mode the returned response has no buffered body.
+    """
     import requests
 
     _approved_url(url, allowed_hosts)
@@ -191,11 +196,16 @@ def get(session: requests.Session, url: str, allowed_hosts: set[str], timeout: i
         raise ValueError("min_interval_seconds must be finite and nonnegative")
     if max_bytes is not None and (type(max_bytes) is not int or max_bytes <= 0):
         raise ValueError("max_bytes must be a positive integer")
+    if output_file is not None and max_bytes is None:
+        raise ValueError("output_file requires max_bytes")
     token_host = urlparse(url).hostname.lower().rstrip(".")
     for attempt in range(3):
         current_url = url
         response = None
         try:
+            if output_file is not None:
+                output_file.seek(0)
+                output_file.truncate()
             for _ in range(MAX_REDIRECTS + 1):
                 _approved_url(current_url, allowed_hosts)
                 if allowed_paths is not None and urlparse(current_url).path not in allowed_paths:
@@ -226,20 +236,31 @@ def get(session: requests.Session, url: str, allowed_hosts: set[str], timeout: i
                     continue
                 response.raise_for_status()
                 if max_bytes is not None:
-                    body = bytearray()
+                    body = bytearray() if output_file is None else None
+                    received = 0
                     for chunk in response.iter_content(chunk_size=min(64 * 1024, max_bytes + 1)):
-                        if len(body) + len(chunk) > max_bytes:
+                        received += len(chunk)
+                        if received > max_bytes:
                             raise ValueError("response exceeds max_bytes")
-                        body.extend(chunk)
-                    response._content = bytes(body)
+                        if output_file is None:
+                            body.extend(chunk)
+                        else:
+                            output_file.write(chunk)
+                    response._content = bytes(body) if output_file is None else b""
                     response._content_consumed = True
                     response.close()
-                if not response.content and not allow_empty:
+                if not allow_empty and (output_file is not None and not received
+                                        or output_file is None and not response.content):
                     raise requests.RequestException("HTTP 成功但內容為空")
+                if output_file is not None:
+                    output_file.seek(0)
                 response._govintel_requested_url = url
                 return response
             raise RuntimeError("redirect budget exhausted")
         except requests.RequestException as exc:
+            if output_file is not None:
+                output_file.seek(0)
+                output_file.truncate()
             status = exc.response.status_code if exc.response is not None else None
             retry_after = _retry_after(response.headers.get("Retry-After")) if response is not None else 0
             if response is not None:
@@ -248,6 +269,9 @@ def get(session: requests.Session, url: str, allowed_hosts: set[str], timeout: i
                 raise
             time.sleep(max(attempt + 1, retry_after))
         except Exception:
+            if output_file is not None:
+                output_file.seek(0)
+                output_file.truncate()
             if response is not None:
                 response.close()
             raise

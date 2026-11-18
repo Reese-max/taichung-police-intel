@@ -1,5 +1,5 @@
 """Validate public metadata, skip unchanged records, and enforce write guards."""
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 import hashlib
 import json
 import os
@@ -152,8 +152,13 @@ def load(store, source, adapter, *, capacity_limit_mb=400, daily_limit=DAILY_WRI
         return True
 
     try:
+        retention_days = source.get("scope", {}).get("retention_days")
+        if retention_days is not None and (type(retention_days) is not int or retention_days < 0):
+            raise ValueError("retention_days must be a nonnegative integer")
         if not dry_run and not permitted(0):
             return run
+        if hasattr(adapter, "begin_run"):
+            adapter.begin_run()
         source_pending = True
         while True:
             records, next_cursor = adapter.fetch(source, cursor)
@@ -190,6 +195,26 @@ def load(store, source, adapter, *, capacity_limit_mb=400, daily_limit=DAILY_WRI
             run["cursor_after"] = cursor
             if cursor is None:
                 break
+        if retention_days is not None:
+            cutoff = (date.fromisoformat(today) - timedelta(days=retention_days)).isoformat()
+            predicate = ("source_id=" + sql_value(run["source_id"])
+                         + " AND event_date < " + sql_value(cutoff))
+            sql = "DELETE FROM records WHERE " + predicate + ";\n"
+            if dry_run:
+                emit(sql)
+            else:
+                count = store.query("SELECT COUNT(*) AS n FROM records WHERE " + predicate)[0]["n"]
+                run["deleted"] = 0
+                # Bound each estimate so a backlog larger than one day's budget can progress.
+                for start in range(0, count, 100):
+                    size = min(100, count - start)
+                    if not permitted(size * RECORD_WRITE_ESTIMATE):
+                        return run
+                    sql = ("DELETE FROM records WHERE id IN (SELECT id FROM records WHERE "
+                           + predicate + " ORDER BY id LIMIT " + str(size) + ");\n")
+                    accounted += store.execute_batch(sql)
+                    run["rows_written"] = accounted
+                    run["deleted"] += size
     except Exception as error:
         # Keep the current page cursor; committed sub-batches are skipped on replay.
         run.update(status="ERROR", exit_code=1, error=type(error).__name__ + ": " + str(error))
