@@ -1,4 +1,5 @@
 """Registry-governed transport for official national metadata adapters."""
+import json
 from urllib.parse import urlsplit
 
 import requests
@@ -17,6 +18,18 @@ def text(row, key):
     return str(value)
 
 
+class RegistryRobotsPolicy(http_fetch.RobotsPolicy):
+    def __init__(self, blocked_origins, **kwargs):
+        super().__init__(**kwargs)
+        self.blocked_hosts = {urlsplit(origin).hostname for origin in blocked_origins}
+
+    def redirect_target(self, url, location, followed):
+        target = super().redirect_target(url, location, followed)
+        if urlsplit(target).hostname in self.blocked_hosts:
+            raise http_fetch.RobotsDisallowed("registry blocks robots redirect origin")
+        return target
+
+
 class HttpAdapter:
     def __init__(self, source, *, session=None):
         self.source = source
@@ -24,7 +37,7 @@ class HttpAdapter:
         self.session.headers.update({"User-Agent": USER_AGENT})
         self.allowed_hosts = {urlsplit(origin).hostname for origin in source["allowed_hosts"]}
         self.robots = source["robots"]
-        self.policy = http_fetch.RobotsPolicy(
+        self.policy = RegistryRobotsPolicy(self.robots.get("blocked_origins", []),
             user_agent=USER_AGENT, documented_open_api=source["documented_open_api"])
         self.warnings = []
 
@@ -45,7 +58,7 @@ class HttpAdapter:
     def request(self, url, *, max_bytes, method="GET", json_body=None):
         response = self.response(url, max_bytes=max_bytes, method=method, json_body=json_body)
         try:
-            payload = response.json()
+            payload = json.loads(response.content.strip())
             if not isinstance(payload, dict):
                 raise ValueError("API response must be an object")
             return payload

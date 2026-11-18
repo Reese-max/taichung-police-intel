@@ -11,6 +11,7 @@ sys.path.insert(0, str(ROOT))
 
 from national.adapters.fixture import FixtureAdapter
 from national.adapters.kee import KeeAdapter
+from national.adapters.ly import Ly20Adapter, Ly6Adapter
 from national.adapters.txg import TxgAdapter
 from national.adapters.tnn import TnnAdapter
 from national.adapters.khh import KhhAdapter
@@ -18,8 +19,10 @@ from national.adapters.tpe import TpeAdapter
 from national.loader import check_guards, load
 from national.store import SCHEMA, SqliteStore, WranglerD1Store
 
-ADAPTERS = {"txg": TxgAdapter, "kee": KeeAdapter, "tnn": TnnAdapter, "khh": KhhAdapter, "tpe": TpeAdapter}
-SOURCE_ADAPTERS = {"N-COUNCIL-" + code.upper(): code for code in ADAPTERS}
+ADAPTERS = {"txg": TxgAdapter, "kee": KeeAdapter, "tnn": TnnAdapter, "khh": KhhAdapter, "tpe": TpeAdapter,
+            "ly20": Ly20Adapter, "ly6": Ly6Adapter}
+SOURCE_ADAPTERS = {**{"N-COUNCIL-" + code.upper(): code for code in ("txg", "kee", "tnn", "khh", "tpe")},
+                   "N-LY-ID20-BILLS": "ly20", "N-LY-ID6-INTERP": "ly6"}
 
 
 def main():

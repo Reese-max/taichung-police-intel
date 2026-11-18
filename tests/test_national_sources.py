@@ -92,6 +92,17 @@ class NationalSourcesTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "non-official host"):
                 sources.validate(registry)
 
+    def test_robots_blocked_origin_is_link_only(self):
+        for sid in ("N-LY-ID20-BILLS", "N-LY-ID6-INTERP"):
+            row = self.rows[sid]
+            self.assertIn("https://ppg.ly.gov.tw", row["official_url_hosts"])
+            self.assertNotIn("https://ppg.ly.gov.tw", row["allowed_hosts"])
+            sources.validate(self.registry)
+            row["allowed_hosts"].append("https://ppg.ly.gov.tw")
+            with self.assertRaisesRegex(ValueError, "robots-blocked origin"):
+                sources.validate(self.registry)
+            row["allowed_hosts"].pop()
+
     def test_source_safety_decisions_are_explicit(self):
         rows = self.rows
         for code in ("TXG", "KEE"):
@@ -102,7 +113,7 @@ class NationalSourcesTests(unittest.TestCase):
         self.assertEqual(rows["N-COUNCIL-CYQ"]["www_access"]["endpoints"], [])
         self.assertEqual(rows["N-COUNCIL-PEN"]["status"], "PARTIAL_ROBOTS")
         self.assertFalse(rows["N-COUNCIL-PEN"]["scope"]["fetch_attachments"])
-        self.assertEqual(rows["N-LY-ID6-INTERP"]["known_gap"], "第 11 屆第 3–6 會期官方回空（2026-11-17 實測）")
+        self.assertEqual(rows["N-LY-ID6-INTERP"]["known_gap"], "第 11 屆第 03、05、06 會期官方回空（2026-11-18 主對話提供）")
         self.assertEqual(rows["N-PCC-WEB"]["min_request_interval_seconds"], 3)
         self.assertEqual(rows["N-PCC-WEB"]["capacity_estimate_mb"], 40)
         self.assertEqual(rows["N-PCC-GPA"]["scope"]["dataset_ids"], [172020, 172023])

@@ -277,6 +277,47 @@ DetailPage.aspx 直接 GET 回 403，沒有可直接開啟的逐筆網址；不�
 臺北上限與連續空片停止、警告與詳情請求禁制；三站各以 SqliteStore 同步兩次，第二次 changed=0。
 真實網路、臺南／高雄 d1-local 全量及臺北 xisx-pc 匯入由主對話另驗收；本 worker 不連網、不碰雲端。
 
+### W3 立法院
+
+`ly20`（`N-LY-ID20-BILLS`）與 `ly6`（`N-LY-ID6-INTERP`）已註冊，狀態為
+`IMPLEMENTED_API`。本輪以主對話提供的 2026-11-18 結構製作離線 fixture，尚未實際連網驗收。
+共用 W2a `HttpAdapter`／`http_fetch.get`，依登記檔每次請求間隔 3 秒、每次最多 8MiB。
+JSON 前置大量空白與換行先 strip 再解析。`sessionPeriod` 必須補零（`01`，不能是 `1`）；
+分頁參數無效，每會期只請求一次 `page=1&limit=20000&fileType=json`。
+
+| 欄位 | ID20 議案 | ID6 質詢 |
+|---|---|---|
+| `kind` | `ly_bill` | `ly_interp` |
+| `external_id` | `billNo`；全範圍取 `sessionTimes` 數值最大者，同值取最後出現者 | `ly6-` + UTF-8 `sha256(term\|sessionPeriod\|sessionTimes\|item)[:24]`；完全重複列依順序加 `-2`、`-3` |
+| `title` | `billName.strip()[:300]` | `item.strip()[:300]`；只有 `甲、`／`乙、` 開頭且短於 20 字的列才當標題列排除 |
+| `case_number` | `第{term}屆第{int(sessionPeriod)}會期 {billNo}` | `第{term}屆第{int(sessionPeriod)}會期第{int(sessionTimes)}次會議` |
+| `authority` | `billOrg.strip()[:200]` | 沿用登記的官方機關 |
+| `official_url` | 安全的 HTTPS `ppg.ly.gov.tw` `pdfUrl`；否則 `https://data.ly.gov.tw/getds.action?id=20` | `https://data.ly.gov.tw/getds.action?id=6` |
+| `event_date` | null（無官方日期欄位） | null（無官方日期欄位） |
+
+ppg 只作官方連結、不連線；只加入 `official_url_hosts`，不加入 `allowed_hosts`。
+登記自檢拒絕將 `blocked_origins` 放入 `allowed_hosts`，內容與 robots 轉址至 ppg 也在送出前拒絕。
+不擷取 PDF／DOC，也不儲存 `billCosignatory`、`docUrl` 或其他未核准原始欄位。
+
+從 `scope.from_term`（目前 10）第 01 會期開始，逐期至 08，再換下一屆；
+每一屆都讀完 01–08 會期，屆中的空期是官方缺口、不停止；某屆 01 與 02 都為空才視為該屆尚未開議並停止，保護上限為第 12 屆第 08 會期。
+標題列過濾或議案去重後為空，不算官方空期。先讀完有界範圍，驗證並保留公開投影，
+完成跨會期議案去重後才交給 loader 寫入；游標 `term-sessionPeriod` 指向尚未完成的會期。
+預算停止後新程序會重新讀取範圍，以重建全域去重，再從游標續寫；
+部分批次重播會以既有內容雜湊跳過。這會重讀已完成會期，並非免網路成本的續跑。
+官方內容若在續跑間改變、使議案移至游標前方，須下一次完整掃描才能補齊。
+
+ID6 有官方缺口：主對話提供第 11 屆第 01 會期 74 筆、03／05／06 會期為 0。
+每個實際讀取的空會期在 JSON run 報告加 `EMPTY_PERIOD term=11 sessionPeriod=03` 等警告；
+不以第三方補資料。2026-11-18 主對話實測：舊的「連續兩個空期即停」會在第 11 屆 03／04 停下，之後會期補上資料就永遠掃不到，已改為整屆掃描；
+未開議屆別的空期不產生警告。這仍不代表已證明全歷史完整性。警告須保存 CLI `--report`，既有 runs 表未新增 warnings 欄位。
+ID6 雜湊使用完整原始 `item`，不使用截短標題；內容改動會產生新 ID，舊列不自動刪除。
+`|` 串接及 24 字元雜湊依本次規格，不等同官方識別碼。
+
+離線驗收涵蓋去重、補零、跨屆與上限、空期停止、預算續跑、標題列與穩定 ID、警告、
+ppg 僅連結、欄位限制及 SqliteStore 兩次完整同步第二次 `changed=0`。
+實際連網及 `--store d1-local` 兩次同步留由主對話驗收，`BUDGET_STOPPED` 不算全量完成。
+
 ## 評估過但不採用（使用者決定只直連官方）
 
 以下保留第一輪提供的 **2026-11-17 實測紀錄**作規模參考，本輪沒有重新連網驗證；不是本輪官方來源的筆數或驗收收據，也不作後續擷取入口。

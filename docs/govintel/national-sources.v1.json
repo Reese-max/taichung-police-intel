@@ -1591,16 +1591,17 @@
       "provider": "立法院開放資料服務平台",
       "official_authority": "立法院開放資料服務平台",
       "tier": "REFERENCE",
-      "status": "PLANNED_API",
+      "status": "IMPLEMENTED_API",
       "transport": "OFFICIAL_JSON_API",
       "endpoints": [
-        "https://data.ly.gov.tw/odw/ID20Action.action?term=11&sessionPeriod=1&page=1&limit=1&fileType=json"
+        "https://data.ly.gov.tw/odw/ID20Action.action?term=11&sessionPeriod=01&page=1&limit=20000&fileType=json"
       ],
       "allowed_hosts": [
         "https://data.ly.gov.tw"
       ],
       "official_url_hosts": [
-        "https://data.ly.gov.tw"
+        "https://data.ly.gov.tw",
+        "https://ppg.ly.gov.tw"
       ],
       "robots": {
         "status": "ROBOTS_SERVER_ERROR_OPEN_API_ALLOWED",
@@ -1640,8 +1641,10 @@
       "capacity_estimate_mb": 50,
       "verified_at": "2026-11-17",
       "notes": [
-        "ppg.ly.gov.tw robots 全禁，不抓；只用官方開放資料 API。",
-        "分頁參數效果、schema 與完整性待實際驗收；容量為預留估算。"
+        "ppg 只作官方連結、不連線；robots 全禁，不擷取文件或附件。",
+        "分頁參數無效；每會期只請求一次，sessionPeriod 補零為兩位數，limit=20000。",
+        "ID6 缺口：主對話 2026-11-18 提供第 11 屆 01 會期 74 筆，03、05、06 會期為 0；遇空期輸出 EMPTY_PERIOD，不以第三方補齊。",
+        "W3 已實作；from_term 起逐屆掃完 01–08 會期，某屆 01、02 皆空即視為未開議並停止，最多第 12 屆第 08 會期；本 worker 僅離線驗收，實際連網完整性由主對話驗收。"
       ],
       "runner": "github-actions",
       "documented_open_api": true
@@ -1651,16 +1654,17 @@
       "provider": "立法院開放資料服務平台",
       "official_authority": "立法院開放資料服務平台",
       "tier": "REFERENCE",
-      "status": "PLANNED_API",
+      "status": "IMPLEMENTED_API",
       "transport": "OFFICIAL_JSON_API",
       "endpoints": [
-        "https://data.ly.gov.tw/odw/ID6Action.action?term=11&sessionPeriod=1&page=1&limit=1&fileType=json"
+        "https://data.ly.gov.tw/odw/ID6Action.action?term=11&sessionPeriod=01&page=1&limit=20000&fileType=json"
       ],
       "allowed_hosts": [
         "https://data.ly.gov.tw"
       ],
       "official_url_hosts": [
-        "https://data.ly.gov.tw"
+        "https://data.ly.gov.tw",
+        "https://ppg.ly.gov.tw"
       ],
       "robots": {
         "status": "ROBOTS_SERVER_ERROR_OPEN_API_ALLOWED",
@@ -1700,10 +1704,12 @@
       "capacity_estimate_mb": 5,
       "verified_at": "2026-11-17",
       "notes": [
-        "ppg.ly.gov.tw robots 全禁，不抓；只用官方開放資料 API。",
-        "分頁參數效果、schema 與完整性待實際驗收；容量為預留估算。"
+        "ppg 只作官方連結、不連線；robots 全禁，不擷取文件或附件。",
+        "分頁參數無效；每會期只請求一次，sessionPeriod 補零為兩位數，limit=20000。",
+        "ID6 缺口：主對話 2026-11-18 提供第 11 屆 01 會期 74 筆，03、05、06 會期為 0；遇空期輸出 EMPTY_PERIOD，不以第三方補齊。",
+        "W3 已實作；from_term 起逐屆掃完 01–08 會期，某屆 01、02 皆空即視為未開議並停止，最多第 12 屆第 08 會期；本 worker 僅離線驗收，實際連網完整性由主對話驗收。"
       ],
-      "known_gap": "第 11 屆第 3–6 會期官方回空（2026-11-17 實測）",
+      "known_gap": "第 11 屆第 03、05、06 會期官方回空（2026-11-18 主對話提供）",
       "runner": "github-actions",
       "documented_open_api": true
     },

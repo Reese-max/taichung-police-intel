@@ -85,6 +85,10 @@ def validate(registry):
         if not isinstance(row["robots"], dict) or not isinstance(row["scope"], dict):
             raise ValueError(f"invalid robots/scope: {sid}")
         hosts = {https_url(host, origin=True) for host in row["allowed_hosts"]}
+        blocked_hosts = {https_url(origin, origin=True)
+                         for origin in row["robots"].get("blocked_origins", [])}
+        if hosts & blocked_hosts:
+            raise ValueError(f"allowed_hosts includes robots-blocked origin: {sid}")
         for host in row["official_url_hosts"]:
             https_url(host, origin=True)
         for endpoint in row["endpoints"]:
