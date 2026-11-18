@@ -34,6 +34,12 @@
 
 原則：**官方原始資料優先；結構化 API／CSV／JSON 優先；可回查版本與日期者優先；媒體與社群只作發現，不作單一事實來源。**
 
+### 首頁 feed 衍生檔
+
+`intelligence-feed-home.json` 是由完整 `intelligence-feed.json` 建置產生的衍生檔，不應手動維護。
+其中 `feed_sha256` 綁定產生當下完整 feed 的原始位元組；更新 feed 後須先重產再驗證或建置。
+此衍生檔不屬於 `publication-state` 的 `STATE_PATHS`，也不納入 release manifest。
+
 ## 3. 第一優先來源矩陣
 
 ### A. 即時／高頻公共事件
@@ -58,6 +64,12 @@
 | S-019 | 臺中市政府市政會議紀錄與專案報告 | PRIMARY_EVENT | 不再收集 | 2026-11-17 退役：憑證不符、只剩公告頁 | 已移出 promotion plan |
 | S-026 | 臺中市政府主管法規共用系統 | PRIMARY_REFERENCE | 每日 | canary PASS | 法規草案、期限及制度變更 |
 | S-029 | 臺中市政府議會專案報告 | PRIMARY_REFERENCE | 不再收集 | 2026-11-17 退役：憑證不符、只剩公告頁 | 已移出 active policy |
+
+### S-009 全量與更新限制（2026-11-14 起）
+
+自 2026-11-14 起，S-009 不帶關鍵字收錄全部提案；量測 `totalCount=15496`，每頁 200 筆共 78 頁。
+每頁間隔 0.4 秒曾於第 61 頁觸發 HTTP 429；collector 改為頁間至少 1.5 秒，429 依 `Retry-After`（上限 120 秒）或 5／15／45 秒退避，最多重試 3 次。
+提案紀錄沒有日期欄位，API 也不支援增量條件，因此無法只擷取新增提案；每次需全量走訪，非空結果仍標記 `PARTIAL` 且 `published_at=null`。
 
 ### C. 統計與內政資料背景
 

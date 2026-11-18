@@ -78,6 +78,29 @@ class V2SemanticsTest(unittest.TestCase):
         _, events = compare_snapshot(state, [old, historical, current], T2)
         self.assertEqual([(event.source_id, event.change_type) for event in events], [("S-032", "NEW")])
 
+    def test_rebaselined_existing_item_updates_its_version_without_an_event(self):
+        short = make_item("bill-1", {"title": "環境部資源循環署補助本府辦理「116年度臺中市源頭減量及強化分類回收補助計畫」中"})
+        other = make_item("bill-2", {"title": "既有提案"})
+        state, _ = compare_snapshot(None, [short, other], T0)
+        full = make_item("bill-1", {"title": "環境部資源循環署補助本府辦理「116年度臺中市源頭減量及強化分類回收補助計畫」中央補助款785萬元整"}, T1)
+        revised = make_item("bill-2", {"title": "既有提案（修正）"}, T1)
+
+        next_state, events = compare_snapshot(
+            state, [full, revised], T1, baseline_identities={full.identity}
+        )
+
+        # Only the item outside the declared baseline is reported as a revision.
+        self.assertEqual([event.identity for event in events], [revised.identity])
+        stored = next_state["items"][full.identity]
+        self.assertEqual(stored["version_no"], 2)
+        self.assertEqual(stored["normalized_sha256"], full.normalized_sha256)
+        self.assertEqual(stored["first_seen_at"], short.first_seen_at)
+
+        # A later official change under the same scope is reported normally.
+        later = make_item("bill-1", {"title": "環境部資源循環署補助本府辦理「116年度臺中市源頭減量及強化分類回收補助計畫」中央補助款800萬元整"}, T2)
+        _, events = compare_snapshot(next_state, [later, revised], T2)
+        self.assertEqual([event.identity for event in events], [later.identity])
+
     def test_raw_wrapper_change_without_semantic_change_emits_no_event(self):
         item = make_item(
             "bill-1",

@@ -11,7 +11,7 @@ from typing import Any, Callable
 from urllib.parse import quote, urlsplit
 
 
-MAX_ROWS = 10000
+MAX_ROWS = 20000
 MAX_LIMIT = 100
 MAX_BYTES = 32 * 1024 * 1024
 EVENT_STORE_SCHEMA_VERSION = 1
@@ -21,6 +21,11 @@ TRUST_TIERS = frozenset({"VERIFIED", "DISCOVERY_UNVERIFIED", "CONFLICT", "STALE"
 VERIFIED_STATUSES = frozenset({
     "VERIFIED", "VERIFIED_OFFICIAL", "OFFICIAL_RECONCILED", "DETERMINISTIC_PASS", "CONFIRMED_OFFICIAL",
 })
+
+
+def _enforce_row_limit(count: int, name: str) -> None:
+    if type(count) is not int or not 0 <= count <= MAX_ROWS:
+        raise ValueError(f"{name} must be a bounded array")
 
 
 def _entity_registry_receipt(value: Any) -> dict[str, Any]:
@@ -255,8 +260,9 @@ def _event_material(store: dict[str, Any]) -> dict[str, Any]:
 
 
 def build_event_store(events: list[dict[str, Any]], *, generated_at: str | None = None) -> dict[str, Any]:
-    if not isinstance(events, list) or len(events) > MAX_ROWS:
+    if not isinstance(events, list):
         raise ValueError("public_events must be a bounded array")
+    _enforce_row_limit(len(events), "public_events")
     rows = [validate_event(event) for event in events]
     rows.sort(key=lambda event: event["public_event_id"])
     if len({event["public_event_id"] for event in rows}) != len(rows):
@@ -290,8 +296,9 @@ def validate_event_store(store: Any) -> dict[str, Any]:
     if not isinstance(store, dict) or store.get("schema_version") != EVENT_STORE_SCHEMA_VERSION or store.get("store_type") != "PUBLIC_EVENT_QUERY":
         raise ValueError("unsupported PublicEvent query store")
     rows = store.get("public_events")
-    if not isinstance(rows, list) or len(rows) > MAX_ROWS:
+    if not isinstance(rows, list):
         raise ValueError("public_events must be a bounded array")
+    _enforce_row_limit(len(rows), "public_events")
     for event in rows:
         validate_event(event)
     expected = build_event_store(rows, generated_at=store.get("generated_at"))
@@ -346,8 +353,9 @@ def validate_statistic(row: Any) -> dict[str, Any]:
 
 
 def build_statistics_store(rows: list[dict[str, Any]], *, generated_at: str | None = None) -> dict[str, Any]:
-    if not isinstance(rows, list) or len(rows) > MAX_ROWS:
+    if not isinstance(rows, list):
         raise ValueError("statistics must be a bounded array")
+    _enforce_row_limit(len(rows), "statistics")
     normalized = [validate_statistic(row) for row in rows]
     normalized.sort(key=lambda row: (row["period"], row["dataset_id"], row["statistic_id"]))
     if len({row["statistic_id"] for row in normalized}) != len(normalized):
@@ -370,8 +378,9 @@ def validate_statistics_store(store: Any) -> dict[str, Any]:
     if not isinstance(store, dict) or store.get("schema_version") != STATISTICS_STORE_SCHEMA_VERSION or store.get("store_type") != "TYPED_STATISTICS_QUERY":
         raise ValueError("unsupported statistics query store")
     rows = store.get("statistics")
-    if not isinstance(rows, list) or len(rows) > MAX_ROWS:
+    if not isinstance(rows, list):
         raise ValueError("statistics must be a bounded array")
+    _enforce_row_limit(len(rows), "statistics")
     expected = build_statistics_store(rows, generated_at=store.get("generated_at"))
     if store.get("source_ids") != expected["source_ids"]:
         raise ValueError("statistics query store source metadata mismatch")

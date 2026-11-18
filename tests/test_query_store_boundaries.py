@@ -44,6 +44,12 @@ class QueryBoundaryTests(unittest.TestCase):
         self.hashes = {}
         self.now = max(qs.instant(d['generated_at']) for d in (self.feed, self.status, self.brief)) + timedelta(minutes=1)
 
+    def test_row_budget_accepts_20000_and_rejects_20001(self):
+        self.assertEqual(qs.MAX_ROWS, 20000)
+        qs._enforce_row_limit(20000, "row limit")
+        with self.assertRaisesRegex(ValueError, "row limit"):
+            qs._enforce_row_limit(20001, "row limit")
+
     def build(self):
         # Publish only into this fictional fixture's isolated canonical paths.
         # Every scenario mutation gets an actual byte hash, rather than keeping

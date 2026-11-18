@@ -17,7 +17,8 @@ from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 
-MAX_BYTES = 2 * 1024 * 1024
+# Same artifact budget as scripts/query-store.py; a full proposal inventory is about 16 MiB.
+MAX_BYTES = 32 * 1024 * 1024
 # Worker artifact fetches cache for 30 seconds. Three attempts span 40 seconds
 # while preserving every release/hash/admission check and the failure receipt.
 RELEASE_BINDING_RETRY_DELAY_SECONDS = 20

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
-  normalizeQueryFilters, queryReplay, replayTrackingItems,
+  normalizeQueryFilters, queryReplay, replayTrackingItems, sha256Json,
   safeHttpsUrl, trackingFilters, validateReplay,
 } from "../lib/public-query.js";
 
@@ -16,6 +16,20 @@ test("saved projection signature rejects altered content and mixed generations",
   const mixed = structuredClone(bundle);
   mixed.snapshots.R1.generation_id = mixed.snapshots.R3.generation_id;
   await assert.rejects(validateReplay(mixed), /hash/);
+});
+
+test("saved projection row budget accepts 20,000 and rejects 20,001", async () => {
+  const within = structuredClone(bundle);
+  within.snapshots.R3.events = Array.from({ length: 20000 }, (_, index) => ({ public_event_id: `EV-${index}` }));
+  const { bundle_sha256: _originalHash, ...withinMaterial } = within;
+  within.bundle_sha256 = await sha256Json(withinMaterial);
+  await validateReplay(within);
+
+  const over = structuredClone(within);
+  over.snapshots.R3.events.push({ public_event_id: "EV-20000" });
+  const { bundle_sha256: _withinHash, ...overMaterial } = over;
+  over.bundle_sha256 = await sha256Json(overMaterial);
+  await assert.rejects(validateReplay(over), /事件結構/);
 });
 
 test("same-road different dates/districts remain separate and version difference preserves daily/road", async () => {

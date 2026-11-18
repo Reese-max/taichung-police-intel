@@ -6,7 +6,7 @@ import { createGovernedPolicyFixture } from "./governed-policy-fixture.mjs";
 import { createLegacyPublicArtifacts, readWorkerEmbeddedRetentionBinding } from "./legacy-policy-fixture.mjs";
 const governedFixture = await createGovernedPolicyFixture();
 after(() => governedFixture.cleanup());
-const { default: worker, buildSnapshot, createReleaseManifest } = await governedFixture.loadWorker("suite");
+const { default: worker, buildSnapshot, createReleaseManifest, assertPublicationRowCount } = await governedFixture.loadWorker("suite");
 
 const base = governedFixture.publicRoot;
 const origin = "https://reese-max.github.io/taichung-police-intel";
@@ -14,6 +14,11 @@ const endpoint = "https://govintel-query-gateway.example/query";
 const mcpEndpoint = "https://govintel-query-gateway.example/mcp";
 const env = { PUBLIC_ORIGIN: origin, ALLOWED_ORIGINS: "https://reese-max.github.io", CF_VERSION_METADATA: { id: "test-worker", tag: "a".repeat(40) } };
 const artifactNames = ["intelligence-feed.json", "source-status.json", "v2-daily-brief.json", "source-policy.json"];
+
+test("Worker publication row budget accepts 20,000 and rejects 20,001", () => {
+  assert.doesNotThrow(() => assertPublicationRowCount(20000));
+  assert.throws(() => assertPublicationRowCount(20001), /publication arrays are invalid/);
+});
 
 test("Worker binds source-specific metadata reviews to the compiler policy hash", async () => {
   for (const changed of [false, true]) {
