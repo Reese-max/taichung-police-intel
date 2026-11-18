@@ -1970,7 +1970,7 @@
         "http_status": 200,
         "observed_text": "HTML SPA fallback; supplied raw/tdx/robots.txt"
       },
-      "min_request_interval_seconds": 3,
+      "min_request_interval_seconds": 13,
       "license": "待確認 TDX 服務及資料授權條款",
       "license_source_url": "https://tdx.transportdata.tw/term",
       "rights_class": "METADATA_ONLY",
@@ -1997,7 +1997,7 @@
         "1MB 為預留，實際用量待 W5；未設定憑證時不得呼叫事件 API。",
         "W0 只探測根路徑，不申請憑證。",
         "2026-11-18 主對話實測：匿名 LiveEvent 回 401（純文字）；token 成功回應尚未實測。",
-        "條款依政府資料開放授權條款並要求標示來源，也寫明依收費要點有償提供；加入金鑰前要先確認費用。",
+        "條款依政府資料開放授權條款並要求標示來源。收費要點（113-03-22 修正）：基礎會員免費、每月 3 點，不需綁卡，點數用完只停用到月底；本端點屬基礎服務（1,500 次/點），六都每日 1 輪約 0.12 點/月。基礎會員速率 5 次/分/金鑰，故請求間隔 13 秒。2026-11-18 查 https://tdx.transportdata.tw/pricing 。",
         "沒有逐筆官方網址，統一連回 TDX；v2 News 缺高雄，改用 v1 LiveEvent 六都城市頁。",
         "每次 run 取一次 token；缺任一憑證零請求，回報 NOT_CONFIGURED / MISSING_SECRET；成功後依 retention_days 清除舊資料。"
       ],
