@@ -1,0 +1,32 @@
+[
+  {
+    "external_id": "fixture-txg-001",
+    "kind": "bill",
+    "title": "測試資料：改善學校通學道路",
+    "case_number": "測試案001",
+    "event_date": "2026-11-01",
+    "official_url": "https://yishi.tccc.gov.tw/?fixture=001",
+    "provider_url": null,
+    "fetched_at": "2026-11-18T00:00:00Z"
+  },
+  {
+    "external_id": "fixture-txg-002",
+    "kind": "bill",
+    "title": "測試資料：更新消防救援設備",
+    "case_number": "測試案002",
+    "event_date": "2026-11-02",
+    "official_url": "https://yishi.tccc.gov.tw/?fixture=002",
+    "provider_url": "https://yishi.tccc.gov.tw/?fixture=002",
+    "fetched_at": "2026-11-18T00:00:00Z"
+  },
+  {
+    "external_id": "fixture-txg-003",
+    "kind": "bill",
+    "title": "測試資料：公園照明改善",
+    "case_number": "測試案003",
+    "event_date": null,
+    "official_url": "https://yishi.tccc.gov.tw/?fixture=003",
+    "provider_url": null,
+    "fetched_at": "2026-11-18T00:00:00Z"
+  }
+]

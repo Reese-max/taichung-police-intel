@@ -97,6 +97,61 @@ robots 允許不代表網站已授權重製或再利用。#247 記錄高雄為�
 
 ## 分批實作
 
+### W1 儲存與載入
+
+`national/schema.sql` 與治理 catalog 分離：`sources` 保存來源登記雜湊與授權，
+`records` 以 `(source_id, external_id)` 去重，`records_fts` 使用 FTS5 trigram 索引標題及案號，
+insert／update／delete trigger 保持同步；`runs` 保存狀態、寫入收據與可重播的頁面游標。
+schema 可重複套用。fixture 是人工測試資料，不代表官方實際資料。
+
+每日 UTC 寫入上限 **90,000 列**，容量超過登記檔的 **400MB（400,000,000 bytes）** 就拒絕資料寫入。
+每筆邏輯資料約 3 列尚未含完整索引成本，W1 暫以 **64 列／筆**保守預留，來源更新預留 2 列，
+另保留每個 run 的稽核列與主鍵索引 2 列。資料寫入以 D1 `meta.rows_written` 回填；
+SQLite 用 `total_changes`，Wrangler 本機版本省略寫入 meta 時，在同一批次前後讀 `total_changes()`。
+本機計數不代表遠端 D1 計費數字。實際成本仍須在 W2 大量匯入前依遠端收據校正；
+schema 初始化成本另列於報告，不冒充來源匯入列數。
+
+未變更資料不產生 upsert，因此重跑 `changed=0`、`rows_written=0`；稽核列另計入每日預算。
+若連稽核預留列都不足且尚未寫資料，只輸出停止報告（`audit_recorded=false`），避免反覆排程耗盡預算。
+公開內容依各來源 `public_fields` 白名單驗證，來源識別、種類與權利分類也納入內容雜湊，
+`fetched_at` 不參與雜湊。禁止全文、摘錄、非 HTTPS 或非官方 host；SQL 用 UTF-8 hex literal
+保留單引號、反斜線、NUL 與換行。批次含本機計數語句仍小於 100KB。
+
+預算不足記 `BUDGET_STOPPED`、exit 0；容量超限記 `CAPACITY_BLOCKED`、exit 1。
+只有整頁成功才前進游標；部分批次已提交時重播該頁，以雜湊跳過已完成資料。
+完成一輪後下次從頭檢查變更。W1 採單一寫入者：workflow concurrency 不取消進行中的 run；
+跨 runner 同時寫入、程序被強制終止或遠端已提交但回覆遺失時，尚無分散式預算保留與復原機制，
+跨 UTC 日的批次尚按開始日計入；跨日前會停止新批次，部署排程應避開午夜，
+正式啟用另一個 writer 前需補上協調，不能把本機收據當成完整帳戶用量。
+
+本機執行（需已安裝 Wrangler；不新增專案套件依賴）：
+
+```sh
+# 專案根目錄；config 明確指定 D1 binding。
+wrangler d1 execute govintel-national --local --config workers/query-gateway/wrangler.jsonc --file national/schema.sql
+python -X utf8 scripts/national-sync.py --source N-COUNCIL-TXG --adapter fixture --fixture tests/fixtures/national/txg.json --store d1-local
+# 完全使用 stdlib SQLite，連跑兩次可驗證冪等。
+python -X utf8 scripts/national-sync.py --source N-COUNCIL-TXG --adapter fixture --fixture tests/fixtures/national/txg.json --store sqlite:nat.db --apply-schema
+python -X utf8 scripts/national-sync.py --store d1-local --check-guards
+# stdout 只有 SQL；JSON 報告送 stderr；不開啟資料庫、不執行 SQL。
+python -X utf8 scripts/national-sync.py --source N-COUNCIL-TXG --adapter fixture --fixture tests/fixtures/national/txg.json --dry-run --apply-schema
+```
+
+`NATIONAL_RUNNER` 預設 `github-actions`，不相符的來源在報告標記 `RUNNER_MISMATCH`。
+W1 唯一 adapter 是明確指定的 fixture；未指定 adapter 時報「無可同步來源」並 exit 0。
+`.github/workflows/national-sync.yml` 每日排程及手動執行皆須先設定 repository variable
+`NATIONAL_SYNC_ENABLED=true`；未開啟前整個 job 跳過。token 需 **Account → D1 → Edit**，
+使用既有 `CLOUDFLARE_API_TOKEN`、account ID 與 Wrangler 4.149.0。
+workflow 依序套 schema、檢查守門、同步已有 adapter 的來源，報告以 `always()` 上傳。
+本次實作未操作雲端；schema 與 workflow 啟用由主對話驗收後處理。
+
+Worker 增加 `GET /national/search` 與 `GET /national/record/{id}`，沿用 CORS、rate limit 與 JSON 回覆。
+搜尋預設 20 筆、最多 50 筆，3 字以上使用已跳脫的 FTS phrase，1–2 字使用已跳脫的 LIKE；
+日期 DESC／id DESC keyset 游標支援缺日期資料，錯誤游標回 400。資料庫缺失或查詢失敗回
+503 `NATIONAL_STORE_UNAVAILABLE`。只投影公開白名單欄位，不回傳內部 hash 或全文。
+`/capabilities` 以額外 `national` 物件描述路徑及 binding 是否存在，既有 capabilities 語意不變；
+binding 存在不代表資料新鮮度或資料庫健康驗證。
+
 | 批次 | 範圍與驗收重點 |
 |---|---|
 | W0 | 官方登記、robots gate、preflight、共用 transport；本輪範圍。 |
