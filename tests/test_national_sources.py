@@ -164,7 +164,7 @@ class PreflightTests(unittest.TestCase):
         self.assertEqual(len(pages), 22)
         self.assertEqual(len(robots), 22)
         self.assertIn("https://api.cyscc.gov.tw/robots.txt", robots)
-        self.assertTrue(any("GPAtender_20261117.json" in u for u in pages))
+        self.assertTrue(any("tender_20260902.xml" in u for u in pages))
         self.assertTrue(all(row["bytes"] == 0 for row in report["results"]))
         blocked_rows = [r for r in report["results"] if r["status"] == "BLOCKED_BY_ROBOTS_NEEDS_CONSENT"]
         self.assertEqual({r["host"] for r in blocked_rows}, {"www.cycc.gov.tw", "www.cyscc.gov.tw"})
