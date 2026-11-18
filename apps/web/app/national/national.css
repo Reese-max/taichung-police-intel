@@ -1,0 +1,50 @@
+.national-page {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 24px 0 48px;
+  color: var(--text);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.national-page h1 { margin: 0; font-size: clamp(1.6rem, 4vw, 2.4rem); }
+.national-page h2, .national-page h3 { font-size: 1.2rem; line-height: 1.6; }
+.national-page header > p, .national-page small, .national-page dt, .national-kind { color: var(--text-muted); }
+.national-notice { margin: 16px 0 24px; padding: 12px 16px; background: var(--surface-solid); border-radius: var(--radius-sm); }
+.national-notice p { margin: 0; }
+.national-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.national-form .pq-field { min-width: 0; }
+.national-form input, .national-form select {
+  min-width: 0;
+  max-width: 100%;
+  min-height: 44px;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border-color: var(--text-muted);
+}
+.national-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.national-page button { min-height: 44px; min-width: 44px; }
+.national-page .pq-btn-primary { color: var(--bg); }
+.national-page .pq-btn-secondary { color: var(--text); background: var(--surface-solid); border-color: var(--text-muted); }
+.national-page .pq-btn-secondary:hover:not(:disabled) { background: var(--surface-solid); text-decoration: underline; }
+.national-page :focus-visible { outline: 3px solid var(--text); outline-offset: 3px; }
+.national-page .national-official:focus-visible { outline-color: var(--accent); }
+.national-page button:disabled { cursor: not-allowed; }
+.national-status { margin: 24px 0; }
+.national-status p { margin: 8px 0; }
+.national-results { list-style: none; margin: 0 0 24px; padding: 0; }
+.national-results li { padding: 24px 0; border-top: 1px solid var(--border); }
+.national-kind { margin: 0 0 8px; font-size: .9rem; }
+.national-results h3 { margin: 0 0 16px; }
+.national-results dl { display: grid; gap: 12px; margin: 0; }
+.national-results dl > div { display: grid; grid-template-columns: minmax(0, 7rem) minmax(0, 1fr); gap: 12px; }
+.national-results dd { margin: 0; }
+.national-official { display: inline-flex; align-items: center; min-height: 44px; margin-top: 12px; color: var(--text); text-decoration: underline; }
+.national-header nav a { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; }
+@media (min-width: 680px) {
+  .national-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .national-keyword, .national-actions { grid-column: 1 / -1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .national-page *, .national-header * { animation: none; transition: none; scroll-behavior: auto; }
+}

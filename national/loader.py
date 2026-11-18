@@ -1,5 +1,5 @@
 """Validate public metadata, skip unchanged records, and enforce write guards."""
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 import hashlib
 import json
 import os
@@ -127,7 +127,7 @@ def load(store, source, adapter, *, capacity_limit_mb=400, daily_limit=DAILY_WRI
     runner = runner or os.environ.get("NATIONAL_RUNNER", "github-actions")
     run = dict(run_id=str(uuid4()), source_id=source["national_source_id"], started_at=utc_now(),
                finished_at=None, status="OK", fetched=0, changed=0, rows_written=0,
-               cursor_before=None, cursor_after=None, error=None, exit_code=0)
+               cursor_before=None, cursor_after=None, error=None, exit_code=0, warnings=[])
     if source["runner"] != runner:
         return {**run, "finished_at": utc_now(), "status": "NOT_CONFIGURED",
                 "reason": "RUNNER_MISMATCH", "runner": runner, "expected_runner": source["runner"]}
@@ -152,18 +152,17 @@ def load(store, source, adapter, *, capacity_limit_mb=400, daily_limit=DAILY_WRI
         return True
 
     try:
+        retention_days = source.get("scope", {}).get("retention_days")
+        if retention_days is not None and (type(retention_days) is not int or retention_days < 0):
+            raise ValueError("retention_days must be a nonnegative integer")
         if not dry_run and not permitted(0):
             return run
-        sql = source_sql(source)
-        if dry_run:
-            emit(sql)
-        elif store.source_hash(run["source_id"]) != digest(source):
-            if not permitted(SOURCE_WRITE_ESTIMATE):
-                return run
-            accounted += store.execute_batch(sql)
-            run["rows_written"] = accounted
+        if hasattr(adapter, "begin_run"):
+            adapter.begin_run()
+        source_pending = True
         while True:
             records, next_cursor = adapter.fetch(source, cursor)
+            run["warnings"] = list(getattr(adapter, "warnings", []))
             run["fetched"] += len(records)
             normalized = [normalize(source, record) for record in records]
             ids = [record["external_id"] for record in normalized]
@@ -173,6 +172,16 @@ def load(store, source, adapter, *, capacity_limit_mb=400, daily_limit=DAILY_WRI
             changed = [record for record in normalized if hashes.get(record["external_id"]) != record["content_sha256"]]
             # Validate all statement sizes before writing any part of the page.
             page_batches = list(batches(changed))
+            if source_pending:
+                sql = source_sql(source)
+                if dry_run:
+                    emit(sql)
+                elif store.source_hash(run["source_id"]) != digest(source):
+                    if not permitted(SOURCE_WRITE_ESTIMATE):
+                        return run
+                    accounted += store.execute_batch(sql)
+                    run["rows_written"] = accounted
+                source_pending = False
             for sql, count in page_batches:
                 if dry_run:
                     emit(sql)
@@ -186,10 +195,31 @@ def load(store, source, adapter, *, capacity_limit_mb=400, daily_limit=DAILY_WRI
             run["cursor_after"] = cursor
             if cursor is None:
                 break
+        if retention_days is not None:
+            cutoff = (date.fromisoformat(today) - timedelta(days=retention_days)).isoformat()
+            predicate = ("source_id=" + sql_value(run["source_id"])
+                         + " AND event_date < " + sql_value(cutoff))
+            sql = "DELETE FROM records WHERE " + predicate + ";\n"
+            if dry_run:
+                emit(sql)
+            else:
+                count = store.query("SELECT COUNT(*) AS n FROM records WHERE " + predicate)[0]["n"]
+                run["deleted"] = 0
+                # Bound each estimate so a backlog larger than one day's budget can progress.
+                for start in range(0, count, 100):
+                    size = min(100, count - start)
+                    if not permitted(size * RECORD_WRITE_ESTIMATE):
+                        return run
+                    sql = ("DELETE FROM records WHERE id IN (SELECT id FROM records WHERE "
+                           + predicate + " ORDER BY id LIMIT " + str(size) + ");\n")
+                    accounted += store.execute_batch(sql)
+                    run["rows_written"] = accounted
+                    run["deleted"] += size
     except Exception as error:
         # Keep the current page cursor; committed sub-batches are skipped on replay.
         run.update(status="ERROR", exit_code=1, error=type(error).__name__ + ": " + str(error))
     finally:
+        run["warnings"] = list(getattr(adapter, "warnings", []))
         run["finished_at"] = utc_now()
         if not dry_run:
             if accounted == 0 and store.rows_written_today() + RUN_WRITE_RESERVE > daily_limit:

@@ -1,0 +1,36 @@
+﻿[
+  {
+    "DoneDate": "2026/10/06",
+    "GradeTime": "第4屆 第8次 定期會",
+    "PTypTitle": "民政教育",
+    "KidTitle": "查照/備查案-一般備查案",
+    "CaseNumber": "1",
+    "OrgTitle": "臺南市議會本會",
+    "CaseCause": "檢送本會115年第2季辦理政策及業務宣導之執行情形表，提請備查。",
+    "ProNo": "082fdfb1-dead-4fd5-a895-3bf98c6dc7ab",
+    "PagesAll": "1",
+    "_fixture_source": "tnn/list_g4_p1.json; 2026-11-18; reduced; PagesAll adjusted; second DoneDate emptied for null regression"
+  },
+  {
+    "DoneDate": "",
+    "GradeTime": "第4屆 第8次 定期會",
+    "PTypTitle": "民政教育",
+    "KidTitle": "市府提案-墊付款案",
+    "CaseNumber": "1",
+    "OrgTitle": "臺南市政府各區公所",
+    "CaseCause": "森霸電力股份有限公司補助本市永康區公所辦理「永康區埔園里自強路468巷旁人行步道設置體健設施及三崁店糖廠神社公園塑木平臺步道新設工程」案，經費計新臺幣400萬元整(全額補助)，因未及納入115年度總預算，為爭取時效，謹請貴會同意先行墊付，俟116年度預算時辦理轉正，敬請審議。",
+    "ProNo": "ffada228-960d-4569-82b1-2c78ac1244d9",
+    "PagesAll": "1"
+  },
+  {
+    "DoneDate": "2026/08/31",
+    "GradeTime": "第4屆 第8次 定期會",
+    "PTypTitle": "民政教育",
+    "KidTitle": "市府提案-墊付款案",
+    "CaseNumber": "2",
+    "OrgTitle": "臺南市政府各區公所",
+    "CaseCause": "經濟部水利署南區水資源分署補助本市楠西區公所辦理「115年度水資源作業基金水庫清淤公益支出計畫共32案」，經費計新臺幣1,400萬元整（中央全額補助）乙案，因未及納入115年度總預算，為爭取時效，謹請貴會同意先行墊付，俾憑辦理後續相關作業事宜，俟116年度總預算時辦理轉正，敬請審議。",
+    "ProNo": "558cf721-c118-4e90-8b00-227c027f47c6",
+    "PagesAll": "1"
+  }
+]

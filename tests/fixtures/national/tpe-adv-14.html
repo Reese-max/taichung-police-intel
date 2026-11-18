@@ -1,0 +1,96 @@
+<!-- Reduced from official 2026-11-18 tpe/adv_post.html.
+Kept form1 hidden names/defaults, printForm and MainTable structure; removed scripts/layout/other controls.
+sele_DETR reduced to 14,12; distinct synthetic VIEWSTATE/EVENTVALIDATION per response.
+Rows selected from original response (fixture grouping is synthetic), counts rewritten to 2.
+14: whitespace added to member kind; 12: one kind changed to spaced government kind.
+POST fixtures retain a checked date filter to catch accidental non-hidden replay. -->
+<form method="post" action="./Adv_SearchInput.aspx" id="form1">
+<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="replay-1-__VIEWSTATE" />
+<input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" value="275377EF" />
+<input type="hidden" name="__EVENTVALIDATION" id="__EVENTVALIDATION" value="replay-1-__EVENTVALIDATION" />
+<input name="afterClick" type="hidden" id="afterClick" value="1" />
+<input name="isFini" type="hidden" id="isFini" />
+<select name="sele_DETR" id="sele_DETR" data-trigger="">
+	<option selected="selected" value="14">第14屆</option>
+
+	<option value="12">第12屆</option>
+
+
+
+
+
+
+
+
+
+
+
+
+</select>
+<label id="OutputWhereStr">共2筆；檢索條件：結案屆次:第14屆大會</label>
+<table id="MainTable" class="table" summary="查詢結果">
+                                <thead>
+                                    <th scope="col" data-checkbox="true"></th>
+                                    <th scope="col" data-field="sid">序號</th>
+                                    <th scope="col" data-field="id">系統號</th>
+                                    <th scope="col" data-field="acno" data-sortable="true">案號</th>
+                                    <th scope="col" data-field="case" data-sortable="true" class="text-nowrap">案別 </th>
+                                    <th scope="col" data-field="cls" data-sortable="true" class="text-nowrap">類別 </th>
+                                    <th scope="col" data-field="text">案由 </th>
+                                </thead>
+                                <tbody>
+                                    <label id="outList" style="display: none;">
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<tr><td></td>
+<td>1</td>
+<td>35481</td>
+<td>140291</td>
+<td nowrap>一般提案</td>
+<td nowrap>財建
+、財建</td>
+<td>有關本市大安區辛亥段四小段277-1地號等16件市有土地、建物續租案，因租用面積大於100平方公尺，且前經貴會同意續租10年後租期已屆滿或即將屆滿，依臺北市市有財產管理自治條例第54條第2項後段規定，送請貴會同意後再審辦續租相關事宜，敬請審議惠復。</td></tr>
+<tr><td></td>
+<td>13</td>
+<td>35479</td>
+<td>140681</td>
+<td nowrap>議 員	提　案</td>
+<td nowrap>工務
+、工務</td>
+<td>建請市府修正「大街廓都市更新」政策，以基地面積達3,000平方公尺為提高基準容積率至300%之適用門檻，取消限於捷運場站及水岸周邊之區位限制，全面促進老舊社區更新及都市環境改善。</td></tr></label>
+                                </tbody>
+                            </table>
+<input type="checkbox" name="REDTChk" checked="checked" />
+<input name="REDTstartdate" value="115/10/01" />
+</form>
+<form name="printForm" target="_blank" method="post" action="PrintDetailPage.aspx">
+        <input type="hidden" name="ListType" value="OM" />
+        <input type="hidden" name="PrintType" />
+        <input type="hidden" name="SYSN" />
+        <input type="hidden" name="orderColumn" />
+        <input type="hidden" name="orderR" />
+        <input name="WhereStr" type="hidden" id="WhereStr" value="檢索條件：收文日期:115/10/01 ~ 115/11/18" />
+        <input name="DisplayType" type="hidden" id="DisplayType" value="OM" />
+    </form>

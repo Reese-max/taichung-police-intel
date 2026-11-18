@@ -6,7 +6,7 @@ import json
 import math
 from pathlib import Path
 import re
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 REGISTRY = Path(__file__).resolve().parents[1] / "docs/govintel/national-sources.v1.json"
 PUBLIC_FIELDS = {"title", "case_number", "event_date", "jurisdiction", "authority",
@@ -85,6 +85,10 @@ def validate(registry):
         if not isinstance(row["robots"], dict) or not isinstance(row["scope"], dict):
             raise ValueError(f"invalid robots/scope: {sid}")
         hosts = {https_url(host, origin=True) for host in row["allowed_hosts"]}
+        blocked_hosts = {https_url(origin, origin=True)
+                         for origin in row["robots"].get("blocked_origins", [])}
+        if hosts & blocked_hosts:
+            raise ValueError(f"allowed_hosts includes robots-blocked origin: {sid}")
         for host in row["official_url_hosts"]:
             https_url(host, origin=True)
         for endpoint in row["endpoints"]:
@@ -98,6 +102,20 @@ def validate(registry):
             raise ValueError(f"invalid public_fields: {sid}")
         if "url" in row["robots"]:
             https_url(row["robots"]["url"])
+        if "absent_when_redirect_to" in row["robots"]:
+            value = row["robots"]["absent_when_redirect_to"]
+            if not isinstance(value, str):
+                raise ValueError("invalid robots absence redirect")
+            target = urlsplit(value)
+            if (target.scheme not in {"http", "https"}
+                    or https_url(target._replace(scheme="https").geturl()) !=
+                    https_url(row["robots"]["url"])
+                    or unquote(target.path).rstrip("/").lower() == "/robots.txt"
+                    or "\\" in value):
+                raise ValueError("invalid robots absence redirect")
+            date.fromisoformat(row["robots"]["observed_at"])
+            if row["robots"].get("observed_runner") not in {"github-actions", "xisx-pc"}:
+                raise ValueError("robots absence redirect requires evidence")
         for origin in row["robots"].get("blocked_origins", []):
             https_url(origin, origin=True)
         for key in ("min_request_interval_seconds", "capacity_estimate_mb"):

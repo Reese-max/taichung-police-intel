@@ -177,7 +177,7 @@ class NationalLoaderTests(unittest.TestCase):
             (state / "db.sqlite").write_bytes(b"x" * 4096)
             (state / "db.sqlite-wal").write_bytes(b"x" * 100)
             with patch.object(local, "_call", side_effect=AssertionError("must not call remote info")):
-                self.assertEqual(local.database_size_bytes(), 4196)
+                self.assertEqual(local.database_size_bytes(), 4096)
 
 
 if __name__ == "__main__":

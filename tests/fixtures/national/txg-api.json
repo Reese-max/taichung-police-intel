@@ -1,0 +1,13 @@
+{
+  "_note": "依 2026-11-18 官方回應結構縮減；內容為人工測試資料，非官方原始收據。",
+  "pages": [
+    {"success": true, "data": {"pageNumber": 1, "pageSize": 200, "totalPages": 2, "totalCount": 4, "data": [
+      {"billId": "00000000-0000-4000-8000-000000000001", "session": "第4屆 第8次 定期會", "committee": "交通", "billType": "議員提案", "sponsor": "測試甲", "billNumber": "第99號", "proposalRationale": "  改善通學道路安全  ", "proposalRationaleSort": "<p>禁止儲存的 HTML 全文</p>", "billAttribute": "一般", "closureType": "", "resolution": "禁止儲存的決議", "execution": "禁止儲存的執行情形"},
+      {"billId": "00000000-0000-4000-8000-000000000002", "session": "第4屆 第8次 定期會", "committee": "交通", "billType": "議員提案", "sponsor": "測試乙", "billNumber": "第100號", "proposalRationale": "  ", "proposalRationaleSort": "<p>另一段全文</p>", "billAttribute": "一般", "closureType": "", "resolution": "", "execution": ""}
+    ]}},
+    {"success": true, "data": {"pageNumber": 2, "pageSize": 200, "totalPages": 2, "totalCount": 4, "data": [
+      {"billId": "00000000-0000-4000-8000-000000000003", "session": "第4屆 第8次 定期會", "committee": "交通", "billType": "議員提案", "sponsor": "測試丙", "billNumber": "第101號", "proposalRationale": "改善行人照明", "proposalRationaleSort": "<p>全文三</p>", "billAttribute": "一般", "closureType": "", "resolution": "", "execution": ""},
+      {"billId": "00000000-0000-4000-8000-000000000004", "session": "第4屆 第8次 定期會", "committee": "交通", "billType": "議員提案", "sponsor": "測試丁", "billNumber": "第102號", "proposalRationale": "增設安全標誌", "proposalRationaleSort": "<p>全文四</p>", "billAttribute": "一般", "closureType": "", "resolution": "", "execution": ""}
+    ]}}
+  ]
+}
