@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import sys
+import time
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -19,7 +20,7 @@ from national.adapters.khh import KhhAdapter
 from national.adapters.tpe import TpeAdapter
 from national.adapters.tdx import TdxAdapter
 from national.adapters.odp import OdpCatalogAdapter
-from national.loader import check_guards, load
+from national.loader import RECORD_WRITE_ESTIMATE, check_guards, load
 from national.store import SCHEMA, SqliteStore, WranglerD1Store
 
 ADAPTERS = {"txg": TxgAdapter, "kee": KeeAdapter, "tnn": TnnAdapter, "khh": KhhAdapter, "tpe": TpeAdapter,
@@ -29,6 +30,8 @@ SOURCE_ADAPTERS = {**{"N-COUNCIL-" + code.upper(): code for code in ("txg", "kee
                    "N-LY-ID20-BILLS": "ly20", "N-LY-ID6-INTERP": "ly6",
                    "N-PCC-GPA": "pcc_gpa", "N-PCC-WEB": "pcc_web",
                    "N-TDX-EVENTS": "tdx", "N-ODP-CATALOG": "odp"}
+# With less than one full batch (~100 records) of budget left, a source would fetch everything and then stop.
+MIN_SOURCE_BUDGET = 100 * RECORD_WRITE_ESTIMATE
 
 
 def main():
@@ -42,6 +45,8 @@ def main():
     parser.add_argument("--apply-schema", action="store_true")
     parser.add_argument("--check-guards", action="store_true")
     parser.add_argument("--report", type=Path)
+    parser.add_argument("--stop-after-minutes", type=float,
+                        help="Do not start another source after this many minutes")
     args = parser.parse_args()
     if args.adapter == "fixture" and (not args.fixture or not args.source):
         parser.error("--adapter fixture requires --fixture and --source")
@@ -62,6 +67,7 @@ def main():
     runner = os.environ.get("NATIONAL_RUNNER", "github-actions")
     report = {"runner": runner, "runs": [], "exit_code": 0}
     store = None
+    started = time.monotonic()
 
     def open_store():
         nonlocal store
@@ -101,6 +107,17 @@ def main():
                                            "warnings": [], "exit_code": 0})
                     continue
                 open_store()
+                skip = None
+                if args.stop_after_minutes is not None and time.monotonic() - started >= args.stop_after_minutes * 60:
+                    skip = "TIME_BUDGET"
+                elif not args.dry_run and check_guards(store)["remaining_rows"] < MIN_SOURCE_BUDGET:
+                    skip = "DAILY_BUDGET"
+                if skip:
+                    report["runs"].append({"source_id": source["national_source_id"], "status": "SKIPPED",
+                                           "reason": skip, "warnings": [], "exit_code": 0})
+                    if not args.dry_run:
+                        print("SKIP", source["national_source_id"], skip, file=sys.stderr, flush=True)
+                    continue
                 options = {"backfill": args.backfill} if adapter_name == "pcc_web" else {}
                 adapter = ADAPTERS[adapter_name](source, **options)
                 # Progress on stderr: the JSON report only prints at the end, so a timeout would show nothing.

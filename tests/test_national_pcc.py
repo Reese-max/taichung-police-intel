@@ -302,6 +302,7 @@ class PccTests(unittest.TestCase):
         for sid, name in [('N-PCC-WEB', 'pcc_web'), ('N-PCC-GPA', 'pcc_gpa'), ('N-LY-ID20-BILLS', 'ly20')]:
             factory = Mock()
             with patch.dict(cli.ADAPTERS, {name: factory}), patch.object(cli, 'load', return_value={'exit_code': 0}), \
+                    patch.object(cli, 'check_guards', return_value={'remaining_rows': 90_000}), \
                     patch('sys.argv', ['national-sync.py', '--source', sid, '--backfill', '--store', 'sqlite::memory:']), \
                     patch.dict('os.environ', {'NATIONAL_RUNNER': 'github-actions'}), redirect_stdout(io.StringIO()):
                 self.assertEqual(cli.main(), 0)
