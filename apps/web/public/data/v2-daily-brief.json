@@ -34,9 +34,9 @@
   "mode": "V2_SHADOW",
   "other_changes": [],
   "overview": {
-    "archive_total": 118,
+    "archive_total": 116,
     "current_change_count": 0,
-    "legacy_home_candidate_count": 118,
+    "legacy_home_candidate_count": 116,
     "other_change_count": 0,
     "priority_count": 0,
     "tracking_count": 0,
@@ -107,12 +107,12 @@
   "quality_issues": [
     {
       "code": "HIGH_LEGACY_ELIGIBILITY_RATIO",
-      "detail": "Legacy feed marks 118/118 items as current. V2 does not treat archive confirmation as a daily change.",
+      "detail": "Legacy feed marks 116/116 items as current. V2 does not treat archive confirmation as a daily change.",
       "severity": "HIGH"
     },
     {
       "code": "LEGACY_CONFIRMED_AS_CURRENT",
-      "count": 118,
+      "count": 116,
       "severity": "HIGH"
     },
     {
@@ -127,9 +127,9 @@
   "source_collection_run_id": "CR-DEMO-20260911-MORNING-SCHEDULE",
   "source_health": {
     "failed_count": 0,
-    "gap_count": 3,
-    "pass_count": 5,
-    "stale_count": 3,
+    "gap_count": 2,
+    "pass_count": 4,
+    "stale_count": 2,
     "status": "SUCCEEDED"
   },
   "source_policy": {
@@ -137,14 +137,13 @@
       "S-004",
       "S-006",
       "S-007",
-      "S-009",
-      "S-029"
+      "S-009"
     ],
-    "catalog_hash": "5088623df5af4b8a30f4c597c51235c0f36a3dfd8bc4f2aea9af8f26d10213ef",
-    "governance_hash": "640d40cf18e32e561273d9525c7235888aa931a8c5be9f29700ae880d8b6f09d",
-    "policy_hash": "f027315e3fcb17d2e8825ad5d797a7c7aa60113e1a2562880f9a6bc6b8aaa62b",
-    "policy_version": 2,
-    "retention_policy_hash": "6a52c17625af49cf4b618bbcd22a4909c23df3efd2f92ff70ae2935e8643cf13"
+    "catalog_hash": "e301a29664700b6e4b31d52d835dd7a0b97a6bac93c6187fa49e6efed3f27231",
+    "governance_hash": "0c665cbd4bbb6cbeac930043b07e4e894f0a386a0aa79874670b29e85e9e405b",
+    "policy_hash": "8cf9a92e5a3a14850e3c34d37b55e739883b20ee20fd19d1c61d4a040265aae8",
+    "policy_version": 3,
+    "retention_policy_hash": "18809f223924adaa70b3015768717f0c36a76ab7e26bb660f2fa9c0479529727"
   },
   "source_status_generated_at": "2026-09-11T08:23:26+08:00",
   "status_message": "本期未偵測到可確認的新增或修正；歷史資料保留於資料庫。",

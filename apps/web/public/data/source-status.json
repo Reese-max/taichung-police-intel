@@ -1,15 +1,6 @@
 {
   "candidate_catalog": [
     {
-      "cadence_class": "DAILY_EVENT",
-      "integration_status": "AUDITED_EXISTING",
-      "promotion_eligible": false,
-      "source_id": "S-019",
-      "source_name": "臺中市政府市政會議紀錄與專案報告",
-      "source_role": "PRIMARY_EVENT",
-      "source_url": "https://www.rdec.taichung.gov.tw/12047/12142/12186"
-    },
-    {
       "cadence_class": "FAST_EVENT",
       "integration_status": "AUDITED_EXISTING",
       "promotion_eligible": false,
@@ -26,15 +17,6 @@
       "source_name": "臺中市政府交通局最新消息",
       "source_role": "PRIMARY_EVENT",
       "source_url": "https://www.traffic.taichung.gov.tw/"
-    },
-    {
-      "cadence_class": "FAST_EVENT",
-      "integration_status": "VERIFIED_CANDIDATE",
-      "promotion_eligible": false,
-      "source_id": "S-033",
-      "source_name": "臺中市政府市政新聞",
-      "source_role": "PRIMARY_EVENT",
-      "source_url": "https://www.taichung.gov.tw/"
     },
     {
       "cadence_class": "FAST_EVENT",
@@ -66,14 +48,13 @@
       "S-004",
       "S-006",
       "S-007",
-      "S-009",
-      "S-029"
+      "S-009"
     ],
-    "catalog_hash": "5088623df5af4b8a30f4c597c51235c0f36a3dfd8bc4f2aea9af8f26d10213ef",
-    "governance_hash": "640d40cf18e32e561273d9525c7235888aa931a8c5be9f29700ae880d8b6f09d",
-    "policy_hash": "f027315e3fcb17d2e8825ad5d797a7c7aa60113e1a2562880f9a6bc6b8aaa62b",
-    "policy_version": 2,
-    "retention_policy_hash": "6a52c17625af49cf4b618bbcd22a4909c23df3efd2f92ff70ae2935e8643cf13"
+    "catalog_hash": "e301a29664700b6e4b31d52d835dd7a0b97a6bac93c6187fa49e6efed3f27231",
+    "governance_hash": "0c665cbd4bbb6cbeac930043b07e4e894f0a386a0aa79874670b29e85e9e405b",
+    "policy_hash": "8cf9a92e5a3a14850e3c34d37b55e739883b20ee20fd19d1c61d4a040265aae8",
+    "policy_version": 3,
+    "retention_policy_hash": "18809f223924adaa70b3015768717f0c36a76ab7e26bb660f2fa9c0479529727"
   },
   "sources": [
     {
@@ -189,36 +170,6 @@
       "source_name": "臺中市議會議事資訊系統－各項提案",
       "source_role": "PRIMARY_EVENT",
       "source_url": "https://yishi.tccc.gov.tw/api/Proposal/FrontList",
-      "window_completeness": "COMPLETE_ZERO",
-      "window_item_count": 0
-    },
-    {
-      "current_source_run_id": "SR-DEMO-20260911-MORNING-029",
-      "data_as_of": "2026-07-24T00:00:00+08:00",
-      "freshness_status": "STALE",
-      "integration_status": "PRODUCTION_ACTIVE",
-      "intelligence_gaps": [
-        "STALE_DATA"
-      ],
-      "last_checked_at": "2026-09-11T08:23:26+08:00",
-      "last_known_good": {
-        "completed_at": "2026-09-11T08:23:26+08:00",
-        "manifest_sha256": "a427ebfe37643d830711f30d02d1ef1ee0adea55ddaf713925c4fb121aa3ce05",
-        "snapshot_count": 4,
-        "snapshot_item_count": 19,
-        "source_run_id": "SR-DEMO-20260911-MORNING-029"
-      },
-      "last_success_at": "2026-09-11T08:23:26+08:00",
-      "manifest_sha256": "a427ebfe37643d830711f30d02d1ef1ee0adea55ddaf713925c4fb121aa3ce05",
-      "next_update_at": "2026-09-11T18:30:00+08:00",
-      "result": "NO_NEW_ITEM",
-      "snapshot_count": 4,
-      "snapshot_item_count": 19,
-      "source_health": "PASS",
-      "source_id": "S-029",
-      "source_name": "臺中市政府議會專案報告",
-      "source_role": "PRIMARY_REFERENCE",
-      "source_url": "https://www.rdec.taichung.gov.tw/12047/12142/12145",
       "window_completeness": "COMPLETE_ZERO",
       "window_item_count": 0
     }

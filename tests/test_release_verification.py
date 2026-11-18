@@ -616,7 +616,7 @@ class ReleaseVerificationTests(unittest.TestCase):
                     native_module.verify("https://gateway.example", PUBLIC, client)
 
     def test_duplicate_diagnostic_injection_handles_all_list_values_and_json_spacing(self):
-        for missing in ([], ["S-006"], ["S-006", "S-009", "S-029"]):
+        for missing in ([], ["S-006"], ["S-004", "S-006", "S-009"]):
             for formatting in ({}, {"separators": (",", ":")}, {"indent": 2}):
                 with self.subTest(missing=missing, formatting=formatting):
                     structured = {"results": [], "query_coverage": {"missing_required_sources": missing}}

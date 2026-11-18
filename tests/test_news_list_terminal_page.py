@@ -11,7 +11,7 @@ def html(controls):
 
 class TerminalPageProofTests(unittest.TestCase):
     def parse(self, controls, base=BASE):
-        return oc.next_news_list_page(html(controls), base, 'S-019')
+        return oc.next_news_list_page(html(controls), base, 'S-001')
 
     def test_matching_explicit_last_page_with_previous_numbers_is_terminal(self):
         controls = '<a href="?Page=1&PageSize=30&type=">第一頁</a><a href="?Page=24&PageSize=30&type=">24</a><a href="?Page=25&PageSize=30&type=">最後一頁</a>'
@@ -61,7 +61,7 @@ class TerminalPageProofTests(unittest.TestCase):
         # The helper wraps controls in a pagination nav. The official utility
         # and pager are siblings, so reproduce that actual ancestry here.
         body=('<main id="center">'+controls+'</main>').encode()
-        self.assertEqual(oc.next_news_list_page(body,BASE,'S-019'),(None,False))
+        self.assertEqual(oc.next_news_list_page(body,BASE,'S-001'),(None,False))
 
     def test_browser_back_in_real_pager_cannot_be_ignored(self):
         for utility in ('<section class="page"><section class="function"><a href="javascript:history.back();">回上一頁</a></section></section>',

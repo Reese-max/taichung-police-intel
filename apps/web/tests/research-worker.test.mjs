@@ -91,7 +91,7 @@ test('legacy policy/publication fixture is blocked without restoring the Worker-
   ]);
   assert.equal(Object.hasOwn(publicPolicy, 'active_sources'), false);
   const retentionBinding = await readWorkerEmbeddedRetentionBinding();
-  assert.equal(retentionBinding.policy_version, 3);
+  assert.equal(retentionBinding.policy_version, 4);
   assert.equal(retentionBinding.rights_status, 'OWNER_ASSERTED_PERMISSION');
   assert.equal(retentionBinding.review_required, true);
   assert.equal(retentionBinding.full_text_allowed, false);

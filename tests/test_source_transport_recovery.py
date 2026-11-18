@@ -44,28 +44,28 @@ class OfficialTransportRecoveryTests(unittest.TestCase):
     def test_exhausted_http_retries_keep_the_original_http_status(self):
         session = oc.http_session()
         self.addCleanup(session.close)
-        retry = session.get_adapter(canary.S029_INDEX_URL).max_retries
+        retry = session.get_adapter(canary.S026_CURRENT_URL).max_retries
         # Exercise retry exhaustion rather than only checking its configuration.
         from urllib3.response import HTTPResponse
 
         failure = HTTPResponse(status=503)
-        retry = retry.increment(method="GET", url=canary.S029_INDEX_URL, response=failure)
-        retry = retry.increment(method="GET", url=canary.S029_INDEX_URL, response=failure)
+        retry = retry.increment(method="GET", url=canary.S026_CURRENT_URL, response=failure)
+        retry = retry.increment(method="GET", url=canary.S026_CURRENT_URL, response=failure)
         self.assertTrue(retry.is_exhausted() is False)
         self.assertFalse(retry.raise_on_status)
-        final = response(canary.S029_INDEX_URL, 503, b"upstream connection timeout")
+        final = response(oc.P0_SOURCES["S-009"][1], 503, b"upstream connection timeout")
         with mock.patch.object(session, "get", return_value=final):
             with self.assertRaises(requests.HTTPError) as caught:
-                oc.get(session, canary.S029_INDEX_URL, source_id="S-029")
+                oc.get(session, oc.P0_SOURCES["S-009"][1], source_id="S-009")
         self.assertEqual(caught.exception.response.status_code, 503)
 
-    def test_s029_does_not_multiply_adapter_and_canary_retry_budgets(self):
+    def test_canary_does_not_multiply_adapter_and_canary_retry_budgets(self):
         session = oc.http_session()
         self.addCleanup(session.close)
-        final = response(canary.S029_INDEX_URL, 503)
+        final = response(canary.S026_CURRENT_URL, 503)
         with mock.patch.object(session, "get", return_value=final) as fetch, mock.patch.object(canary.time, "sleep") as sleep:
             with self.assertRaises(requests.HTTPError) as caught:
-                canary.get(session, canary.S029_INDEX_URL, canary.S029_HOSTS)
+                canary.get(session, canary.S026_CURRENT_URL, canary.S026_HOSTS)
         fetch.assert_called_once()
         sleep.assert_not_called()
         self.assertEqual(caught.exception.response.status_code, 503)
@@ -73,18 +73,18 @@ class OfficialTransportRecoveryTests(unittest.TestCase):
     def test_standalone_canary_keeps_its_three_attempt_budget(self):
         session = requests.Session()
         self.addCleanup(session.close)
-        with mock.patch.object(session, "get", return_value=response(canary.S029_INDEX_URL, 503)) as fetch, mock.patch.object(canary.time, "sleep") as sleep:
+        with mock.patch.object(session, "get", return_value=response(canary.S026_CURRENT_URL, 503)) as fetch, mock.patch.object(canary.time, "sleep") as sleep:
             with self.assertRaises(requests.HTTPError):
-                canary.get(session, canary.S029_INDEX_URL, canary.S029_HOSTS)
+                canary.get(session, canary.S026_CURRENT_URL, canary.S026_HOSTS)
         self.assertEqual(fetch.call_count, 3)
         self.assertEqual(sleep.call_args_list, [mock.call(1), mock.call(2)])
 
     def test_standalone_canary_recovers_from_one_transient_failure(self):
         session = requests.Session()
         self.addCleanup(session.close)
-        good = response(canary.S029_INDEX_URL)
-        with mock.patch.object(session, "get", side_effect=[response(canary.S029_INDEX_URL, 503), good]) as fetch, mock.patch.object(canary.time, "sleep"):
-            result = canary.get(session, canary.S029_INDEX_URL, canary.S029_HOSTS)
+        good = response(canary.S026_CURRENT_URL)
+        with mock.patch.object(session, "get", side_effect=[response(canary.S026_CURRENT_URL, 503), good]) as fetch, mock.patch.object(canary.time, "sleep"):
+            result = canary.get(session, canary.S026_CURRENT_URL, canary.S026_HOSTS)
         self.assertIs(result, good)
         self.assertEqual(fetch.call_count, 2)
 
@@ -143,21 +143,21 @@ class OfficialTransportRecoveryTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "no parseable entries"):
                     oc.collect_news_list(session, "S-001", date(2026, 9, 29), date(2026, 10, 5), max_details=0)
 
-    def test_no_unverified_alternative_is_used_for_s019(self):
-        config = oc.NEWS_LIST_SOURCES["S-019"]
+    def test_no_unverified_alternative_is_used_for_traffic(self):
+        config = oc.NEWS_LIST_SOURCES["S-032"]
         with requests.Session() as session:
             with mock.patch.object(session, "get", return_value=response(config["list_url"], 503)) as fetch:
                 with self.assertRaises(requests.HTTPError):
-                    oc.get_news_listing(session, "S-019")
+                    oc.get_news_listing(session, "S-032")
         fetch.assert_called_once()
 
     def test_same_origin_redirect_keeps_requested_url_evidence(self):
-        config = oc.NEWS_LIST_SOURCES["S-019"]
+        config = oc.NEWS_LIST_SOURCES["S-032"]
         next_url = config["list_url"] + "/"
         good = response(next_url)
         with requests.Session() as session:
             with mock.patch.object(session, "get", side_effect=[response(config["list_url"], 302, location=next_url), good]):
-                result = oc.get_news_listing(session, "S-019")
+                result = oc.get_news_listing(session, "S-032")
         self.assertEqual(oc.snapshot(result, "LIST")["requested_url"], config["list_url"])
         self.assertEqual(oc.snapshot(result, "LIST")["final_url"], next_url)
 
@@ -167,18 +167,20 @@ class OfficialTransportRecoveryTests(unittest.TestCase):
             output = Path(directory) / "source-status.json"
             output.write_text(json.dumps({
                 "schema_version": 1, "mode": "COMPETITION_DEMO", "sources": [{
-                    "source_id": "S-029", "last_success_at": prior_lkg["completed_at"],
+                    "source_id": "S-007", "last_success_at": prior_lkg["completed_at"],
                     "last_known_good": prior_lkg, "data_as_of": "2026-07-24T00:00:00+08:00",
+                    "data_as_of_basis": "OFFICIAL_API_RECORD_DATE",
+                    "data_as_of_scope": "OBSERVED_API_PAGE",
                     "snapshot_item_count": 35,
                 }],
             }))
             (Path(directory) / "intelligence-feed.json").write_text(json.dumps({"items": [{
-                "source_id": "S-029", "stable_id": "prior-police-report", "title": "official report",
+                "source_id": "S-007", "stable_id": "prior-council-record", "title": "fictional official API record",
                 "content_sha256": "b" * 64, "published_at": "2026-07-24T00:00:00+08:00",
             }]}))
-            failed = response(canary.S029_INDEX_URL, 503)
+            failed = response(oc.P0_SOURCES["S-007"][1], 503)
             error = requests.HTTPError("503 upstream timeout", response=failed)
-            with mock.patch.object(oc, "P0_SOURCES", {"S-029": oc.P0_SOURCES["S-029"]}), mock.patch.object(
+            with mock.patch.object(oc, "P0_SOURCES", {"S-007": oc.P0_SOURCES["S-007"]}), mock.patch.object(
                 oc, "collect_source", side_effect=error
             ), contextlib.redirect_stdout(io.StringIO()):
                 state = oc.build_demo_status(output, "MORNING", date(2026, 10, 5), "manual")
@@ -191,27 +193,29 @@ class OfficialTransportRecoveryTests(unittest.TestCase):
         self.assertEqual(source["last_known_good"], prior_lkg)
         self.assertEqual(source["last_success_at"], prior_lkg["completed_at"])
         self.assertEqual(source["data_as_of"], "2026-07-24T00:00:00+08:00")
+        self.assertEqual(source["data_as_of_basis"], "OFFICIAL_API_RECORD_DATE")
+        self.assertEqual(source["data_as_of_scope"], "OBSERVED_API_PAGE")
         self.assertEqual(feed["items"][0]["change_type"], "LKG")
         self.assertEqual(feed["items"][0]["eligibility"], "INELIGIBLE_SOURCE_FAILED")
 
     def test_schema_http_503_is_source_unavailable_with_status_evidence(self):
-        failed = response(oc.NEWS_LIST_SOURCES["S-019"]["list_url"], 503, b"upstream timeout")
-        observation = drift._failed_observation("S-019", requests.HTTPError(response=failed))
-        result = drift.observe(drift.CONTRACTS["S-019"], **{key: value for key, value in observation.items() if key != "source_id"})
+        failed = response(oc.NEWS_LIST_SOURCES["S-032"]["list_url"], 503, b"upstream timeout")
+        observation = drift._failed_observation("S-032", requests.HTTPError(response=failed))
+        result = drift.observe(drift.CONTRACTS["S-032"], **{key: value for key, value in observation.items() if key != "source_id"})
         self.assertEqual(result["status"], "SOURCE_UNAVAILABLE")
         self.assertEqual(result["http_status"], 503)
         self.assertEqual(result["reasons"], ["HTTP_503"])
         self.assertEqual(result["window_completeness"], "PARTIAL")
 
     def test_schema_http_200_parser_drift_stays_distinct_from_transport_failure(self):
-        result = drift.observe(drift.CONTRACTS["S-019"], b"<html>changed list</html>", content_type="text/html")
+        result = drift.observe(drift.CONTRACTS["S-032"], b"<html>changed list</html>", content_type="text/html")
         self.assertEqual(result["status"], "BREAKING_DRIFT")
         self.assertEqual(result["http_status"], 200)
 
     def test_schema_adapter_owns_retry_budget(self):
         session = drift._live_session()
         self.addCleanup(session.close)
-        with mock.patch.object(drift, "CONTRACTS", {"S-019": drift.CONTRACTS["S-019"]}), mock.patch.object(
+        with mock.patch.object(drift, "CONTRACTS", {"S-032": drift.CONTRACTS["S-032"]}), mock.patch.object(
             drift.time, "sleep"
         ) as sleep, contextlib.redirect_stdout(io.StringIO()):
             fetch = mock.Mock(side_effect=requests.ConnectionError("upstream timed out"))
@@ -247,11 +251,11 @@ class OfficialTransportRecoveryTests(unittest.TestCase):
         self.assertEqual(receipt["overall"], "BLOCKED")
 
     def test_candidate_http_503_has_no_schema_or_promotion_claim(self):
-        config = oc.NEWS_LIST_SOURCES["S-019"]
+        config = oc.NEWS_LIST_SOURCES["S-032"]
         with requests.Session() as transport:
             with mock.patch.object(transport, "get", return_value=response(config["list_url"], 503)):
                 report = candidate.run_canary(
-                    oc, ["S-019"], datetime(2026, 10, 5, tzinfo=timezone.utc),
+                    oc, ["S-032"], datetime(2026, 10, 5, tzinfo=timezone.utc),
                     session_factory=lambda url: candidate.BoundedSession(url, transport),
                 )
         row = report["sources"][0]
@@ -271,7 +275,7 @@ class OfficialTransportRecoveryTests(unittest.TestCase):
             "snapshots": [{"purpose": "LIST", "body": b"<html>changed</html>", "content_type": "text/html", "http_status": 200}],
         }):
             report = candidate.run_canary(
-                oc, ["S-019"], datetime(2026, 10, 5, tzinfo=timezone.utc),
+                oc, ["S-032"], datetime(2026, 10, 5, tzinfo=timezone.utc),
                 session_factory=lambda url: candidate.BoundedSession(url),
             )
         row = report["sources"][0]

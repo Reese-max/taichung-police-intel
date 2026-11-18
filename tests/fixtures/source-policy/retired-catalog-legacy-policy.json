@@ -1,0 +1,151 @@
+{
+  "active_source_ids": [
+    "S-004",
+    "S-006",
+    "S-007",
+    "S-009"
+  ],
+  "active_sources": [
+    {
+      "authority": "臺中市議會",
+      "cadence_class": "DAILY_EVENT",
+      "entrypoint": "https://www.tccc.gov.tw/wb_download13.asp?uno=&cno=49",
+      "name": "臺中市議會議事日程",
+      "role": "PRIMARY_EVENT",
+      "source_id": "S-004",
+      "status": "PRODUCTION_ACTIVE"
+    },
+    {
+      "authority": "臺中市議會",
+      "cadence_class": "DAILY_EVENT",
+      "entrypoint": "https://www.tccc.gov.tw/wb_download13.asp?uno=&cno=50",
+      "name": "臺中市議會質詢順序表",
+      "role": "PRIMARY_EVENT",
+      "source_id": "S-006",
+      "status": "PRODUCTION_ACTIVE"
+    },
+    {
+      "authority": "臺中市議會",
+      "cadence_class": "DAILY_EVENT",
+      "entrypoint": "https://yishi.tccc.gov.tw/api/ProceedingsBackWeb/FrontList",
+      "name": "臺中市議會議事資訊系統－議事錄",
+      "role": "PRIMARY_EVENT",
+      "source_id": "S-007",
+      "status": "PRODUCTION_ACTIVE"
+    },
+    {
+      "authority": "臺中市議會",
+      "cadence_class": "DAILY_EVENT",
+      "entrypoint": "https://yishi.tccc.gov.tw/api/Proposal/FrontList",
+      "name": "臺中市議會議事資訊系統－各項提案",
+      "role": "PRIMARY_EVENT",
+      "source_id": "S-009",
+      "status": "PRODUCTION_ACTIVE"
+    }
+  ],
+  "capabilities": [
+    {
+      "candidate_or_optional_sources": [
+        "CTX-165",
+        "CTX-POP",
+        "S-001",
+        "S-010",
+        "S-011",
+        "S-026",
+        "S-028",
+        "S-031",
+        "S-032",
+        "S-035",
+        "S-036",
+        "S-037"
+      ],
+      "capability_id": "publication_metadata",
+      "coverage_limitation": "只代表 policy 中已啟用來源，不代表世界完整性。",
+      "label": "目前核准來源的 publication metadata",
+      "required_sources": [
+        "S-004",
+        "S-006",
+        "S-007",
+        "S-009"
+      ],
+      "supported": true
+    },
+    {
+      "candidate_or_optional_sources": [
+        "CTX-165",
+        "CTX-POP",
+        "S-001",
+        "S-010",
+        "S-011",
+        "S-026",
+        "S-028",
+        "S-031",
+        "S-032",
+        "S-035",
+        "S-036",
+        "S-037"
+      ],
+      "capability_id": "source_health",
+      "coverage_limitation": "健康來源不等於該問題領域具完整覆蓋。",
+      "label": "目前核准來源的來源健康狀態",
+      "required_sources": [
+        "S-004",
+        "S-006",
+        "S-007",
+        "S-009"
+      ],
+      "supported": true
+    },
+    {
+      "candidate_or_optional_sources": [
+        "S-010",
+        "S-011"
+      ],
+      "capability_id": "council_affairs",
+      "coverage_limitation": "只涵蓋 policy 中符合議會語意且已啟用的來源。",
+      "label": "議會／質詢相關公開資料",
+      "required_sources": [
+        "S-004",
+        "S-006",
+        "S-007",
+        "S-009"
+      ],
+      "supported": true
+    },
+    {
+      "candidate_or_optional_sources": [
+        "S-032"
+      ],
+      "capability_id": "traffic_events",
+      "coverage_limitation": "僅涵蓋已啟用且明確屬交通事件的來源；不代表所有臨時交通事件。",
+      "label": "交通事件公開資料",
+      "required_sources": [],
+      "supported": false
+    },
+    {
+      "candidate_or_optional_sources": [
+        "CTX-165"
+      ],
+      "capability_id": "fraud_reference",
+      "coverage_limitation": "僅作已啟用官方資料範圍內的反詐參考，不推論本地案件量。",
+      "label": "反詐公開參考資料",
+      "required_sources": [],
+      "supported": false
+    }
+  ],
+  "catalog_hash": "e301a29664700b6e4b31d52d835dd7a0b97a6bac93c6187fa49e6efed3f27231",
+  "catalog_schema_version": 2,
+  "catalog_updated_at": "2026-11-17",
+  "policy_hash": "4633a38b6b1eee6fd0ae5bbe498bce5f0dac4fde4c8c871eedb6382595398679",
+  "policy_version": 1,
+  "rules": {
+    "candidate_sources_are_verified": false,
+    "runtime_may_drop_failed_required_source": false,
+    "zero_result_scope": "BOUNDED_TO_REQUIRED_SOURCES_ONLY"
+  },
+  "schema_version": 1,
+  "transition": {
+    "promoted": [],
+    "retired": []
+  }
+}

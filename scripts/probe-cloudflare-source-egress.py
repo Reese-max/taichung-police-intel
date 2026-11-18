@@ -57,7 +57,7 @@ def main():
         base = f"https://{name}.{subdomain}.workers.dev/probe"
         # Account API authentication never goes to a public Worker.
         with requests.Session() as client:
-            for sid in ("S-029","S-001","S-019"):
+            for sid in ("S-001",):
                 for retry in range(3):
                     response = client.get(base,params={"source":sid},headers={"Authorization":f"Bearer {token}"},timeout=(5,25),allow_redirects=False)
                     if response.status_code != 404 or retry == 2: break

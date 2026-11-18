@@ -17,7 +17,6 @@ from intel_v2.lkg_age import last_known_good_age
 ROOT = Path(__file__).resolve().parent
 TZ = ZoneInfo("Asia/Taipei")
 STATUS_FIXTURE = "source-seven-day-status-2026-08-14.csv"
-S029_FIXTURE = "source-live-canary-s026-s029-2026-08-14.json"
 SOURCE_POLICY = ROOT / "scripts" / "source-policy.py"
 
 
@@ -108,34 +107,6 @@ def load_fixtures(root: Path = ROOT) -> dict[str, dict]:
             "tracked_items": [],
         }
 
-    canary = json.loads((root / S029_FIXTURE).read_text(encoding="utf-8"))
-    source = canary["sources"]["S-029"]
-    name, source_url = P0_SOURCES["S-029"]
-    window_start, window_end = fixture_window(canary["window_start"], canary["window_end"])
-    fixtures["S-029"] = {
-        "source_id": "S-029",
-        "source_name": name,
-        "source_url": source_url,
-        "capture_time": canary["checked_at"],
-        "source_health": source["source_health"],
-        "window_completeness": source["window_completeness"],
-        "window_start": window_start,
-        "window_end": window_end,
-        "window_item_count": len(source["window_items"]),
-        "manifest_sha256": source["manifest_sha256"],
-        "snapshot_ref": S029_FIXTURE,
-        "snapshot_item_count": source["latest_session"]["parsed_count"],
-        "tracked_items": [
-            {
-                "stable_key": item["item_id"],
-                "title": item["title"],
-                "source_url": item["url"],
-                "published_at": item["published_at"],
-                "content_sha256": item["sha256"],
-            }
-            for item in source["police_attachments"]
-        ],
-    }
     return fixtures
 
 

@@ -1,6 +1,8 @@
 # GovIntel AI－資料來源與取得狀態
 
-文件更新 2026-10-07。active 來源以[核准 policy](../source-policy.approved.json)為準，catalog、入口可取得與 fixture 不代表正式啟用。最新具日期的 production 觀察見[CURRENT_STATUS](CURRENT_STATUS.md)。
+**2026-11-17 退役：** 擁有者決定移除 S-019、S-029、S-033、S-034：前兩者憑證 hostname mismatch 且只剩公告頁，S-033 回傳公告 HTML 而非 RSS，S-034 網域 NXDOMAIN、替代網域同路徑 502。現行 active 為 S-004／S-006／S-007／S-009；候選觀察為 S-001／S-032／S-031，Pages 候選為 S-001／S-032。這次只重建現行發布投影，保留原收集時間；下列日期化歷史收據不改寫，未重新連網收集、未部署驗證。
+
+文件更新 2026-11-17（退役更新；下列 production 收據保留原日期）。active 來源以[核准 policy](../source-policy.approved.json)為準，catalog、入口可取得與 fixture 不代表正式啟用。最新具日期的 production 觀察見[CURRENT_STATUS](CURRENT_STATUS.md)。
 
 ## 已核准基線
 
@@ -10,7 +12,7 @@
 | S-006 | [臺中市議會質詢順序](https://www.tccc.gov.tw/wb_download13.asp?uno=&cno=50) | `PRODUCTION_ACTIVE`；單源結果不能代表所有公共公告。 |
 | S-007 | [議事錄 API](https://yishi.tccc.gov.tw/api/ProceedingsBackWeb/FrontList) | `PRODUCTION_ACTIVE`；這是需參數的 API endpoint，直接無參數 GET 回 400，不是可點開的文件；參數化 collector receipt 為`STALE`，不因 HTTP 成功改成新鮮。 |
 | S-009 | [各項提案 API](https://yishi.tccc.gov.tw/api/Proposal/FrontList) | `PRODUCTION_ACTIVE`；這是需參數的 API endpoint，直接無參數 GET 回 400；保留缺日期、窗口與查詢範圍限制。 |
-| S-029 | [市府議會專案報告](https://www.rdec.taichung.gov.tw/12047/12142/12145) | `PRODUCTION_ACTIVE`；10/7 固定回讀 PASS／STALE，官方資料截至 2026-07-24；成功取得不代表官方近期更新或現況沒有事件。 |
+| S-029 | 市府議會專案報告 | 2026-11-17 退役；憑證 hostname mismatch，入口只剩公告頁。10/7 固定回讀僅為歷史證據。 |
 | S-010 | [市議會官方影音](https://www.tccc.gov.tw/) | 既有 evidence navigation，不是第六個定期 collector；transcript 只作導航。 |
 
 五來源的 publication 仍`PARTIAL`。2026-10-05 01:13 Asia/Taipei 的公開觀察對應 generation `CR-DEMO-20261004-EVENING-SCHEDULE`，generated `2026-10-04T23:26:28+08:00`。這是時間化快照，不是完整涵蓋證明。
@@ -23,10 +25,10 @@
 |---|---|---|
 | S-001 警政 | [catalog](../source-catalog.v2.json)、[observation workflow](../../../.github/workflows/candidate-source-observation.yml) | `CANDIDATE_CANARY`；列表／詳細內容、日期、完整性、失敗與權利。 |
 | S-032 交通 | 同上 | `CANDIDATE_CANARY`；路段、日期、例外與更正依原機關公告。 |
-| S-033 市政 | 同上；[市政新聞 83551](https://data.gov.tw/dataset/83551) | `CANDIDATE_CANARY`；83551 與同源市政公告不增加獨立佐證。 |
+| S-033 市政 | 2026-11-17 退役 | RSS 入口回傳公告 HTML，已移出現行候選與 promotion plan。 |
 | S-031 消防 | 同上 | `CANDIDATE_CANARY`；短生命週期 snapshot 附觀測時間／涵蓋；消失不等於解除，列數不等於完整事件數。 |
 
-歷史 `main@562141e` 的獨立 workflow 漏了 S-019；目前已合併補入並要求五個計畫來源各有有效觀察日，避免漏驗。這沒有製造七日證據，也沒有把 v6 首期四類改成五類。[10/6 原始窗口驗算](../source-reviews/2026-10-06/candidate-window-actual.json)：S-032／33 各 7 有效日、S-031 1 日、S-001／19 為 0；完整性、權利／敏感內容、版本、核准 promotion 與公開 readback 另需通過。S-019 及四類候選均未啟用，沒有每日新增 100–200 筆的證據。
+歷史 `main@562141e` 的獨立 workflow 漏了 S-019；當時已合併補入並要求五個計畫來源各有有效觀察日，避免漏驗。這沒有製造七日證據，也沒有把 v6 首期四類改成五類。[10/6 原始窗口驗算](../source-reviews/2026-10-06/candidate-window-actual.json)：S-032／33 各 7 有效日、S-031 1 日、S-001／19 為 0。2026-11-17 退役後 workflow 僅觀察 S-001／S-032／S-031；完整性、權利／敏感內容、版本、核准 promotion 與公開 readback 另需通過，沒有每日新增 100–200 筆的證據。
 
 ## v6 指定背景資料
 
@@ -46,7 +48,7 @@ D1 由官方固定期別頁的原生 CSV 下載流程取得；同頁 JSON open s
 
 [真實手動晚間蒐集](closure-20261006/evening-collection.json)已取得 S-029 原 WWW 資源，source health PASS／COMPLETE_ZERO；官方日期仍 2026-07-24／STALE，不把取得時間冒成更新。較早 FAILED／LKG receipt 不改寫。S-019 的 schema probe HTTP 200／NO_DRIFT 只算一次實際連線；有效 canary 日數仍依另存原始 observation 驗算。S-001 未恢復。Gateway 初次 503／workflow failure 與後來完整匿名回讀 PASS 分別留證，不以 HTTP 200 取代版本／hash。
 
-10/6 22:06 Asia/Taipei 的[新一輪真實 canary](closure-20261006/current-candidate-observation.json)已獨立留證：S-019 有第一個有效當地日；S-031 仍只有同一天的 1 日，重跑不增加日數。S-032／33 仍需權利及獨立完整性，S-001 失敗；全部未 promotion。較早七日窗口及其失敗不改寫，S-019 至少還需六個未來實際有效日。
+10/6 22:06 Asia/Taipei 的[新一輪真實 canary](closure-20261006/current-candidate-observation.json)已獨立留證：S-019 有第一個有效當地日；S-031 仍只有同一天的 1 日，重跑不增加日數。當時 S-032／33 仍需權利及獨立完整性，S-001 失敗；全部未 promotion。較早七日窗口及其失敗不改寫；2026-11-17 退役後不再要求 S-019／S-033 累積觀察日。
 
 ## 2026-10-07 有界取得進度
 

@@ -310,7 +310,7 @@ test("intelligence-feed.json items do not expose raw payload", async () => {
 test("intelligence-feed.json source_summary covers all P0 sources", async () => {
   const raw = await readFile(new URL("../public/data/intelligence-feed.json", import.meta.url), "utf8");
   const feed = JSON.parse(raw);
-  const expectedSources = ["S-004", "S-006", "S-007", "S-009", "S-029"];
+  const expectedSources = ["S-004", "S-006", "S-007", "S-009"];
   for (const sid of expectedSources) {
     assert.ok(feed.source_summary[sid], `source_summary missing ${sid}`);
     assert.ok(feed.source_summary[sid].health, `source_summary ${sid} missing health`);

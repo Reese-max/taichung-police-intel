@@ -34,7 +34,7 @@ bundle_spec.loader.exec_module(bundle)
 class CandidatePublicationWiringTests(unittest.TestCase):
     def test_collector_archive_gate_rejects_retained_lkg_before_any_publication_write(self):
         cases = [(lane, source_id, location) for lane, source_id in (
-            ("items", "S-004"), ("candidate_items", "S-019")) for location in ("item", "payload")]
+            ("items", "S-004"), ("candidate_items", "S-001")) for location in ("item", "payload")]
         for lane, source_id, location in cases:
             with self.subTest(lane=lane, location=location), tempfile.TemporaryDirectory() as directory:
                 output = Path(directory) / "source-status.json"
@@ -187,7 +187,7 @@ class CandidatePublicationWiringTests(unittest.TestCase):
             status = json.loads(output.read_text(encoding="utf-8"))
             feed = json.loads((output.parent / "intelligence-feed.json").read_text(encoding="utf-8"))
             active_ids = set(collector.P0_SOURCES)
-            candidate_ids = {"S-001", "S-019", "S-032"}
+            candidate_ids = {"S-001", "S-032"}
             self.assertEqual({row["source_id"] for row in status["sources"]}, active_ids)
             self.assertEqual({row["source_id"] for row in status["candidate_sources"]}, candidate_ids)
             self.assertEqual({item["source_id"] for item in feed["items"]}, active_ids)
@@ -265,7 +265,7 @@ class CandidatePublicationWiringTests(unittest.TestCase):
             output = Path(directory) / "source-status.json"
 
             def fake_collect(_session, source_id, _start, _end, *_args, **_kwargs):
-                if source_id == "S-019" and fail_city_meeting[0]:
+                if source_id == "S-001" and fail_city_meeting[0]:
                     raise RuntimeError("candidate-only failure")
                 if source_id in collector.P0_SOURCES:
                     name, source_url = collector.P0_SOURCES[source_id]
@@ -295,15 +295,15 @@ class CandidatePublicationWiringTests(unittest.TestCase):
                 collector.build_demo_status(output, "MORNING", date(2026, 9, 11), "manual")
                 first_status = json.loads(output.read_text(encoding="utf-8"))
                 first_feed = json.loads((output.parent / "intelligence-feed.json").read_text(encoding="utf-8"))
-                prior_lkg = next(row for row in first_status["candidate_sources"] if row["source_id"] == "S-019")["last_known_good"]
+                prior_lkg = next(row for row in first_status["candidate_sources"] if row["source_id"] == "S-001")["last_known_good"]
 
                 fail_city_meeting[0] = True
                 collector.build_demo_status(output, "MORNING", date(2026, 9, 11), "manual")
 
             status = json.loads(output.read_text(encoding="utf-8"))
             feed = json.loads((output.parent / "intelligence-feed.json").read_text(encoding="utf-8"))
-            city = next(row for row in status["candidate_sources"] if row["source_id"] == "S-019")
-            lkg_item = next(item for item in feed["candidate_items"] if item["source_id"] == "S-019")
+            city = next(row for row in status["candidate_sources"] if row["source_id"] == "S-001")
+            lkg_item = next(item for item in feed["candidate_items"] if item["source_id"] == "S-001")
             self.assertEqual(status["latest_collection_run"]["status"], "SUCCEEDED")
             self.assertEqual({row["source_id"] for row in status["sources"]}, set(collector.P0_SOURCES))
             self.assertEqual(city["source_health"], "FAILED")
@@ -325,7 +325,7 @@ class CandidatePublicationWiringTests(unittest.TestCase):
         phase = "complete"
 
         def collect(_session, source_id, *_args, **_kwargs):
-            if source_id == "S-019" and phase == "failed":
+            if source_id == "S-001" and phase == "failed":
                 raise ConnectionError("candidate-only outage")
             keys = ("kept", "missing") if phase == "complete" else ("kept", "new")
             items = [{
@@ -355,8 +355,8 @@ class CandidatePublicationWiringTests(unittest.TestCase):
             )
 
         sources, items, _ = run()
-        original_status = next(row for row in sources if row["source_id"] == "S-019")
-        original = next(item for item in items if item["source_id"] == "S-019" and item["stable_key"] == "missing")
+        original_status = next(row for row in sources if row["source_id"] == "S-001")
+        original = next(item for item in items if item["source_id"] == "S-001" and item["stable_key"] == "missing")
         for phase in ("partial", "empty_partial", "failed", "recovered"):
             with self.subTest(phase=phase):
                 now += timedelta(days=1)
@@ -366,8 +366,8 @@ class CandidatePublicationWiringTests(unittest.TestCase):
                 bundle.validate_candidate_lane(status, feed, active_ids=set(collector.P0_SOURCES), required=True)
                 context = v2.candidate_source_context_projection(status, feed)
                 verify_v2.validate_candidate_source_context(feed, status, {"items": {}}, {"candidate_source_context": context})
-                city = next(row for row in sources if row["source_id"] == "S-019")
-                by_key = {item["stable_key"]: item for item in items if item["source_id"] == "S-019"}
+                city = next(row for row in sources if row["source_id"] == "S-001")
+                by_key = {item["stable_key"]: item for item in items if item["source_id"] == "S-001"}
                 if phase == "recovered":
                     self.assertEqual(set(by_key), {"kept", "new"})
                     self.assertNotEqual(city["last_known_good"], original_status["last_known_good"])
@@ -387,7 +387,7 @@ class CandidatePublicationWiringTests(unittest.TestCase):
                 if phase != "failed":
                     self.assertEqual(city["result"], "PARTIAL")
                     self.assertEqual(city["window_item_count"], 0 if phase == "empty_partial" else 2)
-                    self.assertEqual(summary["S-019"]["item_count"], 3)
+                    self.assertEqual(summary["S-001"]["item_count"], 3)
                     self.assertEqual(by_key["kept"]["title"], "kept partial")
                 else:
                     self.assertIsNone(city["window_item_count"])
@@ -396,9 +396,7 @@ class CandidatePublicationWiringTests(unittest.TestCase):
     def test_v2_context_names_all_first_promotion_candidates(self):
         expected = {
             "S-001": "臺中市政府警察局警政新聞",
-            "S-019": "臺中市政府市政會議紀錄與專案報告",
             "S-032": "臺中市政府交通局最新消息",
-            "S-033": "臺中市政府市政新聞",
             "S-031": "臺中市政府消防局即時災情",
         }
         self.assertEqual(

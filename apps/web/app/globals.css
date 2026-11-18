@@ -838,7 +838,6 @@ h1 {
 .feed-card[data-source-id="S-006"] { border-left-color: #a78bfa; }
 .feed-card[data-source-id="S-007"] { border-left-color: var(--amber); }
 .feed-card[data-source-id="S-009"] { border-left-color: var(--green); }
-.feed-card[data-source-id="S-029"] { border-left-color: #22d3ee; }
 
 /* ── Summary stat box ───────────────────────────────────────────────────────── */
 .summary-stat-box {

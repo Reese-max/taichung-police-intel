@@ -31,11 +31,11 @@ class SourceGovernanceTests(unittest.TestCase):
             legacy_store.DEFAULT_FEED, legacy_store.DEFAULT_STATUS, legacy_store.DEFAULT_BRIEF,
         )
         self.assertEqual(store["items"], [])
-        self.assertEqual(len(store["sources"]), 5)
+        self.assertEqual(len(store["sources"]), 4)
         self.assertEqual(store["formal_admission"]["status"], "UNKNOWN")
         gateway_module = load_fixture_module(fixture, "legacy_governance_health", "scripts/query-gateway.py")
         health = gateway_module.QueryGateway().execute("get_source_health", {})
-        self.assertEqual(len(health["sources"]), 5)
+        self.assertEqual(len(health["sources"]), 4)
         self.assertTrue(all(row["rights_status"] == "UNKNOWN" and row["review_required"]
                             for row in health["source_rights"]))
         self.assertEqual(health["formal_admission"]["status"], "UNKNOWN")

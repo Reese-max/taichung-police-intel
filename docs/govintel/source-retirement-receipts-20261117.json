@@ -1,0 +1,7 @@
+[
+  {
+    "source_id": "S-029",
+    "receipt_id": "owner-decision:2026-11-17:retire-unavailable-sources",
+    "reason": "Owner decision 2026-11-17: 無法用就刪除. Retire S-029 from collection and current publication. Owner-supplied observations on 2026-11-17 Asia/Taipei: rdec.taichung.gov.tw/12047/12142/12145 has TLS hostname mismatch; bypassed verification yielded only a 571-byte live.taichung.gov.tw announcement, not project reports. source-status records CONNECTTIMEOUT / SOURCE_FAILED; last success 2026-11-15. No new collection or independent network verification was performed for this retirement. S-019 has the same TLS/announcement failure and CI http_status=0 since 2026-11-16T16:31Z; S-033 returned announcement HTML instead of RSS; S-034 datacenter.taichung.gov.tw is NXDOMAIN (including 8.8.8.8), alternate newdatacenter same path returns 502. All four removed by this owner decision; historical evidence remains unchanged."
+  }
+]

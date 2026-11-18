@@ -19,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        source: [S-019, S-001, S-032, S-033, S-031]
+        source: [S-001, S-032, S-031]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -38,15 +38,8 @@ jobs:
         env:
           GOVINTEL_CANDIDATE_SOURCE: ${{ matrix.source }}
         run: |
-          budget_args=()
-          # S019's official 25-page archive was actually traversed Oct 7.
-          # Bound its daily verification explicitly; other sources keep defaults.
-          if [[ "$GOVINTEL_CANDIDATE_SOURCE" == "S-019" ]]; then
-            budget_args=(--list-page-limit 30 --http-call-limit 32)
-          fi
           python -X utf8 scripts/candidate-runtime-canary.py \
             --source "$GOVINTEL_CANDIDATE_SOURCE" \
-            "${budget_args[@]}" \
             --existing candidate-source-observation.previous.json \
             --output candidate-source-observation.json
           cp candidate-source-observation.json candidate-source-observation.previous.json

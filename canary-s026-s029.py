@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""執行 S-026 法規草案與 S-029 議會專案報告的唯讀 live canary。"""
+"""執行 S-026 法規草案的唯讀 live canary。"""
 
 from __future__ import annotations
 
@@ -24,9 +24,7 @@ S026_LEGACY_URL = "https://lawsearch.taichung.gov.tw/GLRSout/DraftForum.aspx"
 S026_CURRENT_URL = "https://law.taichung.gov.tw/DraftForum.aspx"
 S026_HISTORY_URL = f"{S026_CURRENT_URL}?Type=H"
 S026_POLICE_PROBE_URL = "https://law.taichung.gov.tw/DraftOpinion.aspx?id=111637&Type=H"
-S029_INDEX_URL = "https://www.rdec.taichung.gov.tw/12047/12142/12145"
 S026_HOSTS = {"lawsearch.taichung.gov.tw", "law.taichung.gov.tw"}
-S029_HOSTS = {"www.rdec.taichung.gov.tw"}
 REDIRECT_STATUSES = {301, 302, 303, 307, 308}
 MAX_REDIRECTS = 3
 
@@ -84,7 +82,7 @@ def get(
 ) -> requests.Response:
     last_error: requests.RequestException | None = None
     # The production session already retries transient failures in its adapter.
-    # Keep one retry owner so S-029 does not multiply two three-attempt budgets.
+    # Keep one retry owner so callers do not multiply two three-attempt budgets.
     attempts = 3
     if isinstance(session, requests.Session):
         retry = session.get_adapter(url).max_retries
@@ -256,132 +254,6 @@ def fetch_s026(session: requests.Session, start: date, end: date) -> dict:
     }
 
 
-def parse_session_links(soup: BeautifulSoup, base_url: str) -> list[dict]:
-    sessions: list[dict] = []
-    seen: set[str] = set()
-    pattern = re.compile(r"^臺中市議會第\d+屆第\d+次(?:定期會|臨時會)$")
-    for anchor in soup.select('a[href*="Lpsimplelist"]'):
-        title = (anchor.get("title") or " ".join(anchor.stripped_strings)).strip()
-        if not pattern.fullmatch(title):
-            continue
-        url = urljoin(base_url, anchor.get("href", ""))
-        if url in seen:
-            continue
-        seen.add(url)
-        sessions.append({"title": title, "url": url})
-    return sessions
-
-
-def parse_rdec_items(soup: BeautifulSoup, base_url: str) -> list[dict]:
-    items: dict[str, dict] = {}
-    for anchor in soup.select('a[href*="/media/"]'):
-        url = urljoin(base_url, anchor.get("href", ""))
-        if ".pdf" not in url.lower():
-            continue
-        row = anchor.find_parent("li") or anchor.find_parent("tr") or anchor.parent
-        row_text = " ".join(row.stripped_strings)
-        date_match = re.search(r"\b(20\d{2}-\d{2}-\d{2})\b", row_text)
-        raw_title = anchor.get("title") or " ".join(anchor.stripped_strings)
-        title = raw_title.split("(另開新視窗)", 1)[0].strip()
-        item_match = re.match(r"(\d{7,9}-\d+)", title)
-        items[url] = {
-            "item_id": item_match.group(1) if item_match else sha256(url.encode("utf-8"))[:16],
-            "title": title,
-            "published_at": date_match.group(1) if date_match else "",
-            "url": url,
-        }
-    return list(items.values())
-
-
-def fetch_s029(session: requests.Session, start: date, end: date, *, on_response=None) -> dict:
-    index = get(session, S029_INDEX_URL, S029_HOSTS)
-    if on_response is not None:
-        on_response(index, "LIST")
-    index_soup = BeautifulSoup(index.content, "html.parser")
-    sessions = parse_session_links(index_soup, index.url)
-    if not sessions:
-        raise RuntimeError("議會專案報告入口找不到會期清單")
-    latest = sessions[0]
-
-    first_url = f"{latest['url']}?Page=1&PageSize=30&type="
-    first = get(session, first_url, S029_HOSTS)
-    if on_response is not None:
-        on_response(first, "LIST")
-    first_soup = BeautifulSoup(first.content, "html.parser")
-    first_text = " ".join(first_soup.stripped_strings)
-    count_match = re.search(r"共\s*([\d,]+)\s*筆資料.*?第\s*(\d+)\s*/\s*(\d+)\s*頁", first_text)
-    if not count_match:
-        raise RuntimeError("最新會期清單缺少總筆數或頁次")
-    declared_count = int(count_match.group(1).replace(",", ""))
-    current_page = int(count_match.group(2))
-    page_count = int(count_match.group(3))
-    if current_page != 1 or page_count > 20:
-        raise RuntimeError(f"最新會期頁次異常：{current_page}/{page_count}")
-
-    pages = [first]
-    for page in range(2, page_count + 1):
-        response = get(session, f"{latest['url']}?Page={page}&PageSize=30&type=", S029_HOSTS)
-        pages.append(response)
-        if on_response is not None:
-            on_response(response, "LIST")
-    items_by_url: dict[str, dict] = {}
-    for response in pages:
-        for item in parse_rdec_items(BeautifulSoup(response.content, "html.parser"), response.url):
-            items_by_url[item["url"]] = item
-    items = list(items_by_url.values())
-    if len(items) != declared_count:
-        raise RuntimeError(f"最新會期筆數不一致：宣告 {declared_count}，取得 {len(items)}")
-    if any(not item["published_at"] for item in items):
-        raise RuntimeError("議會專案報告缺少發布日期")
-
-    police_items = [item for item in items if "警察" in item["title"] or "警政" in item["title"]]
-    if not police_items:
-        raise RuntimeError("最新會期沒有可驗證的警政專案報告")
-    police_attachments = []
-    for item in police_items:
-        response = get(session, item["url"], S029_HOSTS, 120)
-        if on_response is not None:
-            on_response(response, "ATTACHMENT")
-        if not response.content.startswith(b"%PDF-"):
-            raise RuntimeError(f"警政專案附件不是 PDF：{item['url']}")
-        police_attachments.append({
-            **item,
-            "http_status": response.status_code,
-            "content_length": len(response.content),
-            "sha256": sha256(response.content),
-        })
-
-    window_items = [item for item in items if in_window(item["published_at"], start, end)]
-    stable_manifest = {
-        "latest_session": latest,
-        "declared_count": declared_count,
-        "items": items,
-        "police_attachments": police_attachments,
-    }
-    return {
-        "source_id": "S-029",
-        "source_name": "臺中市政府議會專案報告",
-        "canary_status": "PASS",
-        "source_health": "PASS",
-        "window_completeness": "COMPLETE_WITH_ITEMS" if window_items else "COMPLETE_ZERO",
-        "index": {
-            **response_evidence(index),
-            "session_count": len(sessions),
-        },
-        "latest_session": {
-            **latest,
-            "declared_count": declared_count,
-            "page_count": page_count,
-            "parsed_count": len(items),
-            "list_pages": [response_evidence(page) for page in pages],
-        },
-        "window_items": window_items,
-        "police_item_count": len(police_items),
-        "police_attachments": police_attachments,
-        "manifest_sha256": manifest_sha256(stable_manifest),
-    }
-
-
 def self_check() -> None:
     assert roc_dot_to_iso("115.07.27") == "2026-07-27"
     assert roc_dot_to_iso("日期缺失") == ""
@@ -420,7 +292,7 @@ def main() -> None:
         "script_sha256": sha256(Path(__file__).read_bytes()),
         "sources": {},
     }
-    for source_id, fetcher in (("S-026", fetch_s026), ("S-029", fetch_s029)):
+    for source_id, fetcher in (("S-026", fetch_s026),):
         try:
             result["sources"][source_id] = fetcher(session, window_start, args.window_end)
         except Exception as exc:  # 保留失敗證據，不把失敗改寫成零筆。

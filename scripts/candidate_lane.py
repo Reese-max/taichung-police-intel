@@ -33,7 +33,7 @@ def collect_pages_candidate_lane(
     session_factory=None,
     clock=None,
 ) -> tuple[list[dict], list[dict], dict[str, dict]]:
-    """Collect S-001/S-019/S-032 independently from the production-active lane."""
+    """Collect S-001/S-032 independently from the production-active lane."""
     catalog_sources = load_candidate_publication_sources()
     source_configs = collector["NEWS_LIST_SOURCES"]
     configured = {

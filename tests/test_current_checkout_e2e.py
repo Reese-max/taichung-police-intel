@@ -521,7 +521,7 @@ class GovernanceAdmissionTests(unittest.TestCase):
         self.assertEqual(ctx["policy"]["schema_version"], 1)
         self.assertEqual(ctx["formal_admission"]["status"], "UNKNOWN")
         self.assertEqual(ctx["store"]["items"], [])
-        self.assertEqual(len(ctx["store"]["sources"]), 5)
+        self.assertEqual(len(ctx["store"]["sources"]), 4)
         with tempfile.TemporaryDirectory() as tmp:
             serve = vc.prepare_serve_dir(ctx, Path(tmp))
             server, base = vc.start_server(ctx, serve)
@@ -536,7 +536,7 @@ class GovernanceAdmissionTests(unittest.TestCase):
                 self.assertEqual(doc["error"]["code"], "RIGHTS_BLOCKED")
                 status, doc = vc.http_post_json(base + "/query", {"tool": "get_source_health", "arguments": {}})
                 self.assertEqual(status, 200)
-                self.assertEqual(len(doc["sources"]), 5)
+                self.assertEqual(len(doc["sources"]), 4)
             finally:
                 server.shutdown(); server.server_close()
 

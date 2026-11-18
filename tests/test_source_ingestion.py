@@ -9,10 +9,11 @@ import unittest
 import uuid
 from datetime import date, datetime
 from pathlib import Path
+from unittest import mock
 
 from jsonschema import Draft202012Validator, FormatChecker, ValidationError
 
-from collect import P0_SOURCES, TZ, run_slot
+from collect import P0_SOURCES, TZ, canonical_sha256, load_fixtures, run_slot
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -38,6 +39,24 @@ TABLES = {
     "source_snapshots",
     "detail_recheck_state",
 }
+
+
+def active_item_fixtures(root: Path = ROOT) -> dict:
+    """Add fictional pre-window active items without rewriting historical captures."""
+    fixtures = load_fixtures(root)
+    fixture = fixtures["S-006"]
+    fixture.update(
+        snapshot_item_count=2,
+        snapshot_ref="FICTIONAL_OFFLINE_S006_ITEMS", evidence_note="FICTIONAL_OFFLINE_ITEMS",
+        tracked_items=[
+            {"stable_key": f"fictional-report-{number}", "content_sha256": canonical_sha256(number),
+             "published_at": "2026-08-01T00:00:00+08:00"}
+            for number in (1, 2)
+        ],
+    )
+    fixture.pop("manifest_sha256")
+    fixture["manifest_sha256"] = canonical_sha256(fixture)
+    return fixtures
 
 
 def first(bundle: dict, record_type: str) -> dict:
@@ -220,6 +239,7 @@ class SourceIngestionContractTests(unittest.TestCase):
         self.assertIn("detail_recheck_state", compact)
         self.assertIn("FOR UPDATE SKIP LOCKED", (ROOT / "online_collect.py").read_text(encoding="utf-8"))
 
+    @mock.patch("collect.load_fixtures", new=active_item_fixtures)
     def test_d2_fixture_slot_is_idempotent_and_exposes_health_gaps_and_lkg(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             state_path = Path(directory) / "state.json"
@@ -266,11 +286,11 @@ class SourceIngestionContractTests(unittest.TestCase):
             self.assertEqual((s009["current_source_health"], s009["result"]), ("PASS", "PARTIAL"))
             self.assertIn("WINDOW_PARTIAL", s009["intelligence_gaps"])
             self.assertIsNotNone(s009["last_known_good"])
-            s029 = state["source_status"]["S-029"]
-            self.assertEqual(s029["freshness_status"], "FRESH")
-            self.assertEqual(s029["last_known_good"]["snapshot_item_count"], 19)
+            self.assertNotIn("S-029", state["source_status"])
             self.assertEqual(len(state["current_items"]), 2)
+            self.assertEqual({item["source_id"] for item in state["current_items"].values()}, {"S-006"})
 
+    @mock.patch("collect.load_fixtures", new=active_item_fixtures)
     def test_d2_failure_is_isolated_and_does_not_overwrite_lkg(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             state_path = Path(directory) / "state.json"
@@ -300,7 +320,9 @@ class SourceIngestionContractTests(unittest.TestCase):
             self.assertEqual(failed_run["previous_successful_source_run_id"], previous_lkg["source_run_id"])
             self.assertEqual(evening["source_status"]["S-004"]["result"], "NO_NEW_ITEM")
             self.assertEqual(len(evening["current_items"]), 2)
+            self.assertEqual(evening["current_items"], morning["current_items"])
 
+    @mock.patch("collect.load_fixtures", new=active_item_fixtures)
     def test_stable_keys_no_duplicates_and_normalized_manifests(self) -> None:
         """Two fixture runs yield no duplicate stable keys and identical manifests."""
         with tempfile.TemporaryDirectory() as directory:

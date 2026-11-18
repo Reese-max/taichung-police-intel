@@ -1,10 +1,12 @@
 # GovIntel AI－現行實作與證據狀態
 
+**2026-11-17 退役：** 擁有者決定移除 S-019、S-029、S-033、S-034：前兩者憑證 hostname mismatch 且只剩公告頁，S-033 回傳公告 HTML 而非 RSS，S-034 網域 NXDOMAIN、替代網域同路徑 502。現行 active 為 S-004／S-006／S-007／S-009；候選觀察為 S-001／S-032／S-031，Pages 候選為 S-001／S-032。這次只重建現行發布投影，保留原收集時間；下列日期化歷史收據不改寫，未重新連網收集、未部署驗證。
+
 文件核對日：2026-10-16（Asia/Taipei），checkout `c629f82a8b16825d5d89c204c7035dcba500a9ac`。公開驗收引用固定為 2026-10-07 的 `main@b6a602580fddf8b4a634dbdf64fc255678495412` 與 [發布 run 37615111747](https://github.com/Reese-max/taichung-police-intel/actions/runs/37615111747)。[PR #177 驗收包](closure-20261007-pr177/README.md)保存三個必要 CI job、精確樹、匿名五檔、Gateway 與 15 項正式 Chromium 結果。這份紀錄只代表其實際查核時間；後續程式修復或蒐集另留 receipt。本次文件核對不把此 checkout 或今天公開站重新認證為該版本。10/6 的 [歷史包](closure-20261006/README.md)保留原版本與限制。
 
 **程式已發布，正式來源查詢仍 `RIGHTS_BLOCKED`。** `deployment_verified=true` 與 `production_verified=false` 同時成立：發布與受限拒答通過，逐來源正式權利尚未准入；不是已能返回核准官方內容的正值查詢。原始 v6 的 85%／90%／30%、20 事件／60 文件及 3–5 位試用者仍是計畫，沒有模型／真人效益結果。
 
-**2026-11-13 擁有者決定（尚未合併、尚未部署驗證）。** 專案擁有者決定放寬來源權利規定，變更在 draft PR [#237](https://github.com/Reese-max/taichung-police-intel/pull/237)、[#238](https://github.com/Reese-max/taichung-police-intel/pull/238)、[#239](https://github.com/Reese-max/taichung-police-intel/pull/239)。合併後 repo 內的核准政策為 governed schema 2，五個正式來源的 `formal_admission` 為 `ADMITTED`，權利狀態標為 `OWNER_ASSERTED_PERMISSION`／`OWNER_DECISION_TERMS_NOT_VERIFIED`：這是擁有者主張，不是逐來源條款查核或法律判斷，其中四個來源屬臺中市議會，其網站未提供開放宣告。公開範圍仍只有 metadata 與連結；全文、摘錄與模型傳輸未開放，provider 仍停用。上方 `RIGHTS_BLOCKED` 是 2026-10-07 固定正式收據的結果，在重新部署並完成正式環境驗收之前仍是正式環境的已驗證狀態；`ADMITTED` 目前只有 repo 內測試與驗證腳本的結果，沒有正式環境收據。
+**2026-11-13 擁有者決定（尚未合併、尚未部署驗證）。** 專案擁有者決定放寬來源權利規定，變更在 draft PR [#237](https://github.com/Reese-max/taichung-police-intel/pull/237)、[#238](https://github.com/Reese-max/taichung-police-intel/pull/238)、[#239](https://github.com/Reese-max/taichung-police-intel/pull/239)。合併後 repo 內的核准政策為 governed schema 2，四個現行正式來源的 `formal_admission` 為 `ADMITTED`，權利狀態標為 `OWNER_ASSERTED_PERMISSION`／`OWNER_DECISION_TERMS_NOT_VERIFIED`：這是擁有者主張，不是逐來源條款查核或法律判斷，現行四個來源均屬臺中市議會，其網站未提供開放宣告。公開範圍仍只有 metadata 與連結；全文、摘錄與模型傳輸未開放，provider 仍停用。上方 `RIGHTS_BLOCKED` 是 2026-10-07 固定正式收據的結果，在重新部署並完成正式環境驗收之前仍是正式環境的已驗證狀態；`ADMITTED` 目前只有 repo 內測試與驗證腳本的結果，沒有正式環境收據。
 
 產品／構想書工作題名為 **GovIntel AI－公共資訊查詢與個人化追蹤平台**。主辦已確認收妥補件、未接受更名；原報名完整題名、代表資格與封面指示仍待確認。不能把產品工作題名當已核准的正式報名題名。
 
@@ -42,7 +44,7 @@
 
 ## 來源與日期
 
-核准 active 集合維持 S-004／S-006／S-007／S-009／S-029。`source-policy.approved.json` 的 legacy active 與逐用途權利准入是不同條件，不能以 active 名稱推論正式查詢權利。
+核准 active 集合自 2026-11-17 為 S-004／S-006／S-007／S-009。`source-policy.approved.json` 的 legacy active 與逐用途權利准入是不同條件，不能以 active 名稱推論正式查詢權利。
 
 [五檔回讀](closure-20261007-pr177/production-bytes.json)固定 `CR-DEMO-20261007-MORNING-MANUAL`：S-004 為 FRESH；S-006 有已核對附件修訂日 2026-09-01、首次發布日未知，VERY_STALE／PARTIAL；S-007 觀察到的官方 API 記錄截至 2026-05-27，STALE；S-009 首次發布日期未知、PARTIAL；S-029 原 WWW 連線已恢復 PASS，但官方 2026-07-24 仍 STALE，窗口零筆不代表現況沒有事件。重新取得或檢查時間沒有被填成官方日期。Schema drift 仍 BLOCKED，沒有藉發布成功抹除來源缺口。
 

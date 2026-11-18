@@ -139,14 +139,10 @@
       "S-009",
       "S-010",
       "S-011",
-      "S-019",
       "S-026",
       "S-028",
-      "S-029",
       "S-031",
       "S-032",
-      "S-033",
-      "S-034",
       "S-035",
       "S-036",
       "S-037"
@@ -154,27 +150,32 @@
     "formal_admission": {
       "status": "ADMITTED",
       "reason": null,
-      "governance_hash": "640d40cf18e32e561273d9525c7235888aa931a8c5be9f29700ae880d8b6f09d",
+      "governance_hash": "0c665cbd4bbb6cbeac930043b07e4e894f0a386a0aa79874670b29e85e9e405b",
       "blocked_sources": [],
       "per_source": {}
     },
     "model_transmission_allowed": false,
     "canonical_policy_changed": false,
-    "retention_policy_hash": "6a52c17625af49cf4b618bbcd22a4909c23df3efd2f92ff70ae2935e8643cf13",
+    "retention_policy_hash": "18809f223924adaa70b3015768717f0c36a76ab7e26bb660f2fa9c0479529727",
     "approved_policy_binding": {
-      "policy_version": 2,
-      "policy_hash": "f027315e3fcb17d2e8825ad5d797a7c7aa60113e1a2562880f9a6bc6b8aaa62b",
-      "catalog_hash": "5088623df5af4b8a30f4c597c51235c0f36a3dfd8bc4f2aea9af8f26d10213ef",
+      "policy_version": 3,
+      "policy_hash": "8cf9a92e5a3a14850e3c34d37b55e739883b20ee20fd19d1c61d4a040265aae8",
+      "catalog_hash": "e301a29664700b6e4b31d52d835dd7a0b97a6bac93c6187fa49e6efed3f27231",
       "active_source_ids": [
         "S-004",
         "S-006",
         "S-007",
-        "S-009",
-        "S-029"
+        "S-009"
       ],
-      "governance_hash": "640d40cf18e32e561273d9525c7235888aa931a8c5be9f29700ae880d8b6f09d",
-      "retention_policy_hash": "6a52c17625af49cf4b618bbcd22a4909c23df3efd2f92ff70ae2935e8643cf13"
-    }
+      "governance_hash": "0c665cbd4bbb6cbeac930043b07e4e894f0a386a0aa79874670b29e85e9e405b",
+      "retention_policy_hash": "18809f223924adaa70b3015768717f0c36a76ab7e26bb660f2fa9c0479529727"
+    },
+    "retired_source_ids": [
+      "S-019",
+      "S-029",
+      "S-033",
+      "S-034"
+    ]
   },
   "dependency_scope": {
     "inventory_code_sha": "5e2298c8db12ec2631dbd8dac11c14599133dcc6",
@@ -286,12 +287,12 @@
     "source_catalog": {
       "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
       "path": "docs/govintel/source-catalog.v2.json",
-      "sha256": "aa30cbd61e76f14d5d9f48402bea46f7c96fb117ae5c3a7e21463a6d1b0b9afa"
+      "sha256": "752f79ff5dc1ed7d0d17d8eddb1d7ed3449bb362056aa3c3ec267bea1b28e042"
     },
     "retention_rights": {
       "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
       "path": "docs/govintel/retention-rights-policy.v1.json",
-      "sha256": "da6fbe0e4fa92b03cab4f6e8069922d2ce5c0f81d32ecfce2e8dccafc9cff218"
+      "sha256": "8fe0ca4ca63ee6b332fedf985dda08df3f2022273625602fdf8f36761edbaf13"
     },
     "source_review": {
       "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
@@ -301,7 +302,7 @@
     "approved_source_policy": {
       "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",
       "path": "docs/govintel/source-policy.approved.json",
-      "sha256": "9cc53b2f77a2eb728408214fcab9b04be0662f6893316a52fd28dfb743708e09"
+      "sha256": "322c6cd4ee33fad27ab8271ea62126dc02688c52956cd0f4d5873956e700639d"
     },
     "model_diagnostic": {
       "code_sha": "c629f82a8b16825d5d89c204c7035dcba500a9ac",

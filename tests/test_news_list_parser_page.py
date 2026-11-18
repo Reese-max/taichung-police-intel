@@ -54,7 +54,7 @@ class ParserPageTests(unittest.TestCase):
 
     def test_unmarked_next_is_only_accepted_for_s032_parser_shape(self):
         base="https://www.rdec.taichung.gov.tw/12047/12142/12186?Page=82"
-        self.assertNotEqual(oc.next_news_list_page(controls(("最末頁", base), ("下一頁", base)), base, "S-019"), (None, False))
+        self.assertNotEqual(oc.next_news_list_page(controls(("最末頁", base), ("下一頁", base)), base, "S-001"), (None, False))
 
     def test_entry_and_explicit_comma_first_page_need_terminal_evidence(self):
         for current in (ROOT, page(1)):

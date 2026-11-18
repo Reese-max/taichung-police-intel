@@ -33,7 +33,7 @@ class QueryGatewayStdioTests(unittest.TestCase):
         self.assertTrue(all(tool["annotations"]["readOnlyHint"] for tool in responses[1]["result"]["tools"]))
         self.assertFalse(responses[2]["result"]["isError"])
         self.assertTrue(responses[2]["result"]["structuredContent"]["publication_hash"])
-        self.assertEqual(len(responses[2]["result"]["structuredContent"]["sources"]), 5)
+        self.assertEqual(len(responses[2]["result"]["structuredContent"]["sources"]), 4)
 
     def test_invalid_json_is_a_protocol_error_without_gateway_traceback(self):
         result = subprocess.run(

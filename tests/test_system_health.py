@@ -85,7 +85,7 @@ class RelayedSourceHealthTests(unittest.TestCase):
                 {"source_id": "S-001", "status": "NO_DRIFT", "observed_at": "2026-10-28T21:50:00+00:00",
                  "observation_origin": "TAIWAN_RELAY", "relay_captured_by": "taiwan-relay",
                  "live_error_reason": "LIVE_FETCH_CONNECTIONERROR"},
-                {"source_id": "S-019", "status": "NO_DRIFT", "observed_at": "2026-10-28T22:39:00+00:00"},
+                {"source_id": "S-032", "status": "NO_DRIFT", "observed_at": "2026-10-28T22:39:00+00:00"},
             ],
         }
         stage = health.schema_contract_stage(receipt)
@@ -180,7 +180,7 @@ class SystemHealthTests(unittest.TestCase):
 
     def test_missing_approved_source_has_a_counted_gap_and_operator_action(self):
         status, brief = controlled_publication_inputs()
-        status["sources"] = [row for row in status["sources"] if row["source_id"] != "S-029"]
+        status["sources"] = [row for row in status["sources"] if row["source_id"] != "S-007"]
         before = deepcopy(status)
         stages = health.current_publication_stages(status, brief)
         collection = next(row for row in stages if row["stage"] == "collection")
@@ -191,7 +191,7 @@ class SystemHealthTests(unittest.TestCase):
         self.assertIsNone(collection["last_success_at"])
         self.assertEqual(len(collection["source_warnings"]), 1)
         warning = collection["source_warnings"][0]
-        self.assertEqual(warning["source_id"], "S-029")
+        self.assertEqual(warning["source_id"], "S-007")
         self.assertEqual(warning["receipt_status"], "MISSING")
         self.assertEqual(warning["source_health"], "UNKNOWN")
         self.assertEqual(warning["reasons"], ["SOURCE_COVERAGE_OR_COLLECTION_GAP"])
@@ -205,7 +205,7 @@ class SystemHealthTests(unittest.TestCase):
 
     def test_missing_source_and_failed_or_stale_present_sources_keep_all_gaps(self):
         status, brief = controlled_publication_inputs()
-        status["sources"] = [row for row in status["sources"] if row["source_id"] != "S-029"]
+        status["sources"] = [row for row in status["sources"] if row["source_id"] != "S-007"]
         failed_id, stale_id = [row["source_id"] for row in status["sources"][:2]]
         status["sources"][0].update(source_health="FAILED", window_completeness="PARTIAL_WINDOW")
         status["sources"][1]["freshness_status"] = "STALE"
@@ -213,7 +213,7 @@ class SystemHealthTests(unittest.TestCase):
         self.assertEqual(collection["outcome"], "PARTIAL")
         self.assertEqual(collection["gap_count"], 2)
         warnings = {row["source_id"]: row for row in collection["source_warnings"]}
-        self.assertEqual(set(warnings), {"S-029", failed_id, stale_id})
+        self.assertEqual(set(warnings), {"S-007", failed_id, stale_id})
         self.assertEqual(warnings[failed_id]["source_health"], "FAILED")
         self.assertEqual(warnings[stale_id]["reasons"], ["SOURCE_FRESHNESS_STALE"])
         self.assertIsNone(collection["last_success_at"])

@@ -153,7 +153,6 @@ class ParseNewsListTests(unittest.TestCase):
     def test_source_patterns_extract_stable_ids_and_dates(self):
         cases = (
             ("S-001", POLICE_LIST, ["202609100003", "202609080003", "202607010001"]),
-            ("S-019", RDEC_LIST, ["873338", "873320"]),
             ("S-032", TRAFFIC_LIST, ["21750", "21749"]),
         )
         for source_id, html, expected in cases:
@@ -240,18 +239,13 @@ class ListFirstGatingTests(unittest.TestCase):
         self.assertTrue(all(item["payload"]["detail"] == "unchanged-skipped" for item in second["items"]))
 
     def test_changed_list_row_fetches_detail(self):
-        first, _ = _collect("S-019", RDEC_LIST)
+        first, _ = _collect("S-001", POLICE_LIST)
         existing = {item["stable_key"]: item for item in first["items"]}
-        changed = _page(
-            """
-            <li><a href="/12047/12142/12186/873338/post">第 650 次市政會議紀錄（修正） 115年9月10日</a></li>
-            <li><a href="/12047/12142/12186/873320/post">第 649 次市政會議紀錄 115年8月27日</a></li>
-            """
-        )
-        detail_url = "https://www.rdec.taichung.gov.tw/12047/12142/12186/873338/post"
-        second, session = _collect("S-019", changed, existing=existing, **{detail_url: DETAIL})
-        self.assertEqual(session.fetched, [oc.NEWS_LIST_SOURCES["S-019"]["list_url"], detail_url])
-        changed_item = next(item for item in second["items"] if item["stable_key"] == "873338")
+        changed = POLICE_LIST.replace("交通宣導".encode(), "交通宣導（修正）".encode())
+        detail_url = "https://www.police.taichung.gov.tw/ch/home.jsp?id=1&mcustomize=news_view.jsp&dataserno=202609080003"
+        second, session = _collect("S-001", changed, existing=existing, **{detail_url: DETAIL})
+        self.assertEqual(session.fetched, [oc.NEWS_LIST_SOURCES["S-001"]["list_url"], detail_url])
+        changed_item = next(item for item in second["items"] if item["stable_key"] == "202609080003")
         self.assertEqual(changed_item["payload"]["detail"], "fetched")
         self.assertIn("body_sha256", changed_item["payload"])
 
@@ -552,7 +546,7 @@ class IncrementalSlotWiringTests(unittest.TestCase):
 
         self.assertEqual(set(captured), set(oc.P0_SOURCES))
         self.assertEqual(captured["S-004"], {"seed-row": stored})
-        self.assertEqual(captured["S-029"], {})
+        self.assertNotIn("S-029", captured)
 
 class RocDateTests(unittest.TestCase):
     def test_roc_formats(self):

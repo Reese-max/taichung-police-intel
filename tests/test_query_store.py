@@ -258,7 +258,7 @@ class QueryStoreTests(unittest.TestCase):
                 self._reseal(qs, candidate)
                 with self.assertRaises(ValueError):
                     qs.query_store(candidate)
-        self.assertEqual(len(qs.query_store(store)["source_status"]), 5)
+        self.assertEqual(len(qs.query_store(store)["source_status"]), 4)
 
     def test_canonical_source_health_cannot_launder_nested_payloads(self):
         feed, feed_hash = qs.load_json(qs.DEFAULT_FEED)

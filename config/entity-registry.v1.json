@@ -46,7 +46,7 @@
       "aliases": ["臺中市研考會", "中市研考會", "研考會"],
       "jurisdiction": "臺中市",
       "status": "CONFIRMED",
-      "evidence": "official-source-catalog:S-019"
+      "evidence": "retired-source-catalog:2026-11-17:S-019"
     },
     {
       "entity_id": "agency:tc-news",
@@ -55,7 +55,7 @@
       "aliases": ["臺中市新聞局", "中市新聞局"],
       "jurisdiction": "臺中市",
       "status": "CONFIRMED",
-      "evidence": "official-source-catalog:S-033"
+      "evidence": "retired-source-catalog:2026-11-17:S-033"
     },
     {
       "entity_id": "location:taichung-city",

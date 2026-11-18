@@ -133,18 +133,11 @@ CONTRACTS: dict[str, dict[str, Any]] = {
         "臺中市政府警察局警政新聞",
         r"news_view\.jsp[^\"']*dataserno=(\d+)",
     ),
-    "S-019": _news(
-        "S-019",
-        "臺中市政府市政會議紀錄與專案報告",
-        r"/(\d+)/post\b",
-        published_required=False,
-    ),
     "S-032": _news(
         "S-032",
         "臺中市政府交通局最新消息",
         r"index-1\.asp\?Parser=9,4,20,,,,(\d+)",
     ),
-    "S-033": _rss_news("S-033", "臺中市政府市政新聞"),
     "S-031": _fire_live("S-031", "臺中市政府消防局即時災情"),
     "S-007": {
         "source_id": "S-007",
@@ -1290,7 +1283,6 @@ def interrupted_live_observations() -> list[dict[str, Any]]:
 def self_check() -> None:
     html_by_source = {
         "S-001": '<li><a href="home.jsp?mcustomize=news_view.jsp&dataserno=1">標題 115-09-10</a></li>',
-        "S-019": '<li><a href="/12047/12142/12186/873338/post">標題 115-09-10</a></li>',
         "S-032": '<li><a href="index-1.asp?Parser=9,4,20,,,,21750">標題 115-09-10</a></li>',
     }
     for source_id, html in html_by_source.items():
@@ -1300,7 +1292,7 @@ def self_check() -> None:
     rss = '''<?xml version="1.0"?><rss version="2.0"><channel>
     <item iCuItem="3375296"><title>Official item</title><link>https://official.test/3375296/post</link><pubDate>Mon, 21 Sep 2026 02:57:54 GMT</pubDate></item>
     </channel></rss>'''.encode("utf-8")
-    rss_result = observe(CONTRACTS["S-033"], rss, content_type="application/xml", final_url="https://official.test/rss")
+    rss_result = observe(_rss_news("TEST-RSS", "Synthetic RSS parser check"), rss, content_type="application/xml", final_url="https://official.test/rss")
     assert rss_result["status"] == "NO_DRIFT"
     assert rss_result["window_completeness"] == "PARTIAL" and "LIST_WINDOW_NOT_PROVEN" in rss_result["reasons"]
     fire_live = """<div class='update'>最後異動時間：2026-09-21 19:24:23</div>

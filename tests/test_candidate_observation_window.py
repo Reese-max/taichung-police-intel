@@ -53,7 +53,7 @@ class CandidateObservationWindowTests(unittest.TestCase):
         ], as_of=datetime(2026, 9, 20, 12, tzinfo=timezone.utc))
         self.assertEqual(result["status"], "BLOCKED")
         self.assertTrue(any("future observation" in reason for reason in result["reasons"]))
-        self.assertFalse(result["sources"]["S-033"]["window_complete"])
+        self.assertFalse(result["sources"]["S-032"]["window_complete"])
 
     def test_success_days_are_separate_from_partial_coverage_and_guardrails(self):
         start = date(2026, 9, 15)
@@ -70,10 +70,10 @@ class CandidateObservationWindowTests(unittest.TestCase):
         self.assertFalse(fire["promotion_eligible"])
 
     def test_a_source_cannot_borrow_another_report_day(self):
-        observed = report(date(2026, 9, 15), source_ids=("S-033",))
+        observed = report(date(2026, 9, 15), source_ids=("S-032",))
         observed["sources"][0]["observed_at"] = "2026-09-14T10:00:00+08:00"
-        result = module.validate_reports([("clock-mismatch.json", observed)], required_days=1, required_source_ids=("S-033",))
-        self.assertFalse(result["sources"]["S-033"]["window_complete"])
+        result = module.validate_reports([("clock-mismatch.json", observed)], required_days=1, required_source_ids=("S-032",))
+        self.assertFalse(result["sources"]["S-032"]["window_complete"])
         self.assertTrue(any("clock does not match" in reason for reason in result["reasons"]))
 
     def test_seven_continuous_days_pass_without_promotion(self):
@@ -154,17 +154,17 @@ class CandidateObservationWindowTests(unittest.TestCase):
 
     def test_unobserved_promotion_candidate_blocks_window(self):
         start = date(2026, 9, 15)
-        observed = tuple(source_id for source_id in PROMOTION_IDS if source_id != "S-019")
+        observed = tuple(source_id for source_id in PROMOTION_IDS if source_id != "S-031")
         result = module.validate_reports([
             (f"{day}.json", report(day, source_ids=observed))
             for day in (start + timedelta(days=offset) for offset in range(7))
         ])
         self.assertEqual(result["status"], "BLOCKED")
-        self.assertIn("S-019", result["sources"])
-        self.assertFalse(result["sources"]["S-019"]["window_complete"])
-        self.assertEqual(result["sources"]["S-019"]["valid_observed_days"], [])
+        self.assertIn("S-031", result["sources"])
+        self.assertFalse(result["sources"]["S-031"]["window_complete"])
+        self.assertEqual(result["sources"]["S-031"]["valid_observed_days"], [])
         self.assertTrue(
-            any("S-019" in reason and "valid observed days" in reason for reason in result["reasons"])
+            any("S-031" in reason and "valid observed days" in reason for reason in result["reasons"])
         )
 
     def test_empty_or_unknown_promotion_plan_fails_closed(self):
