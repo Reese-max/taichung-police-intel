@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 import shutil
+import re
 import sqlite3
 import subprocess
 import tempfile
@@ -110,7 +111,11 @@ class WranglerD1Store(Store):
                                 capture_output=True, text=True, encoding="utf-8", check=False)
         if result.returncode:
             raise RuntimeError("Wrangler command failed (exit " + str(result.returncode) + ")")
-        data = json.loads(result.stdout)
+        # Remote --file prints upload progress lines ("├ ...") before the JSON on stdout.
+        start = re.search(r"^[\[{]", result.stdout, re.M)
+        if start is None:
+            raise RuntimeError("Wrangler returned no JSON output")
+        data = json.loads(result.stdout[start.start():])
         entries = data if isinstance(data, list) else [data]
         if any(entry.get("success") is False for entry in entries):
             raise RuntimeError("Wrangler reported an unsuccessful operation")

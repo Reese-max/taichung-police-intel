@@ -6,7 +6,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from national.adapters.fixture import FixtureAdapter
 from national.loader import RECORD_WRITE_ESTIMATE, batches, digest, load, normalize
@@ -162,6 +162,15 @@ class NationalLoaderTests(unittest.TestCase):
             local = WranglerD1Store()
         with patch.object(remote, "_execute", return_value=[{"meta": {"rows_written": 7}, "results": []}]):
             self.assertEqual(remote.execute_batch("SELECT 1;"), 7)
+        progress = ("├ Checking if file needs uploading\n│\n├ 🌀 Uploading x.sql\n│ 🌀 Uploading complete.\n│\n"
+                    '[{"results": [], "success": true, "meta": {"rows_written": 9}}]\n')
+        for stdout, expected in ((progress, 9), ('[{"results": [], "meta": {"rows_written": 2}}]', 2)):
+            with patch("national.store.subprocess.run",
+                       return_value=Mock(returncode=0, stdout=stdout)):
+                self.assertEqual(remote.execute_batch("SELECT 1;"), expected)
+        with patch("national.store.subprocess.run", return_value=Mock(returncode=0, stdout="├ no json\n")), \
+                self.assertRaisesRegex(RuntimeError, "no JSON"):
+            remote.query("SELECT 1")
         for info in ({"file_size": 123}, {"database_size": 456}):
             with patch.object(remote, "_call", return_value=[info]):
                 self.assertEqual(remote.database_size_bytes(), next(iter(info.values())))
