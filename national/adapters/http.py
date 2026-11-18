@@ -41,7 +41,8 @@ class HttpAdapter:
             user_agent=USER_AGENT, documented_open_api=source["documented_open_api"])
         self.warnings = []
 
-    def response(self, url, *, max_bytes, method="GET", json_body=None, form_body=None):
+    def response(self, url, *, max_bytes, method="GET", json_body=None, form_body=None,
+                 bearer_token=None, output_file=None):
         if (self.source["status"] == "BLOCKED_BY_ROBOTS_NEEDS_CONSENT"
                 or self.robots["status"] not in http_fetch.RobotsPolicy.ALLOWED
                 and not (self.robots["status"] == "ROBOTS_SERVER_ERROR"
@@ -53,7 +54,8 @@ class HttpAdapter:
             self.session, url, self.allowed_hosts,
             min_interval_seconds=self.source["min_request_interval_seconds"],
             max_bytes=max_bytes, robots_policy=self.policy, method=method,
-            json_body=json_body, form_body=form_body)
+            json_body=json_body, form_body=form_body, bearer_token=bearer_token,
+            output_file=output_file)
 
     def request(self, url, *, max_bytes, method="GET", json_body=None):
         response = self.response(url, max_bytes=max_bytes, method=method, json_body=json_body)

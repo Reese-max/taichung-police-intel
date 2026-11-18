@@ -1925,9 +1925,12 @@
       "notes": [
         "2026-11-17 提供紀錄：全國清單 68.9MB、52,609 筆、每日更新；本輪未重測。",
         "六都命中：北 234、新北 266、桃 178、中 610、南 228、高 792；約 2,300 筆 metadata 預留 2MB。",
-        "data.kcg.gov.tw 與 data.tainan.gov.tw robots 全禁；不爬入口，同 host 的資源亦不抓，待同意或官方其他資源位置。"
+        "data.kcg.gov.tw 與 data.tainan.gov.tw robots 全禁；不爬入口，同 host 的資源亦不抓，待同意或官方其他資源位置。",
+        "2026-11-18 主對話實測：CSV 全量約 69MB、UTF-8 BOM，chunked 且 Content-Type 錯標 text/html；以暫存檔串流解析，限制 100MiB。",
+        "CSV 欄位可含換行，多資源的網址／格式／編碼以 ; 串接且可能有結尾分號；沒有可匿名使用的列表或增量 API。",
+        "只收六都市政府提供且名稱含指定關鍵字的中繼資料；不存聯絡人、電話、描述、下載網址，不連資源或各市入口。"
       ],
-      "status": "PLANNED_API",
+      "status": "IMPLEMENTED_API",
       "rights_note": "依各資料集授權欄位；未確認者不推定為開放授權",
       "runner": "github-actions",
       "documented_open_api": true
@@ -1939,7 +1942,8 @@
       "tier": "REFERENCE",
       "transport": "HTTPS_OAUTH2",
       "endpoints": [
-        "https://tdx.transportdata.tw/"
+        "https://tdx.transportdata.tw/auth/realms/TDXConnect/protocol/openid-connect/token",
+        "https://tdx.transportdata.tw/api/basic/v1/Traffic/RoadEvent/LiveEvent/City/{City}?$format=JSON&$top=1000"
       ],
       "allowed_hosts": [
         "https://tdx.transportdata.tw"
@@ -1948,18 +1952,19 @@
         "https://tdx.transportdata.tw"
       ],
       "robots": {
-        "status": "UNVERIFIED",
+        "status": "HTML_NOT_ROBOTS",
         "failure_disallow_prefixes": [
           "/"
         ],
         "url": "https://tdx.transportdata.tw/robots.txt",
-        "observed_at": "2026-11-17",
-        "observed_runner": "github-actions",
-        "http_status": 200
+        "observed_at": "2026-11-18",
+        "observed_runner": "provided-recon",
+        "http_status": 200,
+        "observed_text": "HTML SPA fallback; supplied raw/tdx/robots.txt"
       },
       "min_request_interval_seconds": 3,
       "license": "待確認 TDX 服務及資料授權條款",
-      "license_source_url": "https://tdx.transportdata.tw/",
+      "license_source_url": "https://tdx.transportdata.tw/term",
       "rights_class": "METADATA_ONLY",
       "public_fields": [
         "title",
@@ -1982,9 +1987,13 @@
       "verified_at": "2026-11-17",
       "notes": [
         "1MB 為預留，實際用量待 W5；未設定憑證時不得呼叫事件 API。",
-        "W0 只探測根路徑，不申請憑證。"
+        "W0 只探測根路徑，不申請憑證。",
+        "2026-11-18 主對話實測：匿名 LiveEvent 回 401（純文字）；token 成功回應尚未實測。",
+        "條款依政府資料開放授權條款並要求標示來源，也寫明依收費要點有償提供；加入金鑰前要先確認費用。",
+        "沒有逐筆官方網址，統一連回 TDX；v2 News 缺高雄，改用 v1 LiveEvent 六都城市頁。",
+        "每次 run 取一次 token；缺任一憑證零請求，回報 NOT_CONFIGURED / MISSING_SECRET；成功後依 retention_days 清除舊資料。"
       ],
-      "status": "PLANNED_API",
+      "status": "IMPLEMENTED_API",
       "rights_note": "待確認 TDX 服務及資料授權條款",
       "runner": "github-actions",
       "documented_open_api": false

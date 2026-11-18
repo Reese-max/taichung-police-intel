@@ -36,6 +36,9 @@ jobs:
       - name: Check capacity and UTC daily budget
         run: python -X utf8 scripts/national-sync.py --store d1-remote --check-guards --report reports/national/guards.json
       - name: Sync sources with configured adapters
+        env:
+          TDX_CLIENT_ID: ${{ secrets.TDX_CLIENT_ID }}
+          TDX_CLIENT_SECRET: ${{ secrets.TDX_CLIENT_SECRET }}
         run: python -X utf8 scripts/national-sync.py --store d1-remote --report reports/national/sync.json
       - name: Upload reports
         if: always()

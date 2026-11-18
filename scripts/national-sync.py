@@ -16,13 +16,16 @@ from national.adapters.txg import TxgAdapter
 from national.adapters.tnn import TnnAdapter
 from national.adapters.khh import KhhAdapter
 from national.adapters.tpe import TpeAdapter
+from national.adapters.tdx import TdxAdapter
+from national.adapters.odp import OdpCatalogAdapter
 from national.loader import check_guards, load
 from national.store import SCHEMA, SqliteStore, WranglerD1Store
 
 ADAPTERS = {"txg": TxgAdapter, "kee": KeeAdapter, "tnn": TnnAdapter, "khh": KhhAdapter, "tpe": TpeAdapter,
-            "ly20": Ly20Adapter, "ly6": Ly6Adapter}
+            "ly20": Ly20Adapter, "ly6": Ly6Adapter, "tdx": TdxAdapter, "odp": OdpCatalogAdapter}
 SOURCE_ADAPTERS = {**{"N-COUNCIL-" + code.upper(): code for code in ("txg", "kee", "tnn", "khh", "tpe")},
-                   "N-LY-ID20-BILLS": "ly20", "N-LY-ID6-INTERP": "ly6"}
+                   "N-LY-ID20-BILLS": "ly20", "N-LY-ID6-INTERP": "ly6",
+                   "N-TDX-EVENTS": "tdx", "N-ODP-CATALOG": "odp"}
 
 
 def main():
@@ -55,19 +58,26 @@ def main():
     runner = os.environ.get("NATIONAL_RUNNER", "github-actions")
     report = {"runner": runner, "runs": [], "exit_code": 0}
     store = None
-    try:
-        if not args.dry_run:
+
+    def open_store():
+        nonlocal store
+        if store is None and not args.dry_run:
             store = (SqliteStore(args.store[7:]) if args.store.startswith("sqlite:") else
                      WranglerD1Store(remote=args.store == "d1-remote"))
+
+    try:
         if args.apply_schema:
+            open_store()
             if args.dry_run:
                 print(SCHEMA.read_text(encoding="utf-8"))
             else:
                 report["schema_rows_written"] = store.apply_schema()
         if args.check_guards:
+            open_store()
             report.update(check_guards(store, capacity_limit_mb=registry["capacity_limit_mb"]))
             report["exit_code"] = int(report["status"] == "CAPACITY_BLOCKED")
         elif args.adapter == "fixture":
+            open_store()
             result = load(store, sources[0], FixtureAdapter(args.fixture), runner=runner,
                           capacity_limit_mb=registry["capacity_limit_mb"], dry_run=args.dry_run)
             report["runs"].append(result)
@@ -81,6 +91,12 @@ def main():
                                                "status": "NOT_CONFIGURED", "warnings": [],
                                                "reason": "RUNNER_MISMATCH" if source["runner"] != runner else "NO_ADAPTER"})
                     continue
+                if adapter_name == "tdx" and not TdxAdapter.configured():
+                    report["runs"].append({"source_id": source["national_source_id"],
+                                           "status": "NOT_CONFIGURED", "reason": "MISSING_SECRET",
+                                           "warnings": [], "exit_code": 0})
+                    continue
+                open_store()
                 adapter = ADAPTERS[adapter_name](source)
                 try:
                     result = load(store, source, adapter, runner=runner,
