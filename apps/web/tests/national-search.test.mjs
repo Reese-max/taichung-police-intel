@@ -72,7 +72,7 @@ test("jurisdictions match the 22 registry councils plus the central API filters"
   assert.equal(councils.length, 22);
   assert.deepEqual(JURISDICTIONS, [...councils.map(source => source.scope.jurisdiction), "立法院", "全國"]);
   assert.equal(new Set(JURISDICTIONS).size, 24);
-  assert.deepEqual(Object.keys(KIND_LABELS), ["bill", "ly_bill", "ly_interp", "tender", "award", "dataset", "traffic_event"]);
+  assert.deepEqual(Object.keys(KIND_LABELS), ["bill", "bill_gov", "bill_other", "ly_bill", "ly_interp", "tender", "award", "dataset", "traffic_event"]);
 });
 
 test("shared navigation retains destinations and adds national; page has accessible states and explicit paging", async () => {

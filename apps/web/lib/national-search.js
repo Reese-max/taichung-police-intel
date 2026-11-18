@@ -1,7 +1,7 @@
 import { safeHttpsUrl } from "./public-query.js";
 
 export const KIND_LABELS = Object.freeze({
-  bill: "議會議案", ly_bill: "立法院議案", ly_interp: "立法院質詢",
+  bill: "議會議案", bill_gov: "議會市府提案", bill_other: "議會其他議案", ly_bill: "立法院議案", ly_interp: "立法院質詢",
   tender: "招標", award: "決標", dataset: "開放資料集", traffic_event: "即時路況事件",
 });
 
