@@ -31,6 +31,16 @@ def in_scope(source, authority):
             or any(authority.startswith(s) for s in scope["authority_startswith_any"]))
 
 
+CITIES = ("臺北市 新北市 桃園市 臺中市 臺南市 高雄市 基隆市 新竹市 嘉義市 新竹縣 苗栗縣 彰化縣 "
+          "南投縣 雲林縣 嘉義縣 屏東縣 宜蘭縣 花蓮縣 臺東縣 澎湖縣 金門縣 連江縣").split()
+
+
+def jurisdiction(authority):
+    """Local agencies map to their county/city by name prefix; everything else is central (全國)."""
+    name = "臺" + authority[1:] if authority.startswith("台") else authority
+    return next((city for city in CITIES if name.startswith(city)), "全國")
+
+
 def iso_date(value, *, roc=False):
     year, month, day = map(int, value.strip().split("/"))
     return date(year + (1911 if roc else 0), month, day).isoformat()
@@ -83,7 +93,8 @@ class PccGpaAdapter(SnapshotAdapter):
                 raise ValueError("PCC XML missing case/title")
             key = "gpa-" + kind + "-" + sha256(f"{authority}|{case}|{event}".encode()).hexdigest()[:24]
             records[key] = dict(kind=kind, external_id=key, title=title, case_number=case,
-                                authority=authority, event_date=event, official_url=OPEN_LIST)
+                                authority=authority, jurisdiction=jurisdiction(authority),
+                                event_date=event, official_url=OPEN_LIST)
         return list(records.values()), len(root)
 
     def _snapshot(self, source):
@@ -223,8 +234,9 @@ class PccWebAdapter(SnapshotAdapter):
                 if "無法決標" in event or "無法決標" in cells[1].text():
                     self.warnings.append("PCC_NO_AWARD " + pk)
                 event = match[1]
+            authority = cells[1 if kind == "tender" else 2].text()
             records.append(dict(kind=kind, external_id="pcc-" + kind + "-" + pk,
-                title=title, case_number=case, authority=cells[1 if kind == "tender" else 2].text(),
+                title=title, case_number=case, authority=authority, jurisdiction=jurisdiction(authority),
                 event_date=iso_date(event, roc=True), official_url=url))
         return records, total, doc
 

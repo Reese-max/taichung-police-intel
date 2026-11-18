@@ -12,7 +12,7 @@ from unittest.mock import Mock, patch
 from urllib.parse import parse_qs, urlsplit
 
 from intel_v2 import http_fetch
-from national.adapters.pcc import PccGpaAdapter, PccWebAdapter, ORIGIN, TENDER, AWARD, detail_link
+from national.adapters.pcc import PccGpaAdapter, PccWebAdapter, ORIGIN, TENDER, AWARD, detail_link, jurisdiction
 from national.loader import load
 from national.store import SqliteStore
 from tests.test_http_fetch import response
@@ -113,7 +113,8 @@ class PccTests(unittest.TestCase):
             records, count = adapter.parse_xml(fixture(kind + ".xml"), kind)
             self.assertEqual((len(records), count), (2, 3))
             for record in records:
-                self.assertEqual(set(record), {"kind", "external_id", "title", "case_number", "authority", "event_date", "official_url"})
+                self.assertEqual(set(record), {"kind", "external_id", "title", "case_number", "authority", "jurisdiction", "event_date", "official_url"})
+                self.assertEqual(record["jurisdiction"], jurisdiction(record["authority"]))
                 self.assertEqual(record["kind"], kind)
                 self.assertRegex(record["event_date"], r"^2026-\d\d-\d\d$")
             self.assertNotIn("PRIVATE_FIXTURE_SENTINEL", json.dumps(records))
@@ -124,6 +125,14 @@ class PccTests(unittest.TestCase):
         records, _ = adapter.parse_xml(body.encode(), "tender")
         self.assertEqual(len(records), 2)
         self.assertEqual(records[0]["title"], "Updated")
+
+    def test_jurisdiction_from_authority_prefix(self):
+        for authority, expected in (("臺中市政府警察局", "臺中市"), ("台中市政府地政局", "臺中市"),
+                                    ("高雄市政府警察局湖內分局", "高雄市"), ("新竹縣政府", "新竹縣"),
+                                    ("新竹市警察局", "新竹市"), ("內政部警政署警察廣播電臺", "全國"),
+                                    ("台灣中油股份有限公司", "全國"), ("國立臺中科技大學", "全國")):
+            with self.subTest(authority=authority):
+                self.assertEqual(jurisdiction(authority), expected)
 
     def test_xml_rejects_dtd_entity_and_oversize(self):
         adapter = PccGpaAdapter(source("GPA"))
