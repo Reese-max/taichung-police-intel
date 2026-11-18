@@ -11,12 +11,24 @@ sys.path.insert(0, str(ROOT))
 
 from national.adapters.fixture import FixtureAdapter
 from national.adapters.kee import KeeAdapter
+from national.adapters.ly import Ly20Adapter, Ly6Adapter
+from national.adapters.pcc import PccGpaAdapter, PccWebAdapter
 from national.adapters.txg import TxgAdapter
+from national.adapters.tnn import TnnAdapter
+from national.adapters.khh import KhhAdapter
+from national.adapters.tpe import TpeAdapter
+from national.adapters.tdx import TdxAdapter
+from national.adapters.odp import OdpCatalogAdapter
 from national.loader import check_guards, load
 from national.store import SCHEMA, SqliteStore, WranglerD1Store
 
-ADAPTERS = {"txg": TxgAdapter, "kee": KeeAdapter}
-SOURCE_ADAPTERS = {"N-COUNCIL-TXG": "txg", "N-COUNCIL-KEE": "kee"}
+ADAPTERS = {"txg": TxgAdapter, "kee": KeeAdapter, "tnn": TnnAdapter, "khh": KhhAdapter, "tpe": TpeAdapter,
+            "ly20": Ly20Adapter, "ly6": Ly6Adapter, "pcc_gpa": PccGpaAdapter, "pcc_web": PccWebAdapter,
+            "tdx": TdxAdapter, "odp": OdpCatalogAdapter}
+SOURCE_ADAPTERS = {**{"N-COUNCIL-" + code.upper(): code for code in ("txg", "kee", "tnn", "khh", "tpe")},
+                   "N-LY-ID20-BILLS": "ly20", "N-LY-ID6-INTERP": "ly6",
+                   "N-PCC-GPA": "pcc_gpa", "N-PCC-WEB": "pcc_web",
+                   "N-TDX-EVENTS": "tdx", "N-ODP-CATALOG": "odp"}
 
 
 def main():
@@ -26,6 +38,7 @@ def main():
     parser.add_argument("--fixture", type=Path)
     parser.add_argument("--store", default="d1-local")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--backfill", action="store_true", help="Use the full PCC web month window")
     parser.add_argument("--apply-schema", action="store_true")
     parser.add_argument("--check-guards", action="store_true")
     parser.add_argument("--report", type=Path)
@@ -49,19 +62,26 @@ def main():
     runner = os.environ.get("NATIONAL_RUNNER", "github-actions")
     report = {"runner": runner, "runs": [], "exit_code": 0}
     store = None
-    try:
-        if not args.dry_run:
+
+    def open_store():
+        nonlocal store
+        if store is None and not args.dry_run:
             store = (SqliteStore(args.store[7:]) if args.store.startswith("sqlite:") else
                      WranglerD1Store(remote=args.store == "d1-remote"))
+
+    try:
         if args.apply_schema:
+            open_store()
             if args.dry_run:
                 print(SCHEMA.read_text(encoding="utf-8"))
             else:
                 report["schema_rows_written"] = store.apply_schema()
         if args.check_guards:
+            open_store()
             report.update(check_guards(store, capacity_limit_mb=registry["capacity_limit_mb"]))
             report["exit_code"] = int(report["status"] == "CAPACITY_BLOCKED")
         elif args.adapter == "fixture":
+            open_store()
             result = load(store, sources[0], FixtureAdapter(args.fixture), runner=runner,
                           capacity_limit_mb=registry["capacity_limit_mb"], dry_run=args.dry_run)
             report["runs"].append(result)
@@ -75,7 +95,14 @@ def main():
                                                "status": "NOT_CONFIGURED", "warnings": [],
                                                "reason": "RUNNER_MISMATCH" if source["runner"] != runner else "NO_ADAPTER"})
                     continue
-                adapter = ADAPTERS[adapter_name](source)
+                if adapter_name == "tdx" and not TdxAdapter.configured():
+                    report["runs"].append({"source_id": source["national_source_id"],
+                                           "status": "NOT_CONFIGURED", "reason": "MISSING_SECRET",
+                                           "warnings": [], "exit_code": 0})
+                    continue
+                open_store()
+                options = {"backfill": args.backfill} if adapter_name == "pcc_web" else {}
+                adapter = ADAPTERS[adapter_name](source, **options)
                 try:
                     result = load(store, source, adapter, runner=runner,
                                   capacity_limit_mb=registry["capacity_limit_mb"], dry_run=args.dry_run)

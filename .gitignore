@@ -30,3 +30,7 @@ coverage/
 *.pre-sequential-fix-*.csv
 .DS_Store
 Thumbs.db
+
+# Internal transcript databases stay outside all checkouts
+*.transcripts.sqlite*
+transcripts.sqlite*

@@ -9,10 +9,11 @@
       "provider": "臺北市議會",
       "official_authority": "臺北市議會",
       "tier": "REFERENCE",
-      "status": "PLANNED_HTML",
+      "status": "IMPLEMENTED_HTML",
       "transport": "HTML",
       "endpoints": [
-        "https://ifddoc2.tcc.gov.tw/TCCMIS_Front"
+        "https://ifddoc2.tcc.gov.tw/TCCMIS_Front/",
+        "https://ifddoc2.tcc.gov.tw/TCCMIS_Front/Adv_SearchInput.aspx"
       ],
       "allowed_hosts": [
         "https://ifddoc2.tcc.gov.tw"
@@ -66,7 +67,9 @@
       "notes": [
         "來源：#247 NATIONAL_COUNCIL_EXPANSION.md 第二節（2026-11-15 盤點）；未重新連網查證。",
         "rights_note 照錄總表網站文字；總表未提供本議會宣告頁精確網址，license_source_url 留 null。",
-        "議案筆數與容量未知，W2 盤點；null 不代表零，容量另計全域預留。"
+        "議案筆數與容量未知，W2 盤點；null 不代表零，容量另計全域預留。",
+        "W2b：依 2026-11-18 台灣 IP 原始回應改用 Adv_SearchInput.aspx，沿用 form1 hidden 狀態先查未結案全部（59 筆中 58 筆也列在第14屆結案屆次清單，先查以保留未結案標示），再逐屆整批查已結案；每頁實際列數必須等於 OutputWhereStr 的共N筆，否則失敗，跨屆或已結／未結重複 SYSN 保留首筆（未結案優先）並警告。主對話實測第1屆3,898列／2,029,868 bytes、第14屆1,716列／1,088,155 bytes、第12屆1,579列，未結案59列／73,810 bytes；無500列固定上限，仍拒絕超過500筆的截斷訊息，單次最多8MiB。舊屆＋次篩選漏掉不屬任何大會的結案：第12屆臨時236＋定期675＝911，各次加總912，少於整屆1,579；第5屆各次1,972少於整屆1,994。日期切片 REDTChk 與民國日期為備案，未實作。2026-11-18 xisx-pc 實跑第10～14屆寫入筆數與官方各屆總數完全相同，第9屆起因每日寫入上限分日續跑。",
+        "runner=xisx-pc；沒有可直接開啟的逐筆網址，詳情直接 GET 回403，不繞過；只儲存入口連結，不請求 DetailPage.aspx 或 PrintDetailPage.aspx。"
       ],
       "official_url": "https://ifddoc2.tcc.gov.tw/TCCMIS_Front",
       "official_system_urls": [
@@ -152,11 +155,9 @@
       "provider": "桃園市議會",
       "official_authority": "桃園市議會",
       "tier": "REFERENCE",
-      "status": "PLANNED_HTML",
+      "status": "無結構化議案",
       "transport": "HTML_FILES",
-      "endpoints": [
-        "https://www.tycc.gov.tw/TC/"
-      ],
+      "endpoints": [],
       "allowed_hosts": [
         "https://www.tycc.gov.tw"
       ],
@@ -208,7 +209,9 @@
         "來源：#247 NATIONAL_COUNCIL_EXPANSION.md 第二節（2026-11-15 盤點）；未重新連網查證。",
         "rights_note 照錄總表網站文字；總表未提供本議會宣告頁精確網址，license_source_url 留 null。",
         "議案筆數與容量未知，W2 盤點；null 不代表零，容量另計全域預留。",
-        "未找到提案檢索，不把會議檔案筆數當成議案筆數。"
+        "未找到提案檢索，不把會議檔案筆數當成議案筆數。",
+        "W2b：依 2026-11-18 台灣 IP 原始回應離線實作；尚未完成真實全量匯入驗收。",
+        "沒有提案檢索，W2b 不實作。可替代資料為 https://www.tycc.gov.tw/TC/schedule.aspx?mid=40、https://www.tycc.gov.tw/TC/meeting.aspx?mid=41、https://www.tycc.gov.tw/TC/file.aspx?mid=44；屬議事日程與PDF清單，不當作結構化議案。"
       ],
       "official_url": "https://www.tycc.gov.tw/TC/",
       "official_system_urls": [
@@ -303,27 +306,29 @@
       "provider": "臺南市議會",
       "official_authority": "臺南市議會",
       "tier": "REFERENCE",
-      "status": "PLANNED_HTML",
-      "transport": "HTML",
+      "status": "IMPLEMENTED_API",
+      "transport": "OFFICIAL_JSON_API",
       "endpoints": [
-        "https://www.tncc.gov.tw/motion1.asp"
+        "https://bill.tncc.gov.tw/NoPaperMeeting_TNCC/api/WEB014_GetProposalList.ashx",
+        "https://bill.tncc.gov.tw/NoPaperMeeting_TNCC/Api/WEB004_GetProMeetGradeList.ashx"
       ],
       "allowed_hosts": [
-        "https://www.tncc.gov.tw"
+        "https://www.tncc.gov.tw",
+        "https://bill.tncc.gov.tw"
       ],
       "official_url_hosts": [
         "https://www.tncc.gov.tw"
       ],
       "robots": {
-        "status": "REDIRECT_UNVERIFIED",
+        "status": "HTML_NOT_ROBOTS",
         "failure_disallow_prefixes": [
           "/"
         ],
         "url": "https://www.tncc.gov.tw/robots.txt",
-        "observed_text": "HTTP 302; terminal response not measured by this CI run.",
-        "observed_at": "2026-11-17",
-        "observed_runner": "github-actions",
-        "http_status": 302
+        "observed_text": "2026-11-18 raw: www robots 302 -> blank.asp HTML; bill.tncc.gov.tw/robots.txt 404; both allowed.",
+        "observed_at": "2026-11-18",
+        "observed_runner": "taiwan-network",
+        "http_status": 200
       },
       "min_request_interval_seconds": 3,
       "license": "非開放授權；依網站條款",
@@ -357,14 +362,16 @@
       "notes": [
         "來源：#247 NATIONAL_COUNCIL_EXPANSION.md 第二節（2026-11-15 盤點）；未重新連網查證。",
         "rights_note 照錄總表網站文字；總表未提供本議會宣告頁精確網址，license_source_url 留 null。",
-        "議案筆數與容量未知，W2 盤點；null 不代表零，容量另計全域預留。"
+        "2026-11-18 原始回應議案共18,440筆；實際容量未驗證，仍計全域預留。",
+        "W2b：依 2026-11-18 台灣 IP 原始回應離線實作；尚未完成真實全量匯入驗收。",
+        "第1–4屆探查計18,440筆；每屆以 pagerow=1 的 PagesAll 核對列表；只取列表中繼資料，不抓詳情。"
       ],
       "official_url": "https://www.tncc.gov.tw/motion1.asp",
       "official_system_urls": [
         "https://www.tncc.gov.tw/motion1.asp"
       ],
       "preflight_url": "https://www.tncc.gov.tw/motion1.asp",
-      "known_bill_count": null,
+      "known_bill_count": 18440,
       "runner": "github-actions",
       "documented_open_api": false
     },
@@ -373,10 +380,11 @@
       "provider": "高雄市議會",
       "official_authority": "高雄市議會",
       "tier": "REFERENCE",
-      "status": "PLANNED_HTML",
+      "status": "IMPLEMENTED_HTML",
       "transport": "HTML",
       "endpoints": [
-        "https://cissearch.kcc.gov.tw/"
+        "https://cissearch.kcc.gov.tw/System/Proposal/Default_RWD.aspx",
+        "https://cissearch.kcc.gov.tw/System/Proposal/Statistics.aspx"
       ],
       "allowed_hosts": [
         "https://cissearch.kcc.gov.tw"
@@ -431,7 +439,9 @@
         "來源：#247 NATIONAL_COUNCIL_EXPANSION.md 第二節（2026-11-15 盤點）；未重新連網查證。",
         "rights_note 照錄總表網站文字；總表未提供本議會宣告頁精確網址，license_source_url 留 null。",
         "容量按已知議案數 × 約 0.8KB 含索引估算；不是實測資料庫大小。",
-        "僅本會期議員提案 1,537＋市府提案 99＝1,636，非全歷史總數。"
+        "僅本會期議員提案 1,537＋市府提案 99＝1,636，非全歷史總數。",
+        "W2b：依 2026-11-18 台灣 IP 原始回應離線實作；尚未完成真實全量匯入驗收。",
+        "歷史探查約32,430筆，舊 known_bill_count=1,636 僅當時本會期，不是歷史總量；全量仍待核。SN 為穩定 ID，postback 須沿用最新 hidden 值及 Session cookie；不抓詳情。條款僅供個人非商業，索引再利用仍有權利風險。"
       ],
       "official_url": "https://cissearch.kcc.gov.tw/",
       "official_system_urls": [
@@ -1581,16 +1591,17 @@
       "provider": "立法院開放資料服務平台",
       "official_authority": "立法院開放資料服務平台",
       "tier": "REFERENCE",
-      "status": "PLANNED_API",
+      "status": "IMPLEMENTED_API",
       "transport": "OFFICIAL_JSON_API",
       "endpoints": [
-        "https://data.ly.gov.tw/odw/ID20Action.action?term=11&sessionPeriod=1&page=1&limit=1&fileType=json"
+        "https://data.ly.gov.tw/odw/ID20Action.action?term=11&sessionPeriod=01&page=1&limit=20000&fileType=json"
       ],
       "allowed_hosts": [
         "https://data.ly.gov.tw"
       ],
       "official_url_hosts": [
-        "https://data.ly.gov.tw"
+        "https://data.ly.gov.tw",
+        "https://ppg.ly.gov.tw"
       ],
       "robots": {
         "status": "ROBOTS_SERVER_ERROR_OPEN_API_ALLOWED",
@@ -1625,13 +1636,16 @@
       "scope": {
         "dataset_id": 20,
         "from_term": 10,
+        "jurisdiction": "立法院",
         "kind": "ly_bill"
       },
       "capacity_estimate_mb": 50,
       "verified_at": "2026-11-17",
       "notes": [
-        "ppg.ly.gov.tw robots 全禁，不抓；只用官方開放資料 API。",
-        "分頁參數效果、schema 與完整性待實際驗收；容量為預留估算。"
+        "ppg 只作官方連結、不連線；robots 全禁，不擷取文件或附件。",
+        "分頁參數無效；每會期只請求一次，sessionPeriod 補零為兩位數，limit=20000。",
+        "ID6 缺口：主對話 2026-11-18 提供第 11 屆 01 會期 74 筆，03、05、06 會期為 0；遇空期輸出 EMPTY_PERIOD，不以第三方補齊。",
+        "W3 已實作；from_term 起逐屆掃完 01–08 會期，某屆 01、02 皆空即視為未開議並停止，最多第 12 屆第 08 會期；本 worker 僅離線驗收，實際連網完整性由主對話驗收。"
       ],
       "runner": "github-actions",
       "documented_open_api": true
@@ -1641,16 +1655,17 @@
       "provider": "立法院開放資料服務平台",
       "official_authority": "立法院開放資料服務平台",
       "tier": "REFERENCE",
-      "status": "PLANNED_API",
+      "status": "IMPLEMENTED_API",
       "transport": "OFFICIAL_JSON_API",
       "endpoints": [
-        "https://data.ly.gov.tw/odw/ID6Action.action?term=11&sessionPeriod=1&page=1&limit=1&fileType=json"
+        "https://data.ly.gov.tw/odw/ID6Action.action?term=11&sessionPeriod=01&page=1&limit=20000&fileType=json"
       ],
       "allowed_hosts": [
         "https://data.ly.gov.tw"
       ],
       "official_url_hosts": [
-        "https://data.ly.gov.tw"
+        "https://data.ly.gov.tw",
+        "https://ppg.ly.gov.tw"
       ],
       "robots": {
         "status": "ROBOTS_SERVER_ERROR_OPEN_API_ALLOWED",
@@ -1685,15 +1700,18 @@
       "scope": {
         "dataset_id": 6,
         "from_term": 10,
+        "jurisdiction": "立法院",
         "kind": "ly_interp"
       },
       "capacity_estimate_mb": 5,
       "verified_at": "2026-11-17",
       "notes": [
-        "ppg.ly.gov.tw robots 全禁，不抓；只用官方開放資料 API。",
-        "分頁參數效果、schema 與完整性待實際驗收；容量為預留估算。"
+        "ppg 只作官方連結、不連線；robots 全禁，不擷取文件或附件。",
+        "分頁參數無效；每會期只請求一次，sessionPeriod 補零為兩位數，limit=20000。",
+        "ID6 缺口：主對話 2026-11-18 提供第 11 屆 01 會期 74 筆，03、05、06 會期為 0；遇空期輸出 EMPTY_PERIOD，不以第三方補齊。",
+        "W3 已實作；from_term 起逐屆掃完 01–08 會期，某屆 01、02 皆空即視為未開議並停止，最多第 12 屆第 08 會期；本 worker 僅離線驗收，實際連網完整性由主對話驗收。"
       ],
-      "known_gap": "第 11 屆第 3–6 會期官方回空（2026-11-17 實測）",
+      "known_gap": "第 11 屆第 03、05、06 會期官方回空（2026-11-18 主對話提供）",
       "runner": "github-actions",
       "documented_open_api": true
     },
@@ -1702,10 +1720,11 @@
       "provider": "行政院公共工程委員會政府電子採購網",
       "official_authority": "行政院公共工程委員會政府電子採購網",
       "tier": "DISCOVERY_ONLY",
-      "status": "PLANNED_HTML",
+      "status": "IMPLEMENTED_HTML",
       "transport": "HTML",
       "endpoints": [
-        "https://web.pcc.gov.tw/"
+        "https://web.pcc.gov.tw/prkms/tender/common/basic/readTenderBasic",
+        "https://web.pcc.gov.tw/prkms/tender/common/bulletion/readBulletion"
       ],
       "allowed_hosts": [
         "https://web.pcc.gov.tw"
@@ -1714,17 +1733,17 @@
         "https://web.pcc.gov.tw"
       ],
       "robots": {
-        "status": "REDIRECT_UNVERIFIED",
+        "status": "NO_ROBOTS_RESOURCE",
         "failure_disallow_prefixes": [
           "/"
         ],
         "url": "https://web.pcc.gov.tw/robots.txt",
-        "redirect_target": "https://web.pcc.gov.tw/",
         "disallow": [],
-        "observed_at": "2026-11-17",
+        "observed_at": "2026-11-18",
         "observed_runner": "github-actions",
         "http_status": 302,
-        "observed_text": "HTTP 302; terminal response not measured by this CI run."
+        "observed_text": "HTTP 302; Location: http://web.pcc.gov.tw/pis; redirect not followed.",
+        "absent_when_redirect_to": "http://web.pcc.gov.tw/pis"
       },
       "min_request_interval_seconds": 3,
       "license": "採購網著作權聲明（非開放授權）",
@@ -1743,7 +1762,6 @@
       ],
       "required_secret": null,
       "scope": {
-        "years": 2,
         "authority_contains_any": [
           "警察",
           "消防",
@@ -1752,14 +1770,17 @@
         "authority_startswith_any": [
           "臺中市政府"
         ],
-        "mode": "官方公告檢索網頁 HTML"
+        "mode": "官方公告檢索網頁 HTML",
+        "months": 24,
+        "daily_months": 2
       },
       "capacity_estimate_mb": 40,
-      "verified_at": "2026-11-17",
+      "verified_at": "2026-11-18",
       "notes": [
-        "每次請求間隔至少 3 秒；只存中繼資料與官方連結。",
-        "2 年約 40MB，涵蓋 GPA 去重後資料；檢索表單路徑與欄位待 W4 盤點。",
-        "CI robots 回 302，終點回應待驗證；preflight 最多跟隨 5 次 HTTPS 轉址，以終點狀態與規則判斷，不再因轉到首頁而放行。"
+        "W4 僅存標案中繼資料與官方連結；不存廠商、金額、地址、電話、聯絡人，不請求 pk 詳情頁。",
+        "本機受 WAF 阻擋；runner 使用 github-actions。2026-11-18 主對話 runner 原始回應為依據，本 worker 僅離線驗收。",
+        "官方 XML 推定為 GPA 適用標案子集，不代表全量；每月 5 日產出兩個月前資料。近半年 GPA JSON 是相同子集，未另行實作。",
+        "招標日期一律切成單月窗口；實測 1／3 個月可用、1 年被拒；決標依公告日期排序，讀至窗口外即停。"
       ],
       "runner": "github-actions",
       "documented_open_api": false
@@ -1769,11 +1790,11 @@
       "provider": "政府電子採購網／政府資料開放平臺",
       "official_authority": "政府電子採購網／政府資料開放平臺",
       "tier": "REFERENCE",
-      "status": "PLANNED_API",
-      "transport": "OFFICIAL_JSON_API",
+      "status": "IMPLEMENTED_API",
+      "transport": "OFFICIAL_XML",
       "endpoints": [
-        "https://web.pcc.gov.tw/tps/tp/OpenData/downloadFile?fileName=GPAtender_YYYYMMDD.json",
-        "https://web.pcc.gov.tw/tps/tp/OpenData/downloadFile?fileName=GPAaward_YYYYMMDD.json"
+        "https://web.pcc.gov.tw/tps/tp/OpenData/downloadFile?fileName=tender_YYYYMM02.xml",
+        "https://web.pcc.gov.tw/tps/tp/OpenData/downloadFile?fileName=award_YYYYMM02.xml"
       ],
       "allowed_hosts": [
         "https://web.pcc.gov.tw"
@@ -1782,21 +1803,21 @@
         "https://web.pcc.gov.tw"
       ],
       "robots": {
-        "status": "REDIRECT_UNVERIFIED",
+        "status": "NO_ROBOTS_RESOURCE",
         "failure_disallow_prefixes": [
           "/"
         ],
         "url": "https://web.pcc.gov.tw/robots.txt",
-        "redirect_target": "https://web.pcc.gov.tw/",
         "disallow": [],
-        "observed_at": "2026-11-17",
+        "observed_at": "2026-11-18",
         "observed_runner": "github-actions",
         "http_status": 302,
-        "observed_text": "HTTP 302; terminal response not measured by this CI run."
+        "observed_text": "HTTP 302; Location: http://web.pcc.gov.tw/pis; redirect not followed.",
+        "absent_when_redirect_to": "http://web.pcc.gov.tw/pis"
       },
       "min_request_interval_seconds": 3,
       "license": "政府資料開放授權條款第 1 版",
-      "license_source_url": "https://data.gov.tw/dataset/172020",
+      "license_source_url": "https://web.pcc.gov.tw/tps/tp/OpenData/showList",
       "rights_note": "政府資料開放授權條款第 1 版",
       "rights_class": "OPEN_METADATA",
       "public_fields": [
@@ -1815,8 +1836,7 @@
           172020,
           172023
         ],
-        "years": 2,
-        "coverage": "僅 GPA 招標／決標；不是全量採購",
+        "coverage": "推定為 GPA 招標／決標子集；不是全量採購",
         "authority_contains_any": [
           "警察",
           "消防",
@@ -1824,13 +1844,17 @@
         ],
         "authority_startswith_any": [
           "臺中市政府"
-        ]
+        ],
+        "months": 24,
+        "daily_months": 2
       },
       "capacity_estimate_mb": 0,
-      "verified_at": "2026-11-17",
+      "verified_at": "2026-11-18",
       "notes": [
-        "另一授權來源：https://data.gov.tw/dataset/172023",
-        "下載模板日期以 YYYYMMDD 代入；與公告資料去重，容量納入 N-PCC-WEB 的 40MB。"
+        "W4 僅存標案中繼資料與官方連結；不存廠商、金額、地址、電話、聯絡人，不請求 pk 詳情頁。",
+        "本機受 WAF 阻擋；runner 使用 github-actions。2026-11-18 主對話 runner 原始回應為依據，本 worker 僅離線驗收。",
+        "官方 XML 推定為 GPA 適用標案子集，不代表全量；每月 5 日產出兩個月前資料。近半年 GPA JSON 是相同子集，未另行實作。",
+        "招標日期一律切成單月窗口；實測 1／3 個月可用、1 年被拒；決標依公告日期排序，讀至窗口外即停。"
       ],
       "runner": "github-actions",
       "documented_open_api": true
@@ -1909,9 +1933,12 @@
       "notes": [
         "2026-11-17 提供紀錄：全國清單 68.9MB、52,609 筆、每日更新；本輪未重測。",
         "六都命中：北 234、新北 266、桃 178、中 610、南 228、高 792；約 2,300 筆 metadata 預留 2MB。",
-        "data.kcg.gov.tw 與 data.tainan.gov.tw robots 全禁；不爬入口，同 host 的資源亦不抓，待同意或官方其他資源位置。"
+        "data.kcg.gov.tw 與 data.tainan.gov.tw robots 全禁；不爬入口，同 host 的資源亦不抓，待同意或官方其他資源位置。",
+        "2026-11-18 主對話實測：CSV 全量約 69MB、UTF-8 BOM，chunked 且 Content-Type 錯標 text/html；以暫存檔串流解析，限制 100MiB。",
+        "CSV 欄位可含換行，多資源的網址／格式／編碼以 ; 串接且可能有結尾分號；沒有可匿名使用的列表或增量 API。",
+        "只收六都市政府提供且名稱含指定關鍵字的中繼資料；不存聯絡人、電話、描述、下載網址，不連資源或各市入口。"
       ],
-      "status": "PLANNED_API",
+      "status": "IMPLEMENTED_API",
       "rights_note": "依各資料集授權欄位；未確認者不推定為開放授權",
       "runner": "github-actions",
       "documented_open_api": true
@@ -1923,7 +1950,8 @@
       "tier": "REFERENCE",
       "transport": "HTTPS_OAUTH2",
       "endpoints": [
-        "https://tdx.transportdata.tw/"
+        "https://tdx.transportdata.tw/auth/realms/TDXConnect/protocol/openid-connect/token",
+        "https://tdx.transportdata.tw/api/basic/v1/Traffic/RoadEvent/LiveEvent/City/{City}?$format=JSON&$top=1000"
       ],
       "allowed_hosts": [
         "https://tdx.transportdata.tw"
@@ -1932,18 +1960,19 @@
         "https://tdx.transportdata.tw"
       ],
       "robots": {
-        "status": "UNVERIFIED",
+        "status": "HTML_NOT_ROBOTS",
         "failure_disallow_prefixes": [
           "/"
         ],
         "url": "https://tdx.transportdata.tw/robots.txt",
-        "observed_at": "2026-11-17",
-        "observed_runner": "github-actions",
-        "http_status": 200
+        "observed_at": "2026-11-18",
+        "observed_runner": "provided-recon",
+        "http_status": 200,
+        "observed_text": "HTML SPA fallback; supplied raw/tdx/robots.txt"
       },
       "min_request_interval_seconds": 3,
       "license": "待確認 TDX 服務及資料授權條款",
-      "license_source_url": "https://tdx.transportdata.tw/",
+      "license_source_url": "https://tdx.transportdata.tw/term",
       "rights_class": "METADATA_ONLY",
       "public_fields": [
         "title",
@@ -1966,9 +1995,13 @@
       "verified_at": "2026-11-17",
       "notes": [
         "1MB 為預留，實際用量待 W5；未設定憑證時不得呼叫事件 API。",
-        "W0 只探測根路徑，不申請憑證。"
+        "W0 只探測根路徑，不申請憑證。",
+        "2026-11-18 主對話實測：匿名 LiveEvent 回 401（純文字）；token 成功回應尚未實測。",
+        "條款依政府資料開放授權條款並要求標示來源，也寫明依收費要點有償提供；加入金鑰前要先確認費用。",
+        "沒有逐筆官方網址，統一連回 TDX；v2 News 缺高雄，改用 v1 LiveEvent 六都城市頁。",
+        "每次 run 取一次 token；缺任一憑證零請求，回報 NOT_CONFIGURED / MISSING_SECRET；成功後依 retention_days 清除舊資料。"
       ],
-      "status": "PLANNED_API",
+      "status": "IMPLEMENTED_API",
       "rights_note": "待確認 TDX 服務及資料授權條款",
       "runner": "github-actions",
       "documented_open_api": false

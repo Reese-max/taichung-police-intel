@@ -183,7 +183,8 @@ class NationalAdapterTests(unittest.TestCase):
                                                                body=json.dumps(payload).encode())
             constructors = {name: Mock(return_value=adapter) for name, adapter in adapters.items()}
             output = io.StringIO()
-            with patch.object(cli, "ADAPTERS", constructors), patch.dict(cli.os.environ, {"NATIONAL_RUNNER": runner}), patch.object(cli.sys, "argv", ["national-sync", "--dry-run"]), contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(output):
+            with patch.object(cli, "ADAPTERS", constructors), patch.object(cli, "SOURCE_ADAPTERS", {
+                    "N-COUNCIL-" + name.upper(): name for name in constructors}), patch.dict(cli.os.environ, {"NATIONAL_RUNNER": runner}), patch.object(cli.sys, "argv", ["national-sync", "--dry-run"]), contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(output):
                 self.assertEqual(cli.main(), 0)
             report = json.loads(output.getvalue())
             self.assertEqual([run["source_id"] for run in report["runs"]], expected)

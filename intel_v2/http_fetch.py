@@ -133,6 +133,8 @@ class RobotsPolicy:
                 _approved_url(str(response.url or current), {host})
                 status = response.status_code
                 if 300 <= status < 400:
+                    if self.redirect_is_absent(current, status, response.headers.get("Location")):
+                        return "NO_ROBOTS_RESOURCE", None
                     current = self.redirect_target(current, response.headers.get("Location"), followed)
                     continue
                 body = bytearray()
@@ -145,6 +147,9 @@ class RobotsPolicy:
                                      documented_open_api=self.documented_open_api)
             finally:
                 response.close()
+
+    def redirect_is_absent(self, url, status, location):
+        return False
 
     def check(self, session, url, allowed_hosts, timeout, min_interval_seconds=0) -> float:
         import requests
@@ -173,23 +178,38 @@ class RobotsPolicy:
 def get(session: requests.Session, url: str, allowed_hosts: set[str], timeout: int = 60, *,
         min_interval_seconds: float = 0, bearer_token: str | None = None,
         max_bytes: int | None = None, robots_policy: RobotsPolicy | None = None,
-        method: str = "GET", json_body=None) -> requests.Response:
+        method: str = "GET", json_body=None, form_body=None, allow_empty=False,
+        allowed_paths=None, output_file=None) -> requests.Response:
+    """Optionally replace a seekable binary file with bounded response chunks.
+
+    The caller owns the file; retries replace partial content, failures clear it.
+    In file mode the returned response has no buffered body.
+    """
     import requests
 
     _approved_url(url, allowed_hosts)
     if method not in {"GET", "POST"}:
         raise ValueError("method must be GET or POST")
+    if form_body is not None and (json_body is not None or method != "POST"):
+        raise ValueError("form_body requires POST and cannot accompany json_body")
     if not math.isfinite(min_interval_seconds) or min_interval_seconds < 0:
         raise ValueError("min_interval_seconds must be finite and nonnegative")
     if max_bytes is not None and (type(max_bytes) is not int or max_bytes <= 0):
         raise ValueError("max_bytes must be a positive integer")
+    if output_file is not None and max_bytes is None:
+        raise ValueError("output_file requires max_bytes")
     token_host = urlparse(url).hostname.lower().rstrip(".")
     for attempt in range(3):
         current_url = url
         response = None
         try:
+            if output_file is not None:
+                output_file.seek(0)
+                output_file.truncate()
             for _ in range(MAX_REDIRECTS + 1):
                 _approved_url(current_url, allowed_hosts)
+                if allowed_paths is not None and urlparse(current_url).path not in allowed_paths:
+                    raise RuntimeError("request path outside adapter allowlist")
                 host = urlparse(current_url).hostname.lower().rstrip(".")
                 interval = min_interval_seconds
                 if robots_policy is not None:
@@ -201,7 +221,8 @@ def get(session: requests.Session, url: str, allowed_hosts: set[str], timeout: i
                     kwargs["headers"] = {"Authorization": f"Bearer {bearer_token}"}
                 if max_bytes is not None:
                     kwargs["stream"] = True
-                response = (session.post(current_url, json=json_body, **kwargs) if method == "POST"
+                body = {"data": form_body} if form_body is not None else {"json": json_body}
+                response = (session.post(current_url, **body, **kwargs) if method == "POST"
                             else session.get(current_url, **kwargs))
                 _approved_url(str(response.url or current_url), allowed_hosts)
                 if method == "POST" and 300 <= response.status_code < 400:
@@ -215,20 +236,31 @@ def get(session: requests.Session, url: str, allowed_hosts: set[str], timeout: i
                     continue
                 response.raise_for_status()
                 if max_bytes is not None:
-                    body = bytearray()
+                    body = bytearray() if output_file is None else None
+                    received = 0
                     for chunk in response.iter_content(chunk_size=min(64 * 1024, max_bytes + 1)):
-                        if len(body) + len(chunk) > max_bytes:
+                        received += len(chunk)
+                        if received > max_bytes:
                             raise ValueError("response exceeds max_bytes")
-                        body.extend(chunk)
-                    response._content = bytes(body)
+                        if output_file is None:
+                            body.extend(chunk)
+                        else:
+                            output_file.write(chunk)
+                    response._content = bytes(body) if output_file is None else b""
                     response._content_consumed = True
                     response.close()
-                if not response.content:
+                if not allow_empty and (output_file is not None and not received
+                                        or output_file is None and not response.content):
                     raise requests.RequestException("HTTP 成功但內容為空")
+                if output_file is not None:
+                    output_file.seek(0)
                 response._govintel_requested_url = url
                 return response
             raise RuntimeError("redirect budget exhausted")
         except requests.RequestException as exc:
+            if output_file is not None:
+                output_file.seek(0)
+                output_file.truncate()
             status = exc.response.status_code if exc.response is not None else None
             retry_after = _retry_after(response.headers.get("Retry-After")) if response is not None else 0
             if response is not None:
@@ -237,6 +269,9 @@ def get(session: requests.Session, url: str, allowed_hosts: set[str], timeout: i
                 raise
             time.sleep(max(attempt + 1, retry_after))
         except Exception:
+            if output_file is not None:
+                output_file.seek(0)
+                output_file.truncate()
             if response is not None:
                 response.close()
             raise
