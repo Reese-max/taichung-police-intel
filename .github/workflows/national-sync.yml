@@ -3,6 +3,7 @@ name: Sync national metadata
 on:
   schedule:
     - cron: '17 2 * * *'
+    - cron: '47 4 * * *'
   workflow_dispatch:
     inputs:
       backfill:
@@ -49,10 +50,13 @@ jobs:
           PCC_BACKFILL: ${{ github.event_name == 'workflow_dispatch' && inputs.backfill }}
           # Leave room for the slowest source (~45 min) to finish before the job timeout.
           STOP_AFTER_MINUTES: ${{ inputs.backfill && 150 || 90 }}
+          SCHEDULE_CRON: ${{ github.event.schedule }}
         run: |
           args=()
           if [ "$PCC_BACKFILL" = "true" ]; then args+=(--backfill); fi
-          python -X utf8 scripts/national-sync.py --store d1-remote --report reports/national/sync.json --stop-after-minutes "$STOP_AFTER_MINUTES" "${args[@]}"
+          SKIP_IF_RAN_TODAY=()
+          if [ "$GITHUB_EVENT_NAME" = "schedule" ] && [ "$SCHEDULE_CRON" = '47 4 * * *' ]; then SKIP_IF_RAN_TODAY+=(--skip-if-ran-today); fi
+          python -X utf8 scripts/national-sync.py --store d1-remote --report reports/national/sync.json --stop-after-minutes "$STOP_AFTER_MINUTES" --reserve-rows 20000 "${SKIP_IF_RAN_TODAY[@]}" "${args[@]}"
       - name: Upload reports
         if: always()
         uses: actions/upload-artifact@v7

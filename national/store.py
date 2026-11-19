@@ -61,6 +61,20 @@ class Store:
             return json.loads(rows[0]["cursor_after"]) if rows[0]["cursor_after"] is not None else None
         return None
 
+    def latest_run(self, source_id):
+        rows = self.query("SELECT status,finished_at,cursor_after FROM runs WHERE source_id=" + sql_value(source_id)
+                          + " ORDER BY rowid DESC LIMIT 1")
+        return rows[0] if rows else None
+
+    def has_run_today(self, source_ids, day):
+        ids = list(source_ids)
+        if not ids:
+            return False
+        rows = self.query("SELECT 1 AS found FROM runs WHERE substr(started_at,1,10)=" + sql_value(day)
+                          + " AND source_id IN (" + ",".join(sql_value(value) for value in ids)
+                          + ") LIMIT 1")
+        return bool(rows)
+
     def record_run(self, run):
         keys = ("run_id", "source_id", "started_at", "finished_at", "status", "fetched", "changed",
                 "rows_written", "cursor_before", "cursor_after", "error")

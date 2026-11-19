@@ -8,6 +8,8 @@ on:
     # 14:30 Taipei: after the 02:17 UTC hosted run (150 min cap) has finished,
     # so both writers do not draw on the shared UTC-day budget at once.
     - cron: '30 6 * * *'
+    # 16:30 Taipei retry in case GitHub drops the first one; --skip-if-ran-today.
+    - cron: '30 8 * * *'
   workflow_dispatch:
     inputs:
       dry_run:
@@ -38,6 +40,10 @@ jobs:
       NATIONAL_RUNNER: xisx-pc
       PYTHONUTF8: '1'
     steps:
+      - name: Check required network connectivity
+        run: >-
+          (curl.exe -sS -o NUL --max-time 20 https://api.cloudflare.com || (echo ::error::xisx-pc DNS/connection failure: api.cloudflare.com & exit /b 1)) &&
+          (curl.exe -sS -o NUL --max-time 20 https://ifddoc2.tcc.gov.tw/robots.txt || (echo ::error::xisx-pc DNS/connection failure: ifddoc2.tcc.gov.tw & exit /b 1))
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v10.3.3
       - name: Create Python environment
@@ -55,7 +61,7 @@ jobs:
         run: .venv\Scripts\python.exe -X utf8 scripts/national-sync.py --store d1-remote --check-guards --report reports/national/guards.json
       - name: Sync xisx-pc sources
         if: ${{ !inputs.dry_run }}
-        run: .venv\Scripts\python.exe -X utf8 scripts/national-sync.py --store d1-remote --report reports/national/sync.json --stop-after-minutes 90
+        run: .venv\Scripts\python.exe -X utf8 scripts/national-sync.py --store d1-remote --report reports/national/sync.json --stop-after-minutes 90 ${{ github.event_name == 'schedule' && github.event.schedule == '30 8 * * *' && '--skip-if-ran-today' || '' }}
       - name: Dry run xisx-pc sources
         if: ${{ inputs.dry_run }}
         run: .venv\Scripts\python.exe -X utf8 scripts/national-sync.py --store d1-remote --dry-run --report reports/national/sync.json

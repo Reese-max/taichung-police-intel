@@ -66,6 +66,13 @@ class NationalSourcesTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "reserve"):
             sources.validate(self.registry)
 
+    def test_refresh_days_requires_a_positive_non_boolean_integer(self):
+        for value in (0, -1, "7", True):
+            registry = deepcopy(self.registry)
+            registry["sources"][0]["scope"]["refresh_days"] = value
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, "refresh_days"):
+                sources.validate(registry)
+
     def test_rejects_blocked_endpoints_including_chiayi_www(self):
         for sid, nested in [("N-COUNCIL-CYI", None), ("N-COUNCIL-CYQ", "www_access")]:
             registry = deepcopy(self.registry)

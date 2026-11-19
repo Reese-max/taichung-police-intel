@@ -60,7 +60,8 @@
           "市府報告",
           "影音"
         ],
-        "transcripts": "僅本機索引，不進 D1；W2 盤點官方供應方式"
+        "transcripts": "僅本機索引，不進 D1；W2 盤點官方供應方式",
+        "refresh_days": 7
       },
       "capacity_estimate_mb": null,
       "verified_at": "2026-11-15",
@@ -281,7 +282,8 @@
           "case_number": "session + space + billNumber",
           "event_date": null,
           "official_url": "https://yishi.tccc.gov.tw/proposals/{billId}"
-        }
+        },
+        "refresh_days": 7
       },
       "capacity_estimate_mb": 12.4,
       "verified_at": "2026-11-15",
@@ -355,7 +357,8 @@
           "議事錄",
           "影音"
         ],
-        "transcripts": "僅本機索引，不進 D1；W2 盤點官方供應方式"
+        "transcripts": "僅本機索引，不進 D1；W2 盤點官方供應方式",
+        "refresh_days": 7
       },
       "capacity_estimate_mb": null,
       "verified_at": "2026-11-15",
@@ -431,7 +434,8 @@
           "執行情形",
           "影音"
         ],
-        "transcripts": "僅本機索引，不進 D1；W2 盤點官方供應方式"
+        "transcripts": "僅本機索引，不進 D1；W2 盤點官方供應方式",
+        "refresh_days": 7
       },
       "capacity_estimate_mb": 1.31,
       "verified_at": "2026-11-15",
@@ -511,7 +515,8 @@
           "case_number": "sm1_title",
           "event_date": null,
           "official_url": "https://www.kmc.gov.tw/kmcweb/#/motion"
-        }
+        },
+        "refresh_days": 7
       },
       "capacity_estimate_mb": 4.0,
       "verified_at": "2026-11-15",

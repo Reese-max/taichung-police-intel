@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Sync registered official national metadata sources or an explicit offline fixture."""
 import argparse
+from datetime import datetime, timedelta, timezone
 import json
 import os
 from pathlib import Path
@@ -20,7 +21,7 @@ from national.adapters.khh import KhhAdapter
 from national.adapters.tpe import TpeAdapter
 from national.adapters.tdx import TdxAdapter
 from national.adapters.odp import OdpCatalogAdapter
-from national.loader import RECORD_WRITE_ESTIMATE, check_guards, load
+from national.loader import DAILY_WRITE_LIMIT, RECORD_WRITE_ESTIMATE, check_guards, load
 from national.store import SCHEMA, SqliteStore, WranglerD1Store
 
 ADAPTERS = {"txg": TxgAdapter, "kee": KeeAdapter, "tnn": TnnAdapter, "khh": KhhAdapter, "tpe": TpeAdapter,
@@ -44,6 +45,11 @@ def main():
     parser.add_argument("--backfill", action="store_true", help="Use the full PCC web month window")
     parser.add_argument("--apply-schema", action="store_true")
     parser.add_argument("--check-guards", action="store_true")
+    parser.add_argument("--reserve-rows", type=int, default=0,
+                        help="Keep this many rows outside the daily write budget")
+    parser.add_argument("--ignore-fresh", action="store_true", help="Run sources even if recently synchronized")
+    parser.add_argument("--skip-if-ran-today", action="store_true",
+                        help="Skip when this runner already synchronized one of its sources today (UTC)")
     parser.add_argument("--report", type=Path)
     parser.add_argument("--stop-after-minutes", type=float,
                         help="Do not start another source after this many minutes")
@@ -56,6 +62,8 @@ def main():
         parser.error("network adapter requires its matching --source")
     if args.dry_run and args.check_guards:
         parser.error("--dry-run and --check-guards are mutually exclusive")
+    if args.reserve_rows < 0 or args.reserve_rows >= DAILY_WRITE_LIMIT:
+        parser.error(f"--reserve-rows must be between 0 and {DAILY_WRITE_LIMIT - 1}")
     if args.store not in {"d1-local", "d1-remote"} and not args.store.startswith("sqlite:"):
         parser.error("--store must be sqlite:<path>, d1-local or d1-remote")
     registry = json.loads((ROOT / "docs/govintel/national-sources.v1.json").read_text(encoding="utf-8"))
@@ -64,10 +72,13 @@ def main():
         sources = [source for source in sources if source["national_source_id"] == args.source]
         if not sources:
             parser.error("unknown source")
+    else:
+        sources = sorted(sources, key=lambda source: source["national_source_id"].startswith("N-COUNCIL-"))
     runner = os.environ.get("NATIONAL_RUNNER", "github-actions")
     report = {"runner": runner, "runs": [], "exit_code": 0}
     store = None
     started = time.monotonic()
+    daily_limit = DAILY_WRITE_LIMIT - args.reserve_rows
 
     def open_store():
         nonlocal store
@@ -84,15 +95,35 @@ def main():
                 report["schema_rows_written"] = store.apply_schema()
         if args.check_guards:
             open_store()
-            report.update(check_guards(store, capacity_limit_mb=registry["capacity_limit_mb"]))
+            report.update(check_guards(store, capacity_limit_mb=registry["capacity_limit_mb"],
+                                       daily_limit=daily_limit))
             report["exit_code"] = int(report["status"] == "CAPACITY_BLOCKED")
         elif args.adapter == "fixture":
             open_store()
             result = load(store, sources[0], FixtureAdapter(args.fixture), runner=runner,
-                          capacity_limit_mb=registry["capacity_limit_mb"], dry_run=args.dry_run)
+                          capacity_limit_mb=registry["capacity_limit_mb"], daily_limit=daily_limit,
+                          dry_run=args.dry_run)
             report["runs"].append(result)
             report["exit_code"] = result["exit_code"]
         elif args.adapter or not args.apply_schema:
+            if args.skip_if_ran_today and not args.dry_run:
+                open_store()
+                eligible = [source for source in sources
+                            if source["runner"] == runner and source["national_source_id"] in SOURCE_ADAPTERS]
+                if store.has_run_today((source["national_source_id"] for source in eligible),
+                                       datetime.now(timezone.utc).date().isoformat()):
+                    report.update(status="ALREADY_RAN", message="runner already synchronized a source today (UTC)")
+                    report["runs"] = [{"source_id": source["national_source_id"], "status": "SKIPPED",
+                                       "reason": "ALREADY_RAN", "warnings": [], "exit_code": 0}
+                                      for source in eligible]
+                    print("SKIP ALL ALREADY_RAN", file=sys.stderr, flush=True)
+                    return_code = 0
+                    output = json.dumps(report, ensure_ascii=False, indent=2)
+                    if args.report:
+                        args.report.parent.mkdir(parents=True, exist_ok=True)
+                        args.report.write_text(output + "\n", encoding="utf-8")
+                    print(output)
+                    return return_code
             for source in sources:
                 adapter_name = SOURCE_ADAPTERS.get(source["national_source_id"])
                 if source["runner"] != runner or adapter_name is None:
@@ -108,9 +139,19 @@ def main():
                     continue
                 open_store()
                 skip = None
-                if args.stop_after_minutes is not None and time.monotonic() - started >= args.stop_after_minutes * 60:
+                refresh_days = source.get("scope", {}).get("refresh_days", 1)
+                last_run = (store.latest_run(source["national_source_id"])
+                            if refresh_days > 1 and not args.ignore_fresh and not args.dry_run else None)
+                if (last_run and last_run["status"] == "OK" and last_run["cursor_after"] is None
+                        and last_run["finished_at"]):
+                    finished = datetime.fromisoformat(last_run["finished_at"].replace("Z", "+00:00"))
+                    if finished.astimezone(timezone.utc).date() > datetime.now(timezone.utc).date() - timedelta(days=refresh_days):
+                        skip = "FRESH"
+                if (skip is None and args.stop_after_minutes is not None
+                        and time.monotonic() - started >= args.stop_after_minutes * 60):
                     skip = "TIME_BUDGET"
-                elif not args.dry_run and check_guards(store)["remaining_rows"] < MIN_SOURCE_BUDGET:
+                elif (skip is None and not args.dry_run
+                      and check_guards(store, daily_limit=daily_limit)["remaining_rows"] < MIN_SOURCE_BUDGET):
                     skip = "DAILY_BUDGET"
                 if skip:
                     report["runs"].append({"source_id": source["national_source_id"], "status": "SKIPPED",
@@ -127,7 +168,8 @@ def main():
                     print("START " + source["national_source_id"], file=progress, flush=True)
                 try:
                     result = load(store, source, adapter, runner=runner,
-                                  capacity_limit_mb=registry["capacity_limit_mb"], dry_run=args.dry_run)
+                                  capacity_limit_mb=registry["capacity_limit_mb"], daily_limit=daily_limit,
+                                  dry_run=args.dry_run)
                     report["runs"].append(result)
                     if progress:
                         print("DONE", source["national_source_id"], *(f"{key}={result.get(key)}" for key in
