@@ -38,7 +38,14 @@
 
 ## 執行位置
 
-來源登記的 `runner` 僅接受 `github-actions` 與 `xisx-pc`。臺北、新北、桃園、屏東、宜蘭議會指定由 Windows 主機 **xisx-pc**（台灣 IP）排程擷取；其他來源維持 GitHub Actions。這是執行位置規劃，本輪沒有連線遠端主機、安裝程式或建立排程。
+來源登記的 `runner` 僅接受 `github-actions` 與 `xisx-pc`。臺北、新北、桃園、屏東、宜蘭議會指定由 Windows 主機 **xisx-pc**（台灣 IP）排程擷取；其他來源維持 GitHub Actions。
+
+2026-11-19 起，xisx-pc 以 GitHub 自架 runner（Windows 服務，`NT AUTHORITY\NETWORK SERVICE`，標籤 `xisx-pc`）執行 `.github/workflows/national-sync-xisx.yml`：
+- 每日 06:30 UTC（臺北 14:30）同步 `runner=xisx-pc` 的來源，排在 02:17 UTC 的 GitHub Actions 同步結束之後，兩者不同時使用同一個 UTC 日的寫入額度。
+- 使用獨立的 concurrency group，runner 離線時不會卡住 GitHub Actions 的同步。
+- 手動執行可勾選 `dry_run`，只抓取、不寫入。
+
+repo 是公開的，因此只由 schedule／workflow_dispatch 觸發，並把外部貢獻者 PR 的 workflow 設為一律需要核准。
 
 2026-11-17／18 實測：GitHub Actions（美國）對下列五站皆發生 `URLError`，Oracle 日本主機也連不到；使用者提供的本機、lab5090、lab301、lab6000、xisx-pc 台灣網路測試皆可連線，因此按使用者決定視為國外 IP 存取限制，改由台灣節點執行。
 
