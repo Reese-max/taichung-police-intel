@@ -124,13 +124,37 @@ MCP_TOOLS = [
     },
     {
         "name": "validate_answer",
-        "description": "Validate structured answer claims against the server-controlled canonical evidence catalog.",
+        # Advertised so MCP clients can build claims the answer gate accepts; mirrors the Worker.
+        "description": (
+            "Validate structured answer claims against the server-controlled canonical evidence catalog. "
+            "For a search_evidence result use claim_type STATUS, proposition "
+            "{subject: \"publication:<canonical_id>:title\", value: <title>} and cited_evidence_ids "
+            "[<canonical_ref.evidence_id>]."
+        ),
         "inputSchema": {
             "type": "object",
             "additionalProperties": False,
             "required": ["claims"],
             "properties": {
-                "claims": {"type": "array", "maxItems": 32, "items": {"type": "object"}},
+                "claims": {"type": "array", "maxItems": 32, "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["text", "claim_type"],
+                    "properties": {
+                        "text": {"type": "string", "maxLength": 2000,
+                                 "description": "The answer sentence this claim backs."},
+                        "claim_type": {"type": "string",
+                                       "enum": ["TIME", "LOCATION", "STATUS", "CAUSE", "STATISTIC", "AGENCY", "OTHER"],
+                                       "description": "OTHER is non-factual and needs no proposition; every other type needs one."},
+                        "temporal_scope": {"type": "string", "enum": ["CURRENT", "HISTORICAL"]},
+                        "proposition": {"type": "object", "additionalProperties": False,
+                                        "required": ["subject", "value"], "properties": {
+                            "subject": {"type": "string", "description": "Evidence assertion subject, e.g. publication:<canonical_id>:title or publication:<canonical_id>:source_id."},
+                            "value": {"type": "string", "description": "The value asserted for the subject, e.g. the publication title."}}},
+                        "cited_evidence_ids": {"type": "array", "maxItems": 32, "items": {"type": "string"},
+                                               "description": "Evidence ids, e.g. canonical_ref.evidence_id (PUB-<canonical_id>) from search_evidence."},
+                    },
+                }},
                 "expected_generation": {"type": "string", "maxLength": 128},
             },
         },
