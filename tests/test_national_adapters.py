@@ -15,6 +15,8 @@ from national.adapters.txg import TxgAdapter
 from national.loader import load
 from national.store import ROOT, SqliteStore
 from tests.test_http_fetch import response
+from national.loader import RECORD_WRITE_ESTIMATE, SOURCE_WRITE_ESTIMATE
+from national.store import RUN_WRITE_RESERVE
 
 REGISTRY = json.loads((ROOT / "docs/govintel/national-sources.v1.json").read_text(encoding="utf-8"))
 SOURCES = {s["national_source_id"]: s for s in REGISTRY["sources"]}
@@ -117,7 +119,7 @@ class NationalAdapterTests(unittest.TestCase):
 
     def test_txg_budget_page_cursor_restarts_with_full_validation(self):
         source, adapter, _, _ = self.adapter("TXG")
-        first = self.run_load(source, adapter, daily_limit=132)
+        first = self.run_load(source, adapter, daily_limit=SOURCE_WRITE_ESTIMATE + 2 * RECORD_WRITE_ESTIMATE + RUN_WRITE_RESERVE)
         self.assertEqual((first["status"], first["changed"], first["cursor_after"]), ("BUDGET_STOPPED", 2, 2), first)
         source, adapter, session, _ = self.adapter("TXG")
         second = self.run_load(source, adapter)

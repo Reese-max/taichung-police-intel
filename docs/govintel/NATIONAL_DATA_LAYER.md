@@ -8,7 +8,7 @@
 - XML 欄位與 GPA JSON 相同，推定為 GPA 適用標案子集，不能代表全量採購。近半年 GPA JSON 未另行實作。XML 單檔上限 5 MiB，解析前拒絕 DOCTYPE／ENTITY；輸出只含類型、名稱、案號、機關、日期及官方列表連結，捨棄地址、電話、聯絡人、廠商及金額。招標日期依指定欄位 `TENDER_SPDT`（截標日），決標使用 `AWARD_NOTICE_DATE`。
 - `pcc_web` 的招標依警察、消防、交通局、臺中市政府逐一查詢，將窗口切為單一曆月，累計原始列數必須等於頁面總筆數。主對話實測 1／3 個月可用，1 年被拒；缺少結果表或查詢區間過長均回報錯誤，不視為零筆。決標以警察局、消防局、交通局、臺中市政府及窗口涵蓋的民國年查詢，依 `AWARD_NOTICE_DATE` 排序，從頁面讀取下一頁參數，使用第 6 欄（cells[5]）決標或無法決標公告日期，取開頭的民國日期；日期空白、格式錯誤或無效日期均報錯。第 5 欄招標公告日期不參與解析或早停；決標公告日早於窗口時停止。「無法決標」仍保留 kind=award，另記 PCC_NO_AWARD <pk> 警告。兩者均再次套用登記檔機關範圍，解析民國日期、標案名稱與更正公告警告，只保留 `tpam`／`atm`／`nonAtm` 的 pk 官方連結。
 - 轄區（`jurisdiction`）依機關名稱開頭推定：以 22 個縣市名稱之一開頭（「台」視同「臺」）就填該縣市，其餘（中央機關、國營事業、國立學校）填「全國」。只看名稱前綴，不查機關隸屬。
-- 網頁預設 `scope.daily_months=2`（當月及前一個曆月）；`national-sync.py --backfill` 改用 `scope.months=24`。XML 固定讀取 24 個月，其他來源不受此參數影響。工作流程只有手動 `workflow_dispatch` 的布林 `backfill=true` 才傳入此參數；排程不傳入。手動 backfill=true 的 job 上限為 210 分鐘，其餘為 150 分鐘；同步在第 150／90 分鐘後不再開始新來源（`--stop-after-minutes`），且剩餘每日寫入額度不足一整批（`MIN_SOURCE_BUDGET`＝100 筆 × 64 列）時，後續來源直接記 `SKIPPED` 而不抓取（2026-11-18 首次遠端同步：臺中 45 分、臺南 30 分、高雄 20 分後額度用盡，其後各來源仍整批抓取，於 120 分鐘被取消）（schedule 沒有 inputs.backfill，空值為 false）。24 個月回填粗估數十分鐘至 2 小時，尚非實測：僅請求間隔就約為 3 × 請求數 ÷ 60 分鐘，例如 1,000 次約 50 分鐘，另加 HTTP 回應、重試及資料庫寫入時間；實際筆數與耗時仍須由 runner 驗收。
+- 網頁預設 `scope.daily_months=2`（當月及前一個曆月）；`national-sync.py --backfill` 改用 `scope.months=24`。XML 固定讀取 24 個月，其他來源不受此參數影響。工作流程只有手動 `workflow_dispatch` 的布林 `backfill=true` 才傳入此參數；排程不傳入。手動 backfill=true 的 job 上限為 210 分鐘，其餘為 150 分鐘；同步在第 150／90 分鐘後不再開始新來源（`--stop-after-minutes`），且剩餘每日寫入額度不足一整批（`MIN_SOURCE_BUDGET`＝100 筆 × 每筆預留列數）時，後續來源直接記 `SKIPPED` 而不抓取（2026-11-18 首次遠端同步：臺中 45 分、臺南 30 分、高雄 20 分後額度用盡，其後各來源仍整批抓取，於 120 分鐘被取消）（schedule 沒有 inputs.backfill，空值為 false）。24 個月回填粗估數十分鐘至 2 小時，尚非實測：僅請求間隔就約為 3 × 請求數 ÷ 60 分鐘，例如 1,000 次約 50 分鐘，另加 HTTP 回應、重試及資料庫寫入時間；實際筆數與耗時仍須由 runner 驗收。
 - 兩個來源均至少間隔 3 秒。內容請求限於列表／下載路徑，連轉址也不可進入 pk 詳情頁。只存中繼資料與連結，不存全文、廠商或個資。
 - robots 的特定例外有 2026-11-18 `github-actions` 證據：僅 301／302 且 `Location` 完全等於 `http://web.pcc.gov.tw/pis` 視為沒有 robots 資源，不跟隨該轉址。不同 Location 或其他轉址狀態均禁止；200 的 robots 規則仍須遵守。網路失敗保持禁止，5xx 沿用既有 `documented_open_api` 判定。登記自檢要求例外為同 host 的 HTTP／HTTPS URL、非 `/robots.txt`，且附觀察日期與 runner。
 
@@ -126,7 +126,7 @@ insert／update／delete trigger 保持同步；`runs` 保存狀態、寫入收�
 schema 可重複套用。fixture 是人工測試資料，不代表官方實際資料。
 
 每日 UTC 寫入上限 **90,000 列**，容量超過登記檔的 **400MB（400,000,000 bytes）** 就拒絕資料寫入。
-每筆邏輯資料約 3 列尚未含完整索引成本，W1 暫以 **64 列／筆**保守預留，來源更新預留 2 列，
+每筆邏輯資料約 3 列尚未含完整索引成本，W1 暫以 **64 列／筆**保守預留（2026-11-19 依 D1 實測每筆新增 6.0 列，改為 **16 列／筆**，保留更新時改寫索引與 FTS 的餘裕；每日上限仍為 9 萬列，因 D1 後台 24 小時寫入量比本地帳高約 27%，原因未明），來源更新預留 2 列，
 另保留每個 run 的稽核列與主鍵索引 2 列。資料寫入以 D1 `meta.rows_written` 回填；
 SQLite 用 `total_changes`，Wrangler 本機版本省略寫入 meta 時，在同一批次前後讀 `total_changes()`。
 本機計數不代表遠端 D1 計費數字。實際成本仍須在 W2 大量匯入前依遠端收據校正；
@@ -376,7 +376,7 @@ EffectiveTime 日期（缺值改用 PublishTime）、AuthorityCode＋Source、�
 
 loader 對設定 `scope.retention_days` 的來源，在所有頁面成功後才清除該來源
 `event_date < UTC 當天日期減 N 天` 的資料；TDX 設 30 天，邊界當天及日期不明者保留。
-每批最多刪除 100 筆，刪除前按既有每筆 64 列預留檢查每日預算，容量及 UTC 換日守門同樣適用；不足就
+每批最多刪除 100 筆，刪除前按既有每筆預留列數（`RECORD_WRITE_ESTIMATE`）檢查每日預算，容量及 UTC 換日守門同樣適用；不足就
 `BUDGET_STOPPED`，不執行該批，保留已完成批次的計帳。SQL delete trigger 同步 FTS，實際含 trigger 寫入量計入
 `rows_written` 與每日預算；JSON 報告另列 `deleted`。dry-run 僅輸出刪除 SQL。
 未設定保留期的來源行為不變；擷取 ERROR 或尚未完成全部頁面時不執行清除。

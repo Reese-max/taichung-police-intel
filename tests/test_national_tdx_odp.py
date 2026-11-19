@@ -14,7 +14,7 @@ import requests
 from intel_v2 import http_fetch
 from national.adapters.odp import OdpCatalogAdapter
 from national.adapters.tdx import TdxAdapter
-from national.loader import load, normalize, record_sql, source_sql, RECORD_WRITE_ESTIMATE
+from national.loader import load, normalize, record_sql, source_sql, RECORD_WRITE_ESTIMATE, SOURCE_WRITE_ESTIMATE
 from national.store import ROOT, SqliteStore, RUN_WRITE_RESERVE
 from tests.test_http_fetch import response
 
@@ -180,7 +180,7 @@ class NationalTdxOdpTests(unittest.TestCase):
 
     def test_tdx_budget_resume_uses_city_cursor_and_fresh_run_token(self):
         source, adapter, session, _ = self.tdx()
-        first = self.run_load(source, adapter, daily_limit=132)
+        first = self.run_load(source, adapter, daily_limit=SOURCE_WRITE_ESTIMATE + 2 * RECORD_WRITE_ESTIMATE + RUN_WRITE_RESERVE)
         self.assertEqual((first["status"], first["changed"], first["cursor_after"]), ("BUDGET_STOPPED", 2, "NewTaipei"), first)
         session.get.reset_mock()
         second = self.run_load(source, adapter)
