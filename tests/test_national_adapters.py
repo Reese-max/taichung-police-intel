@@ -204,8 +204,13 @@ class NationalAdapterTests(unittest.TestCase):
                                         (["--stop-after-minutes", "0"], 90_000, "TIME_BUDGET")):
             constructors = {"txg": Mock(), "kee": Mock()}
             output = io.StringIO()
+            def open_store(path):
+                store = SqliteStore(path)
+                store.apply_schema()
+                return store
             with patch.object(cli, "ADAPTERS", constructors), patch.object(cli, "SOURCE_ADAPTERS", {
                     "N-COUNCIL-TXG": "txg", "N-COUNCIL-KEE": "kee"}), \
+                    patch.object(cli, "SqliteStore", side_effect=open_store), \
                     patch.object(cli, "check_guards", return_value={"remaining_rows": remaining}), \
                     patch.dict(cli.os.environ, {"NATIONAL_RUNNER": "github-actions"}), \
                     patch.object(cli.sys, "argv", ["national-sync", "--store", "sqlite::memory:", *argv]), \

@@ -503,3 +503,11 @@ API 陷阱與處理：
 - `--dry-run` 完全不連網；HTTP 可達不代表資料筆數、內容 schema、授權或匯入正確。報告中的跳過列沒有 HTTP 回應，不冒充成功。
 - D1 workflow 保留唯讀 `d1 list --json`，CI 結果為失敗；不能證明寫入權限或遠端 FTS5。此輪沒有重新執行 Actions 或任何遠端驗收。
 - `intel_v2/http_fetch.py` 的 robots 判定已更新；一般 `get` transport 的重試、內容轉址與 canary 行為維持原規則。preflight 以 stdlib 探測並共用 robots 判定，不新增安裝依賴；正式匯入器留待各批次實作與驗收。
+
+## 排程與每日同步控制（2026-11-19）
+
+- `scope.refresh_days` 是來源的 UTC 日期刷新間隔；未設定時為 1。臺北、臺中、臺南、高雄、基隆議會設為 7 天。只有最新一筆 run 是 `OK`、有 `finished_at` 且 `cursor_after` 為 null 時才算新鮮。`--ignore-fresh` 可手動強制重跑；dry-run 不套用新鮮度略過。
+- 未指定 `--source` 時，CLI 保留 registry 內相對順序，先跑非 `N-COUNCIL-*` 來源，再跑議會來源。指定來源則維持該來源單獨執行。
+- `--reserve-rows N` 把可用每日寫入上限降為 `DAILY_WRITE_LIMIT - N`，同時套用於 guard 檢查及 loader；預設 0。GitHub-hosted workflow 使用 `--reserve-rows 20000`，xisx-pc 不保留此額度。
+- `--skip-if-ran-today` 按 UTC 日期檢查目前 runner 所管理來源的 `runs.started_at`；命中時所有候選來源回報 `SKIPPED / ALREADY_RAN`，不建構 adapter，stderr 輸出 `SKIP ALL ALREADY_RAN`。dry-run 不套用此開關。兩個 workflow 各自在排定重試時啟用，人工 dispatch 不啟用。
+- xisx-pc workflow 的排程為 06:30 與 08:30 UTC；啟動 checkout/setup 前先用 curl 檢查 Cloudflare API 與臺北議會實際 registry host `ifddoc2.tcc.gov.tw`，連線失敗即以 `::error::` 終止。

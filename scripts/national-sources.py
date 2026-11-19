@@ -84,6 +84,9 @@ def validate(registry):
                 raise ValueError(f"invalid {key}: {sid}")
         if not isinstance(row["robots"], dict) or not isinstance(row["scope"], dict):
             raise ValueError(f"invalid robots/scope: {sid}")
+        if "refresh_days" in row["scope"] and (
+                type(row["scope"]["refresh_days"]) is not int or row["scope"]["refresh_days"] < 1):
+            raise ValueError(f"scope.refresh_days must be a positive integer: {sid}")
         hosts = {https_url(host, origin=True) for host in row["allowed_hosts"]}
         blocked_hosts = {https_url(origin, origin=True)
                          for origin in row["robots"].get("blocked_origins", [])}
