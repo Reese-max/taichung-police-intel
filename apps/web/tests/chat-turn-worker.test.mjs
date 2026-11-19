@@ -61,9 +61,11 @@ test("MCP notifications get 202 with no body and GET /mcp gets 405", () => fixtu
   const notified = await send("POST", JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }));
   assert.equal(notified.status, 202);
   assert.equal(await notified.text(), "");
+  assert.equal(notified.headers.get("Cache-Control"), "no-store");
   const stream = await send("GET");
   assert.equal(stream.status, 405);
   assert.equal(stream.headers.get("Allow"), "POST");
+  assert.equal(stream.headers.get("Cache-Control"), "no-store");
   const ping = await send("POST", JSON.stringify({ jsonrpc: "2.0", id: 7, method: "ping" }));
   assert.equal(ping.status, 200);
   assert.deepEqual(await ping.json(), { jsonrpc: "2.0", id: 7, result: {} });
@@ -71,6 +73,18 @@ test("MCP notifications get 202 with no body and GET /mcp gets 405", () => fixtu
   assert.equal(noMethod.status, 400);
   assert.equal((await noMethod.json()).error.code, "INVALID_JSON_RPC");
 }));
+
+test("GET /mcp gets 405 even while the publication is unreachable", async () => {
+  const fixture = await createGovernedPolicyFixture({ briefReviewed: true });
+  const originalFetch = globalThis.fetch;
+  try {
+    const module = await fixture.loadWorker("mcp-get-outage");
+    globalThis.fetch = async () => { throw new Error("publication unreachable"); };
+    const response = await module.default.fetch(new Request("https://gateway.example.test/mcp", { headers: { "CF-Connecting-IP": "outage" } }),
+      { PUBLIC_ORIGIN: "https://publication.example.test", CF_VERSION_METADATA: { id: "outage", tag: "a".repeat(40) } });
+    assert.equal(response.status, 405);
+  } finally { globalThis.fetch = originalFetch; await fixture.cleanup(); }
+});
 
 // An MCP client only knows what tools/list advertises; a claim built from that schema
 // and a search_evidence result must pass the gate.
