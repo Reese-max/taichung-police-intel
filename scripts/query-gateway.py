@@ -1633,6 +1633,8 @@ def dispatch_mcp(gateway: QueryGateway, request: dict[str, Any]) -> dict[str, An
                 "serverInfo": {"name": "govintel-query-gateway", "version": SERVER_VERSION},
             },
         }
+    if method == "ping":
+        return {"jsonrpc": "2.0", "id": request_id, "result": {}}
     if method == "tools/list":
         return {"jsonrpc": "2.0", "id": request_id, "result": {"tools": gateway.mcp_tools()}}
     if method != "tools/call":

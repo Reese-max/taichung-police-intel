@@ -988,6 +988,7 @@ function mcpTools() {
 async function dispatchMcp(snapshot, request) {
   if (request?.jsonrpc !== "2.0" || !("id" in (request || {}))) throw new GatewayError("INVALID_JSON_RPC", "request must be JSON-RPC 2.0 with an id");
   if (request.method === "initialize") return { jsonrpc: "2.0", id: request.id, result: { protocolVersion: MCP_PROTOCOL_VERSION, capabilities: { tools: { listChanged: false } }, serverInfo: { name: "govintel-query-gateway", version: SERVER_VERSION }, release: snapshot.release } };
+  if (request.method === "ping") return { jsonrpc: "2.0", id: request.id, result: {} };
   if (request.method === "tools/list") return { jsonrpc: "2.0", id: request.id, result: { tools: mcpTools(), release: snapshot.release } };
   if (request.method !== "tools/call" || !request.params || typeof request.params.name !== "string") throw new GatewayError("METHOD_NOT_FOUND", `unsupported MCP method: ${request.method}`, 404);
   try {
