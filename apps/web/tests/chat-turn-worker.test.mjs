@@ -62,6 +62,9 @@ test("MCP notifications get 202 with no body and GET /mcp gets 405", () => fixtu
   const stream = await send("GET");
   assert.equal(stream.status, 405);
   assert.equal(stream.headers.get("Allow"), "POST");
+  const ping = await send("POST", JSON.stringify({ jsonrpc: "2.0", id: 7, method: "ping" }));
+  assert.equal(ping.status, 200);
+  assert.deepEqual(await ping.json(), { jsonrpc: "2.0", id: 7, result: {} });
   const noMethod = await send("POST", JSON.stringify({ jsonrpc: "2.0" }));
   assert.equal(noMethod.status, 400);
   assert.equal((await noMethod.json()).error.code, "INVALID_JSON_RPC");
