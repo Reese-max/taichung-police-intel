@@ -30,8 +30,8 @@
   ],
   "baseline_established_at": "2026-08-27T12:13:22+08:00",
   "candidate_source_context": {
-    "collection_run_id": "CR-DEMO-20261119-MORNING-SCHEDULE",
-    "generated_at": "2026-11-19T11:46:38+08:00",
+    "collection_run_id": "CR-DEMO-20261119-EVENING-SCHEDULE",
+    "generated_at": "2026-11-20T03:04:52+08:00",
     "integration_status": "CANDIDATE",
     "items": [
       {
@@ -632,7 +632,7 @@
           "NO_LAST_KNOWN_GOOD",
           "NO_DATA_AS_OF"
         ],
-        "last_checked_at": "2026-11-19T11:46:33+08:00",
+        "last_checked_at": "2026-11-20T03:04:48+08:00",
         "pagination": null,
         "promotion_eligible": false,
         "source_health": "FAILED",
@@ -649,7 +649,7 @@
           "NO_LAST_KNOWN_GOOD",
           "VERY_STALE_DATA"
         ],
-        "last_checked_at": "2026-11-19T11:46:38+08:00",
+        "last_checked_at": "2026-11-20T03:04:52+08:00",
         "pagination": {
           "complete": false,
           "page_limit": 4,
@@ -665,7 +665,7 @@
       }
     ]
   },
-  "generated_at": "2026-11-19T11:46:38+08:00",
+  "generated_at": "2026-11-20T03:04:52+08:00",
   "generator_version": 2,
   "mode": "V2_SHADOW",
   "other_changes": [],
@@ -755,7 +755,7 @@
   ],
   "schema_version": 1,
   "snapshot_complete": false,
-  "source_collection_run_id": "CR-DEMO-20261119-MORNING-SCHEDULE",
+  "source_collection_run_id": "CR-DEMO-20261119-EVENING-SCHEDULE",
   "source_health": {
     "failed_count": 0,
     "gap_count": 6,
@@ -776,7 +776,7 @@
     "policy_version": 3,
     "retention_policy_hash": "18809f223924adaa70b3015768717f0c36a76ab7e26bb660f2fa9c0479529727"
   },
-  "source_status_generated_at": "2026-11-19T11:46:38+08:00",
+  "source_status_generated_at": "2026-11-20T03:04:52+08:00",
   "status_message": "本期未偵測到可確認的新增或修正；歷史資料保留於資料庫。",
   "tracking_items": []
 }
