@@ -46,9 +46,26 @@ async function fixtureRun(run, mutate = () => {}) {
       }), env);
       return { status: response.status, payload: await response.json() };
     };
-    await run({ call, get, list, raw, values, snapshot, fixture });
+    await run({ call, get, list, raw, values, snapshot, fixture, module, env });
   } finally { globalThis.fetch = originalFetch; await fixture.cleanup(); }
 }
+
+// MCP Streamable HTTP: clients (e.g. LibreChat) send id-less notifications after
+// initialize and probe GET /mcp for a server stream; 202 / 405 keep them connected.
+test("MCP notifications get 202 with no body and GET /mcp gets 405", () => fixtureRun(async ({ module, env }) => {
+  const send = (method, body) => module.default.fetch(new Request("https://gateway.example.test/mcp", {
+    method, headers: { "Content-Type": "application/json", "CF-Connecting-IP": `notify-${method}-${body ?? ""}` }, body,
+  }), env);
+  const notified = await send("POST", JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" }));
+  assert.equal(notified.status, 202);
+  assert.equal(await notified.text(), "");
+  const stream = await send("GET");
+  assert.equal(stream.status, 405);
+  assert.equal(stream.headers.get("Allow"), "POST");
+  const noMethod = await send("POST", JSON.stringify({ jsonrpc: "2.0" }));
+  assert.equal(noMethod.status, 400);
+  assert.equal((await noMethod.json()).error.code, "INVALID_JSON_RPC");
+}));
 
 test("chat availability agrees between HTTP capabilities and MCP tools/list", () => fixtureRun(async ({ get, list }) => {
   const capabilities = await get("capabilities");

@@ -1696,6 +1696,17 @@ class GatewayHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _send_empty(self, status: int, headers: dict[str, str] | None = None) -> None:
+        self.send_response(status)
+        self.send_header("Content-Length", "0")
+        for name, value in (headers or {}).items():
+            self.send_header(name, value)
+        allow_origin = getattr(self.server, "allow_origin", None)
+        if allow_origin:
+            self.send_header("Access-Control-Allow-Origin", allow_origin)
+            self.send_header("Vary", "Origin")
+        self.end_headers()
+
     def _within_rate_limit(self) -> bool:
         limiter = getattr(self.server, "rate_limiter", None)
         if limiter is None or limiter.allow(self.client_address[0]):
@@ -1753,6 +1764,10 @@ class GatewayHandler(BaseHTTPRequestHandler):
                 self._send(gateway.health())
             elif path == "/capabilities":
                 self._send(gateway.capabilities())
+            elif path == "/mcp":
+                # MCP Streamable HTTP: no server-initiated stream is offered.
+                if self._require_mcp_origin():
+                    self._send_empty(405, {"Allow": "POST"})
             else:
                 raise GatewayError("NOT_FOUND", "unknown gateway route", 404)
         except GatewayError as error:
@@ -1772,6 +1787,9 @@ class GatewayHandler(BaseHTTPRequestHandler):
                 if not isinstance(tool, str):
                     raise GatewayError("INVALID_ARGUMENTS", "query requires a string tool")
                 self._send(gateway.execute(tool, body.get("arguments")))
+            elif path == "/mcp" and body.get("jsonrpc") == "2.0" and isinstance(body.get("method"), str) and "id" not in body:
+                # JSON-RPC notification: no response body; MCP Streamable HTTP requires 202.
+                self._send_empty(202, {"MCP-Protocol-Version": MCP_PROTOCOL_VERSION})
             elif path == "/mcp":
                 self._send(dispatch_mcp(gateway, body))
             else:
