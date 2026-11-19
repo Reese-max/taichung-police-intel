@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
+import { join } from "node:path";
 import test from "node:test";
 import { createGovernedPolicyFixture } from "./governed-policy-fixture.mjs";
 
@@ -68,6 +70,35 @@ test("MCP notifications get 202 with no body and GET /mcp gets 405", () => fixtu
   const noMethod = await send("POST", JSON.stringify({ jsonrpc: "2.0" }));
   assert.equal(noMethod.status, 400);
   assert.equal((await noMethod.json()).error.code, "INVALID_JSON_RPC");
+}));
+
+// An MCP client only knows what tools/list advertises; a claim built from that schema
+// and a search_evidence result must pass the gate.
+test("validate_answer advertises a claim schema that a search result can satisfy", () => fixtureRun(async ({ call, list }) => {
+  const items = (await list()).find(tool => tool.name === "validate_answer").inputSchema.properties.claims.items;
+  assert.deepEqual(items.required, ["text", "claim_type"]);
+  assert.deepEqual(items.properties.claim_type.enum, ["TIME", "LOCATION", "STATUS", "CAUSE", "STATISTIC", "AGENCY", "OTHER"]);
+  assert.deepEqual(items.properties.proposition.required, ["subject", "value"]);
+  const hit = (await call("search_evidence", { q: "", limit: 1 }, "mcp")).payload.results[0];
+  const claim = { text: hit.title, claim_type: "STATUS", temporal_scope: "CURRENT",
+    proposition: { subject: `publication:${hit.canonical_id}:title`, value: hit.title },
+    cited_evidence_ids: [hit.canonical_ref.evidence_id] };
+  assert.deepEqual(Object.keys(claim).filter(key => !(key in items.properties)), []);
+  const checked = await call("validate_answer", { claims: [claim] }, "mcp");
+  assert.equal(checked.isError, false);
+  assert.equal(checked.payload.gate_status, "PASS");
+}));
+
+test("Python and Worker advertise the same validate_answer definition", () => fixtureRun(async ({ list, fixture }) => {
+  const worker = (await list()).find(tool => tool.name === "validate_answer");
+  const run = spawnSync(process.env.PYTHON || "python", ["-X", "utf8", "-B", join(fixture.repoRoot, "scripts/query-gateway-stdio.py")], {
+    cwd: fixture.repoRoot, encoding: "utf8", timeout: 60_000,
+    input: `${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" })}\n`,
+  });
+  assert.equal(run.status, 0, run.stderr);
+  const python = JSON.parse(run.stdout.trim().split("\n")[0]).result.tools.find(tool => tool.name === "validate_answer");
+  assert.deepEqual(python.inputSchema, worker.inputSchema);
+  assert.equal(python.description, worker.description);
 }));
 
 test("chat availability agrees between HTTP capabilities and MCP tools/list", () => fixtureRun(async ({ get, list }) => {

@@ -970,6 +970,21 @@ class GatewayError extends Error {
 // cannot be rebuilt, and answering from an older generation would hide it.
 class SnapshotIntegrityError extends Error {}
 
+// Advertised so MCP clients can build claims the answer gate accepts; the gate itself is unchanged.
+const VALIDATE_ANSWER_DESCRIPTION = "Validate structured answer claims against the server-controlled canonical evidence catalog. For a search_evidence result use claim_type STATUS, proposition {subject: \"publication:<canonical_id>:title\", value: <title>} and cited_evidence_ids [<canonical_ref.evidence_id>].";
+const CLAIM_ITEM_SCHEMA = {
+  type: "object", additionalProperties: false, required: ["text", "claim_type"],
+  properties: {
+    text: { type: "string", maxLength: 2000, description: "The answer sentence this claim backs." },
+    claim_type: { type: "string", enum: ["TIME", "LOCATION", "STATUS", "CAUSE", "STATISTIC", "AGENCY", "OTHER"], description: "OTHER is non-factual and needs no proposition; every other type needs one." },
+    temporal_scope: { type: "string", enum: ["CURRENT", "HISTORICAL"] },
+    proposition: { type: "object", additionalProperties: false, required: ["subject", "value"], properties: {
+      subject: { type: "string", description: "Evidence assertion subject, e.g. publication:<canonical_id>:title or publication:<canonical_id>:source_id." },
+      value: { type: "string", description: "The value asserted for the subject, e.g. the publication title." } } },
+    cited_evidence_ids: { type: "array", maxItems: 32, items: { type: "string" }, description: "Evidence ids, e.g. canonical_ref.evidence_id (PUB-<canonical_id>) from search_evidence." },
+  },
+};
+
 function mcpTools() {
   const readonly = { readOnlyHint: true, openWorldHint: false, destructiveHint: false };
   return [
@@ -977,7 +992,7 @@ function mcpTools() {
     { name: "get_current_brief", description: "Read the checked-in canonical brief with its freshness and publication receipt.", inputSchema: { type: "object", additionalProperties: false, properties: {} }, annotations: readonly },
     { name: "get_publication_receipt", description: "Read the current publication and canonical artifact hashes without exposing raw content.", inputSchema: { type: "object", additionalProperties: false, properties: {} }, annotations: readonly },
     { name: "get_source_health", description: "Read approved source health, freshness, completeness, and gaps.", inputSchema: { type: "object", additionalProperties: false, properties: { source_id: { type: "string", maxLength: 64 } } }, annotations: readonly },
-    { name: "validate_answer", description: "Validate structured answer claims against the server-controlled canonical evidence catalog.", inputSchema: { type: "object", additionalProperties: false, properties: { claims: { type: "array", maxItems: 32, items: { type: "object" } }, expected_generation: { type: "string", maxLength: 128 } }, required: ["claims"] }, annotations: readonly },
+    { name: "validate_answer", description: VALIDATE_ANSWER_DESCRIPTION, inputSchema: { type: "object", additionalProperties: false, properties: { claims: { type: "array", maxItems: 32, items: CLAIM_ITEM_SCHEMA }, expected_generation: { type: "string", maxLength: 128 } }, required: ["claims"] }, annotations: readonly },
     { name: "chat_turn", description: "Bounded conversation over publication metadata, source health and brief. Event/statistics and unsupported context filters return CAPABILITY_NOT_AVAILABLE; no semantic answer claims.",
       inputSchema: { type: "object", additionalProperties: false, properties: { text: { type: "string", minLength: 1, maxLength: 512 },
         quick_action: { type: "string", enum: Object.keys(CHAT_ACTIONS) }, context: { type: "object", description: "Minimal event/time/region/agency/category selections and last query receipt; unsupported filters never broaden scope." } },
