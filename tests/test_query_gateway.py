@@ -306,6 +306,24 @@ class QueryGatewayTests(unittest.TestCase):
         self.assertTrue(all(tool["annotations"]["readOnlyHint"] for tool in tools))
         self.assertTrue(all(tool["annotations"]["destructiveHint"] is False for tool in tools))
 
+    def test_mcp_notification_gets_202_and_get_gets_405(self):
+        request = Request(
+            self.base_url + "/mcp",
+            data=json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"}).encode("utf-8"),
+            method="POST",
+            headers={"Content-Type": "application/json"},
+        )
+        with urlopen(request, timeout=5) as response:
+            self.assertEqual(response.status, 202)
+            self.assertEqual(response.read(), b"")
+        with self.assertRaises(HTTPError) as caught:
+            urlopen(Request(self.base_url + "/mcp", method="GET"), timeout=5)
+        self.assertEqual(caught.exception.code, 405)
+        self.assertEqual(caught.exception.headers.get("Allow"), "POST")
+        status, response = self.request("POST", "/mcp", {"jsonrpc": "2.0"})
+        self.assertEqual(status, 400)
+        self.assertEqual(response["error"]["code"], "INVALID_JSON_RPC")
+
     def test_mcp_rejects_unapproved_origin_and_advertises_protocol_version(self):
         status, response = self.request(
             "POST",

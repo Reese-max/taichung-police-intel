@@ -1043,6 +1043,8 @@ export default {
 
       }
       if (request.method === "GET" && url.pathname === "/capabilities") return responseJson({ schema_version: 1, server_version: SERVER_VERSION, read_only: true, release: snapshot.release, capabilities: mcpTools().map(tool => tool.name), unavailable_capabilities: DOMAIN_CAPABILITIES, policy: snapshot.policyBinding, retention: retentionPolicy(snapshot), national: { search: "/national/search", record: "/national/record/{id}", available: Boolean(env.NATIONAL_DB), read_only: true } }, 200, request, env);
+      // MCP Streamable HTTP: no server-initiated stream is offered, so the client's GET probe gets 405.
+      if (request.method === "GET" && url.pathname === "/mcp") return new Response(null, { status: 405, headers: { Allow: "POST", ...corsHeaders(request, env) } });
       if (request.method !== "POST" || !["/query", "/mcp", "/research", "/chat"].includes(url.pathname)) return responseJson(jsonError("NOT_FOUND", "route not found"), 404, request, env);
       if (url.pathname === "/research") {
         const input = await readBoundedJson(request, 8192);
@@ -1063,6 +1065,8 @@ export default {
       if (!input || typeof input !== "object" || Array.isArray(input)) throw new GatewayError("INVALID_ARGUMENTS", "request body must be an object");
       if (input?.release_id !== undefined && input.release_id !== snapshot.release.release_id) throw new GatewayError("QUERY_TEMPORARILY_UNAVAILABLE", "Pages and Worker release mismatch; reload the publication", 503);
       if (url.pathname === "/query") return responseJson(await execute(snapshot, input?.tool, input?.arguments), 200, request, env);
+      // JSON-RPC notifications (no id) get no response body; MCP Streamable HTTP requires 202.
+      if (input.jsonrpc === "2.0" && typeof input.method === "string" && !("id" in input)) return new Response(null, { status: 202, headers: corsHeaders(request, env) });
       return responseJson(await dispatchMcp(snapshot, input), 200, request, env);
     } catch (error) {
       if (!(error instanceof GatewayError)) console.error("gateway request failed");
