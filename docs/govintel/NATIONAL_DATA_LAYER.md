@@ -41,7 +41,7 @@
 來源登記的 `runner` 僅接受 `github-actions` 與 `xisx-pc`。臺北、新北、桃園、屏東、宜蘭議會指定由 Windows 主機 **xisx-pc**（台灣 IP）排程擷取；其他來源維持 GitHub Actions。
 
 2026-11-19 起，xisx-pc 以 GitHub 自架 runner（Windows 服務，`NT AUTHORITY\NETWORK SERVICE`，標籤 `xisx-pc`）執行 `.github/workflows/national-sync-xisx.yml`：
-- 每日 06:30 UTC（臺北 14:30）同步 `runner=xisx-pc` 的來源，排在 02:17 UTC 的 GitHub Actions 同步結束之後，兩者不同時使用同一個 UTC 日的寫入額度。
+- 每日 00:20 UTC（臺北 08:20）同步 `runner=xisx-pc` 的來源，在每日額度重設後、02:17 UTC 的 GitHub Actions 同步之前執行，讓只能由 xisx-pc 抓取的臺北議會先取得額度（2026-11-20 起；原為 06:30 UTC 排在 GitHub 之後，回填期間分不到額度）。
 - 使用獨立的 concurrency group，runner 離線時不會卡住 GitHub Actions 的同步。
 - 手動執行可勾選 `dry_run`，只抓取、不寫入。
 
@@ -508,6 +508,6 @@ API 陷阱與處理：
 
 - `scope.refresh_days` 是來源的 UTC 日期刷新間隔；未設定時為 1。臺北、臺中、臺南、高雄、基隆議會設為 7 天。只有最新一筆 run 是 `OK`、有 `finished_at` 且 `cursor_after` 為 null 時才算新鮮。`--ignore-fresh` 可手動強制重跑；dry-run 不套用新鮮度略過。
 - 未指定 `--source` 時，CLI 保留 registry 內相對順序，先跑非 `N-COUNCIL-*` 來源，再跑議會來源。指定來源則維持該來源單獨執行。
-- `--reserve-rows N` 把可用每日寫入上限降為 `DAILY_WRITE_LIMIT - N`，同時套用於 guard 檢查及 loader；預設 0。GitHub-hosted workflow 使用 `--reserve-rows 20000`，xisx-pc 不保留此額度。
+- `--reserve-rows N` 把可用每日寫入上限降為 `DAILY_WRITE_LIMIT - N`，同時套用於 guard 檢查及 loader；預設 0。xisx-pc 改為先跑後，兩個 workflow 皆不使用此參數（保留供手動調整）。
 - `--skip-if-ran-today` 按 UTC 日期檢查目前 runner 所管理來源的 `runs.started_at`；命中時所有候選來源回報 `SKIPPED / ALREADY_RAN`，不建構 adapter，stderr 輸出 `SKIP ALL ALREADY_RAN`。dry-run 不套用此開關。兩個 workflow 各自在排定重試時啟用，人工 dispatch 不啟用。
-- xisx-pc workflow 的排程為 06:30 與 08:30 UTC；啟動 checkout/setup 前先用 curl 檢查 Cloudflare API 與臺北議會實際 registry host `ifddoc2.tcc.gov.tw`，連線失敗即以 `::error::` 終止。
+- xisx-pc workflow 的排程為 00:20 與 08:30 UTC；啟動 checkout/setup 前先用 curl 檢查 Cloudflare API 與臺北議會實際 registry host `ifddoc2.tcc.gov.tw`，連線失敗即以 `::error::` 終止。

@@ -5,9 +5,9 @@ name: Sync national metadata (xisx-pc)
 # offline runner cannot hold up the GitHub-hosted sync.
 on:
   schedule:
-    # 14:30 Taipei: after the 02:17 UTC hosted run (150 min cap) has finished,
-    # so both writers do not draw on the shared UTC-day budget at once.
-    - cron: '30 6 * * *'
+    # 08:20 Taipei, right after the UTC-day budget resets and before the 02:17 UTC
+    # hosted run, so Taipei council (IP-restricted, xisx-pc only) gets first claim.
+    - cron: '20 0 * * *'
     # 16:30 Taipei retry in case GitHub drops the first one; --skip-if-ran-today.
     - cron: '30 8 * * *'
   workflow_dispatch:
