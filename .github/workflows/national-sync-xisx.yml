@@ -30,7 +30,8 @@ jobs:
     timeout-minutes: 150
     defaults:
       run:
-        shell: powershell
+        # cmd, not powershell: the host ExecutionPolicy blocks runner .ps1 step scripts.
+        shell: cmd
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: '03d40efd3c60181edea80af8d927ddc1'
