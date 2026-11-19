@@ -10,8 +10,8 @@ from urllib.parse import parse_qs, urlsplit
 
 from intel_v2 import http_fetch
 from national.adapters.ly import Ly20Adapter, Ly6Adapter
-from national.loader import load
-from national.store import ROOT, SqliteStore
+from national.loader import load, RECORD_WRITE_ESTIMATE, SOURCE_WRITE_ESTIMATE
+from national.store import ROOT, RUN_WRITE_RESERVE, SqliteStore
 from tests.test_http_fetch import response
 
 REGISTRY = json.loads((ROOT / "docs/govintel/national-sources.v1.json").read_text(encoding="utf-8"))
@@ -151,7 +151,7 @@ class NationalLyTests(unittest.TestCase):
     def test_budget_resume_replays_period_and_preserves_empty_streak(self):
         periods = {f"10-0{p}": {"dataList": [self.bill(10, p, str(p))]} for p in (1, 2)}
         source, adapter, _ = self.adapter(20, periods)
-        first = load(self.store, source, adapter, runner="github-actions", daily_limit=68)
+        first = load(self.store, source, adapter, runner="github-actions", daily_limit=SOURCE_WRITE_ESTIMATE + RECORD_WRITE_ESTIMATE + RUN_WRITE_RESERVE)
         self.assertEqual((first["status"], first["changed"], first["cursor_after"]), ("BUDGET_STOPPED", 1, "10-02"), first)
         source, adapter, _ = self.adapter(20, periods)
         second = load(self.store, source, adapter, runner="github-actions")
