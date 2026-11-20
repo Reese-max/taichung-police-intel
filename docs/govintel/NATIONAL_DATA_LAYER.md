@@ -511,3 +511,4 @@ API 陷阱與處理：
 - `--reserve-rows N` 把可用每日寫入上限降為 `DAILY_WRITE_LIMIT - N`，同時套用於 guard 檢查及 loader；預設 0。xisx-pc 改為先跑後，兩個 workflow 皆不使用此參數（保留供手動調整）。
 - `--skip-if-ran-today` 按 UTC 日期檢查目前 runner 所管理來源的 `runs.started_at`；命中時所有候選來源回報 `SKIPPED / ALREADY_RAN`，不建構 adapter，stderr 輸出 `SKIP ALL ALREADY_RAN`。dry-run 不套用此開關。兩個 workflow 各自在排定重試時啟用，人工 dispatch 不啟用。
 - xisx-pc workflow 的排程為 00:20 與 08:30 UTC；啟動 checkout/setup 前先用 curl 檢查 Cloudflare API 與臺北議會實際 registry host `ifddoc2.tcc.gov.tw`，連線失敗即以 `::error::` 終止。
+- 2026-11-20 新增 GitHub Actions 看門狗，於 02:05、03:35、06:05、10:35 UTC 檢查兩個同步 workflow；xisx-pc 最晚開始時間為 01:30 UTC，hosted 最晚為 03:30 UTC。若當日沒有成功或執行中的 run，逾時後透過 `GITHUB_TOKEN` 補發一次；補發後仍失敗或未出現 run 時發出 warning，同日不再重試。看門狗沿用 `NATIONAL_SYNC_ENABLED` 開關，不需 Cloudflare secret。
