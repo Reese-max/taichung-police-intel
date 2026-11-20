@@ -882,7 +882,7 @@ export default function V2DailyDashboard() {
         </div>
         {publication && (
           <div className="v2-updated">
-            <span>快照產生時間（非官方發布時間）</span>
+            <span>資料整理時間（非官方發布時間）</span>
             <strong>{formatDateTime(publication.generated_at)}</strong>
             <small>Asia/Taipei</small>
             {profileViews.length > 1 && (

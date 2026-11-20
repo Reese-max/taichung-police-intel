@@ -252,13 +252,13 @@ export default function QueryGatewayPanel({ onFeedback, feedbackReady = false, p
     <section className="v2-query" aria-labelledby="v2-query-title">
       <div className="v2-section-heading">
         <div>
-          <p className="v2-eyebrow">公開索引關鍵字查詢</p>
-          <h2 id="v2-query-title">Ask GovIntel</h2>
+          <p className="v2-eyebrow">查找公開資料</p>
+          <h2 id="v2-query-title">官方資料查詢</h2>
         </div>
-        <span>標題與來源中介資料</span>
+        <span>搜尋標題與來源資訊</span>
       </div>
       <p className="v2-query-note">
-        只查核准的公開快照與來源健康狀態；目前不是全文搜尋，也不會把結果當成即時事件或勤務指令。
+        只查詢已核准的公開資料版本與來源狀態；目前不是全文搜尋，結果也不代表即時事件或勤務指令。
         <a href={`${BASE_PATH}/#v2-archive-title`}>閱讀既有歷史資料與原文</a>。
       </p>
       <form className="v2-query-form" onSubmit={submit}>

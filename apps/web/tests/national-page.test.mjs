@@ -9,6 +9,12 @@ test("national page keeps accessible responsive search and source links", () => 
   assert.match(page, /aria-pressed=/);
   assert.match(page, /role="status" aria-live="polite" aria-atomic="true"/);
   assert.match(page, /開啟官方原頁（另開視窗）/);
+  assert.match(page, /results\.filters\.q/);
+  assert.match(page, /national-search-conditions/);
+  assert.match(page, /了解更多/);
+  assert.match(page, /只提供來源線索/);
+  assert.match(page, /全國資料查詢服務尚未設定/);
+  assert.match(page, /aria-label=\{`開啟官方原頁（另開視窗）/);
   assert.match(page, /官方連結無法驗證/);
   assert.match(page, /maxLength=\{1000\}/);
   assert.match(page, /max=\{draft\.to \|\| undefined\}/);

@@ -9,7 +9,7 @@
 .national-page h1 { margin: 0; font-size: clamp(1.6rem, 4vw, 2.4rem); }
 .national-page h2, .national-page h3 { font-size: 1.05rem; line-height: 1.45; }
 .national-header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin-bottom: 18px; }
-.national-header > p, .national-page small, .national-result-meta dt, .national-kind, .national-notice { color: var(--text-muted); }
+.national-header > p, .national-page small, .national-result-meta dt, .national-kind { color: var(--text-muted); }
 .national-header > p { margin: 0; }
 .national-form { display: grid; gap: 12px; }
 .national-primary-fields { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
@@ -41,7 +41,8 @@
 .national-actions { display: contents; }
 .national-page button { box-sizing: border-box; min-width: 44px; min-height: 44px; font: inherit; cursor: pointer; }
 .national-page .national-search { grid-column: 2; grid-row: 1; min-width: 72px; height: 48px; padding: 0 16px; border: 1px solid var(--accent); border-radius: var(--radius-sm); color: #0f1923; background: var(--accent); font-weight: 700; }
-.national-page .national-clear, .national-page .national-clear-mobile { padding: 0 10px; border: 0; color: #93c5fd; background: transparent; text-decoration: underline; }
+.national-page .national-clear, .national-page .national-clear-mobile { padding: 0 10px; border: 0; color: var(--text-muted); background: transparent; text-decoration: none; }
+.national-page .national-clear:hover, .national-page .national-clear-mobile:hover { text-decoration: underline; text-underline-offset: 3px; }
 .national-page .national-clear { display: none; }
 .national-type-group { display: none; }
 .national-date-toggle { display: inline-flex; align-items: center; padding: 0 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); background: var(--surface-solid); }
@@ -56,7 +57,11 @@
 .national-status-row { display: flex; flex-direction: column; gap: 2px; margin: 16px 0; }
 .national-status { min-width: 0; }
 .national-status p, .national-notice { margin: 3px 0; }
-.national-notice { font-size: .82rem; }
+.national-search-conditions { color: #b9c5ce; font-size: .82rem; }
+.national-notice { flex: 0 1 42%; color: #b9c5ce; font-size: .78rem; }
+.national-notice summary { display: flex; align-items: baseline; justify-content: flex-end; gap: 8px; cursor: pointer; line-height: 1.5; }
+.national-notice summary span:last-child { flex: none; color: #d2dce3; text-decoration: underline; text-underline-offset: 3px; }
+.national-notice p { margin: 8px 0 0; color: #b9c5ce; line-height: 1.55; }
 .national-list-head { display: none; }
 .national-results { list-style: none; margin: 0; padding: 0; }
 .national-results li { padding: 12px 0 14px; border-top: 1px solid var(--border); }
@@ -66,14 +71,16 @@
 .national-result-date { grid-column: 2; grid-row: 1; align-self: center; color: var(--text-muted); font-size: .8rem; text-align: right; }
 .national-result-main { grid-column: 1 / -1; min-width: 0; }
 .national-results h3 { margin: 6px 0 4px; font-weight: 700; overflow-wrap: anywhere; }
-.national-result-meta { display: flex; flex-wrap: wrap; gap: 0 10px; margin: 0; color: var(--text-muted); font-size: .82rem; }
+.national-result-meta { display: flex; flex-wrap: wrap; gap: 0 10px; margin: 0; color: #b9c5ce; font-size: .82rem; }
 .national-result-meta > div { display: inline-flex; gap: 4px; }
 .national-result-meta > div:not(.national-license) + div:not(.national-license)::before { content: " ・ "; }
 .national-result-meta dt { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
 .national-result-meta dd { margin: 0; overflow-wrap: anywhere; }
 .national-result-meta > .national-license { flex-basis: 100%; }
 .national-result-meta > .national-license::before { content: "授權："; }
-.national-official { display: inline-flex; align-items: center; min-height: 44px; margin-top: 4px; color: #93c5fd; text-decoration: underline; }
+.national-official { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; margin-top: 4px; padding: 0 4px; border-radius: 4px; color: #c4cfd6; font-size: .84rem; text-decoration: underline; text-decoration-color: rgba(196, 207, 214, .45); text-underline-offset: 3px; }
+.national-official::after { content: "↗"; font-size: .8em; }
+.national-official:hover { color: var(--text); text-decoration-color: currentColor; }
 .national-unverified { margin: 4px 0; color: var(--text-muted); font-size: .82rem; }
 .national-load-more { display: flex; justify-content: center; margin-top: 12px; }
 .national-load-more button { padding: 0 16px; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); background: var(--surface-solid); }
