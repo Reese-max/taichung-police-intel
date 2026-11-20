@@ -6,7 +6,7 @@
 
 **程式已發布，正式來源查詢仍 `RIGHTS_BLOCKED`。** `deployment_verified=true` 與 `production_verified=false` 同時成立：發布與受限拒答通過，逐來源正式權利尚未准入；不是已能返回核准官方內容的正值查詢。原始 v6 的 85%／90%／30%、20 事件／60 文件及 3–5 位試用者仍是計畫，沒有模型／真人效益結果。
 
-**2026-11-13 擁有者決定（尚未合併、尚未部署驗證）。** 專案擁有者決定放寬來源權利規定，變更在 draft PR [#237](https://github.com/Reese-max/taichung-police-intel/pull/237)、[#238](https://github.com/Reese-max/taichung-police-intel/pull/238)、[#239](https://github.com/Reese-max/taichung-police-intel/pull/239)。合併後 repo 內的核准政策為 governed schema 2，四個現行正式來源的 `formal_admission` 為 `ADMITTED`，權利狀態標為 `OWNER_ASSERTED_PERMISSION`／`OWNER_DECISION_TERMS_NOT_VERIFIED`：這是擁有者主張，不是逐來源條款查核或法律判斷，現行四個來源均屬臺中市議會，其網站未提供開放宣告。公開範圍仍只有 metadata 與連結；全文、摘錄與模型傳輸未開放，provider 仍停用。上方 `RIGHTS_BLOCKED` 是 2026-10-07 固定正式收據的結果，在重新部署並完成正式環境驗收之前仍是正式環境的已驗證狀態；`ADMITTED` 目前只有 repo 內測試與驗證腳本的結果，沒有正式環境收據。
+**2026-11-13 擁有者決定（2026-11-15 已經由 #242 合併；尚無正式環境驗收收據）。** 專案擁有者決定放寬來源權利規定，變更在 PR [#237](https://github.com/Reese-max/taichung-police-intel/pull/237)、[#238](https://github.com/Reese-max/taichung-police-intel/pull/238)、[#239](https://github.com/Reese-max/taichung-police-intel/pull/239)，三者一併經由 [#242](https://github.com/Reese-max/taichung-police-intel/pull/242)（`17629c2`）合併。repo 內的核准政策為 governed schema 2，四個現行正式來源的 `formal_admission` 為 `ADMITTED`，權利狀態標為 `OWNER_ASSERTED_PERMISSION`／`OWNER_DECISION_TERMS_NOT_VERIFIED`：這是擁有者主張，不是逐來源條款查核或法律判斷，現行四個來源均屬臺中市議會，其網站未提供開放宣告。公開範圍仍只有 metadata 與連結；全文、摘錄與模型傳輸未開放，provider 仍停用。上方 `RIGHTS_BLOCKED` 是 2026-10-07 固定正式收據的結果，在重新部署並完成正式環境驗收之前仍是正式環境的已驗證狀態。2026-11-20 以匿名方式讀取一次正式環境 query gateway（`code_sha` `8e9cf24`），回報 `formal_admission: ADMITTED`、沒有權利受阻的來源；這只是一次讀回，不是已驗收的重新部署收據。
 
 產品／構想書工作題名為 **GovIntel AI－公共資訊查詢與個人化追蹤平台**。主辦已確認收妥補件、未接受更名；原報名完整題名、代表資格與封面指示仍待確認。不能把產品工作題名當已核准的正式報名題名。
 
