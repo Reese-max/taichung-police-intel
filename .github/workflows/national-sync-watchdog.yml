@@ -1,0 +1,31 @@
+name: National sync watchdog
+
+on:
+  schedule:
+    - cron: '5 2 * * *'
+    - cron: '35 3 * * *'
+    - cron: '5 6 * * *'
+    - cron: '35 10 * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  watchdog:
+    if: vars.NATIONAL_SYNC_ENABLED == 'true' && github.repository == 'Reese-max/taichung-police-intel'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: national-sync-watchdog
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Check scheduled sync runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python -X utf8 scripts/national-sync-watchdog.py
