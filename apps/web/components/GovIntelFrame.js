@@ -42,9 +42,9 @@ export default function GovIntelFrame({ children }) {
         {home ? (
           <>
             <section className="govintel-intro" aria-labelledby="govintel-intro-title">
-              <h1 id="govintel-intro-title">查找公告，追蹤你在意的變動</h1>
-              <p>先核對原文與資料時間，再保存自己選擇的地區、路段或議題。追蹤條件保存在此瀏覽器，重新開站時查看更新。</p>
-              <div><Link href="/public-query/">開始公開查詢</Link><Link href="/tracking/">管理我的追蹤</Link></div>
+              <h1 id="govintel-intro-title">全國資料，一次查找</h1>
+              <p>一次查找 5 個地方議會、立法院與政府採購資料，再回到官方來源核對原文與時間。追蹤條件保存在這台瀏覽器，重新開站後可看更新。</p>
+              <div><Link href="/national/">搜尋全國資料</Link><Link href="/tracking/">管理我的追蹤</Link></div>
             </section>
             <V2DailyDashboard />
             <details className="legacy-system-details">

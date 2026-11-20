@@ -54,12 +54,20 @@ export default function NationalPage() {
   }
 
   const changed = results && Object.keys(EMPTY).some(key => draft[key] !== results.filters[key]);
+  const searchConditions = results && [
+    results.filters.q ? `關鍵字「${results.filters.q}」` : "關鍵字不限",
+    `縣市／機關：${results.filters.jurisdiction || "全國"}`,
+    `類型：${KIND_LABELS[results.filters.kind] || "全部"}`,
+    results.filters.from || results.filters.to
+      ? `日期：${results.filters.from || "不限"}～${results.filters.to || "不限"}`
+      : "日期不限",
+  ].join(" · ");
   const field = key => ({ value: draft[key], onChange: event => setDraft(previous => ({ ...previous, [key]: event.target.value })) });
-  const status = !GATEWAY ? "尚未設定全國查詢服務（gateway），目前無法搜尋。"
+  const status = !GATEWAY ? "全國資料查詢服務尚未設定，目前無法搜尋。"
     : state === "loading" ? "載入中，請稍候。"
       : state === "error" ? error
         : results ? (results.records.length ? `已載入 ${results.records.length} 筆資料。${results.next_cursor ? "可載入更多。" : "已顯示全部搜尋結果。"}` : "沒有符合條件的資料，請調整條件後再試。")
-          : "輸入條件後按搜尋；留白可瀏覽目前已載入的中繼資料。";
+          : "輸入條件後按搜尋；留白可瀏覽目前已收錄的來源資訊。";
   const kinds = [["", "全部"], ...Object.entries(KIND_LABELS)];
 
   return <main className="national-page" aria-labelledby="national-title">
@@ -117,10 +125,14 @@ export default function NationalPage() {
     <div className="national-status-row">
       <div className="national-status" role="status" aria-live="polite" aria-atomic="true">
         <p>{status}</p>
+        {searchConditions && <p className="national-search-conditions">搜尋條件：{searchConditions}</p>}
         {changed && <p>條件已修改，請重新搜尋；「載入更多」仍沿用上次搜尋條件。</p>}
         {state === "error" && results && <p>目前保留先前結果，可按「載入更多」重試。</p>}
       </div>
-      <p className="national-notice">只顯示中繼資料與官方連結，不是治理回答的唯一證據；資料每日更新，首次回填需要數天。 TDX 未設定金鑰。</p>
+      <details className="national-notice">
+        <summary><span>只提供來源線索，不能單獨作為治理回答證據</span><span>了解更多</span></summary>
+        <p>頁面只列來源資訊與官方連結，不能單獨作為治理回答證據；資料每日更新，首次匯入可能需要數天。TDX 金鑰尚未設定。</p>
+      </details>
     </div>
 
     <section aria-labelledby="national-results-title" aria-busy={state === "loading"}>
@@ -138,7 +150,7 @@ export default function NationalPage() {
                 <dl className="national-result-meta">
                   {details.map(([label, value]) => <div key={label} className={label === "授權" ? "national-license" : undefined}><dt>{label}</dt><dd>{label === "案號" ? `案號 ${value}` : value}</dd></div>)}
                 </dl>
-                {row.official_url ? <a className="national-official" href={row.official_url} target="_blank" rel="noreferrer">開啟官方原頁（另開視窗）</a> : <p className="national-unverified">官方連結無法驗證</p>}
+                {row.official_url ? <a className="national-official" href={row.official_url} target="_blank" rel="noreferrer" aria-label={`開啟官方原頁（另開視窗）：${row.title || "標題未提供"}`}>查看官方來源</a> : <p className="national-unverified">官方連結無法驗證</p>}
               </div>
               {row.event_date && <time className="national-result-date" dateTime={row.event_date} aria-label={`日期：${row.event_date}`}>{row.event_date}</time>}
             </article>
