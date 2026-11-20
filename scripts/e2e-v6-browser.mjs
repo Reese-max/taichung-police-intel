@@ -128,7 +128,7 @@ try {
     await page.goto(`${root}/`);
     const nav = page.getByRole("navigation", { name: "主要導覽" });
     for (const name of ["概覽", "公開查詢", "我的追蹤", "來源狀態"]) assert.equal(await nav.getByRole("link", { name, exact: true }).isVisible(), true);
-    assert.equal(await page.getByRole("heading", { name: "查找公告，追蹤你在意的變動" }).isVisible(), true);
+    assert.equal(await page.getByRole("heading", { name: "全國資料，一次查找" }).isVisible(), true);
     return { routes_visible: ["/", "/public-query/", "/tracking/", "/sources/"] };
   });
   await check("02-save-query-condition", page, async () => {
