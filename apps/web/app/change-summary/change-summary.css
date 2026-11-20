@@ -1,0 +1,9 @@
+.cs-page { max-width: 70rem; margin: auto; padding: 1.5rem; overflow-wrap: anywhere; }
+.cs-badge { font-weight: 700; border-left: .3rem solid #a96900; padding: .6rem; }
+.cs-statements { padding-left: 1.4rem; }
+.cs-statements > li { padding: 1rem; margin-block: .8rem; border: 1px solid #c2c8cf; border-radius: .5rem; }
+.cs-type { display: inline-block; margin-right: .6rem; padding: .1rem .5rem; border: 1px solid currentColor; border-radius: 999px; font-size: .8rem; }
+.cs-compare { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 1rem; }
+.cs-side { padding: 1rem; border: 1px solid #c2c8cf; border-radius: .5rem; }
+.cs-side mark { background: #ffe08a; color: #1b1b1b; padding: 0 .1rem; }
+.cs-meta { font-size: .85rem; }

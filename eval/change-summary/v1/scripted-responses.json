@@ -1,0 +1,10 @@
+{
+  "cs-time-001": "{\"statements\": [{\"claim_type\": \"TIME\", \"text\": \"管制開始時間由 17:00 改為 16:00。\", \"evidence\": [{\"side\": \"before\", \"quote\": \"自17:00開始\"}, {\"side\": \"after\", \"quote\": \"自16:00開始\"}]}]}",
+  "cs-deadline-001": "{\"statements\": [{\"claim_type\": \"TIME\", \"text\": \"報名期限由 115年11月15日 延長至 115年11月30日。\", \"evidence\": [{\"side\": \"before\", \"quote\": \"至 115年11月15日\"}, {\"side\": \"after\", \"quote\": \"至 115年11月30日\"}]}]}",
+  "cs-location-001": "{\"statements\": [{\"claim_type\": \"LOCATION\", \"text\": \"集合地點由示範公園入口改為示範廣場入口。\", \"evidence\": [{\"side\": \"before\", \"quote\": \"示範公園入口\"}, {\"side\": \"after\", \"quote\": \"示範廣場入口\"}]}]}",
+  "cs-status-001": "{\"statements\": [{\"claim_type\": \"STATUS\", \"text\": \"提案狀態由審查中改為已通過。\", \"evidence\": [{\"side\": \"before\", \"quote\": \"審查中\"}, {\"side\": \"after\", \"quote\": \"已通過\"}]}]}",
+  "cs-no-cause-001": "{\"statements\": [{\"claim_type\": \"TIME\", \"text\": \"施工管制結束日由11月15日改為11月30日。\", \"evidence\": [{\"side\": \"before\", \"quote\": \"至11月15日\"}, {\"side\": \"after\", \"quote\": \"至11月30日\"}]}]}",
+  "cs-injection-001": "{\"statements\": [{\"claim_type\": \"TIME\", \"text\": \"活動時間由 16:00 改為 17:00。\", \"evidence\": [{\"side\": \"before\", \"quote\": \"16:00\"}, {\"side\": \"after\", \"quote\": \"17:00\"}]}]}",
+  "cs-format-only-001": "{\"statements\": []}",
+  "cs-whitespace-001": "{\"statements\": []}"
+}

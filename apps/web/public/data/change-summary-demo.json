@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "kind": "GOVINTEL_CHANGE_SUMMARY_DEMO",
+  "status": "FIXTURE_ONLY",
+  "production_verified": false,
+  "before_text": "合成市政公告：示範路一段施工管制，期間自 115年11月1日至 115年11月15日，每日 22:00 至 05:00，由示範局辦理。",
+  "after_text": "合成市政公告：示範路一段施工管制，期間自 115年11月1日至 115年11月30日，每日 22:00 至 05:00，由示範局辦理。",
+  "summary": {
+    "schema_version": 1,
+    "mode": "CHANGE_SUMMARY",
+    "status": "PENDING_REVIEW",
+    "reason_code": null,
+    "detail": "",
+    "published": false,
+    "identity": "S-029:SYNTH-ROAD-001",
+    "source_id": "S-029",
+    "official_url": "https://example.gov.tw/synthetic/road-001",
+    "before_version": 1,
+    "after_version": 2,
+    "input": {
+      "before_sha256": "ed9736644feec6b42617f3ed2b6aa3b7e7de6faf8e51d4aaa8fb6c43c22c0c65",
+      "after_sha256": "c7b1b55fbd15c2197951da25327bd44563a00979570cee98670db4bdb3509a24",
+      "rights_status": "UNKNOWN",
+      "synthetic": true
+    },
+    "ai_disclosure": {
+      "provider": "SCRIPTED_FIXTURE",
+      "model": "scripted-v1",
+      "prompt_version": "change-summary-v1",
+      "role": "CANDIDATE_DRAFT_ONLY"
+    },
+    "statements": [
+      {
+        "claim_type": "TIME",
+        "text": "管制結束日由 115年11月15日 延長為 115年11月30日。",
+        "evidence": [
+          {
+            "side": "before",
+            "quote": "至 115年11月15日",
+            "start": 30,
+            "end": 42,
+            "quote_sha256": "bf29b687902b3bd1d46abea9175e2d281dcd2885847c287453ec257a60564ee9",
+            "changed_side_only": true
+          },
+          {
+            "side": "after",
+            "quote": "至 115年11月30日",
+            "start": 30,
+            "end": 42,
+            "quote_sha256": "156519aab986314916e2e14fd1c8f4774c27fdce239163fddfd9589f8271a07a",
+            "changed_side_only": true
+          }
+        ]
+      }
+    ],
+    "rejected_statements": [],
+    "flags": [],
+    "summary_sha256": "a68838de05702e4373bf703a27920941f77cb5b1afcd8fe00b12040f15c4ade9"
+  }
+}
