@@ -44,18 +44,18 @@
         "NO_LAST_KNOWN_GOOD",
         "NO_DATA_AS_OF"
       ],
-      "last_checked_at": "2026-11-21T02:41:22+08:00",
+      "last_checked_at": "2026-11-21T11:23:31+08:00",
       "last_known_good": null,
       "last_known_good_age": {
         "age_hours": null,
         "completed_at": null,
-        "observed_at": "2026-11-20T18:41:22.750770+00:00",
+        "observed_at": "2026-11-21T03:23:31.357680+00:00",
         "reason": "NO_LAST_KNOWN_GOOD",
         "status": "UNKNOWN"
       },
       "last_success_at": null,
       "manifest_sha256": null,
-      "next_update_at": "2026-11-21T06:30:00+08:00",
+      "next_update_at": "2026-11-21T18:30:00+08:00",
       "pagination": null,
       "promotion_eligible": false,
       "result": "FAILED",
@@ -80,18 +80,18 @@
         "NO_LAST_KNOWN_GOOD",
         "VERY_STALE_DATA"
       ],
-      "last_checked_at": "2026-11-21T02:41:30+08:00",
+      "last_checked_at": "2026-11-21T11:23:35+08:00",
       "last_known_good": null,
       "last_known_good_age": {
         "age_hours": null,
         "completed_at": null,
-        "observed_at": "2026-11-20T18:41:30.798878+00:00",
+        "observed_at": "2026-11-21T03:23:35.791788+00:00",
         "reason": "NO_LAST_KNOWN_GOOD",
         "status": "UNKNOWN"
       },
       "last_success_at": null,
       "manifest_sha256": "07bf883c472884bf3a1f3f799b63d3ec40a7094e091a9dca82db28b4cd9e59b7",
-      "next_update_at": "2026-11-21T06:30:00+08:00",
+      "next_update_at": "2026-11-21T18:30:00+08:00",
       "pagination": {
         "complete": false,
         "page_limit": 4,
@@ -108,16 +108,16 @@
       "source_role": "PRIMARY_EVENT",
       "source_url": "https://www.traffic.taichung.gov.tw/news/index.asp?Parser=9,4,20",
       "window_completeness": "PARTIAL",
-      "window_item_count": 5
+      "window_item_count": 4
     }
   ],
-  "generated_at": "2026-11-21T02:41:30+08:00",
+  "generated_at": "2026-11-21T11:23:35+08:00",
   "latest_collection_run": {
-    "collection_run_id": "CR-DEMO-20261120-EVENING-SCHEDULE",
-    "finished_at": "2026-11-21T02:41:30+08:00",
-    "scheduled_for": "2026-11-20T18:30:00+08:00",
-    "slot": "EVENING",
-    "slot_date": "2026-11-20",
+    "collection_run_id": "CR-DEMO-20261121-MORNING-SCHEDULE",
+    "finished_at": "2026-11-21T11:23:35+08:00",
+    "scheduled_for": "2026-11-21T06:30:00+08:00",
+    "slot": "MORNING",
+    "slot_date": "2026-11-21",
     "source_policy": {
       "active_source_ids": [
         "S-004",
@@ -131,12 +131,12 @@
       "policy_version": 3,
       "retention_policy_hash": "18809f223924adaa70b3015768717f0c36a76ab7e26bb660f2fa9c0479529727"
     },
-    "started_at": "2026-11-21T02:40:37+08:00",
+    "started_at": "2026-11-21T11:22:52+08:00",
     "status": "PARTIAL",
     "trigger": "SCHEDULE"
   },
   "mode": "COMPETITION_DEMO",
-  "next_update_at": "2026-11-21T06:30:00+08:00",
+  "next_update_at": "2026-11-21T18:30:00+08:00",
   "schema_version": 1,
   "source_policy": {
     "active_source_ids": [
@@ -153,31 +153,31 @@
   },
   "sources": [
     {
-      "current_source_run_id": "SR-DEMO-20261120-EVENING-004",
+      "current_source_run_id": "SR-DEMO-20261121-MORNING-004",
       "data_as_of": "2026-10-02T00:00:00+08:00",
       "freshness_status": "STALE",
       "integration_status": "PRODUCTION_ACTIVE",
       "intelligence_gaps": [
         "STALE_DATA"
       ],
-      "last_checked_at": "2026-11-21T02:40:45+08:00",
+      "last_checked_at": "2026-11-21T11:22:57+08:00",
       "last_known_good": {
-        "completed_at": "2026-11-21T02:40:45+08:00",
+        "completed_at": "2026-11-21T11:22:57+08:00",
         "manifest_sha256": "60376b77531ff0aa07e77a424d676b750e151cd6d239de090a92b60ad9466ac2",
         "snapshot_count": 3,
         "snapshot_item_count": 1,
-        "source_run_id": "SR-DEMO-20261120-EVENING-004"
+        "source_run_id": "SR-DEMO-20261121-MORNING-004"
       },
       "last_known_good_age": {
-        "age_hours": 0.0002375163888888889,
-        "completed_at": "2026-11-21T02:40:45+08:00",
-        "observed_at": "2026-11-20T18:40:45.855059+00:00",
+        "age_hours": 0.00015554666666666667,
+        "completed_at": "2026-11-21T11:22:57+08:00",
+        "observed_at": "2026-11-21T03:22:57.559968+00:00",
         "reason": null,
         "status": "KNOWN"
       },
-      "last_success_at": "2026-11-21T02:40:45+08:00",
+      "last_success_at": "2026-11-21T11:22:57+08:00",
       "manifest_sha256": "60376b77531ff0aa07e77a424d676b750e151cd6d239de090a92b60ad9466ac2",
-      "next_update_at": "2026-11-21T06:30:00+08:00",
+      "next_update_at": "2026-11-21T18:30:00+08:00",
       "result": "NO_NEW_ITEM",
       "snapshot_count": 3,
       "snapshot_item_count": 1,
@@ -190,7 +190,7 @@
       "window_item_count": 0
     },
     {
-      "current_source_run_id": "SR-DEMO-20261120-EVENING-006",
+      "current_source_run_id": "SR-DEMO-20261121-MORNING-006",
       "data_as_of": "2026-09-01T00:00:00+08:00",
       "data_as_of_basis": "OFFICIAL_DOCUMENT_REVISION_DATE",
       "data_as_of_evidence": {
@@ -207,24 +207,24 @@
         "WINDOW_PARTIAL",
         "VERY_STALE_DATA"
       ],
-      "last_checked_at": "2026-11-21T02:40:55+08:00",
+      "last_checked_at": "2026-11-21T11:23:07+08:00",
       "last_known_good": {
-        "completed_at": "2026-11-21T02:40:55+08:00",
+        "completed_at": "2026-11-21T11:23:07+08:00",
         "manifest_sha256": "6f6c76f0be306ca3ad99448bc8d73bed704c04a1a67fa8346f52e7769fc7c997",
         "snapshot_count": 15,
         "snapshot_item_count": 7,
-        "source_run_id": "SR-DEMO-20261120-EVENING-006"
+        "source_run_id": "SR-DEMO-20261121-MORNING-006"
       },
       "last_known_good_age": {
-        "age_hours": 0.00026916555555555553,
-        "completed_at": "2026-11-21T02:40:55+08:00",
-        "observed_at": "2026-11-20T18:40:55.968996+00:00",
+        "age_hours": 7.933166666666667e-05,
+        "completed_at": "2026-11-21T11:23:07+08:00",
+        "observed_at": "2026-11-21T03:23:07.285594+00:00",
         "reason": null,
         "status": "KNOWN"
       },
-      "last_success_at": "2026-11-21T02:40:55+08:00",
+      "last_success_at": "2026-11-21T11:23:07+08:00",
       "manifest_sha256": "6f6c76f0be306ca3ad99448bc8d73bed704c04a1a67fa8346f52e7769fc7c997",
-      "next_update_at": "2026-11-21T06:30:00+08:00",
+      "next_update_at": "2026-11-21T18:30:00+08:00",
       "result": "PARTIAL",
       "snapshot_count": 15,
       "snapshot_item_count": 7,
@@ -237,7 +237,7 @@
       "window_item_count": 0
     },
     {
-      "current_source_run_id": "SR-DEMO-20261120-EVENING-007",
+      "current_source_run_id": "SR-DEMO-20261121-MORNING-007",
       "data_as_of": "2026-08-10T07:18:00+08:00",
       "data_as_of_basis": "OFFICIAL_API_RECORD_DATE",
       "data_as_of_scope": "OBSERVED_API_PAGE",
@@ -246,24 +246,24 @@
       "intelligence_gaps": [
         "STALE_DATA"
       ],
-      "last_checked_at": "2026-11-21T02:41:09+08:00",
+      "last_checked_at": "2026-11-21T11:23:18+08:00",
       "last_known_good": {
-        "completed_at": "2026-11-21T02:41:09+08:00",
+        "completed_at": "2026-11-21T11:23:18+08:00",
         "manifest_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "snapshot_count": 2,
         "snapshot_item_count": 0,
-        "source_run_id": "SR-DEMO-20261120-EVENING-007"
+        "source_run_id": "SR-DEMO-20261121-MORNING-007"
       },
       "last_known_good_age": {
-        "age_hours": 0.0002122475,
-        "completed_at": "2026-11-21T02:41:09+08:00",
-        "observed_at": "2026-11-20T18:41:09.764091+00:00",
+        "age_hours": 8.295277777777779e-05,
+        "completed_at": "2026-11-21T11:23:18+08:00",
+        "observed_at": "2026-11-21T03:23:18.298630+00:00",
         "reason": null,
         "status": "KNOWN"
       },
-      "last_success_at": "2026-11-21T02:41:09+08:00",
+      "last_success_at": "2026-11-21T11:23:18+08:00",
       "manifest_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "next_update_at": "2026-11-21T06:30:00+08:00",
+      "next_update_at": "2026-11-21T18:30:00+08:00",
       "result": "NO_NEW_ITEM",
       "snapshot_count": 2,
       "snapshot_item_count": 0,
@@ -276,7 +276,7 @@
       "window_item_count": 0
     },
     {
-      "current_source_run_id": "SR-DEMO-20261120-EVENING-009",
+      "current_source_run_id": "SR-DEMO-20261121-MORNING-009",
       "data_as_of": null,
       "freshness_status": "NO_DATA",
       "integration_status": "PRODUCTION_ACTIVE",
@@ -284,24 +284,24 @@
         "WINDOW_PARTIAL",
         "NO_DATA_AS_OF"
       ],
-      "last_checked_at": "2026-11-21T02:41:10+08:00",
+      "last_checked_at": "2026-11-21T11:23:19+08:00",
       "last_known_good": {
-        "completed_at": "2026-11-21T02:41:10+08:00",
+        "completed_at": "2026-11-21T11:23:19+08:00",
         "manifest_sha256": "d74de2631cff63316fb4ba717e1c63de412bb6d3ae2fdf32c3bba68fc4957490",
         "snapshot_count": 1,
         "snapshot_item_count": 108,
-        "source_run_id": "SR-DEMO-20261120-EVENING-009"
+        "source_run_id": "SR-DEMO-20261121-MORNING-009"
       },
       "last_known_good_age": {
-        "age_hours": 0.00023177944444444443,
-        "completed_at": "2026-11-21T02:41:10+08:00",
-        "observed_at": "2026-11-20T18:41:10.834406+00:00",
+        "age_hours": 0.00011481138888888889,
+        "completed_at": "2026-11-21T11:23:19+08:00",
+        "observed_at": "2026-11-21T03:23:19.413321+00:00",
         "reason": null,
         "status": "KNOWN"
       },
-      "last_success_at": "2026-11-21T02:41:10+08:00",
+      "last_success_at": "2026-11-21T11:23:19+08:00",
       "manifest_sha256": "d74de2631cff63316fb4ba717e1c63de412bb6d3ae2fdf32c3bba68fc4957490",
-      "next_update_at": "2026-11-21T06:30:00+08:00",
+      "next_update_at": "2026-11-21T18:30:00+08:00",
       "result": "PARTIAL",
       "snapshot_count": 1,
       "snapshot_item_count": 108,
