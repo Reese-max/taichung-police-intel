@@ -82,7 +82,7 @@ class NationalSyncSchedulingTests(unittest.TestCase):
         constructor.assert_called_once()
 
     def test_reserve_rows_skips_source_before_fetching(self):
-        with patch.object(self.store, "rows_written_today", return_value=70_000):
+        with patch.object(self.store, "rows_written_today", return_value=self.cli.DAILY_WRITE_LIMIT - 20_000):
             _, report, constructor, _ = self.invoke(["--reserve-rows", "20000"])
             self.assertEqual(report["runs"][0]["reason"], "DAILY_BUDGET")
             constructor.assert_not_called()
@@ -111,9 +111,10 @@ class NationalSyncSchedulingTests(unittest.TestCase):
 
     def test_explicit_source_keeps_selected_order_and_reserve_is_passed_to_loader(self):
         _, _, _, load_call = self.invoke(["--reserve-rows", "20000"])
-        self.assertEqual(load_call.call_args.kwargs["daily_limit"], 70_000)
-        store = Mock(database_size_bytes=Mock(return_value=0), rows_written_today=Mock(return_value=70_000))
-        self.assertEqual(self.cli.check_guards(store, daily_limit=70_000)["status"], "BUDGET_STOPPED")
+        limit = self.cli.DAILY_WRITE_LIMIT - 20_000
+        self.assertEqual(load_call.call_args.kwargs["daily_limit"], limit)
+        store = Mock(database_size_bytes=Mock(return_value=0), rows_written_today=Mock(return_value=limit))
+        self.assertEqual(self.cli.check_guards(store, daily_limit=limit)["status"], "BUDGET_STOPPED")
         self.assertEqual(self.cli.check_guards(store)["status"], "OK")
 
     def test_default_order_runs_non_council_sources_before_councils(self):
