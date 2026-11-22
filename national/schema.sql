@@ -27,6 +27,10 @@ CREATE TABLE IF NOT EXISTS records (
   content_sha256 TEXT NOT NULL,
   license TEXT,
   rights_class TEXT NOT NULL,
+  proposer TEXT,
+  cosigners TEXT,
+  committee TEXT,
+  outcome TEXT,
   UNIQUE(source_id, external_id)
 );
 CREATE INDEX IF NOT EXISTS records_jurisdiction_date ON records(jurisdiction, event_date);
@@ -47,6 +51,26 @@ CREATE TRIGGER IF NOT EXISTS records_au AFTER UPDATE ON records BEGIN
   INSERT INTO records_fts(records_fts, rowid, title, case_number)
     VALUES ('delete', old.id, old.title, old.case_number);
   INSERT INTO records_fts(rowid, title, case_number) VALUES (new.id, new.title, new.case_number);
+END;
+
+CREATE VIRTUAL TABLE IF NOT EXISTS bill_people_fts USING fts5(
+  proposer, cosigners, committee, content='', tokenize='trigram'
+);
+CREATE TRIGGER IF NOT EXISTS bill_people_ai AFTER INSERT ON records WHEN new.proposer IS NOT NULL BEGIN
+  INSERT INTO bill_people_fts(rowid, proposer, cosigners, committee)
+    VALUES (new.id, new.proposer, new.cosigners, new.committee);
+END;
+CREATE TRIGGER IF NOT EXISTS bill_people_ad AFTER DELETE ON records WHEN old.proposer IS NOT NULL BEGIN
+  INSERT INTO bill_people_fts(bill_people_fts, rowid, proposer, cosigners, committee)
+    VALUES ('delete', old.id, old.proposer, old.cosigners, old.committee);
+END;
+CREATE TRIGGER IF NOT EXISTS bill_people_au_delete AFTER UPDATE ON records WHEN old.proposer IS NOT NULL BEGIN
+  INSERT INTO bill_people_fts(bill_people_fts, rowid, proposer, cosigners, committee)
+    VALUES ('delete', old.id, old.proposer, old.cosigners, old.committee);
+END;
+CREATE TRIGGER IF NOT EXISTS bill_people_au_insert AFTER UPDATE ON records WHEN new.proposer IS NOT NULL BEGIN
+  INSERT INTO bill_people_fts(rowid, proposer, cosigners, committee)
+    VALUES (new.id, new.proposer, new.cosigners, new.committee);
 END;
 
 CREATE TABLE IF NOT EXISTS runs (

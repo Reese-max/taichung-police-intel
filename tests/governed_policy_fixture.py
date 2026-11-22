@@ -41,6 +41,7 @@ RUNTIME_PATHS = (
     "workers/query-gateway/src/public-brief.js", "workers/query-gateway/src/research.js",
     "workers/query-gateway/src/document-evidence.js", "workers/query-gateway/src/document-research.js",
     "workers/query-gateway/src/chat-assist.js", "workers/query-gateway/src/national.js",
+    "workers/query-gateway/src/national-bills.js",
     "apps/web/public/data/retention-policy-binding.json",
     "apps/web/lib/council-prep.js", "docs/govintel/source-catalog.v2.json",
     "docs/govintel/retention-rights-policy.v1.json", "docs/govintel/source-policy.approved.json",

@@ -263,7 +263,11 @@
         "authority",
         "official_url",
         "provider_url",
-        "license"
+        "license",
+        "proposer",
+        "cosigners",
+        "committee",
+        "outcome"
       ],
       "required_secret": null,
       "scope": {
@@ -278,8 +282,12 @@
         "api_method": "GET",
         "field_mapping": {
           "external_id": "billId",
-          "title": "proposalRationale.strip()[:200] or (billType + billNumber)[:200]",
+          "title": "HTML-stripped proposalRationaleSort, or proposalRationale without highlight suffix, or billType + billNumber; at most 1000 characters",
           "case_number": "session + space + billNumber",
+          "proposer": "sponsor",
+          "cosigners": "jointSignatory",
+          "committee": "committee",
+          "outcome": "closureType and resolution joined with ；",
           "event_date": null,
           "official_url": "https://yishi.tccc.gov.tw/proposals/{billId}"
         },
@@ -292,7 +300,7 @@
         "rights_note 照錄總表網站文字；總表未提供本議會宣告頁精確網址，license_source_url 留 null。",
         "容量按已知議案數 × 約 0.8KB 含索引估算；不是實測資料庫大小。",
         "目前盤點只有臺中有議事錄 API；段落不計入 D1。",
-        "W2a 已實作官方議案 API；pageSize=200、最多 100 頁、完整核對 totalCount 後才寫入。無日期，HTML 全文與議事錄不入庫。2026-11-18 主對話提供結構，本 worker 僅離線驗收。"
+        "官方議案 API：pageSize=200、最多 100 頁、完整核對 totalCount 後才寫入。案由去除 HTML 後入庫；無日期，議事錄不入庫。"
       ],
       "official_url": "https://yishi.tccc.gov.tw",
       "official_system_urls": [
