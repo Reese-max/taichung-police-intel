@@ -12,12 +12,12 @@ from .store import RUN_WRITE_RESERVE, sql_value, utc_now
 DAILY_WRITE_LIMIT = 99_000
 MAX_BATCH_BYTES = 99_000  # leave space for local accounting SQL; file stays <100KB
 # D1 meta.rows_written measured 6.0 rows per inserted record (2026-11-19: TNN 69,918/11,653,
-# KHH 16,578/2,763); 16 leaves headroom for updates that rewrite index and FTS entries.
-RECORD_WRITE_ESTIMATE = 16
+# KHH 16,578/2,763); 32 reserves additional headroom for the separate people FTS triggers.
+RECORD_WRITE_ESTIMATE = 32
 SOURCE_WRITE_ESTIMATE = 2
-PUBLIC_FIELDS = set("title case_number event_date jurisdiction authority official_url provider_url license".split())
+PUBLIC_FIELDS = set("title case_number event_date jurisdiction authority official_url provider_url license proposer cosigners committee outcome".split())
 SYSTEM_FIELDS = set("source_id kind external_id fetched_at rights_class".split())
-RECORD_FIELDS = tuple("source_id kind jurisdiction external_id title case_number event_date authority official_url provider_url fetched_at content_sha256 license rights_class".split())
+RECORD_FIELDS = tuple("source_id kind jurisdiction external_id title case_number event_date authority official_url provider_url fetched_at content_sha256 license rights_class proposer cosigners committee outcome".split())
 
 
 def digest(value):

@@ -1,5 +1,5 @@
 // Public metadata only. The national store is independent of publication snapshots.
-const FIELDS = "id source_id kind jurisdiction external_id title case_number event_date authority official_url provider_url license rights_class fetched_at".split(" ");
+const FIELDS = "id source_id kind jurisdiction external_id title case_number event_date authority official_url provider_url license rights_class fetched_at proposer cosigners committee outcome".split(" ");
 const SELECT = FIELDS.map(field => `r.${field}`).join(",");
 const project = row => Object.fromEntries(FIELDS.map(field => [field, row[field] ?? null]));
 const positiveId = value => /^[1-9]\d*$/.test(String(value)) && Number.isSafeInteger(Number(value));
@@ -33,12 +33,24 @@ function searchQuery(params) {
     conditions.push("r.title LIKE ? ESCAPE '\\'");
     values.push(`%${q.replace(/[\\%_]/g, "\\$&")}%`);
   }
-  for (const key of ["jurisdiction", "kind"]) {
+  for (const key of ["jurisdiction", "kind", "source_id"]) {
     if (params.has(key)) {
       const value = params.get(key);
       if (!value || value.length > 100) throw new Error("invalid filter");
       conditions.push(`r.${key} = ?`);
       values.push(value);
+    }
+  }
+  if (params.has("proposer")) {
+    const proposer = params.get("proposer").trim();
+    if (!proposer || proposer.length > 50 || proposer.includes("\0")) throw new Error("invalid proposer");
+    if ([...proposer].length >= 3) {
+      conditions.push("r.id IN (SELECT rowid FROM bill_people_fts WHERE bill_people_fts MATCH ?)");
+      values.push('proposer : "' + proposer.replaceAll('"', '""') + '"');
+    } else {
+      if (!params.get("source_id")) throw new Error("short proposer requires source_id");
+      conditions.push("r.proposer LIKE ? ESCAPE '\\'");
+      values.push("%" + proposer.replace(/[\\%_]/g, "\\$&") + "%");
     }
   }
   for (const [key, operator] of [["from", ">="], ["to", "<="]]) {
