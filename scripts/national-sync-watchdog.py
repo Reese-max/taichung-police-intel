@@ -9,9 +9,11 @@ from datetime import datetime, time, timezone
 
 
 UTC = timezone.utc
+# GitHub fires this repo's schedules 7-8 h late (2026-11-20..22: 00:20 xisx ran ~07:00,
+# 02:17 hosted ~09:45), so deadlines sit past that delay to avoid duplicate dispatches.
 WATCHED_WORKFLOWS = {
-    "national-sync-xisx.yml": time(1, 30),
-    "national-sync.yml": time(3, 30),
+    "national-sync-xisx.yml": time(12, 0),
+    "national-sync.yml": time(15, 0),
 }
 
 

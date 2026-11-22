@@ -2,10 +2,11 @@ name: National sync watchdog
 
 on:
   schedule:
-    - cron: '5 2 * * *'
-    - cron: '35 3 * * *'
-    - cron: '5 6 * * *'
-    - cron: '35 10 * * *'
+    # Observed 7-8 h schedule delay: these fire around 12:00-21:00 UTC, after the deadlines.
+    - cron: '30 4 * * *'
+    - cron: '30 7 * * *'
+    - cron: '30 10 * * *'
+    - cron: '30 13 * * *'
   workflow_dispatch:
 
 permissions:
