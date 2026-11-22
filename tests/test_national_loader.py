@@ -9,7 +9,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from national.adapters.fixture import FixtureAdapter
-from national.loader import RECORD_WRITE_ESTIMATE, batches, digest, load, normalize
+from national.loader import RECORD_WRITE_ESTIMATE, batches, digest, load, normalize, sql_value
 from national.store import ROOT, RUN_WRITE_RESERVE, SqliteStore, WranglerD1Store, utc_now
 
 FIXTURE = ROOT / "tests/fixtures/national/txg.json"
@@ -42,14 +42,22 @@ class NationalLoaderTests(unittest.TestCase):
     def test_existing_hashes_batches_by_command_size(self):
         self.run_load()
         known = [r["external_id"] for r in self.store.query("SELECT external_id FROM records")]
-        ids = known + [f"id-{n:04d}" for n in range(1000)] + ["x" * 512, "y'" * 200]
-        sizes = []
+        filler = [f"id-{n:04d}" for n in range(1000)]
+        # Known ids at chunk edges: first, around the ~155th value (first 5,000-char boundary) and last.
+        ids = [known[0]] + filler[:154] + [known[1]] + filler[154:] + ["x" * 512, "y'" * 200, known[2]]
+        sent = []
         real = self.store.query
-        with patch.object(self.store, "query", side_effect=lambda sql: sizes.append(len(sql)) or real(sql)):
+        def query(sql):
+            sent.append(sql)
+            return real(sql)
+        with patch.object(self.store, "query", side_effect=query):
             found = self.store.existing_hashes(SOURCE["national_source_id"], ids)
         self.assertEqual(set(found), set(known))
-        self.assertLessEqual(len(sizes), 6)  # hex-encoded ids ~32 chars each; 10-id chunks took 101 calls
-        self.assertTrue(all(size < 8200 for size in sizes), sizes)
+        values = [v for sql in sent for v in sql.split(" IN (", 1)[1][:-1].split(",")]
+        self.assertEqual(values, [sql_value(v) for v in ids])  # every id exactly once, in order
+        self.assertLessEqual(len(sent), 8)  # hex-encoded ids ~32 chars each; 10-id chunks took 101 calls
+        self.assertTrue(all(len(sql.split(" IN (", 1)[1]) <= 5002 for sql in sent))
+        self.assertTrue(all(len(sql) < 5200 for sql in sent), [len(sql) for sql in sent])
         self.assertEqual(self.store.existing_hashes(SOURCE["national_source_id"], []), {})
 
     def test_update_one_and_fts_delete_trigger(self):

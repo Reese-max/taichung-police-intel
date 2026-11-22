@@ -38,10 +38,10 @@ class Store:
         values = [sql_value(v) for v in external_ids]
         start = 0
         while start < len(values):
-            # Each remote query costs ~1.3 s regardless of size; ~8K chars stays far below
-            # the 32,767-char Windows command line that carries wrangler --command.
+            # Each remote query costs ~1.3 s regardless of size. npm's wrangler.cmd goes through
+            # cmd.exe, whose 8,191-char line limit (8,200 failed locally) also holds the other args.
             end, size = start + 1, len(values[start])
-            while end < len(values) and size + len(values[end]) + 1 <= 8000:
+            while end < len(values) and size + len(values[end]) + 1 <= 5000:
                 size += len(values[end]) + 1
                 end += 1
             rows = self.query("SELECT external_id, content_sha256 FROM records WHERE source_id="

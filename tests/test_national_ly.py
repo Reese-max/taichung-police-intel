@@ -165,6 +165,13 @@ class NationalLyTests(unittest.TestCase):
         source, adapter, session = self.adapter(20, {})
         adapter.full = False
         self.assertEqual(self.collect(source, adapter), [])
+        # A latest-term cursor on a full day restarts at the first term instead of skipping older terms.
+        source, adapter, _ = self.adapter(20, periods)
+        rows = self.collect(source, adapter, "11-02")
+        self.assertEqual(sorted(r["external_id"] for r in rows), ["10-1", "10-2", "11-1", "11-2"])
+        source, adapter, _ = self.adapter(20, periods)
+        self.assertEqual(sorted(r["external_id"] for r in self.collect(source, adapter, "10-02")),
+                         ["10-2", "11-1", "11-2"])
 
     def test_cli_full_ly_scan_on_monday_or_backfill(self):
         spec = importlib.util.spec_from_file_location("national_sync_ly_full", ROOT / "scripts/national-sync.py")
@@ -179,6 +186,8 @@ class NationalLyTests(unittest.TestCase):
             with patch.dict(cli.ADAPTERS, {"ly20": constructor}), patch.object(cli, "datetime", clock), patch.dict(cli.os.environ, {"NATIONAL_RUNNER": "github-actions"}), patch.object(cli.sys, "argv", args), contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
                 self.assertEqual(cli.main(), 0)
             self.assertEqual(constructor.call_args.kwargs, {"full": full}, day)
+            if not extra:
+                clock.now.assert_any_call(cli.timezone.utc)
 
     def test_budget_resume_replays_period_and_preserves_empty_streak(self):
         periods = {f"10-0{p}": {"dataList": [self.bill(10, p, str(p))]} for p in (1, 2)}
