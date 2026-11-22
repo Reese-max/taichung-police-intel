@@ -148,6 +148,38 @@ class NationalLyTests(unittest.TestCase):
         self.assertEqual(self.collect(source, adapter), [])
         self.assertEqual(session.get.call_count, 3)
 
+    def test_latest_term_scan_and_old_cursor_falls_back_to_full(self):
+        periods = {f"{term}-{period:02d}": {"dataList": [self.bill(term, period, f"{term}-{period}")]}
+                   for term in (10, 11) for period in (1, 2)}
+        source, adapter, session = self.adapter(20, periods)
+        adapter.full = False
+        rows = self.collect(source, adapter)
+        self.assertEqual(sorted(r["external_id"] for r in rows), ["11-1", "11-2"])
+        # robots.txt, probes 12-01, 12-02, 11-01; scans 11-02..11-08; 12-01/02 come from the probe cache
+        self.assertEqual(session.get.call_count, 11)
+        self.assertFalse(any("term=10&" in call.args[0] for call in session.get.call_args_list))
+        source, adapter, _ = self.adapter(20, periods)
+        adapter.full = False
+        rows = self.collect(source, adapter, "10-02")
+        self.assertEqual(sorted(r["external_id"] for r in rows), ["10-2", "11-1", "11-2"])
+        source, adapter, session = self.adapter(20, {})
+        adapter.full = False
+        self.assertEqual(self.collect(source, adapter), [])
+
+    def test_cli_full_ly_scan_on_monday_or_backfill(self):
+        spec = importlib.util.spec_from_file_location("national_sync_ly_full", ROOT / "scripts/national-sync.py")
+        cli = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cli)
+        source, adapter, _ = self.adapter(20)
+        for day, extra, full in (("2026-11-23", [], True), ("2026-11-24", [], False), ("2026-11-24", ["--backfill"], True)):
+            constructor = Mock(return_value=adapter)
+            clock = Mock(wraps=cli.datetime)
+            clock.now.return_value = cli.datetime.fromisoformat(day + "T01:00:00+00:00")
+            args = ["national-sync", "--source", "N-LY-ID20-BILLS", "--adapter", "ly20", "--dry-run", *extra]
+            with patch.dict(cli.ADAPTERS, {"ly20": constructor}), patch.object(cli, "datetime", clock), patch.dict(cli.os.environ, {"NATIONAL_RUNNER": "github-actions"}), patch.object(cli.sys, "argv", args), contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(cli.main(), 0)
+            self.assertEqual(constructor.call_args.kwargs, {"full": full}, day)
+
     def test_budget_resume_replays_period_and_preserves_empty_streak(self):
         periods = {f"10-0{p}": {"dataList": [self.bill(10, p, str(p))]} for p in (1, 2)}
         source, adapter, _ = self.adapter(20, periods)

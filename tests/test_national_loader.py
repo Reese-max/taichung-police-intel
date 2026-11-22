@@ -39,6 +39,19 @@ class NationalLoaderTests(unittest.TestCase):
         self.assertEqual(self.store.rows_written_today(), first["rows_written"] + 2 * RUN_WRITE_RESERVE)
         self.assertEqual(self.store.query("SELECT COUNT(*) AS n FROM records")[0]["n"], 3)
 
+    def test_existing_hashes_batches_by_command_size(self):
+        self.run_load()
+        known = [r["external_id"] for r in self.store.query("SELECT external_id FROM records")]
+        ids = known + [f"id-{n:04d}" for n in range(1000)] + ["x" * 512, "y'" * 200]
+        sizes = []
+        real = self.store.query
+        with patch.object(self.store, "query", side_effect=lambda sql: sizes.append(len(sql)) or real(sql)):
+            found = self.store.existing_hashes(SOURCE["national_source_id"], ids)
+        self.assertEqual(set(found), set(known))
+        self.assertLessEqual(len(sizes), 6)  # hex-encoded ids ~32 chars each; 10-id chunks took 101 calls
+        self.assertTrue(all(size < 8200 for size in sizes), sizes)
+        self.assertEqual(self.store.existing_hashes(SOURCE["national_source_id"], []), {})
+
     def test_update_one_and_fts_delete_trigger(self):
         self.run_load()
         self.adapter.records[0]["title"] = "新標題：道路安全測試"

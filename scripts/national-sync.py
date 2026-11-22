@@ -42,7 +42,7 @@ def main():
     parser.add_argument("--fixture", type=Path)
     parser.add_argument("--store", default="d1-local")
     parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--backfill", action="store_true", help="Use the full PCC web month window")
+    parser.add_argument("--backfill", action="store_true", help="Use the full PCC web month window and a full LY term scan")
     parser.add_argument("--apply-schema", action="store_true")
     parser.add_argument("--check-guards", action="store_true")
     parser.add_argument("--reserve-rows", type=int, default=0,
@@ -160,6 +160,9 @@ def main():
                         print("SKIP", source["national_source_id"], skip, file=sys.stderr, flush=True)
                     continue
                 options = {"backfill": args.backfill} if adapter_name == "pcc_web" else {}
+                if adapter_name in ("ly20", "ly6"):
+                    # shortcut: a missed Monday run delays the full LY scan a week; track last full scan if that matters.
+                    options = {"full": args.backfill or datetime.now(timezone.utc).weekday() == 0}
                 adapter = ADAPTERS[adapter_name](source, **options)
                 # Progress on stderr: the JSON report only prints at the end, so a timeout would show nothing.
                 # Skipped for --dry-run, whose stderr carries the report itself.

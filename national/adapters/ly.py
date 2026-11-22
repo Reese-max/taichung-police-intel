@@ -13,24 +13,39 @@ class LyAdapter(HttpAdapter):
     MAX_PERIOD = 8
     MAX_BYTES = 8 * 1024 * 1024
 
-    def __init__(self, source, *, session=None):
+    def __init__(self, source, *, session=None, full=True):
         super().__init__(source, session=session)
         self._pages = None
+        # full=False scans only the latest convened term; older terms are closed and rarely change.
+        self.full = full
 
-    def _snapshot(self, source):
+    def _rows(self, endpoint, term, period):
+        key = (term, period)
+        if key not in self._cache:
+            url = urlunsplit(endpoint._replace(query=urlencode(dict(
+                term=term, sessionPeriod=f"{period:02d}", page=1,
+                limit=20000, fileType="json"))))
+            rows = self.request(url, max_bytes=self.MAX_BYTES).get("dataList")
+            if not isinstance(rows, list):
+                raise ValueError("invalid LY dataList")
+            self._cache[key] = rows
+        return self._cache[key]
+
+    def _snapshot(self, source, full):
         self.warnings = []
+        self._cache = {}
         pages, winners = {}, {}
         endpoint = urlsplit(source["endpoints"][0])
-        for term in range(source["scope"]["from_term"], self.MAX_TERM + 1):
+        start = source["scope"]["from_term"]
+        if not full:
+            # Same convened test as the forward scan: period 01 or 02 has rows.
+            start = next((term for term in range(self.MAX_TERM, start - 1, -1)
+                          if self._rows(endpoint, term, 1) or self._rows(endpoint, term, 2)), start)
+        for term in range(start, self.MAX_TERM + 1):
             started, term_warnings = set(), []
             for period in range(1, self.MAX_PERIOD + 1):
                 cursor = f"{term}-{period:02d}"
-                url = urlunsplit(endpoint._replace(query=urlencode(dict(
-                    term=term, sessionPeriod=f"{period:02d}", page=1,
-                    limit=20000, fileType="json"))))
-                rows = self.request(url, max_bytes=self.MAX_BYTES).get("dataList")
-                if not isinstance(rows, list):
-                    raise ValueError("invalid LY dataList")
+                rows = self._rows(endpoint, term, period)
                 if rows:
                     started.add(period)
                 elif self.DATASET == 6:
@@ -77,8 +92,11 @@ class LyAdapter(HttpAdapter):
             raise ValueError("invalid LY period cursor")
         if self._pages is None or cursor is None:
             # Rebuild on resume to preserve global winners and the empty-period streak.
-            self._pages = self._snapshot(source)
-        cursor = cursor or f"{start}-01"
+            self._pages = self._snapshot(source, self.full)
+        if cursor is not None and cursor not in self._pages and not self.full:
+            # A cursor saved by an interrupted full scan may point at an older term.
+            self._pages = self._snapshot(source, True)
+        cursor = cursor or next(iter(self._pages))
         if cursor not in self._pages:
             raise ValueError("LY resume period no longer exists")
         keys = list(self._pages)

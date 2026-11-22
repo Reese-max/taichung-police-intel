@@ -306,7 +306,7 @@ class PccTests(unittest.TestCase):
                     patch('sys.argv', ['national-sync.py', '--source', sid, '--backfill', '--store', 'sqlite::memory:']), \
                     patch.dict('os.environ', {'NATIONAL_RUNNER': 'github-actions'}), redirect_stdout(io.StringIO()):
                 self.assertEqual(cli.main(), 0)
-            self.assertEqual(factory.call_args.kwargs, {'backfill': True} if name == 'pcc_web' else {})
+            self.assertEqual(factory.call_args.kwargs, {'pcc_web': {'backfill': True}, 'ly20': {'full': True}}.get(name, {}))
 
 
 if __name__ == '__main__':
