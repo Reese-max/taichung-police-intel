@@ -129,7 +129,8 @@ MCP_TOOLS = [
             "Validate structured answer claims against the server-controlled canonical evidence catalog. "
             "For a search_evidence result use claim_type STATUS, proposition "
             "{subject: \"publication:<canonical_id>:title\", value: <title>} and cited_evidence_ids "
-            "[<canonical_ref.evidence_id>]."
+            "[<canonical_ref.evidence_id>]. National D1 runtimes also accept national:<id>:<field> "
+            "with NAT-<id> citations from search_council_bills."
         ),
         "inputSchema": {
             "type": "object",
@@ -1461,9 +1462,21 @@ class QueryGateway:
         if tool == "query_statistics":
             return self._execute_statistics(args, now)
         if tool == "validate_answer":
+            claims = args.get("claims")
+            if isinstance(claims, list):
+                for claim in claims:
+                    if not isinstance(claim, dict):
+                        continue
+                    props = claim.get("proposition")
+                    props = props if isinstance(props, list) else [props]
+                    citations = claim.get("cited_evidence_ids")
+                    if (any(isinstance(prop, dict) and isinstance(prop.get("subject"), str)
+                            and prop["subject"].strip().startswith("national:") for prop in props)
+                            or isinstance(citations, list) and any(isinstance(item, str) and item.startswith("NAT-")
+                                                                   for item in citations)):
+                        raise GatewayError("CAPABILITY_NOT_AVAILABLE", "National D1 is not configured", 422)
             if self.snapshot.get("rebuild_failure"):
                 raise GatewayError("STALE_INDEX", "query rebuild failed; retained historical index cannot validate current answers", 503)
-            claims = args.get("claims")
             if not isinstance(claims, list) or not 1 <= len(claims) <= 32:
                 raise GatewayError("INVALID_ARGUMENTS", "validate_answer requires 1 to 32 structured claims")
             claim_keys = {

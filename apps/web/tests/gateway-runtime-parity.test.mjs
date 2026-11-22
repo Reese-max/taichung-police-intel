@@ -122,6 +122,18 @@ test("invalid requests fail with the same error code", () => bothRuntimes(async 
   }
 }));
 
+test("national bills explicitly require D1, which the Python stdio twin does not have", () => bothRuntimes(async call => {
+  // Worker results with a real SQLite-backed D1 mock are covered in national-bills-worker.test.mjs.
+  // This fixture omits the binding, so both runtimes must refuse the capability.
+  const claim = { text: "議案", claim_type: "STATUS", proposition: { subject: "national:1:title", value: "議案" },
+    cited_evidence_ids: ["NAT-1"] };
+  for (const [name, args] of [["search_council_bills", {}], ["validate_answer", { claims: [claim] }]]) {
+    const pair = await call(name, args);
+    assert.equal(pair.web.error, "CAPABILITY_NOT_AVAILABLE");
+    assert.equal(pair.mcp.error, "CAPABILITY_NOT_AVAILABLE");
+  }
+}));
+
 test("results published at the same instant are ordered by code point on both", () => bothRuntimes(async call => {
   const pair = await call("search_evidence", {});
   assertParity(pair, "search_evidence {} with mixed-case IDs");

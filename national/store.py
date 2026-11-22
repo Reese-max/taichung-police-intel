@@ -31,7 +31,18 @@ def sql_value(value):
 
 class Store:
     def apply_schema(self):
-        return self.execute_batch(SCHEMA.read_text(encoding="utf-8"))
+        columns = {row["name"] for row in self.query("PRAGMA table_info(records)")}
+        written = 0
+        if columns:
+            for column in ("proposer", "cosigners", "committee", "outcome"):
+                if column not in columns:
+                    try:
+                        written += self.execute_batch(f"ALTER TABLE records ADD COLUMN {column} TEXT;")
+                    except Exception:
+                        # Another sync may have added the column after our PRAGMA.
+                        if column not in {row["name"] for row in self.query("PRAGMA table_info(records)")}:
+                            raise
+        return written + self.execute_batch(SCHEMA.read_text(encoding="utf-8"))
 
     def existing_hashes(self, source_id, external_ids):
         found = {}

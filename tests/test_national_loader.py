@@ -70,6 +70,54 @@ class NationalLoaderTests(unittest.TestCase):
         self.store.execute_batch("DELETE FROM records WHERE external_id='fixture-txg-001';")
         self.assertEqual(self.store.query("SELECT rowid FROM records_fts WHERE records_fts MATCH '道路安全'"), [])
 
+    def test_old_schema_migration_and_people_fts_triggers(self):
+        old = SqliteStore(":memory:")
+        self.addCleanup(old.close)
+        old.execute_batch("""
+            CREATE TABLE records (
+              id INTEGER PRIMARY KEY, source_id TEXT NOT NULL, kind TEXT NOT NULL,
+              jurisdiction TEXT, external_id TEXT NOT NULL, title TEXT NOT NULL,
+              case_number TEXT, event_date TEXT, authority TEXT, official_url TEXT NOT NULL,
+              provider_url TEXT, fetched_at TEXT NOT NULL, content_sha256 TEXT NOT NULL,
+              license TEXT, rights_class TEXT NOT NULL, UNIQUE(source_id, external_id)
+            );
+            CREATE VIRTUAL TABLE records_fts USING fts5(
+              title, case_number, content='records', content_rowid='id', tokenize='trigram'
+            );
+            INSERT INTO records (source_id, kind, external_id, title, official_url, fetched_at, content_sha256, rights_class)
+              VALUES ('N-COUNCIL-TXG', 'bill', 'old', '舊議案', 'https://example.org', '2026-01-01', 'hash', 'METADATA_ONLY');
+            INSERT INTO records_fts(rowid, title, case_number) VALUES (1, '舊議案', NULL);
+        """)
+        old.apply_schema()
+        old.apply_schema()
+        self.assertTrue({"proposer", "cosigners", "committee", "outcome"} <=
+                        {row["name"] for row in old.query("PRAGMA table_info(records)")})
+        self.assertEqual(old.query("SELECT proposer FROM records")[0]["proposer"], None)
+        old.execute_batch("""
+            INSERT INTO records (source_id,kind,external_id,title,official_url,fetched_at,content_sha256,rights_class,proposer)
+              VALUES ('N-COUNCIL-TXG','bill','new','新議案','https://example.org','2026-01-01','hash','METADATA_ONLY','李大華');
+        """)
+        old.execute_batch("UPDATE records SET proposer='吳瓊華', cosigners='張瀞分', committee='警察委員會' WHERE id=1;")
+        def matches(term):
+            return old.query("SELECT rowid FROM bill_people_fts WHERE bill_people_fts MATCH '" + term + "'")
+        self.assertEqual(matches("李大華"), [{"rowid": 2}])
+        self.assertEqual(matches("吳瓊華"), [{"rowid": 1}])
+        self.assertEqual(matches("張瀞分"), [{"rowid": 1}])
+        old.execute_batch("UPDATE records SET proposer='陳小明' WHERE id=1;")
+        self.assertEqual(matches("吳瓊華"), [])
+        self.assertEqual(matches("陳小明"), [{"rowid": 1}])
+        old.execute_batch("UPDATE records SET proposer=NULL WHERE id=1;")
+        self.assertEqual(matches("陳小明"), [])
+        old.execute_batch("UPDATE records SET proposer='王大明' WHERE id=1;")
+        self.assertEqual(matches("王大明"), [{"rowid": 1}])
+        old.execute_batch("DELETE FROM records WHERE id=1;")
+        self.assertEqual(matches("王大明"), [])
+
+        self.run_load()
+        self.adapter.records[0]["proposer"] = "林小明"
+        self.assertEqual(self.run_load()["changed"], 1)
+        self.assertEqual(self.run_load()["changed"], 0)
+
     def test_reject_nonpublic_fields_and_bad_values(self):
         for update in ({"official_url": "https://evil.example/"}, {"official_url": "http://yishi.tccc.gov.tw/"},
                        {"provider_url": "https://evil.example/"}, {"official_url": "https://u:p@yishi.tccc.gov.tw/"},

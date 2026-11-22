@@ -10,7 +10,7 @@ from urllib.parse import unquote, urlsplit
 
 REGISTRY = Path(__file__).resolve().parents[1] / "docs/govintel/national-sources.v1.json"
 PUBLIC_FIELDS = {"title", "case_number", "event_date", "jurisdiction", "authority",
-                 "official_url", "provider_url", "license"}
+                 "official_url", "provider_url", "license", "proposer", "cosigners", "committee", "outcome"}
 REQUIRED = set("national_source_id provider official_authority tier transport endpoints allowed_hosts "
                "official_url_hosts robots min_request_interval_seconds license license_source_url "
                "rights_class rights_note status public_fields required_secret scope capacity_estimate_mb verified_at notes "

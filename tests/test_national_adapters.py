@@ -74,6 +74,8 @@ class NationalAdapterTests(unittest.TestCase):
                     self.assertEqual(rows[0]["title"], "改善通學道路安全")
                     self.assertEqual(rows[1]["title"], "議員提案第100號")
                     self.assertEqual(rows[0]["case_number"], "第4屆 第8次 定期會 第99號")
+                    self.assertEqual((rows[0]["proposer"], rows[0]["cosigners"], rows[0]["committee"], rows[0]["outcome"]),
+                                     ("吳瓊華, 張瀞分", "陳甲, 林乙", "警消環衛委員會-警察", "照案通過；照審查意見通過。"))
                     self.assertEqual(rows[0]["external_id"], payload["pages"][0]["data"]["data"][0]["billId"])
                     self.assertEqual(rows[0]["official_url"], "https://yishi.tccc.gov.tw/proposals/" + rows[0]["external_id"])
                     self.assertEqual(session.get.call_count, 3)  # robots + two pages
@@ -87,13 +89,27 @@ class NationalAdapterTests(unittest.TestCase):
                                                          allow_redirects=False, stream=True)
 
     def test_only_public_fields_and_bounded_titles(self):
-        for code, limit in (("TXG", 200), ("KEE", 300)):
+        for code, limit in (("TXG", 1000), ("KEE", 300)):
             source, adapter, _, payload = self.adapter(code)
             row = payload["pages"][0]["data"]["data"][0] if code == "TXG" else payload["data"][0]
-            row["proposalRationale" if code == "TXG" else "sm1_3c"] = " " + "長" * 400 + " "
+            row["proposalRationaleSort" if code == "TXG" else "sm1_3c"] = " " + "長" * 1200 + " "
             records, _ = adapter.fetch(source, None)
             self.assertEqual(len(records[0]["title"]), limit)
-            self.assertEqual(set(records[0]), {"kind", "external_id", "title", "case_number", "official_url", "event_date"})
+            expected = {"kind", "external_id", "title", "case_number", "official_url", "event_date"}
+            if code == "TXG":
+                expected |= {"proposer", "cosigners", "committee", "outcome"}
+            self.assertEqual(set(records[0]), expected)
+
+    def test_txg_title_fallback_html_and_outcome(self):
+        source, adapter, _, payload = self.adapter("TXG")
+        rows = payload["pages"][0]["data"]["data"]
+        rows[0].update(proposalRationaleSort="<p>建請&nbsp;改善<br>道路　安全</p>",
+                       closureType=" - ", resolution=" 照案通過。 ")
+        rows[1].update(proposalRationaleSort=" <p> </p> ", proposalRationale=" 改善\n環境 \n 關鍵字包含: 環境")
+        records, _ = adapter.fetch(source, None)
+        self.assertEqual(records[0]["title"], "建請 改善 道路 安全")
+        self.assertEqual(records[0]["outcome"], "照案通過。")
+        self.assertEqual(records[1]["title"], "改善 環境")
 
     def test_txg_mismatch_or_bad_later_page_never_writes_metadata(self):
         for fault in ("count", "totals", "duplicate", "page", "guard", "missing_id"):

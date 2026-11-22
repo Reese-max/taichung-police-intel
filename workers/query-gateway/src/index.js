@@ -1,5 +1,6 @@
 import { executeDocumentResearch } from "./document-research.js";
 import { handleNational } from "./national.js";
+import { NationalError, searchCouncilBills, getNationalBill } from "./national-bills.js";
 import { parseResearchInput, researchProviderState, researchTerms, selectResearchSources, ResearchError, readBoundedJson, RESEARCH_LIMITS } from "./research.js";
 import { CHAT_INTENT_PARSER, CHAT_RULES_PARSER, planChatIntent } from "./chat-assist.js";
 import { gateAnswer } from "../../../apps/web/lib/answer-evidence-gate.js";
@@ -661,6 +662,88 @@ export async function validateAnswer(snapshot, claims, gate = gateAnswer) {
   };
 }
 
+function isNationalClaim(claim) {
+  const props = Array.isArray(claim?.proposition) ? claim.proposition : [claim?.proposition];
+  return props.some(prop => typeof prop?.subject === "string" && prop.subject.trim().startsWith("national:"))
+    || (Array.isArray(claim?.cited_evidence_ids) && claim.cited_evidence_ids.some(id => typeof id === "string" && id.startsWith("NAT-")));
+}
+
+async function nationalCall(fn) {
+  try { return await fn(); }
+  catch (error) {
+    if (error instanceof NationalError) throw new GatewayError(error.code, error.message, error.status);
+    throw error;
+  }
+}
+
+async function validateNationalAnswer(snapshot, claims, db) {
+  if (!db) throw new GatewayError("CAPABILITY_NOT_AVAILABLE", "National D1 is not configured", 422);
+  const publicationClaims = claims.filter(claim => !isNationalClaim(claim));
+  const publication = publicationClaims.length ? await validateAnswer(snapshot, publicationClaims) : null;
+  const nationalEntries = [];
+  for (const claim of claims.filter(isNationalClaim)) {
+    const prop = claim.proposition;
+    const match = typeof prop?.subject === "string" && /^national:([1-9]\d*):(title|proposer|cosigners|case_number|committee|outcome|official_url)$/.exec(prop.subject);
+    const id = match && Number(match[1]);
+    const citations = claim.cited_evidence_ids;
+    const valid = match && Number.isSafeInteger(id) && prop && !Array.isArray(prop)
+      && Object.keys(prop).every(key => ["subject", "value"].includes(key))
+      && typeof prop.value === "string" && prop.value.trim()
+      && typeof claim.text === "string" && claim.text.trim()
+      && ["TIME", "LOCATION", "STATUS", "CAUSE", "STATISTIC", "AGENCY"].includes(claim.claim_type)
+      && (claim.schema_version === undefined || claim.schema_version === 1)
+      && Array.isArray(citations) && citations.length === 1 && citations[0] === "NAT-" + id;
+    const row = valid ? await nationalCall(() => getNationalBill(db, id)) : null;
+    let status = "BLOCKED", reason = "INVALID_NATIONAL_CLAIM";
+    if (valid && !row) { status = "NO_EVIDENCE"; reason = "NO_EVIDENCE"; }
+    if (row) {
+      const value = prop.value.trim(), stored = typeof row[match[2]] === "string" ? row[match[2]].trim() : null;
+      let matches = stored !== null && stored === value;
+      if (stored !== null && match[2] === "title" && [...value].length >= 8) matches ||= stored.includes(value);
+      if (stored !== null && ["proposer", "cosigners"].includes(match[2])) {
+        const names = value.split(/[,，、]/).map(name => name.trim());
+        const official = stored.split(/[,，、]/).map(name => name.trim());
+        matches = names.length > 0 && names.every(name => name && official.includes(name));
+      }
+      status = matches ? "PASS" : "BLOCKED";
+      reason = matches ? null : "VALUE_MISMATCH";
+    }
+    const claimId = typeof claim.claim_id === "string" && claim.claim_id ? claim.claim_id
+      : "CLM-" + (await sha256(canonicalJson(claim))).slice(0, 16).toUpperCase();
+    nationalEntries.push({
+      claim_id: claimId, claim_type: claim.claim_type, propositions: valid ? [prop] : [],
+      support_status: status === "PASS" ? "SUPPORTED" : "UNSUPPORTED", validation_status: status,
+      reason_code: reason, reason: reason === "VALUE_MISMATCH" ? "Value does not match the official bill metadata."
+        : reason === "NO_EVIDENCE" ? "No national bill exists for this evidence id."
+          : reason ? "National claim or citation is invalid." : null,
+      requires_evidence: true, original_text: claim.text ?? "", final_text: null,
+      supporting_evidence: status === "PASS" ? [{ evidence_id: "NAT-" + id, source_id: row.source_id,
+        locator: row.official_url, document_version: row.content_sha256 }] : [],
+      ...(row ? { data_basis: { fetched_at: row.fetched_at, official_date: null } } : {}),
+    });
+  }
+  let nationalIndex = 0, publicationIndex = 0;
+  const entries = claims.map(claim => isNationalClaim(claim) ? nationalEntries[nationalIndex++] : publication.receipt.claims[publicationIndex++]);
+  const status = nationalEntries.some(entry => entry.validation_status !== "PASS") ? "BLOCKED" : publication?.gate_status ?? "PASS";
+  const answer = status === "BLOCKED" ? [] : entries.map(entry => entry.validation_status
+    ? entry.validation_status === "PASS" ? "官方來源已核對：" + entry.propositions[0].subject + "=" + entry.propositions[0].value.trim() + "。" : null
+    : controlledText(entry)).filter(Boolean);
+  const evidence = nationalEntries.flatMap(entry => entry.supporting_evidence);
+  const receipt = { ...(publication?.receipt ?? { schema_version: 1, validator_version: ANSWER_VALIDATOR_VERSION,
+    publication_hash: snapshot.generatedFrom.brief_sha256, indexed_evidence_count: 0, source_document_versions: {} }),
+    gate_status: status, claims: entries, claim_ids: entries.map(entry => entry.claim_id),
+    evidence_ids: [...new Set([...(publication?.receipt.evidence_ids ?? []), ...evidence.map(item => item.evidence_id)])].sort(),
+    source_document_versions: { ...(publication?.receipt.source_document_versions ?? {}),
+      ...Object.fromEntries(evidence.map(item => [item.evidence_id, item.document_version])) },
+    answer_sha256: await sha256(JSON.stringify(answer)) };
+  return { gate_status: status, answer, receipt, final_claims: entries.map(entry => ({
+    claim_id: entry.claim_id, claim_type: entry.claim_type, support_status: entry.support_status,
+    ...(entry.validation_status ? { validation_status: entry.validation_status, reason_code: entry.reason_code,
+      reason: entry.reason, ...(entry.data_basis ? { data_basis: entry.data_basis } : {}) } : {}),
+    text: entry.validation_status ? (entry.validation_status === "PASS" ? controlledText(entry) : null) : controlledText(entry),
+  })) };
+}
+
 function controlledText(entry) {
     const facts = (entry.propositions || []).filter((value) => value && value.subject !== undefined && value.value !== undefined).map((value) => `${String(value.subject)}=${String(value.value)}`);
     if (!["TIME", "LOCATION", "STATUS", "CAUSE", "STATISTIC", "AGENCY"].includes(entry.claim_type) || !facts.length) return null;
@@ -810,17 +893,19 @@ async function executeChat(snapshot, args, plan = null) {
   return result;
 }
 
-async function execute(snapshot, tool, rawArgs = {}) {
+async function execute(snapshot, tool, rawArgs = {}, env = {}) {
   if (!rawArgs || typeof rawArgs !== "object" || Array.isArray(rawArgs)) throw new GatewayError("INVALID_ARGUMENTS", "arguments must be an object");
   const allowed = {
     search_evidence: ["q", "canonical_id", "source_id", "change_type", "limit", "cursor", "expected_generation"],
     get_current_brief: [], get_publication_receipt: [], get_source_health: ["source_id"], validate_answer: ["claims", "expected_generation"],
     chat_turn: ["text", "quick_action", "context"],
+    search_council_bills: ["q", "proposer", "session", "outcome", "limit", "cursor"],
   }[tool];
   if (!allowed) throw new GatewayError("CAPABILITY_NOT_AVAILABLE", `${tool} is not implemented; available capabilities: ${mcpTools().map(item => item.name).join(", ")}`, 422);
   const unknown = Object.keys(rawArgs).filter((key) => !allowed.includes(key));
   if (unknown.length) throw new GatewayError("INVALID_ARGUMENTS", `unsupported argument(s): ${unknown.sort().join(", ")}`);
   const args = { ...rawArgs };
+  if (tool === "search_council_bills") return nationalCall(() => searchCouncilBills(env.NATIONAL_DB, args));
   if (tool === "chat_turn") return executeChat(snapshot, args);
   if (tool === "search_evidence") {
     const result = await queryStore(snapshot, args);
@@ -855,7 +940,9 @@ async function execute(snapshot, tool, rawArgs = {}) {
   }
   if (!Array.isArray(args.claims) || args.claims.length < 1 || args.claims.length > 32 || (args.claims.some((claim) => !claim || typeof claim !== "object" || Object.keys(claim).some((key) => !["schema_version", "claim_id", "text", "claim_type", "temporal_scope", "proposition", "cited_evidence_ids"].includes(key))))) throw new GatewayError("INVALID_ARGUMENTS", "validate_answer requires 1 to 32 structured claims");
   if (args.expected_generation != null && args.expected_generation !== snapshot.generationId) throw new GatewayError("INVALID_ARGUMENTS", "query generation mismatch; retry against the requested snapshot");
-  const gate = await validateAnswer(snapshot, args.claims);
+  const gate = args.claims.some(isNationalClaim)
+    ? await validateNationalAnswer(snapshot, args.claims, env.NATIONAL_DB)
+    : await validateAnswer(snapshot, args.claims);
   return { ...envelope(snapshot, tool, args, scope, { gate_status: gate.gate_status, answer: gate.answer, final_claims: gate.final_claims, evidence_ids: gate.receipt.evidence_ids || [], answer_evidence_receipt: gate.receipt }, gate.final_claims?.length || 0, false, "answer_evidence"), receipt: { ...envelope(snapshot, tool, args, scope, {}, gate.final_claims?.length || 0).receipt, arguments_sha256: argumentsHash } };
 }
 
@@ -971,7 +1058,7 @@ class GatewayError extends Error {
 class SnapshotIntegrityError extends Error {}
 
 // Advertised so MCP clients can build claims the answer gate accepts; the gate itself is unchanged.
-const VALIDATE_ANSWER_DESCRIPTION = "Validate structured answer claims against the server-controlled canonical evidence catalog. For a search_evidence result use claim_type STATUS, proposition {subject: \"publication:<canonical_id>:title\", value: <title>} and cited_evidence_ids [<canonical_ref.evidence_id>].";
+const VALIDATE_ANSWER_DESCRIPTION = "Validate structured answer claims against the server-controlled canonical evidence catalog. For a search_evidence result use claim_type STATUS, proposition {subject: \"publication:<canonical_id>:title\", value: <title>} and cited_evidence_ids [<canonical_ref.evidence_id>]. National D1 runtimes also accept national:<id>:<field> with NAT-<id> citations from search_council_bills.";
 const CLAIM_ITEM_SCHEMA = {
   type: "object", additionalProperties: false, required: ["text", "claim_type"],
   properties: {
@@ -989,6 +1076,7 @@ function mcpTools() {
   const readonly = { readOnlyHint: true, openWorldHint: false, destructiveHint: false };
   return [
     { name: "search_evidence", description: "Search approved publication metadata; this is not full-text or PublicEvent search.", inputSchema: { type: "object", additionalProperties: false, properties: { q: { type: "string", maxLength: 512 }, canonical_id: { type: "string", maxLength: 256 }, source_id: { type: "string", maxLength: 64 }, change_type: { type: "string", maxLength: 64 }, limit: { type: "integer", minimum: 1, maximum: 100 }, cursor: { type: "string", maxLength: 1024 }, expected_generation: { type: "string", maxLength: 128 } } }, annotations: readonly },
+    { name: "search_council_bills", description: "Search Taichung City Council proposal metadata, ordered by newest term and session; no official bill date is available.", inputSchema: { type: "object", additionalProperties: false, properties: { q: { type: "string", maxLength: 200 }, proposer: { type: "string", maxLength: 50 }, session: { type: "string", maxLength: 50 }, outcome: { type: "string", maxLength: 50 }, limit: { type: "integer", minimum: 1, maximum: 20 }, cursor: { type: "string", maxLength: 256 } } }, annotations: readonly },
     { name: "get_current_brief", description: "Read the checked-in canonical brief with its freshness and publication receipt.", inputSchema: { type: "object", additionalProperties: false, properties: {} }, annotations: readonly },
     { name: "get_publication_receipt", description: "Read the current publication and canonical artifact hashes without exposing raw content.", inputSchema: { type: "object", additionalProperties: false, properties: {} }, annotations: readonly },
     { name: "get_source_health", description: "Read approved source health, freshness, completeness, and gaps.", inputSchema: { type: "object", additionalProperties: false, properties: { source_id: { type: "string", maxLength: 64 } } }, annotations: readonly },
@@ -1000,14 +1088,14 @@ function mcpTools() {
   ];
 }
 
-async function dispatchMcp(snapshot, request) {
+async function dispatchMcp(snapshot, request, env) {
   if (request?.jsonrpc !== "2.0" || !("id" in (request || {}))) throw new GatewayError("INVALID_JSON_RPC", "request must be JSON-RPC 2.0 with an id");
   if (request.method === "initialize") return { jsonrpc: "2.0", id: request.id, result: { protocolVersion: MCP_PROTOCOL_VERSION, capabilities: { tools: { listChanged: false } }, serverInfo: { name: "govintel-query-gateway", version: SERVER_VERSION }, release: snapshot.release } };
   if (request.method === "ping") return { jsonrpc: "2.0", id: request.id, result: {} };
   if (request.method === "tools/list") return { jsonrpc: "2.0", id: request.id, result: { tools: mcpTools(), release: snapshot.release } };
   if (request.method !== "tools/call" || !request.params || typeof request.params.name !== "string") throw new GatewayError("METHOD_NOT_FOUND", `unsupported MCP method: ${request.method}`, 404);
   try {
-    const payload = await execute(snapshot, request.params.name, request.params.arguments);
+    const payload = await execute(snapshot, request.params.name, request.params.arguments, env);
     return { jsonrpc: "2.0", id: request.id, result: { isError: false, content: [{ type: "text", text: JSON.stringify(payload) }], structuredContent: payload } };
   } catch (error) {
     if (!(error instanceof GatewayError)) console.error("mcp dispatch failed");
@@ -1081,10 +1169,10 @@ export default {
       catch { throw new GatewayError("INVALID_ARGUMENTS", "request body must be valid JSON"); }
       if (!input || typeof input !== "object" || Array.isArray(input)) throw new GatewayError("INVALID_ARGUMENTS", "request body must be an object");
       if (input?.release_id !== undefined && input.release_id !== snapshot.release.release_id) throw new GatewayError("QUERY_TEMPORARILY_UNAVAILABLE", "Pages and Worker release mismatch; reload the publication", 503);
-      if (url.pathname === "/query") return responseJson(await execute(snapshot, input?.tool, input?.arguments), 200, request, env);
+      if (url.pathname === "/query") return responseJson(await execute(snapshot, input?.tool, input?.arguments, env), 200, request, env);
       // JSON-RPC notifications (no id) get no response body; MCP Streamable HTTP requires 202.
       if (input.jsonrpc === "2.0" && typeof input.method === "string" && !("id" in input)) return new Response(null, { status: 202, headers: { "Cache-Control": "no-store", ...corsHeaders(request, env) } });
-      return responseJson(await dispatchMcp(snapshot, input), 200, request, env);
+      return responseJson(await dispatchMcp(snapshot, input, env), 200, request, env);
     } catch (error) {
       if (!(error instanceof GatewayError)) console.error("gateway request failed");
       const gatewayError = error instanceof GatewayError || error instanceof ResearchError ? error : new GatewayError("UPSTREAM_UNAVAILABLE", "upstream publication is unavailable", 503);

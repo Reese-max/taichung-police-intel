@@ -1,9 +1,35 @@
 """Taichung proposals: validate the whole snapshot before exposing write pages."""
+from html.parser import HTMLParser
+import re
 from urllib.parse import urlencode
 from uuid import UUID
 
 from national.loader import normalize
 from .http import HttpAdapter, text
+
+
+class _PlainText(HTMLParser):
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.parts = []
+
+    def handle_data(self, data):
+        self.parts.append(data)
+
+    def handle_starttag(self, tag, attrs):
+        if tag in {"p", "div", "br", "li"}:
+            self.parts.append(" ")
+
+    def handle_endtag(self, tag):
+        if tag in {"p", "div", "li"}:
+            self.parts.append(" ")
+
+
+def plain_text(value):
+    parser = _PlainText()
+    parser.feed(value)
+    parser.close()
+    return " ".join("".join(parser.parts).split())
 
 
 class TxgAdapter(HttpAdapter):
@@ -48,10 +74,17 @@ class TxgAdapter(HttpAdapter):
                 if external_id in ids:
                     raise ValueError("duplicate TXG billId across pages")
                 ids.add(external_id)
-                title = text(row, "proposalRationale").strip() or (
-                    text(row, "billType") + text(row, "billNumber")).strip()
-                record = dict(kind="bill", external_id=external_id, title=title[:200],
+                title = plain_text(text(row, "proposalRationaleSort"))
+                if not title:
+                    title = plain_text(re.split(r"\s*關鍵字包含\s*[:：]", text(row, "proposalRationale"), maxsplit=1)[0])
+                title = title or (text(row, "billType") + text(row, "billNumber")).strip()
+                outcome = "；".join(part for part in (text(row, key).strip() for key in ("closureType", "resolution"))
+                                   if part and part != "-") or None
+                record = dict(kind="bill", external_id=external_id, title=title[:1000],
                               case_number=f"{text(row, 'session')} {text(row, 'billNumber')}",
+                              proposer=text(row, "sponsor").strip() or None,
+                              cosigners=text(row, "jointSignatory").strip() or None,
+                              committee=text(row, "committee").strip() or None, outcome=outcome,
                               official_url="https://yishi.tccc.gov.tw/proposals/" + external_id,
                               event_date=None)
                 normalize(source, record)

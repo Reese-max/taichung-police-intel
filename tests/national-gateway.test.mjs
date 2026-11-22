@@ -26,7 +26,7 @@ async function request(path, db, options = {}) {
 }
 
 test("search and record expose only public fields, independent of publication snapshot", async () => {
-  const expected = "id source_id kind jurisdiction external_id title case_number event_date authority official_url provider_url license rights_class fetched_at".split(" ").sort();
+  const expected = "id source_id kind jurisdiction external_id title case_number event_date authority official_url provider_url license rights_class fetched_at proposer cosigners committee outcome".split(" ").sort();
   const db = fakeDB([row(1)]);
   const search = await request("/national/search", db);
   assert.equal(search.status, 200);

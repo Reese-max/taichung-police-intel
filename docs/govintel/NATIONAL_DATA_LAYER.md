@@ -122,11 +122,11 @@ robots 允許不代表網站已授權重製或再利用。#247 記錄高雄為�
 
 `national/schema.sql` 與治理 catalog 分離：`sources` 保存來源登記雜湊與授權，
 `records` 以 `(source_id, external_id)` 去重，`records_fts` 使用 FTS5 trigram 索引標題及案號，
-insert／update／delete trigger 保持同步；`runs` 保存狀態、寫入收據與可重播的頁面游標。
+insert／update／delete trigger 保持同步；另有 contentless `bill_people_fts`，僅為 `proposer IS NOT NULL` 的資料建立提案人、連署人及委員會 trigram 索引，不重建或修改既有 `records_fts`；`runs` 保存狀態、寫入收據與可重播的頁面游標。
 schema 可重複套用。fixture 是人工測試資料，不代表官方實際資料。
 
 每日 UTC 寫入上限 **99,000 列**（2026-11-23 由 90,000 調高：D1 帳目已和本地 `runs` 對上，只差 8 列；免費上限 100,000，保留 1,000 列給稽核列與人工查詢），容量超過登記檔的 **400MB（400,000,000 bytes）** 就拒絕資料寫入。
-每筆邏輯資料約 3 列尚未含完整索引成本，W1 暫以 **64 列／筆**保守預留（2026-11-19 依 D1 實測每筆新增 6.0 列，改為 **16 列／筆**，保留更新時改寫索引與 FTS 的餘裕；每日上限當時仍為 9 萬列，因 D1 後台 24 小時寫入量比本地帳高約 27%；2026-11-23 重查已一致，改為 99,000 列），來源更新預留 2 列，
+2026-11-19 D1 實測每筆新增約 6.0 列，原先每筆預留 16 列；加入獨立人名 FTS 後保守提高為 **32 列／筆**。此數字是批次前估算，尚未以遠端人名索引寫入收據校正；來源更新預留 2 列，
 另保留每個 run 的稽核列與主鍵索引 2 列。資料寫入以 D1 `meta.rows_written` 回填；
 SQLite 用 `total_changes`，Wrangler 本機版本省略寫入 meta 時，在同一批次前後讀 `total_changes()`。
 本機計數不代表遠端 D1 計費數字。實際成本仍須在 W2 大量匯入前依遠端收據校正；
@@ -135,7 +135,7 @@ schema 初始化成本另列於報告，不冒充來源匯入列數。
 未變更資料不產生 upsert，因此重跑 `changed=0`、`rows_written=0`；稽核列另計入每日預算。
 若連稽核預留列都不足且尚未寫資料，只輸出停止報告（`audit_recorded=false`），避免反覆排程耗盡預算。
 公開內容依各來源 `public_fields` 白名單驗證，來源識別、種類與權利分類也納入內容雜湊，
-`fetched_at` 不參與雜湊。禁止全文、摘錄、非 HTTPS 或非官方 host；SQL 用 UTF-8 hex literal
+`fetched_at` 不參與雜湊。臺中議案案由是經核准的公開議案中繼資料；其他文件全文、摘錄、非 HTTPS 或非官方 host 仍不允許；SQL 用 UTF-8 hex literal
 保留單引號、反斜線、NUL 與換行。批次含本機計數語句仍小於 100KB。
 
 預算不足記 `BUDGET_STOPPED`、exit 0；容量超限記 `CAPACITY_BLOCKED`、exit 1。
@@ -175,6 +175,16 @@ Worker 增加 `GET /national/search` 與 `GET /national/record/{id}`，沿用 CO
 `/capabilities` 以額外 `national` 物件描述路徑及 binding 是否存在，既有 capabilities 語意不變；
 binding 存在不代表資料新鮮度或資料庫健康驗證。
 
+臺中議案新增可空欄位 `proposer`、`cosigners`、`committee`、`outcome`，僅 TXG 的來源白名單允許；其他來源維持 null。`/national/search` 可按 `source_id` 與 `proposer` 篩選；三字以上的人名走獨立索引，一至二字走 `LIKE` 並必須指定 `source_id`。
+
+MCP 的 `search_council_bills` 支援 `q`、`proposer`、`session` 前綴、`outcome`、`limit`（1–20）與游標，限定臺中所有議案，不限定警察關鍵字。結果以數字解析屆次與會期降序、再以 id 降序，並提供 `NAT-<id>` 證據及官方連結。官方 API 未提供日期；排序不是議案日期。Python stdio 沒有 D1，對此工具及國家議案驗證回 `CAPABILITY_NOT_AVAILABLE`。
+
+`validate_answer` 可引用 `NAT-<id>` 並以 `national:<id>:<field>` 查證標題、提案人、連署人、案號、委員會、結果及官方網址。標題允許至少八字的連續子字串，人名須逐一存在於官方名單，其餘欄位去除首尾空白後精確比對；不符為 `BLOCKED`，找不到資料為 `NO_EVIDENCE`。無官方日期的議案不標為 `STALE`，資料依據回傳 `fetched_at`；既有 publication 驗證維持原流程。
+
+兩個既有同步 workflow 的 `--apply-schema` 先以 `PRAGMA table_info(records)` 檢查舊表並只新增缺少的欄位，再建立獨立索引與 triggers；不預先掃描回填人名索引。下次臺中來源實際同步時，新增欄位參與內容雜湊，15,496 筆已存在議案會逐頁改寫並自然建立索引；若最近一次成功同步仍在七日刷新期內，首次改寫可能延後至下一次符合刷新條件的執行。以每筆預留 32 列、每日完整可用 99,000 列粗估約 **6 個預算日**；實際按 D1 寫入收據計數，可能更快，也可能因其他來源、批次界線、時間上限或排程延誤而更久。預算不足時 `BUDGET_STOPPED` 並保留頁面游標供下次續跑；實際天數與寫入成本須待正式同步收據驗證。
+
+正式 rollout 時應先確認同步 workflow 的 schema 步驟成功，再啟用新版 Worker；若 Worker 先上線而舊 D1 尚未新增欄位，國家資料查詢會失敗。回填完成前，提案人搜尋及新增欄位的查證只涵蓋已改寫資料，零結果不代表沒有符合的議案。本次未執行遠端遷移或部署。
+
 | 批次 | 範圍與驗收重點 |
 |---|---|
 | W0 | 官方登記、robots gate、preflight、共用 transport；本輪範圍。 |
@@ -204,8 +214,11 @@ binding 存在不代表資料新鮮度或資料庫健康驗證。
 | 入口 | GET `https://yishi.tccc.gov.tw/api/Proposal/FrontList?pageNumber=N&pageSize=200` | POST `https://www.kmc.gov.tw/kmcwebapi/motion/getlist`，JSON `{}` |
 | `kind` | `bill` | `bill` |
 | `external_id` | `billId`（GUID） | `kmc-` + UTF-8 `sha256(expkd\|seqkd\|seqno\|3c\|1c)[:24]`，欄位均來自 `sm1_` 前綴 |
-| `title` | `proposalRationale.strip()[:200]`；空白時改用 `billType + billNumber`，同樣最多 200 字 | `sm1_3c.strip()[:300]` |
+| `title` | `proposalRationaleSort` 去除 HTML、合併空白；空白時用去除「關鍵字包含」後綴的 `proposalRationale`，再退回 `billType + billNumber`，最多 1,000 字 | `sm1_3c.strip()[:300]` |
 | `case_number` | `session + " " + billNumber` | `sm1_title` |
+| `proposer`／`cosigners` | `sponsor`／`jointSignatory` | null |
+| `committee` | `committee` | null |
+| `outcome` | `closureType`、`resolution` 略過空白及 `-` 後以 `；` 連接 | null |
 | `event_date` | null，官方回應沒有日期 | null，官方回應沒有日期 |
 | `official_url` | `https://yishi.tccc.gov.tw/proposals/{billId}` | `https://www.kmc.gov.tw/kmcweb/#/motion`（只有列表頁） |
 
@@ -213,8 +226,7 @@ binding 存在不代表資料新鮮度或資料庫健康驗證。
 每個 adapter 使用 `GovIntelNationalBot/1.0` 識別與獨立 RobotsPolicy，
 `documented_open_api` 沿用來源設定，不放寬 robots 禁止。
 臺中每頁上限 2MiB、基隆單次 8MiB；POST 使用 JSON Content-Type，任何 3xx 皆拒絕且不跟隨。
-既有 GET 預設與 retry 規則維持不變。HTML 全文 `proposalRationaleSort`、議事錄、
-決議、連署人與其他原始欄位不進 record；只保留以上投影。
+既有 GET 預設與 retry 規則維持不變。案由只保存去除 HTML 後的純文字與以上公開欄位；議事錄、執行情形及其他原始欄位不進 record。
 
 臺中先讀完最多 100 頁，檢查頁碼、穩定的總頁數／總筆數、跨頁重複 ID 與實際 `totalCount`，
 全部通過才交給 loader 寫入。錯誤或 robots 禁止時不寫 sources／records，仍保留失敗 run 稽核。
