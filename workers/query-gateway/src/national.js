@@ -19,6 +19,9 @@ function decodeCursor(value) {
   return cursor;
 }
 
+// Totals only for full-text (3+ chars) queries: a 2-char LIKE count scans every row (82k reads on 2026-11-23).
+const TOTAL_CAP = 1000;
+
 function searchQuery(params) {
   const conditions = [], values = [];
   const q = (params.get("q") || "").trim();
@@ -47,6 +50,9 @@ function searchQuery(params) {
     }
   }
   if (params.has("from") && params.has("to") && params.get("from") > params.get("to")) throw new Error("invalid range");
+  const count = [...q].length >= 3 && !params.has("cursor") ? {
+    sql: `SELECT COUNT(*) AS total FROM (SELECT 1 FROM records r WHERE ${conditions.join(" AND ")} LIMIT ${TOTAL_CAP + 1})`,
+    values: [...values] } : null;
   if (params.has("cursor")) {
     const cursor = decodeCursor(params.get("cursor"));
     // SQLite DESC puts null dates last; retain undated rows on every page.
@@ -62,7 +68,7 @@ function searchQuery(params) {
   if (!/^\d+$/.test(rawLimit) || !Number.isSafeInteger(Number(rawLimit)) || Number(rawLimit) < 1) throw new Error("invalid limit");
   const limit = Math.min(50, Number(rawLimit));
   values.push(limit + 1);
-  return { sql: `SELECT ${SELECT} FROM records r${conditions.length ? " WHERE " + conditions.join(" AND ") : ""} ORDER BY r.event_date DESC,r.id DESC LIMIT ?`, values, limit };
+  return { sql: `SELECT ${SELECT} FROM records r${conditions.length ? " WHERE " + conditions.join(" AND ") : ""} ORDER BY r.event_date DESC,r.id DESC LIMIT ?`, values, limit, count };
 }
 
 export async function handleNational(request, env, responseJson) {
@@ -93,8 +99,14 @@ export async function handleNational(request, env, responseJson) {
     const result = await statement.all();
     if (result.success === false || !Array.isArray(result.results)) throw new Error("query failed");
     const rows = result.results.slice(0, query.limit);
+    let total;
+    if (query.count) {
+      // The total is optional; a failed count must not fail the search itself.
+      try { total = (await env.NATIONAL_DB.prepare(query.count.sql).bind(...query.count.values).first())?.total; } catch { total = undefined; }
+    }
     return reply({ records: rows.map(project), next_cursor: result.results.length > query.limit
-      ? encodeCursor(rows.at(-1)) : null }, 200);
+      ? encodeCursor(rows.at(-1)) : null,
+      ...(Number.isSafeInteger(total) && total >= 0 ? { total: Math.min(total, TOTAL_CAP), total_capped: total > TOTAL_CAP } : {}) }, 200);
   } catch {
     return reply({ error: "NATIONAL_STORE_UNAVAILABLE" }, 503);
   }
