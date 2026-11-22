@@ -8,7 +8,8 @@ from uuid import uuid4
 
 from .store import RUN_WRITE_RESERVE, sql_value, utc_now
 
-DAILY_WRITE_LIMIT = 90_000
+# D1 free tier allows 100,000 rows/UTC day; keep 1,000 for run receipts and manual queries.
+DAILY_WRITE_LIMIT = 99_000
 MAX_BATCH_BYTES = 99_000  # leave space for local accounting SQL; file stays <100KB
 # D1 meta.rows_written measured 6.0 rows per inserted record (2026-11-19: TNN 69,918/11,653,
 # KHH 16,578/2,763); 16 leaves headroom for updates that rewrite index and FTS entries.
