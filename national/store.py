@@ -46,12 +46,20 @@ class Store:
 
     def existing_hashes(self, source_id, external_ids):
         found = {}
-        ids = list(external_ids)
-        for start in range(0, len(ids), 10):
+        values = [sql_value(v) for v in external_ids]
+        start = 0
+        while start < len(values):
+            # Each remote query costs ~1.3 s regardless of size. npm's wrangler.cmd goes through
+            # cmd.exe, whose 8,191-char line limit (8,200 failed locally) also holds the other args.
+            end, size = start + 1, len(values[start])
+            while end < len(values) and size + len(values[end]) + 1 <= 5000:
+                size += len(values[end]) + 1
+                end += 1
             rows = self.query("SELECT external_id, content_sha256 FROM records WHERE source_id="
                               + sql_value(source_id) + " AND external_id IN ("
-                              + ",".join(sql_value(v) for v in ids[start:start + 10]) + ")")
+                              + ",".join(values[start:end]) + ")")
             found.update((row["external_id"], row["content_sha256"]) for row in rows)
+            start = end
         return found
 
     def source_hash(self, source_id):
