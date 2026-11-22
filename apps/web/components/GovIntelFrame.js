@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import V2DailyDashboard from "./V2DailyDashboard.js";
 
@@ -22,6 +23,10 @@ export default function GovIntelFrame({ children }) {
     : pathname;
   const home = route === "/" || route === "";
   const normalized = route?.replace(/\/$/, "") || "/";
+  // Keep the current page visible when the mobile nav row scrolls sideways.
+  useEffect(() => {
+    document.querySelector('.govintel-header nav [aria-current="page"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [normalized]);
   return (
     <>
       <a className="govintel-skip" href="#govintel-content">跳至主要內容</a>

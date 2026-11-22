@@ -46,6 +46,9 @@
 .govintel-source-warning { padding: 16px; border: 1px solid #76582d; border-radius: 10px; background: #342817; color: #ffe2ae !important; }
 @media (max-width: 680px) {
   .govintel-header { align-items: flex-start; flex-direction: column; gap: 14px; }
-  .govintel-header nav { width: 100%; }
-  .govintel-header nav a { flex: 1; padding: 10px 6px; text-align: center; font-size: .82rem; }
+  /* One scrollable row instead of two wrapped rows; the cut-off last item hints there is more. */
+  .govintel-header nav { width: 100%; flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
+  .govintel-header nav::-webkit-scrollbar { display: none; }
+  .govintel-header nav a { flex: 0 0 auto; display: inline-flex; align-items: center; min-height: 44px; padding: 10px 12px; white-space: nowrap; font-size: .85rem; }
+  .govintel-header nav a:focus-visible { outline-offset: -3px; }
 }
