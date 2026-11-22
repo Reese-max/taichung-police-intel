@@ -29,6 +29,9 @@ test("response projects only public fields, preserves unknown kinds and never mu
   const row = { id: 1, title: "公開議案", kind: "future_kind", official_url: "https://data.ly.gov.tw/", full_text: "private", content_sha256: "internal" };
   const output = validateNationalResponse({ records: [row], next_cursor: null, debug: "private" });
   assert.deepEqual(Object.keys(output), ["records", "next_cursor"]);
+  assert.deepEqual(validateNationalResponse({ records: [], next_cursor: null, total: 1000, total_capped: true }), { records: [], next_cursor: null, total: 1000, total_capped: true });
+  for (const bad of [{ total: -1, total_capped: false }, { total: 1.5, total_capped: false }, { total: "9", total_capped: false }, { total: 3 }])
+    assert.deepEqual(Object.keys(validateNationalResponse({ records: [], next_cursor: null, ...bad })), ["records", "next_cursor"]);
   assert.deepEqual(Object.keys(output.records[0]), "id source_id kind jurisdiction external_id title case_number event_date authority official_url provider_url license rights_class fetched_at".split(" "));
   assert.equal(output.records[0].kind, "future_kind");
   assert.equal(output.records[0].official_url, row.official_url);

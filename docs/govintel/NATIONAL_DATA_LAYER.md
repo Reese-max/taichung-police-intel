@@ -167,6 +167,8 @@ workflow 依序套 schema、檢查守門、同步已有 adapter 的來源，報�
 本次實作未操作雲端；schema 與 workflow 啟用由主對話驗收後處理。
 
 Worker 增加 `GET /national/search` 與 `GET /national/record/{id}`，沿用 CORS、rate limit 與 JSON 回覆。
+
+關鍵字 3 個字以上（走全文索引）而且是第一頁時，`/national/search` 會另外回 `total` 與 `total_capped`：命中總數最多算到 1,000，超過時 `total_capped` 為 true。2 個字的關鍵字走 `LIKE` 比對，算總數要掃整張表（2026-11-23 實測讀 81,991 列，免費額度每天 500 萬列），所以不算總數。全文計數實測每命中一筆約讀 3 列，最多約 3,000 列。
 搜尋預設 20 筆、最多 50 筆，3 字以上使用已跳脫的 FTS phrase，1–2 字使用已跳脫的 LIKE；
 日期 DESC／id DESC keyset 游標支援缺日期資料，錯誤游標回 400。資料庫缺失或查詢失敗回
 503 `NATIONAL_STORE_UNAVAILABLE`。只投影公開白名單欄位，不回傳內部 hash 或全文。

@@ -38,6 +38,7 @@ export default function NationalPage() {
       setResults(previous => ({
         records: cursor ? [...new Map([...previous.records, ...data.records].map(row => [row.id, row])).values()] : data.records,
         next_cursor: data.next_cursor, filters: submitted,
+        total: cursor ? previous.total : data.total, total_capped: cursor ? previous.total_capped : data.total_capped,
       }));
       setState("ready");
     } catch (reason) {
@@ -66,7 +67,7 @@ export default function NationalPage() {
   const status = !GATEWAY ? "全國資料查詢服務尚未設定，目前無法搜尋。"
     : state === "loading" ? "載入中，請稍候。"
       : state === "error" ? error
-        : results ? (results.records.length ? `已載入 ${results.records.length} 筆資料。${results.next_cursor ? "可載入更多。" : "已顯示全部搜尋結果。"}` : "沒有符合條件的資料，請調整條件後再試。")
+        : results ? (results.records.length ? `${results.total === undefined ? "" : `共 ${results.total_capped ? "超過 " : ""}${results.total.toLocaleString("zh-TW")} 筆，`}已載入 ${results.records.length} 筆資料。${results.next_cursor ? "可載入更多。" : "已顯示全部搜尋結果。"}` : "沒有符合條件的資料，請調整條件後再試。")
           : "輸入條件後按搜尋；留白可瀏覽目前已收錄的來源資訊。";
   const kinds = [["", "全部"], ...Object.entries(KIND_LABELS)];
 

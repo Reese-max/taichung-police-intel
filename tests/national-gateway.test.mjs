@@ -120,3 +120,31 @@ test("national routes retain gateway CORS and rate limits", async () => {
   for (let i = 0; i < 61; i++) response = await request("/national/search", db, { headers: { "CF-Connecting-IP": "fixed-rate-test" } });
   assert.equal(response.status, 429);
 });
+
+test("full-text first page adds a capped total; short keywords and later pages do not count", async () => {
+  const counting = total => {
+    const db = fakeDB([row(1)]);
+    const prepare = db.prepare;
+    db.prepare = sql => sql.startsWith("SELECT COUNT") ? { bind(...values) {
+      db.calls.push({ sql, values }); return { first: async () => (total instanceof Error ? Promise.reject(total) : { total }) };
+    } } : prepare(sql);
+    return db;
+  };
+  let db = counting(220);
+  let body = await (await request("/national/search?q=" + encodeURIComponent("監視器") + "&jurisdiction=臺北市", db)).json();
+  assert.equal(body.total, 220);
+  assert.equal(body.total_capped, false);
+  assert.match(db.calls[1].sql, /^SELECT COUNT\(\*\) AS total FROM \(SELECT 1 FROM records r WHERE .*records_fts MATCH .* LIMIT 1001\)$/);
+  assert.deepEqual(db.calls[1].values, ['"監視器"', "臺北市"]);
+  body = await (await request("/national/search?q=" + encodeURIComponent("監視器"), counting(1001))).json();
+  assert.deepEqual([body.total, body.total_capped], [1000, true]);
+  body = await (await request("/national/search?q=" + encodeURIComponent("監視器"), counting(new Error("quota")))).json();
+  assert.equal(body.records.length, 1);
+  assert.equal("total" in body, false);
+  for (const path of ["/national/search?q=" + encodeURIComponent("警察"), `/national/search?q=${encodeURIComponent("監視器")}&cursor=${encodeCursor(row(5))}`]) {
+    db = counting(5);
+    body = await (await request(path, db)).json();
+    assert.equal(db.calls.length, 1);
+    assert.equal("total" in body, false);
+  }
+});

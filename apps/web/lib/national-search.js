@@ -60,7 +60,9 @@ export function validateNationalResponse(json) {
     }
     return record;
   });
-  return { records, next_cursor: json.next_cursor };
+  const total = Number.isSafeInteger(json.total) && json.total >= 0 && typeof json.total_capped === "boolean"
+    ? { total: json.total, total_capped: json.total_capped } : {};
+  return { records, next_cursor: json.next_cursor, ...total };
 }
 
 export function errorMessage(status, code) {
