@@ -5,7 +5,7 @@
     "CTX-165": {
       "current": {
         "contract_version": "1.1",
-        "final_url": "https://opdadm.moi.gov.tw/api/v1/no-auth/resource/api/dataset/29E8E643-88ED-4952-B21E-BD42A3B7108C/resource/45B2331A-34FB-49CF-BEC0-3E32F94A40AC/download",
+        "final_url": "https://opdadm.moi.gov.tw/api/v1/no-auth/resource/api/dataset/29E8E643-88ED-4952-B21E-BD42A3B7108C/resource/56314FA3-3EEB-4A94-9F16-A84EFA0AEE76/download",
         "fingerprint_signature": {
           "column_count": 5,
           "header": [
@@ -19,31 +19,25 @@
           "transport": "DATA_GOV_CSV"
         },
         "http_status": 200,
-        "observed_at": "2026-11-24T06:18:45+00:00",
+        "observed_at": "2026-11-24T20:45:07+00:00",
         "observed_schema_fingerprint": "39ca06e30287e63ec70dc219ea78349b4d1fbca4223b3a627fa5b615ad49425e",
         "parser_version": "canary-s028-165:1",
-        "reasons": [],
-        "requested_url": "https://opdadm.moi.gov.tw/api/v1/no-auth/resource/api/dataset/29E8E643-88ED-4952-B21E-BD42A3B7108C/resource/45B2331A-34FB-49CF-BEC0-3E32F94A40AC/download",
-        "resource_id": "45B2331A-34FB-49CF-BEC0-3E32F94A40AC",
-        "resource_id_changed": false,
-        "review_required": false,
+        "reasons": [
+          "RESOURCE_ID_CHANGED"
+        ],
+        "requested_url": "https://opdadm.moi.gov.tw/api/v1/no-auth/resource/api/dataset/29E8E643-88ED-4952-B21E-BD42A3B7108C/resource/56314FA3-3EEB-4A94-9F16-A84EFA0AEE76/download",
+        "resource_id": "56314FA3-3EEB-4A94-9F16-A84EFA0AEE76",
+        "resource_id_changed": true,
+        "review_required": true,
         "sample_sha256": "8d7378bf6aae87206d1692f22110e03298dd357547474d3d8552e5b93736a069",
         "source_health": "PASS",
         "source_id": "CTX-165",
         "source_name": "165反詐騙諮詢專線－遭停止解析涉詐網站",
-        "status": "NO_DRIFT",
+        "status": "ADDITIVE_COMPATIBLE",
         "transport": "DATA_GOV_CSV",
         "window_completeness": "COMPLETE_WITH_ITEMS"
       },
       "history": [
-        {
-          "contract_version": "1.1",
-          "observed_at": "2026-11-08T16:46:03+00:00",
-          "observed_schema_fingerprint": "39ca06e30287e63ec70dc219ea78349b4d1fbca4223b3a627fa5b615ad49425e",
-          "resource_id": "8F4BF37E-6B27-4DFE-BD47-BF40A84265AA",
-          "sample_sha256": "8d7378bf6aae87206d1692f22110e03298dd357547474d3d8552e5b93736a069",
-          "status": "ADDITIVE_COMPATIBLE"
-        },
         {
           "contract_version": "1.1",
           "observed_at": "2026-11-09T01:53:12+00:00",
@@ -435,15 +429,23 @@
           "resource_id": "45B2331A-34FB-49CF-BEC0-3E32F94A40AC",
           "sample_sha256": "8d7378bf6aae87206d1692f22110e03298dd357547474d3d8552e5b93736a069",
           "status": "ADDITIVE_COMPATIBLE"
+        },
+        {
+          "contract_version": "1.1",
+          "observed_at": "2026-11-24T06:18:45+00:00",
+          "observed_schema_fingerprint": "39ca06e30287e63ec70dc219ea78349b4d1fbca4223b3a627fa5b615ad49425e",
+          "resource_id": "45B2331A-34FB-49CF-BEC0-3E32F94A40AC",
+          "sample_sha256": "8d7378bf6aae87206d1692f22110e03298dd357547474d3d8552e5b93736a069",
+          "status": "NO_DRIFT"
         }
       ],
       "last_known_good": {
         "contract_version": "1.1",
-        "observed_at": "2026-11-24T06:18:45+00:00",
+        "observed_at": "2026-11-24T20:45:07+00:00",
         "observed_schema_fingerprint": "39ca06e30287e63ec70dc219ea78349b4d1fbca4223b3a627fa5b615ad49425e",
-        "resource_id": "45B2331A-34FB-49CF-BEC0-3E32F94A40AC",
+        "resource_id": "56314FA3-3EEB-4A94-9F16-A84EFA0AEE76",
         "sample_sha256": "8d7378bf6aae87206d1692f22110e03298dd357547474d3d8552e5b93736a069",
-        "status": "NO_DRIFT"
+        "status": "ADDITIVE_COMPATIBLE"
       }
     },
     "CTX-POP": {
@@ -511,7 +513,7 @@
           "transport": "DATA_GOV_JSON"
         },
         "http_status": 200,
-        "observed_at": "2026-11-24T06:18:33+00:00",
+        "observed_at": "2026-11-24T20:44:56+00:00",
         "observed_schema_fingerprint": "40cb88fe6222d8c103e41789bcc7df653e87267a523035fa151a769cf4a6412d",
         "parser_version": "canary-s028-165:1",
         "reasons": [
@@ -530,14 +532,6 @@
         "window_completeness": "COMPLETE_WITH_ITEMS"
       },
       "history": [
-        {
-          "contract_version": "1.1",
-          "observed_at": "2026-11-08T16:45:54+00:00",
-          "observed_schema_fingerprint": "40cb88fe6222d8c103e41789bcc7df653e87267a523035fa151a769cf4a6412d",
-          "resource_id": "e2ec75c8-2866-4332-b5d5-a048bbb231d3",
-          "sample_sha256": "cbf6b57c03fe2da197c58b05613b7a5529cc070792644aae1865ae84014827fa",
-          "status": "ADDITIVE_COMPATIBLE"
-        },
         {
           "contract_version": "1.1",
           "observed_at": "2026-11-09T01:53:01+00:00",
@@ -929,11 +923,19 @@
           "resource_id": "e2ec75c8-2866-4332-b5d5-a048bbb231d3",
           "sample_sha256": "cbf6b57c03fe2da197c58b05613b7a5529cc070792644aae1865ae84014827fa",
           "status": "ADDITIVE_COMPATIBLE"
+        },
+        {
+          "contract_version": "1.1",
+          "observed_at": "2026-11-24T06:18:33+00:00",
+          "observed_schema_fingerprint": "40cb88fe6222d8c103e41789bcc7df653e87267a523035fa151a769cf4a6412d",
+          "resource_id": "e2ec75c8-2866-4332-b5d5-a048bbb231d3",
+          "sample_sha256": "cbf6b57c03fe2da197c58b05613b7a5529cc070792644aae1865ae84014827fa",
+          "status": "ADDITIVE_COMPATIBLE"
         }
       ],
       "last_known_good": {
         "contract_version": "1.1",
-        "observed_at": "2026-11-24T06:18:33+00:00",
+        "observed_at": "2026-11-24T20:44:56+00:00",
         "observed_schema_fingerprint": "40cb88fe6222d8c103e41789bcc7df653e87267a523035fa151a769cf4a6412d",
         "resource_id": "e2ec75c8-2866-4332-b5d5-a048bbb231d3",
         "sample_sha256": "cbf6b57c03fe2da197c58b05613b7a5529cc070792644aae1865ae84014827fa",
@@ -946,7 +948,7 @@
         "final_url": null,
         "fingerprint_signature": null,
         "http_status": 0,
-        "observed_at": "2026-11-24T06:18:02+00:00",
+        "observed_at": "2026-11-24T20:44:26+00:00",
         "observed_schema_fingerprint": null,
         "parser_version": "online_collect:p0-live-1",
         "reasons": [
@@ -966,15 +968,6 @@
         "window_completeness": "PARTIAL"
       },
       "history": [
-        {
-          "contract_version": "1.1",
-          "observed_at": "2026-11-08T16:45:32+00:00",
-          "observed_schema_fingerprint": null,
-          "relay_rejected": "RELAY_STALE",
-          "resource_id": null,
-          "sample_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-          "status": "SOURCE_UNAVAILABLE"
-        },
         {
           "contract_version": "1.1",
           "observed_at": "2026-11-09T01:52:32+00:00",
@@ -1427,6 +1420,15 @@
           "resource_id": null,
           "sample_sha256": "8d4decfce908996c5a9c7aeef6e4c8abf1cdb5236fdde02ae24f3cfb21a615b2",
           "status": "NO_DRIFT"
+        },
+        {
+          "contract_version": "1.1",
+          "observed_at": "2026-11-24T06:18:02+00:00",
+          "observed_schema_fingerprint": null,
+          "relay_rejected": "RELAY_STALE",
+          "resource_id": null,
+          "sample_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "status": "SOURCE_UNAVAILABLE"
         }
       ],
       "last_known_good": {
@@ -1504,7 +1506,7 @@
           "transport": "JSON_API"
         },
         "http_status": 200,
-        "observed_at": "2026-11-24T06:18:18+00:00",
+        "observed_at": "2026-11-24T20:44:40+00:00",
         "observed_record_count": 200,
         "observed_schema_fingerprint": "eae5bed06423aa859e72caada48d52edbb6597c27a2763130d96af16465ba07e",
         "parser_version": "online_collect:p0-live-1",
@@ -1516,7 +1518,7 @@
         "resource_id": null,
         "resource_id_changed": false,
         "review_required": false,
-        "sample_sha256": "6b9ac86aa681bf57cfe8fc0224ab49de32ec6a23439dc87f366b49e832cda293",
+        "sample_sha256": "f8799966cb8276b5f9d3edd9f4bc133396e203fa0a3df234ba16c2b75375e3c5",
         "source_health": "PASS",
         "source_id": "S-007",
         "source_name": "臺中市議會議事資訊系統－議事錄",
@@ -1525,14 +1527,6 @@
         "window_completeness": "PARTIAL"
       },
       "history": [
-        {
-          "contract_version": "1.1",
-          "observed_at": "2026-11-08T16:45:48+00:00",
-          "observed_schema_fingerprint": "eae5bed06423aa859e72caada48d52edbb6597c27a2763130d96af16465ba07e",
-          "resource_id": null,
-          "sample_sha256": "d97d668b43194c6b6385e3ecea751f9bbcbcb638b34cc5a3d143ac564fab2ecf",
-          "status": "ADDITIVE_COMPATIBLE"
-        },
         {
           "contract_version": "1.1",
           "observed_at": "2026-11-09T01:52:55+00:00",
@@ -1924,14 +1918,22 @@
           "resource_id": null,
           "sample_sha256": "679e1a73ec46f7b19e864d9ceecea64db76d1198d5ade9f12bf8444cb78ad6f3",
           "status": "ADDITIVE_COMPATIBLE"
+        },
+        {
+          "contract_version": "1.1",
+          "observed_at": "2026-11-24T06:18:18+00:00",
+          "observed_schema_fingerprint": "eae5bed06423aa859e72caada48d52edbb6597c27a2763130d96af16465ba07e",
+          "resource_id": null,
+          "sample_sha256": "6b9ac86aa681bf57cfe8fc0224ab49de32ec6a23439dc87f366b49e832cda293",
+          "status": "ADDITIVE_COMPATIBLE"
         }
       ],
       "last_known_good": {
         "contract_version": "1.1",
-        "observed_at": "2026-11-24T06:18:18+00:00",
+        "observed_at": "2026-11-24T20:44:40+00:00",
         "observed_schema_fingerprint": "eae5bed06423aa859e72caada48d52edbb6597c27a2763130d96af16465ba07e",
         "resource_id": null,
-        "sample_sha256": "6b9ac86aa681bf57cfe8fc0224ab49de32ec6a23439dc87f366b49e832cda293",
+        "sample_sha256": "f8799966cb8276b5f9d3edd9f4bc133396e203fa0a3df234ba16c2b75375e3c5",
         "status": "ADDITIVE_COMPATIBLE"
       }
     },
@@ -2030,7 +2032,7 @@
           "transport": "JSON_API"
         },
         "http_status": 200,
-        "observed_at": "2026-11-24T06:18:19+00:00",
+        "observed_at": "2026-11-24T20:44:41+00:00",
         "observed_record_count": 108,
         "observed_schema_fingerprint": "f8db9d7800ed74e9e057349414c4367bd57fa2503bee2f064076eed11e4ddc15",
         "parser_version": "online_collect:p0-live-1",
@@ -2050,14 +2052,6 @@
         "window_completeness": "COMPLETE_WITH_ITEMS"
       },
       "history": [
-        {
-          "contract_version": "1.1",
-          "observed_at": "2026-11-08T16:45:49+00:00",
-          "observed_schema_fingerprint": "f8db9d7800ed74e9e057349414c4367bd57fa2503bee2f064076eed11e4ddc15",
-          "resource_id": null,
-          "sample_sha256": "20ab12ad1298475a7dda8221edcc9e2bddd46ffab0cbba0b5a83c64bbf0d85d0",
-          "status": "ADDITIVE_COMPATIBLE"
-        },
         {
           "contract_version": "1.1",
           "observed_at": "2026-11-09T01:52:55+00:00",
@@ -2449,11 +2443,19 @@
           "resource_id": null,
           "sample_sha256": "20ab12ad1298475a7dda8221edcc9e2bddd46ffab0cbba0b5a83c64bbf0d85d0",
           "status": "ADDITIVE_COMPATIBLE"
+        },
+        {
+          "contract_version": "1.1",
+          "observed_at": "2026-11-24T06:18:19+00:00",
+          "observed_schema_fingerprint": "f8db9d7800ed74e9e057349414c4367bd57fa2503bee2f064076eed11e4ddc15",
+          "resource_id": null,
+          "sample_sha256": "20ab12ad1298475a7dda8221edcc9e2bddd46ffab0cbba0b5a83c64bbf0d85d0",
+          "status": "ADDITIVE_COMPATIBLE"
         }
       ],
       "last_known_good": {
         "contract_version": "1.1",
-        "observed_at": "2026-11-24T06:18:19+00:00",
+        "observed_at": "2026-11-24T20:44:41+00:00",
         "observed_schema_fingerprint": "f8db9d7800ed74e9e057349414c4367bd57fa2503bee2f064076eed11e4ddc15",
         "resource_id": null,
         "sample_sha256": "20ab12ad1298475a7dda8221edcc9e2bddd46ffab0cbba0b5a83c64bbf0d85d0",
@@ -2960,7 +2962,7 @@
           "transport": "DATA_GOV_JSON"
         },
         "http_status": 200,
-        "observed_at": "2026-11-24T06:18:29+00:00",
+        "observed_at": "2026-11-24T20:44:53+00:00",
         "observed_schema_fingerprint": "151d98768fd1e5a1efbf8f4fa21436320b14b2b808cfd2d9bcda78bcf2dd5732",
         "parser_version": "canary-s028-165:1",
         "reasons": [
@@ -2979,14 +2981,6 @@
         "window_completeness": "COMPLETE_WITH_ITEMS"
       },
       "history": [
-        {
-          "contract_version": "1.1",
-          "observed_at": "2026-11-08T16:45:53+00:00",
-          "observed_schema_fingerprint": "151d98768fd1e5a1efbf8f4fa21436320b14b2b808cfd2d9bcda78bcf2dd5732",
-          "resource_id": "e9ad23b4-ec5a-476e-a866-d276af1200ac",
-          "sample_sha256": "8e2229ce88c98632839f838c1b02d80218b254acfa8cc9f7f547eb2bbf40cf35",
-          "status": "ADDITIVE_COMPATIBLE"
-        },
         {
           "contract_version": "1.1",
           "observed_at": "2026-11-09T01:52:59+00:00",
@@ -3378,11 +3372,19 @@
           "resource_id": "e9ad23b4-ec5a-476e-a866-d276af1200ac",
           "sample_sha256": "8e2229ce88c98632839f838c1b02d80218b254acfa8cc9f7f547eb2bbf40cf35",
           "status": "ADDITIVE_COMPATIBLE"
+        },
+        {
+          "contract_version": "1.1",
+          "observed_at": "2026-11-24T06:18:29+00:00",
+          "observed_schema_fingerprint": "151d98768fd1e5a1efbf8f4fa21436320b14b2b808cfd2d9bcda78bcf2dd5732",
+          "resource_id": "e9ad23b4-ec5a-476e-a866-d276af1200ac",
+          "sample_sha256": "8e2229ce88c98632839f838c1b02d80218b254acfa8cc9f7f547eb2bbf40cf35",
+          "status": "ADDITIVE_COMPATIBLE"
         }
       ],
       "last_known_good": {
         "contract_version": "1.1",
-        "observed_at": "2026-11-24T06:18:29+00:00",
+        "observed_at": "2026-11-24T20:44:53+00:00",
         "observed_schema_fingerprint": "151d98768fd1e5a1efbf8f4fa21436320b14b2b808cfd2d9bcda78bcf2dd5732",
         "resource_id": "e9ad23b4-ec5a-476e-a866-d276af1200ac",
         "sample_sha256": "8e2229ce88c98632839f838c1b02d80218b254acfa8cc9f7f547eb2bbf40cf35",
@@ -3394,45 +3396,47 @@
         "contract_version": "1.1",
         "final_url": "https://www.fire.taichung.gov.tw/caselist/index.asp?Parser=99,8,226",
         "fingerprint_signature": {
-          "entry_fields": [
-            "category",
-            "dispatch_unit",
-            "district",
-            "event_type",
-            "observed_at",
-            "source_modified_at",
-            "stable_key",
-            "status"
-          ],
+          "parse": "failed",
           "source_id": "S-031",
-          "transport": "HTML_LIVE_SNAPSHOT"
+          "transport": "HTML_LIVE_SNAPSHOT",
+          "validation_failure": "HTML_LIVE_REQUIRED_VALUE_MISSING"
         },
         "http_status": 200,
-        "observed_at": "2026-11-24T06:18:06+00:00",
-        "observed_schema_fingerprint": "47c2cbe52471e9c7cc4fa76d13ffe5a01525104560eb434aae287b352d3148ca",
+        "observed_at": "2026-11-24T20:44:30+00:00",
+        "observed_schema_fingerprint": "3e5287d9654002e251f609689532b6e504588ee8b70f060e9e7c882f90b4b105",
+        "parse_diagnostics": {
+          "empty_required_fields": [
+            "派遣分隊"
+          ],
+          "invalid_required_fields": [],
+          "invalid_row_count": 2,
+          "invalid_row_numbers": [
+            5,
+            6
+          ],
+          "missing_labels": [],
+          "page": 1,
+          "rejected_row_count": 6,
+          "row_numbers_truncated": false,
+          "source_id": "S-031"
+        },
         "parser_version": "online_collect:p0-live-1",
-        "reasons": [],
+        "reasons": [
+          "HTML_LIVE_REQUIRED_VALUE_MISSING"
+        ],
         "requested_url": "https://www.fire.taichung.gov.tw/caselist/index.asp?Parser=99,8,226",
         "resource_id": null,
         "resource_id_changed": false,
-        "review_required": false,
-        "sample_sha256": "2732a2f883dff7e8d009013bb7b3a14f17efa6bfabea47969c32cbf91e9ce749",
-        "source_health": "PASS",
+        "review_required": true,
+        "sample_sha256": "b960b7229786822af76678bb562c5729bbbb9181613a1ebd849bdf7510713354",
+        "source_health": "DEGRADED",
         "source_id": "S-031",
         "source_name": "臺中市政府消防局即時災情",
-        "status": "NO_DRIFT",
+        "status": "CONTENT_SHAPE_UNKNOWN",
         "transport": "HTML_LIVE_SNAPSHOT",
         "window_completeness": "PARTIAL"
       },
       "history": [
-        {
-          "contract_version": "1.1",
-          "observed_at": "2026-11-08T16:45:37+00:00",
-          "observed_schema_fingerprint": "3e5287d9654002e251f609689532b6e504588ee8b70f060e9e7c882f90b4b105",
-          "resource_id": null,
-          "sample_sha256": "80530e2edc0edab3947343a0511082df0ee5fa460b7957fa83002c44fba3c6d9",
-          "status": "CONTENT_SHAPE_UNKNOWN"
-        },
         {
           "contract_version": "1.1",
           "observed_at": "2026-11-09T01:52:42+00:00",
@@ -3824,6 +3828,14 @@
           "resource_id": null,
           "sample_sha256": "c2c53d5b39f4222c91e776de6e45d694ebe14b261112d510ff17b3873aa2b6c7",
           "status": "CONTENT_SHAPE_UNKNOWN"
+        },
+        {
+          "contract_version": "1.1",
+          "observed_at": "2026-11-24T06:18:06+00:00",
+          "observed_schema_fingerprint": "47c2cbe52471e9c7cc4fa76d13ffe5a01525104560eb434aae287b352d3148ca",
+          "resource_id": null,
+          "sample_sha256": "2732a2f883dff7e8d009013bb7b3a14f17efa6bfabea47969c32cbf91e9ce749",
+          "status": "NO_DRIFT"
         }
       ],
       "last_known_good": {
@@ -3852,7 +3864,7 @@
           "transport": "HTML_LIST_DETAIL"
         },
         "http_status": 200,
-        "observed_at": "2026-11-24T06:18:04+00:00",
+        "observed_at": "2026-11-24T20:44:27+00:00",
         "observed_schema_fingerprint": "98b99108d6e847c3b387b06b279f5c45e59a49fc0eaff89cca1d554647c80a2a",
         "parser_version": "online_collect:p0-live-1",
         "reasons": [
@@ -3862,7 +3874,7 @@
         "resource_id": null,
         "resource_id_changed": false,
         "review_required": false,
-        "sample_sha256": "32c42d6a3ae99ba5519345771550cb1b314dc03d9aa00212955c51187e6da77e",
+        "sample_sha256": "930fd69e41748a18154f38aef863dcac538d3585dc85a33e63669667fba0f62a",
         "source_health": "PASS",
         "source_id": "S-032",
         "source_name": "臺中市政府交通局最新消息",
@@ -3871,14 +3883,6 @@
         "window_completeness": "PARTIAL"
       },
       "history": [
-        {
-          "contract_version": "1.1",
-          "observed_at": "2026-11-08T16:45:35+00:00",
-          "observed_schema_fingerprint": "98b99108d6e847c3b387b06b279f5c45e59a49fc0eaff89cca1d554647c80a2a",
-          "resource_id": null,
-          "sample_sha256": "14eda5622e61a2d1a7bba7a27973ddf1890c0dee74e2d5f2b3f6b92fdcbeb2bd",
-          "status": "NO_DRIFT"
-        },
         {
           "contract_version": "1.1",
           "observed_at": "2026-11-09T01:52:35+00:00",
@@ -4270,14 +4274,22 @@
           "resource_id": null,
           "sample_sha256": "e30a3ec27b861d44ef6465ff000a4fee2f0410144e913225ee9e2df778acdb16",
           "status": "NO_DRIFT"
+        },
+        {
+          "contract_version": "1.1",
+          "observed_at": "2026-11-24T06:18:04+00:00",
+          "observed_schema_fingerprint": "98b99108d6e847c3b387b06b279f5c45e59a49fc0eaff89cca1d554647c80a2a",
+          "resource_id": null,
+          "sample_sha256": "32c42d6a3ae99ba5519345771550cb1b314dc03d9aa00212955c51187e6da77e",
+          "status": "NO_DRIFT"
         }
       ],
       "last_known_good": {
         "contract_version": "1.1",
-        "observed_at": "2026-11-24T06:18:04+00:00",
+        "observed_at": "2026-11-24T20:44:27+00:00",
         "observed_schema_fingerprint": "98b99108d6e847c3b387b06b279f5c45e59a49fc0eaff89cca1d554647c80a2a",
         "resource_id": null,
-        "sample_sha256": "32c42d6a3ae99ba5519345771550cb1b314dc03d9aa00212955c51187e6da77e",
+        "sample_sha256": "930fd69e41748a18154f38aef863dcac538d3585dc85a33e63669667fba0f62a",
         "status": "NO_DRIFT"
       }
     },
@@ -4727,5 +4739,5 @@
       }
     }
   },
-  "updated_at": "2026-11-24T06:18:45+00:00"
+  "updated_at": "2026-11-24T20:45:07+00:00"
 }
