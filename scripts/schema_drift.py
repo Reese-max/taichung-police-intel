@@ -156,6 +156,9 @@ CONTRACTS: dict[str, dict[str, Any]] = {
             "data.totalCount": "integer",
         },
         "record_required_fields": ["proceedingsId", "date", "speaker", "content"],
+        # Optional fields are the ones the source published on every production run
+        # (2026-11-12 to 2026-11-26); only a field outside both lists is additive.
+        "record_optional_fields": ["meetingTypeName", "name", "sessionDisplay", "sessionType", "sessionTypeSort", "subTerm", "term"],
         "record_type_fields": {
             "proceedingsId": "string",
             "date": "string",
@@ -182,6 +185,11 @@ CONTRACTS: dict[str, dict[str, Any]] = {
             "data.totalCount": "integer",
         },
         "record_required_fields": ["billId"],
+        "record_optional_fields": [
+            "billAttribute", "billAttributeSort", "billNumber", "billType", "billTypeSort", "closureType",
+            "closureTypeSort", "committee", "execution", "executionSort", "jointSignatory", "proposalRationale",
+            "proposalRationaleSort", "resolution", "resolutionSort", "seq", "session", "sponsor",
+        ],
         "record_type_fields": {"billId": "string"},
         "pagination_paths": ["data.totalPages", "data.totalCount"],
         "record_count_path": "data.totalCount",
@@ -196,6 +204,7 @@ CONTRACTS: dict[str, dict[str, Any]] = {
         "parser_version": "canary-s028-165:1",
         "dataset_id": "88147",
         "required_fields": ["項目", "欄位名稱", "數值", "資料時間日期", "資料週期"],
+        "optional_fields": ["地區", "市話", "機關代碼", "縣市別代碼", "行動電話", "行政區域代碼", "郵遞區號", "電子郵件"],
         "field_types": {field: "string" for field in ["項目", "欄位名稱", "數值", "資料時間日期", "資料週期"]},
         "resource_id_required": True,
     },
@@ -208,6 +217,7 @@ CONTRACTS: dict[str, dict[str, Any]] = {
         "parser_version": "canary-s028-165:1",
         "dataset_id": "103703",
         "required_fields": ["地區", "項目", "欄位名稱", "數值", "資料時間日期", "資料週期"],
+        "optional_fields": ["市話", "機關代碼", "縣市別代碼", "行動電話", "行政區域代碼", "郵遞區號", "電子郵件"],
         "field_types": {field: "string" for field in ["地區", "項目", "欄位名稱", "數值", "資料時間日期", "資料週期"]},
         "resource_id_required": True,
     },
@@ -221,6 +231,9 @@ CONTRACTS: dict[str, dict[str, Any]] = {
         "dataset_id": "176455",
         "required_fields": ["民國年月", "網域", "網站性質", "法律依據", "聲請單位"],
         "resource_id_required": True,
+        # Republished under a new resource id about daily (14 ids in 14 days), so a
+        # changed id alone is not a reason for review; the header check still is.
+        "resource_id_rotates": True,
         "expected_column_count": 5,
     },
 }
@@ -505,7 +518,8 @@ def observe(
         result = _observe_data_gov_csv(contract, raw, result, previous)
     else:
         result["reasons"] = ["UNSUPPORTED_TRANSPORT"]
-    _resource_drift(result, previous)
+    if not contract.get("resource_id_rotates"):
+        _resource_drift(result, previous)
     result["review_required"] = result["status"] in {"BREAKING_DRIFT", "CONTENT_SHAPE_UNKNOWN", "SOURCE_UNAVAILABLE"} or bool(result.get("resource_id_changed"))
     return result
 
@@ -642,7 +656,7 @@ def _observe_json_api(contract: dict[str, Any], body: bytes, result: dict[str, A
             "BREAKING_DRIFT",
             contract_failures,
         )
-    extra = sorted(set(fields) - set(contract["record_required_fields"]))
+    extra = sorted(set(fields) - set(contract["record_required_fields"]) - set(contract.get("record_optional_fields", ())))
     status = "ADDITIVE_COMPATIBLE" if extra else "NO_DRIFT"
     reasons = ["ADDITIVE_FIELDS"] if extra else []
     signature = {
@@ -687,7 +701,7 @@ def _observe_data_gov_json(contract: dict[str, Any], body: bytes, result: dict[s
             "BREAKING_DRIFT",
             contract_failures,
         )
-    extra = sorted(set(fields) - set(contract["required_fields"]))
+    extra = sorted(set(fields) - set(contract["required_fields"]) - set(contract.get("optional_fields", ())))
     status = "ADDITIVE_COMPATIBLE" if extra else "NO_DRIFT"
     return _finish(
         result,
