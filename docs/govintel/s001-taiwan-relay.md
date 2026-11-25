@@ -19,7 +19,9 @@ relay host（OCI，常駐）── 排程 ── SSH（forced command）──�
 - `scripts/source-relay/capture-s001.ps1`：台灣主機上由 SSH forced command 執行，只輸出一個 JSON；URL、標頭、fallback 規則同 `online_collect.get_news_listing`。主機上不放任何 GitHub 憑證。
 - `scripts/source-relay/check_relay.py`：relay host 發佈前的檢查（僅標準函式庫），15 分鐘內的擷取才發佈。
 - `scripts/source-relay/relay-s001.sh`：relay host 排程腳本。
-- `scripts/schema_drift.py --live --relay FILE`：`load_relay` 先限檔案大小再讀，驗 schema、型別、catalog URL、HTTP 200、時間（4 小時內、不超前 5 分鐘）、內容雜湊；格式錯誤一律轉成拒絕原因，不中止 live probe。**只有整次 probe（含 fallback、redirect）都沒收到任何 HTTP 回應時**才以轉交代替；收到過回應（例如 503 後 fallback 逾時）就保留 live 證據。
+- `scripts/schema_drift.py --live --relay FILE`：`load_relay` 先限檔案大小再讀，驗 schema、型別、catalog URL、HTTP 200、時間（13 小時內、不超前 5 分鐘）、內容雜湊；格式錯誤一律轉成拒絕原因，不中止 live probe。**只有整次 probe（含 fallback、redirect）都沒收到任何 HTTP 回應時**才以轉交代替；收到過回應（例如 503 後 fallback 逾時）就保留 live 證據。
+
+擷取每 12 小時一次（09:50Z／21:50Z），pages.yml 排程設在擷取後 40 分鐘；實測 GitHub 延遲 6.5–10 小時才啟動排程，40 分鐘的設計落差形同虛設。時限因此定為 13 小時：涵蓋一個完整擷取間隔加上排程延遲，又短於兩個間隔（24 小時），漏掉一次擷取的轉交仍會被 `RELAY_STALE` 拒絕。
 
 ## 收據上的標示
 

@@ -48,7 +48,8 @@ LIVE_REQUEST_TIMEOUT = (5, 15)
 # live fetch got no response at all, and only while it is recent.
 RELAY_SCHEMA = "govintel-source-relay/v1"
 RELAY_SOURCES = frozenset({"S-001"})
-RELAY_MAX_AGE_SECONDS = 4 * 3600
+# Captures land 12h apart and GitHub starts the schedule 6.5-10h late; under 24h a relay that missed one capture is still rejected.
+RELAY_MAX_AGE_SECONDS = 13 * 3600
 RELAY_MAX_FUTURE_SECONDS = 300
 RELAY_MAX_BODY_BYTES = 5 * 1024 * 1024
 # base64 of the largest body plus its metadata; a larger file is not read at all
