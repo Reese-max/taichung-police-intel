@@ -313,7 +313,6 @@ class ReferenceJsonCollectionTests(unittest.TestCase):
         self.declaration['resources'][0]['resource_id'] = '99999999-0000-0000-0000-000000000000'
         with self.assertRaisesRegex(ValueError, 'invalid/duplicate'): self.audit()
 
-    @unittest.skipIf(os.name == 'nt', 'POSIX file modes')
     def test_cli_hash_index_stays_private_and_refuses_original_directory_output(self):
         path = self.resource()
         before = path.read_bytes()
@@ -330,7 +329,8 @@ class ReferenceJsonCollectionTests(unittest.TestCase):
             out, index = Path(output_directory) / 'aggregate.json', Path(output_directory) / 'private-index.json'
             accepted = subprocess.run(command + ['--out', str(out), '--private-index-out', str(index)], capture_output=True)
             self.assertEqual(accepted.returncode, 0, accepted.stderr)
-            self.assertEqual(index.stat().st_mode & 0o777, 0o600)
+            if os.name != 'nt':  # Windows has no POSIX file modes
+                self.assertEqual(index.stat().st_mode & 0o777, 0o600)
             self.assertNotIn('private_disposition_index', json.loads(out.read_text()))
             self.assertNotIn('FICTIONAL_PRIVATE', out.read_text() + index.read_text())
             self.assertEqual(path.read_bytes(), before)

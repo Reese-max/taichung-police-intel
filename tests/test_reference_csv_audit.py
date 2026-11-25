@@ -121,7 +121,6 @@ class ReferenceCsvAuditTests(unittest.TestCase):
         self.assertNotIn('private_disposition_index', result)
         self.assertNotIn('FICTIONAL_PRIVATE', json.dumps(result))
 
-    @unittest.skipIf(os.name == 'nt', 'POSIX file modes')
     def test_cli_rejects_original_as_output_and_preserves_original_hash(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'original.csv'
@@ -136,7 +135,8 @@ class ReferenceCsvAuditTests(unittest.TestCase):
             accepted = subprocess.run(command + ['--out', str(out), '--private-index-out', str(index)], capture_output=True)
             self.assertEqual(accepted.returncode, 0, accepted.stderr)
             self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(), sha)
-            self.assertEqual(index.stat().st_mode & 0o777, 0o600)
+            if os.name != 'nt':  # Windows has no POSIX file modes
+                self.assertEqual(index.stat().st_mode & 0o777, 0o600)
             self.assertNotIn('private_disposition_index', json.loads(out.read_text()))
 
     @unittest.skipUnless(hasattr(os, 'mkfifo'), 'POSIX FIFO regression')

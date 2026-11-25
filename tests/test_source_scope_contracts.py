@@ -208,25 +208,27 @@ class MetadataOutputTests(unittest.TestCase):
                     self.assertEqual(hashlib.sha256(source.read_bytes()).hexdigest(), before)
                     self.assertEqual(sorted(p.name for p in directory.iterdir()), ['nested', 'original.html'])
 
-    @unittest.skipIf(os.name == 'nt', 'symlink creation needs a privilege Windows does not grant by default')
     def test_cli_rejects_symlink_and_hardlink_alias_without_changing_original(self):
         with tempfile.TemporaryDirectory() as temp:
             directory = Path(temp)
             source = directory / 'original.html'
             source.write_bytes(EMPTY)
             symlink = directory / 'symbolic.json'
-            symlink.symlink_to(source)
             hardlink = directory / 'hard.json'
             os.link(source, hardlink)
             before = hashlib.sha256(source.read_bytes()).hexdigest()
-            for output in [symlink, hardlink]:
+            outputs = [hardlink]
+            if os.name != 'nt':  # symlink creation needs a privilege Windows does not grant by default
+                symlink.symlink_to(source)
+                outputs.insert(0, symlink)
+            for output in outputs:
                 with self.subTest(output=output):
                     source.write_bytes(EMPTY)
                     result = self.run_cli(source, output)
                     self.assertNotEqual(result.returncode, 0)
                     self.assertEqual(hashlib.sha256(source.read_bytes()).hexdigest(), before)
                     self.assertEqual(hashlib.sha256(output.read_bytes()).hexdigest(), before)
-            self.assertTrue(symlink.is_symlink())
+            self.assertEqual(symlink.is_symlink(), os.name != 'nt')
             self.assertEqual(source.stat().st_ino, hardlink.stat().st_ino)
 
     @unittest.skipIf(os.name == 'nt', 'symlink creation needs a privilege Windows does not grant by default')

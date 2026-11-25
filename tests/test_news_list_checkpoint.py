@@ -210,27 +210,30 @@ class CheckpointIOTests(unittest.TestCase):
             self.assertIn(b"regular file",result.stderr)
             self.assertFalse(output.exists())
 
-    @unittest.skipIf(os.name == "nt", "symlink creation needs a privilege Windows does not grant by default")
     def test_cli_same_resolved_path_rejected_before_loading_or_network(self):
         with tempfile.TemporaryDirectory() as directory:
             source, alias = Path(directory)/"input.json", Path(directory)/"alias.json"
             original = b"FICTIONAL_NON_JSON_ORIGINAL"
             source.write_bytes(original)
-            alias.symlink_to(source)
-            for target in (source,alias):
+            targets = [source]
+            if os.name != "nt":  # symlink creation needs a privilege Windows does not grant by default
+                alias.symlink_to(source)
+                targets.append(alias)
+            for target in targets:
                 with self.subTest(target=target):
                     result = subprocess.run(self.command(source,target), capture_output=True, timeout=2)
                     self.assertEqual(result.returncode,2)
                     self.assertIn(b"must differ",result.stderr)
                     self.assertEqual(source.read_bytes(),original)
 
-    @unittest.skipIf(os.name == "nt", "Windows cannot open a directory to reject it")
     def test_reader_checks_regular_file_and_byte_bound(self):
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory)/"too-large.json"
             source.write_bytes(b"x"*(cp.MAX_CHECKPOINT_BYTES+1))
             with self.assertRaisesRegex(ValueError,"2 MiB"):
                 cli.read_regular_bounded(source)
+            if os.name == "nt":
+                self.skipTest("Windows cannot open a directory to reject it")
             with self.assertRaisesRegex(ValueError,"regular file"):
                 cli.read_regular_bounded(Path(directory))
 
