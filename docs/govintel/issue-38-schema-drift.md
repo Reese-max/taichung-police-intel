@@ -17,7 +17,7 @@
 - 每個 signature 都由 `_signature` 統一補上 `source_id`，連錯誤分支也是；所以兩個欄位結構相同但來源不同的 dataset（真實的 S-028 與 CTX-POP 就是這樣）不會拿到同一個 fingerprint。
 - receipt 的每筆 source 另存 `fingerprint_signature`，讓 review 可以直接看到「觀察到什麼形狀」。這會隨 receipt 一起發佈到 `apps/web/public/data/schema-drift.json`；內容只有公開政府來源的欄位名稱、CSV header 與 content type，沒有查詢參數或內容本文。
 - 從遠端回應帶進 signature 的名稱清單都受上限保護：欄位名稱與 CSV header 用 `MAX_SIGNATURE_NAMES`（500），`row_column_counts` 用 `MAX_ROW_REASONS`（10）。這些上限只作用在 signature 的呈現，required 欄位存在性、型別與欄位數判定都用完整清單，所以上限不會改變任何 verdict。
-- 指紋反映的是「這一筆觀測看到的形狀」，不是資料量。`record_types` / `field_types` 是這一列取樣到的型別集合，`date_coverage` 也是這一頁的覆蓋分級，所以某個 optional 欄位在某一頁全部是 null、下一頁出現值時，指紋仍會變。這是刻意的取樣誠實，不是告警：目前沒有任何 alert 以指紋比較觸發，只有 `resource_id` 變更會升級成需要覆核。
+- 指紋反映的是「這一筆觀測看到的形狀」，不是資料量。`record_types` / `field_types` 是這一列取樣到的型別集合，`date_coverage` 也是這一頁的覆蓋分級，所以某個 optional 欄位在某一頁全部是 null、下一頁出現值時，指紋仍會變。這是刻意的取樣誠實，不是告警：目前沒有任何 alert 以指紋比較觸發，只有 `resource_id` 變更會升級成需要覆核（標了 `resource_id_rotates` 的來源除外，見下節）。
 - `contract_version` 已推進到 `1.1`。1.0 以前持久化的 fingerprint 是舊 signature（含 pagination 數值、`n/m` 計數與 `entry_count`），與 1.1 之後的值不可直接比較；`update_state` 會把 state 頂層的 marker 更新成當前版本，但保留每筆 `current` / `last_known_good` / `history` 各自記錄的版本。
 
 ## 逐列的 required field 與欄位數
@@ -30,6 +30,13 @@
 - 刻意不做的事：required 欄位「有欄位但值是空字串」不算 schema drift。欄位存在與欄位有值是兩件事，後者是資料品質，publication lane 的 `source-status.json` / `intelligence_gaps` 已經負責；把它放進契約層只會在真實資源出現合法稀疏值時誤擋。
 - CSV 讀取本身失敗（超過 `csv` 欄位長度上限等）只會讓該來源變成 `UNPARSEABLE_CSV` 的 `CONTENT_SHAPE_UNKNOWN`，不會中止整份 receipt，也不會讓其他來源失去 last-known-good。
 - 這個欄位數檢查刻意比 production parser 嚴格。`canary-s028-165.py` 用 `csv.DictReader`，多出來的欄位會被 `restkey` 吞掉；monitor 必須先把這種不一致叫出來，而不是讓 parser 的靜默吸收決定結果。
+
+## 已知欄位與輪替的 resource id
+
+- `ADDITIVE_COMPATIBLE`／`ADDITIVE_FIELDS` 的意思是「出現契約沒列過的欄位」。JSON/API 契約以 `record_optional_fields`、data.gov JSON 契約以 `optional_fields` 列出來源本來就有、但 parser 不依賴的欄位；只有不在必要與選用清單裡的欄位才算新增。選用欄位缺席不算漂移。
+- 2026-11-26 以前契約只列必要欄位，S-007、S-009、S-028、CTX-POP 既有的其他欄位每次都被算成新增：11/12 到 11/26 的 50 筆 history 中每次成功觀測都是 `ADDITIVE_COMPATIBLE`，指紋則各只有一個。receipt 的 `overall` 因此永遠是 `DEGRADED`，真的多出欄位時也看不出差別。選用清單就是那段期間觀察到的欄位。
+- 上游真的新增欄位時，狀態會變成 `ADDITIVE_COMPATIBLE`、`overall` 變成 `DEGRADED`。確認 parser 不受影響後，把欄位補進該契約的選用清單，狀態才會回到 `NO_DRIFT`。
+- CTX-165 的契約標了 `resource_id_rotates`：上游幾乎每天以新的 resource id 重新發布同一份資料（14 天 14 個 id，其中 11/25 那次換 id 前後的 `sample_sha256` 相同），所以它換 id 不再產生 `RESOURCE_ID_CHANGED`，也不進 Review Inbox；`resource_id` 仍照常記錄，表頭、欄數與逐列欄數檢查不變。S-028 與 CTX-POP 的 id 在同一段期間沒有變過，維持原本「換 id 就要覆核」的行為。
 
 ## 窗口覆蓋與 replay 證據
 
