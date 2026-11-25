@@ -30,8 +30,7 @@
 | schema-drift 整體狀態 | 11/25 的收據是 `DEGRADED`，不是故障：8 個來源都回 HTTP 200，S-007、S-009、S-028、CTX-POP、CTX-165 五個是 `ADDITIVE_COMPATIBLE`（上游新增欄位；CTX-165 是 `RESOURCE_ID_CHANGED`，列在收據的 `review_inbox`），其餘 `NO_DRIFT` |
 | 候選來源觀測 | 「Observe candidate public sources」的 S-001 那一格在 GitHub-hosted runner 上從 10 月初起每次都失敗（非台灣位址）。改由 xisx-pc 執行（#285）；分支上實跑四次，後三次成功，上次觀測的快取可存可取 |
 | Windows 上的雜湊綁定 | 來源政策以 `file_sha256` 綁定 `retention-rights-policy.v1.json` 與 `freshness_policy.py`。Windows 把它們取出成 CRLF 時，`collect.py` 會以 `policy/catalog binding mismatch` 結束。`.gitattributes` 已把這兩個檔固定為 LF（#285） |
-| 每日簡報 | 收集器重新建立基準時，已在簡報狀態裡的既有項目不再被當成官方修訂發布（#286，自 #246 拆出） |
-| 擱置的草稿 PR | #240、#243、#244、#245、#220 已關閉，分支都保留。#246 只保留上面那項修正；#247 的來源盤點併入主線（本 PR），原分期計畫改指向 `NATIONAL_DATA_LAYER.md` |
+| 擱置的草稿 PR | #240、#243、#244、#245、#246、#220 已關閉，分支都保留。#246 的「重新建立基準不算官方修訂」曾單獨拆出（#286），獨立審查指出：主線沒有 #244 的範圍變更機制，單獨套用會把真實的官方修訂靜默吞掉，已撤回。#247 的來源盤點併入主線（本 PR），原分期計畫改指向 `NATIONAL_DATA_LAYER.md` |
 | 清理 | 已合併且乾淨的 worktree 移除 19 個。還留著的是有未提交內容或未合併 commit 的 7 個，以及 devin、Orca 管理的 8 個 |
 
 ## 一、現況（2026-11-20 實測）
