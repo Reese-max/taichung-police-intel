@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 import signal
 import tempfile
 import time
@@ -638,6 +639,7 @@ class SchemaDriftTests(unittest.TestCase):
         self.assertEqual(len(truncated["fingerprint_signature"]["header"]), drift.MAX_SIGNATURE_NAMES)
         self.assertLessEqual(len(truncated["reasons"]), drift.MAX_ROW_REASONS + 2)
 
+    @unittest.skipIf(os.name == "nt", "the state write fsyncs its directory, which Windows cannot open")
     def test_live_runs_persist_state_so_last_known_good_survives_to_the_receipt(self):
         observations = [
             {"source_id": "S-007", "body": json.dumps(API).encode(), "http_status": 200,
@@ -842,6 +844,7 @@ class SchemaDriftTests(unittest.TestCase):
                     expected == "PARTIAL",
                 )
 
+    @unittest.skipIf(os.name == "nt", "the state write fsyncs its directory, which Windows cannot open")
     def test_durable_state_is_replaced_wholesale_and_never_left_partial(self):
         with tempfile.TemporaryDirectory() as directory:
             state_path = Path(directory) / "nested" / "state.json"
@@ -950,6 +953,7 @@ class SchemaDriftTests(unittest.TestCase):
         self.assertEqual(result["status"], "SOURCE_UNAVAILABLE")
         self.assertEqual(result["window_completeness"], "PARTIAL")
 
+    @unittest.skipUnless(hasattr(signal, "setitimer"), "live source deadline requires Unix")
     def test_live_observations_cover_every_contract_and_fail_closed_per_source(self):
         response = SimpleNamespace(
             content=b"sample",
@@ -976,6 +980,7 @@ class SchemaDriftTests(unittest.TestCase):
         self.assertEqual(observed["http_status"], 0)
         self.assertTrue(observed["review_required"])
 
+    @unittest.skipUnless(hasattr(signal, "setitimer"), "live source deadline requires Unix")
     def test_live_observations_retries_transient_connection_once(self):
         response = SimpleNamespace(
             content=b"sample",
@@ -1058,6 +1063,7 @@ class SchemaDriftTests(unittest.TestCase):
         finally:
             session.close()
 
+    @unittest.skipUnless(hasattr(signal, "setitimer"), "live source deadline requires Unix")
     def test_production_probe_has_no_second_outer_transport_retry(self):
         session = drift._live_session()
         contracts = {"S-007": drift.CONTRACTS["S-007"]}

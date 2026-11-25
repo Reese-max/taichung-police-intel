@@ -299,6 +299,7 @@ class ReferenceJsonCollectionTests(unittest.TestCase):
         self.assertTrue(result['multiplicity_retained'])
         self.assertFalse(result['aggregation_guard']['deduplication_allowed'])
 
+    @unittest.skipIf(os.name == 'nt', 'symlink creation needs a privilege Windows does not grant by default')
     def test_resource_symlink_escape_rejected(self):
         path = self.resource()
         path.unlink()
@@ -312,6 +313,7 @@ class ReferenceJsonCollectionTests(unittest.TestCase):
         self.declaration['resources'][0]['resource_id'] = '99999999-0000-0000-0000-000000000000'
         with self.assertRaisesRegex(ValueError, 'invalid/duplicate'): self.audit()
 
+    @unittest.skipIf(os.name == 'nt', 'POSIX file modes')
     def test_cli_hash_index_stays_private_and_refuses_original_directory_output(self):
         path = self.resource()
         before = path.read_bytes()

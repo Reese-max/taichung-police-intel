@@ -121,6 +121,7 @@ class ReferenceCsvAuditTests(unittest.TestCase):
         self.assertNotIn('private_disposition_index', result)
         self.assertNotIn('FICTIONAL_PRIVATE', json.dumps(result))
 
+    @unittest.skipIf(os.name == 'nt', 'POSIX file modes')
     def test_cli_rejects_original_as_output_and_preserves_original_hash(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / 'original.csv'

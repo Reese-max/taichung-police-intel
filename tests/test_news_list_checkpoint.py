@@ -210,6 +210,7 @@ class CheckpointIOTests(unittest.TestCase):
             self.assertIn(b"regular file",result.stderr)
             self.assertFalse(output.exists())
 
+    @unittest.skipIf(os.name == "nt", "symlink creation needs a privilege Windows does not grant by default")
     def test_cli_same_resolved_path_rejected_before_loading_or_network(self):
         with tempfile.TemporaryDirectory() as directory:
             source, alias = Path(directory)/"input.json", Path(directory)/"alias.json"
@@ -223,6 +224,7 @@ class CheckpointIOTests(unittest.TestCase):
                     self.assertIn(b"must differ",result.stderr)
                     self.assertEqual(source.read_bytes(),original)
 
+    @unittest.skipIf(os.name == "nt", "Windows cannot open a directory to reject it")
     def test_reader_checks_regular_file_and_byte_bound(self):
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory)/"too-large.json"
@@ -232,6 +234,7 @@ class CheckpointIOTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,"regular file"):
                 cli.read_regular_bounded(Path(directory))
 
+    @unittest.skipUnless(hasattr(os, "fchmod"), "os.fchmod is unavailable")
     def test_atomic_private_writer_does_not_touch_colliding_temp_hardlink(self):
         with tempfile.TemporaryDirectory() as directory:
             source, output = Path(directory)/"original.json", Path(directory)/"output.json"
@@ -257,6 +260,7 @@ class CheckpointIOTests(unittest.TestCase):
             self.assertEqual(cp.validate_checkpoint(loaded,START,END),prior_state)
             self.assertEqual(sorted(path.name for path in Path(directory).iterdir()), ["original.json","output.json","output.json.tmp"])
 
+    @unittest.skipUnless(hasattr(os, "fchmod"), "os.fchmod is unavailable")
     def test_failed_atomic_replace_keeps_destination_and_removes_private_temp(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory)/"output.json"
