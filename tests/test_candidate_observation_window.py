@@ -225,11 +225,20 @@ class CandidateObservationWindowTests(unittest.TestCase):
             "    if: github.repository == 'Reese-max/taichung-police-intel' && github.event_name != 'pull_request'\n",
             job.group(1),
         )
-        # xisx-pc resolves `bash` to WSL; the Taiwan leg must stay on cmd.
+        # Same shell national-sync-xisx.yml uses on that host; the Taiwan leg must stay on cmd.
         taiwan = re.search(r"- name: Observe \$\{\{ matrix\.source \}\} from Taiwan\n((?:[ \t]{8,}[^\n]*\n?)*)", job.group(1))
         self.assertIsNotNone(taiwan, "the S-001 leg needs its own observe step")
         self.assertIn("if: matrix.source == 'S-001'", taiwan.group(1))
         self.assertIn("shell: cmd", taiwan.group(1))
+
+    def test_policy_bound_files_keep_lf_on_windows_checkouts(self):
+        # scripts/source-governance.py binds these by file_sha256; a CRLF checkout breaks the binding.
+        bound = ("docs/govintel/retention-rights-policy.v1.json", "intel_v2/freshness_policy.py")
+        attributes = (ROOT / ".gitattributes").read_text(encoding="utf-8").splitlines()
+        for path in bound:
+            self.assertIn(f"{path} text eol=lf", attributes)
+        # xisx-pc keeps its workspace, so the S-001 leg rewrites copies checked out before the pin.
+        self.assertIn(f"set BOUND={' '.join(bound)}\n", WORKFLOW.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

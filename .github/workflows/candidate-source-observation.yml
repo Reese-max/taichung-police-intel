@@ -42,7 +42,16 @@ jobs:
         run: python -m pip install -r requirements.txt
       # The S-001 leg follows national-sync-xisx.yml on xisx-pc: uv provides the
       # toolchain and steps run under cmd, because that host's ExecutionPolicy
-      # blocks runner .ps1 step scripts and the first `bash` on its PATH is WSL.
+      # blocks runner .ps1 step scripts.
+      # xisx-pc keeps its workspace between runs: copies checked out as CRLF before
+      # .gitattributes pinned them stay CRLF and break the source policy binding.
+      # Dropping them from the index first is what makes git rewrite an unchanged file.
+      - name: Restore LF for the policy-bound files
+        if: matrix.source == 'S-001'
+        shell: cmd
+        run: |
+          set BOUND=docs/govintel/retention-rights-policy.v1.json intel_v2/freshness_policy.py
+          git rm -q --cached -- %BOUND% && git checkout HEAD -- %BOUND%
       - uses: astral-sh/setup-uv@v10.3.3
         if: matrix.source == 'S-001'
       - name: Create Python environment

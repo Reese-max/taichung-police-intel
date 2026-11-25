@@ -3,4 +3,7 @@ apps/web/public/data/intelligence-feed.json text eol=lf
 apps/web/public/data/source-status.json text eol=lf
 apps/web/public/data/v2-daily-brief.json text eol=lf
 apps/web/public/data/source-policy.json text eol=lf
+# The source policy binds these two files by file_sha256 (scripts/source-governance.py).
+docs/govintel/retention-rights-policy.v1.json text eol=lf
+intel_v2/freshness_policy.py text eol=lf
 tests/fixtures/s006-synthetic-revision-date.pdf binary
