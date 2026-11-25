@@ -1,7 +1,11 @@
+import contextlib
 import importlib.util
+import io
+import os
 from datetime import datetime, time, timezone
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -52,6 +56,23 @@ class NationalSyncWatchdogTests(unittest.TestCase):
             triggering_actor={"login": "github-actions[bot]"},
         )
         self.assertEqual(watchdog.decide(self.now, [run], self.latest_start), "ALERT")
+
+    def test_alert_turns_the_watchdog_run_red(self):
+        # On 2026-11-23 two ALERTs ended as green runs with a warning and a day without sync went unnoticed.
+        def run_main(decision):
+            output = io.StringIO()
+            with patch.dict(os.environ, {"GH_TOKEN": "x", "GITHUB_REPOSITORY": "o/r"}), \
+                    patch.object(watchdog, "fetch_runs", return_value=[]), \
+                    patch.object(watchdog, "decide", return_value=decision), \
+                    patch.object(watchdog, "dispatch_workflow") as dispatch, \
+                    contextlib.redirect_stdout(output):
+                return watchdog.main(), output.getvalue(), dispatch
+
+        code, output, dispatch = run_main("ALERT")
+        self.assertEqual(code, 1)
+        self.assertIn("::error::national-sync.yml", output)
+        dispatch.assert_not_called()
+        self.assertEqual(run_main("OK")[0], 0)
 
     def test_previous_day_run_does_not_count_today(self):
         run = self.run_record(conclusion="success", created_at="2026-11-19T23:59:00Z")

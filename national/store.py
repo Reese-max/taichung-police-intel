@@ -1,6 +1,7 @@
 """SQLite and Wrangler backends; SQL values are encoded, never interpolated raw."""
 from datetime import datetime, timezone
 import json
+import os
 from pathlib import Path
 import shutil
 import re
@@ -143,7 +144,13 @@ class WranglerD1Store(Store):
         result = subprocess.run([self.command, "d1", *args, "--json"], cwd=self.cwd,
                                 capture_output=True, text=True, encoding="utf-8", check=False)
         if result.returncode:
-            raise RuntimeError("Wrangler command failed (exit " + str(result.returncode) + ")")
+            # Wrangler says why on stdout (the --json error object) or stderr. The tail goes
+            # into public logs and report artifacts, so the API token is never passed through.
+            detail = " ".join(f"{result.stdout or ''} {result.stderr or ''}".split())
+            token = os.environ.get("CLOUDFLARE_API_TOKEN")
+            if token:
+                detail = detail.replace(token, "***")
+            raise RuntimeError(f"Wrangler command failed (exit {result.returncode}): {detail[-600:]}")
         # Remote --file prints upload progress lines ("├ ...") before the JSON on stdout.
         start = re.search(r"^[\[{]", result.stdout, re.M)
         if start is None:

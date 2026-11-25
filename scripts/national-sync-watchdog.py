@@ -106,7 +106,9 @@ def main():
             if result == "DISPATCH":
                 dispatch_workflow(repository, workflow_file)
             elif result == "ALERT":
-                print(f"::warning::{workflow_file} was already dispatched today but is still failed or absent")
+                # A red run is the alert: a warning on a green run goes unseen.
+                print(f"::error::{workflow_file} was already dispatched today but is still failed or absent")
+                failed = True
             print(f"::notice::{workflow_file}: {result}")
         except subprocess.CalledProcessError as exc:
             print(f"::error::{workflow_file}: gh command failed with exit code {exc.returncode}", file=sys.stderr)
