@@ -44,3 +44,7 @@ relay host（OCI，常駐）── 排程 ── SSH（forced command）──�
 - 台灣主機或 relay host 停機時，轉交過期，S-001 回到現行的 `SOURCE_UNAVAILABLE`（fail closed）。
 - 台灣主機的管理員能偽造擷取內容；影響限於 S-001 的 schema-drift 判定，不進正式資料。
 - 公開儀表板（`apps/web/components/V2DailyDashboard.js`）尚未顯示 `relayed_sources`／`evidence_observed_at`，畫面上的時間仍是檢查完成時間；JSON 收據已有完整標記（後續工作）。
+
+## 候選觀察改在台灣 self-hosted runner 執行
+
+`.github/workflows/candidate-source-observation.yml` 的 S-001 leg 自 2026-11-25 起改在台灣 self-hosted runner `[self-hosted, Windows, xisx-pc]` 執行（S-032／S-031 仍留在 `ubuntu-latest`），直接從台灣位址 live 觀察，不走本檔的轉交。該主機不是 24 小時開機：關機期間 S-001 leg 會留在佇列等待 runner，可能等到逾時被 GitHub 取消——這是預期行為，恢復開機後下一次執行即補上觀察。整個 job 帶有與 `national-sync-xisx.yml` 同型的防護：只在本 repo（`Reese-max/taichung-police-intel`）執行、絕不跑 `pull_request`。S-001 leg 的步驟一律用 cmd，做法同 `national-sync-xisx.yml`（該主機的 ExecutionPolicy 會擋 runner 的 `.ps1` 步驟腳本）。該主機的工作區會跨次保留，所以 S-001 leg 在 checkout 後會把來源政策以 `file_sha256` 綁定的兩個檔（`docs/govintel/retention-rights-policy.v1.json`、`intel_v2/freshness_policy.py`）重新取出成 LF；`.gitattributes` 也已把這兩個檔固定為 LF，否則 Windows 的 CRLF checkout 會讓 `policy/catalog binding mismatch`。另外，`actions/cache` 在該主機用的是 Git 附的 tar，需要同目錄的 gzip，所以 S-001 leg 會先把 `C:\Program Files\Git\usr\bin` 加進 PATH，上次觀測才存得進快取。
