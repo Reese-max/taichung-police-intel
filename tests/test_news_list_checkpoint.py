@@ -215,8 +215,11 @@ class CheckpointIOTests(unittest.TestCase):
             source, alias = Path(directory)/"input.json", Path(directory)/"alias.json"
             original = b"FICTIONAL_NON_JSON_ORIGINAL"
             source.write_bytes(original)
-            alias.symlink_to(source)
-            for target in (source,alias):
+            targets = [source]
+            if os.name != "nt":  # symlink creation needs a privilege Windows does not grant by default
+                alias.symlink_to(source)
+                targets.append(alias)
+            for target in targets:
                 with self.subTest(target=target):
                     result = subprocess.run(self.command(source,target), capture_output=True, timeout=2)
                     self.assertEqual(result.returncode,2)
@@ -229,9 +232,12 @@ class CheckpointIOTests(unittest.TestCase):
             source.write_bytes(b"x"*(cp.MAX_CHECKPOINT_BYTES+1))
             with self.assertRaisesRegex(ValueError,"2 MiB"):
                 cli.read_regular_bounded(source)
+            if os.name == "nt":
+                self.skipTest("Windows cannot open a directory to reject it")
             with self.assertRaisesRegex(ValueError,"regular file"):
                 cli.read_regular_bounded(Path(directory))
 
+    @unittest.skipUnless(hasattr(os, "fchmod"), "os.fchmod is unavailable")
     def test_atomic_private_writer_does_not_touch_colliding_temp_hardlink(self):
         with tempfile.TemporaryDirectory() as directory:
             source, output = Path(directory)/"original.json", Path(directory)/"output.json"
@@ -257,6 +263,7 @@ class CheckpointIOTests(unittest.TestCase):
             self.assertEqual(cp.validate_checkpoint(loaded,START,END),prior_state)
             self.assertEqual(sorted(path.name for path in Path(directory).iterdir()), ["original.json","output.json","output.json.tmp"])
 
+    @unittest.skipUnless(hasattr(os, "fchmod"), "os.fchmod is unavailable")
     def test_failed_atomic_replace_keeps_destination_and_removes_private_temp(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory)/"output.json"

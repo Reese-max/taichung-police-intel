@@ -246,8 +246,9 @@ class PublicationStateBranchTests(unittest.TestCase):
         self.assertEqual(self.head(), before)
 
     def run_pages_schema_step(self, *, pending, interrupted=False, relay=False):
-        if not shutil.which("bash") or not shutil.which("timeout"):
-            self.skipTest("the Pages shell requires bash and timeout")
+        # Windows has a bash (the WSL launcher) and a timeout.exe, but neither runs the #! shims below.
+        if os.name == "nt" or not shutil.which("bash") or not shutil.which("timeout"):
+            self.skipTest("the Pages shell requires a POSIX bash and timeout")
         from scripts import schema_drift
 
         module.restore(self.work, "publication-state")

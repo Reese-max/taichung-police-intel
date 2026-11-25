@@ -299,6 +299,7 @@ class ReferenceJsonCollectionTests(unittest.TestCase):
         self.assertTrue(result['multiplicity_retained'])
         self.assertFalse(result['aggregation_guard']['deduplication_allowed'])
 
+    @unittest.skipIf(os.name == 'nt', 'symlink creation needs a privilege Windows does not grant by default')
     def test_resource_symlink_escape_rejected(self):
         path = self.resource()
         path.unlink()
@@ -328,7 +329,8 @@ class ReferenceJsonCollectionTests(unittest.TestCase):
             out, index = Path(output_directory) / 'aggregate.json', Path(output_directory) / 'private-index.json'
             accepted = subprocess.run(command + ['--out', str(out), '--private-index-out', str(index)], capture_output=True)
             self.assertEqual(accepted.returncode, 0, accepted.stderr)
-            self.assertEqual(index.stat().st_mode & 0o777, 0o600)
+            if os.name != 'nt':  # Windows has no POSIX file modes
+                self.assertEqual(index.stat().st_mode & 0o777, 0o600)
             self.assertNotIn('private_disposition_index', json.loads(out.read_text()))
             self.assertNotIn('FICTIONAL_PRIVATE', out.read_text() + index.read_text())
             self.assertEqual(path.read_bytes(), before)

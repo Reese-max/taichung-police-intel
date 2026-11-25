@@ -4,9 +4,11 @@ import importlib.util
 import contextlib
 import io
 import json
+import os
 from datetime import date
 from datetime import datetime, timezone
 from pathlib import Path
+import signal
 import tempfile
 import unittest
 from unittest import mock
@@ -212,6 +214,7 @@ class OfficialTransportRecoveryTests(unittest.TestCase):
         self.assertEqual(result["status"], "BREAKING_DRIFT")
         self.assertEqual(result["http_status"], 200)
 
+    @unittest.skipUnless(hasattr(signal, "setitimer"), "live source deadline requires Unix")
     def test_schema_adapter_owns_retry_budget(self):
         session = drift._live_session()
         self.addCleanup(session.close)
@@ -225,6 +228,7 @@ class OfficialTransportRecoveryTests(unittest.TestCase):
         self.assertEqual(observations[0]["http_status"], 0)
         self.assertEqual(observations[0]["error_reason"], "LIVE_FETCH_CONNECTIONERROR")
 
+    @unittest.skipIf(os.name == "nt", "the state write fsyncs its directory, which Windows cannot open")
     def test_two_live_cli_runs_persist_history_and_last_good_across_outage(self):
         body = '<meta charset="utf-8"><li><a href="news_view.jsp?dataserno=1">官方新聞 115-09-30</a></li>'.encode()
         good = drift._response_observation("S-001", response(oc.NEWS_LIST_SOURCES["S-001"]["list_url"], body=body))

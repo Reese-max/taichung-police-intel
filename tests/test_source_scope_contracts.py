@@ -167,6 +167,7 @@ class VideoContractTests(unittest.TestCase):
 
 
 class BoundedFileTests(unittest.TestCase):
+    @unittest.skipUnless(hasattr(os, 'O_NONBLOCK'), 'os.O_NONBLOCK is unavailable')
     def test_regular_file_reader_is_bounded(self):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp) / 'input'
@@ -213,20 +214,24 @@ class MetadataOutputTests(unittest.TestCase):
             source = directory / 'original.html'
             source.write_bytes(EMPTY)
             symlink = directory / 'symbolic.json'
-            symlink.symlink_to(source)
             hardlink = directory / 'hard.json'
             os.link(source, hardlink)
             before = hashlib.sha256(source.read_bytes()).hexdigest()
-            for output in [symlink, hardlink]:
+            outputs = [hardlink]
+            if os.name != 'nt':  # symlink creation needs a privilege Windows does not grant by default
+                symlink.symlink_to(source)
+                outputs.insert(0, symlink)
+            for output in outputs:
                 with self.subTest(output=output):
                     source.write_bytes(EMPTY)
                     result = self.run_cli(source, output)
                     self.assertNotEqual(result.returncode, 0)
                     self.assertEqual(hashlib.sha256(source.read_bytes()).hexdigest(), before)
                     self.assertEqual(hashlib.sha256(output.read_bytes()).hexdigest(), before)
-            self.assertTrue(symlink.is_symlink())
+            self.assertEqual(symlink.is_symlink(), os.name != 'nt')
             self.assertEqual(source.stat().st_ino, hardlink.stat().st_ino)
 
+    @unittest.skipIf(os.name == 'nt', 'symlink creation needs a privilege Windows does not grant by default')
     def test_distinct_output_is_private_atomic_replacement(self):
         with tempfile.TemporaryDirectory() as temp:
             directory = Path(temp)
@@ -251,6 +256,7 @@ class MetadataOutputTests(unittest.TestCase):
             self.assertEqual(sorted(p.name for p in directory.iterdir()),
                              ['metadata.json', 'metadata.json.tmp', 'original.html', 'previous.json'])
 
+    @unittest.skipIf(os.name == 'nt', 'symlink creation needs a privilege Windows does not grant by default')
     def test_symlink_to_unrelated_target_is_replaced_without_following_it(self):
         with tempfile.TemporaryDirectory() as temp:
             directory = Path(temp)
