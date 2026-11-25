@@ -27,7 +27,7 @@
 | 項目 | 狀態 |
 |---|---|
 | 正式發布告警 | 11/18 起 #20 每天出現 `PRODUCTION_PUBLICATION FAILURE`（stage `SCHEMA_DRIFT`）。原因：S-001 的台灣轉交每 12 小時擷取一次，但 GitHub 的 schedule 實際晚 6.5～10 小時才開始，用到轉交時已經過了 7～11 小時，超過 4 小時時限而被判 `RELAY_STALE`。時限改為 13 小時（#284）。合併後的發布（run 45636541837）採用了轉交，S-001 為 HTTP 200，#20 收到 `RECOVERY` |
-| schema-drift 整體狀態 | 11/25 的收據是 `DEGRADED`，不是故障：8 個來源都回 HTTP 200，S-007、S-009、S-028、CTX-POP、CTX-165 五個是 `ADDITIVE_COMPATIBLE`，其餘 `NO_DRIFT`。更正：這不是上游新增欄位。契約只列必要欄位，前四個來源既有的其他欄位每次都被算成「額外」，11/12 到 11/26 的 50 筆紀錄裡每次成功觀測都是如此，欄位結構則完全沒變；CTX-165 是上游幾乎每天換一個 resource id（14 天 14 個），每換一次就產生一筆待覆核。所以整體狀態原本不可能是 `HEALTHY`。已改為：契約列出這些既有欄位，只有清單以外的欄位才算新增；CTX-165 換 id 不再要求覆核，仍檢查表頭與欄數（詳見 `issue-38-schema-drift.md`「已知欄位與輪替的 resource id」） |
+| schema-drift 整體狀態 | 11/25 的收據是 `DEGRADED`，不是故障：8 個來源都回 HTTP 200，S-007、S-009、S-028、CTX-POP、CTX-165 五個是 `ADDITIVE_COMPATIBLE`，其餘 `NO_DRIFT`。更正：這不是上游新增欄位。契約只列必要欄位，前四個來源既有的其他欄位每次都被算成「額外」，11/12 到 11/26 的 50 筆紀錄裡每次成功觀測都是如此，欄位結構則完全沒變；CTX-165 是上游幾乎每天換一個 resource id（14 天 14 個），每換一次就產生一筆待覆核。所以整體狀態原本不可能是 `HEALTHY`。已改為：契約列出這些既有欄位，只有清單以外的欄位才算新增；CTX-165 換 id 不再要求覆核，仍檢查表頭與欄數（#290，詳見 `issue-38-schema-drift.md`「已知欄位與輪替的 resource id」）。合併後第一次正式發布（11/26 03:50）的收據是 `HEALTHY`；下一次（04:09）是 `UNKNOWN`，因為 S-031 當時有 2 列案件的派遣分隊是空的（`HTML_LIVE_REQUIRED_VALUE_MISSING`，50 筆紀錄裡出現 14 次，是既有且有測試固定的行為）。這個狀態以前被 `DEGRADED` 蓋住，現在看得到 |
 | 候選來源觀測 | 「Observe candidate public sources」的 S-001 那一格在 GitHub-hosted runner 上從 10 月初起每次都失敗（非台灣位址）。改由 xisx-pc 執行（#285）；分支上實跑四次，後三次成功，上次觀測的快取可存可取 |
 | Windows 上的雜湊綁定 | 來源政策以 `file_sha256` 綁定 `retention-rights-policy.v1.json` 與 `freshness_policy.py`。Windows 把它們取出成 CRLF 時，`collect.py` 會以 `policy/catalog binding mismatch` 結束。`.gitattributes` 已把這兩個檔固定為 LF（#285） |
 | 擱置的草稿 PR | #240、#243、#244、#245、#246、#220 已關閉，分支都保留。#246 的「重新建立基準不算官方修訂」曾單獨拆出（#286），獨立審查指出：主線沒有 #244 的範圍變更機制，單獨套用會把真實的官方修訂靜默吞掉，已撤回。#247 的來源盤點併入主線（本 PR），原分期計畫改指向 `NATIONAL_DATA_LAYER.md` |
@@ -35,7 +35,7 @@
 | 同步失敗的可見性 | 11/23 hosted 同步整天零成功：03:36 UTC 起 6 次同步（hosted 4 次、xisx-pc 2 次）都失敗在額度檢查的 Wrangler 呼叫，記錄裡只有 `Wrangler command failed (exit 1)`，原因已無法查證；看門狗兩次判定 `ALERT`，但執行結果是成功，沒有人被通知。#288：錯誤訊息附上 Wrangler 自己的說明（token 遮蔽），`ALERT` 改為讓看門狗執行失敗。第 1 項「連續 7 天」的驗收因 11/23 中斷，從 11/24 重新起算（11/24、11/25 兩天達成） |
 | 回填 | 高雄：11/24 為 `BUDGET_STOPPED`（寫入 80,358 列），11/25 該次同步為 `OK`（寫入 95,070 列）。基隆這兩天都因當日額度用完而略過（`DAILY_BUDGET`） |
 | 候選觀測七日窗口 | S-001 的第一個有效觀測日是 2026-11-26，最早 2026-12-02 才可能滿 7 天；xisx-pc 整天沒開機的日子會讓窗口中斷（詳見 #22） |
-| Windows 上跑測試 | 完整 Python 測試 1,908 個，在 Windows 取出時有 38 個失敗：10 個是 `tests/fixtures/national/` 被轉成 CRLF（本 PR 固定為 LF），其餘 28 個與換行無關（POSIX 專用 API、符號連結權限、Unix 訊號計時、缺 PDF 解析器），尚未處理。CI（Linux）不受影響 |
+| Windows 上跑測試 | 完整 Python 測試在 Windows 取出時原有 37 個失敗（這裡先前寫 38 與 28，是計數錯誤，實際是 37 與 27）：10 個是 `tests/fixtures/national/` 被轉成 CRLF（#289 固定為 LF）；4 個是量測用的 Python 裝了 pypdf 6.18.0、與 `requirements.txt` 釘的 6.19.0 不符，與 Windows 無關；其餘 23 個用到 Windows 沒有的功能（SIGALRM、`os.fchmod`、`os.O_NONBLOCK`、開啟目錄、檔案權限位元、符號連結權限、Pages 的 shell 步驟），#291 比照既有慣例在 Windows 略過並寫明原因，其中 4 個只略過做不到的那一段。依 `requirements.txt` 安裝的環境（Python 3.12）現在整套通過：1,912 個測試、略過 36 個。CI（Linux）跑的測試不變。略過不代表程式在 Windows 能用：schema-drift 的即時探測與狀態寫入、news-list 檢查點寫入只能在 Linux 執行 |
 
 ## 一、現況（2026-11-20 實測）
 
