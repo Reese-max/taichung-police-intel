@@ -225,6 +225,22 @@ class NationalLoaderTests(unittest.TestCase):
             self.assertIn("CREATE TABLE IF NOT EXISTS", result.stdout)
             self.assertEqual(json.loads(result.stderr)["runs"][0]["changed"], 3)
 
+    def test_failed_wrangler_call_reports_wranglers_own_reason(self):
+        with patch("national.store.shutil.which", return_value="wrangler"):
+            remote = WranglerD1Store(remote=True)
+        stdout = ('{"error": {"text": "A request to the Cloudflare API failed.", '
+                  '"notes": [{"text": "daily limit exceeded [code: 7500] tok-secret"}]}}')
+        with patch("national.store.subprocess.run",
+                   return_value=Mock(returncode=1, stdout="x" * 5000 + stdout, stderr="")), \
+                patch.dict(os.environ, {"CLOUDFLARE_API_TOKEN": "tok-secret"}), \
+                self.assertRaises(RuntimeError) as caught:
+            remote.query("SELECT 1")
+        message = str(caught.exception)
+        self.assertIn("exit 1", message)
+        self.assertIn("daily limit exceeded [code: 7500]", message)
+        self.assertNotIn("tok-secret", message)
+        self.assertLess(len(message), 700)
+
     def test_wrangler_receipts_and_local_size_never_use_remote_info(self):
         with patch("national.store.shutil.which", return_value="wrangler"):
             remote = WranglerD1Store(remote=True)
