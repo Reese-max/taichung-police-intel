@@ -32,6 +32,10 @@
 | Windows 上的雜湊綁定 | 來源政策以 `file_sha256` 綁定 `retention-rights-policy.v1.json` 與 `freshness_policy.py`。Windows 把它們取出成 CRLF 時，`collect.py` 會以 `policy/catalog binding mismatch` 結束。`.gitattributes` 已把這兩個檔固定為 LF（#285） |
 | 擱置的草稿 PR | #240、#243、#244、#245、#246、#220 已關閉，分支都保留。#246 的「重新建立基準不算官方修訂」曾單獨拆出（#286），獨立審查指出：主線沒有 #244 的範圍變更機制，單獨套用會把真實的官方修訂靜默吞掉，已撤回。#247 的來源盤點併入主線（本 PR），原分期計畫改指向 `NATIONAL_DATA_LAYER.md` |
 | 清理 | 已合併且乾淨的 worktree 移除 19 個。還留著的是有未提交內容或未合併 commit 的 7 個，以及 devin、Orca 管理的 8 個 |
+| 同步失敗的可見性 | 11/23 hosted 同步整天零成功：03:36 UTC 起 6 次同步（hosted 4 次、xisx-pc 2 次）都失敗在額度檢查的 Wrangler 呼叫，記錄裡只有 `Wrangler command failed (exit 1)`，原因已無法查證；看門狗兩次判定 `ALERT`，但執行結果是成功，沒有人被通知。#288：錯誤訊息附上 Wrangler 自己的說明（token 遮蔽），`ALERT` 改為讓看門狗執行失敗。第 1 項「連續 7 天」的驗收因 11/23 中斷，從 11/24 重新起算（11/24、11/25 兩天達成） |
+| 回填 | 高雄：11/24 為 `BUDGET_STOPPED`（寫入 80,358 列），11/25 該次同步為 `OK`（寫入 95,070 列）。基隆這兩天都因當日額度用完而略過（`DAILY_BUDGET`） |
+| 候選觀測七日窗口 | S-001 的第一個有效觀測日是 2026-11-26，最早 2026-12-02 才可能滿 7 天；xisx-pc 整天沒開機的日子會讓窗口中斷（詳見 #22） |
+| Windows 上跑測試 | 完整 Python 測試 1,908 個，在 Windows 取出時有 38 個失敗：10 個是 `tests/fixtures/national/` 被轉成 CRLF（本 PR 固定為 LF），其餘 28 個與換行無關（POSIX 專用 API、符號連結權限、Unix 訊號計時、缺 PDF 解析器），尚未處理。CI（Linux）不受影響 |
 
 ## 一、現況（2026-11-20 實測）
 
