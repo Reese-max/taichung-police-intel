@@ -191,6 +191,46 @@ class CandidateObservationWindowTests(unittest.TestCase):
         missing = sorted(set(PROMOTION_IDS) - scheduled)
         self.assertEqual(missing, [], "daily candidate observation misses promotion sources")
 
+    def test_s001_leg_runs_on_the_taiwan_self_hosted_runner(self):
+        # PyYAML is not a project dependency, so parse the fixed-shape blocks
+        # this workflow uses: the `on:` trigger block and the per-source
+        # runner mapping in the observe job's matrix include entries.
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        on_block = re.search(r"^on:\n((?:[ \t]+[^\n]*\n?)*)", workflow, re.M)
+        self.assertIsNotNone(on_block, "candidate observation workflow must declare its triggers")
+        self.assertIsNone(
+            re.search(r"^\s*pull_request\s*:", on_block.group(1), re.M),
+            "candidate observation must never trigger on pull_request",
+        )
+        job = re.search(r"^  observe:\n((?:[ \t]{4,}[^\n]*\n?)*)", workflow, re.M)
+        self.assertIsNotNone(job, "candidate observation workflow must declare jobs.observe")
+        self.assertIn("runs-on: ${{ matrix.runner }}", job.group(1))
+        runners = dict(re.findall(
+            r"-\s*source:\s*(S-\d+)\s*\r?\n\s*runner:\s*([^\r\n]+)",
+            job.group(1),
+        ))
+        self.assertEqual(
+            runners.get("S-001"),
+            "[self-hosted, Windows, xisx-pc]",
+            "S-001 must run on the self-hosted Taiwan runner",
+        )
+        for source_id in ("S-032", "S-031"):
+            self.assertEqual(
+                runners.get(source_id),
+                "ubuntu-latest",
+                f"{source_id} must stay on GitHub-hosted runners",
+            )
+        # Job-level, so GitHub decides before any runner (hosted or self-hosted) is assigned.
+        self.assertIn(
+            "    if: github.repository == 'Reese-max/taichung-police-intel' && github.event_name != 'pull_request'\n",
+            job.group(1),
+        )
+        # xisx-pc resolves `bash` to WSL; the Taiwan leg must stay on cmd.
+        taiwan = re.search(r"- name: Observe \$\{\{ matrix\.source \}\} from Taiwan\n((?:[ \t]{8,}[^\n]*\n?)*)", job.group(1))
+        self.assertIsNotNone(taiwan, "the S-001 leg needs its own observe step")
+        self.assertIn("if: matrix.source == 'S-001'", taiwan.group(1))
+        self.assertIn("shell: cmd", taiwan.group(1))
+
 
 if __name__ == "__main__":
     unittest.main()
