@@ -238,7 +238,9 @@ class CandidateObservationWindowTests(unittest.TestCase):
         for path in bound:
             self.assertIn(f"{path} text eol=lf", attributes)
         # xisx-pc keeps its workspace, so the S-001 leg rewrites copies checked out before the pin.
-        self.assertIn(f"set BOUND={' '.join(bound)}\n", WORKFLOW.read_text(encoding="utf-8"))
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        self.assertIn(f"set BOUND={' '.join(bound)}\n", workflow)
+        self.assertIn("git rm -q --cached -- %BOUND% && git checkout HEAD -- %BOUND%\n", workflow)
 
 
 if __name__ == "__main__":
