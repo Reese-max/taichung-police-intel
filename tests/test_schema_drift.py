@@ -1283,7 +1283,7 @@ class SourceRelayTests(unittest.TestCase):
             (_relay_payload(http_status=True), "RELAY_HTTP_STATUS_NOT_200"),
             (_relay_payload(requested_url="https://evil.test/list"), "RELAY_URL_NOT_IN_CATALOG"),
             (_relay_payload(final_url="https://www.police.taichung.gov.tw/other"), "RELAY_URL_NOT_IN_CATALOG"),
-            (_relay_payload(observed_at=(now - timedelta(hours=5)).isoformat()), "RELAY_STALE"),
+            (_relay_payload(observed_at=(now - timedelta(seconds=drift.RELAY_MAX_AGE_SECONDS + 60)).isoformat()), "RELAY_STALE"),
             (_relay_payload(observed_at=(now + timedelta(hours=1)).isoformat()), "RELAY_FROM_FUTURE"),
             (_relay_payload(observed_at="2026-10-28T06:00:00"), "RELAY_OBSERVED_AT_NAIVE"),
             (_relay_payload(observed_at="yesterday"), "RELAY_OBSERVED_AT_INVALID"),
@@ -1381,6 +1381,28 @@ class SourceRelayTests(unittest.TestCase):
         self.assertNotIn("observation_origin", kept)
         used = drift._with_relay(failed, relay, responded=False, now=loaded_at)
         self.assertEqual(used["observation_origin"], "TAIWAN_RELAY")
+
+    def test_the_relay_window_accepts_just_inside_and_refuses_just_past(self):
+        from datetime import datetime, timedelta, timezone
+
+        now = datetime.now(timezone.utc)
+        inside = self._relay(
+            _relay_payload(observed_at=(now - timedelta(seconds=drift.RELAY_MAX_AGE_SECONDS - 60)).isoformat()),
+            now=now,
+        )
+        self.assertIsInstance(inside["S-001"], dict)
+        past = self._relay(
+            _relay_payload(observed_at=(now - timedelta(seconds=drift.RELAY_MAX_AGE_SECONDS + 60)).isoformat()),
+            now=now,
+        )
+        self.assertEqual(past, {"S-001": "RELAY_STALE"})
+
+    def test_the_relay_window_covers_one_capture_interval_but_not_two(self):
+        # Captures land 12 hours apart; GitHub's schedule delay needs more than
+        # one interval, while two intervals means a capture was missed entirely.
+        interval = 12 * 3600
+        self.assertGreater(drift.RELAY_MAX_AGE_SECONDS, interval)
+        self.assertLess(drift.RELAY_MAX_AGE_SECONDS, 2 * interval)
 
     def test_a_malformed_relay_is_refused_and_the_live_probe_still_runs(self):
         for payload in ({"source_id": []}, {"source_id": {"S-001": 1}}, ["S-001"], "S-001", 7, None):
