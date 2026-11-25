@@ -27,7 +27,7 @@
 | 項目 | 狀態 |
 |---|---|
 | 正式發布告警 | 11/18 起 #20 每天出現 `PRODUCTION_PUBLICATION FAILURE`（stage `SCHEMA_DRIFT`）。原因：S-001 的台灣轉交每 12 小時擷取一次，但 GitHub 的 schedule 實際晚 6.5～10 小時才開始，用到轉交時已經過了 7～11 小時，超過 4 小時時限而被判 `RELAY_STALE`。時限改為 13 小時（#284）。合併後的發布（run 45636541837）採用了轉交，S-001 為 HTTP 200，#20 收到 `RECOVERY` |
-| schema-drift 整體狀態 | 11/25 的收據是 `DEGRADED`，不是故障：8 個來源都回 HTTP 200，S-007、S-009、S-028、CTX-POP、CTX-165 五個是 `ADDITIVE_COMPATIBLE`（上游新增欄位；CTX-165 是 `RESOURCE_ID_CHANGED`，列在收據的 `review_inbox`），其餘 `NO_DRIFT` |
+| schema-drift 整體狀態 | 11/25 的收據是 `DEGRADED`，不是故障：8 個來源都回 HTTP 200，S-007、S-009、S-028、CTX-POP、CTX-165 五個是 `ADDITIVE_COMPATIBLE`，其餘 `NO_DRIFT`。更正：這不是上游新增欄位。契約只列必要欄位，前四個來源既有的其他欄位每次都被算成「額外」，11/12 到 11/26 的 50 筆紀錄裡每次成功觀測都是如此，欄位結構則完全沒變；CTX-165 是上游幾乎每天換一個 resource id（14 天 14 個），每換一次就產生一筆待覆核。所以整體狀態原本不可能是 `HEALTHY`。已改為：契約列出這些既有欄位，只有清單以外的欄位才算新增；CTX-165 換 id 不再要求覆核，仍檢查表頭與欄數（詳見 `issue-38-schema-drift.md`「已知欄位與輪替的 resource id」） |
 | 候選來源觀測 | 「Observe candidate public sources」的 S-001 那一格在 GitHub-hosted runner 上從 10 月初起每次都失敗（非台灣位址）。改由 xisx-pc 執行（#285）；分支上實跑四次，後三次成功，上次觀測的快取可存可取 |
 | Windows 上的雜湊綁定 | 來源政策以 `file_sha256` 綁定 `retention-rights-policy.v1.json` 與 `freshness_policy.py`。Windows 把它們取出成 CRLF 時，`collect.py` 會以 `policy/catalog binding mismatch` 結束。`.gitattributes` 已把這兩個檔固定為 LF（#285） |
 | 擱置的草稿 PR | #240、#243、#244、#245、#246、#220 已關閉，分支都保留。#246 的「重新建立基準不算官方修訂」曾單獨拆出（#286），獨立審查指出：主線沒有 #244 的範圍變更機制，單獨套用會把真實的官方修訂靜默吞掉，已撤回。#247 的來源盤點併入主線（本 PR），原分期計畫改指向 `NATIONAL_DATA_LAYER.md` |

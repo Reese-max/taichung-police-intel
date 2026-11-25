@@ -236,6 +236,48 @@ class SchemaDriftTests(unittest.TestCase):
         result = drift.observe(drift.CONTRACTS["CTX-165"], missing, content_type="text/csv", resource_id="r1")
         self.assertEqual(result["status"], "BREAKING_DRIFT")
 
+    def test_fields_a_source_already_publishes_are_not_additive_but_a_new_one_is(self):
+        # The field sets production observed on every run from 2026-11-12 to 2026-11-26.
+        published = {
+            "S-007": "content date meetingTypeName name proceedingsId sessionDisplay sessionType sessionTypeSort speaker subTerm term",
+            "S-009": "billAttribute billAttributeSort billId billNumber billType billTypeSort closureType closureTypeSort committee"
+                     " execution executionSort jointSignatory proposalRationale proposalRationaleSort resolution resolutionSort seq session sponsor",
+            "S-028": "地區 市話 數值 機關代碼 欄位名稱 縣市別代碼 行動電話 行政區域代碼 資料時間日期 資料週期 郵遞區號 電子郵件 項目",
+            "CTX-POP": "地區 市話 數值 機關代碼 欄位名稱 縣市別代碼 行動電話 行政區域代碼 資料時間日期 資料週期 郵遞區號 電子郵件 項目",
+        }
+        observations = []
+        for source_id, names in published.items():
+            contract = drift.CONTRACTS[source_id]
+            record = {name: "x" for name in names.split()}
+            api = contract["transport"] == "JSON_API"
+
+            def body(row, api=api):
+                return json.dumps({"success": True, "data": {"data": [row], "totalPages": 1, "totalCount": 1}} if api else [row])
+
+            meta = {"content_type": "application/json", "resource_id": None if api else "r1"}
+            with self.subTest(source=source_id):
+                known = drift.observe(contract, body(record), **meta)
+                self.assertEqual((known["status"], known["reasons"]), ("NO_DRIFT", []))
+                new = drift.observe(contract, body({**record, "newField": "x"}), **meta)
+                self.assertEqual((new["status"], new["reasons"]), ("ADDITIVE_COMPATIBLE", ["ADDITIVE_FIELDS"]))
+            observations.append({"source_id": source_id, "body": body(record), **meta})
+        receipt, _ = drift.build_receipt(observations, contracts={name: drift.CONTRACTS[name] for name in published})
+        self.assertEqual(receipt["overall"], "HEALTHY")
+
+    def test_a_republished_resource_id_is_not_escalated_for_a_source_that_rotates_it(self):
+        # CTX-165 came back under 14 resource ids in 14 days; its header is what the contract checks.
+        contracts = {"CTX-165": drift.CONTRACTS["CTX-165"]}
+        row = {"source_id": "CTX-165", "content_type": "text/csv",
+               "body": "民國年月,網域,網站性質,法律依據,聲請單位\n11509,a.test,其他,法規,機關\n"}
+        _, state = drift.build_receipt([{**row, "resource_id": "resource-A"}], contracts=contracts)
+        receipt, state = drift.build_receipt([{**row, "resource_id": "resource-B"}], state=state, contracts=contracts)
+        source = receipt["sources"][0]
+        self.assertEqual((source["status"], source["reasons"], source["review_required"]), ("NO_DRIFT", [], False))
+        self.assertEqual(source["resource_id"], "resource-B")
+        self.assertEqual(receipt["review_inbox"], [])
+        self.assertEqual(receipt["overall"], "HEALTHY")
+        self.assertEqual(state["sources"]["CTX-165"]["last_known_good"]["resource_id"], "resource-B")
+
     def test_required_record_field_missing_from_only_some_rows_fails_closed(self):
         partial = copy.deepcopy(API)
         partial["data"]["data"].append({"proceedingsId": "p2", "date": "2026-09-11", "content": "無講者"})
