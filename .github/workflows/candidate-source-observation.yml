@@ -62,6 +62,11 @@ jobs:
         if: matrix.source == 'S-001'
         shell: cmd
         run: uv pip install --python .venv -r requirements.txt
+      # actions/cache runs Git's tar on xisx-pc, and that tar needs the gzip next to it.
+      - name: Put Git's gzip on PATH for the observation cache
+        if: matrix.source == 'S-001'
+        shell: cmd
+        run: echo C:\Program Files\Git\usr\bin>>"%GITHUB_PATH%"
       - name: Restore previous observation for incremental diff
         uses: actions/cache@v4
         with:
