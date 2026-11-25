@@ -22,6 +22,18 @@
 | 逐站 vs `/national` 計時 | **已完成（改用 AI 量測加 KLM 推估，擁有者 11/23 決定不做人工碼表）**。Playwright 量出機器時間（關鍵字「警察」，每站 3 次取中位數）：`/national` 1.6 秒、3 個動作；可量的 5 站合計 35.6 秒、21 個動作（臺中 4.3、臺南 15.6、高雄 7.0、基隆 6.1、立法院 2.7 秒）。再用 KLM 鍵擊層級模型（Card, Moran & Newell 1980；思考 1.35 秒、指向 1.1 秒、按鍵 0.28 秒，注音輸入「警察」約 10 鍵）加上人操作的時間，推估熟練使用者的時間：`/national` 13.1 秒；5 站合計 109.3 秒，分別是臺中 18.5、臺南 29.8、高雄 23.8、基隆 20.3、立法院 16.9 秒。**約省 88%**。這是下限，不含閱讀結果和熟悉各站介面的時間；臺北市議會和政府電子採購網擋下自動化瀏覽器，沒有算進去，實際省下的應該更多。另外發現：高雄的簡易查詢預設只查本會期；`/national` 不顯示命中總數 |
 | 網站 | 手機版導覽列改成可橫向滑動的單行，不再每個項目擠成兩行；目前所在頁面會自動捲到看得見的位置（本 PR） |
 
+## 進度更新（2026-11-26）
+
+| 項目 | 狀態 |
+|---|---|
+| 正式發布告警 | 11/18 起 #20 每天出現 `PRODUCTION_PUBLICATION FAILURE`（stage `SCHEMA_DRIFT`）。原因：S-001 的台灣轉交每 12 小時擷取一次，但 GitHub 的 schedule 實際晚 6.5～10 小時才開始，用到轉交時已經過了 7～11 小時，超過 4 小時時限而被判 `RELAY_STALE`。時限改為 13 小時（#284）。合併後的發布（run 45636541837）採用了轉交，S-001 為 HTTP 200，#20 收到 `RECOVERY` |
+| schema-drift 整體狀態 | 11/25 的收據是 `DEGRADED`，不是故障：8 個來源都回 HTTP 200，S-007、S-009、S-028、CTX-POP、CTX-165 五個是 `ADDITIVE_COMPATIBLE`（上游新增欄位；CTX-165 是 `RESOURCE_ID_CHANGED`，列在收據的 `review_inbox`），其餘 `NO_DRIFT` |
+| 候選來源觀測 | 「Observe candidate public sources」的 S-001 那一格在 GitHub-hosted runner 上從 10 月初起每次都失敗（非台灣位址）。改由 xisx-pc 執行（#285）；分支上實跑四次，後三次成功，上次觀測的快取可存可取 |
+| Windows 上的雜湊綁定 | 來源政策以 `file_sha256` 綁定 `retention-rights-policy.v1.json` 與 `freshness_policy.py`。Windows 把它們取出成 CRLF 時，`collect.py` 會以 `policy/catalog binding mismatch` 結束。`.gitattributes` 已把這兩個檔固定為 LF（#285） |
+| 每日簡報 | 收集器重新建立基準時，已在簡報狀態裡的既有項目不再被當成官方修訂發布（#286，自 #246 拆出） |
+| 擱置的草稿 PR | #240、#243、#244、#245、#220 已關閉，分支都保留。#246 只保留上面那項修正；#247 的來源盤點併入主線（本 PR），原分期計畫改指向 `NATIONAL_DATA_LAYER.md` |
+| 清理 | 已合併且乾淨的 worktree 移除 19 個。還留著的是有未提交內容或未合併 commit 的 7 個，以及 devin、Orca 管理的 8 個 |
+
 ## 一、現況（2026-11-20 實測）
 
 ### 資料庫（D1 `govintel-national`）
@@ -99,7 +111,7 @@
 
 ### 6. 清理
 
-- 已合併分支的 worktree：`wt-sync-fix`、`wt-nat-ui`、`govintel-worktrees/mcp-notify`、`govintel-chat-shadow`，等擁有者確認後再刪。
+- 已合併且乾淨的 worktree 都已清除（原列的四個已不在，11/25 另移除 19 個，見進度更新）；有未提交內容或未合併 commit 的仍保留，等擁有者決定。
 - 本機的競賽評估素材（提案草稿、輔助資料 PDF、Demo 影片）不入版控；需要時重新產生。
 
 ## 三、不做的事

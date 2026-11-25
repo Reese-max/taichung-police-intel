@@ -24,7 +24,7 @@
 
 ## 官方來源
 
-議會的官方／議事系統網址、資料種類、取得方式與網站條款照錄 #247 分支 `origin/docs/national-council-plan-20261115` 的 `docs/govintel/NATIONAL_COUNCIL_EXPANSION.md` 第二節（2026-11-15 盤點）；robots 狀態依 2026-11-17／18 的 CI 與使用者提供之台灣網路實測更新。本輪未重新連網查證。`rights_note` 保留該表網站文字；原表沒有提供宣告頁精確網址者，`license_source_url` 留 null，不把入口頁冒充授權證據。
+議會的官方／議事系統網址、資料種類、取得方式與網站條款照錄 `docs/govintel/NATIONAL_COUNCIL_EXPANSION.md` 第二節（2026-11-15 盤點，原 #247）；robots 狀態依 2026-11-17／18 的 CI 與使用者提供之台灣網路實測更新。本輪未重新連網查證。`rights_note` 保留該表網站文字；原表沒有提供宣告頁精確網址者，`license_source_url` 留 null，不把入口頁冒充授權證據。
 
 - 22 個地方議會各一筆 `N-COUNCIL-{ISO 縣市縮寫}`。有 API 的臺中、基隆與嘉義縣 API 使用 `OFFICIAL_JSON_API`；新北使用 `HTML_HEADLESS`；其餘使用 `HTML` 或 `HTML_FILES`。完整狀態、資料種類與來源網址以登記檔為準。
 - 嘉義縣保留單一 `N-COUNCIL-CYQ`：主來源是 `PLANNED_API`，`www_access` 另外標成 `BLOCKED_BY_ROBOTS_NEEDS_CONSENT` 且 endpoints 為空。API 根網址只標示官方 origin；CI 的 API robots 回 500，沒有 documented open API 旗標，維持禁止內容請求。W2a 不實作，待書面同意或確認公開文件化 API 並重新審核登記。preflight 仍只探測其 robots。
