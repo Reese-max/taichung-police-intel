@@ -33,27 +33,29 @@
   "candidate_sources": [
     {
       "catalog_status": "AUDITED_EXISTING",
-      "current_source_run_id": "SR-CAND-20261126-001",
+      "current_source_run_id": "SR-CAND-20261127-001",
       "data_as_of": "2026-11-23T00:00:00+08:00",
+      "error_code": "CONNECTIONERROR",
       "freshness_status": "VERY_STALE",
       "integration_status": "CANDIDATE",
       "intelligence_gaps": [
+        "SOURCE_FAILED",
         "WINDOW_PARTIAL",
         "NO_LAST_KNOWN_GOOD",
         "VERY_STALE_DATA"
       ],
-      "last_checked_at": "2026-11-26T12:18:15+08:00",
+      "last_checked_at": "2026-11-27T03:44:02+08:00",
       "last_known_good": null,
       "last_known_good_age": {
         "age_hours": null,
         "completed_at": null,
-        "observed_at": "2026-11-26T04:18:15.522742+00:00",
+        "observed_at": "2026-11-26T19:44:02.666925+00:00",
         "reason": "NO_LAST_KNOWN_GOOD",
         "status": "UNKNOWN"
       },
       "last_success_at": null,
-      "manifest_sha256": "b2120df83becf9747a1345aba092476fff3e8e09ba27174416af129d41c8b76e",
-      "next_update_at": "2026-11-26T18:30:00+08:00",
+      "manifest_sha256": null,
+      "next_update_at": "2026-11-27T06:30:00+08:00",
       "pagination": {
         "complete": false,
         "page_limit": 4,
@@ -61,39 +63,40 @@
         "strategy": "next-link"
       },
       "promotion_eligible": false,
-      "result": "PARTIAL",
-      "snapshot_count": 5,
+      "result": "FAILED",
+      "snapshot_count": null,
       "snapshot_item_count": 60,
-      "source_health": "PASS",
+      "source_health": "FAILED",
       "source_id": "S-001",
       "source_name": "臺中市政府警察局警政新聞",
       "source_role": "PRIMARY_EVENT",
       "source_url": "https://www.police.taichung.gov.tw/ch/home.jsp?id=1&parentpath=0&mcustomize=news_list.jsp",
       "window_completeness": "PARTIAL",
-      "window_item_count": 3
+      "window_item_count": null
     },
     {
       "catalog_status": "VERIFIED_CANDIDATE",
-      "current_source_run_id": "SR-CAND-20261126-032",
+      "current_source_run_id": "SR-CAND-20261127-032",
       "data_as_of": "2026-11-26T00:00:00+08:00",
-      "freshness_status": "FRESH",
+      "freshness_status": "VERY_STALE",
       "integration_status": "CANDIDATE",
       "intelligence_gaps": [
         "WINDOW_PARTIAL",
-        "NO_LAST_KNOWN_GOOD"
+        "NO_LAST_KNOWN_GOOD",
+        "VERY_STALE_DATA"
       ],
-      "last_checked_at": "2026-11-26T12:18:20+08:00",
+      "last_checked_at": "2026-11-27T03:44:06+08:00",
       "last_known_good": null,
       "last_known_good_age": {
         "age_hours": null,
         "completed_at": null,
-        "observed_at": "2026-11-26T04:18:20.046998+00:00",
+        "observed_at": "2026-11-26T19:44:06.639174+00:00",
         "reason": "NO_LAST_KNOWN_GOOD",
         "status": "UNKNOWN"
       },
       "last_success_at": null,
       "manifest_sha256": "b00aa37dd00a1a7da60630ad147f82efadb05efb20dc42a6d7dc4302f155011c",
-      "next_update_at": "2026-11-26T18:30:00+08:00",
+      "next_update_at": "2026-11-27T06:30:00+08:00",
       "pagination": {
         "complete": false,
         "page_limit": 4,
@@ -113,12 +116,12 @@
       "window_item_count": 6
     }
   ],
-  "generated_at": "2026-11-26T12:18:20+08:00",
+  "generated_at": "2026-11-27T03:44:06+08:00",
   "latest_collection_run": {
-    "collection_run_id": "CR-DEMO-20261126-MORNING-SCHEDULE",
-    "finished_at": "2026-11-26T12:18:20+08:00",
-    "scheduled_for": "2026-11-26T06:30:00+08:00",
-    "slot": "MORNING",
+    "collection_run_id": "CR-DEMO-20261126-EVENING-SCHEDULE",
+    "finished_at": "2026-11-27T03:44:06+08:00",
+    "scheduled_for": "2026-11-26T18:30:00+08:00",
+    "slot": "EVENING",
     "slot_date": "2026-11-26",
     "source_policy": {
       "active_source_ids": [
@@ -133,12 +136,12 @@
       "policy_version": 3,
       "retention_policy_hash": "18809f223924adaa70b3015768717f0c36a76ab7e26bb660f2fa9c0479529727"
     },
-    "started_at": "2026-11-26T12:17:41+08:00",
+    "started_at": "2026-11-27T03:43:19+08:00",
     "status": "PARTIAL",
     "trigger": "SCHEDULE"
   },
   "mode": "COMPETITION_DEMO",
-  "next_update_at": "2026-11-26T18:30:00+08:00",
+  "next_update_at": "2026-11-27T06:30:00+08:00",
   "schema_version": 1,
   "source_policy": {
     "active_source_ids": [
@@ -155,31 +158,31 @@
   },
   "sources": [
     {
-      "current_source_run_id": "SR-DEMO-20261126-MORNING-004",
+      "current_source_run_id": "SR-DEMO-20261126-EVENING-004",
       "data_as_of": "2026-10-02T00:00:00+08:00",
       "freshness_status": "STALE",
       "integration_status": "PRODUCTION_ACTIVE",
       "intelligence_gaps": [
         "STALE_DATA"
       ],
-      "last_checked_at": "2026-11-26T12:17:47+08:00",
+      "last_checked_at": "2026-11-27T03:43:27+08:00",
       "last_known_good": {
-        "completed_at": "2026-11-26T12:17:47+08:00",
+        "completed_at": "2026-11-27T03:43:27+08:00",
         "manifest_sha256": "60376b77531ff0aa07e77a424d676b750e151cd6d239de090a92b60ad9466ac2",
         "snapshot_count": 3,
         "snapshot_item_count": 1,
-        "source_run_id": "SR-DEMO-20261126-MORNING-004"
+        "source_run_id": "SR-DEMO-20261126-EVENING-004"
       },
       "last_known_good_age": {
-        "age_hours": 0.00018963083333333334,
-        "completed_at": "2026-11-26T12:17:47+08:00",
-        "observed_at": "2026-11-26T04:17:47.682671+00:00",
+        "age_hours": 7.820833333333334e-05,
+        "completed_at": "2026-11-27T03:43:27+08:00",
+        "observed_at": "2026-11-26T19:43:27.281550+00:00",
         "reason": null,
         "status": "KNOWN"
       },
-      "last_success_at": "2026-11-26T12:17:47+08:00",
+      "last_success_at": "2026-11-27T03:43:27+08:00",
       "manifest_sha256": "60376b77531ff0aa07e77a424d676b750e151cd6d239de090a92b60ad9466ac2",
-      "next_update_at": "2026-11-26T18:30:00+08:00",
+      "next_update_at": "2026-11-27T06:30:00+08:00",
       "result": "NO_NEW_ITEM",
       "snapshot_count": 3,
       "snapshot_item_count": 1,
@@ -192,42 +195,41 @@
       "window_item_count": 0
     },
     {
-      "current_source_run_id": "SR-DEMO-20261126-MORNING-006",
-      "data_as_of": "2026-09-01T00:00:00+08:00",
+      "current_source_run_id": "SR-DEMO-20261126-EVENING-006",
+      "data_as_of": "2026-09-15T00:00:00+08:00",
       "data_as_of_basis": "OFFICIAL_DOCUMENT_REVISION_DATE",
       "data_as_of_evidence": {
-        "content_sha256": "f21ecb06c6fe0153fbaad287d7192e85445b58f5a24e7ec343df1432a6b32cdf",
+        "content_sha256": "e1cf0e51eed6cad5fd6ade83dc63cdeef83ca91d4809d1e4de4801e3f000a5be",
         "date_basis": "OFFICIAL_DOCUMENT_REVISION_DATE",
-        "document_revision_at": "2026-09-01T00:00:00+08:00",
-        "official_url": "https://www.tccc.gov.tw/pic/DocCouncil/17882754682859(2).pdf",
+        "document_revision_at": "2026-09-15T00:00:00+08:00",
+        "official_url": "https://www.tccc.gov.tw/pic/DocCouncil/17894846552853(2).pdf",
         "page_number": 1
       },
       "data_as_of_scope": "LATEST_EVIDENCED_DOCUMENT_VERSION",
       "freshness_status": "VERY_STALE",
       "integration_status": "PRODUCTION_ACTIVE",
       "intelligence_gaps": [
-        "WINDOW_PARTIAL",
         "VERY_STALE_DATA"
       ],
-      "last_checked_at": "2026-11-26T12:17:56+08:00",
+      "last_checked_at": "2026-11-27T03:43:36+08:00",
       "last_known_good": {
-        "completed_at": "2026-11-26T12:17:56+08:00",
+        "completed_at": "2026-11-27T03:43:36+08:00",
         "manifest_sha256": "6f6c76f0be306ca3ad99448bc8d73bed704c04a1a67fa8346f52e7769fc7c997",
         "snapshot_count": 15,
         "snapshot_item_count": 7,
-        "source_run_id": "SR-DEMO-20261126-MORNING-006"
+        "source_run_id": "SR-DEMO-20261126-EVENING-006"
       },
       "last_known_good_age": {
-        "age_hours": 3.228361111111111e-05,
-        "completed_at": "2026-11-26T12:17:56+08:00",
-        "observed_at": "2026-11-26T04:17:56.116221+00:00",
+        "age_hours": 0.00013134722222222223,
+        "completed_at": "2026-11-27T03:43:36+08:00",
+        "observed_at": "2026-11-26T19:43:36.472850+00:00",
         "reason": null,
         "status": "KNOWN"
       },
-      "last_success_at": "2026-11-26T12:17:56+08:00",
+      "last_success_at": "2026-11-27T03:43:36+08:00",
       "manifest_sha256": "6f6c76f0be306ca3ad99448bc8d73bed704c04a1a67fa8346f52e7769fc7c997",
-      "next_update_at": "2026-11-26T18:30:00+08:00",
-      "result": "PARTIAL",
+      "next_update_at": "2026-11-27T06:30:00+08:00",
+      "result": "NO_NEW_ITEM",
       "snapshot_count": 15,
       "snapshot_item_count": 7,
       "source_health": "PASS",
@@ -235,35 +237,35 @@
       "source_name": "臺中市議會質詢順序表",
       "source_role": "PRIMARY_EVENT",
       "source_url": "https://www.tccc.gov.tw/wb_download13.asp?uno=&cno=50",
-      "window_completeness": "PARTIAL",
+      "window_completeness": "COMPLETE_ZERO",
       "window_item_count": 0
     },
     {
-      "current_source_run_id": "SR-DEMO-20261126-MORNING-007",
+      "current_source_run_id": "SR-DEMO-20261126-EVENING-007",
       "data_as_of": "2026-09-03T08:36:00+08:00",
       "data_as_of_basis": "OFFICIAL_API_RECORD_DATE",
       "data_as_of_scope": "OBSERVED_API_PAGE",
       "freshness_status": "FRESH",
       "integration_status": "PRODUCTION_ACTIVE",
       "intelligence_gaps": [],
-      "last_checked_at": "2026-11-26T12:18:06+08:00",
+      "last_checked_at": "2026-11-27T03:43:50+08:00",
       "last_known_good": {
-        "completed_at": "2026-11-26T12:18:06+08:00",
+        "completed_at": "2026-11-27T03:43:50+08:00",
         "manifest_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
         "snapshot_count": 2,
         "snapshot_item_count": 0,
-        "source_run_id": "SR-DEMO-20261126-MORNING-007"
+        "source_run_id": "SR-DEMO-20261126-EVENING-007"
       },
       "last_known_good_age": {
-        "age_hours": 0.00025932055555555556,
-        "completed_at": "2026-11-26T12:18:06+08:00",
-        "observed_at": "2026-11-26T04:18:06.933554+00:00",
+        "age_hours": 1.2750833333333333e-05,
+        "completed_at": "2026-11-27T03:43:50+08:00",
+        "observed_at": "2026-11-26T19:43:50.045903+00:00",
         "reason": null,
         "status": "KNOWN"
       },
-      "last_success_at": "2026-11-26T12:18:06+08:00",
+      "last_success_at": "2026-11-27T03:43:50+08:00",
       "manifest_sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
-      "next_update_at": "2026-11-26T18:30:00+08:00",
+      "next_update_at": "2026-11-27T06:30:00+08:00",
       "result": "NO_NEW_ITEM",
       "snapshot_count": 2,
       "snapshot_item_count": 0,
@@ -276,7 +278,7 @@
       "window_item_count": 0
     },
     {
-      "current_source_run_id": "SR-DEMO-20261126-MORNING-009",
+      "current_source_run_id": "SR-DEMO-20261126-EVENING-009",
       "data_as_of": null,
       "freshness_status": "NO_DATA",
       "integration_status": "PRODUCTION_ACTIVE",
@@ -284,24 +286,24 @@
         "WINDOW_PARTIAL",
         "NO_DATA_AS_OF"
       ],
-      "last_checked_at": "2026-11-26T12:18:07+08:00",
+      "last_checked_at": "2026-11-27T03:43:51+08:00",
       "last_known_good": {
-        "completed_at": "2026-11-26T12:18:07+08:00",
+        "completed_at": "2026-11-27T03:43:51+08:00",
         "manifest_sha256": "d74de2631cff63316fb4ba717e1c63de412bb6d3ae2fdf32c3bba68fc4957490",
         "snapshot_count": 1,
         "snapshot_item_count": 108,
-        "source_run_id": "SR-DEMO-20261126-MORNING-009"
+        "source_run_id": "SR-DEMO-20261126-EVENING-009"
       },
       "last_known_good_age": {
-        "age_hours": 0.0002557019444444444,
-        "completed_at": "2026-11-26T12:18:07+08:00",
-        "observed_at": "2026-11-26T04:18:07.920527+00:00",
+        "age_hours": 7.013888888888889e-06,
+        "completed_at": "2026-11-27T03:43:51+08:00",
+        "observed_at": "2026-11-26T19:43:51.025250+00:00",
         "reason": null,
         "status": "KNOWN"
       },
-      "last_success_at": "2026-11-26T12:18:07+08:00",
+      "last_success_at": "2026-11-27T03:43:51+08:00",
       "manifest_sha256": "d74de2631cff63316fb4ba717e1c63de412bb6d3ae2fdf32c3bba68fc4957490",
-      "next_update_at": "2026-11-26T18:30:00+08:00",
+      "next_update_at": "2026-11-27T06:30:00+08:00",
       "result": "PARTIAL",
       "snapshot_count": 1,
       "snapshot_item_count": 108,
