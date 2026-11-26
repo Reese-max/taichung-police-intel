@@ -94,6 +94,43 @@ class OfficialSourceDateTests(unittest.TestCase):
             self.assertIsNone(oc.attachment_revision_evidence(b"%PDF-1.7" + b"x" * (8 * 1024 * 1024), PDF_URL))
             reader.assert_not_called()
 
+    def extract_revision(self, text):
+        page = mock.Mock()
+        page.extract_text.return_value = text
+        with mock.patch.object(oc, "PdfReader", return_value=SimpleNamespace(is_encrypted=False, pages=[page])):
+            return oc.attachment_revision_evidence(b"%PDF-1.7", PDF_URL)
+
+    def test_revision_label_tolerates_parenthesis_and_compact_roc_date(self):
+        cases = [
+            ("115.8.25(第9次修正)", "2026-08-25T00:00:00+08:00"),
+            ("（財政經濟委員會） 115.8.17(第11次修正)", "2026-08-17T00:00:00+08:00"),
+            ("（民政委員會） 115.8.11 (第 9次修正)", "2026-08-11T00:00:00+08:00"),
+            ("1150915第8次修正。(李文傑、張廖乃綸等議員互調)", "2026-09-15T00:00:00+08:00"),
+            ("1150915 第8次修正", "2026-09-15T00:00:00+08:00"),
+            ("1150915(第8次修正)", "2026-09-15T00:00:00+08:00"),
+            ("115.08.20第10次修正", "2026-08-20T00:00:00+08:00"),
+            ("115.9.1第15次修正", "2026-09-01T00:00:00+08:00"),
+            ("115.08.27 第13次修正", "2026-08-27T00:00:00+08:00"),
+        ]
+        for text, expected in cases:
+            with self.subTest(text=text):
+                self.assertEqual(self.extract_revision(text)["document_revision_at"], expected)
+
+    def test_unlabelled_or_impossible_compact_dates_stay_undated(self):
+        for text in (
+            "1150915",
+            "041150915第8次修正",
+            "1151345第8次修正",
+            "電話 1150915 更新",
+            "更新 1150915",
+            "1150915 修正",
+            "修正日期：1150915",
+            "(115.8.25)",
+            "115.8.25\n(第9次修正)",
+        ):
+            with self.subTest(text=text):
+                self.assertIsNone(self.extract_revision(text))
+
     def test_explicit_offset_is_converted_without_changing_the_instant(self):
         self.assertEqual(oc.official_record_timestamp("2026-05-26T17:12:00Z"), "2026-05-27T01:12:00+08:00")
         self.assertEqual(oc.official_record_timestamp("2026-05-27T01:12:00+08:00"), "2026-05-27T01:12:00+08:00")

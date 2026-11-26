@@ -199,6 +199,19 @@ def official_record_timestamp(value: str) -> str:
     return timestamp(parsed.astimezone(TZ))
 
 
+def _compact_roc_date(value: str) -> date | None:
+    """Parse a separator-free seven-digit ROC date (YYYMMDD)."""
+    if not re.fullmatch(r"\d{7}", value):
+        return None
+    year, month, day = int(value[:3]), int(value[3:5]), int(value[5:])
+    if not 1 <= year <= 289:
+        return None
+    try:
+        return date(year + 1911, month, day)
+    except ValueError:
+        return None
+
+
 def attachment_revision_evidence(body: bytes, url: str) -> dict | None:
     """Read an explicitly labelled revision date from an already fetched PDF.
 
@@ -219,15 +232,22 @@ def attachment_revision_evidence(body: bytes, url: str) -> dict | None:
         return None
     # Match a date with its explicit revision label on the same line. In
     # particular, dates in the question-order grid cannot establish this date.
-    date_pattern = r"(?<!\d)(?:\d{4}|\d{2,3})[^\S\n]*[-/.年][^\S\n]*\d{1,2}[^\S\n]*[-/.月][^\S\n]*\d{1,2}[^\S\n]*日?(?!\d)"
+    date_pattern = (
+        r"(?<!\d)(?:\d{4}|\d{2,3})[^\S\n]*[-/.年][^\S\n]*\d{1,2}[^\S\n]*[-/.月][^\S\n]*\d{1,2}[^\S\n]*日?(?!\d)"
+    )
+    ordinal = r"第[^\S\n]*\d+[^\S\n]*次"
+    label = r"(?:修正|修訂|更新)"
     patterns = (
-        rf"({date_pattern})[^\S\n]*(?:第[^\S\n]*\d+[^\S\n]*次[^\S\n]*)?(?:修正|修訂|更新)",
-        rf"(?:修正|修訂|更新)(?:日期|時間)?[^\S\n]*[:：]?[^\S\n]*({date_pattern})",
+        rf"({date_pattern})[^\S\n]*[（(]?[^\S\n]*(?:{ordinal}[^\S\n]*)?{label}",
+        rf"{label}(?:日期|時間)?[^\S\n]*[:：]?[^\S\n]*({date_pattern})",
+        # A bare seven-digit number is not unmistakably a date; it counts only
+        # when a revision ordinal and label follow it on the same line.
+        rf"((?<!\d)\d{{7}}(?!\d))[^\S\n]*[（(]?[^\S\n]*{ordinal}[^\S\n]*{label}",
     )
     matches = []
     for pattern in patterns:
         for match in re.finditer(pattern, text):
-            revision_date = roc_date(match.group(1))
+            revision_date = roc_date(match.group(1)) or _compact_roc_date(match.group(1))
             if revision_date:
                 matches.append((revision_date, match.group(0)))
     if not matches:
